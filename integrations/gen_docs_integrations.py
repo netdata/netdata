@@ -1,10 +1,13 @@
 import json
+import os
 
 path_dict = {}
 
 path_dict["collector"] = "collectors/"
 path_dict["exporter"] = "exporting/"
 path_dict["notification"] = "health/notifications/"
+
+symlink_dict = {}
 
 
 def generate_category_from_name(category_fragment, category_array):
@@ -33,6 +36,16 @@ def generate_category_from_name(category_fragment, category_array):
         i += 1
 
 
+def clean_and_write(md, txt):
+    # clean first, replace
+    md = md.replace("{% details summary=\"", "<details><summary>").replace(
+        "\" %}", "</summary>\n").replace("{% /details %}", "</details>\n")
+    # print(md)
+    # exit()
+
+    txt.write(md)
+
+
 with open('integrations/integrations.js') as dataFile:
     data = dataFile.read()
     categories_str = data.split("export const categories = ")[1].split("export const integrations = ")[0]
@@ -49,7 +62,7 @@ with open('integrations/integrations.js') as dataFile:
 # COLLECTORS
 for integration in integrations:
     # integration = integrations[0]
-    if integration['integration_type'] == "collectorfail":
+    if integration['integration_type'] == "collector":
 
         try:
             custom_edit_url = integration['edit_link'].replace("blob", "edit")
@@ -58,7 +71,6 @@ for integration in integrations:
 
             learn_rel_path = generate_category_from_name(
                 integration['meta']['monitored_instance']['categories'][0].split("."), categories)
-
             md = f"""
 ---
 custom_edit_url: "{custom_edit_url}"
@@ -92,17 +104,29 @@ learn_rel_path "{learn_rel_path}"
 
             path = custom_edit_url.replace("https://github.com/netdata/", "").split("/",
                                                                                     1)[1].replace("edit/master/", "").replace("/metadata.yaml", "")
+            if os.path.exists(path):
+                try:
+                    if not os.path.exists(f'{path}/integrations'):
 
-            # print(path)
+                        os.mkdir(f'{path}/integrations')
+                    with open(f'{path}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md', 'w+') as txt:
+                        clean_and_write(md, txt)
+                except Exception as e:
+                    print("Error in writing to the file", str(e), integration['id'])
 
-            try:
-                with open(f'{path}/README_new.md', 'w') as txt:
-                    txt.write(md)
-            except:
-                pass
+                if len(os.listdir(f'{path}/integrations')) == 1:
+                    symlink_dict.update(
+                        {path: f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md'})
+                else:
+                    try:
+                        symlink_dict.pop(path)
+                    except Exception as e:
+                        pass
+                        # print("Info: No entry in symlink dict anyway for key ->", e)
+
         except Exception as e:
-            print(e, "\n", integration)
-            quit()
+            print("Exception in md construction", str(e), integration['id'])
+
     elif integration['integration_type'] == "exporter":
         try:
             # print(integration.keys())
@@ -137,16 +161,15 @@ learn_rel_path "{learn_rel_path}"
                                                                                     1)[1].replace("edit/master/", "").replace("/metadata.yaml", "")
 
             try:
-                with open(f'{path}/test.md', 'w') as txt:
-                    txt.write(md)
+                with open(f'{path}/README.md', 'w') as txt:
+                    clean_and_write(md, txt)
             except:
                 pass
         except Exception as e:
-            print(e, "\n", integration)
+            print(str(e), "\n", integration)
             quit()
     elif integration['integration_type'] == "notification":
         try:
-            print(integration.keys())
             custom_edit_url = integration['edit_link'].replace("blob", "edit")
 
             sidebar_label = integration['meta']['name']
@@ -178,22 +201,32 @@ learn_rel_path "{learn_rel_path}"
                                                                                     1)[1].replace("edit/master/", "").replace("/metadata.yaml", "")
 
             if "cloud-notifications" in path:
-                name = integration['meta']['name'].lower()
-                try:
-                    with open(f'{path}/{name}.md', 'w') as txt:
-                        txt.write(md)
-                except:
-                    print("EXCEPTION", integration)
-                    quit()
+                name = integration['meta']['name'].lower().replace(" ", "_")
+                finalpath = f'{path}/{name}.md'
             else:
-
-                try:
-                    with open(f'{path}/test.md', 'w') as txt:
-                        txt.write(md)
-                except:
-                    print("EXCEPTION", integration)
-                    quit()
+                finalpath = f'{path}/README.md'
+            try:
+                with open(finalpath, 'w') as txt:
+                    clean_and_write(md, txt)
+            except Exception as e:
+                print(str(e), integration['id'])
 
         except Exception as e:
-            print(e, "\n", integration)
-            quit()
+            print(str(e), "\n", integration)
+
+
+# print(symlink_dict)
+
+for element in symlink_dict:
+    # print(element,symlink_dict[element])
+    os.remove(f'{element}/README.md')
+
+    # print(f'{element}/{symlink_dict[element]}',f'{element}/README.md')
+
+    os.symlink(f'{symlink_dict[element]}',f'{element}/README.md')
+    # with open(, 'w') as txt:
+    #     str = 
+    #     print(str)
+    #     txt.write(str)
+    # quit()
+
