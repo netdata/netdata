@@ -577,55 +577,6 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
 
 // ----------------------------------------------------------------------------
 
-struct {
-    ARAL *aral[RRD_STORAGE_TIERS];
-} dbengine_page_alloc_globals = {};
-
-static inline ARAL *page_size_lookup(size_t size) {
-    for(size_t tier = 0; tier < storage_tiers ;tier++)
-        if(size == tier_page_size[tier])
-            return dbengine_page_alloc_globals.aral[tier];
-
-    return NULL;
-}
-
-static void dbengine_page_alloc_init(void) {
-    for(size_t i = storage_tiers; i > 0 ;i--) {
-        size_t tier = storage_tiers - i;
-
-        char buf[20 + 1];
-        snprintfz(buf, 20, "tier%zu-pages", tier);
-
-        dbengine_page_alloc_globals.aral[tier] = aral_create(
-                buf,
-                tier_page_size[tier],
-                64,
-                512 * tier_page_size[tier],
-                pgc_aral_statistics(),
-                NULL, NULL, false, false);
-    }
-}
-
-void *dbengine_page_alloc(size_t size) {
-    ARAL *ar = page_size_lookup(size);
-    if(ar) return aral_mallocz(ar);
-
-    return mallocz(size);
-}
-
-void dbengine_page_free(void *page, size_t size __maybe_unused) {
-    if(unlikely(!page || page == DBENGINE_EMPTY_PAGE))
-        return;
-
-    ARAL *ar = page_size_lookup(size);
-    if(ar)
-        aral_freez(ar, page);
-    else
-        freez(page);
-}
-
-// ----------------------------------------------------------------------------
-
 void *dbengine_extent_alloc(size_t size) {
     void *extent = mallocz(size);
     return extent;
@@ -1628,7 +1579,7 @@ static void dbengine_initialize_structures(void) {
     rrdeng_query_handle_init();
     page_descriptors_init();
     extent_buffer_init();
-    dbengine_page_alloc_init();
+    pgd_init();
     extent_io_descriptor_init();
 }
 
