@@ -237,7 +237,7 @@ inline bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position, STORAGE_
 
     internal_fatal(pgdc->position != expected_position, "Wrong expected cursor position");
 
-    switch(pgd_type(pgdc->pgd)) {
+    switch(pgdc->pgd->type) {
         case PAGE_METRICS: {
             storage_number *array = (storage_number *)pgdc->pgd->data;
             storage_number n = array[pgdc->position++];
