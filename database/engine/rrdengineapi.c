@@ -825,7 +825,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     handle->position = position;
     handle->dt_s = page_update_every_s;
 
-    pgdc_reset(&handle->pgdc, pgc_page_data((PGC_PAGE *)handle->page), position);
+    pgdc_reset(&handle->pgdc, pgc_page_data(handle->page), handle->position);
 
     return true;
 }

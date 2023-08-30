@@ -83,7 +83,7 @@ static inline bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position, S
 
         case PAGE_TIER: {
             storage_number_tier1_t *array = (storage_number_tier1_t *)pgd_raw_data_pointer(pgdc->pgd);
-            storage_number_tier1_t n = array[pgdc->position];
+            storage_number_tier1_t n = array[pgdc->position++];
             sp->flags = n.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
             sp->count = n.count;
             sp->anomaly_count = n.anomaly_count;
