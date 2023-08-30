@@ -1546,7 +1546,7 @@ inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struc
                     "   },\n"
                     "   \"error code\": %d,\n"
                     "   \"error\": \"%s\"\n}",
-                    res_err->err_code,
+                    (int) res_err->err_code,
                     res_err->err_str);
 
     buffer_no_cacheable(w->response.data);
@@ -1736,7 +1736,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                                             end.ru_stime.tv_usec - 
                                             start.ru_stime.tv_sec * USEC_PER_SEC -
                                             start.ru_stime.tv_usec,
-                                        res_err->err_code,
+                                        (int) res_err->err_code,
                                         res_err->err_str);
         
     buffer_free(query_params.results_buff);

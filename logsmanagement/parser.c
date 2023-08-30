@@ -245,7 +245,7 @@ static inline char **parse_csv( const char *line, const char delimiter, int num_
  * @param[in] ignore_case Perform case insensitive search if 1.
  * @return Number of matches, or -1 in case of error
  */
-int search_keyword( char *src, size_t src_sz, 
+int search_keyword( char *src, size_t src_sz __maybe_unused, 
                     char *dest, size_t *dest_sz, 
                     const char *keyword, regex_t *regex,
                     const int ignore_case){
