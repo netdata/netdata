@@ -35,7 +35,6 @@ void pgd_append_point(PGD *pg,
 
 bool pgd_is_empty(PGD *pg);
 
-uint32_t pgd_uncompressed_data_size(PGD *pg);
 uint32_t pgd_memory_footprint(PGD *pg);
 uint32_t pgd_disk_footprint_size(PGD *pg);
 void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size);

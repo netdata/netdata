@@ -168,13 +168,6 @@ inline PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
     return pg;
 }
 
-inline uint32_t pgd_uncompressed_data_size(PGD *pg) {
-    if(pg && pg != PGD_EMPTY)
-        return pg->size;
-
-    return 0;
-}
-
 inline uint32_t pgd_memory_footprint(PGD *pg) {
     if(pg && pg != PGD_EMPTY)
         return sizeof(PGD) + pg->size;
@@ -192,6 +185,9 @@ inline uint32_t pgd_slots_used(PGD *pg) {
 
     return 0;
 }
+
+// ----------------------------------------------------------------------------
+// flushing to disk
 
 inline uint32_t pgd_disk_footprint_size(PGD *pg) {
     uint32_t used_size = 0;
@@ -211,6 +207,9 @@ inline void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size) {
 
     memcpy(dst, pg->data, dst_size);
 }
+
+// ----------------------------------------------------------------------------
+// querying
 
 static inline void pgdc_seek(PGDC *pgdc) {
     ;
