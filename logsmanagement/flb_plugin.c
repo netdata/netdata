@@ -124,7 +124,7 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
 
     char *flb_lib_path = strdupz_path_subpath(netdata_configured_stock_config_dir, "/../libfluent-bit.so");
     if (unlikely(NULL == (flb_lib_handle = dlopen(flb_lib_path, RTLD_LAZY)))){
-        if ((dl_error = dlerror()) != NULL) 
+        if (NULL != (dl_error = dlerror())) 
             collector_error("dlopen() libfluent-bit.so error: %s", dl_error);
         m_assert(flb_lib_handle, "dlopen() libfluent-bit.so error");
         rc = -1;
@@ -134,13 +134,13 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
     dlerror();    /* Clear any existing error */
 
     /* Load Fluent-Bit functions from the shared library */
-    #define load_function(FUNC_NAME){\
-        *(void **) (&FUNC_NAME) = dlsym(flb_lib_handle, LOGS_MANAG_STR(FUNC_NAME));\
-        if ((dl_error = dlerror()) != NULL) {\
-            collector_error("dlerror loading %s: %s", LOGS_MANAG_STR(FUNC_NAME), dl_error);\
-            rc = -1;\
-            goto do_return;\
-        }\
+    #define load_function(FUNC_NAME){                                                       \
+        *(void **) (&FUNC_NAME) = dlsym(flb_lib_handle, LOGS_MANAG_STR(FUNC_NAME));         \
+        if ((dl_error = dlerror()) != NULL) {                                               \
+            collector_error("dlerror loading %s: %s", LOGS_MANAG_STR(FUNC_NAME), dl_error); \
+            rc = -1;                                                                        \
+            goto do_return;                                                                 \
+        }                                                                                   \
     }
 
     load_function(flb_create);
@@ -198,10 +198,10 @@ int flb_init(flb_srvc_config_t flb_srvc_config){
 
 do_return:
     freez(flb_lib_path);
-    if(unlikely(rc)){
+    if(unlikely(rc && flb_lib_handle))
         dlclose(flb_lib_handle);
-        return rc;
-    } else return 0;
+
+    return rc;
 }
 
 int flb_run(void){
