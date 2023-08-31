@@ -28,7 +28,7 @@
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 # Author: Austin S. Hemmelgarn <austin@netdata.cloud>
 
-# Next unused error code: U001B
+# Next unused error code: U001D
 
 set -e
 
@@ -40,6 +40,7 @@ NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata
 # Following variables are intended to be overridden by the updater config file.
 NETDATA_UPDATER_JITTER=3600
 NETDATA_NO_SYSTEMD_JOURNAL=0
+NETDATA_MAJOR_VERSION_UPDATES=0
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
@@ -168,6 +169,44 @@ _get_scheduler_type() {
     echo 'crontab'
   else
     echo 'none'
+  fi
+}
+
+confirm() {
+  prompt="${1} [y/n]"
+
+  while true; do
+    echo "${prompt}"
+    read -r yn
+
+    case "$yn" in
+      [Yy]*) return 0;;
+      [Nn]*) return 1;;
+      *) echo "Please answer yes or no.";;
+    esac
+  done
+}
+
+warn_major_update() {
+  if ! is_integer "${NETDATA_MAJOR_VERSION_UPDATES}"; then
+    NETDATA_MAJOR_VERSION_UPDATES=1
+  fi
+
+  nmv_suffix="New major versions generally involve breaking changes, and may not work in the same way as older versions."
+
+  if [ "${INTERACTIVE}" -eq 0 ] && [ "${NETDATA_MAJOR_VERSION_UPDATES}" -eq 0 ]; then
+    warning "Would update to a new major version of Netdata. ${nmv_suffix}"
+    warning "To install the new major version anyway, either run the updater interactively, or set NETDATA_MAJOR_VERSION_UPDATES to a non-zero value in ${UPDATER_CONFIG_PATH}."
+    fatal "Aborting update to new major version to avoid breaking things." U001B
+  elif [ "${NETDATA_MAJOR_VERSION_UPDATES}" -ne 0 ]; then
+    warning "Updating to a new major version of Netdata at user request. This may break some functionality."
+  else
+    warning "This update will install a new major version of Netdata. ${nmv_suffix}"
+    if confirm "Are you sure you want to update to a new major version of Netdata?"; then
+      notice "User accepted update to new major version of Netdata."
+    else
+      fatal "Aborting update to new major version at user request." U001C
+    fi
   fi
 }
 
@@ -513,6 +552,7 @@ update_available() {
      info "Force update requested"
      return 0
   fi
+
   basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
   searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
   searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
@@ -542,6 +582,16 @@ update_available() {
     return 1
   else
     info "Update available"
+
+    if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
+      current_major="$(${ndbinary} -v | cut -f 2 -d ' ' | cut -f 1 -d '.' | tr -d 'v')"
+      latest_major="$(echo "${latest_tag}" | cut -f 1 -d '.' | tr -d 'v')"
+
+      if [ "${current_major}" -ne "${latest_major}" ]; then
+        warn_major_update
+      fi
+    fi
+
     return 0
   fi
 }
@@ -713,6 +763,15 @@ update_static() {
   exit 0
 }
 
+get_new_binpkg_major() {
+  case "${pm_cmd}" in
+    apt-get) apt-get --just-print upgrade 2>&1 | grep Inst | grep ' netdata ' | cut -f 3 -d ' ' | tr -d '[]' | cut -f 1 -d '.' ;;
+    yum) yum check-update netdata | grep -E '^netdata ' | awk '{print $2}' | cut -f 1 -d '.' ;;
+    dnf) dnf check-update netdata | grep -E '^netdata ' | awk '{print $2}' | cut -f 1 -d '.' ;;
+    zypper) zypper list-updates | grep '| netdata |' | cut -f 5 -d '|' | tr -d ' ' | cut -f 1 -d '.' ;;
+  esac
+}
+
 update_binpkg() {
   os_release_file=
   if [ -s "/etc/os-release" ] && [ -r "/etc/os-release" ]; then
@@ -823,6 +882,13 @@ update_binpkg() {
     fi
   done
 
+  current_major="$(netdata -v | cut -f 2 -d ' ' | cut -f 1 -d '.' | tr -d 'v')"
+  latest_major="$(get_new_binpkg_major)"
+
+  if [ -n "${latest_major}" ] && [ "${latest_major}" -ne "${current_major}" ]; then
+    warn_major_version_update
+  fi
+
   # shellcheck disable=SC2086
   env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
 
@@ -901,9 +967,10 @@ if [ -r "$(dirname "${ENVIRONMENT_FILE}")/.install-type" ]; then
   . "$(dirname "${ENVIRONMENT_FILE}")/.install-type" || fatal "Failed to source $(dirname "${ENVIRONMENT_FILE}")/.install-type" U0015
 fi
 
-if [ -r "$(dirname "${ENVIRONMENT_FILE}")/netdata-updater.conf" ]; then
+UPDATER_CONFIG_PATH="$(dirname "${ENVIRONMENT_FILE}")/netdata-updater.conf"
+if [ -r "${UPDATER_CONFIG_PATH}" ]; then
   # shellcheck source=/dev/null
-  . "$(dirname "${ENVIRONMENT_FILE}")/netdata-updater.conf"
+  . "${UPDATER_CONFIG_PATH}"
 fi
 
 while [ -n "${1}" ]; do
