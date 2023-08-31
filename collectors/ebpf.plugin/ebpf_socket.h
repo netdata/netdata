@@ -330,7 +330,6 @@ typedef struct netdata_socket_idx {
 void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *values);
-void parse_network_viewer_section(struct config *cfg);
 void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void parse_service_name_section(struct config *cfg);
 void ebpf_parse_ips(char *ptr);

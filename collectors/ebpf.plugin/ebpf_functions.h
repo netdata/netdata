@@ -34,6 +34,7 @@ inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_FUNCTION_SOCKET_RESOLVE "resolve:"
 #define EBPF_FUNCTION_SOCKET_RANGE "range:"
 #define EBPF_FUNCTION_SOCKET_PORT "port:"
+#define EBPF_FUNCTION_SOCKET_RESET "reset"
 
 void *ebpf_function_thread(void *ptr);
 

@@ -423,6 +423,9 @@ static void ebpf_function_socket_help(const char *transaction) {
             "   port:range\n"
             "      Show sockets that have only a specific destination.\n"
             "\n"
+            "   reset\n"
+            "      Send a reset to collector. When a collector receives this command, it uses everything defined in configuration file.\n"
+            "\n"
             "Filters can be combined. Each filter can be given only one time. Default all ports\n"
     );
     pluginsd_function_result_end_to_stdout();
@@ -720,6 +723,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                 ebpf_parse_ports((char *)name);
                 ebpf_socket_clean_judy_array_unsafe();
             }
+        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESET, sizeof(EBPF_FUNCTION_SOCKET_RESET) - 1) == 0) {
         } else if (strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
             rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
