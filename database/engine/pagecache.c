@@ -44,7 +44,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
         descr->pgd = pgc_page_data(pages_array[Index]);
         descr->type = pgd_type(descr->pgd);
-        descr->page_length = pgd_disk_footprint_size(descr->pgd);
+        descr->page_length = pgd_disk_footprint(descr->pgd);
 
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, descr, link.prev, link.next);
 

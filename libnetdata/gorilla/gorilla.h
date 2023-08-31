@@ -11,14 +11,64 @@
 extern "C" {
 #endif
 
-typedef struct gorilla_page_writer gpw_t;
+struct gorilla_buffer;
 
-gpw_t *gpw_new();
-void gpw_free(gpw_t *gpw);
+typedef struct {
+    struct gorilla_buffer *next;
+    uint32_t entries;
+    uint32_t nbits;
+} gorilla_header_t;
 
-void gpw_add_buffer(gpw_t *gpw);
-bool gpw_add(gpw_t *gw, uint32_t value);
-void gpw_flush(gpw_t *gw);
+typedef struct gorilla_buffer {
+    gorilla_header_t header;
+    uint32_t data[];
+} gorilla_buffer_t;
+
+typedef struct {
+    gorilla_buffer_t *head_buffer;
+    gorilla_buffer_t *last_buffer;
+
+    uint32_t prev_number;
+    uint32_t prev_xor_lzc;
+
+    // in bits
+    uint32_t capacity;
+} gorilla_writer_t;
+
+typedef struct {
+    const gorilla_buffer_t *buffer;
+
+    // number of values
+    size_t entries;
+    size_t index;
+
+    // in bits
+    size_t capacity; // FIXME: this not needed on the reader's side
+    size_t position;
+
+    uint32_t prev_number;
+    uint32_t prev_xor_lzc;
+    uint32_t prev_xor;
+} gorilla_reader_t;
+
+gorilla_writer_t gorilla_writer_init(gorilla_buffer_t *gbuf, size_t n);
+void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, size_t n);
+bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number);
+uint32_t gorilla_writer_entries(const gorilla_writer_t *gw);
+
+gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw);
+
+gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw);
+
+uint32_t gorilla_writer_disk_size_in_bytes(const gorilla_writer_t *gw);
+bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size);
+
+uint32_t gorilla_buffer_patch(gorilla_buffer_t *buf);
+gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *buf);
+bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number);
+
+#define GORILLA_BUFFER_SLOTS 128
+#define GORILLA_BUFFER_SIZE (GORILLA_BUFFER_SLOTS * sizeof(uint32_t))
 
 #ifdef __cplusplus
 }

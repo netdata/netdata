@@ -11,4 +11,4 @@ clang++ \
     -fsanitize=fuzzer \
     -o gorilla_fuzzer gorilla.cc
 
-./gorilla_fuzzer -workers=8 -jobs=8
+./gorilla_fuzzer -workers=12 -jobs=16

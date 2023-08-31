@@ -629,14 +629,33 @@ void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
 }
 
 inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
+    time_t start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
+
+    time_t end_time_s;
+    size_t entries;
+
+    switch (descr->type) {
+        case PAGE_METRICS:
+        case PAGE_TIER:
+            end_time_s = descr->end_time_ut / USEC_PER_SEC;
+            entries = 0;
+            break;
+        case PAGE_GORILLA_METRICS:
+            end_time_s = start_time_s + descr->gorilla.delta_time_s;
+            entries = descr->gorilla.entries;
+            break;
+        default:
+            fatal("Unknown page type: %uc\n", descr->type);
+    }
+
     return validate_page(
             (uuid_t *)descr->uuid,
-            (time_t) (descr->start_time_ut / USEC_PER_SEC),
-            (time_t) (descr->end_time_ut / USEC_PER_SEC),
+            start_time_s,
+            end_time_s,
             0,
             descr->page_length,
             descr->type,
-            0,
+            entries,
             now_s,
             overwrite_zero_update_every_s,
             have_read_error,
@@ -666,13 +685,25 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             .is_valid = true,
     };
 
-    // always calculate entries by size
     vd.point_size = page_type_size[vd.type];
-    vd.entries = page_entries_by_size(vd.page_length, vd.point_size);
+    switch (page_type) {
+        case PAGE_METRICS:
+        case PAGE_TIER:
+            // always calculate entries by size
+            vd.entries = page_entries_by_size(vd.page_length, vd.point_size);
 
-    // allow to be called without entries (when loading pages from disk)
-    if(!entries)
-        entries = vd.entries;
+            // allow to be called without entries (when loading pages from disk)
+            if(!entries)
+                entries = vd.entries;
+            break;
+        case PAGE_GORILLA_METRICS:
+            internal_fatal(entries == 0, "0 number of entries found on gorilla page");
+            vd.entries = entries;
+            break;
+        default:
+            // TODO: should set vd.is_valid false instead?
+            fatal("Unknown page type: %uc", page_type);
+    }
 
     // allow to be called without update every (when loading pages from disk)
     if(!update_every_s) {
@@ -696,10 +727,10 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         vd.end_time_s <= 0                                      ||
         vd.update_every_s < 0                                   ||
         (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
-        (vd.update_every_s == 0 && vd.entries > 1)
-        )
+        (vd.update_every_s == 0 && vd.entries > 1))
+    {
         vd.is_valid = false;
-
+    }
     else {
         if(unlikely(vd.entries != entries || vd.update_every_s != update_every_s))
             updated = true;
@@ -832,7 +863,15 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
 
     if (descr) {
         start_time_s = (time_t)(descr->start_time_ut / USEC_PER_SEC);
-        end_time_s = (time_t)(descr->end_time_ut / USEC_PER_SEC);
+        switch (descr->type) {
+            case PAGE_METRICS:
+            case PAGE_TIER:
+                end_time_s = (time_t)(descr->end_time_ut / USEC_PER_SEC);
+                break;
+            case PAGE_GORILLA_METRICS:
+                end_time_s = (time_t) start_time_s + (descr->gorilla.delta_time_s);
+                break;
+        }
         uuid_unparse_lower(descr->uuid, uuid);
         used_descr = true;
     }

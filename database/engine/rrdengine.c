@@ -841,7 +841,20 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
-        header->descr[i].end_time_ut = descr->end_time_ut;
+
+        switch (descr->type) {
+            case PAGE_METRICS:
+            case PAGE_TIER:
+                header->descr[i].end_time_ut = descr->end_time_ut;
+                break;
+            case PAGE_GORILLA_METRICS:
+                header->descr[i].gorilla.delta_time_s = (uint32_t) ((descr->end_time_ut - descr->start_time_ut) / USEC_PER_SEC);
+                header->descr[i].gorilla.entries = pgd_slots_used(descr->pgd);
+                break;
+            default:
+                fatal("Unknown page type: %uc", descr->type);
+        }
+
         pos += sizeof(header->descr[i]);
     }
     for (i = 0 ; i < count ; ++i) {
@@ -1579,7 +1592,7 @@ static void dbengine_initialize_structures(void) {
     rrdeng_query_handle_init();
     page_descriptors_init();
     extent_buffer_init();
-    pgd_init();
+    pgd_init_arals();
     extent_io_descriptor_init();
 }
 

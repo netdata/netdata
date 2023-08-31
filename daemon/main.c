@@ -4,6 +4,8 @@
 #include "buildinfo.h"
 #include "static_threads.h"
 
+#include "database/engine/page_test.h"
+
 #if defined(ENV32BIT)
 #warning COMPILING 32BIT NETDATA
 #endif
@@ -1455,6 +1457,10 @@ int main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 #endif
+
+                        if(strcmp(optarg, "pgd-tests") == 0) {
+                            return pgd_test(argc, argv);
+                        }
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
                             sql_init_database(DB_CHECK_RECOVER, 0);

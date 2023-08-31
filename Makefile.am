@@ -128,6 +128,7 @@ AM_CFLAGS = \
     $(OPTIONAL_CUPS_CFLAGS) \
     $(OPTIONAL_XENSTAT_CFLAGS) \
     $(OPTIONAL_BPF_CFLAGS) \
+    $(OPTIONAL_GTEST_CFLAGS) \
     $(NULL)
 
 sbin_PROGRAMS =
@@ -591,10 +592,12 @@ if ENABLE_DBENGINE
         database/engine/metric.h \
         database/engine/page.c \
         database/engine/page.h \
+        database/engine/page_test.cc \
+        database/engine/page_test.h \
         database/engine/pdc.c \
         database/engine/pdc.h \
         $(NULL)
-    
+
     RRD_PLUGIN_KSY_BUILTFILES = \
         database/engine/journalfile_v2.ksy \
         database/engine/journalfile_v2_virtmemb.ksy \
@@ -1187,6 +1190,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
+    $(OPTIONAL_GTEST_LIBS) \
     $(NULL)
 
 if ENABLE_ACLK

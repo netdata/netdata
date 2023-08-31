@@ -19,7 +19,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void ml_config_load(ml_config_t *cfg) {
     const char *config_section_ml = CONFIG_SECTION_ML;
 
-    bool enable_anomaly_detection = config_get_boolean(config_section_ml, "enabled", false);
+    bool enable_anomaly_detection = config_get_boolean(config_section_ml, "enabled", true);
 
     /*
      * Read values

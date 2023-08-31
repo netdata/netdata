@@ -1022,10 +1022,6 @@ RRDSET *rrdset_create_custom(
         , RRD_MEMORY_MODE memory_mode
         , long history_entries
 ) {
-    if (strcmp(type, "profile")) {
-        fatal("Only profile plugin charts are allowed!!! (type='%s')", type);
-    }
-
     if (host != localhost)
         host->child_last_chart_command = now_realtime_sec();
 
