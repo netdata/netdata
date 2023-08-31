@@ -1,0 +1,11 @@
+{
+    "applinks": {
+      "apps": [],
+      "details": [
+          {
+             "appID": "2T8GZ986CU.cloud.netdata.ios",
+             "paths": [ "*" ]
+          }
+      ]
+   }
+}
