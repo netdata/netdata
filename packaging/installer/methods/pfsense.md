@@ -18,6 +18,8 @@ learn_rel_path: "Installation/Install on specific environments"
 
 ## Install prerequisites/dependencies
 
+> **Note** The following instructions are meant to be used for the Commmunity Edition of pfSense. 
+
 To install Netdata on pfSense, first enable the [FreeBSD package repo](https://docs.netgate.com/pfsense/en/latest/recipes/freebsd-pkg-repo.html)
 Then run the following command (within a shell or under the **Diagnostics/Command**
 prompt within the pfSense web interface).
