@@ -282,7 +282,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                     NETDATA_ML_MODULE_DETECTION, // module
                     ML_CHART_PRIO_TYPE_ANOMALY_RATE, // priority
                     localhost->rrd_update_every, // update_every
-                    RRDSET_TYPE_LINE // chart_type
+                    RRDSET_TYPE_STACKED // chart_type
             );
 
             rrdset_flag_set(host->type_anomaly_rate_rs, RRDSET_FLAG_ANOMALY_DETECTION);
