@@ -126,7 +126,7 @@ learn_rel_path "{learn_rel_path}"
         except Exception as e:
             print("Exception in md construction", e, integration['id'])
 
-    elif integration['integration_type'] == "exporter":
+    elif integration['integration_type'] == "exporter" and not "go.d.plugin" in os.getcwd():
         try:
             custom_edit_url = integration['edit_link'].replace("blob", "edit")
 
@@ -169,7 +169,7 @@ learn_rel_path "{learn_rel_path}"
                 print(e, "Excpection writing to README", integration['id'])
         except Exception as e:
             print(e, "\n", integration)
-    elif integration['integration_type'] == "notification":
+    elif integration['integration_type'] == "notification" and not "go.d.plugin" in os.getcwd():
         try:
             custom_edit_url = integration['edit_link'].replace("blob", "edit")
 
