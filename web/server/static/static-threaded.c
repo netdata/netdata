@@ -242,7 +242,9 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
 
+#ifdef ENABLE_HTTPS
 cleanup:
+#endif
     worker_is_idle();
     return w;
 }
@@ -499,12 +501,12 @@ void *socket_listen_main_static_threaded(void *ptr) {
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
 
+#ifdef ENABLE_HTTPS
     netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
         netdata_log_info("SSL: web server will skip SSL certificates verification.");
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
 #endif
 

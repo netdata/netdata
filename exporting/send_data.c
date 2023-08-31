@@ -2,6 +2,7 @@
 
 #include "exporting_engine.h"
 
+#ifdef ENABLE_HTTPS
 /**
  * Check if TLS is enabled in the configuration
  *
@@ -9,14 +10,16 @@
  * @param options an instance data structure.
  * @return Returns 1 if TLS should be enabled, 0 otherwise.
  */
-static int exporting_tls_is_enabled(EXPORTING_CONNECTOR_TYPE type, EXPORTING_OPTIONS options)
+static int exporting_tls_is_enabled(EXPORTING_CONNECTOR_TYPE type __maybe_unused, EXPORTING_OPTIONS options __maybe_unused)
 {
+
     return (type == EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP ||
             type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP ||
             type == EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP ||
             type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) &&
            options & EXPORTING_OPTION_USE_TLS;
 }
+#endif
 
 /**
  * Discard response

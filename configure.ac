@@ -650,7 +650,7 @@ AC_C_BIGENDIAN([],
     [AC_MSG_ERROR([Could not find out system endiannnes])])
 
 AC_CHECK_SIZEOF(void *)
-if test "$ac_cv_sizeof_void_p" = 8; then 
+if test "$ac_cv_sizeof_void_p" = 8; then
     AC_MSG_RESULT(Detected 64-bit Build Environment)
     	LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -DJU_64BIT"
 else 
