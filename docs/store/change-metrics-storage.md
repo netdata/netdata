@@ -43,7 +43,7 @@ we will have a data point every minute in tier 1 and every minute in tier 2.
 Up to 5 tiers are supported. You may add, or remove tiers and/or modify these multipliers, as long as the 
 product of all the "update every iterations" does not exceed 65535 (number of points for each tier0 point).
 
-e.g. If you simply add a fourth tier by setting `storage tiers = 4` and defining the disk space for the new tier, 
+e.g. If you simply add a fourth tier by setting `storage tiers = 4` and define the disk space for the new tier, 
 the product of the "update every iterations" will be 60 \* 60 \* 60 = 216,000, which is > 65535. So you'd need to reduce  
 the `update every iterations` of the tiers, to stay under the limit.
 
