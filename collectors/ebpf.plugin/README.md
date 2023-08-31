@@ -325,7 +325,7 @@ and `145`.
 The following options are available:
 
 -   `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
--   `resolve hostname ips`: This option is disabled, because it is too slow.
+-   `resolve hostname ips`: nable resolving IPs to hostnames. It is disabled by default because it can be too slow.
 -   `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
     all names are read from /etc/services.
 -   `ports`: Define the destination ports for Netdata to monitor.
@@ -335,7 +335,9 @@ The following options are available:
 
 The table for the traffic are created using the destination IPs and ports of the sockets by default. This can be
 changed setting `resolve service names = yes`, after this Netdata will fill function tables with
-the `service name` every time that is possible to resolve them.
+the table for traffic is created using the destination IPs and ports of the sockets by default.
+This can be changed by setting `resolve service names = yes`. After this, Netdata will fill function tables with the
+`service name` whenever it is possible to resolve them.
 
 #### `[service name]`
 
@@ -1042,29 +1044,30 @@ dashboard
 ### ebpf_socket
 
 The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
-`ebpf_socket` that shows current status of open sockets on host.
+`ebpf_socket` that shows the current status of open sockets on host.
 
 #### Families
 
-The plugin shows by default sockets for IPV4 and IPV6, but it is possible to select a specific family passing the family
-as an argument:
+The plugin shows by default sockets for IPV4 and IPV6, but it is possible to select a specific family by passing the
+family as an argument:
 
 `http://localhost:19999/api/v1/function?function=ebpf_socket%20family:IPV4`
 
 #### Resolve
 
-The plugin resolves port to service name by default. You can show the port number disabling the name resolution:
+The plugin resolves ports to service names by default. You can show the port number by disabling the name resolution:
 
 `http://localhost:19999/api/v1/function?function=ebpf_socket%20resolve:NO`
 
 #### CIDR
 
-The plugin shows connection for all possible destination IP by default. You can limit the range specifying the CIDR:
+The plugin shows connections for all possible destination IPs by default. You can limit the range by specifying the CIDR:
 
 `http://localhost:19999/api/v1/function?function=ebpf_socket%20cidr:192.168.1.0/24`
 
 #### PORT
 
-The plugin shows connection for all possible ports by default. You can limit the range specifying a port or range of ports:
+The plugin shows connections for all possible ports by default. You can limit the range by specifying a port or range
+of ports:
 
 `http://localhost:19999/api/v1/function?function=ebpf_socket%20port:1-1024`
