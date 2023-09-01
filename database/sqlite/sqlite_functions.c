@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_functions.h"
+#include "sqlite3recover.h"
 #include "sqlite_db_migration.h"
 
 #define DB_METADATA_VERSION 11
@@ -120,6 +121,66 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
     return rc;
 }
 
+static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
+{
+
+    if (!res && !database)
+        return false;
+
+    if (!database)
+        database = sqlite3_db_handle(res);
+
+    if (db_meta == database) {
+        char recover_file[FILENAME_MAX + 1];
+        snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
+        int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
+        if (fd >= 0) {
+            close(fd);
+            return true;
+        }
+    }
+    return false;
+}
+
+static void recover_database(const char *sqlite_database, const char *new_sqlite_database)
+{
+    sqlite3 *database;
+    int rc = sqlite3_open(sqlite_database, &database);
+    if (rc != SQLITE_OK)
+        return;
+
+    netdata_log_info("Recover %s", sqlite_database);
+    netdata_log_info("     to %s", new_sqlite_database);
+
+    // This will remove the -shm and -wal files when we close the database
+    db_execute(database, "select count(*) from sqlite_master limit 0");
+
+    sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
+    if (recover) {
+
+        rc = sqlite3_recover_run(recover);
+
+        if (rc == SQLITE_OK)
+            netdata_log_info("Recover complete");
+        else
+            netdata_log_info("Recover encountered an error but the database may be usable");
+
+        rc = sqlite3_recover_finish(recover);
+
+        (void) sqlite3_close(database);
+
+        if (rc == SQLITE_OK) {
+            rc = rename(new_sqlite_database, sqlite_database);
+            if (rc == 0) {
+                netdata_log_info("Renamed %s", new_sqlite_database);
+                netdata_log_info("     to %s", sqlite_database);
+            }
+        }
+    }
+    else
+        (void) sqlite3_close(database);
+}
+
 int execute_insert(sqlite3_stmt *res)
 {
     int rc;
@@ -130,6 +191,8 @@ int execute_insert(sqlite3_stmt *res)
             error_report("Failed to insert/update, rc = %d -- attempt %d", rc, cnt);
         }
         else {
+            if (rc == SQLITE_CORRUPT)
+                (void) mark_database_to_recover(res, NULL);
             error_report("SQLite error %d", rc);
             break;
         }
@@ -202,118 +265,7 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
     return rc;
 }
 
-static int check_table_integrity_cb(void *data, int argc, char **argv, char **column)
-{
-    int *status = data;
-    UNUSED(argc);
-    UNUSED(column);
-    netdata_log_info("---> %s", argv[0]);
-    *status = (strcmp(argv[0], "ok") != 0);
-    return 0;
-}
-
-
-static int check_table_integrity(char *table)
-{
-    int status = 0;
-    char *err_msg = NULL;
-    char wstr[255];
-
-    if (table) {
-        netdata_log_info("Checking table %s", table);
-        snprintfz(wstr, 254, "PRAGMA integrity_check(%s);", table);
-    }
-    else {
-        netdata_log_info("Checking entire database");
-        strcpy(wstr,"PRAGMA integrity_check;");
-    }
-
-    int rc = sqlite3_exec_monitored(db_meta, wstr, check_table_integrity_cb, (void *) &status, &err_msg);
-    if (rc != SQLITE_OK) {
-        error_report("SQLite error during database integrity check for %s, rc = %d (%s)",
-                     table ? table : "the entire database", rc, err_msg);
-        sqlite3_free(err_msg);
-    }
-
-    return status;
-}
-
-const char *rebuild_chart_commands[] = {
-    "BEGIN TRANSACTION; ",
-    "DROP INDEX IF EXISTS ind_c1;" ,
-    "DROP TABLE IF EXISTS chart_backup; " ,
-    "CREATE TABLE chart_backup AS SELECT * FROM chart; " ,
-    "DROP TABLE chart;  ",
-    "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, "
-       "name text, family text, context text, title text, unit text, plugin text, "
-       "module text, priority int, update_every int, chart_type int, memory_mode int, history_entries); ",
-    "INSERT INTO chart SELECT DISTINCT * FROM chart_backup; ",
-    "DROP TABLE chart_backup;  " ,
-    "CREATE INDEX IF NOT EXISTS ind_c1 on chart (host_id, id, type, name);",
-    "COMMIT TRANSACTION;",
-    NULL
-};
-
-static void rebuild_chart()
-{
-    int rc;
-    char *err_msg = NULL;
-    netdata_log_info("Rebuilding chart table");
-    for (int i = 0; rebuild_chart_commands[i]; i++) {
-        netdata_log_info("Executing %s", rebuild_chart_commands[i]);
-        rc = sqlite3_exec_monitored(db_meta, rebuild_chart_commands[i], 0, 0, &err_msg);
-        if (rc != SQLITE_OK) {
-            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
-            error_report("SQLite failed statement %s", rebuild_chart_commands[i]);
-            sqlite3_free(err_msg);
-        }
-    }
-}
-
-const char *rebuild_dimension_commands[] = {
-    "BEGIN TRANSACTION; ",
-    "DROP INDEX IF EXISTS ind_d1;" ,
-    "DROP TABLE IF EXISTS dimension_backup; " ,
-    "CREATE TABLE dimension_backup AS SELECT * FROM dimension; " ,
-    "DROP TABLE dimension; " ,
-    "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
-        "multiplier int, divisor int , algorithm int, options text);" ,
-    "INSERT INTO dimension SELECT distinct * FROM dimension_backup; " ,
-    "DROP TABLE dimension_backup;  " ,
-    "CREATE INDEX IF NOT EXISTS ind_d1 on dimension (chart_id, id, name);",
-    "COMMIT TRANSACTION;",
-    NULL
-};
-
-void rebuild_dimension()
-{
-    int rc;
-    char *err_msg = NULL;
-
-    netdata_log_info("Rebuilding dimension table");
-    for (int i = 0; rebuild_dimension_commands[i]; i++) {
-        netdata_log_info("Executing %s", rebuild_dimension_commands[i]);
-        rc = sqlite3_exec_monitored(db_meta, rebuild_dimension_commands[i], 0, 0, &err_msg);
-        if (rc != SQLITE_OK) {
-            error_report("SQLite error during database setup, rc = %d (%s)", rc, err_msg);
-            error_report("SQLite failed statement %s", rebuild_dimension_commands[i]);
-            sqlite3_free(err_msg);
-        }
-    }
-}
-
-static int attempt_database_fix()
-{
-    netdata_log_info("Closing database and attempting to fix it");
-    int rc = sqlite3_close(db_meta);
-    if (rc != SQLITE_OK)
-        error_report("Failed to close database, rc = %d", rc);
-    netdata_log_info("Attempting to fix database");
-    db_meta = NULL;
-    return sql_init_database(DB_CHECK_FIX_DB | DB_CHECK_CONT, 0);
-}
-
-int init_database_batch(sqlite3 *database, int rebuild, int init_type, const char *batch[])
+int init_database_batch(sqlite3 *database, const char *batch[])
 {
     int rc;
     char *err_msg = NULL;
@@ -321,16 +273,14 @@ int init_database_batch(sqlite3 *database, int rebuild, int init_type, const cha
         netdata_log_debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
-            error_report("SQLite error during database %s, rc = %d (%s)", init_type ? "cleanup" : "setup", rc, err_msg);
+            error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
             analytics_set_data_str(&analytics_data.netdata_fail_reason, err_msg);
             sqlite3_free(err_msg);
             if (SQLITE_CORRUPT == rc) {
-                if (!rebuild)
-                    return attempt_database_fix();
-                rc = check_table_integrity(NULL);
-                if (rc)
-                    error_report("Databse integrity errors reported");
+                if (mark_database_to_recover(NULL, database))
+                    error_report("Database is corrupted will attempt to fix");
+                return SQLITE_CORRUPT;
             }
             return 1;
         }
@@ -390,8 +340,19 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
 
-    if (likely(!memory))
+    if (likely(!memory)) {
+        snprintfz(sqlite_database, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
+        rc = unlink(sqlite_database);
         snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
+
+        if (rc == 0 || (rebuild & DB_CHECK_RECOVER)) {
+            char new_sqlite_database[FILENAME_MAX + 1];
+            snprintfz(new_sqlite_database, FILENAME_MAX, "%s/netdata-meta-recover.db", netdata_configured_cache_dir);
+            recover_database(sqlite_database, new_sqlite_database);
+            if (rebuild & DB_CHECK_RECOVER)
+                return 0;
+        }
+    }
     else
         strcpy(sqlite_database, ":memory:");
 
@@ -404,45 +365,19 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
         return 1;
     }
 
-    if (rebuild & (DB_CHECK_INTEGRITY | DB_CHECK_FIX_DB)) {
-        int errors_detected = 0;
-        if (!(rebuild & DB_CHECK_CONT))
-            netdata_log_info("Running database check on %s", sqlite_database);
-
-        if (check_table_integrity("chart")) {
-            errors_detected++;
-            if (rebuild & DB_CHECK_FIX_DB)
-                rebuild_chart();
-            else
-                error_report("Errors reported -- run with -W sqlite-fix");
-        }
-
-        if (check_table_integrity("dimension")) {
-            errors_detected++;
-            if (rebuild & DB_CHECK_FIX_DB)
-                rebuild_dimension();
-            else
-                error_report("Errors reported -- run with -W sqlite-fix");
-        }
-
-        if (!errors_detected) {
-            if (check_table_integrity(NULL))
-                error_report("Errors reported");
-        }
-    }
-
     if (rebuild & DB_CHECK_RECLAIM_SPACE) {
-        if (!(rebuild & DB_CHECK_CONT))
-            netdata_log_info("Reclaiming space of %s", sqlite_database);
+        netdata_log_info("Reclaiming space of %s", sqlite_database);
         rc = sqlite3_exec_monitored(db_meta, "VACUUM;", 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("Failed to execute VACUUM rc = %d (%s)", rc, err_msg);
             sqlite3_free(err_msg);
         }
-    }
-
-    if (rebuild && !(rebuild & DB_CHECK_CONT))
+        else {
+            db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void) sqlite3_close(db_meta);
+        }
         return 1;
+    }
 
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
@@ -469,41 +404,41 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
     snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
     snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
     snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
     snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
     snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, list)) return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
     snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, list)) return 1;
 
     snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
-    if(init_database_batch(db_meta, rebuild, 0, list)) return 1;
+    if(init_database_batch(db_meta, list)) return 1;
 
-    if (init_database_batch(db_meta, rebuild, 0, &database_config[0]))
+    if (init_database_batch(db_meta, &database_config[0]))
         return 1;
 
-    if (init_database_batch(db_meta, rebuild, 0, &database_cleanup[0]))
+    if (init_database_batch(db_meta, &database_cleanup[0]))
         return 1;
 
     netdata_log_info("SQLite database initialization completed");

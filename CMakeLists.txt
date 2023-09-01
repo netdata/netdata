@@ -771,6 +771,9 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_aclk_alert.h
         database/sqlite/sqlite3.c
         database/sqlite/sqlite3.h
+        database/sqlite/sqlite3recover.c
+        database/sqlite/sqlite3recover.h
+        database/sqlite/dbdata.c
         database/engine/rrdengine.c
         database/engine/rrdengine.h
         database/engine/rrddiskprotocol.h
