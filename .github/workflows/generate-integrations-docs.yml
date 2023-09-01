@@ -10,7 +10,7 @@ on:
       - 'integrations/integrations.js'
   workflow_dispatch: null
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref.
-  group: integrations-${{ github.ref }}
+  group: generate-integrations-docs-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   generate-integrations-documentation:
