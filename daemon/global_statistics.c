@@ -2681,9 +2681,12 @@ static void dbengine2_statistics_charts(void) {
 
 static void update_strings_charts() {
     static RRDSET *st_ops = NULL, *st_entries = NULL, *st_mem = NULL;
-    static RRDDIM *rd_ops_inserts = NULL, *rd_ops_deletes = NULL, *rd_ops_searches = NULL, *rd_ops_duplications = NULL, *rd_ops_releases = NULL;
-    static RRDDIM *rd_entries_entries = NULL, *rd_entries_refs = NULL;
+    static RRDDIM *rd_ops_inserts = NULL, *rd_ops_deletes = NULL;
+    static RRDDIM *rd_entries_entries = NULL;
     static RRDDIM *rd_mem = NULL;
+#ifdef NETDATA_INTERNAL_CHECKS
+    static RRDDIM *rd_entries_refs = NULL, *rd_ops_releases = NULL,  *rd_ops_duplications = NULL, *rd_ops_searches = NULL;
+#endif
 
     size_t inserts, deletes, searches, entries, references, memory, duplications, releases;
 
