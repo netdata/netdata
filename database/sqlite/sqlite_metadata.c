@@ -107,6 +107,7 @@ struct metadata_wc {
     volatile unsigned queue_size;
     METADATA_FLAG flags;
     struct completion init_complete;
+    struct completion *scan_complete;
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
     uv_cond_t cmd_cond;
@@ -1173,7 +1174,6 @@ void run_metadata_cleanup(struct metadata_wc *wc)
 struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
-    struct completion *completion;
     BUFFER *work_buffer;
     uint32_t max_count;
 };
@@ -1301,8 +1301,8 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
 
     metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
     internal_error(true, "METADATA: scanning hosts complete");
-    if (unlikely(data->completion)) {
-        completion_mark_complete(data->completion);
+    if (unlikely(wc->scan_complete)) {
+        completion_mark_complete(wc->scan_complete);
         internal_error(true, "METADATA: Sending completion done");
     }
     freez(data);
@@ -1610,7 +1610,6 @@ static void metadata_event_loop(void *arg)
                     data = mallocz(sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
-                    data->completion = cmd.completion;  // Completion by the worker
                     data->work_buffer = work_buffer;
 
                     if (unlikely(cmd.completion)) {
@@ -1626,7 +1625,7 @@ static void metadata_event_loop(void *arg)
                                           start_metadata_hosts,
                                           after_metadata_hosts))) {
                         // Failed to launch worker -- let the event loop handle completion
-                        cmd.completion = data->completion;
+                        cmd.completion = wc->scan_complete;
                         freez(data);
                         metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
                     }
@@ -1674,6 +1673,8 @@ static void metadata_event_loop(void *arg)
 
     netdata_log_info("METADATA: Shutting down event loop");
     completion_mark_complete(&wc->init_complete);
+    completion_destroy(wc->scan_complete);
+    freez(wc->scan_complete);
     return;
 
 error_after_timer_init:
@@ -1712,8 +1713,11 @@ void metadata_sync_shutdown_prepare(void)
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
 
-    struct completion compl;
-    completion_init(&compl);
+    struct metadata_wc *wc = &metasync_worker;
+
+    struct completion *compl = mallocz(sizeof(*compl));
+    completion_init(compl);
+    __atomic_store_n(&wc->scan_complete, compl, __ATOMIC_RELAXED);
 
     netdata_log_info("METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
@@ -1724,12 +1728,10 @@ void metadata_sync_shutdown_prepare(void)
     }
 
     cmd.opcode = METADATA_SCAN_HOSTS;
-    cmd.completion = &compl;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     netdata_log_info("METADATA: Waiting for host scan completion");
-    completion_wait_for(&compl);
-    completion_destroy(&compl);
+    completion_wait_for(wc->scan_complete);
     netdata_log_info("METADATA: Host scan complete; can continue with shutdown");
 }
 
