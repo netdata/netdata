@@ -35,6 +35,10 @@
  *
  */
 
+#ifdef NETDATA_INTERNAL_CHECKS
+#define DICT_WITH_STATS 1
+#endif
+
 #ifdef DICTIONARY_INTERNALS
 #define DICTFE_CONST
 #define DICT_ITEM_CONST
@@ -92,7 +96,7 @@ struct dictionary_stats {
 
     // memory
     struct {
-        long index;               // bytes of keys indexed (indication of the index size)
+        long index;                 // bytes of keys indexed (indication of the index size)
         long values;                // bytes of caller structures
         long dict;                  // bytes of the structures dictionary needs
     } memory;
