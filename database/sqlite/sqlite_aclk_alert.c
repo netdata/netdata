@@ -407,7 +407,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
     if (first_sequence_id) {
         buffer_flush(sql);
         buffer_sprintf(sql, "UPDATE aclk_alert_%s SET date_submitted=unixepoch() "
-                            "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
+                            "WHERE +date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                        wc->uuid_str, first_sequence_id, last_sequence_id);
 
         if (unlikely(db_execute(db_meta, buffer_tostring(sql))))

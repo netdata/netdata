@@ -506,7 +506,7 @@ static inline void storage_engine_store_metric(
 }
 
 size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
-static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_disk_space_max(db_instance);
@@ -516,7 +516,7 @@ static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backen
 }
 
 size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
-static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_disk_space_used(db_instance);
@@ -527,7 +527,7 @@ static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backe
 }
 
 time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance);
-static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_global_first_time_s(db_instance);
@@ -537,7 +537,7 @@ static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND b
 }
 
 size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
-static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance) {
+static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_currently_collected_metrics(db_instance);
