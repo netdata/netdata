@@ -445,7 +445,16 @@ get_netdata_latest_tag() {
     fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
   fi
 
-  echo "${tag}" >"${dest}"
+  # Fallback case for simpler local testing.
+  if echo "${tag}" | grep -q '[^/]latest$'; then
+    if _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt; then
+      tag="$(cat ./ndupdate-version.txt)"
+    fi
+
+    rm -f ./ndupdate-version.txt
+  fi
+
+  echo "${tag}" > "${dest}"
 }
 
 newer_commit_date() {
