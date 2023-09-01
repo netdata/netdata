@@ -434,26 +434,6 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
  *****************************************************************/
 
 /**
- * Clean port Structure
- *
- * Clean the allocated list.
- *
- * @param clean the list that will be cleaned
- */
-void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
-{
-    ebpf_network_viewer_port_list_t *move = *clean;
-    while (move) {
-        ebpf_network_viewer_port_list_t *next = move->next;
-        freez(move->value);
-        freez(move);
-
-        move = next;
-    }
-    *clean = NULL;
-}
-
-/**
  * Socket Free
  *
  * Cleanup variables after child threads to stop

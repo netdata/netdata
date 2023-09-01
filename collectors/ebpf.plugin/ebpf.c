@@ -1657,6 +1657,26 @@ static inline int ebpf_ip2nl(uint8_t *dst, char *ip, int domain, char *source)
 }
 
 /**
+ * Clean port Structure
+ *
+ * Clean the allocated list.
+ *
+ * @param clean the list that will be cleaned
+ */
+void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
+{
+    ebpf_network_viewer_port_list_t *move = *clean;
+    while (move) {
+        ebpf_network_viewer_port_list_t *next = move->next;
+        freez(move->value);
+        freez(move);
+
+        move = next;
+    }
+    *clean = NULL;
+}
+
+/**
  * Clean IP structure
  *
  * Clean the allocated list.
