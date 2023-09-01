@@ -9,6 +9,7 @@ extern "C" {
 
 #include "daemon/common.h"
 #include "web/api/queries/rrdr.h"
+#include "database/sqlite/sqlite_db_migration.h"
 
 bool ml_capable();
 bool ml_enabled(RRDHOST *rh);

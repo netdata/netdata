@@ -60,10 +60,11 @@
 #define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
 #define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat check for pending metadata
 #define METADATA_HOST_CHECK_IMMEDIATE (5)           // Repeat immediate run because we have more metadata to write
-#define METADATA_FREE_PAGES_THRESHOLD_PC (5)        // Percentage of free pages to trigger vacuum
-#define METADATA_FREE_PAGES_VACUUM_PC (10)          // Percentage of free pages to vacuum
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
+
+#define DATABASE_FREE_PAGES_THRESHOLD_PC (5)        // Percentage of free pages to trigger vacuum
+#define DATABASE_FREE_PAGES_VACUUM_PC (10)          // Percentage of free pages to vacuum
 
 enum metadata_opcode {
     METADATA_DATABASE_NOOP = 0,
@@ -1148,6 +1149,28 @@ static void timer_cb(uv_timer_t* handle)
    }
 }
 
+void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc)
+{
+   int free_pages = get_free_page_count(database);
+   int total_pages = get_database_page_count(database);
+
+   if (!threshold)
+       threshold = DATABASE_FREE_PAGES_THRESHOLD_PC;
+
+   if (!vacuum_pc)
+       vacuum_pc = DATABASE_FREE_PAGES_VACUUM_PC;
+
+   if (free_pages > (total_pages * threshold / 100)) {
+
+       int do_free_pages = (int) (free_pages * vacuum_pc / 100);
+       netdata_log_info("%s: Freeing %d database pages", db_alias, do_free_pages);
+
+       char sql[128];
+       snprintfz(sql, 127, "PRAGMA incremental_vacuum(%d)", do_free_pages);
+       (void) db_execute(database, sql);
+   }
+}
+
 void run_metadata_cleanup(struct metadata_wc *wc)
 {
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
@@ -1161,18 +1184,7 @@ void run_metadata_cleanup(struct metadata_wc *wc)
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
        return;
 
-    int free_pages = get_free_page_count(db_meta);
-    int total_pages = get_database_page_count(db_meta);
-
-    if (free_pages > (total_pages * METADATA_FREE_PAGES_THRESHOLD_PC / 100)) {
-
-       int do_free_pages = (int) (free_pages * METADATA_FREE_PAGES_VACUUM_PC / 100);
-       netdata_log_info("METADATA: Freeing %d database pages", do_free_pages);
-
-       char sql[128];
-       snprintfz(sql, 127, "PRAGMA incremental_vacuum(%d)", do_free_pages);
-       (void) db_execute(db_meta, sql);
-    }
+    vacuum_database(db_meta, "METADATA", DATABASE_FREE_PAGES_THRESHOLD_PC, DATABASE_FREE_PAGES_VACUUM_PC);
 
     (void) sqlite3_wal_checkpoint(db_meta, NULL);
 }
