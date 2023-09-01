@@ -123,7 +123,6 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
 
 static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
 {
-    char recover_file[FILENAME_MAX + 1];
 
     if (!res && !database)
         return false;
@@ -132,6 +131,7 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
         database = sqlite3_db_handle(res);
 
     if (db_meta == database) {
+        char recover_file[FILENAME_MAX + 1];
         snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
         int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
         if (fd >= 0) {
@@ -155,7 +155,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     // This will remove the -shm and -wal files when we close the database
     db_execute(database, "select count(*) from sqlite_master limit 0");
 
-    sqlite3_recover *recover = sqlite3_recover_init(database,"main", new_sqlite_database);
+    sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
     if (recover) {
 
         rc = sqlite3_recover_run(recover);
@@ -344,8 +344,9 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
         snprintfz(sqlite_database, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
         rc = unlink(sqlite_database);
         snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
-        char new_sqlite_database[FILENAME_MAX + 1];
+
         if (rc == 0 || (rebuild & DB_CHECK_RECOVER)) {
+            char new_sqlite_database[FILENAME_MAX + 1];
             snprintfz(new_sqlite_database, FILENAME_MAX, "%s/netdata-meta-recover.db", netdata_configured_cache_dir);
             recover_database(sqlite_database, new_sqlite_database);
             if (rebuild & DB_CHECK_RECOVER)
