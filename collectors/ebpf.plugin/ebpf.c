@@ -2902,9 +2902,6 @@ static void read_collector_values(int *disable_cgroups,
         enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
                                         CONFIG_BOOLEAN_YES);
 
-    if (!enabled)
-        enabled = appconfig_get_boolean(&collector_config, EBPF_NETWORK_VIEWER_SECTION, "enabled",
-                                        CONFIG_BOOLEAN_YES);
     network_viewer_opt.enabled = enabled;
     if (enabled) {
         if (!ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled)

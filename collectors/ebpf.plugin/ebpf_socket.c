@@ -2705,6 +2705,11 @@ void *ebpf_socket_thread(void *ptr)
 
     em->maps = socket_maps;
 
+    // It was not enabled from main config file (ebpf.d.conf)
+    if (!network_viewer_opt.enabled)
+        network_viewer_opt.enabled = appconfig_get_boolean(&socket_config, EBPF_NETWORK_VIEWER_SECTION, "enabled",
+                                                           CONFIG_BOOLEAN_YES);
+
     parse_table_size_options(&socket_config);
 
     ebpf_socket_initialize_global_vectors();
