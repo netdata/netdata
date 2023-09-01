@@ -657,13 +657,14 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     UNUSED(line_buffer);
     UNUSED(timeout);
 
-    network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
-
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     const char *name;
     int period = -1;
-    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+    network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
+    uint32_t previous;
+
     for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
@@ -671,20 +672,25 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
         if (strncmp(keyword, EBPF_FUNCTION_SOCKET_FAMILY, sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1];
-            uint32_t curr_family = network_viewer_opt.family;
+            previous = network_viewer_opt.family;
+            uint32_t family;
             if (name) {
                 if (!strcmp(name, "IPV4"))
-                    network_viewer_opt.family = AF_INET;
+                    family = AF_INET;
                 else if (!strcmp(name, "IPV6"))
-                    network_viewer_opt.family = AF_INET6;
+                    family = AF_INET6;
                 else
-                    network_viewer_opt.family = AF_UNSPEC;
+                    family = AF_UNSPEC;
             } else {
                 network_viewer_opt.family = AF_UNSPEC;
             }
 
-            if (network_viewer_opt.family != curr_family)
+            if (family != previous) {
+                rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
+                network_viewer_opt.family = family;
                 ebpf_socket_clean_judy_array_unsafe();
+                rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
+            }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
             pthread_mutex_lock(&ebpf_exit_cleanup);
@@ -701,20 +707,24 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 #endif
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESOLVE, sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1) == 0) {
-            uint32_t previous = network_viewer_opt.service_resolution_enabled;
+            previous = network_viewer_opt.service_resolution_enabled;
+            uint32_t resolution;
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RESOLVE) - 1];
             if (name)
-                network_viewer_opt.service_resolution_enabled =
-                    (!strcasecmp(name, "YES")) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
+                resolution = (!strcasecmp(name, "YES")) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
             else
-                network_viewer_opt.service_resolution_enabled = CONFIG_BOOLEAN_YES;
+                resolution = CONFIG_BOOLEAN_YES;
 
-            if (previous != network_viewer_opt.service_resolution_enabled)
+            if (previous != resolution) {
+                rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
+                network_viewer_opt.service_resolution_enabled = resolution;
                 ebpf_socket_clean_judy_array_unsafe();
+                rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
+            }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];
             if (name) {
-                ebpf_parse_ips((char *)name);
+                ebpf_parse_ips_unsafe((char *)name);
                 ebpf_socket_clean_judy_array_unsafe();
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PORT, sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1) == 0) {
@@ -730,7 +740,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             return;
         }
     }
-    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {

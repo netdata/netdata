@@ -1704,7 +1704,7 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
  * @param out a pointer to store the link list
  * @param ip the value given as parameter
  */
-static void ebpf_parse_ip_list(void **out, char *ip)
+static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
 {
     ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
 
@@ -1860,7 +1860,7 @@ static void ebpf_parse_ip_list(void **out, char *ip)
     memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
     memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
 
-    ebpf_fill_ip_list(list, store, "socket");
+    ebpf_fill_ip_list_unsafe(list, store, "socket");
     return;
 
     cleanipdup:
@@ -1874,7 +1874,7 @@ static void ebpf_parse_ip_list(void **out, char *ip)
  *
  * @param ptr  is a pointer with the text to parse.
  */
-void ebpf_parse_ips(char *ptr)
+void ebpf_parse_ips_unsafe(char *ptr)
 {
     // No value
     if (unlikely(!ptr))
@@ -1901,9 +1901,8 @@ void ebpf_parse_ips(char *ptr)
         }
 
         if (isascii(*ptr)) { // Parse port
-            ebpf_parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:
-                               (void **)&network_viewer_opt.excluded_ips,
-                               ptr);
+            ebpf_parse_ip_list_unsafe(
+                (!neg) ? (void **)&network_viewer_opt.included_ips : (void **)&network_viewer_opt.excluded_ips, ptr);
         }
 
         ptr = end;
@@ -2438,7 +2437,7 @@ static int ebpf_is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_
  * @param in the structure that will be linked.
  * @param table the modified table.
  */
-void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in,
+void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in,
                        char *table __maybe_unused)
 {
     if (in->ver == AF_INET) { // It is simpler to compare using host order
@@ -2594,7 +2593,7 @@ void parse_network_viewer_section(struct config *cfg)
                           "ips",
                           NULL);
                                    //"ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7 !::1/128");
-    ebpf_parse_ips(value);
+    ebpf_parse_ips_unsafe(value);
 }
 
 /**
@@ -2641,7 +2640,7 @@ static void read_local_ports(char *filename, uint8_t proto)
  *
  * Read the local address from the interfaces.
  */
-static void read_local_addresses()
+static void ebpf_read_local_addresses_unsafe()
 {
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) == -1) {
@@ -2690,9 +2689,8 @@ static void read_local_addresses()
             }
         }
 
-        ebpf_fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
-                          w,
-                     "selector");
+        ebpf_fill_ip_list_unsafe(
+            (family == AF_INET) ? &network_viewer_opt.ipv4_local_ip : &network_viewer_opt.ipv6_local_ip, w, "selector");
     }
 
     freeifaddrs(ifaddr);
@@ -2930,7 +2928,7 @@ static void read_collector_values(int *disable_cgroups,
         // Read network viewer section if network viewer is enabled
         // This is kept here to keep backward compatibility
         parse_network_viewer_section(&collector_config);
-        parse_service_name_section(&collector_config);
+        ebpf_parse_service_name_section(&collector_config);
     }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
@@ -3177,6 +3175,7 @@ static void ebpf_parse_args(int argc, char **argv)
     };
 
     memset(&network_viewer_opt, 0, sizeof(network_viewer_opt));
+    rw_spinlock_init(&network_viewer_opt.rw_spinlock);
 
     if (argc > 1) {
         int n = (int)str2l(argv[1]);
@@ -3188,6 +3187,7 @@ static void ebpf_parse_args(int argc, char **argv)
     if (!freq)
         freq = EBPF_DEFAULT_UPDATE_EVERY;
 
+    rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
     if (ebpf_load_collector_config(ebpf_user_config_dir, &disable_cgroups, freq)) {
         netdata_log_info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
@@ -3198,6 +3198,7 @@ static void ebpf_parse_args(int argc, char **argv)
     }
 
     ebpf_load_thread_config();
+    rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 
     while (1) {
         int c = getopt_long_only(argc, argv, "", long_options, &option_index);
@@ -4094,7 +4095,7 @@ int main(int argc, char **argv)
     libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 #endif
 
-    read_local_addresses();
+    ebpf_read_local_addresses_unsafe();
     read_local_ports("/proc/net/tcp", IPPROTO_TCP);
     read_local_ports("/proc/net/tcp6", IPPROTO_TCP);
     read_local_ports("/proc/net/udp", IPPROTO_UDP);

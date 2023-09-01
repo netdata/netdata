@@ -1422,16 +1422,20 @@ int hostname_matches_pattern(char *cmp)
  *
  * @return It returns 1 if this socket is inside the ranges and 0 otherwise.
  */
-int is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
+int ebpf_is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
 {
+    int ret = 0;
     // If family is not AF_UNSPEC and it is different of specified
     if (network_viewer_opt.family && network_viewer_opt.family != data->family)
-        return 0;
+        goto endsocketallowed;
 
     if (!ebpf_is_port_inside_range(key->dport))
-        return 0;
+        goto endsocketallowed;
 
-    return ebpf_is_specific_ip_inside_range(&key->daddr, data->family);
+    ret = ebpf_is_specific_ip_inside_range(&key->daddr, data->family);
+
+endsocketallowed:
+    return ret;
 }
 
 /**
@@ -1606,6 +1610,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     time_t update_time = time(NULL);
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyHSArray;
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_read_lock(&network_viewer_opt.rw_spinlock);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -1634,7 +1639,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         }
 
         // When socket is not allowed, we do not append it to table, but we are still keeping it to accumulate data.
-        if (!is_socket_allowed(&key, values)) {
+        if (!ebpf_is_socket_allowed(&key, values)) {
             goto end_socket_loop;
         }
 
@@ -1680,6 +1685,7 @@ end_socket_loop:
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
     }
+    rw_spinlock_read_unlock(&network_viewer_opt.rw_spinlock);
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_thread_enable_cancelability();
 }
@@ -2533,7 +2539,7 @@ static void ebpf_socket_initialize_global_vectors()
  * @param hash the calculated hash for the dimension name.
  * @param name the dimension name.
  */
-static void link_dimension_name(char *port, uint32_t hash, char *value)
+static void ebpf_link_dimension_name(char *port, uint32_t hash, char *value)
 {
     int test = str2i(port);
     if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE){
@@ -2578,13 +2584,13 @@ static void link_dimension_name(char *port, uint32_t hash, char *value)
  *
  * @param cfg the configuration structure
  */
-void parse_service_name_section(struct config *cfg)
+void ebpf_parse_service_name_section(struct config *cfg)
 {
     struct section *co = appconfig_get_section(cfg, EBPF_SERVICE_NAME_SECTION);
     if (co) {
         struct config_option *cv;
         for (cv = co->values; cv ; cv = cv->next) {
-            link_dimension_name(cv->name, cv->hash, cv->value);
+            ebpf_link_dimension_name(cv->name, cv->hash, cv->value);
         }
     }
 
@@ -2605,7 +2611,7 @@ void parse_service_name_section(struct config *cfg)
         // if variable has an invalid value, we assume netdata is using 19999
         int default_port = str2i(port_string);
         if (default_port > 0 && default_port < 65536)
-            link_dimension_name(port_string, simple_hash(port_string), "Netdata");
+            ebpf_link_dimension_name(port_string, simple_hash(port_string), "Netdata");
     }
 }
 
@@ -2685,10 +2691,12 @@ void *ebpf_socket_thread(void *ptr)
 
     em->maps = socket_maps;
 
+    rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
     // It was not enabled from main config file (ebpf.d.conf)
     if (!network_viewer_opt.enabled)
         network_viewer_opt.enabled = appconfig_get_boolean(&socket_config, EBPF_NETWORK_VIEWER_SECTION, "enabled",
                                                            CONFIG_BOOLEAN_YES);
+    rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 
     parse_table_size_options(&socket_config);
 
