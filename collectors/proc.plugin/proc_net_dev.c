@@ -123,7 +123,7 @@ static struct netdev {
 
     const char *chart_family;
 
-    DICTIONARY *chart_labels;
+    RRDLABELS *chart_labels;
 
     int flipped;
     unsigned long priority;
@@ -348,7 +348,7 @@ static struct netdev_rename {
     const char *container_name;
     const char *ctx_prefix;
 
-    DICTIONARY *chart_labels;
+    RRDLABELS *chart_labels;
 
     int processed;
 
@@ -373,7 +373,7 @@ void netdev_rename_device_add(
     const char *host_device,
     const char *container_device,
     const char *container_name,
-    DICTIONARY *labels,
+    RRDLABELS *labels,
     const char *ctx_prefix)
 {
     netdata_mutex_lock(&netdev_rename_mutex);

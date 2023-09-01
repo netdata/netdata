@@ -292,7 +292,7 @@ struct format_prometheus_label_callback {
     size_t count;
 };
 
-static int format_prometheus_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+static int format_prometheus_label_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     struct format_prometheus_label_callback *d = (struct format_prometheus_label_callback *)data;
 
     if (!should_send_label(d->instance, ls)) return 0;
@@ -338,10 +338,8 @@ struct format_prometheus_chart_label_callback {
     const char *labels_prefix;
 };
 
-static int format_prometheus_chart_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+static int format_prometheus_chart_label_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     struct format_prometheus_chart_label_callback *d = (struct format_prometheus_chart_label_callback *)data;
-
-    (void)ls;
 
     if (name[0] == '_' )
         return 1;
@@ -517,7 +515,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
                                               struct gen_parameters *p,
                                               int homogeneous,
                                               int prometheus_collector,
-                                              DICTIONARY *chart_labels)
+                                              RRDLABELS *chart_labels)
 {
     struct format_prometheus_chart_label_callback local_label;
     local_label.labels_buffer = wb;

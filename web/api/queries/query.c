@@ -2497,7 +2497,7 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 buffer_fast_strcat(key, "|", 1);
                 rrdlabels_get_value_to_buffer_or_unset(labels, key, qt->group_by[group_by_id].label_keys[l], "[unset]");
@@ -2545,7 +2545,7 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 if (buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);
@@ -2600,7 +2600,7 @@ static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
-            DICTIONARY *labels = rrdinstance_acquired_labels(qi->ria);
+            RRDLABELS *labels = rrdinstance_acquired_labels(qi->ria);
             for (size_t l = 0; l < qt->group_by[group_by_id].used; l++) {
                 if (buffer_strlen(key) != 0)
                     buffer_fast_strcat(key, ",", 1);

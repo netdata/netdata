@@ -1317,7 +1317,7 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdset_foreach_done(st);
 }
 
-struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels) {
+struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels) {
     struct rrdhost_system_info *info = callocz(1, sizeof(struct rrdhost_system_info));
     info->hops = 1;
 
@@ -1345,7 +1345,7 @@ struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels) {
 }
 
 static void rrdhost_load_auto_labels(void) {
-    DICTIONARY *labels = localhost->rrdlabels;
+    RRDLABELS *labels = localhost->rrdlabels;
 
     if (localhost->system_info->cloud_provider_type)
         rrdlabels_add(labels, "_cloud_provider_type", localhost->system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
@@ -1418,7 +1418,7 @@ void rrdhost_set_is_parent_label(void) {
     int count = __atomic_load_n(&localhost->connected_children_count, __ATOMIC_RELAXED);
 
     if (count == 0 || count == 1) {
-        DICTIONARY *labels = localhost->rrdlabels;
+        RRDLABELS *labels = localhost->rrdlabels;
         rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
         //queue a node info

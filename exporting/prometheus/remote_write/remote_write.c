@@ -139,11 +139,11 @@ struct format_remote_write_label_callback {
     void *write_request;
 };
 
-static int format_remote_write_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+static int format_remote_write_label_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data)
+{
     struct format_remote_write_label_callback *d = (struct format_remote_write_label_callback *)data;
 
     if (!should_send_label(d->instance, ls)) return 0;
-
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];
 

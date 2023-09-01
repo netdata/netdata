@@ -213,7 +213,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         buffer_json_array_close(wb);
     }
 
-    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && ri->rrdlabels && dictionary_entries(ri->rrdlabels)) {
+    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && ri->rrdlabels && rrdlabels_entries(ri->rrdlabels)) {
         buffer_json_member_add_object(wb, "labels");
         rrdlabels_to_buffer_json_members(ri->rrdlabels, wb);
         buffer_json_object_close(wb);
