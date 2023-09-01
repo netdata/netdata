@@ -18,16 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'netdata/netdata'
     steps:
-      - name: Prepare Dependencies
-        id: prep-deps
-        run: |
-          sudo apt-get install python3-venv
-          python3 -m venv ./virtualenv
-          source ./virtualenv/bin/activate
       - name: Generate Integrations Documentation
         id: generate
         run: |
-          source ./virtualenv/bin/activate
           python3 integrations/gen_docs_integrations.py
       - name: Clean Up Temporary Data
         id: clean
@@ -55,7 +48,6 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create PR generating documentation from integrations.js
-              Prepare Dependencies: ${{ steps.prep-deps.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
               Clean Up Temporary Data: ${{ steps.clean.outcome }}
               Create PR: ${{ steps.create-pr.outcome }}
