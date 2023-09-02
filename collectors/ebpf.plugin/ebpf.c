@@ -1663,7 +1663,7 @@ static inline int ebpf_ip2nl(uint8_t *dst, char *ip, int domain, char *source)
  *
  * @param clean the list that will be cleaned
  */
-void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
+void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean)
 {
     ebpf_network_viewer_port_list_t *move = *clean;
     while (move) {
@@ -1683,7 +1683,7 @@ void clean_port_structure(ebpf_network_viewer_port_list_t **clean)
  *
  * @param clean the list that will be cleaned
  */
-static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
+void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
 {
     ebpf_network_viewer_ip_list_t *move = *clean;
     while (move) {
@@ -1718,7 +1718,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
 
         is_ipv6 = ip;
 
-        clean_ip_structure(list);
+        ebpf_clean_ip_structure(list);
         goto storethisip;
     }
 
@@ -2004,7 +2004,7 @@ static void ebpf_parse_port_list(void **out, char *range)
         first = 1;
         last = 65535;
 
-        clean_port_structure(list);
+        ebpf_clean_port_structure(list);
         goto fillenvpl;
     }
 
@@ -3187,7 +3187,7 @@ static void ebpf_parse_args(int argc, char **argv)
     if (!freq)
         freq = EBPF_DEFAULT_UPDATE_EVERY;
 
-    rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
+    //rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
     if (ebpf_load_collector_config(ebpf_user_config_dir, &disable_cgroups, freq)) {
         netdata_log_info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
@@ -3198,7 +3198,7 @@ static void ebpf_parse_args(int argc, char **argv)
     }
 
     ebpf_load_thread_config();
-    rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
+    //rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 
     while (1) {
         int c = getopt_long_only(argc, argv, "", long_options, &option_index);

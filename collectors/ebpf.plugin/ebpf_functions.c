@@ -688,8 +688,8 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             if (family != previous) {
                 rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
                 network_viewer_opt.family = family;
-                ebpf_socket_clean_judy_array_unsafe();
                 rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
+                ebpf_socket_clean_judy_array_unsafe();
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
@@ -718,25 +718,45 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             if (previous != resolution) {
                 rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
                 network_viewer_opt.service_resolution_enabled = resolution;
-                ebpf_socket_clean_judy_array_unsafe();
                 rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
+
+                ebpf_socket_clean_judy_array_unsafe();
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RANGE, sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_RANGE) - 1];
             if (name) {
+                rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
+                ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
+                ebpf_clean_ip_structure(&network_viewer_opt.excluded_ips);
                 ebpf_parse_ips_unsafe((char *)name);
+                rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
+
                 ebpf_socket_clean_judy_array_unsafe();
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PORT, sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PORT) - 1];
             if (name) {
+                rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
+                ebpf_clean_port_structure(&network_viewer_opt.included_port);
+                ebpf_clean_port_structure(&network_viewer_opt.excluded_port);
                 ebpf_parse_ports((char *)name);
+                rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
+
                 ebpf_socket_clean_judy_array_unsafe();
             }
         } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_RESET, sizeof(EBPF_FUNCTION_SOCKET_RESET) - 1) == 0) {
+            rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
+            ebpf_clean_port_structure(&network_viewer_opt.included_port);
+            ebpf_clean_port_structure(&network_viewer_opt.excluded_port);
+
+            ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
+            ebpf_clean_ip_structure(&network_viewer_opt.excluded_ips);
+
+            parse_network_viewer_section(&socket_config);
+            rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
         } else if (strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
-            rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
         }
     }
