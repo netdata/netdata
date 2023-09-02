@@ -753,6 +753,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             ebpf_clean_ip_structure(&network_viewer_opt.excluded_ips);
 
             parse_network_viewer_section(&socket_config);
+            network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
             rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
         } else if (strncmp(keyword, "help", 4) == 0) {
             ebpf_function_socket_help(transaction);
