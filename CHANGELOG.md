@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- Improve shutdown of the metadata thread [\#15901](https://github.com/netdata/netdata/pull/15901) ([stelfrag](https://github.com/stelfrag))
 - bump ui to v6.32.0 [\#15897](https://github.com/netdata/netdata/pull/15897) ([andrewm4894](https://github.com/andrewm4894))
 - make `anomaly_detection.type_anomaly_rate` stacked [\#15895](https://github.com/netdata/netdata/pull/15895) ([andrewm4894](https://github.com/andrewm4894))
+- Add better recovery for corrupted metadata [\#15891](https://github.com/netdata/netdata/pull/15891) ([stelfrag](https://github.com/stelfrag))
 - Add index to ACLK table to improve update statements [\#15890](https://github.com/netdata/netdata/pull/15890) ([stelfrag](https://github.com/stelfrag))
+- Limit atomic operations for statistics [\#15887](https://github.com/netdata/netdata/pull/15887) ([ktsaou](https://github.com/ktsaou))
 - allow any field to be a facet [\#15880](https://github.com/netdata/netdata/pull/15880) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#15879](https://github.com/netdata/netdata/pull/15879) ([netdatabot](https://github.com/netdatabot))
 - use the newer XXH3 128bits algorithm, instead of the classic XXH128 [\#15878](https://github.com/netdata/netdata/pull/15878) ([ktsaou](https://github.com/ktsaou))
@@ -427,9 +430,6 @@
 - Add missing required field in schema [\#15335](https://github.com/netdata/netdata/pull/15335) ([Ancairon](https://github.com/Ancairon))
 - Fix compilation on BSD [\#15331](https://github.com/netdata/netdata/pull/15331) ([thiagoftsm](https://github.com/thiagoftsm))
 - alerts\_transitions outputs hostnames and items statistics [\#15329](https://github.com/netdata/netdata/pull/15329) ([ktsaou](https://github.com/ktsaou))
-- Use spinlock in host and chart [\#15328](https://github.com/netdata/netdata/pull/15328) ([stelfrag](https://github.com/stelfrag))
-- multi-threaded version of freeipmi.plugin [\#15327](https://github.com/netdata/netdata/pull/15327) ([ktsaou](https://github.com/ktsaou))
-- Single module schema, add required properties [\#15326](https://github.com/netdata/netdata/pull/15326) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
