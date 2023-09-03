@@ -827,7 +827,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Source IP", "Source IP", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Request from", "Request from IP", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -1001,13 +1001,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         }
         buffer_json_object_close(wb);
 
-        // group by Source IP
-        buffer_json_member_add_object(wb, "Source IP");
+        // group by Request From IP
+        buffer_json_member_add_object(wb, "Request from");
         {
-            buffer_json_member_add_string(wb, "name", "Source IP");
+            buffer_json_member_add_string(wb, "name", "Request from IP");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Source IP");
+                buffer_json_add_array_item_string(wb, "Request from");
             }
             buffer_json_array_close(wb);
         }
