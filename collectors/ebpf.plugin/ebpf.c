@@ -2640,7 +2640,7 @@ static void read_local_ports(char *filename, uint8_t proto)
  *
  * Read the local address from the interfaces.
  */
-static void ebpf_read_local_addresses_unsafe()
+void ebpf_read_local_addresses_unsafe()
 {
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) == -1) {

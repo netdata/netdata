@@ -751,8 +751,11 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
             ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
             ebpf_clean_ip_structure(&network_viewer_opt.excluded_ips);
+            ebpf_clean_ip_structure(&network_viewer_opt.ipv4_local_ip);
+            ebpf_clean_ip_structure(&network_viewer_opt.ipv6_local_ip);
 
             parse_network_viewer_section(&socket_config);
+            ebpf_read_local_addresses_unsafe();
             network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
             rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
         } else if (strncmp(keyword, "help", 4) == 0) {

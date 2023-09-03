@@ -348,6 +348,7 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 void parse_network_viewer_section(struct config *cfg);
 void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
 void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
+void ebpf_read_local_addresses_unsafe();
 
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
