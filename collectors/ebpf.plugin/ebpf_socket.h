@@ -298,11 +298,17 @@ typedef enum netdata_socket_flags {
     NETDATA_SOCKET_FLAGS_ALREADY_OPEN = (1<<0)
 } netdata_socket_flags_t;
 
+typedef enum netdata_socket_src_ip_origin {
+    NETDATA_EBPF_SRC_IP_ORIGIN_LOCAL,
+    NETDATA_EBPF_SRC_IP_ORIGIN_EXTERNAL
+} netdata_socket_src_ip_origin_t;
+
 typedef struct netata_socket_plus {
     netdata_socket_t data;           // Data read from database
     uint32_t pid;
     time_t last_update;
     netdata_socket_flags_t flags;
+    netdata_socket_src_ip_origin_t origin;
 
     struct  {
         char src_ip[INET6_ADDRSTRLEN + 1];

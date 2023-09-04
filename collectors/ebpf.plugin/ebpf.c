@@ -2449,8 +2449,10 @@ void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_
         while (move) {
             if (in->ver == move->ver &&
                 ebpf_is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
+#ifdef NETDATA_DEV_MODE
                 netdata_log_info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
                                  in->value, move->value);
+#endif
                 freez(in->value);
                 freez(in);
                 return;
