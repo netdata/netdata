@@ -320,7 +320,6 @@ int init_database_batch(sqlite3 *database, const char *batch[])
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
-        netdata_log_debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
@@ -496,7 +495,7 @@ int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
 
     rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host parameter to %s, rc = %d", sql, rc);
+        error_report("Failed to bind UUID parameter to %s, rc = %d", sql, rc);
         goto skip;
     }
 
