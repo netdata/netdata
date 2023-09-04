@@ -773,7 +773,7 @@ failed:
 
 void sql_load_node_id(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -782,13 +782,11 @@ void sql_load_node_id(RRDHOST *host)
         return;
     }
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_GET_HOST_NODE_ID, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to fetch node id");
-            return;
-        };
-    }
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_HOST_NODE_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch node id");
+        return;
+    };
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
@@ -805,8 +803,8 @@ void sql_load_node_id(RRDHOST *host)
     }
 
 failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset the prepared statement when loading node instance information");
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when loading node instance information");
 };
 
 
