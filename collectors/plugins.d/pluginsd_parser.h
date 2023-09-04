@@ -43,8 +43,8 @@ typedef struct parser_user_object {
     void    *opaque;
     struct plugind *cd;
     int trust_durations;
-    DICTIONARY *new_host_labels;
-    DICTIONARY *chart_rrdlabels_linked_temporarily;
+    RRDLABELS *new_host_labels;
+    RRDLABELS *chart_rrdlabels_linked_temporarily;
     size_t data_collections_count;
     int enabled;
 
@@ -55,7 +55,7 @@ typedef struct parser_user_object {
         uuid_t machine_guid;
         char machine_guid_str[UUID_STR_LEN];
         STRING *hostname;
-        DICTIONARY *rrdlabels;
+        RRDLABELS *rrdlabels;
     } host_define;
 
     struct parser_user_object_replay {

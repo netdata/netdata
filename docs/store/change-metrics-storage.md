@@ -43,8 +43,8 @@ we will have a data point every minute in tier 1 and every minute in tier 2.
 Up to 5 tiers are supported. You may add, or remove tiers and/or modify these multipliers, as long as the 
 product of all the "update every iterations" does not exceed 65535 (number of points for each tier0 point).
 
-e.g. If you simply add a fourth tier by setting `storage tiers = 4` and defining the disk space for the new tier, 
-the product of the "update every iterations" will be 60 * 60 * 60 = 216,000, which is > 65535. So you'd need to reduce  
+e.g. If you simply add a fourth tier by setting `storage tiers = 4` and define the disk space for the new tier, 
+the product of the "update every iterations" will be 60 \* 60 \* 60 = 216,000, which is > 65535. So you'd need to reduce  
 the `update every iterations` of the tiers, to stay under the limit.
 
 The exact retention that can be achieved by each tier depends on the number of metrics collected. The more 
@@ -163,6 +163,16 @@ Save the file and restart the Agent with `sudo systemctl restart netdata`, or
 the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) 
 for your system, to change the database engine's size.
 
+## Scaling dedicated parent nodes
+
+When you use streaming in medium to large infrastructures, you can have potentially millions of metrics per second reaching each parent node.
+In the lab we have reliably collected 1 million metrics/sec with 16cores and 32GB RAM.
+
+Our suggestion for scaling parents is to have them running on dedicated VMs, using a maximum of 50% of cpu, and ensuring you have enough RAM 
+for the desired retention. When your infrastructure can lead a parent to exceed these characteristics, split the load to multiple parents that
+do not communicate with each other. With each child sending data to only one of the parents, you can still have replication, high availability,
+and infrastructure level observability via the Netdata Cloud UI. 
+
 ## Legacy configuration
 
 ### v1.35.1 and prior
@@ -195,13 +205,3 @@ All new child nodes are automatically transferred to the multihost dbengine inst
 space. If you want to migrate a child node from its legacy dbengine instance to the multihost dbengine instance, you
 must delete the instance's directory, which is located in `/var/cache/netdata/MACHINE_GUID/dbengine`, after stopping the
 Agent.
-
-## Scaling dedicated parent nodes
-
-When you use streaming in medium to large infrastructures, you can have potentially millions of metrics per second reaching each parent node.
-In the lab we have reliably collected 1 million metrics/sec with 16cores and 32GB RAM.
-
-Our suggestion for scaling parents is to have them running on dedicated VMs, using a maximum of 50% of cpu, and ensuring you have enough RAM 
-for the desired retention. When your infrastructure can lead a parent to exceed these characteristics, split the load to multiple parents that
-do not communicate with each other. With each child sending data to only one of the parents, you can still have replication, high availability,
-and infrastructure level observability via the Netdata Cloud UI. 

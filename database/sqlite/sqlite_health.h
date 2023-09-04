@@ -7,12 +7,9 @@
 
 struct sql_alert_transition_data;
 struct sql_alert_config_data;
-extern sqlite3 *db_meta;
 void sql_health_alarm_log_load(RRDHOST *host);
-void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae);
-void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae);
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
-void sql_health_alarm_log_cleanup(RRDHOST *host);
+void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed);
 int alert_hash_and_store_config(uuid_t hash_id, struct alert_config *cfg, int store_hash);
 void sql_aclk_alert_clean_dead_entries(RRDHOST *host);
 int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status);
@@ -38,6 +35,4 @@ int sql_get_alert_configuration(
     bool debug __maybe_unused);
 
 bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data);
-bool is_chart_name_populated(uuid_t  *host_uuid);
-void chart_name_populate(uuid_t *host_uuid);
 #endif //NETDATA_SQLITE_HEALTH_H

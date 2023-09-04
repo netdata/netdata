@@ -39,6 +39,6 @@ typedef struct netdata_ebpf_cgroup_shm {
 
 #include "../proc.plugin/plugin_proc.h"
 
-char *cgroup_parse_resolved_name_and_labels(DICTIONARY *labels, char *data);
+char *cgroup_parse_resolved_name_and_labels(RRDLABELS *labels, char *data);
 
 #endif //NETDATA_SYS_FS_CGROUP_H

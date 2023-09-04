@@ -28,7 +28,9 @@ void ml_config_load(ml_config_t *cfg) {
     unsigned max_train_samples = config_get_number(config_section_ml, "maximum num samples to train", 6 * 3600);
     unsigned min_train_samples = config_get_number(config_section_ml, "minimum num samples to train", 1 * 900);
     unsigned train_every = config_get_number(config_section_ml, "train every", 3 * 3600);
+
     unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 9);
+    unsigned delete_models_older_than = config_get_number(config_section_ml, "delete models older than", 60 * 60 * 24 * 7);
 
     unsigned diff_n = config_get_number(config_section_ml, "num samples to diff", 1);
     unsigned smooth_n = config_get_number(config_section_ml, "num samples to smooth", 3);
@@ -58,7 +60,9 @@ void ml_config_load(ml_config_t *cfg) {
     max_train_samples = clamp<unsigned>(max_train_samples, 1 * 3600, 24 * 3600);
     min_train_samples = clamp<unsigned>(min_train_samples, 1 * 900, 6 * 3600);
     train_every = clamp<unsigned>(train_every, 1 * 3600, 6 * 3600);
+
     num_models_to_use = clamp<unsigned>(num_models_to_use, 1, 7 * 24);
+    delete_models_older_than = clamp<unsigned>(delete_models_older_than, 60 * 60 * 24 * 1, 60 * 60 * 24 * 7);
 
     diff_n = clamp(diff_n, 0u, 1u);
     smooth_n = clamp(smooth_n, 0u, 5u);
@@ -100,6 +104,7 @@ void ml_config_load(ml_config_t *cfg) {
     cfg->train_every = train_every;
 
     cfg->num_models_to_use = num_models_to_use;
+    cfg->delete_models_older_than = delete_models_older_than;
 
     cfg->diff_n = diff_n;
     cfg->smooth_n = smooth_n;

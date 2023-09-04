@@ -272,6 +272,8 @@ struct engine *read_exporting_config()
 
         prometheus_exporter_instance->config.prefix = prometheus_config_get("prefix", global_exporting_prefix);
 
+        prometheus_exporter_instance->config.label_prefix = prometheus_config_get("netdata label prefix", "");
+
         prometheus_exporter_instance->config.initialized = 1;
     }
 

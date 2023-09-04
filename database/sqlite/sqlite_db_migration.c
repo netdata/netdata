@@ -94,7 +94,7 @@ static int do_migration_v1_v2(sqlite3 *database, const char *name)
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "hops"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v1_v2[0]);
+        return init_database_batch(database, &database_migrate_v1_v2[0]);
     return 0;
 }
 
@@ -104,7 +104,7 @@ static int do_migration_v2_v3(sqlite3 *database, const char *name)
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "memory_mode"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v2_v3[0]);
+        return init_database_batch(database, &database_migrate_v2_v3[0]);
     return 0;
 }
 
@@ -145,7 +145,7 @@ static int do_migration_v4_v5(sqlite3 *database, const char *name)
     UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
-    return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v4_v5[0]);
+    return init_database_batch(database, &database_migrate_v4_v5[0]);
 }
 
 static int do_migration_v5_v6(sqlite3 *database, const char *name)
@@ -153,7 +153,7 @@ static int do_migration_v5_v6(sqlite3 *database, const char *name)
     UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
-    return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v5_v6[0]);
+    return init_database_batch(database, &database_migrate_v5_v6[0]);
 }
 
 static int do_migration_v6_v7(sqlite3 *database, const char *name)
@@ -301,7 +301,7 @@ static int do_migration_v9_v10(sqlite3 *database, const char *name)
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "chart_labels"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v9_v10[0]);
+        return init_database_batch(database, &database_migrate_v9_v10[0]);
     return 0;
 }
 
@@ -310,7 +310,7 @@ static int do_migration_v10_v11(sqlite3 *database, const char *name)
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("health_log") && !column_exists_in_table("health_log", "chart_name"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v10_v11[0]);
+        return init_database_batch(database, &database_migrate_v10_v11[0]);
 
     return 0;
 }

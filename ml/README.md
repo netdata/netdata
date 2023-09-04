@@ -144,7 +144,8 @@ Below is a list of all the available configuration params and their default valu
 	# hosts to skip from training = !*
 	# charts to skip from training = netdata.*
 	# dimension anomaly rate suppression window = 900
-	# dimension anomaly rate suppression threshold = 450    
+	# dimension anomaly rate suppression threshold = 450
+	# delete models older than = 604800
 ```
 
 ### Configuration Examples
@@ -201,7 +202,8 @@ This example assumes 3 child nodes [streaming](https://github.com/netdata/netdat
 - `anomaly detection grouping method`: The grouping method used when calculating node level anomaly rate.
 - `anomaly detection grouping duration`: (`60`/`900`) The duration across which to calculate the node level anomaly rate, the default of `900` means that the node level anomaly rate is calculated across a rolling 5 minute window.
 - `hosts to skip from training`: This parameter allows you to turn off anomaly detection for any child hosts on a parent host by defining those you would like to skip from training here. For example, a value like `dev-*` skips all hosts on a parent that begin with the "dev-" prefix. The default value of `!*` means "don't skip any".
-- `charts to skip from training`: This parameter allows you to exclude certain charts from anomaly detection. By default, only netdata related charts are excluded. This is to avoid the scenario where accessing the netdata dashboard could itself trigger some anomalies if you don't access them regularly. If you want to include charts that are excluded by default, add them in small groups and then measure any impact on performance before adding additional ones. Example: If you want to include system, apps, and user charts:`!system.* !apps.* !user.* *`. 
+- `charts to skip from training`: This parameter allows you to exclude certain charts from anomaly detection. By default, only netdata related charts are excluded. This is to avoid the scenario where accessing the netdata dashboard could itself trigger some anomalies if you don't access them regularly. If you want to include charts that are excluded by default, add them in small groups and then measure any impact on performance before adding additional ones. Example: If you want to include system, apps, and user charts:`!system.* !apps.* !user.* *`.
+- `delete models older than`: (`86400`/`604800`) Delete old models from the database that are unused, by default models will be deleted after 7 days.
 
 ## Charts
 

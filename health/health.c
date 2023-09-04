@@ -844,9 +844,6 @@ static void initialize_health(RRDHOST *host)
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
 
-    //if (!is_chart_name_populated(&host->host_uuid))
-    //    chart_name_populate(&host->host_uuid);
-
     sql_health_alarm_log_load(host);
 
     // ------------------------------------------------------------------------
@@ -1187,7 +1184,7 @@ void *health_main(void *ptr) {
 
 #ifdef ENABLE_ACLK
                             if (netdata_cloud_enabled)
-                                sql_queue_alarm_to_aclk(host, ae, 1);
+                                sql_queue_alarm_to_aclk(host, ae, true);
 #endif
                         }
                     }
@@ -1611,7 +1608,7 @@ void *health_main(void *ptr) {
 }
 
 void health_add_host_labels(void) {
-    DICTIONARY *labels = localhost->rrdlabels;
+    RRDLABELS *labels = localhost->rrdlabels;
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
     // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.

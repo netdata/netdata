@@ -230,7 +230,7 @@ typedef struct rrdinstance {
     time_t update_every_s;              // data collection frequency
     RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL
 
-    DICTIONARY *rrdlabels;              // linked to RRDSET->chart_labels or own version
+    RRDLABELS *rrdlabels;              // linked to RRDSET->chart_labels or own version
 
     struct rrdcontext *rc;
     DICTIONARY *rrdmetrics;

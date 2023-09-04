@@ -47,7 +47,7 @@ char *get_agent_claimid()
 extern struct registry registry;
 
 /* rrd_init() and post_conf_load() must have been called before this function */
-CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, const char **msg)
+CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, const char **msg __maybe_unused)
 {
     if (!force || !netdata_cloud_enabled) {
         netdata_log_error("Refusing to claim agent -> cloud functionality has been disabled");

@@ -353,7 +353,7 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
 
 static void pluginsd_host_define_cleanup(PARSER *parser) {
     string_freez(parser->user.host_define.hostname);
-    dictionary_destroy(parser->user.host_define.rrdlabels);
+    rrdlabels_destroy(parser->user.host_define.rrdlabels);
 
     parser->user.host_define.hostname = NULL;
     parser->user.host_define.rrdlabels = NULL;
@@ -390,17 +390,17 @@ static inline PARSER_RC pluginsd_host_define(char **words, size_t num_words, PAR
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_host_dictionary(char **words, size_t num_words, PARSER *parser, DICTIONARY *dict, const char *keyword) {
+static inline PARSER_RC pluginsd_host_dictionary(char **words, size_t num_words, PARSER *parser, RRDLABELS *labels, const char *keyword) {
     char *name = get_word(words, num_words, 1);
     char *value = get_word(words, num_words, 2);
 
     if(!name || !*name || !value)
         return PLUGINSD_DISABLE_PLUGIN(parser, keyword, "missing parameters");
 
-    if(!parser->user.host_define.parsing_host || !dict)
+    if(!parser->user.host_define.parsing_host || !labels)
         return PLUGINSD_DISABLE_PLUGIN(parser, keyword, "host is not defined, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
-    rrdlabels_add(dict, name, value, RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, name, value, RRDLABEL_SRC_CONFIG);
 
     return PARSER_RC_OK;
 }
@@ -764,29 +764,29 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     pf->sent_ut = now_realtime_usec();
 
     if(ret < 0) {
-        netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %d", string2str(pf->function), ret);
+        netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
 
     if (!pf->payload)
         return;
-    
+
     // send the payload to the plugin
     ret = send_to_plugin(pf->payload, parser);
 
     if(ret < 0) {
-        netdata_log_error("FUNCTION_PAYLOAD '%s': failed to send function to plugin, error %d", string2str(pf->function), ret);
+        netdata_log_error("FUNCTION_PAYLOAD '%s': failed to send function to plugin, error %zd", string2str(pf->function), ret);
         rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%d bytes, in %llu usec)",
+                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
@@ -1894,7 +1894,7 @@ struct mutex_cond {
     int rc;
 };
 
-static void virt_fnc_got_data_cb(BUFFER *wb, int code, void *callback_data)
+static void virt_fnc_got_data_cb(BUFFER *wb __maybe_unused, int code, void *callback_data)
 {
     struct mutex_cond *ctx = callback_data;
     pthread_mutex_lock(&ctx->lock);
@@ -2097,7 +2097,7 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
     struct configurable_plugin *plug_cfg = parser->user.cd->configuration;
     if (unlikely(plug_cfg == NULL))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "you have to enable dynamic configuration first using " PLUGINSD_KEYWORD_DYNCFG_ENABLE);
-    
+
     if (unlikely(num_words != 3))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE, "expected 2 parameters module_name followed by module_type");
 
@@ -2452,7 +2452,7 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 
         case 101:
             return pluginsd_register_plugin(words, num_words, parser);
-        
+
         case 102:
             return pluginsd_register_module(words, num_words, parser);
 

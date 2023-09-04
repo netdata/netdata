@@ -28,19 +28,22 @@ static struct string_partition {
 
     Pvoid_t JudyHSArray;        // the Judy array - hashtable
 
-    size_t searches;            // the number of successful searches in the index
-    size_t duplications;        // when a string is referenced
-    size_t releases;            // when a string is unreferenced
-
     size_t inserts;             // the number of successful inserts to the index
     size_t deletes;             // the number of successful deleted from the index
 
     long int entries;           // the number of entries in the index
-    long int active_references; // the number of active references alive
     long int memory;            // the memory used, without the JudyHS index
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // internal statistics
+
+    struct {
+        size_t searches;            // the number of successful searches in the index
+        size_t releases;            // when a string is unreferenced
+        size_t duplications;        // when a string is referenced
+        long int active_references; // the number of active references alive
+    } atomic;
+
     size_t found_deleted_on_search;
     size_t found_available_on_search;
     size_t found_deleted_on_insert;
@@ -51,13 +54,14 @@ static struct string_partition {
 } string_base[STRING_PARTITIONS] = { 0 };
 
 #ifdef NETDATA_INTERNAL_CHECKS
+#define string_stats_atomic_increment(partition, var) __atomic_add_fetch(&string_base[partition].atomic.var, 1, __ATOMIC_RELAXED)
+#define string_stats_atomic_decrement(partition, var) __atomic_sub_fetch(&string_base[partition].atomic.var, 1, __ATOMIC_RELAXED)
 #define string_internal_stats_add(partition, var, val) __atomic_add_fetch(&string_base[partition].var, val, __ATOMIC_RELAXED)
 #else
+#define string_stats_atomic_increment(partition, var) do {;} while(0)
+#define string_stats_atomic_decrement(partition, var) do {;} while(0)
 #define string_internal_stats_add(partition, var, val) do {;} while(0)
 #endif
-
-#define string_stats_atomic_increment(partition, var) __atomic_add_fetch(&string_base[partition].var, 1, __ATOMIC_RELAXED)
-#define string_stats_atomic_decrement(partition, var) __atomic_sub_fetch(&string_base[partition].var, 1, __ATOMIC_RELAXED)
 
 void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases) {
     if (inserts) *inserts = 0;
@@ -72,12 +76,15 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     for(size_t i = 0; i < STRING_PARTITIONS ;i++) {
         if (inserts)        *inserts        += string_base[i].inserts;
         if (deletes)        *deletes        += string_base[i].deletes;
-        if (searches)       *searches       += string_base[i].searches;
         if (entries)        *entries        += (size_t) string_base[i].entries;
-        if (references)     *references     += (size_t) string_base[i].active_references;
         if (memory)         *memory         += (size_t) string_base[i].memory;
-        if (duplications)   *duplications   += string_base[i].duplications;
-        if (releases)       *releases       += string_base[i].releases;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if (searches)       *searches       += string_base[i].atomic.searches;
+        if (references)     *references     += (size_t) string_base[i].atomic.active_references;
+        if (duplications)   *duplications   += string_base[i].atomic.duplications;
+        if (releases)       *releases       += string_base[i].atomic.releases;
+#endif
     }
 }
 
@@ -85,7 +92,9 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
 #define string_entry_release(se) __atomic_sub_fetch(&((se)->refcount), 1, __ATOMIC_SEQ_CST);
 
 static inline bool string_entry_check_and_acquire(STRING *se) {
+#ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition(se);
+#endif
 
     REFCOUNT expected, desired, count = 0;
 
@@ -125,7 +134,9 @@ STRING *string_dup(STRING *string) {
 
     string_entry_acquire(string);
 
+#ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition(string);
+#endif
 
     // statistics
     string_stats_atomic_increment(partition, active_references);
@@ -275,7 +286,9 @@ static inline void string_index_delete(STRING *string) {
 STRING *string_strdupz(const char *str) {
     if(unlikely(!str || !*str)) return NULL;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition_str(str);
+#endif
 
     size_t length = strlen(str) + 1;
     STRING *string = string_index_search(str, length);
@@ -297,7 +310,9 @@ STRING *string_strdupz(const char *str) {
 void string_freez(STRING *string) {
     if(unlikely(!string)) return;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     uint8_t partition = string_partition(string);
+#endif
     REFCOUNT refcount = string_entry_release(string);
 
 #ifdef NETDATA_INTERNAL_CHECKS

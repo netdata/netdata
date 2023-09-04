@@ -155,7 +155,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
 void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
     if(!rc->rrdset || !rc->original_info || !rc->rrdset->rrdlabels) return;
 
-    size_t labels_version = dictionary_version(rc->rrdset->rrdlabels);
+    size_t labels_version = rrdlabels_version(rc->rrdset->rrdlabels);
     if(rc->labels_version != labels_version) {
 
         STRING *old = rc->info;
