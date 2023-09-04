@@ -291,13 +291,6 @@ static int store_host_metadata(RRDHOST *host)
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
 
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
-            return 0;
-        error_report("Database has not been initialized");
-        return 1;
-    }
-
     if (unlikely((!res))) {
         rc = prepare_statement(db_meta, SQL_STORE_HOST_INFO, &res);
         if (unlikely(rc != SQLITE_OK)) {
@@ -483,13 +476,6 @@ static int store_chart_metadata(RRDSET *st)
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0, store_rc = 0;
 
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
-            return 0;
-        error_report("Database has not been initialized");
-        return 1;
-    }
-
     if (unlikely(!res)) {
         rc = prepare_statement(db_meta, SQL_STORE_CHART, &res);
         if (unlikely(rc != SQLITE_OK)) {
@@ -591,13 +577,6 @@ static int store_dimension_metadata(RRDDIM *rd)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
-            return 0;
-        error_report("Database has not been initialized");
-        return 1;
-    }
 
     if (unlikely(!res)) {
         rc = prepare_statement(db_meta, SQL_STORE_DIMENSION, &res);
