@@ -62,10 +62,8 @@ void initialize_thread_key_pool(void);
 
 // Look up functions
 int get_node_id(uuid_t *host_id, uuid_t *node_id);
-int get_host_id(uuid_t *node_id, uuid_t *host_id);
 struct node_instance_list *get_node_list(void);
 void sql_load_node_id(RRDHOST *host);
-char *get_hostname_by_node_id(char *node_id);
 
 // Help build archived hosts in memory when agent starts
 void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);
