@@ -746,8 +746,7 @@ static json_object *job_statuses_grouped() {
 
     RRDHOST *host;
 
-    rrd_rdlock();
-    rrdhost_foreach_read(host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         json_object *host_obj = json_object_new_object();
         json_object *host_sub_obj = json_object_new_string(host->machine_guid);
         json_object_object_add(host_obj, "host_guid", host_sub_obj);
@@ -787,7 +786,7 @@ static json_object *job_statuses_grouped() {
         json_object_object_add(host_obj, "plugins", host_sub_obj);
         json_object_array_add(host_vec, host_obj);
     }
-    rrd_unlock();
+    dfe_done(host);
 
     json_object_object_add(top_obj, "hosts", host_vec);
     return top_obj;
@@ -798,8 +797,7 @@ static json_object *job_statuses_flat() {
 
     json_object *ret = json_object_new_array();
 
-    rrd_rdlock();
-    rrdhost_foreach_read(host) {
+    dfe_start_reentrant(rrdhost_root_index, host) {
         DICTIONARY *plugins_dict = host->configurable_plugins;
 
         struct configurable_plugin *plugin;
@@ -822,7 +820,7 @@ static json_object *job_statuses_flat() {
             } dfe_done(module);
         } dfe_done(plugin);
     }
-    rrd_unlock();
+    dfe_done(host);
 
     return ret;
 }
