@@ -11,7 +11,7 @@
 #define DYN_CONF_JOB_LIST "jobs"
 #define DYN_CONF_CFG_EXT ".cfg"
 
-void job_flags_wallktrough(dyncfg_job_flg_t flags, void (*cb)(const char *str, void *data), void *data)
+void job_flags_wallkthrough(dyncfg_job_flg_t flags, void (*cb)(const char *str, void *data), void *data)
 {
     if (flags & JOB_FLG_PS_LOADED)
         cb("JOB_FLG_PS_LOADED", data);
@@ -199,7 +199,7 @@ json_object *job2json(struct job *job) {
     json_object_object_add(json_job, "last_state_update_us", json_item);
 
     json_item = json_object_new_array();
-    job_flags_wallktrough(job->flags, _job_flags2str_cb, json_item);
+    job_flags_wallkthrough(job->flags, _job_flags2str_cb, json_item);
     json_object_object_add(json_job, "flags", json_item);
 
     netdata_mutex_unlock(&job->lock);

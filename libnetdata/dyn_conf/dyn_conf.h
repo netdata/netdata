@@ -86,7 +86,7 @@ typedef uint32_t dyncfg_job_flg_t;
 enum job_flags {
     JOB_FLG_PS_LOADED        = 1 << 0, // PS abbr. Persistent Storage
     JOB_FLG_PLUGIN_PUSHED    = 1 << 1, // got it from plugin (e.g. autodiscovered job)
-    JOB_FLG_STREAMING_PUSHED = 1 << 2, // got it trough streaming
+    JOB_FLG_STREAMING_PUSHED = 1 << 2, // got it through streaming
     JOB_FLG_USER_CREATED     = 1 << 3, // user created this job during agent runtime
 };
 
