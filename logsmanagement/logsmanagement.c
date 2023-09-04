@@ -1159,7 +1159,8 @@ static void logs_management_init(uv_loop_t *main_loop,
 
 static void on_walk_cleanup(uv_handle_t* handle, void* data){
     UNUSED(data);
-    if (!uv_is_closing(handle)) uv_close(handle, NULL);
+    if (!uv_is_closing(handle)) 
+        uv_close(handle, NULL);
 }
 
 typedef struct {
@@ -1169,13 +1170,13 @@ typedef struct {
 } logsmanagement_main_thread_data_t;
 
 static void logsmanagement_main_cleanup(void *ptr) {
-    rrd_collector_finished();
-
     logsmanagement_main_thread_data_t *thread_data = (logsmanagement_main_thread_data_t *) ptr;
 
     thread_data->logsmanagement_main_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    collector_info("cleaning up...");
+    collector_info("logs management cleaning up...");
+
+    rrd_collector_finished();    
 
     uv_stop(thread_data->main_loop);
 
@@ -1197,6 +1198,8 @@ static void logsmanagement_main_cleanup(void *ptr) {
         freez(p_file_infos_arr);
         p_file_infos_arr = NULL;
     }
+
+    collector_info("logs management clean up done");
 
     thread_data->logsmanagement_main_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -1303,7 +1306,8 @@ void *logsmanagement_main(void *ptr) {
     collector_info("logsmanagement_main() setup completed successfully");
 
     /* Run uvlib loop. */
-    uv_run(thread_data.main_loop, UV_RUN_DEFAULT);
+    while(service_running(SERVICE_LOGS_MANAGEMENT)) 
+        uv_run(thread_data.main_loop, UV_RUN_ONCE);
 
     /* If there are valid log sources, there should always be valid handles */
     collector_error("uv_run(main_loop, ...); - no handles or requests - exiting");

@@ -211,7 +211,7 @@ const struct netdata_static_thread static_threads_common[] = {
 
 #if defined(ENABLE_LOGSMANAGEMENT)
     {
-        .name = "LOGSMANAGEMENT",
+        .name = "LOGSMANAG_MAIN",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,

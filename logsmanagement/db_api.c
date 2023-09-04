@@ -378,7 +378,7 @@ static void db_writer_db_mode_full(void *arg){
             char old_path[FILENAME_MAX + 1], new_path[FILENAME_MAX + 1];
 
             /* Rotate path of BLOBs */
-            for(int i = BLOB_MAX_FILES - 1; i >= 0; i--){                
+            for(int i = BLOB_MAX_FILES - 1; i >= 0; i--){
                 snprintfz(old_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME "%d", p_file_info->db_dir, i);
                 snprintfz(new_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME "%d", p_file_info->db_dir, i + 1);
                 rc = uv_fs_rename(NULL, &rename_req, old_path, new_path, NULL);
@@ -492,7 +492,12 @@ static void db_writer_db_mode_full(void *arg){
         // TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
         uv_mutex_unlock(p_file_info->db_mut);
         uv_rwlock_rdunlock(&p_file_info->circ_buff->buff_realloc_rwlock);
-        sleep_usec(p_file_info->buff_flush_to_db_interval * USEC_PER_SEC);
+        for(int i = 0; i < p_file_info->buff_flush_to_db_interval; i++){
+            if(__atomic_load_n(&p_file_info->state, __ATOMIC_RELAXED) != LOG_SRC_READY)
+                break;
+            sleep_usec(USEC_PER_SEC);
+        }
+
     }
 }
 

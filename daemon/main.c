@@ -166,6 +166,8 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "EXPORTERS ");
     if(service & SERVICE_HTTPD)
         buffer_strcat(wb, "HTTPD ");
+    if(service & SERVICE_LOGS_MANAGEMENT)
+        buffer_strcat(wb, "LOGS_MANAGEMENT");
 }
 
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
@@ -348,6 +350,12 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_ACLK
             | SERVICE_ACLKSYNC
             );
+
+    delta_shutdown_time("stop logs management threads");
+
+    timeout = !service_wait_exit(
+            SERVICE_LOGS_MANAGEMENT
+            , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("stop replication, exporters, health and web servers threads");
 

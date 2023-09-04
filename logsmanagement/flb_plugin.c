@@ -211,7 +211,7 @@ int flb_run(void){
 
 void flb_terminate(void){
     if(ctx){
-        if(ctx->status == 1) flb_stop(ctx);
+        flb_stop(ctx);
         flb_destroy(ctx);
         ctx = NULL;
     }
