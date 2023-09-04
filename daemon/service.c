@@ -105,14 +105,11 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
     return done_all_dimensions;
 }
 
-static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
-    worker_is_busy(WORKER_JOB_ARCHIVE_CHART);
-
+static void svc_rrdset_obsolete_to_free(RRDSET *st) {
     if(!svc_rrdset_archive_obsolete_dimensions(st, true))
         return;
 
-    rrdset_flag_set(st, RRDSET_FLAG_ARCHIVED);
-    rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+    worker_is_busy(WORKER_JOB_FREE_CHART);
 
     rrdcalc_unlink_all_rrdset_alerts(st);
 
@@ -132,7 +129,6 @@ static void svc_rrdset_obsolete_to_archive(RRDSET *st) {
         }
     }
 
-    worker_is_busy(WORKER_JOB_FREE_CHART);
     rrdset_free(st);
 }
 
@@ -150,7 +146,7 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
                      && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
                      && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
                      )) {
-            svc_rrdset_obsolete_to_archive(st);
+            svc_rrdset_obsolete_to_free(st);
         }
         else if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {
             rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);

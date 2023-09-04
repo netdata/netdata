@@ -36,7 +36,7 @@ const char* get_release_channel() {
     return (use_stable)?"stable":"nightly";
 }
 
-void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived) {
+void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile) {
     static char *custom_dashboard_info_js_filename = NULL;
     size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
@@ -70,16 +70,14 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 
     c = 0;
     rrdset_foreach_read(st, host) {
-        if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
-            if(c) buffer_strcat(wb, ",");
-            buffer_strcat(wb, "\n\t\t\"");
-            buffer_strcat(wb, rrdset_id(st));
-            buffer_strcat(wb, "\": ");
-            rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
+        if(c) buffer_strcat(wb, ",");
+        buffer_strcat(wb, "\n\t\t\"");
+        buffer_strcat(wb, rrdset_id(st));
+        buffer_strcat(wb, "\": ");
+        rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
-            c++;
-            st->last_accessed_time_s = now;
-        }
+        c++;
+        st->last_accessed_time_s = now;
     }
     rrdset_foreach_done(st);
 

@@ -644,7 +644,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 0);
+    charts2json(host, w->response.data, 0);
     return HTTP_RESP_OK;
 }
 
