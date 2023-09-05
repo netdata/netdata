@@ -8,7 +8,9 @@
 
 - Improve shutdown of the metadata thread [\#15901](https://github.com/netdata/netdata/pull/15901) ([stelfrag](https://github.com/stelfrag))
 - bump ui to v6.32.0 [\#15897](https://github.com/netdata/netdata/pull/15897) ([andrewm4894](https://github.com/andrewm4894))
+- Update change-metrics-storage.md [\#15896](https://github.com/netdata/netdata/pull/15896) ([Ancairon](https://github.com/Ancairon))
 - make `anomaly_detection.type_anomaly_rate` stacked [\#15895](https://github.com/netdata/netdata/pull/15895) ([andrewm4894](https://github.com/andrewm4894))
+- Update pfsense.md [\#15894](https://github.com/netdata/netdata/pull/15894) ([Ancairon](https://github.com/Ancairon))
 - Add better recovery for corrupted metadata [\#15891](https://github.com/netdata/netdata/pull/15891) ([stelfrag](https://github.com/stelfrag))
 - Add index to ACLK table to improve update statements [\#15890](https://github.com/netdata/netdata/pull/15890) ([stelfrag](https://github.com/stelfrag))
 - Limit atomic operations for statistics [\#15887](https://github.com/netdata/netdata/pull/15887) ([ktsaou](https://github.com/ktsaou))
@@ -428,8 +430,6 @@
 - docs: make the default Docker installation provide the full feature set [\#15339](https://github.com/netdata/netdata/pull/15339) ([ilyam8](https://github.com/ilyam8))
 - add internal stats metrics csv [\#15337](https://github.com/netdata/netdata/pull/15337) ([ilyam8](https://github.com/ilyam8))
 - Add missing required field in schema [\#15335](https://github.com/netdata/netdata/pull/15335) ([Ancairon](https://github.com/Ancairon))
-- Fix compilation on BSD [\#15331](https://github.com/netdata/netdata/pull/15331) ([thiagoftsm](https://github.com/thiagoftsm))
-- alerts\_transitions outputs hostnames and items statistics [\#15329](https://github.com/netdata/netdata/pull/15329) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
