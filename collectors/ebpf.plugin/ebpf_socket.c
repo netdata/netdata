@@ -1574,6 +1574,9 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
     }
     dst->pid = key->pid;
 
+    if (!strcmp(dst->socket_string.dst_port, "0"))
+        snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  ntohs(key->dport));
+
 #ifdef NETDATA_DEV_MODE
     collector_info("New socket: { ORIGIN IP: %s, ORIGIN : %u, DST IP:%s, DST PORT: %s, PID: %u, PROTO: %d, FAMILY: %d}",
                    dst->socket_string.src_ip,
