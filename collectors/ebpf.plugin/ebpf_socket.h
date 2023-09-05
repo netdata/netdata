@@ -275,6 +275,7 @@ typedef struct netdata_socket {
     // Socket additional info
     uint16_t protocol;
     uint16_t family;
+    uint32_t external_origin;
     struct {
         uint32_t call_tcp_sent;
         uint32_t call_tcp_received;
@@ -308,7 +309,6 @@ typedef struct netata_socket_plus {
     uint32_t pid;
     time_t last_update;
     netdata_socket_flags_t flags;
-    netdata_socket_src_ip_origin_t origin;
 
     struct  {
         char src_ip[INET6_ADDRSTRLEN + 1];

@@ -1452,6 +1452,7 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
     uint64_t ct = values[0].current_timestamp;
     uint64_t ft = values[0].first_timestamp;
     uint16_t family = AF_UNSPEC;
+    uint32_t external_origin = values[0].external_origin;
     for (i = 1; i < end; i++) {
         netdata_socket_t *w = &values[i];
 
@@ -1475,11 +1476,15 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
 
         if (!ft)
             ft = w->first_timestamp;
+
+        if (w->external_origin)
+            external_origin = NETDATA_EBPF_SRC_IP_ORIGIN_EXTERNAL;
     }
 
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
     values[0].current_timestamp = ct;
     values[0].first_timestamp = ft;
+    values[0].external_origin = external_origin;
 }
 
 /**
@@ -1509,6 +1514,7 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
                 resolve = 0;
             } else {
                 ipv4_addr.sin_addr.s_addr = key->daddr.addr32[0];
+
                 ipv4_addr.sin_port = key->dport;
                 ret = getnameinfo((struct sockaddr *) &ipv4_addr, sizeof(ipv4_addr), dst->socket_string.dst_ip,
                                   INET6_ADDRSTRLEN, dst->socket_string.dst_port, NI_MAXSERV,
@@ -1523,10 +1529,12 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
         // When resolution fail, we should use addresses
         if (!resolve) {
             ipv4_addr.sin_addr.s_addr = key->saddr.addr32[0];
+
             if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.src_ip, INET6_ADDRSTRLEN))
                 netdata_log_info("Cannot convert IP %u .", ipv4_addr.sin_addr.s_addr);
 
             ipv4_addr.sin_addr.s_addr = key->daddr.addr32[0];
+
             if(!inet_ntop(AF_INET, &ipv4_addr.sin_addr, dst->socket_string.dst_ip, INET6_ADDRSTRLEN))
                 netdata_log_info("Cannot convert IP %u .", ipv4_addr.sin_addr.s_addr);
             snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  ntohs(key->dport));
@@ -1569,7 +1577,7 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
 #ifdef NETDATA_DEV_MODE
     collector_info("New socket: { ORIGIN IP: %s, ORIGIN : %u, DST IP:%s, DST PORT: %s, PID: %u, PROTO: %d, FAMILY: %d}",
                    dst->socket_string.src_ip,
-                   dst->origin,
+                   dst->data.external_origin,
                    dst->socket_string.dst_ip,
                    dst->socket_string.dst_port,
                    dst->pid,
