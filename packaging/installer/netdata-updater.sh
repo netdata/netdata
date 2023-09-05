@@ -438,20 +438,23 @@ get_netdata_latest_tag() {
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
+    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eom 1 '[^/]*/?$')
   elif command -v wget >/dev/null 2>&1; then
-    tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep -m 1 Location | grep -o '[^/]*$')
+    tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep -m 1 Location | grep -Eo '[^/]*/?$')
   else
     fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
   fi
 
   # Fallback case for simpler local testing.
-  if echo "${tag}" | grep -q '[^/]latest$'; then
-    if _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt; then
-      tag="$(cat ./ndupdate-version.txt)"
-    fi
+  if echo "${tag}" | grep -Eq 'latest/?$'; then
+    _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt || true
 
-    rm -f ./ndupdate-version.txt
+    if [ -r ./ndupdate-version.txt ]; then
+      tag="$(cat ./ndupdate-version.txt)"
+      rm -f ./ndupdate-version.txt
+    else
+      tag="latest"
+    fi
   fi
 
   echo "${tag}" > "${dest}"
