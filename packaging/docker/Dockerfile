@@ -61,31 +61,39 @@ RUN mkdir -p /app/usr/sbin/ \
 # hadolint ignore=DL3007
 FROM netdata/base:latest as base
 
+LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
+LABEL org.opencontainers.image.url="https://netdata.cloud"
+LABEL org.opencontainers.image.documentation="https://learn.netdata.cloud"
+LABEL org.opencontainers.image.source="https://github.com/netdata/netdata"
+LABEL org.opencontainers.image.title="Netdata Agent"
+LABEL org.opencontainers.image.description="Official Netdata Agent Docker Image"
+LABEL org.opencontainers.image.vendor="Netdata Inc."
+
 ARG OFFICIAL_IMAGE=false
 ENV NETDATA_OFFICIAL_IMAGE=$OFFICIAL_IMAGE
 
-# Configure system
+ONBUILD ENV NETDATA_OFFICIAL_IMAGE=false
+
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
 ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
 # If DISABLE_TELEMETRY is set, it will disable anonymous stats collection and reporting
 #ENV DISABLE_TELEMETRY=1
+ENV NETDATA_LISTENER_PORT 19999
+EXPOSE $NETDATA_LISTENER_PORT
 
-# Copy files over
+ENV NETDATA_EXTRA_APK_PACKAGES=""
+
 RUN mkdir -p /opt/src /var/log/netdata && \
-    # Link log files to stdout
     ln -sf /dev/stdout /var/log/netdata/access.log && \
     ln -sf /dev/stdout /var/log/netdata/debug.log && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
     ln -sf /dev/stdout /var/log/netdata/collector.log && \
     ln -sf /dev/stdout /var/log/netdata/health.log && \
-    # Add netdata user
     addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
     adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
-    # Fix handling of config directory
 
-# Long-term this should leverage BuildKit’s mount option.
 COPY --from=builder /app /
 
 # Apply the permissions as described in
@@ -119,21 +127,6 @@ RUN chown -R root:root \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     cp -va /etc/netdata /etc/netdata.stock
 
-ENV NETDATA_LISTENER_PORT 19999
-EXPOSE $NETDATA_LISTENER_PORT
-
-ENV NETDATA_EXTRA_APK_PACKAGES=""
-
 ENTRYPOINT ["/usr/sbin/run.sh"]
 
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /usr/sbin/health.sh
-
-ONBUILD ENV NETDATA_OFFICIAL_IMAGE=false
-
-LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
-LABEL org.opencontainers.image.url="https://netdata.cloud"
-LABEL org.opencontainers.image.documentation="https://learn.netdata.cloud"
-LABEL org.opencontainers.image.source="https://github.com/netdata/netdata"
-LABEL org.opencontainers.image.title="Netdata Agent"
-LABEL org.opencontainers.image.description="Official Netdata Agent Docker Image"
-LABEL org.opencontainers.image.vendor="Netdata Inc."
