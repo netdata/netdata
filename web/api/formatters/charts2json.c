@@ -70,14 +70,16 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile) {
 
     c = 0;
     rrdset_foreach_read(st, host) {
-        if(c) buffer_strcat(wb, ",");
-        buffer_strcat(wb, "\n\t\t\"");
-        buffer_strcat(wb, rrdset_id(st));
-        buffer_strcat(wb, "\": ");
-        rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
+        if (rrdset_is_available_for_viewers(st)) {
+            if(c) buffer_strcat(wb, ",");
+            buffer_strcat(wb, "\n\t\t\"");
+            buffer_strcat(wb, rrdset_id(st));
+            buffer_strcat(wb, "\": ");
+            rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
-        c++;
-        st->last_accessed_time_s = now;
+            c++;
+            st->last_accessed_time_s = now;
+        }
     }
     rrdset_foreach_done(st);
 
