@@ -730,7 +730,8 @@ static bool run_cleanup_loop(
 
     time_t start_running = now_monotonic_sec();
     bool time_expired = false;
-    while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW && *total_deleted < cleanup_threshold) {
+    while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW && *total_deleted < cleanup_threshold &&
+           *total_checked < cleanup_threshold) {
         if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
             break;
 
@@ -745,7 +746,7 @@ static bool run_cleanup_loop(
         (*total_checked)++;
         time_expired = ((now_monotonic_sec() - start_running) > run_threshold);
     }
-    return time_expired;
+    return time_expired || (*total_deleted == cleanup_threshold) || (*total_checked == cleanup_threshold);
 }
 
 
