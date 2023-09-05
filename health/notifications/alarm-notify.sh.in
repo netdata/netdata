@@ -2454,7 +2454,7 @@ send_ntfy() {
     msg="${host} ${status_message}: ${alarm} - ${info}"
     httpcode=$(docurl -X POST \
                       -H "Icon: https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard/images/favicon-196x196.png" \
-                      -H "Title: ${host}: ${name}" \
+                      -H "Title: ${host}: ${name//_/ }" \
                       -H "Tags: ${emoji}" \
                       -H "Priority: ${priority}" \
                       -H "Actions: view, View node, ${goto_url}, clear=true;" \
