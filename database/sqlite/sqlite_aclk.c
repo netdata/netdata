@@ -65,7 +65,7 @@ static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
     uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
 
     /* wake up event loop */
-    int rc = uv_async_send(&aclk_sync_config.async);
+    (void) uv_async_send(&aclk_sync_config.async);
 }
 
 enum {

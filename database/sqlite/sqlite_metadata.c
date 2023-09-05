@@ -257,7 +257,7 @@ failed:
     return rc != SQLITE_DONE;
 }
 
-static void delete_dimension_uuid(uuid_t *dimension_uuid, bool flag __maybe_unused)
+static void delete_dimension_uuid(uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc;
@@ -270,7 +270,7 @@ static void delete_dimension_uuid(uuid_t *dimension_uuid, bool flag __maybe_unus
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, dimension_uuid,  sizeof(*dimension_uuid), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 1, dimension_uuid, sizeof(*dimension_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto skip_execution;
 
@@ -638,7 +638,7 @@ bind_fail:
     return 1;
 }
 
-static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused, bool flag __maybe_unused)
+static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused, sqlite3_stmt **res __maybe_unused, bool flag __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
@@ -695,17 +695,16 @@ int get_database_page_count(sqlite3 *database)
 static bool run_cleanup_loop(
     sqlite3_stmt *res,
     struct metadata_wc *wc,
-    bool (*check_cb)(uuid_t *uuid, bool check_flag __maybe_unused),
-    void (*action_cb)(uuid_t *uuid, bool action_flag __maybe_unused),
+    bool (*check_cb)(uuid_t *, sqlite3_stmt **, bool),
+    void (*action_cb)(uuid_t *, sqlite3_stmt **, bool),
     uint32_t *total_checked,
     uint32_t *total_deleted,
-    uint32_t run_threshold,
-    uint32_t cleanup_threshold,
     uint64_t *row_id,
+    sqlite3_stmt **check_stmt,
+    sqlite3_stmt **action_stmt,
     bool check_flag,
     bool action_flag)
 {
-
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
         return true;
 
@@ -715,41 +714,45 @@ static bool run_cleanup_loop(
 
     time_t start_running = now_monotonic_sec();
     bool time_expired = false;
-    while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW && *total_deleted < cleanup_threshold &&
-           *total_checked < cleanup_threshold) {
+    while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW &&
+           (*total_deleted < MAX_METADATA_CLEANUP && *total_checked < MAX_METADATA_CLEANUP)) {
         if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
             break;
 
         *row_id = sqlite3_column_int64(res, 1);
-        rc = check_cb((uuid_t *)sqlite3_column_blob(res, 0), check_flag);
+        rc = check_cb((uuid_t *)sqlite3_column_blob(res, 0), check_stmt, check_flag);
 
         if (rc == true) {
-            action_cb((uuid_t *)sqlite3_column_blob(res, 0), action_flag);
+            action_cb((uuid_t *)sqlite3_column_blob(res, 0), action_stmt, action_flag);
             (*total_deleted)++;
         }
 
         (*total_checked)++;
-        time_expired = ((now_monotonic_sec() - start_running) > run_threshold);
+        time_expired = ((now_monotonic_sec() - start_running) > METADATA_RUNTIME_THRESHOLD);
     }
-    return time_expired || (*total_deleted == cleanup_threshold) || (*total_checked == cleanup_threshold);
+    return time_expired || (*total_checked == MAX_METADATA_CLEANUP) || (*total_deleted == MAX_METADATA_CLEANUP);
 }
 
 
 #define SQL_CHECK_CHART_EXISTENCE_IN_DIMENSION "SELECT count(1) FROM dimension WHERE chart_id = @chart_id"
 #define SQL_CHECK_CHART_EXISTENCE_IN_CHART "SELECT count(1) FROM chart WHERE chart_id = @chart_id"
 
-static bool chart_can_be_deleted(uuid_t *chart_uuid, bool check_in_dimension)
+static bool chart_can_be_deleted(uuid_t *chart_uuid, sqlite3_stmt **check_res, bool check_in_dimension)
 {
     int rc, result = 1;
-    sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = check_res ? *check_res : NULL;
 
-    if (check_in_dimension)
-        rc = sqlite3_prepare_v2(db_meta, SQL_CHECK_CHART_EXISTENCE_IN_DIMENSION, -1, &res, 0);
-    else
-        rc = sqlite3_prepare_v2(db_meta, SQL_CHECK_CHART_EXISTENCE_IN_CHART, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to check for chart existence, rc = %d", rc);
-        return 0;
+    if (!res) {
+        if (check_in_dimension)
+            rc = sqlite3_prepare_v2(db_meta, SQL_CHECK_CHART_EXISTENCE_IN_DIMENSION, -1, &res, 0);
+        else
+            rc = sqlite3_prepare_v2(db_meta, SQL_CHECK_CHART_EXISTENCE_IN_CHART, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to check for chart existence, rc = %d", rc);
+            return 0;
+        }
+        if (check_res)
+            *check_res = res;
     }
 
     rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
@@ -763,20 +766,58 @@ static bool chart_can_be_deleted(uuid_t *chart_uuid, bool check_in_dimension)
         result = sqlite3_column_int(res, 0);
 
 skip:
-    rc = sqlite3_finalize(res);
+    if (check_res)
+        rc = sqlite3_reset(res);
+    else
+        rc = sqlite3_finalize(res);
+
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement that checks chart uuid existence rc = %d", rc);
+        error_report("Failed to %s statement that checks chart uuid existence rc = %d", check_res ? "reset" : "finalize", rc);
     return result == 0;
 }
 
 #define SQL_DELETE_CHART_BY_UUID        "DELETE FROM chart WHERE chart_id = @chart_id"
 #define SQL_DELETE_CHART_LABEL_BY_UUID  "DELETE FROM chart_label WHERE chart_id = @chart_id"
 
-static void delete_chart_uuid(uuid_t(*chart_uuid), bool label_only)
+static void delete_chart_uuid(uuid_t(*chart_uuid), sqlite3_stmt **action_res, bool label_only)
 {
-    if (label_only == false)
-        (void) exec_statement_with_uuid(SQL_DELETE_CHART_BY_UUID, chart_uuid);
-    (void) exec_statement_with_uuid(SQL_DELETE_CHART_LABEL_BY_UUID, chart_uuid);
+    int rc;
+    sqlite3_stmt *res = action_res ? *action_res : NULL;
+
+    if (!res) {
+        if (label_only)
+            rc = sqlite3_prepare_v2(db_meta, SQL_DELETE_CHART_LABEL_BY_UUID, -1, &res, 0);
+        else
+            rc = sqlite3_prepare_v2(db_meta, SQL_DELETE_CHART_BY_UUID, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to check for chart existence, rc = %d", rc);
+            return;
+        }
+        if (action_res)
+            *action_res = res;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind chart uuid parameter, rc = %d", rc);
+        goto skip;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to delete a chart uuid from the %s table, rc = %d", label_only ? "labels" : "chart", rc);
+
+skip:
+    if (action_res)
+        rc = sqlite3_reset(res);
+    else
+        rc = sqlite3_finalize(res);
+
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to %s statement that deletes a chart uuid rc = %d", action_res ? "reset" : "finalize", rc);
+//    if (label_only == false)
+//        (void) exec_statement_with_uuid(SQL_DELETE_CHART_BY_UUID, chart_uuid);
+//    (void) exec_statement_with_uuid(SQL_DELETE_CHART_LABEL_BY_UUID, chart_uuid);
 }
 
 static void check_dimension_metadata(struct metadata_wc *wc)
@@ -806,21 +847,21 @@ static void check_dimension_metadata(struct metadata_wc *wc)
 
     internal_error(true, "METADATA: Checking dimensions starting after row %"PRIu64, last_row_id);
 
-    bool runtime_exceeded = run_cleanup_loop(
+    bool more_to_do = run_cleanup_loop(
         res,
         wc,
         dimension_can_be_deleted,
         delete_dimension_uuid,
         &total_checked,
         &total_deleted,
-        METADATA_RUNTIME_THRESHOLD,
-        MAX_METADATA_CLEANUP,
         &last_row_id,
+        NULL,
+        NULL,
         false,
         false);
 
     now = now_realtime_sec();
-    if (total_deleted > 0 || runtime_exceeded)
+    if (more_to_do)
         next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
     else {
         last_row_id = 0;
@@ -861,25 +902,33 @@ static void check_chart_metadata(struct metadata_wc *wc)
     }
 
     uint32_t total_checked = 0;
-    uint32_t total_deleted= 0;
+    uint32_t total_deleted = 0;
 
     internal_error(true, "METADATA: Checking charts starting after row %"PRIu64, last_row_id);
 
-    bool runtime_exceeded = run_cleanup_loop(
+    sqlite3_stmt *check_res = NULL;
+    sqlite3_stmt *action_res = NULL;
+    bool more_to_do = run_cleanup_loop(
         res,
         wc,
         chart_can_be_deleted,
         delete_chart_uuid,
         &total_checked,
         &total_deleted,
-        METADATA_RUNTIME_THRESHOLD,
-        MAX_METADATA_CLEANUP,
         &last_row_id,
+        &check_res,
+        &action_res,
         true,
         false);
 
+    if (check_res)
+        sqlite3_finalize(check_res);
+
+    if (action_res)
+        sqlite3_finalize(action_res);
+
     now = now_realtime_sec();
-    if (total_deleted > 0 || runtime_exceeded)
+    if (more_to_do)
         next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
     else {
         last_row_id = 0;
@@ -921,25 +970,34 @@ static void check_label_metadata(struct metadata_wc *wc)
     }
 
     uint32_t total_checked = 0;
-    uint32_t total_deleted= 0;
+    uint32_t total_deleted = 0;
 
     internal_error(true,"METADATA: Checking charts labels starting after row %"PRIu64, last_row_id);
 
-    bool runtime_exceeded = run_cleanup_loop(
+    sqlite3_stmt *check_res = NULL;
+    sqlite3_stmt *action_res = NULL;
+
+    bool more_to_do = run_cleanup_loop(
         res,
         wc,
         chart_can_be_deleted,
         delete_chart_uuid,
         &total_checked,
         &total_deleted,
-        METADATA_RUNTIME_THRESHOLD,
-        MAX_METADATA_CLEANUP,
         &last_row_id,
+        &check_res,
+        &action_res,
         false,
         true);
 
+    if (check_res)
+        sqlite3_finalize(check_res);
+
+    if (action_res)
+        sqlite3_finalize(action_res);
+
     now = now_realtime_sec();
-    if (total_deleted > 0 || runtime_exceeded)
+    if (more_to_do)
         next_execution_t = now + METADATA_MAINTENANCE_REPEAT;
     else {
         last_row_id = 0;
@@ -1313,7 +1371,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     uint32_t scan_count = 1;
 
     if (use_transaction)
-        (void)db_execute(db_meta, "BEGIN TRANSACTION;");
+        (void)db_execute(db_meta, "BEGIN TRANSACTION");
 
     rrdset_foreach_reentrant(st, host) {
         if (scan_count == max_count) {
@@ -1362,7 +1420,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     rrdset_foreach_done(st);
 
     if (use_transaction)
-        (void)db_execute(db_meta, "COMMIT TRANSACTION;");
+        (void)db_execute(db_meta, "COMMIT TRANSACTION");
 
     return more_to_do;
 }
@@ -1579,13 +1637,14 @@ static void metadata_event_loop(void *arg)
 
                 case METADATA_ML_LOAD_MODELS: {
                     RRDDIM *rd = (RRDDIM *) cmd.param[0];
-                    ml_dimension_load_models(rd);
+                    if (!shutdown)
+                        ml_dimension_load_models(rd);
                     break;
                 }
                 case METADATA_DEL_DIMENSION:
                     uuid = (uuid_t *) cmd.param[0];
-                    if (likely(dimension_can_be_deleted(uuid, false)))
-                        delete_dimension_uuid(uuid, false);
+                    if (likely(dimension_can_be_deleted(uuid, NULL, false)))
+                        delete_dimension_uuid(uuid, NULL, false);
                     freez(uuid);
                     break;
                 case METADATA_STORE_CLAIM_ID:

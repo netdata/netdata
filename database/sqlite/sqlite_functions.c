@@ -185,18 +185,10 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
 int execute_insert(sqlite3_stmt *res)
 {
     int rc;
-    int cnt = 0;
-    while ((rc = sqlite3_step_monitored(res)) != SQLITE_DONE && ++cnt < SQL_MAX_RETRY && likely(!netdata_exit)) {
-        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
-            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
-            error_report("Failed to insert/update, rc = %d -- attempt %d", rc, cnt);
-        }
-        else {
-            if (rc == SQLITE_CORRUPT)
-                (void) mark_database_to_recover(res, NULL);
-            error_report("SQLite error %d", rc);
-            break;
-        }
+    rc =  sqlite3_step_monitored(res);
+    if (rc == SQLITE_CORRUPT) {
+        (void)mark_database_to_recover(res, NULL);
+        error_report("SQLite error %d", rc);
     }
     return rc;
 }
