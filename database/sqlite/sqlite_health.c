@@ -435,8 +435,8 @@ done:
     "hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id) " \
     "AND health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = @host_id) " \
     "AND when_key < unixepoch() - @history " \
-    "AND updated_by_id <> 0 AND transition_id NOT IN " \
-    "(SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id);", guid
+    "AND updated_by_id <> 0 AND HEX(transition_id) NOT IN " \
+    "(SELECT HEX(last_transition_id) FROM health_log hl WHERE hl.host_id = @host_id);", guid
 
 void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed) {
     sqlite3_stmt *res = NULL;
