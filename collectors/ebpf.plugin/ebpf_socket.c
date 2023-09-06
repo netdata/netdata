@@ -143,7 +143,7 @@ static void ebpf_socket_disable_probes(struct socket_bpf *obj)
  */
 static void ebpf_socket_disable_trampoline(struct socket_bpf *obj)
 {
-    bpf_program__set_autoload(obj->progs.netdata_inet_csk_accept_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_inet_csk_accept_fexit, false);
     bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_fexit, false);
     bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_fexit, false);
     bpf_program__set_autoload(obj->progs.netdata_tcp_retransmit_skb_fentry, false);
@@ -164,7 +164,7 @@ static void ebpf_socket_disable_trampoline(struct socket_bpf *obj)
  */
 static void ebpf_set_trampoline_target(struct socket_bpf *obj)
 {
-    bpf_program__set_attach_target(obj->progs.netdata_inet_csk_accept_fentry, 0,
+    bpf_program__set_attach_target(obj->progs.netdata_inet_csk_accept_fexit, 0,
                                    socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
 
     bpf_program__set_attach_target(obj->progs.netdata_tcp_v4_connect_fexit, 0,
