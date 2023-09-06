@@ -224,9 +224,13 @@ static inline void ebpf_socket_disable_specific_trampoline(struct socket_bpf *ob
 {
     if (sel == MODE_RETURN) {
         bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_fentry, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fentry, false);
     } else {
         bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_fexit, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_fexit, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_fexit, false);
         bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_fexit, false);
     }
 }
@@ -243,9 +247,13 @@ static inline void ebpf_socket_disable_specific_probe(struct socket_bpf *obj, ne
 {
     if (sel == MODE_RETURN) {
         bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kprobe, false);
     } else {
         bpf_program__set_autoload(obj->progs.netdata_tcp_sendmsg_kretprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v4_connect_kretprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_tcp_v6_connect_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_udp_sendmsg_kretprobe, false);
     }
 }
