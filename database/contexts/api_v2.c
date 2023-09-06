@@ -1648,6 +1648,21 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
     }
 }
 
+static void contexts_v2_alert_eval_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
+    struct health_virtual hv = {
+        .debug = debug,
+        .chart = ctl->request->alert_eval.chart,
+        .context = ctl->request->alert_eval.context,
+        .calc = ctl->request->alert_eval.calc,
+        .lookup = ctl->request->alert_eval.lookup,
+        .warn = ctl->request->alert_eval.warn,
+        .crit = ctl->request->alert_eval.crit,
+        .after = ctl->window.after,
+        .before = ctl->window.before,
+    };
+    health_virtual(ctl->nodes.dict, wb, &hv);
+}
+
 static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
     struct alert_transitions_callback_data data = {
             .wb = wb,
@@ -2113,6 +2128,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
         if (mode & CONTEXTS_V2_AGENTS)
             buffer_json_agents_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO), true);
+
+        if(mode & CONTEXTS_V2_ALERT_EVAL)
+            contexts_v2_alert_eval_to_json(wb, &ctl, debug);
     }
 
     buffer_json_cloud_timings(wb, "timings", &ctl.timings);

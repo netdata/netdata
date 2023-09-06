@@ -106,16 +106,17 @@ void health_add_host_labels(void);
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
 struct health_virtual {
+    bool debug;
     char *chart;
     char *context;
     char *lookup;
     char *calc;
     char *warn;
     char *crit;
-    time_t before;
     time_t after;
+    time_t before;
 };
 
-void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv);
+void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv);
 void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, RRDCALC *rcv, struct health_virtual *hv);
 #endif //NETDATA_HEALTH_H

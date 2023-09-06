@@ -27,7 +27,7 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
             rcv->value = NAN;
             //rcv->run_flags |= RRDCALC_FLAG_DB_ERROR;
 
-            debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': database lookup returned error %d",
+            netdata_log_debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': database lookup returned error %d",
                   rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv), ret
                   );
         } else
@@ -38,14 +38,14 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
             rcv->value = NAN;
             rcv->run_flags |= RRDCALC_FLAG_DB_NAN;
 
-            debug(D_HEALTH,
+            netdata_log_debug(D_HEALTH,
                   "Health (virtual) on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
                   rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv)
                   );
         } else
             rcv->run_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-        debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
+        netdata_log_debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
               rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv), rcv->value
               );
 
@@ -60,7 +60,7 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
             rcv->value = NAN;
             rcv->run_flags |= RRDCALC_FLAG_CALC_ERROR;
 
-            debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': expression '%s' failed: %s",
+            netdata_log_debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': expression '%s' failed: %s",
                   rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv),
                   rcv->calculation->parsed_as, buffer_tostring(rcv->calculation->error_msg)
                   );
@@ -68,7 +68,7 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
         } else {
             rcv->run_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
-            debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': expression '%s' gave value "
+            netdata_log_debug(D_HEALTH, "Health (virtual) on host '%s', alarm '%s.%s': expression '%s' gave value "
                   NETDATA_DOUBLE_FORMAT
                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rcv), rrdcalc_name(rcv),
                   rcv->calculation->parsed_as, rcv->calculation->result,
@@ -118,20 +118,20 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
     buffer_json_object_close(wb);
 }
 
-void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv) {
-
+void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv) {
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
-    buffer_json_initialize(wb, "\"", "\"", 0, false, false);
-    buffer_json_member_add_string(wb, "host", rrdhost_hostname(host));
+    buffer_json_member_add_object(wb, "alert_eval");
+    /* //buffer_json_member_add_string(wb, "host", rrdhost_hostname(host)); */
     buffer_json_member_add_int64(wb, "health_run_every", min_run_every);
     buffer_json_member_add_time_t(wb, "after", hv->after);
     buffer_json_member_add_time_t(wb, "before", hv->before);
     buffer_json_member_add_object(wb, "configuration");
 
     RRDCALC *rcv = callocz(1, sizeof(RRDCALC));
-    health_config_setup_rc_from_api(wb, host, rcv, hv);
+    //TODO get from the v2 nodes which one to run on
+    health_config_setup_rc_from_api(wb, localhost, rcv, hv);
 
     buffer_json_object_close(wb);
     buffer_json_member_add_array(wb, string2str(rcv->chart));
@@ -140,9 +140,10 @@ void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv) {
     time_t at = hv->after ? hv->after : now;
     hv->before = hv->before ? hv->before : now;
     while (at <= hv->before) {
-        health_virtual_run(host, wb, rcv, at);
+        health_virtual_run(localhost, wb, rcv, at);
         at+=min_run_every;
     }
 
     buffer_json_array_close(wb);
+    buffer_json_object_close(wb);
 }
