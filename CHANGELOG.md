@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Reduce workload during cleanup [\#15919](https://github.com/netdata/netdata/pull/15919) ([stelfrag](https://github.com/stelfrag))
+- python.d/sensors: Increase voltage limits 127 -\> 400 [\#15905](https://github.com/netdata/netdata/pull/15905) ([kylemanna](https://github.com/kylemanna))
+- Assorted Dockerfile cleanup. [\#15902](https://github.com/netdata/netdata/pull/15902) ([Ferroin](https://github.com/Ferroin))
 - Improve shutdown of the metadata thread [\#15901](https://github.com/netdata/netdata/pull/15901) ([stelfrag](https://github.com/stelfrag))
 - bump ui to v6.32.0 [\#15897](https://github.com/netdata/netdata/pull/15897) ([andrewm4894](https://github.com/andrewm4894))
 - Update change-metrics-storage.md [\#15896](https://github.com/netdata/netdata/pull/15896) ([Ancairon](https://github.com/Ancairon))
@@ -14,6 +17,7 @@
 - Add better recovery for corrupted metadata [\#15891](https://github.com/netdata/netdata/pull/15891) ([stelfrag](https://github.com/stelfrag))
 - Add index to ACLK table to improve update statements [\#15890](https://github.com/netdata/netdata/pull/15890) ([stelfrag](https://github.com/stelfrag))
 - Limit atomic operations for statistics [\#15887](https://github.com/netdata/netdata/pull/15887) ([ktsaou](https://github.com/ktsaou))
+- Properly document issues with installing on hosts without IPv4. [\#15882](https://github.com/netdata/netdata/pull/15882) ([Ferroin](https://github.com/Ferroin))
 - allow any field to be a facet [\#15880](https://github.com/netdata/netdata/pull/15880) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#15879](https://github.com/netdata/netdata/pull/15879) ([netdatabot](https://github.com/netdatabot))
 - use the newer XXH3 128bits algorithm, instead of the classic XXH128 [\#15878](https://github.com/netdata/netdata/pull/15878) ([ktsaou](https://github.com/ktsaou))
@@ -425,11 +429,6 @@
 - Fix coverity issues [\#15345](https://github.com/netdata/netdata/pull/15345) ([stelfrag](https://github.com/stelfrag))
 - Update libbpf on netdata repo [\#15343](https://github.com/netdata/netdata/pull/15343) ([thiagoftsm](https://github.com/thiagoftsm))
 - bearer improvements [\#15342](https://github.com/netdata/netdata/pull/15342) ([ktsaou](https://github.com/ktsaou))
-- Attempt to more aggressively skip CI jobs on PRs if those jobs are irrelevant to the PR. [\#15341](https://github.com/netdata/netdata/pull/15341) ([Ferroin](https://github.com/Ferroin))
-- Remove availability from required fields on metric level [\#15340](https://github.com/netdata/netdata/pull/15340) ([Ancairon](https://github.com/Ancairon))
-- docs: make the default Docker installation provide the full feature set [\#15339](https://github.com/netdata/netdata/pull/15339) ([ilyam8](https://github.com/ilyam8))
-- add internal stats metrics csv [\#15337](https://github.com/netdata/netdata/pull/15337) ([ilyam8](https://github.com/ilyam8))
-- Add missing required field in schema [\#15335](https://github.com/netdata/netdata/pull/15335) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
