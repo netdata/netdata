@@ -477,6 +477,9 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
     // NAME
     buffer_json_add_array_item_string(wb, (name) ? name : "not identified");
 
+    // Origin
+    buffer_json_add_array_item_string(wb, (values->data.external_origin) ? "external" : "local");
+
     // Source IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
 
@@ -827,11 +830,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
+        buffer_rrdf_table_add_field(wb, fields_id++, "Origin", "Origin of initial connection", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
         buffer_rrdf_table_add_field(wb, fields_id++, "Request from", "Request from IP", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
         /*
         buffer_rrdf_table_add_field(wb, fields_id++, "SRC PORT", "Source Port", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
@@ -996,6 +1006,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Origin");
+        {
+            buffer_json_member_add_string(wb, "name", "Origin");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Origin");
             }
             buffer_json_array_close(wb);
         }
