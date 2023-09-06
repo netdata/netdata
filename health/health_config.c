@@ -1383,9 +1383,6 @@ void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, RRDCALC *rcv, st
         rcv->chart = string_strdupz(hv->chart);
         RRDSET *st;
         rrdset_foreach_write(st, host) {
-            if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-                continue;
-
             if ((rcv->chart != st->id) && (rcv->chart != st->name))
                 continue;
             else {
