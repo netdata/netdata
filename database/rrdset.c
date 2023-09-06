@@ -292,11 +292,6 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
 
     ctr->react_action = RRDSET_REACT_NONE;
 
-    if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
-        rrdset_flag_clear(st, RRDSET_FLAG_ARCHIVED);
-        ctr->react_action |= RRDSET_REACT_CHART_ACTIVATED;
-    }
-
     if (rrdset_reset_name(st, (ctr->name && *ctr->name) ? ctr->name : ctr->id) == 2)
         ctr->react_action |= RRDSET_REACT_UPDATED;
 
@@ -657,11 +652,6 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))) {
-        netdata_log_info("Cannot obsolete already archived chart %s", rrdset_name(st));
-        return;
-    }
-
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
