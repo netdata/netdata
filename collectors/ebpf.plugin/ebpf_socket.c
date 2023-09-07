@@ -82,15 +82,15 @@ struct config socket_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "tcp_retransmit_skb", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "tcp_cleanup_rbuf", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "tcp_close", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "udp_recvmsg", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "tcp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "udp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "tcp_v4_connect", .mode = EBPF_LOAD_TRAMPOLINE},
-                                            {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
+netdata_ebpf_targets_t socket_targets[] = { {.name = "inet_csk_accept", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "tcp_retransmit_skb", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "tcp_cleanup_rbuf", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "tcp_close", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "udp_recvmsg", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "tcp_sendmsg", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "udp_sendmsg", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "tcp_v4_connect", .mode = EBPF_LOAD_PROBE},
+                                            {.name = "tcp_v6_connect", .mode = EBPF_LOAD_PROBE},
                                             {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 struct netdata_static_thread ebpf_read_socket = {
@@ -273,34 +273,6 @@ static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t
                                                                               socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
     long ret = libbpf_get_error(obj->links.netdata_inet_csk_accept_kretprobe);
     if (ret)
-            return -1;
-
-    obj->links.netdata_tcp_v4_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v4_connect_kprobe,
-                                                                          false,
-                                                                          socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
-    ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_tcp_v4_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v4_connect_kretprobe,
-                                                                             true,
-                                                                             socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
-    ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_tcp_v6_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v6_connect_kprobe,
-                                                                          false,
-                                                                          socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
-    ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_tcp_v6_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v6_connect_kretprobe,
-                                                                             true,
-                                                                             socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
-    ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kretprobe);
-    if (ret)
         return -1;
 
     obj->links.netdata_tcp_retransmit_skb_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_retransmit_skb_kprobe,
@@ -352,6 +324,20 @@ static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t
         ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kretprobe);
         if (ret)
             return -1;
+
+        obj->links.netdata_tcp_v4_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v4_connect_kretprobe,
+                                                                                 true,
+                                                                                 socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kretprobe);
+        if (ret)
+            return -1;
+
+        obj->links.netdata_tcp_v6_connect_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v6_connect_kretprobe,
+                                                                                 true,
+                                                                                 socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kretprobe);
+        if (ret)
+            return -1;
     } else {
         obj->links.netdata_tcp_sendmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_sendmsg_kprobe,
                                                                            false,
@@ -364,6 +350,20 @@ static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t
                                                                            false,
                                                                            socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
         ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kprobe);
+        if (ret)
+            return -1;
+
+        obj->links.netdata_tcp_v4_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v4_connect_kprobe,
+                                                                              false,
+                                                                              socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kprobe);
+        if (ret)
+            return -1;
+
+        obj->links.netdata_tcp_v6_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v6_connect_kprobe,
+                                                                              false,
+                                                                              socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+        ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kprobe);
         if (ret)
             return -1;
     }
