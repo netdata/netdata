@@ -525,8 +525,8 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                         buffer_json_add_array_item_array(wb); // point
 
                         buffer_json_add_array_item_uint64(wb, v->histogram[i]);
-                        buffer_json_add_array_item_uint64(wb, 0);
-                        buffer_json_add_array_item_uint64(wb, 1);
+                        buffer_json_add_array_item_uint64(wb, 0); // arp - anomaly rate
+                        buffer_json_add_array_item_uint64(wb, 0); // pa - point annotation
 
                         buffer_json_array_close(wb); // point
                     }
