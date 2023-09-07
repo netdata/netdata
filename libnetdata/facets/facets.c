@@ -9,11 +9,17 @@ static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
 static inline void uint64_to_char(uint64_t num, char *out) {
     static const char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
-    int i;
-    for(i = 10; i >= 0; --i) {
-        out[i] = id_encoding_characters[num & 63];
-        num >>= 6;
-    }
+    out[10] = id_encoding_characters[num & 63]; num >>= 6;
+    out[9]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[8]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[7]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[6]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[5]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[4]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[3]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[2]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[1]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[0]  = id_encoding_characters[num & 63];
 }
 
 inline void facets_string_hash(const char *src, size_t len, char *out) {

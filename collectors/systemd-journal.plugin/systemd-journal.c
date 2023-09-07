@@ -39,18 +39,11 @@
     "|SYSLOG_IDENTIFIER"                        \
     "|SYSLOG_FACILITY"                          \
     "|PRIORITY"                                 \
-    "|_HOSTNAME"                                \
-    "|_RUNTIME_SCOPE"                           \
     "|_UID"                                     \
     "|_GID"                                     \
     "|_SYSTEMD_UNIT"                            \
     "|_SYSTEMD_SLICE"                           \
-    "|_SYSTEMD_USER_SLICE"                      \
     "|_COMM"                                    \
-    "|_EXE"                                     \
-    "|_SYSTEMD_CGROUP"                          \
-    "|_SYSTEMD_USER_UNIT"                       \
-    "|USER_UNIT"                                \
     "|UNIT"                                     \
     "|CONTAINER_NAME"                           \
     "|IMAGE_NAME"                               \
@@ -585,7 +578,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // debug
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
-        char buf[] = "systemd-journal after:-86400 before:0 last:500";
+        char buf[] = "systemd-journal after:-864000 before:0 last:500";
         function_systemd_journal("123", buf, "", 0, 30);
         exit(1);
     }
