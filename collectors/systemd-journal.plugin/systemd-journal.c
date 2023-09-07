@@ -41,7 +41,6 @@
     "|PRIORITY"                                 \
     "|_HOSTNAME"                                \
     "|_RUNTIME_SCOPE"                           \
-    "|_PID"                                     \
     "|_UID"                                     \
     "|_GID"                                     \
     "|_SYSTEMD_UNIT"                            \
@@ -341,7 +340,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
 
-    FACETS *facets = facets_create(50, 0, FACETS_OPTION_ALL_KEYS_FTS,
+    FACETS *facets = facets_create(50, FACETS_OPTION_ALL_KEYS_FTS,
                                    SYSTEMD_ALWAYS_VISIBLE_KEYS,
                                    SYSTEMD_KEYS_INCLUDED_IN_FACETS,
                                    SYSTEMD_KEYS_EXCLUDED_FROM_FACETS);
@@ -491,7 +490,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     buffer_json_object_close(wb); // request
 
     facets_set_items(facets, last);
-    facets_set_anchor(facets, anchor);
+    facets_set_anchor(facets, anchor, FACETS_ANCHOR_DIRECTION_BACKWARD);
     facets_set_query(facets, query);
     facets_set_histogram(facets, chart ? chart : "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 

@@ -6,6 +6,11 @@
 #define FACET_VALUE_UNSET "-"
 
 typedef enum __attribute__((packed)) {
+    FACETS_ANCHOR_DIRECTION_FORWARD,
+    FACETS_ANCHOR_DIRECTION_BACKWARD,
+} FACETS_ANCHOR_DIRECTION;
+
+typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_FACET      = (1 << 0), // filterable values
     FACET_KEY_OPTION_NO_FACET   = (1 << 1), // non-filterable value
     FACET_KEY_OPTION_STICKY     = (1 << 2), // should be sticky in the table
@@ -42,7 +47,7 @@ typedef enum __attribute__((packed)) {
     FACETS_OPTION_ALL_KEYS_FTS          = (1 << 1), // all keys are searchable by full text search
 } FACETS_OPTIONS;
 
-FACETS *facets_create(uint32_t items_to_return, usec_t anchor, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);
+FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);
 void facets_destroy(FACETS *facets);
 
 void facets_accepted_param(FACETS *facets, const char *param);
@@ -53,7 +58,7 @@ void facets_row_finished(FACETS *facets, usec_t usec);
 FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options);
 void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
-void facets_set_anchor(FACETS *facets, usec_t anchor);
+void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION direction);
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);
 void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options);
 void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, usec_t before_ut);
