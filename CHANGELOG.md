@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Reduce workload during cleanup [\#15919](https://github.com/netdata/netdata/pull/15919) ([stelfrag](https://github.com/stelfrag))
+- Replace \_ with spaces for name variable for ntfy [\#15909](https://github.com/netdata/netdata/pull/15909) ([MAH69IK](https://github.com/MAH69IK))
 - python.d/sensors: Increase voltage limits 127 -\> 400 [\#15905](https://github.com/netdata/netdata/pull/15905) ([kylemanna](https://github.com/kylemanna))
 - Assorted Dockerfile cleanup. [\#15902](https://github.com/netdata/netdata/pull/15902) ([Ferroin](https://github.com/Ferroin))
 - Improve shutdown of the metadata thread [\#15901](https://github.com/netdata/netdata/pull/15901) ([stelfrag](https://github.com/stelfrag))
@@ -14,6 +15,7 @@
 - Update change-metrics-storage.md [\#15896](https://github.com/netdata/netdata/pull/15896) ([Ancairon](https://github.com/Ancairon))
 - make `anomaly_detection.type_anomaly_rate` stacked [\#15895](https://github.com/netdata/netdata/pull/15895) ([andrewm4894](https://github.com/andrewm4894))
 - Update pfsense.md [\#15894](https://github.com/netdata/netdata/pull/15894) ([Ancairon](https://github.com/Ancairon))
+- Reset the obsolete flag on service thread [\#15892](https://github.com/netdata/netdata/pull/15892) ([MrZammler](https://github.com/MrZammler))
 - Add better recovery for corrupted metadata [\#15891](https://github.com/netdata/netdata/pull/15891) ([stelfrag](https://github.com/stelfrag))
 - Add index to ACLK table to improve update statements [\#15890](https://github.com/netdata/netdata/pull/15890) ([stelfrag](https://github.com/stelfrag))
 - Limit atomic operations for statistics [\#15887](https://github.com/netdata/netdata/pull/15887) ([ktsaou](https://github.com/ktsaou))
@@ -427,8 +429,6 @@
 - health: fix evaluating expression with `nan` [\#15348](https://github.com/netdata/netdata/pull/15348) ([ilyam8](https://github.com/ilyam8))
 - add missing labels to freeipmi metrics csv [\#15347](https://github.com/netdata/netdata/pull/15347) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#15345](https://github.com/netdata/netdata/pull/15345) ([stelfrag](https://github.com/stelfrag))
-- Update libbpf on netdata repo [\#15343](https://github.com/netdata/netdata/pull/15343) ([thiagoftsm](https://github.com/thiagoftsm))
-- bearer improvements [\#15342](https://github.com/netdata/netdata/pull/15342) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
