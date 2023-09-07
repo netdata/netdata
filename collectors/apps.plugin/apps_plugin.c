@@ -4696,21 +4696,24 @@ static void function_processes(const char *transaction, char *function __maybe_u
         if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_CATEGORY)]);
             if(!category) {
-                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
+                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
+                                                       "No category with that name found.");
                 return;
             }
         }
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
-                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
+                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
+                                                       "No user with that name found.");
                 return;
             }
         }
         else if(strncmp(keyword, PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &keyword[strlen(PROCESS_FILTER_GROUP)]);
             if(!group) {
-                pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
+                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
+                                                       "No group with that name found.");
                 return;
             }
         }
@@ -4736,7 +4739,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
         else {
             char msg[PLUGINSD_LINE_MAX];
             snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
-            pluginsd_function_json_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
+            pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, msg);
             return;
         }
     }
@@ -5562,7 +5565,8 @@ static void *reader_main(void *arg __maybe_unused) {
                 if(strncmp(function, "processes", strlen("processes")) == 0)
                     function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else
-                    pluginsd_function_json_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
+                    pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
+                                                           "No function with this name found in apps.plugin.");
 
                 fflush(stdout);
                 netdata_mutex_unlock(&mutex);
