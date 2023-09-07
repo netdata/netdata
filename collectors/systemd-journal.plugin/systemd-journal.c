@@ -5,7 +5,7 @@
  *  GPL v3+
  */
 
-// TODO - 1) MARKDOC
+// TODO - 1) MARKDOC 2) HELP TEXT
 
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
@@ -31,6 +31,7 @@
 #define JOURNAL_PARAMETER_QUERY                 "query"
 #define JOURNAL_PARAMETER_FACETS                "facets"
 #define JOURNAL_PARAMETER_HISTOGRAM             "histogram"
+#define JOURNAL_PARAMETER_DIRECTION             "direction"
 
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       NULL
@@ -341,6 +342,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     facets_accepted_param(facets, JOURNAL_PARAMETER_AFTER);
     facets_accepted_param(facets, JOURNAL_PARAMETER_BEFORE);
     facets_accepted_param(facets, JOURNAL_PARAMETER_ANCHOR);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_DIRECTION);
     facets_accepted_param(facets, JOURNAL_PARAMETER_LAST);
     facets_accepted_param(facets, JOURNAL_PARAMETER_QUERY);
     facets_accepted_param(facets, JOURNAL_PARAMETER_FACETS);
@@ -375,6 +377,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
     size_t last = 0;
+    FACETS_ANCHOR_DIRECTION direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     const char *query = NULL;
     const char *chart = NULL;
 
@@ -398,6 +401,9 @@ static void function_systemd_journal(const char *transaction, char *function, ch
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_ANCHOR ":", sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1) == 0) {
             anchor = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1], NULL);
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_DIRECTION ":", sizeof(JOURNAL_PARAMETER_DIRECTION ":") - 1) == 0) {
+            direction = strcasecmp(&keyword[sizeof(JOURNAL_PARAMETER_DIRECTION ":") - 1], "forward") ? FACETS_ANCHOR_DIRECTION_FORWARD : FACETS_ANCHOR_DIRECTION_BACKWARD;
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_LAST ":", sizeof(JOURNAL_PARAMETER_LAST ":") - 1) == 0) {
             last = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_LAST ":") - 1]);
@@ -476,6 +482,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     buffer_json_member_add_time_t(wb, "after", after_s);
     buffer_json_member_add_time_t(wb, "before", before_s);
     buffer_json_member_add_uint64(wb, "anchor", anchor);
+    buffer_json_member_add_string(wb, "direction", direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
     buffer_json_member_add_uint64(wb, "last", last);
     buffer_json_member_add_string(wb, "query", query);
     buffer_json_member_add_string(wb, "chart", chart);
@@ -483,7 +490,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     buffer_json_object_close(wb); // request
 
     facets_set_items(facets, last);
-    facets_set_anchor(facets, anchor, FACETS_ANCHOR_DIRECTION_BACKWARD);
+    facets_set_anchor(facets, anchor, direction);
     facets_set_query(facets, query);
     facets_set_histogram(facets, chart ? chart : "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
