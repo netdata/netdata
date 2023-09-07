@@ -186,9 +186,12 @@ static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k __
     v->histogram[slot]++;
 }
 
-static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
     buffer_json_member_add_array(wb, key);
     {
+        if(first_key)
+            buffer_json_add_array_item_string(wb, first_key);
+
         FACET_VALUE *v;
         dfe_start_read(k->values, v) {
             if(unlikely(!v->histogram))
@@ -496,7 +499,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
     buffer_json_member_add_object(wb, "result");
     {
-        facets_histogram_value_names(wb, facets, k, "labels");
+        facets_histogram_value_names(wb, facets, k, "labels", "time");
 
         buffer_json_member_add_object(wb, "point");
         {
@@ -547,7 +550,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         buffer_json_member_add_string(wb, "units", "events");
         buffer_json_member_add_object(wb, "dimensions");
         {
-            facets_histogram_value_names(wb, facets, k, "ids");
+            facets_histogram_value_names(wb, facets, k, "ids", NULL);
             facets_histogram_value_units(wb, facets, k, "units");
 
             buffer_json_member_add_object(wb, "sts");
@@ -595,8 +598,8 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
             }
             buffer_json_array_close(wb); // grouped_by
 
-            facets_histogram_value_names(wb, facets, k, "ids");
-            facets_histogram_value_names(wb, facets, k, "names");
+            facets_histogram_value_names(wb, facets, k, "ids", NULL);
+            facets_histogram_value_names(wb, facets, k, "names", NULL);
             facets_histogram_value_units(wb, facets, k, "units");
 
             buffer_json_member_add_object(wb, "sts");
