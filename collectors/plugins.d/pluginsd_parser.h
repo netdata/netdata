@@ -157,7 +157,7 @@ static inline int parser_action(PARSER *parser, char *input) {
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
             if(parser->defer.response) {
                 buffer_strcat(parser->defer.response, input);
-                if(buffer_strlen(parser->defer.response) > 10 * 1024 * 1024) {
+                if(buffer_strlen(parser->defer.response) > 20 * 1024 * 1024) {
                     // more than 10MB of data
                     // a bad plugin that did not send the end_keyword
                     internal_error(true, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
