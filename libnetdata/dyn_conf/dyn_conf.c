@@ -580,7 +580,7 @@ int register_job(DICTIONARY *plugins_dict, const char *plugin_name, const char *
     const DICTIONARY_ITEM *plugin_item = dictionary_get_and_acquire_item(plugins_dict, plugin_name);
     if (plugin_item == NULL) {
         error_report("plugin \"%s\" not registered", plugin_name);
-        return 1;
+        return rc;
     }
     struct configurable_plugin *plugin = dictionary_acquired_item_value(plugin_item);
     struct module *mod = get_module_by_name(plugin, module_name);

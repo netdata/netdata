@@ -2475,7 +2475,7 @@ static inline PARSER_RC pluginsd_register_job(char **words __maybe_unused, size_
 }
 
 static inline PARSER_RC pluginsd_job_status_common(char **words, size_t num_words, PARSER *parser, const char *plugin_name) {
-    int state = atoi(words[3]);
+    int state = str2i(words[3]);
 
     enum job_status status = str2job_state(words[2]);
     if (unlikely(SERVING_PLUGINSD(parser) && status == JOB_STATUS_UNKNOWN))
