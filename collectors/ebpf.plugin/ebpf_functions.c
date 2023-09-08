@@ -679,14 +679,12 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         if (strncmp(keyword, EBPF_FUNCTION_SOCKET_FAMILY, sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1) == 0) {
             name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_FAMILY) - 1];
             previous = network_viewer_opt.family;
-            uint32_t family;
+            uint32_t family = AF_UNSPEC;
             if (name) {
                 if (!strcmp(name, "IPV4"))
                     family = AF_INET;
                 else if (!strcmp(name, "IPV6"))
                     family = AF_INET6;
-                else
-                    family = AF_UNSPEC;
             } else {
                 network_viewer_opt.family = AF_UNSPEC;
             }
