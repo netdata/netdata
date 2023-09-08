@@ -9,11 +9,17 @@ static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
 static inline void uint64_to_char(uint64_t num, char *out) {
     static const char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
-    int i;
-    for(i = 10; i >= 0; --i) {
-        out[i] = id_encoding_characters[num & 63];
-        num >>= 6;
-    }
+    out[10] = id_encoding_characters[num & 63]; num >>= 6;
+    out[9]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[8]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[7]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[6]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[5]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[4]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[3]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[2]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[1]  = id_encoding_characters[num & 63]; num >>= 6;
+    out[0]  = id_encoding_characters[num & 63];
 }
 
 inline void facets_string_hash(const char *src, size_t len, char *out) {
@@ -79,7 +85,11 @@ struct facets {
     SIMPLE_PATTERN *included_keys;
 
     FACETS_OPTIONS options;
-    usec_t anchor;
+
+    struct {
+        usec_t key;
+        FACETS_ANCHOR_DIRECTION direction;
+    } anchor;
 
     SIMPLE_PATTERN *query;          // the full text search pattern
     size_t keys_filtered_by_query;  // the number of fields we do full text search (constant)
@@ -99,7 +109,7 @@ struct facets {
         char *chart;
         bool enabled;
         uint32_t slots;
-        usec_t slot_width;
+        usec_t slot_width_ut;
         usec_t after_ut;
         usec_t before_ut;
     } histogram;
@@ -125,42 +135,51 @@ struct facets {
 
 static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
     // Array of valid durations in seconds
-    static time_t valid_durations[] = {
-            1,
-            15,
-            30,
+    static time_t valid_durations_s[] = {
+            1, 2, 5, 10, 15, 30,                                                // seconds
             1 * 60, 2 * 60, 3 * 60, 5 * 60, 10 * 60, 15 * 60, 30 * 60,          // minutes
             1 * 3600, 2 * 3600, 6 * 3600, 8 * 3600, 12 * 3600,                  // hours
             1 * 86400, 2 * 86400, 3 * 86400, 5 * 86400, 7 * 86400, 14 * 86400,  // days
             1 * (30*86400)                                                      // months
     };
-    static int array_size = sizeof(valid_durations) / sizeof(valid_durations[0]);
+    static int array_size = sizeof(valid_durations_s) / sizeof(valid_durations_s[0]);
 
-    usec_t duration = before_ut - after_ut;
-    usec_t bar_width = 1 * 60;
+    usec_t duration_ut = before_ut - after_ut;
+    usec_t bar_width_ut = 1 * 60 * USEC_PER_SEC;
 
     for (int i = array_size - 1; i >= 0; --i) {
-        if (duration / (valid_durations[i] * 60) >= HISTOGRAM_COLUMNS) {
-            bar_width = valid_durations[i] * 60;
+        if (duration_ut / (valid_durations_s[i] * USEC_PER_SEC) >= HISTOGRAM_COLUMNS) {
+            bar_width_ut = valid_durations_s[i] * USEC_PER_SEC;
             break;
         }
     }
 
-    return bar_width;
+    return bar_width_ut;
 }
 
 static inline usec_t facets_histogram_slot_baseline_ut(FACETS *facets, usec_t ut) {
-    usec_t delta = ut % facets->histogram.slot_width;
-    return ut - delta;
+    usec_t delta_ut = ut % facets->histogram.slot_width_ut;
+    return ut - delta_ut;
 }
 
 void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, usec_t before_ut) {
+    if(after_ut > before_ut) {
+        usec_t t = after_ut;
+        after_ut = before_ut;
+        before_ut = t;
+    }
+
     facets->histogram.enabled = true;
     facets->histogram.chart = chart ? strdupz(chart) : NULL;
-    facets->histogram.slot_width = calculate_histogram_bar_width(after_ut, before_ut);
+    facets->histogram.slot_width_ut = calculate_histogram_bar_width(after_ut, before_ut);
     facets->histogram.after_ut = facets_histogram_slot_baseline_ut(facets, after_ut);
-    facets->histogram.before_ut = facets_histogram_slot_baseline_ut(facets, before_ut) + facets->histogram.slot_width;
-    facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width + 1;
+    facets->histogram.before_ut = facets_histogram_slot_baseline_ut(facets, before_ut) + facets->histogram.slot_width_ut;
+    facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width_ut + 1;
+
+    if(facets->histogram.slots > 1000) {
+        facets->histogram.slots = 1000 + 1;
+        facets->histogram.slot_width_ut = (facets->histogram.before_ut - facets->histogram.after_ut) / 1000;
+    }
 }
 
 static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k __maybe_unused, FACET_VALUE *v, usec_t usec) {
@@ -178,7 +197,7 @@ static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k __
     if(base_ut > facets->histogram.before_ut)
         base_ut = facets->histogram.before_ut;
 
-    uint32_t slot = (base_ut - facets->histogram.after_ut) / facets->histogram.slot_width;
+    uint32_t slot = (base_ut - facets->histogram.after_ut) / facets->histogram.slot_width_ut;
 
     if(unlikely(slot >= facets->histogram.slots))
         slot = facets->histogram.slots - 1;
@@ -186,9 +205,12 @@ static inline void facets_histogram_update_value(FACETS *facets, FACET_KEY *k __
     v->histogram[slot]++;
 }
 
-static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
     buffer_json_member_add_array(wb, key);
     {
+        if(first_key)
+            buffer_json_add_array_item_string(wb, first_key);
+
         FACET_VALUE *v;
         dfe_start_read(k->values, v) {
             if(unlikely(!v->histogram))
@@ -478,25 +500,31 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
             buffer_json_member_add_uint64(wb, "sl", 1);
             buffer_json_member_add_uint64(wb, "qr", 1);
         }
-        buffer_json_object_close(wb); // nodes;
+        buffer_json_object_close(wb); // nodes
         buffer_json_member_add_object(wb, "contexts");
         {
             buffer_json_member_add_uint64(wb, "sl", 1);
             buffer_json_member_add_uint64(wb, "qr", 1);
         }
-        buffer_json_object_close(wb); // contexts;
+        buffer_json_object_close(wb); // contexts
+        buffer_json_member_add_object(wb, "instances");
+        {
+            buffer_json_member_add_uint64(wb, "sl", 1);
+            buffer_json_member_add_uint64(wb, "qr", 1);
+        }
+        buffer_json_object_close(wb); // instances
         buffer_json_member_add_object(wb, "dimensions");
         {
             buffer_json_member_add_uint64(wb, "sl", dimensions);
             buffer_json_member_add_uint64(wb, "qr", dimensions);
         }
-        buffer_json_object_close(wb); // contexts;
+        buffer_json_object_close(wb); // dimension
     }
     buffer_json_object_close(wb); // totals
 
     buffer_json_member_add_object(wb, "result");
     {
-        facets_histogram_value_names(wb, facets, k, "labels");
+        facets_histogram_value_names(wb, facets, k, "labels", "time");
 
         buffer_json_member_add_object(wb, "point");
         {
@@ -522,8 +550,8 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                         buffer_json_add_array_item_array(wb); // point
 
                         buffer_json_add_array_item_uint64(wb, v->histogram[i]);
-                        buffer_json_add_array_item_uint64(wb, 0);
-                        buffer_json_add_array_item_uint64(wb, 1);
+                        buffer_json_add_array_item_uint64(wb, 0); // arp - anomaly rate
+                        buffer_json_add_array_item_uint64(wb, 0); // pa - point annotation
 
                         buffer_json_array_close(wb); // point
                     }
@@ -531,7 +559,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 }
                 buffer_json_array_close(wb); // row
 
-                t += facets->histogram.slot_width;
+                t += facets->histogram.slot_width_ut;
             }
         }
         buffer_json_array_close(wb); //data
@@ -541,13 +569,13 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
     buffer_json_member_add_object(wb, "db");
     {
         buffer_json_member_add_uint64(wb, "tiers", 1);
-        buffer_json_member_add_uint64(wb, "update_every", 1);
+        buffer_json_member_add_uint64(wb, "update_every", facets->histogram.slot_width_ut / USEC_PER_SEC);
         buffer_json_member_add_time_t(wb, "first_entry", facets->histogram.after_ut / USEC_PER_SEC);
         buffer_json_member_add_time_t(wb, "last_entry", facets->histogram.before_ut / USEC_PER_SEC);
         buffer_json_member_add_string(wb, "units", "events");
         buffer_json_member_add_object(wb, "dimensions");
         {
-            facets_histogram_value_names(wb, facets, k, "ids");
+            facets_histogram_value_names(wb, facets, k, "ids", NULL);
             facets_histogram_value_units(wb, facets, k, "units");
 
             buffer_json_member_add_object(wb, "sts");
@@ -569,7 +597,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 buffer_json_member_add_uint64(wb, "tier", 0);
                 buffer_json_member_add_uint64(wb, "queries", 1);
                 buffer_json_member_add_uint64(wb, "points", count);
-                buffer_json_member_add_time_t(wb, "update_every", 1);
+                buffer_json_member_add_time_t(wb, "update_every", facets->histogram.slot_width_ut / USEC_PER_SEC);
                 buffer_json_member_add_time_t(wb, "first_entry", facets->histogram.after_ut / USEC_PER_SEC);
                 buffer_json_member_add_time_t(wb, "last_entry", facets->histogram.before_ut / USEC_PER_SEC);
             }
@@ -582,11 +610,11 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
     buffer_json_member_add_object(wb, "view");
     {
         buffer_json_member_add_string(wb, "title", "Events Distribution");
-        buffer_json_member_add_time_t(wb, "update_every", 1);
+        buffer_json_member_add_time_t(wb, "update_every", facets->histogram.slot_width_ut / USEC_PER_SEC);
         buffer_json_member_add_time_t(wb, "after", facets->histogram.after_ut / USEC_PER_SEC);
         buffer_json_member_add_time_t(wb, "before", facets->histogram.before_ut / USEC_PER_SEC);
         buffer_json_member_add_string(wb, "units", "events");
-        buffer_json_member_add_string(wb, "chart_type", "stacked");
+        buffer_json_member_add_string(wb, "chart_type", "stackedBar");
         buffer_json_member_add_object(wb, "dimensions");
         {
             buffer_json_member_add_array(wb, "grouped_by");
@@ -595,8 +623,8 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
             }
             buffer_json_array_close(wb); // grouped_by
 
-            facets_histogram_value_names(wb, facets, k, "ids");
-            facets_histogram_value_names(wb, facets, k, "names");
+            facets_histogram_value_names(wb, facets, k, "ids", NULL);
+            facets_histogram_value_names(wb, facets, k, "names", NULL);
             facets_histogram_value_units(wb, facets, k, "units");
 
             buffer_json_member_add_object(wb, "sts");
@@ -792,7 +820,7 @@ static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 // ----------------------------------------------------------------------------
 
-FACETS *facets_create(uint32_t items_to_return, usec_t anchor, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {
+FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys) {
     FACETS *facets = callocz(1, sizeof(FACETS));
     facets->options = options;
     facets->keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, NULL, sizeof(FACET_KEY));
@@ -810,7 +838,8 @@ FACETS *facets_create(uint32_t items_to_return, usec_t anchor, FACETS_OPTIONS op
         facets->visible_keys = simple_pattern_create(visible_keys, "|", SIMPLE_PATTERN_EXACT, true);
 
     facets->max_items_to_return = items_to_return;
-    facets->anchor = anchor;
+    facets->anchor.key = 0;
+    facets->anchor.direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     facets->order = 1;
 
     return facets;
@@ -877,8 +906,9 @@ void facets_set_items(FACETS *facets, uint32_t items) {
     facets->max_items_to_return = items;
 }
 
-void facets_set_anchor(FACETS *facets, usec_t anchor) {
-    facets->anchor = anchor;
+void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION direction) {
+    facets->anchor.key = anchor;
+    facets->anchor.direction = direction;
 }
 
 inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options) {
@@ -1027,24 +1057,12 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
 
 // ----------------------------------------------------------------------------
 
-static void facets_row_keep(FACETS *facets, usec_t usec) {
-    facets->operations.matched++;
+static inline FACET_ROW *facets_row_keep_seek_to_position(FACETS *facets, usec_t usec) {
+    if(usec < facets->base->prev->usec)
+        return facets->base->prev;
 
-    if(usec < facets->anchor) {
-        facets->operations.skips_before++;
-        return;
-    }
-
-    if(unlikely(!facets->base)) {
-        facets->operations.last_added = facets_row_create(facets, usec, NULL);
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->base, facets->operations.last_added, prev, next);
-        facets->items_to_return++;
-        facets->operations.first++;
-        return;
-    }
-
-    if(likely(usec > facets->base->prev->usec))
-        facets->operations.last_added = facets->base->prev;
+    if(usec > facets->base->usec)
+        return facets->base;
 
     FACET_ROW *last = facets->operations.last_added;
     while(last->prev != facets->base->prev && usec > last->prev->usec) {
@@ -1057,45 +1075,104 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
         facets->operations.forwards++;
     }
 
-    if(facets->items_to_return >= facets->max_items_to_return) {
-        if(last == facets->base->prev && usec < last->usec) {
-            facets->operations.skips_after++;
-            return;
+    return last;
+}
+
+static void facets_row_keep_first_entry(FACETS *facets, usec_t usec) {
+    facets->operations.last_added = facets_row_create(facets, usec, NULL);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->base, facets->operations.last_added, prev, next);
+    facets->items_to_return++;
+    facets->operations.first++;
+}
+
+static void facets_row_keep(FACETS *facets, usec_t usec) {
+    facets->operations.matched++;
+
+    if(facets->anchor.key) {
+        // we have an anchor key
+        // we don't want to keep rows on the other side of the direction
+
+        switch (facets->anchor.direction) {
+            default:
+            case FACETS_ANCHOR_DIRECTION_BACKWARD:
+                if (usec < facets->anchor.key) {
+                    facets->operations.skips_before++;
+                    return;
+                }
+                break;
+
+            case FACETS_ANCHOR_DIRECTION_FORWARD:
+                if (usec > facets->anchor.key) {
+                    facets->operations.skips_after++;
+                    return;
+                }
+                break;
         }
+    }
+
+    if(unlikely(!facets->base)) {
+        // the first row to keep
+        facets_row_keep_first_entry(facets, usec);
+        return;
+    }
+
+    FACET_ROW *closest = facets_row_keep_seek_to_position(facets, usec);
+    FACET_ROW *to_replace = NULL;
+
+    if(likely(facets->items_to_return >= facets->max_items_to_return)) {
+        // we have enough items to return already
+
+        switch(facets->anchor.direction) {
+            default:
+            case FACETS_ANCHOR_DIRECTION_BACKWARD:
+                if(closest == facets->base->prev && usec < closest->usec) {
+                    // this is to the end of the list, belonging to the next page
+                    facets->operations.skips_after++;
+                    return;
+                }
+
+                // it seems we need to remove an item - the last one
+                to_replace = facets->base->prev;
+                if(closest == to_replace)
+                    closest = to_replace->prev;
+
+                break;
+
+            case FACETS_ANCHOR_DIRECTION_FORWARD:
+                if(closest == facets->base && usec > closest->usec) {
+                    // this is to the beginning of the list, belonging to the next page
+                    facets->operations.skips_before++;
+                    return;
+                }
+
+                // it seems we need to remove an item - the first one
+                to_replace = facets->base;
+                if(closest == to_replace)
+                    closest = to_replace->next;
+
+                break;
+        }
+
+        facets->operations.shifts++;
+        facets->items_to_return--;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(facets->base, to_replace, prev, next);
+    }
+
+    internal_fatal(!closest, "FACETS: closest cannot be NULL");
+    internal_fatal(closest == to_replace, "FACETS: closest cannot be the same as to_replace");
+
+    facets->operations.last_added = facets_row_create(facets, usec, to_replace);
+
+    if(usec < closest->usec) {
+        DOUBLE_LINKED_LIST_INSERT_ITEM_AFTER_UNSAFE(facets->base, closest, facets->operations.last_added, prev, next);
+        facets->operations.appends++;
+    }
+    else {
+        DOUBLE_LINKED_LIST_INSERT_ITEM_BEFORE_UNSAFE(facets->base, closest, facets->operations.last_added, prev, next);
+        facets->operations.prepends++;
     }
 
     facets->items_to_return++;
-
-    if(usec > last->usec) {
-        if(facets->items_to_return > facets->max_items_to_return) {
-            facets->items_to_return--;
-            facets->operations.shifts++;
-            facets->operations.last_added = facets->base->prev;
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(facets->base, facets->operations.last_added, prev, next);
-            facets->operations.last_added = facets_row_create(facets, usec, facets->operations.last_added);
-        }
-        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(facets->base, facets->operations.last_added, prev, next);
-        facets->operations.prepends++;
-    }
-    else {
-        facets->operations.last_added = facets_row_create(facets, usec, NULL);
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->base, facets->operations.last_added, prev, next);
-        facets->operations.appends++;
-    }
-
-    while(facets->items_to_return > facets->max_items_to_return) {
-        // we have to remove something
-
-        FACET_ROW *tmp = facets->base->prev;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(facets->base, tmp, prev, next);
-        facets->items_to_return--;
-
-        if(unlikely(facets->operations.last_added == tmp))
-            facets->operations.last_added = facets->base->prev;
-
-        facets_row_free(facets, tmp);
-        facets->operations.shifts++;
-    }
 }
 
 void facets_rows_begin(FACETS *facets) {
