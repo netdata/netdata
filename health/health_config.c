@@ -1374,84 +1374,123 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
     sql_store_hashes = 0;
 }
 
-void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, RRDCALC *rcv, struct health_virtual *hv)
+void health_config_setup_rc_from_api_do_lookup(BUFFER *wb, RRDCALC *rcv, char *lookup)
 {
+    if (!lookup)
+        return;
+
+    buffer_json_member_add_string_or_omit(wb, "lookup", lookup);
+    health_parse_db_lookup(0, NULL, lookup, &rcv->group, &rcv->after, &rcv->before,
+                           &rcv->update_every, &rcv->options, &rcv->dimensions, &rcv->foreach_dimension);
+
+    if(rcv->foreach_dimension)
+        rcv->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalc_foreachdim(rcv));
+}
+
+void health_config_setup_rc_from_api_do_calc(BUFFER *wb, RRDCALC *rcv, char *calc)
+{
+    if (!calc)
+        return;
+
+    const char *failed_at = NULL;
+    int error = 0;
+    rcv->calculation = expression_parse(calc, &failed_at, &error);
+    if (!error) {
+        rcv->calculation->status = &rcv->status;
+        rcv->calculation->myself = &rcv->value;
+        rcv->calculation->after = &rcv->db_after;
+        rcv->calculation->before = &rcv->db_before;
+        rcv->calculation->rrdcalc = rcv;
+        buffer_json_member_add_string(wb, "calc", calc);
+    } else {
+        buffer_json_member_add_string(wb, "calc_error", expression_strerror(error));
+    }
+}
+
+void health_config_setup_rc_from_api_do_warn(BUFFER *wb, RRDCALC *rcv, char *warn)
+{
+    if (!warn)
+        return;
+
+    const char *failed_at = NULL;
+    int error = 0;
+    rcv->warning = expression_parse(warn, &failed_at, &error);
+    if (!error) {
+        rcv->warning->status = &rcv->status;
+        rcv->warning->myself = &rcv->value;
+        rcv->warning->after = &rcv->db_after;
+        rcv->warning->before = &rcv->db_before;
+        rcv->warning->rrdcalc = rcv;
+        buffer_json_member_add_string(wb, "warn", warn);
+    } else {
+        buffer_json_member_add_string(wb, "warn_error", expression_strerror(error));
+    }
+}
+
+void health_config_setup_rc_from_api_do_crit(BUFFER *wb, RRDCALC *rcv, char *crit)
+{
+    if (!crit)
+        return;
+
+    const char *failed_at = NULL;
+    int error = 0;
+    rcv->critical = expression_parse(crit, &failed_at, &error);
+    if (!error) {
+        rcv->critical->status = &rcv->status;
+        rcv->critical->myself = &rcv->value;
+        rcv->critical->after = &rcv->db_after;
+        rcv->critical->before = &rcv->db_before;
+        rcv->critical->rrdcalc = rcv;
+        buffer_json_member_add_string(wb, "crit", crit);
+    } else {
+        buffer_json_member_add_string(wb, "crit_error", expression_strerror(error));
+    }
+}
+
+void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, DICTIONARY *dict_rcvs, struct health_virtual *hv)
+{
+    RRDCALC *rcv = callocz(1, sizeof(RRDCALC));
     rcv->name = string_strdupz("virtual");
 
     if (hv->chart) {
         buffer_json_member_add_string(wb, "chart", hv->chart);
-        rcv->chart = string_strdupz(hv->chart);
         RRDSET *st;
-        rrdset_foreach_write(st, host) {
-            if ((rcv->chart != st->id) && (rcv->chart != st->name))
+        rrdset_foreach_read(st, host) {
+            if (strcmp(hv->chart, string2str(st->id)) && strcmp(hv->chart, string2str(st->name)))
                 continue;
             else {
+                rcv->chart = string_dup(st->id);
                 rcv->rrdset = st;
                 rcv->units = string_dup(st->units);
+                health_config_setup_rc_from_api_do_lookup(wb, rcv, hv->lookup);
+                health_config_setup_rc_from_api_do_calc(wb, rcv, hv->calc);
+                health_config_setup_rc_from_api_do_warn(wb, rcv, hv->warn);
+                health_config_setup_rc_from_api_do_crit(wb, rcv, hv->crit);
+ 
+                dictionary_set(dict_rcvs, string2str(st->id), rcv, sizeof(RRDCALC));
+                break;
             }
         }
         rrdset_foreach_done(st);
-
-    } else if (hv->context) {
+    }
+    else if (hv->context) {
         buffer_json_member_add_string(wb, "context", hv->context);
+        RRDSET *st;
+        rrdset_foreach_read(st, host) {
+            if (!strcmp(hv->context, string2str(st->context))) {
+                //TODO check if we can use some of the existing checkers for match with templates
+                rcv->chart = string_dup(st->id);
+                rcv->rrdset = st;
+                rcv->units = string_dup(st->units);
+                health_config_setup_rc_from_api_do_lookup(wb, rcv, hv->lookup);
+                health_config_setup_rc_from_api_do_calc(wb, rcv, hv->calc);
+                health_config_setup_rc_from_api_do_warn(wb, rcv, hv->warn);
+                health_config_setup_rc_from_api_do_crit(wb, rcv, hv->crit);
 
-
-    }
-
-    if (hv->lookup) {
-        buffer_json_member_add_string_or_omit(wb, "lookup", hv->lookup);
-        health_parse_db_lookup(0, NULL, hv->lookup, &rcv->group, &rcv->after, &rcv->before,
-                           &rcv->update_every, &rcv->options, &rcv->dimensions, &rcv->foreach_dimension);
-
-        if(rcv->foreach_dimension)
-            rcv->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalc_foreachdim(rcv));
-    }
-
-    if (hv->calc) {
-        const char *failed_at = NULL;
-        int error = 0;
-        rcv->calculation = expression_parse(hv->calc, &failed_at, &error);
-        if (!error) {
-            rcv->calculation->status = &rcv->status;
-            rcv->calculation->myself = &rcv->value;
-            rcv->calculation->after = &rcv->db_after;
-            rcv->calculation->before = &rcv->db_before;
-            rcv->calculation->rrdcalc = rcv;
-            buffer_json_member_add_string(wb, "calc", hv->calc);
-        } else {
-            buffer_json_member_add_string(wb, "calc_error", expression_strerror(error));
+                dictionary_set(dict_rcvs, string2str(st->id), rcv, sizeof(RRDCALC));
+                rcv = callocz(1, sizeof(RRDCALC));
+            }
         }
-    }
-
-    if (hv->warn) {
-        const char *failed_at = NULL;
-        int error = 0;
-        rcv->warning = expression_parse(hv->warn, &failed_at, &error);
-        if (!error) {
-            rcv->warning->status = &rcv->status;
-            rcv->warning->myself = &rcv->value;
-            rcv->warning->after = &rcv->db_after;
-            rcv->warning->before = &rcv->db_before;
-            rcv->warning->rrdcalc = rcv;
-            buffer_json_member_add_string(wb, "warn", hv->warn);
-        } else {
-            buffer_json_member_add_string(wb, "warn_error", expression_strerror(error));
-        }
-    }
-
-    if (hv->crit) {
-        const char *failed_at = NULL;
-        int error = 0;
-        rcv->critical = expression_parse(hv->crit, &failed_at, &error);
-        if (!error) {
-            rcv->critical->status = &rcv->status;
-            rcv->critical->myself = &rcv->value;
-            rcv->critical->after = &rcv->db_after;
-            rcv->critical->before = &rcv->db_before;
-            rcv->critical->rrdcalc = rcv;
-            buffer_json_member_add_string(wb, "crit", hv->warn);
-        } else {
-            buffer_json_member_add_string(wb, "crit_error", expression_strerror(error));
-        }
+        rrdset_foreach_done(st);
     }
 }

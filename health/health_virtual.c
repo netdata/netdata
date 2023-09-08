@@ -122,28 +122,36 @@ void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv) {
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
-    buffer_json_member_add_object(wb, "alert_eval");
-    /* //buffer_json_member_add_string(wb, "host", rrdhost_hostname(host)); */
-    buffer_json_member_add_int64(wb, "health_run_every", min_run_every);
-    buffer_json_member_add_time_t(wb, "after", hv->after);
-    buffer_json_member_add_time_t(wb, "before", hv->before);
-    buffer_json_member_add_object(wb, "configuration");
+    buffer_json_member_add_object(wb, "alert_eval"                     );
+    buffer_json_member_add_int64 (wb, "health_run_every", min_run_every);
+    buffer_json_member_add_time_t(wb, "after",            hv->after    );
+    buffer_json_member_add_time_t(wb, "before",           hv->before   );
+    buffer_json_member_add_object(wb, "configuration"                  );
 
-    RRDCALC *rcv = callocz(1, sizeof(RRDCALC));
+    DICTIONARY *dict_rcvs = NULL;
+    dict_rcvs = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+
     //TODO get from the v2 nodes which one to run on
-    health_config_setup_rc_from_api(wb, localhost, rcv, hv);
-
+    health_config_setup_rc_from_api(wb, localhost, dict_rcvs, hv);
     buffer_json_object_close(wb);
-    buffer_json_member_add_array(wb, string2str(rcv->chart));
+    buffer_json_member_add_object(wb, localhost->machine_guid);
 
-    time_t now = now_realtime_sec();
-    time_t at = hv->after ? hv->after : now;
-    hv->before = hv->before ? hv->before : now;
-    while (at <= hv->before) {
-        health_virtual_run(localhost, wb, rcv, at);
-        at+=min_run_every;
+    RRDCALC *rcv;
+    dfe_start_read(dict_rcvs, rcv) {
+        buffer_json_member_add_array(wb, string2str(rcv->chart));
+
+        time_t now = now_realtime_sec();
+        time_t at  = hv->after  ? hv->after  : now;
+        hv->before = hv->before ? hv->before : now;
+
+        while (at <= hv->before) {
+            health_virtual_run(localhost, wb, rcv, at);
+            at += min_run_every;
+        }
+
+        buffer_json_array_close(wb);
     }
-
-    buffer_json_array_close(wb);
+    dfe_done(rcv);
+    buffer_json_object_close(wb);
     buffer_json_object_close(wb);
 }
