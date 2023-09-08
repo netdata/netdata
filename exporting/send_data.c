@@ -106,6 +106,8 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
             // failed to receive data
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
                 netdata_log_error("EXPORTING: cannot receive data from '%s'.", instance->config.destination);
+                close(*sock);
+                *sock = -1;
             }
         }
 
