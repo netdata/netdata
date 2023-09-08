@@ -33,7 +33,8 @@
 #define JOURNAL_PARAMETER_HISTOGRAM             "histogram"
 #define JOURNAL_PARAMETER_DIRECTION             "direction"
 #define JOURNAL_PARAMETER_IF_MODIFIED_SINCE     "if_modified_since"
-
+#define JOURNAL_PARAMETER_SOURCE                "source"
+#define JOURNAL_PARAMETER_INFO                  "info"
 
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       NULL
@@ -353,6 +354,8 @@ static void function_systemd_journal(const char *transaction, char *function, ch
                                    SYSTEMD_KEYS_INCLUDED_IN_FACETS,
                                    SYSTEMD_KEYS_EXCLUDED_FROM_FACETS);
 
+    facets_accepted_param(facets, JOURNAL_PARAMETER_INFO);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_SOURCE);
     facets_accepted_param(facets, JOURNAL_PARAMETER_AFTER);
     facets_accepted_param(facets, JOURNAL_PARAMETER_BEFORE);
     facets_accepted_param(facets, JOURNAL_PARAMETER_ANCHOR);
@@ -389,6 +392,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     facets_register_key_name_transformation(facets, "_GID", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
                                             systemd_journal_transform_gid, gids);
 
+    bool info = false;
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
     usec_t if_modified_since = 0;
@@ -396,6 +400,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     FACETS_ANCHOR_DIRECTION direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     const char *query = NULL;
     const char *chart = NULL;
+    const char *source = NULL;
 
     buffer_json_member_add_object(wb, "request");
 
@@ -408,6 +413,12 @@ static void function_systemd_journal(const char *transaction, char *function, ch
         if(strcmp(keyword, JOURNAL_PARAMETER_HELP) == 0) {
             systemd_journal_function_help(transaction);
             goto cleanup;
+        }
+        else if(strcmp(keyword, JOURNAL_PARAMETER_INFO) == 0) {
+            info = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {
+            source = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_AFTER ":", sizeof(JOURNAL_PARAMETER_AFTER ":") - 1) == 0) {
             after_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_AFTER ":") - 1]);
@@ -498,6 +509,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     if(!last)
         last = SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY;
 
+    buffer_json_member_add_string(wb, "source", source ? source : "default");
     buffer_json_member_add_time_t(wb, "after", after_s);
     buffer_json_member_add_time_t(wb, "before", before_s);
     buffer_json_member_add_uint64(wb, "if_modified_since", if_modified_since);
@@ -509,19 +521,35 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     buffer_json_member_add_time_t(wb, "timeout", timeout);
     buffer_json_object_close(wb); // request
 
+    int response;
+
+    if(info) {
+        facets_accepted_parameters_to_json_array(facets, wb, false);
+        buffer_json_member_add_array(wb, "sources");
+        buffer_json_add_array_item_string(wb, "default");
+        buffer_json_array_close(wb); // sources
+        buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+        buffer_json_member_add_string(wb, "type", "table");
+        buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
+        buffer_json_finalize(wb);
+        response = HTTP_RESP_OK;
+        goto output;
+    }
+
     facets_set_items(facets, last);
     facets_set_anchor(facets, anchor, direction);
     facets_set_query(facets, query);
     facets_set_histogram(facets, chart ? chart : "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
-    int response = systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
-                                       if_modified_since, now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
+    response = systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
+                                     if_modified_since, now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
 
     if(response != HTTP_RESP_OK) {
         pluginsd_function_json_error_to_stdout(transaction, response, "failed");
         goto cleanup;
     }
 
+output:
     pluginsd_function_result_begin_to_stdout(transaction, response, "application/json", expires);
     fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
     pluginsd_function_result_end_to_stdout();
