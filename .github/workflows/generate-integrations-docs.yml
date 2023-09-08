@@ -18,13 +18,16 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'netdata/netdata'
     steps:
+      - name: Checkout Agent
+        id: checkout-agent
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          submodules: recursive
       - name: Generate Integrations Documentation
         id: generate
         run: |
           python3 integrations/gen_docs_integrations.py
-      - name: Clean Up Temporary Data
-        id: clean
-        run: rm -rf virtualenv
       - name: Create PR
         id: create-pr
         uses: peter-evans/create-pull-request@v5
@@ -48,8 +51,8 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create PR generating documentation from integrations.js
+              Checkout Agent: ${{ steps.checkout-agent.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
-              Clean Up Temporary Data: ${{ steps.clean.outcome }}
               Create PR: ${{ steps.create-pr.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
