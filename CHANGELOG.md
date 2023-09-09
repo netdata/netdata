@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix memory leak on prometheus exporter and code cleanup [\#15929](https://github.com/netdata/netdata/pull/15929) ([ktsaou](https://github.com/ktsaou))
+- systemd-journal and facets improvements [\#15926](https://github.com/netdata/netdata/pull/15926) ([ktsaou](https://github.com/ktsaou))
 - Reduce workload during cleanup [\#15919](https://github.com/netdata/netdata/pull/15919) ([stelfrag](https://github.com/stelfrag))
 - Replace \_ with spaces for name variable for ntfy [\#15909](https://github.com/netdata/netdata/pull/15909) ([MAH69IK](https://github.com/MAH69IK))
 - python.d/sensors: Increase voltage limits 127 -\> 400 [\#15905](https://github.com/netdata/netdata/pull/15905) ([kylemanna](https://github.com/kylemanna))
@@ -81,6 +83,7 @@
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
 - Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
+- don't return `-1` if the socket was closed [\#15771](https://github.com/netdata/netdata/pull/15771) ([moonbreon](https://github.com/moonbreon))
 - Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
 - Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
@@ -425,10 +428,6 @@
 - Update dashboard to version v3.0.1. [\#15352](https://github.com/netdata/netdata/pull/15352) ([netdatabot](https://github.com/netdatabot))
 - Fix installation type command [\#15351](https://github.com/netdata/netdata/pull/15351) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - agent alert notifications redirect [\#15350](https://github.com/netdata/netdata/pull/15350) ([ktsaou](https://github.com/ktsaou))
-- bearer protection - additions [\#15349](https://github.com/netdata/netdata/pull/15349) ([ktsaou](https://github.com/ktsaou))
-- health: fix evaluating expression with `nan` [\#15348](https://github.com/netdata/netdata/pull/15348) ([ilyam8](https://github.com/ilyam8))
-- add missing labels to freeipmi metrics csv [\#15347](https://github.com/netdata/netdata/pull/15347) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity issues [\#15345](https://github.com/netdata/netdata/pull/15345) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
