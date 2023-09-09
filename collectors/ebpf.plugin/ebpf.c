@@ -920,7 +920,7 @@ int ebpf_exit_plugin = 0;
  *
  * @param sig is the signal number used to close the collector
  */
-static void ebpf_stop_threads(int sig)
+void ebpf_stop_threads(int sig)
 {
     UNUSED(sig);
     static int only_one = 0;

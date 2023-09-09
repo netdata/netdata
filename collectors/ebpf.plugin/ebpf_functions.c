@@ -1151,5 +1151,10 @@ void *ebpf_function_thread(void *ptr)
         else
             netdata_log_error("Received unknown command: %s", keyword ? keyword : "(unset)");
     }
+
+    if(!s || feof(stdin) || ferror(stdin)) {
+        ebpf_stop_threads(SIGQUIT);
+        netdata_log_error("Received error on stdin.");
+    }
     return NULL;
 }
