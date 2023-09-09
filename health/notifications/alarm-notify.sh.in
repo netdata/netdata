@@ -2450,9 +2450,20 @@ send_ntfy() {
     *) priority="default" ;;
   esac
 
+  # Adding ntfy header generation logic
+  # Heavily inspired by https://github.com/nickexyz/ntfy-shellscripts/blob/main/sabnzbd.sh
+  ntfy_auth_header=""
+  if [[ -n "${NTFY_USERNAME}" ]] && [[ -n "${NTFY_PASSWORD}" ]]; then
+    ntfy_base64=$( echo -n "$NTFY_USERNAME:$NTFY_PASSWORD" | base64 )
+    ntfy_auth_header="-H Authorization: Basic ${ntfy_base64}"
+  elif [ -n "${NTFY_ACCESS_TOKEN}" ]; then
+    ntfy_auth_header="-H Authorization: Bearer $auth"
+  fi
+
   for recipient in ${recipients}; do
     msg="${host} ${status_message}: ${alarm} - ${info}"
     httpcode=$(docurl -X POST \
+                      "${ntfy_auth_header}" \
                       -H "Icon: https://raw.githubusercontent.com/netdata/netdata/master/web/gui/dashboard/images/favicon-196x196.png" \
                       -H "Title: ${host}: ${name//_/ }" \
                       -H "Tags: ${emoji}" \
