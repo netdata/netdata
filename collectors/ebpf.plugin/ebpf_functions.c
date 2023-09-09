@@ -596,10 +596,10 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
         rw_spinlock_read_lock(&pid_ptr->socket_stats.rw_spinlock);
         if (pid_ptr->socket_stats.JudyHSArray) {
             while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_timestamp, &first_socket))) {
-                counter++;
                 netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
                 ebpf_fill_function_buffer(buf, values, pid_ptr->cmdline);
             }
+            counter++;
         }
         rw_spinlock_read_unlock(&pid_ptr->socket_stats.rw_spinlock);
     }

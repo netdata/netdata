@@ -2565,8 +2565,6 @@ static void ebpf_socket_initialize_global_vectors()
                                                sizeof(netdata_socket_plus_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
-
-    rw_spinlock_init(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /*****************************************************************

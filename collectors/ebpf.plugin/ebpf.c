@@ -2709,6 +2709,7 @@ void ebpf_start_pthread_variables()
     pthread_mutex_init(&ebpf_exit_cleanup, NULL);
     pthread_mutex_init(&collect_data_mutex, NULL);
     pthread_mutex_init(&mutex_cgroup_shm, NULL);
+    rw_spinlock_init(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /**
