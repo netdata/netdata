@@ -625,7 +625,6 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 {
     // thread was not initialized or Array was reset
-    rw_spinlock_read_lock(&network_viewer_opt.rw_spinlock);
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
         !ebpf_judy_pid.index.JudyHSArray){
@@ -638,9 +637,10 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
         return;
     }
 
+    rw_spinlock_read_lock(&network_viewer_opt.rw_spinlock);
     ebpf_socket_fill_function_buffer_unsafe(buf);
-    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     rw_spinlock_read_unlock(&network_viewer_opt.rw_spinlock);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /**
