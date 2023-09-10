@@ -1609,7 +1609,6 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
 
     if (!strcmp(dst->socket_string.dst_port, "0"))
         snprintfz(dst->socket_string.dst_port, NI_MAXSERV, "%u",  ntohs(key->dport));
-
 #ifdef NETDATA_DEV_MODE
     collector_info("New socket: { ORIGIN IP: %s, ORIGIN : %u, DST IP:%s, DST PORT: %s, PID: %u, PROTO: %d, FAMILY: %d}",
                    dst->socket_string.src_ip,
@@ -1653,9 +1652,6 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // can have values from the previous one.
     memset(values, 0, length);
     time_t update_time = time(NULL);
-    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyHSArray;
-    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-    rw_spinlock_read_lock(&network_viewer_opt.rw_spinlock);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -1689,6 +1685,8 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         }
 
         // Get PID structure
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyHSArray;
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key.pid);
         if (!pid_ptr) {
             goto end_socket_loop;
@@ -1725,13 +1723,12 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         }
 
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
 end_socket_loop:
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
     }
-    rw_spinlock_read_unlock(&network_viewer_opt.rw_spinlock);
-    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_thread_enable_cancelability();
 }
 
