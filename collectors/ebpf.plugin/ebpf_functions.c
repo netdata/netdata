@@ -478,7 +478,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
     buffer_json_add_array_item_string(wb, (name) ? name : "not identified");
 
     // Origin
-    buffer_json_add_array_item_string(wb, (values->data.external_origin) ? "incoming" : "outcoming");
+    buffer_json_add_array_item_string(wb, (values->data.external_origin) ? "incoming" : "outgoing");
 
     // Source IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
