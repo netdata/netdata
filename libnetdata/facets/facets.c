@@ -1258,6 +1258,31 @@ cleanup:
 // ----------------------------------------------------------------------------
 // output
 
+void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys) {
+    buffer_json_member_add_array(wb, "accepted_params");
+    {
+        if(facets->accepted_params) {
+            void *t;
+            dfe_start_read(facets->accepted_params, t) {
+                        buffer_json_add_array_item_string(wb, t_dfe.name);
+                    }
+            dfe_done(t);
+        }
+
+        if(with_keys) {
+            FACET_KEY *k;
+            dfe_start_read(facets->keys, k){
+                        if (!k->values)
+                            continue;
+
+                        buffer_json_add_array_item_string(wb, k_dfe.name);
+                    }
+            dfe_done(k);
+        }
+    }
+    buffer_json_array_close(wb); // accepted_params
+}
+
 void facets_report(FACETS *facets, BUFFER *wb) {
     buffer_json_member_add_boolean(wb, "show_ids", false);
     buffer_json_member_add_boolean(wb, "has_history", true);
@@ -1268,26 +1293,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     buffer_json_member_add_string(wb, "column", "timestamp");
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_array(wb, "accepted_params");
-    {
-        if(facets->accepted_params) {
-            void *t;
-            dfe_start_read(facets->accepted_params, t) {
-                buffer_json_add_array_item_string(wb, t_dfe.name);
-            }
-            dfe_done(t);
-        }
-
-        FACET_KEY *k;
-        dfe_start_read(facets->keys, k) {
-            if(!k->values)
-                continue;
-
-            buffer_json_add_array_item_string(wb, k_dfe.name);
-        }
-        dfe_done(k);
-    }
-    buffer_json_array_close(wb); // accepted_params
+    facets_accepted_parameters_to_json_array(facets, wb, true);
 
     buffer_json_member_add_array(wb, "facets");
     {

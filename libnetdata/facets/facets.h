@@ -67,5 +67,6 @@ void facets_add_key_value(FACETS *facets, const char *key, const char *value);
 void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len);
 
 void facets_report(FACETS *facets, BUFFER *wb);
+void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys);
 
 #endif
