@@ -60,8 +60,7 @@
             detailed_description: |
             This should be used with `NTFY_PASSWORD` and is only useful on self hosted instances of ntfy. See https://docs.ntfy.sh/config/#users-and-roles for details.
 
-            Ensure that your user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`.
-            "
+            Ensure that your user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`
           - name: 'NTFY_PASSWORD'
             default_value: ''
             description: "The password for netdata to use to authenticate with an ntfy server."
@@ -69,8 +68,7 @@
             detailed_description: |
             This should be used with `NTFY_USERNAME` and is only useful on self hosted instances of ntfy. See https://docs.ntfy.sh/config/#users-and-roles for details.
 
-            Ensure that your user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`.
-            "
+            Ensure that your user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`
           - name: 'NTFY_ACCESS_TOKEN'
             default_value: ''
             description: "The access token for netdata to use to authenticate with an ntfy server."
@@ -78,8 +76,7 @@
             detailed_description: |
             This can be used in place of `NTFY_USERNAME` and `NTFY_PASSWORD` to authenticate with a self hosted ntfy instance. See https://docs.ntfy.sh/config/?h=access+to#access-tokens for details.
 
-            Ensure that the token user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`.
-            "
+            Ensure that the token user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`
 
       examples:
         folding:
