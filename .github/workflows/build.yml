@@ -52,7 +52,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -127,7 +127,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -203,7 +203,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Prepare tools
         id: prepare
         run: |
@@ -252,7 +252,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
@@ -351,7 +351,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Fetch test environment
@@ -431,7 +431,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Fetch dist tarball artifacts
         id: fetch-tarball
         uses: actions/download-artifact@v3
@@ -495,7 +495,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Prepare Environment
         id: prepare
         run: mkdir -p artifacts
@@ -569,7 +569,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Fetch artifacts
         id: fetch
         uses: actions/download-artifact@v3
@@ -623,7 +623,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Fetch artifacts
         id: fetch-artifacts
         uses: actions/download-artifact@v3
@@ -725,12 +725,12 @@ jobs:
     steps:
       - name: Checkout Main Repo
         id: checkout-main
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: main
       - name: Checkout Nightly Repo
         id: checkout-nightly
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: netdata/netdata-nightlies
           path: nightlies
@@ -811,7 +811,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Retrieve Artifacts
         id: fetch
         uses: actions/download-artifact@v3
