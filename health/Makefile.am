@@ -41,6 +41,7 @@ dist_healthconfig_DATA = \
     health.d/dnsmasq_dhcp.conf \
     health.d/dns_query.conf \
     health.d/docker.conf \
+    health.d/dummy.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/exporting.conf \
