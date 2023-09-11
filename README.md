@@ -165,6 +165,9 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
   Check also the [Netdata Deployment Strategies](https://learn.netdata.cloud/docs/architecture/deployment-strategies) to decide how to deploy it in your infrastructure.
 
+  By default, you will have immediately available a local dashboard. Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and
+navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If installed on localhost, you can access it through `http://localhost:19999`. 
+
 ### 2. **Configure Collectors** :boom:
 
    Netdata auto-detects and auto-discovers most operating system data sources and applications. However, many data sources require some manual configuration, usually to allow Netdata to get access to the metrics.
