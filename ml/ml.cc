@@ -1152,7 +1152,7 @@ ml_acquired_dimension_get(char *machine_guid, STRING *chart_id, STRING *dimensio
             acq_rs = rrdset_find_and_acquire(rh, string2str(chart_id));
             if (acq_rs) {
                 RRDSET *rs = rrdset_acquired_to_rrdset(acq_rs);
-                if (rs && !rrdset_flag_check(rs, RRDSET_FLAG_ARCHIVED | RRDSET_FLAG_OBSOLETE)) {
+                if (rs && !rrdset_flag_check(rs, RRDSET_FLAG_OBSOLETE)) {
                     acq_rd = rrddim_find_and_acquire(rs, string2str(dimension_id));
                     if (acq_rd) {
                         RRDDIM *rd = rrddim_acquired_to_rrddim(acq_rd);

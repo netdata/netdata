@@ -376,9 +376,6 @@ static void health_reload_host(RRDHOST *host) {
 
     // link the loaded alarms to their charts
     rrdset_foreach_write(st, host) {
-        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-            continue;
-
         rrdcalc_link_matching_alerts_to_rrdset(st);
         rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
@@ -724,11 +721,6 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_ARCHIVED))) {
-        netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as archived", rrdcalc_chart_name(rc), rrdcalc_name(rc));
-        return 0;
-    }
-
     if(unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
         netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
@@ -854,9 +846,6 @@ static void initialize_health(RRDHOST *host)
     // link the loaded alarms to their charts
     RRDSET *st;
     rrdset_foreach_reentrant(st, host) {
-        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-            continue;
-
         rrdcalc_link_matching_alerts_to_rrdset(st);
         rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }

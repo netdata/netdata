@@ -1604,7 +1604,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_ARCHIVED)))
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
         rrdset_isnot_obsolete(st);
 
     timing_step(TIMING_STEP_BEGIN2_FIND_CHART);

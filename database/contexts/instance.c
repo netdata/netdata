@@ -494,7 +494,7 @@ inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED|RRDSET_FLAG_OBSOLETE)))
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
         rrd_flag_set_archived(ri);
 
     rrdinstance_updated_rrdset_flags_no_action(ri, st);

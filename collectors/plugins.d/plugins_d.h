@@ -123,7 +123,7 @@ size_t pluginsd_initialize_plugin_directories();
 #define pluginsd_function_result_end_to_stdout() \
     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
 
-static inline void pluginsd_function_json_error(const char *transaction, int code, const char *msg) {
+static inline void pluginsd_function_json_error_to_stdout(const char *transaction, int code, const char *msg) {
     char buffer[PLUGINSD_LINE_MAX + 1];
     json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
 

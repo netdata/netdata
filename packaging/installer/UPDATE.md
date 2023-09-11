@@ -71,6 +71,12 @@ find the updater script.
 
 On such installs, you can update Netdata using your distribution package manager.
 
+### Updates on hosts without IPv4 connectivity
+
+The update process outlined above suffers from the same issues that installing on hosts without IPv4
+connectivity does, and requires similar workarounds. For more details check [the explanation in our install
+documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#installs-on-hosts-without-ipv4-connectivity).
+
 ### If the kickstart script does not work
 
 If the above command fails, you can [reinstall

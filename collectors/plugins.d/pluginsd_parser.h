@@ -10,6 +10,9 @@
 // this has to be in-sync with the same at receiver.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
+// this controls the max response size of a function
+#define PLUGINSD_MAX_DEFERRED_SIZE (20 * 1024 * 1024)
+
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
     PARSER_RC_OK,       // Callback was successful, go on
@@ -157,9 +160,9 @@ static inline int parser_action(PARSER *parser, char *input) {
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
             if(parser->defer.response) {
                 buffer_strcat(parser->defer.response, input);
-                if(buffer_strlen(parser->defer.response) > 10 * 1024 * 1024) {
-                    // more than 10MB of data
-                    // a bad plugin that did not send the end_keyword
+                if(buffer_strlen(parser->defer.response) > PLUGINSD_MAX_DEFERRED_SIZE) {
+                    // more than PLUGINSD_MAX_DEFERRED_SIZE of data,
+                    // or a bad plugin that did not send the end_keyword
                     internal_error(true, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
                     return 1;
                 }

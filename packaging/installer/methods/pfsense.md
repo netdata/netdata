@@ -7,7 +7,7 @@ learn_status: "Published"
 learn_rel_path: "Installation/Install on specific environments"
 -->
 
-# Install Netdata on pfSense
+# Install Netdata on pfSense CE
 
 > 💡 This document is maintained by Netdata's community, and may not be completely up-to-date. Please double-check the
 > details of the installation process, such as version numbers for downloadable packages, before proceeding.
