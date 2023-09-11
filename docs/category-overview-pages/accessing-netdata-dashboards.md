@@ -32,8 +32,7 @@ You can access the dashboard at https://app.netdata.cloud/ and [sign-in](https:/
 ### Netdata Agent
 
 Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and
-navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If you're unsure, try
-`http://localhost:19999` first.
+navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If installed on localhost, you can access it through `http://localhost:19999`.
 
 
 Documentation for previous Agent dashboard can still be found [here](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
