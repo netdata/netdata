@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Prepare tools
         id: prepare
         run: |
@@ -77,7 +77,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Fetch base image
         id: fetch-images
