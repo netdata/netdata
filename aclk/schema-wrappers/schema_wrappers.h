@@ -14,5 +14,6 @@
 #include "capability.h"
 #include "context_stream.h"
 #include "context.h"
+#include "agent_cmds.h"
 
 #endif /* SCHEMA_WRAPPERS_H */

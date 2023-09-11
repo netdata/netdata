@@ -18,6 +18,7 @@ static struct proc_module {
     {.name = "/proc/stat",                   .dim = "stat",         .func = do_proc_stat},
     {.name = "/proc/uptime",                 .dim = "uptime",       .func = do_proc_uptime},
     {.name = "/proc/loadavg",                .dim = "loadavg",      .func = do_proc_loadavg},
+    {.name = "/proc/sys/fs/file-nr",         .dim = "file-nr",      .func = do_proc_sys_fs_file_nr},
     {.name = "/proc/sys/kernel/random/entropy_avail", .dim = "entropy", .func = do_proc_sys_kernel_random_entropy_avail},
 
     // pressure metrics
@@ -32,7 +33,8 @@ static struct proc_module {
     {.name = "/proc/meminfo",                .dim = "meminfo",      .func = do_proc_meminfo},
     {.name = "/sys/kernel/mm/ksm",           .dim = "ksm",          .func = do_sys_kernel_mm_ksm},
     {.name = "/sys/block/zram",              .dim = "zram",         .func = do_sys_block_zram},
-    {.name = "/sys/devices/system/edac/mc",  .dim = "ecc",          .func = do_proc_sys_devices_system_edac_mc},
+    {.name = "/sys/devices/system/edac/mc",  .dim = "edac",         .func = do_proc_sys_devices_system_edac_mc},
+    {.name = "/sys/devices/pci/aer",         .dim = "pci_aer",      .func = do_proc_sys_devices_pci_aer},
     {.name = "/sys/devices/system/node",     .dim = "numa",         .func = do_proc_sys_devices_system_node},
     {.name = "/proc/pagetypeinfo",           .dim = "pagetypeinfo", .func = do_proc_pagetypeinfo},
 
@@ -68,8 +70,11 @@ static struct proc_module {
     // IPC metrics
     {.name = "ipc",                          .dim = "ipc",          .func = do_ipc},
 
-    {.name = "/sys/class/power_supply",      .dim = "power_supply", .func = do_sys_class_power_supply},
     // linux power supply metrics
+    {.name = "/sys/class/power_supply",      .dim = "power_supply", .func = do_sys_class_power_supply},
+    
+    // GPU metrics
+    {.name = "/sys/class/drm",               .dim = "drm",          .func = do_sys_class_drm},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
@@ -139,7 +144,7 @@ void *proc_main(void *ptr)
 
     if (config_get_boolean("plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
         netdev_thread = mallocz(sizeof(netdata_thread_t));
-        debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
+        netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
         netdata_thread_create(
             netdev_thread, THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, netdev_thread);
     }
@@ -180,7 +185,7 @@ void *proc_main(void *ptr)
             if (unlikely(!pm->enabled))
                 continue;
 
-            debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
+            netdata_log_debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
             worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);

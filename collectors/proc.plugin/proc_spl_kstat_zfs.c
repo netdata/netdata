@@ -216,6 +216,7 @@ struct zfs_pool {
     RRDDIM *rd_offline;
     RRDDIM *rd_removed;
     RRDDIM *rd_unavail;
+    RRDDIM *rd_suspended;
 
     int updated;
     int disabled;
@@ -226,6 +227,7 @@ struct zfs_pool {
     int offline;
     int removed;
     int unavail;
+    int suspended;
 };
 
 struct deleted_zfs_pool {
@@ -248,6 +250,7 @@ void disable_zfs_pool_state(struct zfs_pool *pool)
     pool->rd_offline = NULL;
     pool->rd_removed = NULL;
     pool->rd_unavail = NULL;
+    pool->rd_suspended = NULL;
 
     pool->disabled = 1;
 }
@@ -285,6 +288,7 @@ int update_zfs_pool_state_chart(const DICTIONARY_ITEM *item, void *pool_p, void 
                 pool->rd_offline = rrddim_add(pool->st, "offline", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 pool->rd_removed = rrddim_add(pool->st, "removed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 pool->rd_unavail = rrddim_add(pool->st, "unavail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                pool->rd_suspended = rrddim_add(pool->st, "suspended", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(pool->st->rrdlabels, "pool", name, RRDLABEL_SRC_AUTO);
             }
@@ -295,6 +299,7 @@ int update_zfs_pool_state_chart(const DICTIONARY_ITEM *item, void *pool_p, void 
             rrddim_set_by_pointer(pool->st, pool->rd_offline, pool->offline);
             rrddim_set_by_pointer(pool->st, pool->rd_removed, pool->removed);
             rrddim_set_by_pointer(pool->st, pool->rd_unavail, pool->unavail);
+            rrddim_set_by_pointer(pool->st, pool->rd_suspended, pool->suspended);
             rrdset_done(pool->st);
         }
     } else {
@@ -364,10 +369,10 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                 pool->offline = 0;
                 pool->removed = 0;
                 pool->unavail = 0;
+                pool->suspended = 0;
 
                 char filename[FILENAME_MAX + 1];
-                snprintfz(
-                    filename, FILENAME_MAX, "%s%s/%s/state", netdata_configured_host_prefix, dirname, de->d_name);
+                snprintfz(filename, FILENAME_MAX, "%s/%s/state", dirname, de->d_name);
 
                 char state[STATE_SIZE + 1];
                 int ret = read_file(filename, state, STATE_SIZE);
@@ -388,6 +393,8 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                         pool->removed = 1;
                     } else if (!strcmp(state, "UNAVAIL\n")) {
                         pool->unavail = 1;
+                    } else if (!strcmp(state, "SUSPENDED\n")) {
+                        pool->suspended = 1;
                     } else {
                         disable_zfs_pool_state(pool);
 

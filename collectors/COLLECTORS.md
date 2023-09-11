@@ -1,12 +1,3 @@
-<!--
-title: "Monitor anything with Netdata"
-description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
-sidebar_label: "Monitor"
-learn_status: "Published"
-learn_rel_path: "Integrations/Monitor"
--->
-
 # Monitor anything with Netdata
 
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in
@@ -31,13 +22,13 @@ accompanying configuration file.
 
 If you don't see the app/service you'd like to monitor in this list:
 
-- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our 
+- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our
   [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md).
 
-- If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics, 
+- If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics,
   see our [generic StatsD collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
 
-- If you have data in CSV, JSON, XML or other popular formats, you may be able to use our 
+- If you have data in CSV, JSON, XML or other popular formats, you may be able to use our
   [generic structured data (Pandas) collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/pandas/README.md),
 
 - Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous
@@ -47,12 +38,12 @@ If you don't see the app/service you'd like to monitor in this list:
   a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
 
 - If you have basic software development skills, you can add your own plugin
-  in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector)
+  in [Go](https://github.com/netdata/go.d.plugin/blob/master/README.md#how-to-develop-a-collector)
   or [Python](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md)
 
 ## Available Collectors
 
-- [Supported collectors list](#supported-collectors-list)
+- [Monitor anything with Netdata](#monitor-anything-with-netdata)
   - [Add your application to Netdata](#add-your-application-to-netdata)
   - [Available Collectors](#available-collectors)
   - [Service and application collectors](#service-and-application-collectors)
@@ -351,8 +342,6 @@ configure any of these collectors according to your setup and infrastructure.
   any HTTP endpoint's availability and response time.
 - [Lighttpd](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd/README.md): Collect web server
   performance metrics using the `server-status?auto` endpoint.
-- [Lighttpd2](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd2/README.md): Collect web server
-  performance metrics using the `server-status?format=plain` endpoint.
 - [Litespeed](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/litespeed/README.md): Collect
   web server data (network, connection,
   requests, cache) by reading `.rtreport*` files.
@@ -462,7 +451,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 - [MegaRAID controllers](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/megacli/README.md):
   Collect adapter, physical drives, and
   battery stats using the `megacli` tool.
-- [NVIDIA GPU](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nvidia_smi/README.md): Monitor
+- [NVIDIA GPU](https://github.com/netdata/go.d.plugin/blob/master/modules/nvidia_smi/README.md): Monitor
   performance metrics (memory usage, fan
   speed, pcie bandwidth utilization, temperature, and more) using the `nvidia-smi` tool.
 - [Sensors](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors/README.md): Reads system
@@ -592,9 +581,9 @@ collectors are described only in code and associated charts in Netdata dashboard
 - [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/legacy/aclk_stats.c): View whether a Netdata
   Agent is connected to Netdata Cloud via the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md), the
   volume of queries, process times, and more.
-- [Alarms](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md): This collector
+- [Alerts](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md): This collector
   creates an
-  **Alarms** menu with one line plot showing the alarm states of a Netdata Agent over time.
+  **Alerts** menu with one line plot showing the alert states of a Netdata Agent over time.
 - [Anomalies](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md): This
   collector uses the
   Python PyOD library to perform unsupervised anomaly detection on your Netdata charts and/or dimensions.
@@ -657,7 +646,7 @@ $ sudo echo "clickhouse: yes" >> /etc/netdata/python.d.conf
 $ sudo vi /etc/netdata/python.d/clickhouse.conf
 
 # restart netdata 
-# see docs for more information: https://learn.netdata.cloud/docs/configure/start-stop-restart
+# see docs for more information: https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md
 $ sudo systemctl restart netdata
 ```
 
@@ -675,6 +664,12 @@ $ sudo systemctl restart netdata
 - [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
 - [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse):
   Monitor [ClickHouse](https://clickhouse.com/) database.
+- [Ethtool](https://github.com/ghanapunq/netdata_ethtool_plugin): Monitor network interfaces with ethtool.
+- [netdata-needrestart](https://github.com/nodiscc/netdata-needrestart) - Check/graph the number of processes/services/kernels that should be restarted after upgrading packages.
+- [netdata-debsecan](https://github.com/nodiscc/netdata-debsecan) - Check/graph the number of CVEs in currently installed packages.
+- [netdata-logcount](https://github.com/nodiscc/netdata-logcount) - Check/graph the number of syslog messages, by level over time.
+- [netdata-apt](https://github.com/nodiscc/netdata-apt) - Check/graph and alert on the number of upgradeable packages, and available distribution upgrades.
+- [diskquota](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/diskquota) - Monitors the defined quotas on one or more filesystems depending on configuration.
 
 ## Etc
 
@@ -682,3 +677,5 @@ $ sudo systemctl restart netdata
   example `charts.d` collector.
 - [python.d example](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/README.md): An
   example `python.d` collector.
+- [go.d example](https://github.com/netdata/go.d.plugin/blob/master/modules/example/README.md): An
+  example `go.d` collector.

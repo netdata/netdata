@@ -8,6 +8,7 @@ SUBDIRS = \
     cgroups.plugin \
     charts.d.plugin \
     cups.plugin \
+    debugfs.plugin \
     diskspace.plugin \
     timex.plugin \
     ioping.plugin \
@@ -24,6 +25,7 @@ SUBDIRS = \
     statsd.plugin \
     ebpf.plugin \
     tc.plugin \
+    systemd-journal.plugin \
     $(NULL)
 
 usercustompluginsconfigdir=$(configdir)/custom-plugins.d

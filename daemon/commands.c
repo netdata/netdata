@@ -47,6 +47,7 @@ static cmd_status_t cmd_write_config_execute(char *args, char **message);
 static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
+static cmd_status_t cmd_dumpconfig(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -61,7 +62,8 @@ static command_info_t command_info_array[] = {
         {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
         {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
         {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
-        {"version", cmd_version, CMD_TYPE_ORTHOGONAL}
+        {"version", cmd_version, CMD_TYPE_ORTHOGONAL},
+        {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -127,6 +129,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Return with 'pong' if agent is alive.\n"
              "aclk-state [json]\n"
              "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
+             "dumpconfig\n"
+             "    Returns the current netdata.conf on stdout.\n"
              "version\n"
              "    Returns the netdata version.\n",
              MAX_COMMAND_LENGTH - 1);
@@ -139,7 +143,7 @@ static cmd_status_t cmd_reload_health_execute(char *args, char **message)
     (void)message;
 
     error_log_limit_unlimited();
-    info("COMMAND: Reloading HEALTH configuration.");
+    netdata_log_info("COMMAND: Reloading HEALTH configuration.");
     health_reload();
     error_log_limit_reset();
 
@@ -152,9 +156,9 @@ static cmd_status_t cmd_save_database_execute(char *args, char **message)
     (void)message;
 
     error_log_limit_unlimited();
-    info("COMMAND: Saving databases.");
+    netdata_log_info("COMMAND: Saving databases.");
     rrdhost_save_all();
-    info("COMMAND: Databases saved.");
+    netdata_log_info("COMMAND: Databases saved.");
     error_log_limit_reset();
 
     return CMD_STATUS_SUCCESS;
@@ -166,7 +170,7 @@ static cmd_status_t cmd_reopen_logs_execute(char *args, char **message)
     (void)message;
 
     error_log_limit_unlimited();
-    info("COMMAND: Reopening all log files.");
+    netdata_log_info("COMMAND: Reopening all log files.");
     reopen_all_log_files();
     error_log_limit_reset();
 
@@ -179,7 +183,7 @@ static cmd_status_t cmd_exit_execute(char *args, char **message)
     (void)message;
 
     error_log_limit_unlimited();
-    info("COMMAND: Cleaning up to exit.");
+    netdata_log_info("COMMAND: Cleaning up to exit.");
     netdata_cleanup_and_exit(0);
     exit(0);
 
@@ -201,23 +205,19 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
     (void)args;
     (void)message;
 #if defined(DISABLE_CLOUD) || !defined(ENABLE_ACLK)
-    info("The claiming feature has been explicitly disabled");
+    netdata_log_info("The claiming feature has been explicitly disabled");
     *message = strdupz("This agent cannot be claimed, it was built without support for Cloud");
     return CMD_STATUS_FAILURE;
 #endif
-    error_log_limit_unlimited();
-    info("COMMAND: Reloading Agent Claiming configuration.");
-    load_claiming_state();
-    registry_update_cloud_base_url();
-    rrdpush_claimed_id(localhost);
-    error_log_limit_reset();
+    netdata_log_info("COMMAND: Reloading Agent Claiming configuration.");
+    claim_reload_all();
     return CMD_STATUS_SUCCESS;
 }
 
 static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
 {
     (void)args;
-    info("COMMAND: reloading host labels.");
+    netdata_log_info("COMMAND: reloading host labels.");
     reload_host_labels();
 
     BUFFER *wb = buffer_create(10, NULL);
@@ -251,8 +251,10 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
     char *value = appconfig_get(tmp_config, temp + offset + 1, temp + offset2 + 1, NULL);
     if (value == NULL)
     {
-        error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set", conf_file,
-              temp + offset + 1, temp + offset2 + 1);
+        netdata_log_error("Cannot execute read-config conf_file=%s section=%s / key=%s because no value set",
+                          conf_file,
+                          temp + offset + 1,
+                          temp + offset2 + 1);
         freez(temp);
         return CMD_STATUS_FAILURE;
     }
@@ -268,7 +270,7 @@ static cmd_status_t cmd_read_config_execute(char *args, char **message)
 static cmd_status_t cmd_write_config_execute(char *args, char **message)
 {
     UNUSED(message);
-    info("write-config %s", args);
+    netdata_log_info("write-config %s", args);
     size_t n = strlen(args);
     char *separator = strchr(args,'|');
     if (separator == NULL)
@@ -292,7 +294,7 @@ static cmd_status_t cmd_write_config_execute(char *args, char **message)
     struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
 
     appconfig_set(tmp_config, temp + offset + 1, temp + offset2 + 1, temp + offset3 + 1);
-    info("write-config conf_file=%s section=%s key=%s value=%s",conf_file, temp + offset + 1, temp + offset2 + 1,
+    netdata_log_info("write-config conf_file=%s section=%s key=%s value=%s",conf_file, temp + offset + 1, temp + offset2 + 1,
          temp + offset3 + 1);
     freez(temp);
     return CMD_STATUS_SUCCESS;
@@ -309,7 +311,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
 
 static cmd_status_t cmd_aclk_state(char *args, char **message)
 {
-    info("COMMAND: Reopening aclk/cloud state.");
+    netdata_log_info("COMMAND: Reopening aclk/cloud state.");
     if (strstr(args, "json"))
         *message = aclk_state_json();
     else
@@ -327,6 +329,17 @@ static cmd_status_t cmd_version(char *args, char **message)
 
     *message = strdupz(version);
 
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_dumpconfig(char *args, char **message)
+{
+    (void)args;
+
+    BUFFER *wb = buffer_create(1024, NULL);
+    config_generate(wb, 0);
+    *message = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
     return CMD_STATUS_SUCCESS;
 }
 
@@ -393,32 +406,30 @@ static void pipe_write_cb(uv_write_t* req, int status)
 
     uv_close((uv_handle_t *)client, pipe_close_cb);
     --clients;
-    freez(client->data);
-    info("Command Clients = %u\n", clients);
+    buffer_free(client->data);
+    // netdata_log_info("Command Clients = %u", clients);
 }
 
-static inline void add_char_to_command_reply(char *reply_string, unsigned *reply_string_size, char character)
+static inline void add_char_to_command_reply(BUFFER *reply_string, unsigned *reply_string_size, char character)
 {
-    reply_string[(*reply_string_size)++] = character;
+    buffer_fast_charcat(reply_string, character);
+    *reply_string_size +=1;
 }
 
-static inline void add_string_to_command_reply(char *reply_string, unsigned *reply_string_size, char *str)
+static inline void add_string_to_command_reply(BUFFER *reply_string, unsigned *reply_string_size, char *str)
 {
     unsigned len;
 
     len = strlen(str);
-
-    if (MAX_COMMAND_LENGTH - 1 < len + *reply_string_size)
-        len = MAX_COMMAND_LENGTH - *reply_string_size - 1;
-
-    strncpyz(reply_string + *reply_string_size, str, len);
+    buffer_fast_strcat(reply_string, str, len);
     *reply_string_size += len;
 }
 
 static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t status, char *message)
 {
     int ret;
-    char *reply_string = mallocz(MAX_COMMAND_LENGTH);
+    BUFFER *reply_string = buffer_create(128, NULL);
+
     char exit_status_string[MAX_EXIT_STATUS_LENGTH + 1] = {'\0', };
     unsigned reply_string_size = 0;
     uv_buf_t write_buf;
@@ -436,13 +447,12 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
 
     cmd_ctx->write_req.data = client;
     client->data = reply_string;
-    write_buf.base = reply_string;
+    write_buf.base = reply_string->buffer;
     write_buf.len = reply_string_size;
     ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
-        error("uv_write(): %s", uv_strerror(ret));
+        netdata_log_error("uv_write(): %s", uv_strerror(ret));
     }
-    info("COMMAND: Sending reply: \"%s\"", reply_string);
 }
 
 cmd_status_t execute_command(cmd_t idx, char *args, char **message)
@@ -522,12 +532,12 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     struct command_context *cmd_ctx = (struct command_context *)client;
 
     if (0 == nread) {
-        info("%s: Zero bytes read by command pipe.", __func__);
+        netdata_log_info("%s: Zero bytes read by command pipe.", __func__);
     } else if (UV_EOF == nread) {
-        info("EOF found in command pipe.");
+        netdata_log_info("EOF found in command pipe.");
         parse_commands(cmd_ctx);
     } else if (nread < 0) {
-        error("%s: %s", __func__, uv_strerror(nread));
+        netdata_log_error("%s: %s", __func__, uv_strerror(nread));
     }
 
     if (nread < 0) { /* stop stream due to EOF or error */
@@ -547,7 +557,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     if (nread < 0 && UV_EOF != nread) {
         uv_close((uv_handle_t *)client, pipe_close_cb);
         --clients;
-        info("Command Clients = %u\n", clients);
+        // netdata_log_info("Command Clients = %u", clients);
     }
 }
 
@@ -571,29 +581,29 @@ static void connection_cb(uv_stream_t *server, int status)
     client = (uv_pipe_t *)cmd_ctx;
     ret = uv_pipe_init(server->loop, client, 1);
     if (ret) {
-        error("uv_pipe_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_pipe_init(): %s", uv_strerror(ret));
         freez(cmd_ctx);
         return;
     }
     ret = uv_accept(server, (uv_stream_t *)client);
     if (ret) {
-        error("uv_accept(): %s", uv_strerror(ret));
+        netdata_log_error("uv_accept(): %s", uv_strerror(ret));
         uv_close((uv_handle_t *)client, pipe_close_cb);
         return;
     }
 
     ++clients;
-    info("Command Clients = %u\n", clients);
+    // netdata_log_info("Command Clients = %u", clients);
     /* Start parsing a new command */
     cmd_ctx->command_string_size = 0;
     cmd_ctx->command_string[0] = '\0';
 
     ret = uv_read_start((uv_stream_t*)client, alloc_cb, pipe_read_cb);
     if (ret) {
-        error("uv_read_start(): %s", uv_strerror(ret));
+        netdata_log_error("uv_read_start(): %s", uv_strerror(ret));
         uv_close((uv_handle_t *)client, pipe_close_cb);
         --clients;
-        info("Command Clients = %u\n", clients);
+        // netdata_log_info("Command Clients = %u", clients);
         return;
     }
 }
@@ -612,7 +622,7 @@ static void command_thread(void *arg)
     loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
-        error("uv_loop_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_loop_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_loop_init;
     }
@@ -620,7 +630,7 @@ static void command_thread(void *arg)
 
     ret = uv_async_init(loop, &async, async_cb);
     if (ret) {
-        error("uv_async_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_async_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_async_init;
     }
@@ -628,26 +638,30 @@ static void command_thread(void *arg)
 
     ret = uv_pipe_init(loop, &server_pipe, 0);
     if (ret) {
-        error("uv_pipe_init(): %s", uv_strerror(ret));
+        netdata_log_error("uv_pipe_init(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_pipe_init;
     }
-    (void)uv_fs_unlink(loop, &req, PIPENAME, NULL);
+
+    const char *pipename = daemon_pipename();
+
+    (void)uv_fs_unlink(loop, &req, pipename, NULL);
     uv_fs_req_cleanup(&req);
-    ret = uv_pipe_bind(&server_pipe, PIPENAME);
+    ret = uv_pipe_bind(&server_pipe, pipename);
     if (ret) {
-        error("uv_pipe_bind(): %s", uv_strerror(ret));
+        netdata_log_error("uv_pipe_bind(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_pipe_bind;
     }
+
     ret = uv_listen((uv_stream_t *)&server_pipe, SOMAXCONN, connection_cb);
     if (ret) {
         /* Fallback to backlog of 1 */
-        info("uv_listen() failed with backlog = %d, falling back to backlog = 1.", SOMAXCONN);
+        netdata_log_info("uv_listen() failed with backlog = %d, falling back to backlog = 1.", SOMAXCONN);
         ret = uv_listen((uv_stream_t *)&server_pipe, 1, connection_cb);
     }
     if (ret) {
-        error("uv_listen(): %s", uv_strerror(ret));
+        netdata_log_error("uv_listen(): %s", uv_strerror(ret));
         command_thread_error = ret;
         goto error_after_uv_listen;
     }
@@ -661,12 +675,12 @@ static void command_thread(void *arg)
         uv_run(loop, UV_RUN_DEFAULT);
     }
     /* cleanup operations of the event loop */
-    info("Shutting down command event loop.");
+    netdata_log_info("Shutting down command event loop.");
     uv_close((uv_handle_t *)&async, NULL);
     uv_close((uv_handle_t*)&server_pipe, NULL);
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
-    info("Shutting down command loop complete.");
+    netdata_log_info("Shutting down command loop complete.");
     fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
@@ -702,7 +716,7 @@ void commands_init(void)
     if (command_server_initialized)
         return;
 
-    info("Initializing command server.");
+    netdata_log_info("Initializing command server.");
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         fatal_assert(0 == uv_mutex_init(&command_lock_array[i]));
     }
@@ -711,7 +725,7 @@ void commands_init(void)
     completion_init(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
     if (error) {
-        error("uv_thread_create(): %s", uv_strerror(error));
+        netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         goto after_error;
     }
     /* wait for worker thread to initialize */
@@ -722,7 +736,7 @@ void commands_init(void)
     if (command_thread_error) {
         error = uv_thread_join(&thread);
         if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
+            netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         }
         goto after_error;
     }
@@ -731,7 +745,7 @@ void commands_init(void)
     return;
 
 after_error:
-    error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
+    netdata_log_error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
 }
 
 void commands_exit(void)
@@ -742,7 +756,7 @@ void commands_exit(void)
         return;
 
     command_thread_shutdown = 1;
-    info("Shutting down command server.");
+    netdata_log_info("Shutting down command server.");
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&async));
     fatal_assert(0 == uv_thread_join(&thread));
@@ -751,6 +765,6 @@ void commands_exit(void)
         uv_mutex_destroy(&command_lock_array[i]);
     }
     uv_rwlock_destroy(&exclusive_rwlock);
-    info("Command server has stopped.");
+    netdata_log_info("Command server has stopped.");
     command_server_initialized = 0;
 }

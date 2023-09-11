@@ -1,13 +1,10 @@
-<!--
-title: "OS provided metrics (proc.plugin)"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/proc.plugin/README.md"
-sidebar_label: "OS provided metrics (proc.plugin)"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/System metrics"
--->
-
 # OS provided metrics (proc.plugin)
+
+`proc.plugin` gathers metrics from the /proc and /sys folders in Linux systems, along with a few other endpoints, and is responsible for the bulk of the system metrics collected and visualized by Netdata.
+
+This plugin is not an external plugin, but one of Netdata's threads.
+
+In detail, it collects metrics from:
 
 -   `/proc/net/dev` (all network interfaces for all their values)
 -   `/proc/diskstats` (all disks for all their values)
@@ -34,6 +31,7 @@ learn_rel_path: "Integrations/Monitor/System metrics"
 -   `/proc/spl/kstat/zfs/pool/state` (state of ZFS pools)
 -   `/sys/class/power_supply` (power supply properties)
 -   `/sys/class/infiniband` (infiniband interconnect)
+-   `/sys/class/drm` (AMD GPUs)
 -   `ipc` (IPC semaphores and message queues)
 -   `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
 -   `netdata` (internal Netdata resources utilization)
@@ -400,11 +398,11 @@ You can set the following values for each configuration option:
      
 #### Wireless configuration     
 
-#### alarms
+#### alerts
 
-There are several alarms defined in `health.d/net.conf`.
+There are several alerts defined in `health.d/net.conf`.
 
-The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
+The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alerts can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alert with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-families) line in the alert configuration. For example, if you want to disable the `inbound packets dropped` alert for `eth0`, set `families: !eth0 *` in the alert definition for `template: inbound_packets_dropped`.
 
 #### configuration
 
@@ -582,6 +580,36 @@ Default configuration will monitor only enabled infiniband ports, and refresh ne
   # refresh ports state every seconds = 30
 ```
 
+## AMD GPUs
+
+This module monitors every AMD GPU card discovered at agent startup.
+
+### Monitored GPU metrics
+
+The following charts will be provided:
+
+-   **GPU utilization**
+-   **GPU memory utilization**
+-   **GPU clock frequency**
+-   **GPU memory clock frequency**
+-   **VRAM memory usage percentage**
+-   **VRAM memory usage**
+-   **visible VRAM memory usage percentage**
+-   **visible VRAM memory usage**
+-   **GTT memory usage percentage**
+-   **GTT memory usage**
+
+### configuration
+
+The `drm` path can be configured if it differs from the default:
+
+```
+[plugin:proc:/sys/class/drm]
+  # directory to monitor = /sys/class/drm
+```
+
+> [!NOTE]  
+> Temperature, fan speed, voltage and power metrics for AMD GPUs can be monitored using the [Sensors](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/sensors/README.md) plugin.
 
 ## IPC
 

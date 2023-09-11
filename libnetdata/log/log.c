@@ -530,7 +530,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
     else {
         f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
         if(f == -1) {
-            error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
+            netdata_log_error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
             if(fd_ptr) *fd_ptr = fd;
             return fp;
         }
@@ -550,12 +550,12 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         // it automatically closes
         int t = dup2(f, fd);
         if (t == -1) {
-            error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+            netdata_log_error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
             close(f);
             if(fd_ptr) *fd_ptr = fd;
             return fp;
         }
-        // info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
+        // netdata_log_info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
         close(f);
     }
     else fd = f;
@@ -563,10 +563,10 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
     if(!fp) {
         fp = fdopen(fd, "a");
         if (!fp)
-            error("Cannot fdopen() fd %d ('%s')", fd, filename);
+            netdata_log_error("Cannot fdopen() fd %d ('%s')", fd, filename);
         else {
             if (setvbuf(fp, NULL, _IOLBF, 0) != 0)
-                error("Cannot set line buffering on fd %d ('%s')", fd, filename);
+                netdata_log_error("Cannot set line buffering on fd %d ('%s')", fd, filename);
         }
     }
 
@@ -582,9 +582,11 @@ void reopen_all_log_files() {
         open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
 
     if(stderr_filename) {
-        log_lock();
-        stderror = open_log_file(stdcollector_fd, stderror, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
-        log_unlock();
+        // Netdata starts using stderr and if it has success to open file it redirects
+        FILE *fp = open_log_file(stdcollector_fd, stderror, stderr_filename,
+                                 &error_log_syslog, 1, &stdcollector_fd);
+        if (fp)
+            stderror = fp;
     }
 
 #ifdef ENABLE_ACLK
@@ -606,9 +608,10 @@ void open_all_log_files() {
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
     open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
 
-    log_lock();
-    stderror = open_log_file(stdcollector_fd, NULL, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
-    log_unlock();
+    // Netdata starts using stderr and if it has success to open file it redirects
+    FILE *fp = open_log_file(stdcollector_fd, NULL, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
+    if (fp)
+        stderror = fp;
 
 #ifdef ENABLE_ACLK
     if(aclklog_enabled)
@@ -631,7 +634,7 @@ int error_log_limit(int reset) {
     static time_t start = 0;
     static unsigned long counter = 0, prevented = 0;
 
-    FILE *fp = (!stderror) ? stderr : stderror;
+    FILE *fp = stderror ? stderror : stderr;
 
     // fprintf(fp, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
 
@@ -838,7 +841,7 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #endif
 
 void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-    FILE *fp = (!stderror) ? stderr : stderror;
+    FILE *fp = stderror ? stderror : stderr;
 
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
@@ -972,7 +975,7 @@ static void print_call_stack(void) {
 #endif
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    FILE *fp = (!stderror) ? stderr : stderror;
+    FILE *fp = stderror ? stderror : stderr;
 
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
@@ -1043,7 +1046,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 // ----------------------------------------------------------------------------
 // access log
 
-void log_access( const char *fmt, ... ) {
+void netdata_log_access( const char *fmt, ... ) {
     va_list args;
 
     if(access_log_syslog) {
@@ -1075,7 +1078,7 @@ void log_access( const char *fmt, ... ) {
 // ----------------------------------------------------------------------------
 // health log
 
-void log_health( const char *fmt, ... ) {
+void netdata_log_health( const char *fmt, ... ) {
     va_list args;
 
     if(health_log_syslog) {

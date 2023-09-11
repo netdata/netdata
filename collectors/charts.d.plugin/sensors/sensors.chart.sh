@@ -187,7 +187,7 @@ sensors_create() {
 				files="$(ls "$path"/energy*_input 2>/dev/null)"
 				files="$(sensors_check_files "$files")"
 				[ -z "$files" ] && continue
-				echo "CHART 'sensors.energy_${id}_${name}' '' 'Energy' 'Joule' 'energy' 'sensors.energy' areastack $((sensors_priority + 6)) $sensors_update_every '' '' 'sensors'"
+				echo "CHART 'sensors.energy_${id}_${name}' '' 'Energy' 'Joule' 'energy' 'sensors.energy' area $((sensors_priority + 6)) $sensors_update_every '' '' 'sensors'"
 				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN 'sensors.energy_${id}_${name}' \$1\""
 				algorithm="incremental"
 				divisor=1000000

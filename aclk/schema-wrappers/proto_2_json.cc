@@ -11,6 +11,7 @@
 #include "proto/nodeinstance/info/v1/info.pb.h"
 #include "proto/context/v1/stream.pb.h"
 #include "proto/context/v1/context.pb.h"
+#include "proto/agent/v1/cmds.pb.h"
 
 #include "libnetdata/libnetdata.h"
 
@@ -29,8 +30,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new nodeinstance::create::v1::CreateNodeInstance;
     if (!strcmp(msgname, "UpdateNodeInfo"))
         return new nodeinstance::info::v1::UpdateNodeInfo;
-    if (!strcmp(msgname, "AlarmLogHealth"))
-        return new alarms::v1::AlarmLogHealth;
+    if (!strcmp(msgname, "AlarmCheckpoint"))
+        return new alarms::v1::AlarmCheckpoint;
     if (!strcmp(msgname, "ProvideAlarmConfiguration"))
         return new alarms::v1::ProvideAlarmConfiguration;
     if (!strcmp(msgname, "AlarmSnapshot"))
@@ -51,8 +52,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new agent::v1::SendNodeInstances;
     if (!strcmp(msgname, "StartAlarmStreaming"))
         return new alarms::v1::StartAlarmStreaming;
-    if (!strcmp(msgname, "SendAlarmLogHealth"))
-        return new alarms::v1::SendAlarmLogHealth;
+    if (!strcmp(msgname, "SendAlarmCheckpoint"))
+        return new alarms::v1::SendAlarmCheckpoint;
     if (!strcmp(msgname, "SendAlarmConfiguration"))
         return new alarms::v1::SendAlarmConfiguration;
     if (!strcmp(msgname, "SendAlarmSnapshot"))
@@ -63,6 +64,8 @@ static google::protobuf::Message *msg_name_to_protomsg(const char *msgname)
         return new context::v1::ContextsCheckpoint;
     if (!strcmp(msgname, "StopStreamingContexts"))
         return new context::v1::StopStreamingContexts;
+    if (!strcmp(msgname, "CancelPendingRequest"))
+        return new agent::v1::CancelPendingRequest;
 
     return NULL;
 }

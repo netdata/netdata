@@ -41,6 +41,14 @@ using your preferred method listed above.
 sudo netdatacli shutdown-agent
 ```
 
+## Netdata MSI installations
+
+Netdata provides an installer for Windows using WSL, on those installations by using a Windows terminal (e.g. the Command prompt or Windows Powershell) you can:
+
+- Start Netdata, by running `start-netdata`
+- Stop Netdata, by running `stop-netdata`
+- Restart Netdata, by running `restart-netdata`
+
 ## Reload health configuration
 
 You do not need to restart the Netdata Agent between changes to health configuration files, such as specific health

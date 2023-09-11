@@ -66,7 +66,7 @@ void *macos_main(void *ptr)
             if (unlikely(!pm->enabled))
                 continue;
 
-            debug(D_PROCNETDEV_LOOP, "macos calling %s.", pm->name);
+            netdata_log_debug(D_PROCNETDEV_LOOP, "macos calling %s.", pm->name);
 
             worker_is_busy(i);
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);

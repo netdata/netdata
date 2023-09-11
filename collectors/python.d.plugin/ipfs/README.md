@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Storage"
 -->
 
-# IPFS monitoring with Netdata
+# IPFS collector
 
 Collects [`IPFS`](https://ipfs.io) basic information like file system bandwidth, peers and repo metrics.
 

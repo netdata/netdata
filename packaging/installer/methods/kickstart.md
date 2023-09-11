@@ -98,13 +98,13 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
 - `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
   See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
-- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://api.netdata.cloud`.
+- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`.
 - `--override-distro`: Override the distro detection logic and assume the system is using a specific Linux distribution and release. Takes a single argument consisting of the values of the `ID`, `VERSION_ID`, and `VERSION_CODENAME` fields from `/etc/os-release` for the desired distribution.
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 
 - `--reinstall`: If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
-- `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what tyep of installation it is). If there is not an existing install, install Netdata normally.
+- `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what type of installation it is). If there is not an existing install, install Netdata normally.
 - `--reinstall-clean`: If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
 - `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
 - `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
@@ -164,11 +164,3 @@ run the following:
 ```
 
 If the script is valid, this command will return `OK, VALID`.
-
-## What's next?
-
-When you're finished with installation, check out [how to monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), or skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
-
-Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
-solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
-external databases, and more.

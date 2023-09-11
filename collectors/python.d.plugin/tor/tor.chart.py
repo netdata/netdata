@@ -17,6 +17,7 @@ except ImportError:
     STEM_AVAILABLE = False
 
 DEF_PORT = 'default'
+DEF_ADDR = '127.0.0.1'
 
 ORDER = [
     'traffic',
@@ -41,6 +42,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.port = self.configuration.get('control_port', DEF_PORT)
+        self.addr = self.configuration.get('control_addr', DEF_ADDR)
         self.password = self.configuration.get('password')
         self.use_socket = isinstance(self.port, str) and self.port != DEF_PORT and not self.port.isdigit()
         self.conn = None
@@ -78,7 +80,7 @@ class Service(SimpleService):
 
     def connect_via_port(self):
         try:
-            self.conn = stem.control.Controller.from_port(port=self.port)
+            self.conn = stem.control.Controller.from_port(address=self.addr, port=self.port)
         except (stem.SocketError, ValueError) as error:
             self.error(error)
 

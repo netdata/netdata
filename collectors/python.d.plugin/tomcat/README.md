@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Apache Tomcat monitoring with Netdata
+# Apache Tomcat collector
 
 Presents memory utilization of tomcat containers.
 

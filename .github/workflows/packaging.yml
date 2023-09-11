@@ -8,6 +8,29 @@ on:
       - reopened
       - labeled
       - synchronize
+    paths: # This MUST be kept in-sync with the paths-ignore key for the packaging-dummy.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - 'netdata.spec.in'
+      - 'configure.ac'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.github/workflows/packaging.yml'
+      - '.github/scripts/gen-matrix-packaging.py'
+      - '.github/scripts/pkg-test.sh'
+      - 'build/**'
+      - 'packaging/*.sh'
+      - 'packaging/*.checksums'
+      - 'packaging/*.version'
+      - 'contrib/debian/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+      - '!**.md'
     branches:
       - master
   push:
@@ -37,7 +60,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Prepare tools
         id: prepare
         run: |
@@ -84,7 +107,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Check Version
         id: check-version
         run: |
@@ -148,7 +171,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 # We need full history for versioning
           submodules: recursive
@@ -193,28 +216,10 @@ jobs:
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }} \
                      /netdata/.github/scripts/pkg-test.sh
-      - name: SSH setup
-        id: ssh-setup
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
-        continue-on-error: true
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
-          name: id_ecdsa
-          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Upload to packages.netdata.cloud
-        id: package-upload
-        continue-on-error: true
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
-        run: |
-          .github/scripts/package-upload.sh \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          ${{ needs.version-check.outputs.repo }}
       - name: Upload to PackageCloud
         id: upload
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        continue-on-error: true
         shell: bash
         env:
           PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
@@ -225,6 +230,23 @@ jobs:
             "$(basename "${pkgfile}")" || true
             .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} "${pkgfile}"
           done
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload to packages.netdata.cloud
+        id: package-upload
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        run: |
+          .github/scripts/package-upload.sh \
+          ${{ matrix.repo_distro }} \
+          ${{ matrix.arch }} \
+          ${{ matrix.format }} \
+          ${{ needs.version-check.outputs.repo }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -240,9 +262,9 @@ jobs:
               Fetch images: ${{ steps.fetch-images.outcome }}
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
+              Publish to PackageCloud: ${{ steps.upload.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
               Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
-              Publish to PackageCloud: ${{ steps.upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

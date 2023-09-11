@@ -22,13 +22,13 @@ int json_tokens = JSON_TOKENS;
 #ifdef ENABLE_JSONC
 json_object *json_tokenise(char *js) {
     if(!js) {
-        error("JSON: json string is empty.");
+        netdata_log_error("JSON: json string is empty.");
         return NULL;
     }
 
     json_object *token = json_tokener_parse(js);
     if(!token) {
-        error("JSON: Invalid json string.");
+        netdata_log_error("JSON: Invalid json string.");
         return NULL;
     }
 
@@ -39,7 +39,7 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
     int n = json_tokens;
     if(!js || !len) {
-        error("JSON: json string is empty.");
+        netdata_log_error("JSON: json string is empty.");
         return NULL;
     }
 
@@ -62,12 +62,12 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
     }
 
     if (ret == JSMN_ERROR_INVAL) {
-        error("JSON: Invalid json string.");
+        netdata_log_error("JSON: Invalid json string.");
         freez(tokens);
         return NULL;
     }
     else if (ret == JSMN_ERROR_PART) {
-        error("JSON: Truncated JSON string.");
+        netdata_log_error("JSON: Truncated JSON string.");
         freez(tokens);
         return NULL;
     }
@@ -124,7 +124,7 @@ int json_callback_print(JSON_ENTRY *e)
             buffer_strcat(wb,"NULL");
             break;
     }
-    info("JSON: %s", buffer_tostring(wb));
+    netdata_log_info("JSON: %s", buffer_tostring(wb));
     buffer_free(wb);
     return 0;
 }
@@ -323,7 +323,7 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
     for(i = 0; i < size ; i++) {
         ne.pos = i;
         if (strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
-            info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
+            netdata_log_info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
             continue;
         }
         snprintfz(ne.name, JSON_NAME_LEN, "%s[%lu]", e->name, i);

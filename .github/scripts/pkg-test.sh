@@ -13,7 +13,10 @@ install_debian_like() {
   apt-get update
 
   # Install Netdata
-  apt-get install -y /netdata/artifacts/netdata_"${VERSION}"*_*.deb || exit 1
+  # Strange quoting is required here so that glob matching works.
+  # shellcheck disable=SC2046
+  apt-get install -y $(find /netdata/artifacts -type f -name 'netdata*.deb' \
+! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*') || exit 3
 
   # Install testing tools
   apt-get install -y --no-install-recommends curl "${netcat}" jq || exit 1
@@ -25,13 +28,16 @@ install_fedora_like() {
 
   PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
 
-  pkg_version="$(echo "${VERSION}" | tr - .)"
+  if [ "${PKGMGR}" = "dnf" ]; then
+    opts="--allowerasing"
+  fi
 
   # Install Netdata
-  "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
+  # Strange quoting is required here so that glob matching works.
+  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
-  "$PKGMGR" install -y curl nc jq || exit 1
+  "${PKGMGR}" install -y curl nc jq || exit 1
 }
 
 install_centos() {
@@ -40,33 +46,48 @@ install_centos() {
 
   PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
 
-  pkg_version="$(echo "${VERSION}" | tr - .)"
-
   if [ "${PKGMGR}" = "dnf" ]; then
     opts="--allowerasing"
   fi
 
   # Install EPEL (needed for `jq`
-  "$PKGMGR" install -y epel-release || exit 1
+  "${PKGMGR}" install -y epel-release || exit 1
 
   # Install Netdata
-  "$PKGMGR" install -y /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
+  # Strange quoting is required here so that glob matching works.
+  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
-  "$PKGMGR" install -y ${opts} curl nc jq || exit 1
+  # shellcheck disable=SC2086
+  "${PKGMGR}" install -y ${opts} curl nc jq || exit 1
+}
+
+install_amazon_linux() {
+  PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
+
+  if [ "${PKGMGR}" = "dnf" ]; then
+    opts="--allowerasing"
+  fi
+
+  # Install Netdata
+  # Strange quoting is required here so that glob matching works.
+  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
+
+  # Install testing tools
+  # shellcheck disable=SC2086
+  "${PKGMGR}" install -y ${opts} curl nc jq || exit 1
 }
 
 install_suse_like() {
   # Using a glob pattern here because I can't reliably determine what the
   # resulting package name will be (TODO: There must be a better way!)
 
-  pkg_version="$(echo "${VERSION}" | tr - .)"
-
   # Install Netdata
-  zypper install -y --allow-unsigned-rpm /netdata/artifacts/netdata-"${pkg_version}"-*.rpm
+  # Strange quoting is required here so that glob matching works.
+  zypper install -y --allow-downgrade --allow-unsigned-rpm /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
-  zypper install -y --no-recommends curl netcat-openbsd jq || exit 1
+  zypper install -y --allow-downgrade --no-recommends curl netcat-openbsd jq || exit 1
 }
 
 dump_log() {
@@ -111,8 +132,11 @@ case "${DISTRO}" in
   fedora | oraclelinux)
     install_fedora_like
     ;;
-  centos | rockylinux | almalinux)
+  centos| centos-stream | rockylinux | almalinux)
     install_centos
+    ;;
+  amazonlinux)
+    install_amazon_linux
     ;;
   opensuse)
     install_suse_like

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# UPS/PDU monitoring with Netdata
+# UPS/PDU collector
 
 Collects UPS data for all power devices configured in the system.
 
@@ -52,6 +52,8 @@ The following charts will be created:
 -   current temperature
 
 ## Configuration
+
+If using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md), make sure `netdata-plugin-chartsd` is installed.
 
 Edit the `charts.d/nut.conf` configuration file using `edit-config` from the Netdata [config
 directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.

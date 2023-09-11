@@ -70,6 +70,9 @@ typedef long long collected_number;
 #define netdata_double_isnumber(a) (fpclassify(a) != FP_NAN && fpclassify(a) != FP_INFINITE)
 #endif
 
+#define netdata_double_is_zero(a) (!netdata_double_isnumber(a) || considered_equal_ndd(a, 0.0))
+#define netdata_double_is_nonzero(a) (!netdata_double_is_zero(a))
+
 typedef uint32_t storage_number;
 
 typedef struct storage_number_tier1 {

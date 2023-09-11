@@ -1,12 +1,3 @@
-<!--
-title: "Running Netdata behind Nginx"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-nginx.md"
-sidebar_label: "Running Netdata behind Nginx"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration/Secure your nodes"
--->
-
 # Running Netdata behind Nginx
 
 ## Intro
@@ -51,7 +42,7 @@ With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can
 upstream backend {
     # the Netdata server
     server 127.0.0.1:19999;
-    keepalive 64;
+    keepalive 1024;
 }
 
 server {
@@ -216,8 +207,6 @@ If your Nginx is on `localhost`, you can use this to protect your Netdata:
     bind to = 127.0.0.1 ::1
 ```
 
-
-
 You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
 ```
@@ -257,6 +246,26 @@ Nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 ```
 [global]
       access log = none
+```
+
+## Use gzip compression
+
+By default, netdata compresses its responses. You can have nginx do that instead, with the following options in the `location /` block:
+
+```conf
+  location / {
+		...
+		gzip on;
+		gzip_proxied any;
+		gzip_types *;
+	}
+```
+
+To disable Netdata's gzip compression, open `netdata.conf` and in the `[web]` section put:
+
+```conf
+[web]
+    enable gzip compression = no
 ```
 
 ## SELinux

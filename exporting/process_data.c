@@ -77,8 +77,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t before = instance->before;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rd->tiers[0].query_ops->oldest_time_s(rd->tiers[0].db_metric_handle);
-    time_t last_t = rd->tiers[0].query_ops->latest_time_s(rd->tiers[0].db_metric_handle);
+    time_t first_t = storage_engine_oldest_time_s(rd->tiers[0].backend, rd->tiers[0].db_metric_handle);
+    time_t last_t = storage_engine_latest_time_s(rd->tiers[0].backend, rd->tiers[0].db_metric_handle);
     time_t update_every = st->update_every;
     struct storage_engine_query_handle handle;
 
@@ -107,7 +107,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
 
     if (unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
-        debug(
+        netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
             rrdhost_hostname(host),
@@ -126,8 +126,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (rd->tiers[0].query_ops->init(rd->tiers[0].db_metric_handle, &handle, after, before, STORAGE_PRIORITY_LOW); !rd->tiers[0].query_ops->is_finished(&handle);) {
-        STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
+    for (storage_engine_query_init(rd->tiers[0].backend, rd->tiers[0].db_metric_handle, &handle, after, before, STORAGE_PRIORITY_SYNCHRONOUS); !storage_engine_query_is_finished(&handle);) {
+        STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
         points_read++;
 
         if (unlikely(storage_point_is_gap(sp))) {
@@ -138,11 +138,11 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         sum += sp.sum;
         counter += sp.count;
     }
-    rd->tiers[0].query_ops->finalize(&handle);
+    storage_engine_query_finalize(&handle);
     global_statistics_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {
-        debug(
+        netdata_log_debug(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: no values stored in database for range %lu to %lu",
             rrdhost_hostname(host),
@@ -170,7 +170,7 @@ void start_batch_formatting(struct engine *engine)
         if (instance->scheduled) {
             uv_mutex_lock(&instance->mutex);
             if (instance->start_batch_formatting && instance->start_batch_formatting(instance) != 0) {
-                error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
+                netdata_log_error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
                 disable_instance(instance);
             }
         }
@@ -189,7 +189,7 @@ void start_host_formatting(struct engine *engine, RRDHOST *host)
         if (instance->scheduled) {
             if (rrdhost_is_exportable(instance, host)) {
                 if (instance->start_host_formatting && instance->start_host_formatting(instance, host) != 0) {
-                    error("EXPORTING: cannot start host formatting for %s", instance->config.name);
+                    netdata_log_error("EXPORTING: cannot start host formatting for %s", instance->config.name);
                     disable_instance(instance);
                 }
             } else {
@@ -211,7 +211,7 @@ void start_chart_formatting(struct engine *engine, RRDSET *st)
         if (instance->scheduled && !instance->skip_host) {
             if (rrdset_is_exportable(instance, st)) {
                 if (instance->start_chart_formatting && instance->start_chart_formatting(instance, st) != 0) {
-                    error("EXPORTING: cannot start chart formatting for %s", instance->config.name);
+                    netdata_log_error("EXPORTING: cannot start chart formatting for %s", instance->config.name);
                     disable_instance(instance);
                 }
             } else {
@@ -232,7 +232,7 @@ void metric_formatting(struct engine *engine, RRDDIM *rd)
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (instance->scheduled && !instance->skip_host && !instance->skip_chart) {
             if (instance->metric_formatting && instance->metric_formatting(instance, rd) != 0) {
-                error("EXPORTING: cannot format metric for %s", instance->config.name);
+                netdata_log_error("EXPORTING: cannot format metric for %s", instance->config.name);
                 disable_instance(instance);
                 continue;
             }
@@ -252,7 +252,7 @@ void end_chart_formatting(struct engine *engine, RRDSET *st)
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (instance->scheduled && !instance->skip_host && !instance->skip_chart) {
             if (instance->end_chart_formatting && instance->end_chart_formatting(instance, st) != 0) {
-                error("EXPORTING: cannot end chart formatting for %s", instance->config.name);
+                netdata_log_error("EXPORTING: cannot end chart formatting for %s", instance->config.name);
                 disable_instance(instance);
                 continue;
             }
@@ -271,8 +271,8 @@ void variables_formatting(struct engine *engine, RRDHOST *host)
 {
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (instance->scheduled && !instance->skip_host && should_send_variables(instance)) {
-            if (instance->variables_formatting && instance->variables_formatting(instance, host) != 0){ 
-                error("EXPORTING: cannot format variables for %s", instance->config.name);
+            if (instance->variables_formatting && instance->variables_formatting(instance, host) != 0){
+                netdata_log_error("EXPORTING: cannot format variables for %s", instance->config.name);
                 disable_instance(instance);
                 continue;
             }
@@ -293,7 +293,7 @@ void end_host_formatting(struct engine *engine, RRDHOST *host)
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (instance->scheduled && !instance->skip_host) {
             if (instance->end_host_formatting && instance->end_host_formatting(instance, host) != 0) {
-                error("EXPORTING: cannot end host formatting for %s", instance->config.name);
+                netdata_log_error("EXPORTING: cannot end host formatting for %s", instance->config.name);
                 disable_instance(instance);
                 continue;
             }
@@ -312,7 +312,7 @@ void end_batch_formatting(struct engine *engine)
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         if (instance->scheduled) {
             if (instance->end_batch_formatting && instance->end_batch_formatting(instance) != 0) {
-                error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
+                netdata_log_error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
                 disable_instance(instance);
                 continue;
             }

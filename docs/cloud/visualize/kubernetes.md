@@ -79,7 +79,7 @@ and `k8s_node_name`. The default is `k8s_controller_name`.
 
 ### Filtering
 
-Filtering behaves identically to the [node filter in War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#node-filter), with the ability to
+Filtering behaves identically to the [node filter in War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/node-filter.md), with the ability to
 filter pods/containers by `container_id` and `namespace`.
 
 ### Detailed information

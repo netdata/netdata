@@ -1,0 +1,39 @@
+id: ''
+meta:
+  name: ''
+  link: ''
+  categories: []
+  icon_filename: ''
+keywords: []
+overview:
+  exporter_description: ''
+  exporter_limitations: ''
+setup:
+  prerequisites:
+    list:
+      - title: ''
+        description: ''
+  configuration:
+    file:
+      name: ''
+      description: ''
+    options:
+      description: ''
+      folding:
+        title: ''
+        enabled: true
+      list:
+        - name: ''
+          default_value: ''
+          description: ''
+          required: false
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list:
+        - name: ''
+          folding:
+            enabled: false
+          description: ''
+          config: ''

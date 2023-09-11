@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Apps"
 -->
 
-# Samba monitoring with Netdata
+# Samba collector
 
 Monitors the performance metrics of Samba file sharing using `smbstatus` command-line tool.
 

@@ -209,7 +209,7 @@ static inline uint64_t str2uint64_hex(const char *src, char **endptr) {
     const unsigned char *s = (const unsigned char *)src;
     unsigned char c;
 
-    while ((c = hex_value_from_ascii[*s]) != 255) {
+    while ((c = hex_value_from_ascii[toupper(*s)]) != 255) {
         num = (num << 4) | c;
         s++;
     }
@@ -508,6 +508,89 @@ static inline int read_single_signed_number_file(const char *filename, long long
     buffer[30] = '\0';
     *result = atoll(buffer);
     return 0;
+}
+
+static inline int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
+    char buffer[30 + 1];
+
+    int ret = read_file(filename, buffer, 30);
+    if(unlikely(ret)) {
+        *result = 0;
+        return ret;
+    }
+
+    buffer[30] = '\0';
+
+    if(likely(buffer[0])){
+        *result = str2ull_encoded(buffer);
+        return 0;
+    }
+    else {
+        *result = 0;
+        return -1;
+    }
+}
+
+static inline int uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {
+    return memcmp(uu1, uu2, sizeof(uuid_t));
+}
+
+static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {
+    char *p = (char *)"";
+    while (p && !p[0] && *ptr) p = strsep(ptr, s);
+    return (p);
+}
+
+// remove leading and trailing spaces; may return NULL
+static inline char *trim(char *s) {
+    // skip leading spaces
+    while (*s && isspace(*s)) s++;
+    if (!*s) return NULL;
+
+    // skip tailing spaces
+    // this way is way faster. Writes only one NUL char.
+    ssize_t l = (ssize_t)strlen(s);
+    if (--l >= 0) {
+        char *p = s + l;
+        while (p > s && isspace(*p)) p--;
+        *++p = '\0';
+    }
+
+    if (!*s) return NULL;
+
+    return s;
+}
+
+// like trim(), but also remove duplicate spaces inside the string; may return NULL
+static inline char *trim_all(char *buffer) {
+    char *d = buffer, *s = buffer;
+
+    // skip spaces
+    while(isspace(*s)) s++;
+
+    while(*s) {
+        // copy the non-space part
+        while(*s && !isspace(*s)) *d++ = *s++;
+
+        // add a space if we have to
+        if(*s && isspace(*s)) {
+            *d++ = ' ';
+            s++;
+        }
+
+        // skip spaces
+        while(isspace(*s)) s++;
+    }
+
+    *d = '\0';
+
+    if(d > buffer) {
+        d--;
+        if(isspace(*d)) *d = '\0';
+    }
+
+    if(!buffer[0]) return NULL;
+    return buffer;
 }
 
 #endif //NETDATA_INLINED_H

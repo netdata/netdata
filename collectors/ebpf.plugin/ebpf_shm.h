@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_SHM_H
 #define NETDATA_EBPF_SHM_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SHM "shm"
+#define NETDATA_EBPF_SHM_MODULE_DESC "Show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2). This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_SHM_GLOBAL_CHART "shared_memory_calls"
@@ -26,6 +27,9 @@
 #define NETDATA_SYSTEMD_SHM_AT_CONTEXT "services.shmat"
 #define NETDATA_SYSTEMD_SHM_DT_CONTEXT "services.shmdt"
 #define NETDATA_SYSTEMD_SHM_CTL_CONTEXT "services.shmctl"
+
+// ARAL name
+#define NETDATA_EBPF_SHM_ARAL_NAME "ebpf_shm"
 
 typedef struct netdata_publish_shm {
     uint64_t get;
@@ -49,8 +53,6 @@ enum shm_counters {
     // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_SHM_END
 };
-
-extern netdata_publish_shm_t **shm_pid;
 
 void *ebpf_shm_thread(void *ptr);
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);

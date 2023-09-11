@@ -14,13 +14,13 @@ SUBDIRS = \
     dictionary \
     ebpf \
     eval \
+    facets \
     json \
     july \
     health \
     locks \
     log \
     onewayalloc \
-    parser \
     popen \
     procfile \
     simple_pattern \

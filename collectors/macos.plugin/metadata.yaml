@@ -1,0 +1,727 @@
+plugin_name: macos.plugin
+modules:
+  - meta:
+      plugin_name: macos.plugin
+      module_name: mach_smi
+      monitored_instance:
+        name: macOS
+        link: "https://www.apple.com/macos"
+        categories:
+          - data-collection.macos-systems
+        icon_filename: "macos.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - macos
+        - apple
+        - darwin
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Monitor macOS metrics for efficient operating system performance."
+        method_description: |
+          The plugin uses three different methods to collect data:
+            - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
+            - The functtion `host_statistic` is called to collect CPU and Virtual memory data;
+            - The function `IOServiceGetMatchingServices` to collect storage information.
+      supported_platforms:
+        include:
+          - macOS
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          description: "The netdata main configuration file."
+        options:
+          description: |
+            There are three sections in the file which you can configure:
+
+            - `[plugin:macos:sysctl]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
+            - `[plugin:macos:mach_smi]` - Enable or disable monitoring for CPU and Virtual memory.
+            - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: enable load average
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of load average metrics (load1, load5, load15).
+              default_value: yes
+              required: false
+            - name: system swap
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of system swap metrics (free, used).
+              default_value: yes
+              required: false
+            - name: bandwidth
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of network bandwidth metrics (received, sent).
+              default_value: yes
+              required: false
+            - name: ipv4 TCP packets
+              description: Enable or disable monitoring of IPv4 TCP total packets metrics (received, sent).
+              section_name: plugin:macos:sysctl
+              default_value: yes
+              required: false
+            - name: ipv4 TCP errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 TCP packets metrics (Input Errors, Checksum, Retransmission segments).
+              default_value: yes
+              required: false
+            - name: ipv4 TCP handshake issues
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 TCP handshake metrics (Established Resets, Active Opens, Passive Opens, Attempt Fails).
+              default_value: yes
+              required: false
+            - name: ECN packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ECN statistics metrics (InCEPkts, InNoECTPkts).
+              default_value: auto
+              required: false
+            - name: TCP SYN cookies
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of TCP SYN cookies metrics (received, sent, failed).
+              default_value: auto
+              required: false
+            - name: TCP out-of-order queue
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of TCP out-of-order queue metrics (inqueue).
+              default_value: auto
+              required: false
+            - name: TCP connection aborts
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of TCP connection aborts metrics (Bad Data, User closed, No memory, Timeout).
+              default_value: auto
+              required: false
+            - name: ipv4 UDP packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 UDP packets metrics (sent, received.).
+              default_value: yes
+              required: false
+            - name: ipv4 UDP errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 UDP errors metrics (Recieved Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi).
+              default_value: yes
+              required: false
+            - name: ipv4 icmp packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 ICMP packets metrics (sent, received, in error, OUT error, IN Checksum error).
+              default_value: yes
+              required: false
+            - name: ipv4 icmp messages
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 ICMP messages metrics (I/O messages, I/O Errors, In Checksum).
+              default_value: yes
+              required: false
+            - name: ipv4 packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ipv4 packets metrics (received, sent, forwarded, delivered).
+              default_value: yes
+              required: false
+            - name: ipv4 fragments sent
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 fragments sent metrics (ok, fails, creates).
+              default_value: yes
+              required: false
+            - name: ipv4 fragments assembly
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 fragments assembly metrics (ok, failed, all).
+              default_value: yes
+              required: false
+            - name: ipv4 errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv4 errors metrics (I/O discard, I/O HDR errors, In Addr errors, In Unknown protos, OUT No Routes).
+              default_value: yes
+              required: false
+            - name: ipv6 packets
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 packets metrics (received, sent, forwarded, delivered).
+              default_value: auto
+              required: false
+            - name: ipv6 fragments sent
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 fragments sent metrics (ok, failed, all).
+              default_value: auto
+              required: false
+            - name: ipv6 fragments assembly
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 fragments assembly metrics (ok, failed, timeout, all).
+              default_value: auto
+              required: false
+            - name: ipv6 errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of IPv6 errors metrics (I/O Discards, In Hdr Errors, In Addr Errors, In Truncaedd Packets, I/O No Routes).
+              default_value: auto
+              required: false
+            - name: icmp
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP metrics (sent, received).
+              default_value: auto
+              required: false
+            - name: icmp redirects
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP redirects metrics (received, sent).
+              default_value: auto
+              required: false
+            - name: icmp errors
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP metrics (I/O Errors, In Checksums, In Destination Unreachable, In Packet too big, In Time Exceeds, In Parm Problem, Out Dest Unreachable, Out Timee Exceeds, Out Parm Problems.).
+              default_value: auto
+              required: false
+            - name: icmp echos
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP echos metrics (I/O Echos, I/O Echo Reply).
+              default_value: auto
+              required: false
+            - name: icmp router
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP router metrics (I/O Solicits, I/O Advertisements).
+              default_value: auto
+              required: false
+            - name: icmp neighbor
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP neighbor metrics (I/O Solicits, I/O Advertisements).
+              default_value: auto
+              required: false
+            - name: icmp types
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of ICMP types metrics (I/O Type1, I/O Type128, I/O Type129, Out Type133, Out Type135, In Type136, Out Type145).
+              default_value: auto
+              required: false
+            - name: space usage for all disks
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of space usage for all disks metrics (available, used, reserved for root).
+              default_value: yes
+              required: false
+            - name: inodes usage for all disks
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of inodes usage for all disks metrics (available, used, reserved for root).
+              default_value: yes
+              required: false
+            - name: bandwidth
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of bandwidth metrics (received, sent).
+              default_value: yes
+              required: false
+            - name: system uptime
+              section_name: plugin:macos:sysctl
+              description: Enable or disable monitoring of system uptime metrics (uptime).
+              default_value: yes
+              required: false
+            - name: cpu utilization
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of CPU utilization metrics (user, nice, system, idel).
+              default_value: yes
+              required: false
+            - name: system ram
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of system RAM metrics (Active, Wired, throttled, compressor, inactive, purgeable, speculative, free).
+              default_value: yes
+              required: false
+            - name: swap i/o
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of SWAP I/O metrics (I/O Swap).
+              default_value: yes
+              required: false
+            - name: memory page faults
+              section_name: plugin:macos:mach_smi
+              description: Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge).
+              default_value: yes
+              required: false
+            - name: disk i/o
+              section_name: plugin:macos:iokit
+              description: Enable or disable monitoring of disk I/O metrics (In, Out).
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: "Config"
+          list:
+            - name: Disable swap monitoring.
+              folding:
+                enabled: true
+              description: A basic example that discards swap monitoring
+              config: |
+                [plugin:macos:sysctl]
+                  system swap = no
+                [plugin:macos:mach_smi]
+                  swap i/o = no
+            - name: Disable complete Machine SMI section.
+              folding:
+                enabled: true
+              description: A basic example that discards swap monitoring
+              config: |
+                [plugin:macos:mach_smi]
+                  cpu utilization = no
+                  system ram = no
+                  swap i/o = no
+                  memory page faults = no
+                  disk i/o = no
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: interface_speed
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: network interface ${label:device} current speed
+        os: "*"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: |
+            These metrics refer to hardware and network monitoring.
+          labels: []
+          metrics:
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: nice
+                - name: system
+                - name: idle
+            - name: system.ram
+              description: System RAM
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: wired
+                - name: throttled
+                - name: compressor
+                - name: inactive
+                - name: purgeable
+                - name: speculative
+                - name: free
+            - name: mem.swapio
+              description: Swap I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: io
+                - name: out
+            - name: mem.pgfaults
+              description: Memory Page Faults
+              unit: "faults/s"
+              chart_type: line
+              dimensions:
+                - name: memory
+                - name: cow
+                - name: pagein
+                - name: pageout
+                - name: compress
+                - name: decompress
+                - name: zero_fill
+                - name: reactivate
+                - name: purge
+            - name: system.load
+              description: System Load Average
+              unit: "load"
+              chart_type: line
+              dimensions:
+                - name: load1
+                - name: load5
+                - name: load15
+            - name: mem.swap
+              description: System Swap
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: system.ipv4
+              description: IPv4 Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcperrors
+              description: IPv4 TCP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrs
+                - name: InCsumErrors
+                - name: RetransSegs
+            - name: ipv4.tcphandshake
+              description: IPv4 TCP Handshake Issues
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: EstabResets
+                - name: ActiveOpens
+                - name: PassiveOpens
+                - name: AttemptFails
+            - name: ipv4.tcpconnaborts
+              description: TCP Connection Aborts
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: baddata
+                - name: userclosed
+                - name: nomemory
+                - name: timeout
+            - name: ipv4.tcpofo
+              description: TCP Out-Of-Order Queue
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: inqueue
+            - name: ipv4.tcpsyncookies
+              description: TCP SYN Cookies
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: failed
+            - name: ipv4.ecnpkts
+              description: IPv4 ECN Statistics
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: CEP
+                - name: NoECTP
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udperrors
+              description: IPv4 UDP Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: RcvbufErrors
+                - name: InErrors
+                - name: NoPorts
+                - name: InCsumErrors
+                - name: IgnoredMulti
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp_errors
+              description: IPv4 ICMP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Messages
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InEchos
+                - name: OutEchos
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.fragsout
+              description: IPv4 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: created
+            - name: ipv4.fragsin
+              description: IPv4 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InUnknownProtos
+            - name: ipv6.packets
+              description: IPv6 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivers
+            - name: ipv6.fragsout
+              description: IPv6 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv6.fragsin
+              description: IPv6 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: timeout
+                - name: all
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: InAddrErrors
+                - name: InTruncatedPkts
+                - name: InNoRoutes
+                - name: OutNoRoutes
+            - name: ipv6.icmp
+              description: IPv6 ICMP Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmpredir
+              description: IPv6 ICMP Redirects
+              unit: "redirects/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmperrors
+              description: IPv6 ICMP Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+                - name: InDestUnreachs
+                - name: InPktTooBigs
+                - name: InTimeExcds
+                - name: InParmProblems
+                - name: OutDestUnreachs
+                - name: OutTimeExcds
+                - name: OutParmProblems
+            - name: ipv6.icmpechos
+              description: IPv6 ICMP Echo
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InEchos
+                - name: OutEchos
+                - name: InEchoReplies
+                - name: OutEchoReplies
+            - name: ipv6.icmprouter
+              description: IPv6 Router Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmpneighbor
+              description: IPv6 Neighbor Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmptypes
+              description: IPv6 ICMP Types
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InType1
+                - name: InType128
+                - name: InType129
+                - name: InType136
+                - name: OutType1
+                - name: OutType128
+                - name: OutType129
+                - name: OutType133
+                - name: OutType135
+                - name: OutType143
+            - name: system.uptime
+              description: System Uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+        - name: disk
+          description: ""
+          labels: []
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: writes
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: "% of time working"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: svctm
+        - name: mount point
+          description: ""
+          labels: []
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
+              unit: "GiB"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
+              unit: "inodes"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+        - name: network device
+          description: ""
+          labels: []
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: net.errors
+              description: Interface Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+            - name: net.events
+              description: Network Interface Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: frames
+                - name: collisions
+                - name: carrier

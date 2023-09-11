@@ -11,7 +11,7 @@
 AutoReqProv: yes
 
 # This is temporary and should eventually be resolved. This bypasses
-# the default rhel __os_install_post which throws a python compile
+# the default rhel __os_install_p,ost which throws a python compile
 # error.
 %global __os_install_post %{nil}
 
@@ -34,71 +34,24 @@ AutoReqProv: yes
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+# Fedora doesn’t define this, but other distros do
+%{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
+
 # Redefine centos_ver to standardize on a single macro
 %{?rhel:%global centos_ver %rhel}
 
-#
-# Conditional build:
-%bcond_without  systemd  # systemd
-%bcond_without  netns    # build with netns support (cgroup-network)
-
-%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
+# Disable FreeIPMI on Amazon Linux 2023 and newer
+%if 0%{?amzn} >= 2023
+%global _have_freeipmi 0
 %else
-%undefine	with_systemd
-%undefine	with_netns
+%global _have_freeipmi 1
 %endif
 
-%if %{with systemd}
-%if 0%{?suse_version}
-%global netdata_initd_buildrequires \
-BuildRequires: systemd-rpm-macros \
-%{nil}
-%global netdata_initd_requires \
-%{?systemd_requires} \
-%{nil}
-%global netdata_init_post %service_add_post netdata.service \
-/sbin/service netdata restart > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_preun %service_del_preun netdata.service \
-/sbin/service netdata stop > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_postun %service_del_postun netdata.service
+# Disable NFACCT for RHEL equivalents and Amazon Linux
+%if 0%{?centos_ver} || 0%{?amzn}
+%global _have_nfacct 0
 %else
-%global netdata_initd_buildrequires \
-BuildRequires: systemd
-%global netdata_initd_requires \
-Requires(preun):  systemd-units \
-Requires(postun): systemd-units \
-Requires(post):   systemd-units \
-%{nil}
-%global netdata_init_post %systemd_post netdata.service \
-/usr/bin/systemctl enable netdata.service \
-/usr/bin/systemctl daemon-reload \
-/usr/bin/systemctl restart netdata.service \
-%{nil}
-%global netdata_init_preun %systemd_preun netdata.service
-%global netdata_init_postun %systemd_postun_with_restart netdata.service
-%endif
-%else
-%global netdata_initd_buildrequires %{nil}
-%global netdata_initd_requires \
-Requires(post):   chkconfig \
-%{nil}
-%global netdata_init_post \
-/sbin/chkconfig --add netdata \
-/sbin/service netdata restart > /dev/null 2>&1 \
-%{nil}
-%global netdata_init_preun %{nil} \
-if [ $1 = 0 ]; then \
-        /sbin/service netdata stop > /dev/null 2>&1 \
-        /sbin/chkconfig --del netdata \
-fi \
-%{nil}
-%global netdata_init_postun %{nil} \
-if [ $1 != 0 ]; then \
-        /sbin/service netdata condrestart 2>&1 > /dev/null \
-fi \
-%{nil}
+%global _have_nfacct 1
 %endif
 
 Summary:	Real-time performance monitoring, done right!
@@ -127,7 +80,7 @@ BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
-%if 0%{?rhel} <= 8
+%if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
 BuildRequires: autogen
 %endif
 %endif
@@ -145,12 +98,14 @@ BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
 BuildRequires: liblz4-devel
 BuildRequires: libjson-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?fedora}
 BuildRequires: protobuf-devel
 BuildRequires: protobuf-c-devel
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %else
 %if 0%{?centos_ver} >= 8
 BuildRequires: protobuf-devel
@@ -158,46 +113,77 @@ BuildRequires: protobuf-c-devel
 %endif
 BuildRequires: lz4-devel
 BuildRequires: json-c-devel
+BuildRequires: libyaml-devel
 %endif
 %endif
 
 # Core build requirements for service install
-%{netdata_initd_buildrequires}
-
-# Runtime dependencies
-#
-%if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
-Requires: python
+%if 0%{?suse_version}
+BuildRequires: systemd-rpm-macros
 %else
-%if 0%{?centos_ver} == 8
-Requires: python38
-%else
-Requires: python3
-%endif
+BuildRequires: systemd
 %endif
 
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
-%{netdata_initd_requires}
+# #####################################################################
+# External plugin package dependencies
+# #####################################################################
+# CentOS prior to CentOS 8 does not have a new enough version of RPM
+# to support weak dependencies. Explicitly requiring our default plugins
+# makes it impossible to properly test the packages prior to upload,
+# so we just skip depending on them on CentOS 7.
+%if 0%{?_have_ebpf}
+Requires: netdata-plugin-ebpf = %{version}
+%endif
+Requires: netdata-plugin-apps = %{version}
+Requires: netdata-plugin-pythond = %{version}
+Requires: netdata-plugin-go = %{version}
+Requires: netdata-plugin-debugfs = %{version}
+Requires: netdata-plugin-chartsd = %{version}
+Requires: netdata-plugin-slabinfo = %{version}
+Requires: netdata-plugin-perf = %{version}
+%if 0%{?_have_nfacct}
+Requires: netdata-plugin-nfacct = %{version}
+%endif
+%if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+Suggests: netdata-plugin-freeipmi = %{version}
+%endif
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+Suggests: netdata-plugin-cups = %{version}
+Recommends: netdata-plugin-systemd-journal = %{version}
+%endif
+
 
 # #####################################################################
 # Functionality-dependent package dependencies
 # #####################################################################
-# Note: Some or all of the Packages may be found in the EPEL repo, 
+# Note: Some or all of the Packages may be found in the EPEL repo,
 # rather than the standard ones
 
+# epbf plugin dependencies
+%if 0%{?_have_ebpf}
+%if 0%{?suse_version}
+BuildRequires:	libelf-devel
+%else
+BuildRequires:	elfutils-libelf-devel
+%endif
+%endif
+# end ebpf plugin dependencies
+
 # nfacct plugin dependencies
+%if 0%{?_have_nfacct}
 BuildRequires:  libmnl-devel
-%if 0%{?fedora} || 0%{?suse_version} >= 1140
 BuildRequires:  libnetfilter_acct-devel
 %endif
-
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
+%if 0%{?_have_freeipmi}
 BuildRequires:  freeipmi-devel
+%endif
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
@@ -205,6 +191,10 @@ BuildRequires:  freeipmi-devel
 BuildRequires: cups-devel >= 1.7
 %endif
 # end - cups plugin dependencies
+
+# systemd-journal dependencies
+BuildRequires: systemd-devel
+# end - systemd-journal dependencies
 
 # Prometheus remote write dependencies
 BuildRequires: snappy-devel
@@ -251,7 +241,13 @@ export CFLAGS="${CFLAGS} -fPIC" && ${RPM_BUILD_DIR}/%{name}-%{version}/packaging
 autoreconf -ivf
 %configure \
 	%if 0%{!?_have_ebpf}
-	--disable-ebpf
+	--disable-ebpf \
+	%endif
+	%if 0%{!?_have_freeipmi}
+	--disable-plugin-freeipmi \
+	%endif
+	%if 0%{!?_have_nfacct}
+	--disable-plugin-nfacct \
 	%endif
 	%if 0%{?centos_ver:1}
 	%if %{centos_ver} < 8
@@ -291,11 +287,21 @@ install -m 644 -p system/logrotate/netdata "${RPM_BUILD_ROOT}%{_sysconfdir}/logr
 
 # ###########################################################
 # Install freeipmi
+%if 0%{?_have_freeipmi}
 install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
+%endif
 
 # ###########################################################
 # Install apps.plugin
 install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/apps.plugin"
+
+# ###########################################################
+# Install debugfs.plugin
+install -m 0750 -p debugfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/debugfs.plugin"
+
+# ###########################################################
+# Install systemd-journal.plugin
+install -m 4750 -p systemd-journal.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin"
 
 # ###########################################################
 # Install perf.plugin
@@ -327,16 +333,21 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/log/%{name}"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 
 # ###########################################################
+# Install uninstaller script
+install -m 750 -p packaging/installer/netdata-uninstaller.sh \
+        "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/netdata-uninstaller.sh"
+
+# ###########################################################
 # Install netdata service
-%if %{with systemd}
+
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
 %else
-# install SYSV init stuff
-install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
-install -m 755 system/initd/init.d/netdata \
-        "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
+install -m 644 -p system/systemd/netdata.service.v235 "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
 %endif
+install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
+install -m 644 -p system/systemd/50-netdata.preset "${RPM_BUILD_ROOT}%{_presetdir}/50-netdata.preset"
 
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
@@ -384,9 +395,10 @@ install_go() {
 	)
 
 	if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
-		echo >&2 "Install go.d.plugin"
-		ARCH=$(uname -m)
+		ARCH="%{_arch}"
 		OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+		echo >&2 "Install go.d.plugin (ARCH=${ARCH}, OS=${OS})"
 
 		for index in "${ARCH_MAP[@]}" ; do
 			KEY="${index%%::*}"
@@ -454,74 +466,77 @@ for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
 done
 
 %post
-%{netdata_init_post}
+%if 0%{?suse_version}
+%service_add_post netdata.service
+%else
+%systemd_post netdata.service
+%endif
 
 %preun
-%{netdata_init_preun}
+%if 0%{?suse_version}
+%service_del_preun netdata.service
+%else
+%systemd_preun netdata.service
+%endif
 
 %postun
-%{netdata_init_postun}
+%if 0%{?suse_version}
+%service_del_postun netdata.service
+%else
+%systemd_postun_with_restart netdata.service
+%endif
 
 %clean
 rm -rf "${RPM_BUILD_ROOT}"
 
 %files
 %doc README.md
-%{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
+%config(noreplace) %{_sysconfdir}/%{name}/netdata-updater.conf
+%attr(0755,root,netdata) %{_sysconfdir}/%{name}/edit-config
+%attr(0644,root,netdata) %{_sysconfdir}/%{name}/.install-type
+%dir %{_sysconfdir}/%{name}/health.d
+%dir %{_sysconfdir}/%{name}/statsd.d
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
-%dir %{_libdir}/%{name}
-%dir %{_datadir}/%{name}
 %{_libdir}/%{name}
-%{_libdir}/%{name}/conf.d/
-%{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
 %{_sbindir}/netdata-claim.sh
 
-%if %{with systemd}
 %{_unitdir}/netdata.service
-%else
-%{_sysconfdir}/rc.d/init.d/netdata
-%endif
+%{_presetdir}/50-netdata.preset
 
-%defattr(0750,root,netdata,0750)
-
-%dir %{_libexecdir}/%{name}/python.d
-%dir %{_libexecdir}/%{name}/charts.d
+%dir %{_libexecdir}/%{name}
 %dir %{_libexecdir}/%{name}/plugins.d
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/install-service.sh
+%{_libexecdir}/%{name}/netdata-updater.sh
+%{_libexecdir}/%{name}/netdata-uninstaller.sh
+%{_libexecdir}/%{name}/plugins.d/acl.sh
+%{_libexecdir}/%{name}/plugins.d/alarm.sh
+%{_libexecdir}/%{name}/plugins.d/alarm-email.sh
+%{_libexecdir}/%{name}/plugins.d/alarm-notify.sh
+%{_libexecdir}/%{name}/plugins.d/alarm-test.sh
+%{_libexecdir}/%{name}/plugins.d/anonymous-statistics.sh
+%{_libexecdir}/%{name}/plugins.d/cgroup-name.sh
+%{_libexecdir}/%{name}/plugins.d/get-kubernetes-labels.sh
+%{_libexecdir}/%{name}/plugins.d/health-cmdapi-test.sh
+%{_libexecdir}/%{name}/plugins.d/ioping.plugin
+%{_libexecdir}/%{name}/plugins.d/loopsleepms.sh.inc
+%{_libexecdir}/%{name}/plugins.d/request.sh
+%{_libexecdir}/%{name}/plugins.d/system-info.sh
+%{_libexecdir}/%{name}/plugins.d/tc-qos-helper.sh
+%{_libexecdir}/%{name}/plugins.d/template_dim.sh
+%{_libexecdir}/%{name}/plugins.d/ebpf_thread_function.sh
 
-%{_libexecdir}/%{name}/python.d
-%{_libexecdir}/%{name}/plugins.d
-
-%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
-
-%if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
-%endif
 
-# ebpf plugin
-%if 0%{?_have_ebpf}
-%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
-%endif
-
-# perf plugin
-# This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
-# %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
-%caps(cap_sys_admin=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
-
-# perf plugin
-%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
-
-# freeipmi files
-%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
-
-# go.d.plugin (the capability required for wireguard module)
-%caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+# local-listeners detects the local processes that are listening for connections
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/local-listeners
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
@@ -537,42 +552,386 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 # Free IPMI belongs to a different sub-package
+%if 0%{?_have_freeipmi}
 %exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
+
+# NFACCT belongs to a different sub-package
+%if 0%{?_have_nfacct}
+%exclude %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
+%endif
+
+# Charts.d belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/charts.d.plugin
+%exclude %{_libexecdir}/%{name}/plugins.d/charts.d.dryrun-helper.sh
+%exclude %{_libexecdir}/%{name}/charts.d/
+%exclude %{_libdir}/%{name}/conf.d/charts.d.conf
+%exclude %{_libdir}/%{name}/conf.d/charts.d/
+
+# eBPF belongs to a different sub-package
+%if 0%{?_have_ebpf}
+%exclude %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%exclude %{_libdir}/%{name}/conf.d/ebpf.d.conf
+%exclude %{_libdir}/%{name}/conf.d/ebpf.d
+%exclude %{_libexecdir}/%{name}/plugins.d/ebpf.d
+%endif
+
+# Python.d belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/python.d.plugin
+%exclude %{_libexecdir}/%{name}/python.d
+%exclude %{_libdir}/%{name}/conf.d/python.d.conf
+%exclude %{_libdir}/%{name}/conf.d/python.d
+
+# Go.d belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+%exclude %{_libdir}/%{name}/conf.d/go.d.conf
+%exclude %{_libdir}/%{name}/conf.d/go.d
+
+# apps belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%exclude %{_libdir}/%{name}/conf.d/apps_groups.conf
+
+# slabinfo belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+
+# perf belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/perf.plugin
+
+# systemd-journal belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
 
 %package plugin-cups
-Summary: The Common Unix Printing System plugin for netdata
+Summary: The CUPS metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: cups >= 1.7
 Requires: netdata = %{version}
 
 %description plugin-cups
- This is the Common Unix Printing System plugin for the netdata daemon.
-Use this plugin to enable metrics collection from cupsd, the daemon running when CUPS is enabled on the system
+ This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.
+
+%pre plugin-cups
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
 
 %files plugin-cups
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
 
+%if 0%{?_have_freeipmi}
 %package plugin-freeipmi
-Summary: FreeIPMI - The Intelligent Platform Management System
+Summary: The FreeIPMI metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: freeipmi
 Requires: netdata = %{version}
 
 %description plugin-freeipmi
- The IPMI specification defines a set of interfaces for platform management.
-It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in 
-are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+ This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
+
+%pre plugin-freeipmi
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
 
 %files plugin-freeipmi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
+
+%if 0%{?_have_nfacct}
+%package plugin-nfacct
+Summary: The NFACCT metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+
+%description plugin-nfacct
+ This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
+
+%pre plugin-nfacct
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-nfacct
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
+%endif
+
+%package plugin-chartsd
+Summary: The charts.d metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: bash
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+%if 0%{?centos_ver} != 7
+Suggests: nut
+Suggests: apcupsd
+Suggests: iw
+Suggests: sudo
+%endif
+
+%description plugin-chartsd
+ This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
+It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
+
+%pre plugin-chartsd
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-chartsd
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/charts.d.plugin
+%{_libexecdir}/%{name}/plugins.d/charts.d.dryrun-helper.sh
+%{_libexecdir}/%{name}/charts.d/
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/charts.d.conf
+%{_libdir}/%{name}/conf.d/charts.d/
+
+%if 0%{?_have_ebpf}
+%package plugin-ebpf
+Summary: The eBPF metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+%if 0%{?centos_ver} != 7
+Recommends: netdata-plugin-apps = %{version}
+Recommends: netdata-ebpf-legacy-code >= %{version}
+%else
+Requires: netdata-plugin-apps = %{version}
+Requires: netdata-ebpf-legacy-code >= %{version}
+%endif
+
+%description plugin-ebpf
+ This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
+
+%pre plugin-ebpf
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-ebpf
+%defattr(4750,root,netdata,4750)
+%{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/ebpf.d.conf
+%{_libdir}/%{name}/conf.d/ebpf.d
+
+%package ebpf-legacy-code
+Summary: Compiled eBPF legacy code for the Netdata eBPF plugin
+Group: Applications/System
+Requires: netdata-plugin-ebpf = %{version}
+Conflicts: netdata < %{version}
+
+%description ebpf-legacy-code
+ This package provides the pre-compiled eBPF legacy code for use by the Netdata eBPF plugin.
+ This code is only needed when using the eBPF plugin with kernel versions before 5.10.
+
+%pre ebpf-legacy-code
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files ebpf-legacy-code
+%defattr(0640,root,netdata,0640)
+%{_libexecdir}/%{name}/plugins.d/ebpf.d/*.o
+
+%endif
+
+%package plugin-pythond
+Summary: The python.d metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+%if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
+Requires: python
+%else
+Requires: python3
+%endif
+%if 0%{?centos_ver} != 7
+Suggests: sudo
+%endif
+
+%description plugin-pythond
+ This plugin adds a selection of additional collectors written in Python to the Netdata Agent.
+Many of the collectors provided by this package are also available in netdata-plugin-go. In msot cases, you probably
+want to use those versions instead of the Python versions.
+
+%pre plugin-pythond
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-pythond
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/python.d.plugin
+%{_libexecdir}/%{name}/python.d
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/python.d.conf
+%{_libdir}/%{name}/conf.d/python.d
+
+%package plugin-go
+Summary: The go.d metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+%if 0%{?centos_ver} != 7
+Suggests: nvme-cli
+Suggests: sudo
+%endif
+
+%description plugin-go
+ This plugin adds a selection of additional collectors written in Go to the Netdata Agent
+A significant percentage of the application specific collectors provided by Netdata are part of this plugin,
+so most users will want it installed.
+
+%pre plugin-go
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-go
+%defattr(0750,root,netdata,0750)
+# CAP_NET_ADMIN needed for WireGuard collector
+# CAP_NET_RAW needed for ping collector
+%caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/go.d.conf
+%{_libdir}/%{name}/conf.d/go.d
+
+%package plugin-apps
+Summary: The per-application metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+
+%description plugin-apps
+ This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
+
+%pre plugin-apps
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-apps
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH and CAP_SYS_PTRACE needed for data collection by the plugin.
+%caps(cap_dac_read_search,cap_sys_ptrace=ep) %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/apps_groups.conf
+
+%package plugin-slabinfo
+Summary: The slabinfo metrics collector for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+
+%description plugin-slabinfo
+ This plugin allows the Netdata Agent to collect perfromance and utilization metrics for the Linux kernel’s SLAB allocator.
+
+%pre plugin-slabinfo
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-slabinfo
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH needed to access the files the plugin reads to collect data.
+%caps(cap_dac_read_search=ep) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+
+%package plugin-perf
+Summary: The perf metrics collector for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+
+%description plugin-perf
+ This plugin allows the Netdata to collect metrics from the Linux perf subsystem.
+
+%pre plugin-perf
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-perf
+%defattr(0750,root,netdata,0750)
+# Either CAP_SYS_ADMIN or CAP_PERFMON needed for data collection
+# PERFMON is newer, so only try to use it on platforms which support it.
+%if 0%{?centos_ver} >= 9 || 0%{?fedora} >= 36
+%caps(cap_perfmon=ep) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+%else
+%caps(cap_sys_admin=ep) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+%endif
+
+%package plugin-debugfs
+Summary: The debugfs metrics collector for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+
+%description plugin-debugfs
+ This plugin allows the Netdata Agent to collect Linux kernel metrics exposed through debugfs.
+
+%pre plugin-debugfs
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-debugfs
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH required for data collection.
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
+
+%package plugin-systemd-journal
+Summary: The systemd-journal plugin for the Netdata Agent
+Group: Applications/System
+Requires: netdata = %{version}
+Conflicts: netdata < %{version}
+
+%description plugin-systemd-journal
+ This plugin allows the Netdata Agent to present entries from the systemd
+ journal on Netdata Cloud or the local Agent Dashboard.
+
+%pre plugin-systemd-journal
+
+if ! getent group netdata > /dev/null; then
+  groupadd --system netdata
+fi
+
+%files plugin-systemd-journal
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH required for data collection.
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
 %changelog
-* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+* Mon Aug 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-22
+* Thu Aug 03 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-21
+- Added systemd-journal plugin handling
+* Wed Jun 14 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-20
+- Added eBPF build dependency (again)
+* Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
+- Split additional plugins out in their own packages.
+* Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
+- Fix systemd handling to follow BCP.
+- Drop pre-systemd init support.
+* Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
+- Added eBPF build dependency
+* Fri Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
 - Bundle updater script in native packages.
 * Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
 - Remove support code for legacy ACLK implementation.
@@ -609,7 +968,7 @@ First draft refactor on package dependencies section
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
 - Temporary set version statically
 - Fix changelog ordering
-- Comment-out node.d configuration directory 
+- Comment-out node.d configuration directory
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
 - Fix permissions for log files
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1

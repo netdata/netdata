@@ -58,26 +58,29 @@ to work on these platforms with minimal user effort.
 
 | Platform                 | Version        | Official Native Packages               | Notes                                                                                                                                              |
 |--------------------------|----------------|----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Alpine Linux             | 3.17           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images                                     |
+| Alpine Linux             | 3.18           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images                                     |
 | Alma Linux               | 9.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
 | Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
+| Amazon Linux             | 2023           | x86\_64, AArch64         |                                                                                                      |
+| Amazon Linux             | 2              | x86\_64, AArch64         |                                                                                                      |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                                                    |
 | Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) for more info on using Netdata on Docker |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 10.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
+| Fedora                   | 38             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 37             | x86\_64, AArch64                       |                                                                                                                                                    |
-| Fedora                   | 36             | x86\_64, AArch64                       |                                                                                                                                                    |
 | openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                                                    |
+| openSUSE                 | Leap 15.5      | x86\_64, AArch64                       |                                                                                                                                                    |
 | Oracle Linux             | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Oracle Linux             | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                                                    |
-| Ubuntu                   | 22.10          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
+| Ubuntu                   | 23.04          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
-| Ubuntu                   | 18.04          | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
+
 
 ### Intermediate
 
@@ -88,13 +91,15 @@ platforms that we officially support ourselves to the intermediate tier. Our [st
 expected to work on these platforms if available. Source-based installs are expected to work on these platforms
 with minimal user effort.
 
-| Platform      | Version | Official Native Packages | Notes                                                                   |
-|---------------|---------|--------------------------|-------------------------------------------------------------------------|
-| Alpine Linux  | 3.16    | No                       |                                                                         |
-| Alpine Linux  | 3.15    | No                       |                                                                         |
-| Alpine Linux  | 3.14    | No                       |                                                                         |
-| Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
-| Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
+| Platform      | Version    | Official Native Packages | Notes                                                                                                |
+|---------------|------------|--------------------------|------------------------------------------------------------------------------------------------------|
+| Alpine Linux  | Edge       | No                       |                                                                                                      |
+| Alpine Linux  | 3.17       | No                       |                                                                                                      |
+| Alpine Linux  | 3.16       | No                       |                                                                                                      |
+| Alpine Linux  | 3.15       | No                       |                                                                                                      |
+| Arch Linux    | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
+| Manjaro Linux | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
+| openSUSE      | Tumbleweed | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.41.0 of the Netdata Agent |
 
 ### Community
 
@@ -106,17 +111,14 @@ platforms, but may require some extra effort from users.
 
 | Platform     | Version    | Official Native Packages | Notes                                                                                                     |
 |--------------|------------|--------------------------|-----------------------------------------------------------------------------------------------------------|
-| Alpine Linux | Edge       | No                       |                                                                                                           |
 | Clear Linux  | Latest     | No                       |                                                                                                           |
 | Debian       | Sid        | No                       |                                                                                                           |
 | Fedora       | Rawhide    | No                       |                                                                                                           |
 | FreeBSD      | 13-STABLE  | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
-| FreeBSD      | 12-STABLE  | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | Gentoo       | Latest     | No                       |                                                                                                           |
+| macOS        | 13         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
 | macOS        | 12         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
 | macOS        | 11         | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
-| macOS        | 10.15      | No                       | Requires Homebrew for dependencies.                                                                       |
-| openSUSE     | Tumbleweed | No                       |                                                                                                           |
 
 ## Third-party supported platforms
 
@@ -153,14 +155,15 @@ This is a list of platforms that we have supported in the recent past but no lon
 
 | Platform     | Version   | Notes                |
 |--------------|-----------|----------------------|
+| Alpine Linux | 3.14      | EOL as of 2023-05-01 |
 | Alpine Linux | 3.13      | EOL as of 2022-11-01 |
-| Alpine Linux | 3.12      | EOL as of 2022-05-01 |
 | Debian       | 9.x       | EOL as of 2022-06-30 |
+| Fedora       | 36        | EOL as of 2023-05-18 |
 | Fedora       | 35        | EOL as of 2022-12-13 |
-| Fedora       | 34        | EOL as of 2022-06-07 |
 | openSUSE     | Leap 15.3 | EOL as of 2022-12-01 |
+| Ubuntu       | 22.10     | EOL as of 2023-07-20 |
 | Ubuntu       | 21.10     | EOL as of 2022-07-31 |
-| Ubuntu       | 21.04     | EOL as of 2022-01-01 |
+| Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds
 

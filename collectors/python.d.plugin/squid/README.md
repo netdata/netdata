@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Squid monitoring with Netdata
+# Squid collector
 
 Monitors one or more squid instances depending on configuration.
 

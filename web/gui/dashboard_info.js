@@ -140,6 +140,12 @@ netdataDashboard.menu = {
         info: 'Detailed information for each CPU of the system. A summary of the system for all CPUs can be found at the <a href="#menu_system">System Overview</a> section.'
     },
 
+    'amdgpu': {
+        title: 'AMD GPUs',
+        icon: '<i class="fas fa-microchip"></i>',
+        info: 'Detailed information for each AMD GPU of the system. Temperature, fan speed, voltage and power metrics can be found at the <a href="#menu_sensors">Sensors</a> section.'
+    },
+
     'mem': {
         title: 'Memory',
         icon: '<i class="fas fa-microchip"></i>',
@@ -883,6 +889,19 @@ netdataDashboard.submenu = {
         'When the kernel or an application requests some memory, the buddy allocator provides a page that matches closest the request.'
     },
 
+    'mem.fragmentation': {
+        info: 'These charts show whether the kernel will compact memory or direct reclaim to satisfy a high-order allocation. '+
+            'The extfrag/extfrag_index file in debugfs shows what the fragmentation index for each order is in each zone in the system.' +
+            'Values tending towards 0 imply allocations would fail due to lack of memory, values towards 1000 imply failures are due to ' +
+            'fragmentation and -1 implies that the allocation will succeed as long as watermarks are met.'
+    },
+
+    'system.zswap': {
+        info : 'Zswap is a backend for frontswap that takes pages that are in the process of being swapped out and attempts to compress and store them in a ' +
+            'RAM-based memory pool.  This can result in a significant I/O reduction on the swap device and, in the case where decompressing from RAM is faster ' +
+            'than reading from the swap device, can also improve workload performance.'
+    },
+
     'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> '+
         'is an extension to the IP and to the TCP that allows end-to-end notification of network congestion without dropping packets. '+
@@ -1163,6 +1182,10 @@ netdataDashboard.submenu = {
     'postgres.connections': {
         info: 'A connection is an established line of communication between a client and the PostgreSQL server. Each connection adds to the load on the PostgreSQL server. To guard against running out of memory or overloading the database the <i>max_connections</i> parameter (default = 100) defines the maximum number of concurrent connections to the database server. A separate parameter, <i>superuser_reserved_connections</i> (default = 3), defines the quota for superuser connections (so that superusers can connect even if all other connection slots are blocked).'
     },
+
+    'system.power_consumption': {
+        info: 'The current power consumption of the zones defined by the <a href="https://www.kernel.org/doc/html/next/power/powercap/powercap.html" target="_blank">power capping framework</a>.'
+    }
 
 };
 
@@ -1507,7 +1530,7 @@ netdataDashboard.context = {
         info: 'Memory paged from/to disk. This is usually the total disk I/O of the system.'
     },
 
-    'system.swapio': {
+    'mem.swapio': {
         info: '<p>System swap I/O.</p>'+
         '<b>In</b> - pages the system has swapped in from disk to RAM. '+
         '<b>Out</b> - pages the system has swapped out from RAM to disk.'
@@ -1520,6 +1543,14 @@ netdataDashboard.context = {
     'system.entropy': {
         colors: '#CC22AA',
         info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, is a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that is mainly used in cryptography. If the pool of entropy gets empty, processes requiring random numbers may run a lot slower (it depends on the interface each program uses), waiting for the pool to be replenished. Ideally a system with high entropy demands should have a hardware device for that purpose (TPM is one such device). There are also several software-only options you may install, like <code>haveged</code>, although these are generally useful only in servers.'
+    },
+
+    'system.zswap_rejections': {
+        info: '<p>Zswap rejected pages per access.</p>' +
+            '<p><b>CompressPoor</b> - compressed page was too big for the allocator to store. ' +
+            '<b>KmemcacheFail</b> - number of entry metadata that could not be allocated. ' +
+            '<b>AllocFail</b> - allocator could not get memory. ' +
+            '<b>ReclaimFail</b> - memory cannot be reclaimed (pool limit was reached).</p>'
     },
 
     'system.clock_sync_state': {
@@ -1644,7 +1675,7 @@ netdataDashboard.context = {
         info: 'System Random Access Memory (i.e. physical memory) usage.'
     },
 
-    'system.swap': {
+    'mem.swap': {
         info: 'System swap memory usage. Swap space is used when the amount of physical memory (RAM) is full. When the system needs more memory resources and the RAM is full, inactive pages in memory are moved to the swap space (usually a disk, a disk partition or a file).'
     },
 
@@ -1707,6 +1738,10 @@ netdataDashboard.context = {
     'system.process_status': {
         title : 'Task status',
         info: 'Difference between the number of calls to <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#process-exit" target="_blank">functions</a> that close a task and release a task.'+ ebpfChartProvides
+    },
+
+    'system.power_consumption': {
+        info: 'The current power consumption of the zones defined by the <a href="https://www.kernel.org/doc/html/next/power/powercap/powercap.html" target="_blank">power capping framework</a>.'
     },
 
     // ------------------------------------------------------------------------
@@ -4914,14 +4949,34 @@ netdataDashboard.context = {
     },
 
     'netdata.ebpf_threads': {
-        info: 'Show total number of threads and number of active threads. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs-configuration-options" target="_blank">official documentation</a>.'
+        info: 'Show thread status. Threads running have value 1 an stopped value 0. For more details about the threads, see the <a href="https://learn.netdata.cloud/docs/agent/collectors/ebpf.plugin#ebpf-programs-configuration-options" target="_blank">official documentation</a>.'
+    },
+
+    'netdata.ebpf_life_time': {
+        info: 'Time remaining for thread shutdown itself.'
     },
 
     'netdata.ebpf_load_methods': {
         info: 'Show number of threads loaded using legacy code (independent binary) or <code>CO-RE (Compile Once Run Everywhere)</code>.'
     },
 
-    // ------------------------------------------------------------------------
+    'netdata.ebpf_kernel_memory': {
+        info: 'Show amount of memory allocated inside kernel ring for hash tables. This chart shows the same information displayed by command `bpftool map show`.'
+    },
+
+    'netdata.ebpf_hash_tables_count': {
+        info: 'Show total number of hash tables loaded by eBPF.plugin`.'
+    },
+
+    'netdata.ebpf_aral_stat_size': {
+        info: 'Show total memory allocated for the specific ARAL.'
+    },
+
+    'netdata.ebpf_aral_stat_alloc': {
+        info: 'Show total memory of calls to get a specific region of memory inside an ARAL region.'
+    },
+
+// ------------------------------------------------------------------------
     // RETROSHARE
 
     'retroshare.bandwidth': {
@@ -6427,6 +6482,22 @@ netdataDashboard.context = {
 
     'btrfs.system': {
         info: 'Logical disk usage for BTRFS system. System chunks store information about the allocation of other chunks. The disk space reported here is the usable allocation (i.e. after any striping or replication). The values reported here should be relatively small compared to Data and Metadata, and will scale with the volume size and overall space usage.'
+    },
+
+    'btrfs.commits': {
+        info: 'Tracks filesystem wide commits. Commits mark fully consistent synchronization points for the filesystem, and are triggered automatically when certain events happen or when enough time has elapsed since the last commit.'
+    },
+
+    'btrfs.commits_perc_time': {
+        info: 'Tracks commits time share. The reported time share metrics are valid only when BTRFS commit interval is longer than Netdata\'s <b>update_every</b> interval.'
+    },
+
+    'btrfs.commit_timings': {
+        info: 'Tracks timing information for commits. <b>last</b> dimension metrics are valid only when BTRFS commit interval is longer than Netdata\'s <b>update_every</b> interval.'
+    },
+
+    'btrfs.device_errors': {
+        info: 'Tracks per-device error counts. Five types of errors are tracked: read errors, write errors, flush errors, corruption errors, and generation errors. <b>Read</b>, <b>write</b>, and <b>flush</b> are errors reported by the underlying block device when trying to perform the associated operations on behalf of BTRFS. <b>Corruption</b> errors count checksum mismatches, which usually are a result of either at-rest data corruption or hardware problems. <b>Generation</b> errors count generational mismatches within the internal data structures of the volume, and are also usually indicative of at-rest data corruption or hardware problems. Note that errors reported here may not trigger an associated IO error in userspace, as BTRFS has relatively robust error recovery that allows it to return correct data in most multi-device setups.'
     },
 
     // ------------------------------------------------------------------------

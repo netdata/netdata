@@ -126,7 +126,7 @@ You can configure each connector individually using the available [options](#opt
 [prometheus:exporter]
     send names instead of ids = yes
     send configured labels = yes
-    end automatic labels = no
+    send automatic labels = no
     send charts matching = *
     send hosts matching = localhost *
     prefix = netdata
@@ -284,7 +284,7 @@ Configure individual connectors and override any global settings with the follow
     and names are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several
     cases they are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
 
--   `send configured labels = yes | no` controls if labels defined in the `[host labels]` section in `netdata.conf`
+-   `send configured labels = yes | no` controls if host labels defined in the `[host labels]` section in `netdata.conf`
     should be sent to the external database
 
 -   `send automatic labels = yes | no` controls if automatically created labels, like `_os_name` or `_architecture`
@@ -314,9 +314,9 @@ and performance of the exporting engine itself:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20463536/eb196084-af3d-11e6-8ee5-ddbd3b4d8449.png)
 
-## Exporting engine alarms
+## Exporting engine alerts
 
-Netdata adds 3 alarms:
+Netdata adds 3 alerts:
 
 1.  `exporting_last_buffering`, number of seconds since the last successful buffering of exported data
 2.  `exporting_metrics_sent`, percentage of metrics sent to the external database server

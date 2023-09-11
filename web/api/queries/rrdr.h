@@ -41,20 +41,42 @@ typedef enum rrdr_options {
     RRDR_OPTION_RETURN_JWAR     = (1 << 20), // Return anomaly rates in jsonwrap
     RRDR_OPTION_SELECTED_TIER   = (1 << 21), // Use the selected tier for the query
     RRDR_OPTION_ALL_DIMENSIONS  = (1 << 22), // Return the full dimensions list
-    RRDR_OPTION_SHOW_PLAN       = (1 << 23), // Return the query plan in jsonwrap
-    RRDR_OPTION_SHOW_DETAILS    = (1 << 24), // v2 returns detailed object tree
-    RRDR_OPTION_DEBUG           = (1 << 25), // v2 returns request description
-    RRDR_OPTION_MINIFY          = (1 << 26), // remove JSON spaces and newlines from JSON output
-    RRDR_OPTION_JW_ANNOTATIONS  = (1 << 27), // add annotation array to the JSON output
+    RRDR_OPTION_SHOW_DETAILS    = (1 << 23), // v2 returns detailed object tree
+    RRDR_OPTION_DEBUG           = (1 << 24), // v2 returns request description
+    RRDR_OPTION_MINIFY          = (1 << 25), // remove JSON spaces and newlines from JSON output
+    RRDR_OPTION_GROUP_BY_LABELS = (1 << 26), // v2 returns flattened labels per dimension of the chart
 
     // internal ones - not to be exposed to the API
-    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 28), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
-    RRDR_OPTION_INTERNAL_ANNOTATIONS = (1 << 29), // internal use only, to let the formatters know we want to render the annotations
-    RRDR_OPTION_INTERNAL_AR          = (1 << 30), // internal use only, to let the formatters know we want to render the anomaly rate
-    RRDR_OPTION_INTERNAL_GBC         = (1 << 31), // internal use only, to let the formatters know we want to render the group by count
+    RRDR_OPTION_HEALTH_RSRVD1        = (1 << 30), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
+    RRDR_OPTION_INTERNAL_AR          = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 
+typedef enum context_v2_options {
+    CONTEXT_V2_OPTION_MINIFY                        = (1 << 0), // remove JSON spaces and newlines from JSON output
+    CONTEXT_V2_OPTION_DEBUG                         = (1 << 1), // show the request
+    CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS    = (1 << 2), // include alert configurations (used by /api/v2/alert_transitions)
+    CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES         = (1 << 3), // include alert instances      (used by /api/v2/alerts)
+    CONTEXT_V2_OPTION_ALERTS_WITH_VALUES            = (1 << 4), // include alert latest values  (used by /api/v2/alerts)
+    CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY           = (1 << 5), // include alerts summary counters  (used by /api/v2/alerts)
+} CONTEXTS_V2_OPTIONS;
+
+typedef enum context_v2_alert_status {
+    CONTEXT_V2_ALERT_UNINITIALIZED  = (1 << 5), // include UNINITIALIZED alerts
+    CONTEXT_V2_ALERT_UNDEFINED      = (1 << 6), // include UNDEFINED alerts
+    CONTEXT_V2_ALERT_CLEAR          = (1 << 7), // include CLEAR alerts
+    CONTEXT_V2_ALERT_RAISED         = (1 << 8), // include WARNING & CRITICAL alerts
+    CONTEXT_V2_ALERT_WARNING        = (1 << 9), // include WARNING alerts
+    CONTEXT_V2_ALERT_CRITICAL       = (1 << 10), // include CRITICAL alerts
+} CONTEXTS_V2_ALERT_STATUS;
+
+#define CONTEXTS_V2_ALERT_STATUSES (CONTEXT_V2_ALERT_UNINITIALIZED|CONTEXT_V2_ALERT_UNDEFINED|CONTEXT_V2_ALERT_CLEAR|CONTEXT_V2_ALERT_RAISED|CONTEXT_V2_ALERT_WARNING|CONTEXT_V2_ALERT_CRITICAL)
+
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
+
+    // IMPORTANT:
+    // THIS IS AN AGREED BIT MAP BETWEEN AGENT, CLOUD FRONT-END AND CLOUD BACK-END
+    // DO NOT CHANGE THE MAPPINGS !
+
     RRDR_VALUE_NOTHING      = 0,            // no flag set (a good default)
     RRDR_VALUE_EMPTY        = (1 << 0),     // the database value is empty
     RRDR_VALUE_RESET        = (1 << 1),     // the database value is marked as reset (overflown)
@@ -80,6 +102,8 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
 } RRDR_RESULT_FLAGS;
 
+#define RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER 1000.0
+
 typedef struct rrdresult {
     size_t d;                 // the number of dimensions
     size_t n;                 // the number of values in the arrays (number of points per dimension)
@@ -90,8 +114,15 @@ typedef struct rrdresult {
     STRING **di;              // array of d dimension ids
     STRING **dn;              // array of d dimension names
     STRING **du;              // array of d dimension units
-    uint32_t *dgbc;           // array of d dimension units - NOT ALLOCATED when RRDR is created
+    uint32_t *dgbs;           // array of d dimension group by slots - NOT ALLOCATED when RRDR is created
+    uint32_t *dgbc;           // array of d dimension group by counts - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
+    DICTIONARY **dl;          // array of d dimension labels - NOT ALLOCATED when RRDR is created
+    STORAGE_POINT *dqp;       // array of d dimensions query points - NOT ALLOCATED when RRDR is created
+    STORAGE_POINT *dview;     // array of d dimensions group by view - NOT ALLOCATED when RRDR is created
+    NETDATA_DOUBLE *vh;       // array of n x d hidden values, while grouping - NOT ALLOCATED when RRDR is created
+
+    DICTIONARY *label_keys;
 
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values
@@ -107,7 +138,6 @@ typedef struct rrdresult {
         NETDATA_DOUBLE min;
         NETDATA_DOUBLE max;
         RRDR_RESULT_FLAGS flags; // RRDR_RESULT_FLAG_*
-        RRDR_OPTIONS options; // RRDR_OPTION_* (as run by the query)
     } view;
 
     struct {
@@ -119,6 +149,7 @@ typedef struct rrdresult {
         void *data;                         // the internal data of the grouping function
 
         // grouping function pointers
+        RRDR_TIME_GROUPING add_flush;
         void (*create)(struct rrdresult *r, const char *options);
         void (*reset)(struct rrdresult *r);
         void (*free)(struct rrdresult *r);
@@ -130,15 +161,29 @@ typedef struct rrdresult {
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE
         NETDATA_DOUBLE resampling_divisor;  // used by AVERAGE
-    } grouping;
+    } time_grouping;
+
+    struct {
+        struct rrdresult *r;
+    } group_by;
+
+    struct {
+        time_t max_update_every;
+        time_t expected_after;
+        time_t trimmed_after;
+    } partial_data_trimming;
 
     struct {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
+        size_t contexts;            // temp needed between json_wrapper_begin2() and json_wrapper_end2()
+        size_t queries_count;       // temp needed to know if a query is the first executed
 
 #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
 #endif
+
+        struct query_target *release_with_rrdr_qt;
     } internal;
 } RRDR;
 
@@ -155,13 +200,11 @@ RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
         RRDR_TIME_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
-        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source,
+        const char *group_options, time_t timeout_ms, size_t tier, QUERY_SOURCE query_source,
         STORAGE_PRIORITY priority);
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 bool query_target_calculate_window(struct query_target *qt);
-
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before);
 
 #ifdef __cplusplus
 }

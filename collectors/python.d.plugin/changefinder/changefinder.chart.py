@@ -22,11 +22,11 @@ ORDER = [
 
 CHARTS = {
     'scores': {
-        'options': [None, 'ChangeFinder', 'score', 'Scores', 'scores', 'line'],
+        'options': [None, 'ChangeFinder', 'score', 'Scores', 'changefinder.scores', 'line'],
         'lines': []
     },
     'flags': {
-        'options': [None, 'ChangeFinder', 'flag', 'Flags', 'flags', 'stacked'],
+        'options': [None, 'ChangeFinder', 'flag', 'Flags', 'changefinder.flags', 'stacked'],
         'lines': []
     }
 }

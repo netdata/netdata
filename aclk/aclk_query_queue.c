@@ -20,14 +20,14 @@ static struct aclk_query_queue {
 
 static inline int _aclk_queue_query(aclk_query_t query)
 {
-    now_realtime_timeval(&query->created_tv);
+    now_monotonic_high_precision_timeval(&query->created_tv);
     query->created = now_realtime_usec();
 
     ACLK_QUEUE_LOCK;
     if (aclk_query_queue.block_push) {
         ACLK_QUEUE_UNLOCK;
         if(service_running(SERVICE_ACLK | ABILITY_DATA_QUERIES))
-            error("Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
+            netdata_log_error("Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
         aclk_query_free(query);
         return 1;
     }
@@ -67,7 +67,7 @@ aclk_query_t aclk_queue_pop(void)
     if (aclk_query_queue.block_push) {
         ACLK_QUEUE_UNLOCK;
         if(service_running(SERVICE_ACLK | ABILITY_DATA_QUERIES))
-            error("POP Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
+            netdata_log_error("POP Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
         return NULL;
     }
 

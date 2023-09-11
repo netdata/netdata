@@ -6,8 +6,25 @@
 
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
-ARAL *ebpf_aral_apps_pid_stat;
-ARAL *ebpf_aral_process_stat;
+ARAL *ebpf_aral_apps_pid_stat = NULL;
+ARAL *ebpf_aral_process_stat = NULL;
+ARAL *ebpf_aral_socket_pid = NULL;
+ARAL *ebpf_aral_cachestat_pid = NULL;
+ARAL *ebpf_aral_dcstat_pid = NULL;
+ARAL *ebpf_aral_vfs_pid = NULL;
+ARAL *ebpf_aral_fd_pid = NULL;
+ARAL *ebpf_aral_shm_pid = NULL;
+
+// ----------------------------------------------------------------------------
+// Global vectors used with apps
+ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
+netdata_publish_cachestat_t **cachestat_pid = NULL;
+netdata_publish_dcstat_t **dcstat_pid = NULL;
+netdata_publish_swap_t **swap_pid = NULL;
+netdata_publish_vfs_t **vfs_pid = NULL;
+netdata_fd_stat_t **fd_pid = NULL;
+netdata_publish_shm_t **shm_pid = NULL;
+ebpf_process_stat_t **global_process_stats = NULL;
 
 /**
  * eBPF ARAL Init
@@ -18,16 +35,16 @@ void ebpf_aral_init(void)
 {
     size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
     if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
-        error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
+        netdata_log_error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
         max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
     }
 
-    ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf-pid_stat", sizeof(struct ebpf_pid_stat));
+    ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf_pid_stat", sizeof(struct ebpf_pid_stat));
 
-    ebpf_aral_process_stat = ebpf_allocate_pid_aral("ebpf-proc_stat", sizeof(ebpf_process_stat_t));
+    ebpf_aral_process_stat = ebpf_allocate_pid_aral(NETDATA_EBPF_PROC_ARAL_NAME, sizeof(ebpf_process_stat_t));
 
 #ifdef NETDATA_DEV_MODE
-    info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
+    netdata_log_info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
 #endif
 }
 
@@ -55,6 +72,12 @@ void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
     aral_freez(ebpf_aral_apps_pid_stat, stat);
 }
 
+/*****************************************************************
+ *
+ *  PROCESS ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
 /**
  * eBPF process stat get
  *
@@ -77,6 +100,246 @@ ebpf_process_stat_t *ebpf_process_stat_get(void)
 void ebpf_process_stat_release(ebpf_process_stat_t *stat)
 {
     aral_freez(ebpf_aral_process_stat, stat);
+}
+
+/*****************************************************************
+ *
+ *  SOCKET ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF socket Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_socket_aral_init()
+{
+    ebpf_aral_socket_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_NAME, sizeof(ebpf_socket_publish_apps_t));
+}
+
+/**
+ * eBPF socket get
+ *
+ * Get a ebpf_socket_publish_apps_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
+{
+    ebpf_socket_publish_apps_t *target = aral_mallocz(ebpf_aral_socket_pid);
+    memset(target, 0, sizeof(ebpf_socket_publish_apps_t));
+    return target;
+}
+
+/**
+ * eBPF socket release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
+{
+    aral_freez(ebpf_aral_socket_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  CACHESTAT ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF Cachestat Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_cachestat_aral_init()
+{
+    ebpf_aral_cachestat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_CACHESTAT_ARAL_NAME, sizeof(netdata_publish_cachestat_t));
+}
+
+/**
+ * eBPF publish cachestat get
+ *
+ * Get a netdata_publish_cachestat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void)
+{
+    netdata_publish_cachestat_t *target = aral_mallocz(ebpf_aral_cachestat_pid);
+    memset(target, 0, sizeof(netdata_publish_cachestat_t));
+    return target;
+}
+
+/**
+ * eBPF cachestat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_cachestat_release(netdata_publish_cachestat_t *stat)
+{
+    aral_freez(ebpf_aral_cachestat_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  DCSTAT ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF directory cache Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_dcstat_aral_init()
+{
+    ebpf_aral_dcstat_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_DCSTAT_ARAL_NAME, sizeof(netdata_publish_dcstat_t));
+}
+
+/**
+ * eBPF publish dcstat get
+ *
+ * Get a netdata_publish_dcstat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void)
+{
+    netdata_publish_dcstat_t *target = aral_mallocz(ebpf_aral_dcstat_pid);
+    memset(target, 0, sizeof(netdata_publish_dcstat_t));
+    return target;
+}
+
+/**
+ * eBPF dcstat release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_dcstat_release(netdata_publish_dcstat_t *stat)
+{
+    aral_freez(ebpf_aral_dcstat_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  VFS ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF VFS Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_vfs_aral_init()
+{
+    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_VFS_ARAL_NAME, sizeof(netdata_publish_vfs_t));
+}
+
+/**
+ * eBPF publish VFS get
+ *
+ * Get a netdata_publish_vfs_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_vfs_t *ebpf_vfs_get(void)
+{
+    netdata_publish_vfs_t *target = aral_mallocz(ebpf_aral_vfs_pid);
+    memset(target, 0, sizeof(netdata_publish_vfs_t));
+    return target;
+}
+
+/**
+ * eBPF VFS release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_vfs_release(netdata_publish_vfs_t *stat)
+{
+    aral_freez(ebpf_aral_vfs_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  FD ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF file descriptor Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_fd_aral_init()
+{
+    ebpf_aral_fd_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_FD_ARAL_NAME, sizeof(netdata_fd_stat_t));
+}
+
+/**
+ * eBPF publish file descriptor get
+ *
+ * Get a netdata_fd_stat_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_fd_stat_t *ebpf_fd_stat_get(void)
+{
+    netdata_fd_stat_t *target = aral_mallocz(ebpf_aral_fd_pid);
+    memset(target, 0, sizeof(netdata_fd_stat_t));
+    return target;
+}
+
+/**
+ * eBPF file descriptor release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_fd_release(netdata_fd_stat_t *stat)
+{
+    aral_freez(ebpf_aral_fd_pid, stat);
+}
+
+/*****************************************************************
+ *
+ *  SHM ARAL FUNCTIONS
+ *
+ *****************************************************************/
+
+/**
+ * eBPF shared memory Aral init
+ *
+ * Initiallize array allocator that will be used when integration with apps is enabled.
+ */
+void ebpf_shm_aral_init()
+{
+    ebpf_aral_shm_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SHM_ARAL_NAME, sizeof(netdata_publish_shm_t));
+}
+
+/**
+ * eBPF shared memory get
+ *
+ * Get a netdata_publish_shm_t entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+netdata_publish_shm_t *ebpf_shm_stat_get(void)
+{
+    netdata_publish_shm_t *target = aral_mallocz(ebpf_aral_shm_pid);
+    memset(target, 0, sizeof(netdata_publish_shm_t));
+    return target;
+}
+
+/**
+ * eBPF shared memory release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_shm_release(netdata_publish_shm_t *stat)
+{
+    aral_freez(ebpf_aral_shm_pid, stat);
 }
 
 // ----------------------------------------------------------------------------
@@ -389,7 +652,7 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
             // add this target
             struct ebpf_target *n = get_apps_groups_target(agrt, s, w, name);
             if (!n) {
-                error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
+                netdata_log_error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
             }
 
@@ -492,32 +755,32 @@ static inline void debug_log_dummy(void)
 static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
 {
     if (unlikely(!status)) {
-        // error("command failed log %u, errno %d", log, errno);
+        // netdata_log_error("command failed log %u, errno %d", log, errno);
 
         if (unlikely(debug_enabled || errno != ENOENT)) {
             if (unlikely(debug_enabled || !(p->log_thrown & log))) {
                 p->log_thrown |= log;
                 switch (log) {
                     case PID_LOG_IO:
-                        error(
+                        netdata_log_error(
                             "Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_STATUS:
-                        error(
+                        netdata_log_error(
                             "Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_CMDLINE:
-                        error(
+                        netdata_log_error(
                             "Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid,
                             p->comm);
                         break;
 
                     case PID_LOG_FDS:
-                        error(
+                        netdata_log_error(
                             "Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix,
                             p->pid, p->comm);
                         break;
@@ -526,14 +789,14 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
                         break;
 
                     default:
-                        error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        netdata_log_error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
                         break;
                 }
             }
         }
         errno = 0;
     } else if (unlikely(p->log_thrown & log)) {
-        // error("unsetting log %u on pid %d", log, p->pid);
+        // netdata_log_error("unsetting log %u on pid %d", log, p->pid);
         p->log_thrown &= ~log;
     }
 
@@ -742,7 +1005,7 @@ static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
 static inline int collect_data_for_pid(pid_t pid, void *ptr)
 {
     if (unlikely(pid < 0 || pid > pid_max)) {
-        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
+        netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
@@ -757,7 +1020,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr)
 
     // check its parent pid
     if (unlikely(p->ppid < 0 || p->ppid > pid_max)) {
-        error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
+        netdata_log_error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
         p->ppid = 0;
     }
 
@@ -957,7 +1220,7 @@ static inline void del_pid_entry(pid_t pid)
     struct ebpf_pid_stat *p = ebpf_all_pids[pid];
 
     if (unlikely(!p)) {
-        error("attempted to free pid %d that is not allocated.", pid);
+        netdata_log_error("attempted to free pid %d that is not allocated.", pid);
         return;
     }
 
@@ -1075,8 +1338,10 @@ void cleanup_exited_pids()
             p = p->next;
 
             // Clean process structure
-            ebpf_process_stat_release(global_process_stats[r]);
-            global_process_stats[r] = NULL;
+            if (global_process_stats) {
+                ebpf_process_stat_release(global_process_stats[r]);
+                global_process_stats[r] = NULL;
+            }
 
             cleanup_variables_from_other_threads(r);
 
@@ -1140,7 +1405,7 @@ static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pi
     }
 
     if (unlikely(!w)) {
-        error("pid %d %s was left without a target!", p->pid, p->comm);
+        netdata_log_error("pid %d %s was left without a target!", p->pid, p->comm);
         return;
     }
 
@@ -1152,14 +1417,37 @@ static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pi
 }
 
 /**
+ * Process Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ * @param maps_per_core do I need to read all cores?
+ */
+void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
+{
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
+    ebpf_process_stat_t *total = &out[0];
+    for (i = 1; i < end; i++) {
+        ebpf_process_stat_t *w = &out[i];
+        total->exit_call += w->exit_call;
+        total->task_err += w->task_err;
+        total->create_thread += w->create_thread;
+        total->create_process += w->create_process;
+        total->release_call += w->release_call;
+    }
+}
+
+/**
  * Collect data for all process
  *
  * Read data from hash table and store it in appropriate vectors.
  * It also creates the link between targets and PIDs.
  *
  * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
+ * @param maps_per_core         do I have hash maps per core?
  */
-void collect_data_for_all_processes(int tbl_pid_stats_fd)
+void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 {
     if (unlikely(!ebpf_all_pids))
         return;
@@ -1185,26 +1473,40 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
     uint32_t key;
     pids = ebpf_root_of_pids; // global list of all processes running
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-    while (pids) {
-        key = pids->pid;
-        ebpf_process_stat_t *w = global_process_stats[key];
-        if (!w) {
-            w = ebpf_process_stat_get();
-            global_process_stats[key] = w;
-        }
 
-        if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
-            // Clean Process structures
-            ebpf_process_stat_release(w);
-            global_process_stats[key] = NULL;
+    if (tbl_pid_stats_fd != -1) {
+        size_t length =  sizeof(ebpf_process_stat_t);
+        if (maps_per_core)
+            length *= ebpf_nprocs;
 
-            cleanup_variables_from_other_threads(key);
+        while (pids) {
+            key = pids->pid;
+
+            ebpf_process_stat_t *w = global_process_stats[key];
+            if (!w) {
+                w = ebpf_process_stat_get();
+                global_process_stats[key] = w;
+            }
+
+            if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
+                // Clean Process structures
+                ebpf_process_stat_release(w);
+                global_process_stats[key] = NULL;
+
+                cleanup_variables_from_other_threads(key);
+
+                pids = pids->next;
+                continue;
+            }
+
+            ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
+
+            memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
+
+            memset(process_stat_vector, 0, length);
 
             pids = pids->next;
-            continue;
         }
-
-        pids = pids->next;
     }
 
     link_all_processes_to_their_parents();

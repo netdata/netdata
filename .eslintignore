@@ -1,2 +1,4 @@
 **/*{.,-}min.js
-web/gui/dashboard/*
+integrations/*
+web/gui/v1/*
+web/gui/v2/*

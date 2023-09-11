@@ -7,5 +7,6 @@ SUBDIRS = \
     $(NULL)
 
 dist_noinst_DATA = \
+    gperf-config.txt \
     README.md \
     $(NULL)

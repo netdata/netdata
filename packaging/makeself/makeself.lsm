@@ -10,7 +10,7 @@ Description:    netdata is a system for distributed real-time performance and he
 Keywords:       real-time performance and health monitoring
 Author:         Costa Tsaousis (costa@tsaousis.gr)
 Maintained-by:  Costa Tsaousis (costa@tsaousis.gr)
-Original-site:  https://my-netdata.io/
+Original-site:  https://netdata.cloud/
 Platform:       Unix
 Copying-policy: GPL
 End

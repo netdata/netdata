@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
-# Icecast monitoring with Netdata
+# Icecast collector
 
 Monitors the number of listeners for active sources.
 

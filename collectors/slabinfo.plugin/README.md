@@ -18,6 +18,9 @@ Each internal structure (process, file descriptor, inode...) is stored within a 
 The plugin is disabled by default because it collects and displays a huge amount of metrics.
 To enable it set `slabinfo = yes` in the `plugins` section of the `netdata.conf` configuration file.
 
+If you are using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md), you will additionally need to install the `netdata-plugin-slabinfo`
+package using your system package manager.
+
 There is currently no configuration needed for the plugin itself.
 
 As `/proc/slabinfo` is only readable by root, this plugin is setuid root.

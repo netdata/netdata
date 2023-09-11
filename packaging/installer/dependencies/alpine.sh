@@ -31,6 +31,7 @@ package_tree="
   util-linux-dev
   libmnl-dev
   json-c-dev
+  yaml-dev
   "
 
 usage() {

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
-# 1-Wire Sensors monitoring with Netdata
+# 1-Wire Sensors collector
 
 Monitors sensor temperature.
 
@@ -26,8 +26,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d/w1sensor.conf
 ```
 
-
-
+An example of a working configuration can be found in the default [configuration file](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/w1sensor/w1sensor.conf) of this collector.
 
 ### Troubleshooting
 

@@ -22,6 +22,6 @@ curl -sSL --connect-timeout 10 --retry 3 "https://github.com/netdata/libbpf/arch
 sha256sum -c "${1}/packaging/libbpf.checksums" || exit 1
 tar -xzf "${LIBBPF_TARBALL}" -C "${1}/externaldeps/libbpf" || exit 1
 make -C "${LIBBPF_BUILD_PATH}/src" BUILD_STATIC_ONLY=1 OBJDIR=build/ DESTDIR=../ install || exit 1
-cp -a "${LIBBPF_BUILD_PATH}/usr/${lib_subdir}/libbpf.a" "${1}/externaldeps/libbpf" || exit 1
-cp -a "${LIBBPF_BUILD_PATH}/usr/include" "${1}/externaldeps/libbpf" || exit 1
-cp -a "${LIBBPF_BUILD_PATH}/include/uapi" "${1}/externaldeps/libbpf/include" || exit 1
+cp -r "${LIBBPF_BUILD_PATH}/usr/${lib_subdir}/libbpf.a" "${1}/externaldeps/libbpf" || exit 1
+cp -r "${LIBBPF_BUILD_PATH}/usr/include" "${1}/externaldeps/libbpf" || exit 1
+cp -r "${LIBBPF_BUILD_PATH}/include/uapi" "${1}/externaldeps/libbpf/include" || exit 1

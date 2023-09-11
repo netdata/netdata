@@ -13,6 +13,7 @@
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
 extern int default_rrdeng_page_cache_mb;
+extern int default_rrdeng_extent_cache_mb;
 extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
@@ -220,5 +221,8 @@ struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
 bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance);
+
+size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
+size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

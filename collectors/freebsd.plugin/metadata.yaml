@@ -1,0 +1,3430 @@
+plugin_name: freebsd.plugin
+modules:
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.loadavg
+      monitored_instance:
+        name: vm.loadavg
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "System Load Average"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: vm.loadavg
+              description: Enable or disable load average metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: load_cpu_number
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: number of active CPU cores in the system
+        os: "linux"
+      - name: load_average_15
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system fifteen-minute load average
+        os: "linux"
+      - name: load_average_5
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system five-minute load average
+        os: "linux"
+      - name: load_average_1
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        metric: system.load
+        info: system one-minute load average
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "Monitoring for number of threads running or waiting."
+          labels: []
+          metrics:
+            - name: system.load
+              description: System Load Average
+              unit: "load"
+              chart_type: line
+              dimensions:
+                - name: load1
+                - name: load5
+                - name: load15
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.vmtotal
+      monitored_instance:
+        name: vm.vmtotal
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "memory.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect Virtual Memory information from host."
+        method_description: "The plugin calls function `sysctl` to collect data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:vm.vmtotal]"
+          description: ""
+        options:
+          description: ""
+          folding:
+            title: "Config Options"
+            enabled: true
+          list:
+            - name: enable total processes
+              description: Number of active processes.
+              default_value: yes
+              required: false
+            - name: processes running
+              description: Show number of processes running or blocked.
+              default_value: yes
+              required: false
+            - name: real memory
+              description: Memeory used on host.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: active_processes
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/processes.conf
+        metric: system.active_processes
+        info: system process IDs (PID) space utilization
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show an overall vision about processes running."
+          labels: []
+          metrics:
+            - name: system.active_processes
+              description: System Active Processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: system.processes
+              description: System Processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: blocked
+            - name: mem.real
+              description: Total Real Memory In Use
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: used
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.cp_time
+      monitored_instance:
+        name: kern.cp_time
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Total CPU utilization"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          description: "[plugin:freebsd]"
+        options:
+          description: "The netdata main configuration file."
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: kern.cp_time
+              description: Enable or disable Total CPU usage.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU utilization over the last 10 minutes (excluding iowait, nice and steal)
+        os: "linux"
+      - name: 10min_cpu_iowait
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU iowait time over the last 10 minutes
+        os: "linux"
+      - name: 20min_steal_cpu
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU steal time over the last 20 minutes
+        os: "linux"
+      - name: 10min_cpu_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        metric: system.cpu
+        info: average CPU utilization over the last 10 minutes (excluding nice)
+        os: "freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show CPU usage statistics."
+          labels: []
+          metrics:
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: nice
+                - name: system
+                - name: user
+                - name: interrupt
+                - name: idle
+        - name: core
+          description: ""
+          labels: []
+          metrics:
+            - name: cpu.cpu
+              description: Core utilization
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: nice
+                - name: system
+                - name: user
+                - name: interrupt
+                - name: idle
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: dev.cpu.temperature
+      monitored_instance:
+        name: dev.cpu.temperature
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.org"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Get current CPU temperature"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: dev.cpu.temperature
+              description: Enable or disable CPU temperature metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "This metric show latest CPU temperature."
+          labels: []
+          metrics:
+            - name: cpu.temperature
+              description: Core temperature
+              unit: "Celsius"
+              chart_type: line
+              dimensions:
+                - name: a dimension per core
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: dev.cpu.0.freq
+      monitored_instance:
+        name: dev.cpu.0.freq
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Read current CPU Scaling frequency."
+        method_description: "Current CPU Scaling Frequency"
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "Config options"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list:
+            - name: dev.cpu.0.freq
+              description: Enable or disable CPU Scaling frequency metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "The metric shows status of CPU frequency, it is direct affected by system load."
+          labels: []
+          metrics:
+            - name: cpu.scaling_cur_freq
+              description: Current CPU Scaling Frequency
+              unit: "MHz"
+              chart_type: line
+              dimensions:
+                - name: frequency
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: hw.intrcnt
+      monitored_instance:
+        name: hw.intrcnt
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Get total number of interrupts"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: true
+          list:
+            - name: hw.intrcnt
+              description: Enable or disable Interrupts metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show system interrupts frequency."
+          labels: []
+          metrics:
+            - name: system.intr
+              description: Total Hardware Interrupts
+              unit: "interrupts/s"
+              chart_type: line
+              dimensions:
+                - name: interrupts
+            - name: system.interrupts
+              description: System interrupts
+              unit: "interrupts/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per interrupt
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.sys.v_intr
+      monitored_instance:
+        name: vm.stats.sys.v_intr
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Device interrupts"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: true
+          list:
+            - name: vm.stats.sys.v_intr
+              description: Enable or disable device interrupts metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "The metric show device interrupt frequency."
+          labels: []
+          metrics:
+            - name: system.dev_intr
+              description: Device Interrupts
+              unit: "interrupts/s"
+              chart_type: line
+              dimensions:
+                - name: interrupts
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.sys.v_soft
+      monitored_instance:
+        name: vm.stats.sys.v_soft
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Software Interrupt"
+        method_description: "vm.stats.sys.v_soft"
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: true
+          list:
+            - name: vm.stats.sys.v_soft
+              description: Enable or disable software inerrupts metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "This metric shows software interrupt frequency."
+          labels: []
+          metrics:
+            - name: system.soft_intr
+              description: Software Interrupts
+              unit: "interrupts/s"
+              chart_type: line
+              dimensions:
+                - name: interrupts
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.sys.v_swtch
+      monitored_instance:
+        name: vm.stats.sys.v_swtch
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "CPU context switch"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: vm.stats.sys.v_swtch
+              description: Enable or disable CPU context switch metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "The metric count the number of context switches happening on host."
+          labels: []
+          metrics:
+            - name: system.ctxt
+              description: CPU Context Switches
+              unit: "context switches/s"
+              chart_type: line
+              dimensions:
+                - name: switches
+            - name: system.forks
+              description: Started Processes
+              unit: "processes/s"
+              chart_type: line
+              dimensions:
+                - name: started
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.swap_info
+      monitored_instance:
+        name: vm.swap_info
+        link: ""
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information about SWAP memory."
+        method_description: "The plugin calls `sysctlnametomib` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: vm.swap_info
+              description: Enable or disable SWAP metrics.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: used_swap
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        metric: mem.swap
+        info: swap memory utilization
+        os: "linux freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "This metric shows the SWAP usage."
+          labels: []
+          metrics:
+            - name: mem.swap
+              description: System Swap
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: system.ram
+      monitored_instance:
+        name: system.ram
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "memory.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Show information about system memory usage."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: system.ram
+              description: Enable or disable system RAM metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: system.ram
+        info: system memory utilization
+        os: "linux"
+      - name: ram_in_use
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: system.ram
+        info: system memory utilization
+        os: "freebsd"
+      - name: ram_available
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: mem.available
+        info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
+        os: "linux"
+      - name: ram_available
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        metric: mem.available
+        info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
+        os: "freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "This metric shows RAM usage statistics."
+          labels: []
+          metrics:
+            - name: system.ram
+              description: System RAM
+              unit: "MiB"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: active
+                - name: inactive
+                - name: wired
+                - name: cache
+                - name: laundry
+                - name: buffers
+            - name: mem.available
+              description: Available RAM for applications
+              unit: "MiB"
+              chart_type: line
+              dimensions:
+                - name: avail
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.vm.v_swappgs
+      monitored_instance:
+        name: vm.stats.vm.v_swappgs
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "memory.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "The metric swap amount of data read from and written to SWAP."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: vm.stats.vm.v_swappgs
+              description: Enable or disable infoormation about SWAP I/O metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 30min_ram_swapped_out
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        metric: mem.swapio
+        info: percentage of the system RAM swapped in the last 30 minutes
+        os: "linux freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "This metric shows events happening on SWAP."
+          labels: []
+          metrics:
+            - name: mem.swapio
+              description: Swap I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: io
+                - name: out
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.stats.vm.v_pgfaults
+      monitored_instance:
+        name: vm.stats.vm.v_pgfaults
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "memory.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect memory page faults events."
+        method_description: "The plugin calls `sysctl` function to collect necessary data"
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: vm.stats.vm.v_pgfaults
+              description: Enable or disable Memory page fault metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "The number of page faults happened on host."
+          labels: []
+          metrics:
+            - name: mem.pgfaults
+              description: Memory Page Faults
+              unit: "page faults/s"
+              chart_type: line
+              dimensions:
+                - name: memory
+                - name: io_requiring
+                - name: cow
+                - name: cow_optimized
+                - name: in_transit
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.ipc.sem
+      monitored_instance:
+        name: kern.ipc.sem
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information about semaphore."
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: kern.ipc.sem
+              description: Enable or disable semaphore metrics.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: semaphores_used
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
+        metric: system.ipc_semaphores
+        info: IPC semaphore utilization
+        os: "linux"
+      - name: semaphore_arrays_used
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
+        metric: system.ipc_semaphore_arrays
+        info: IPC semaphore arrays utilization
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics shows counters for semaphores on host."
+          labels: []
+          metrics:
+            - name: system.ipc_semaphores
+              description: IPC Semaphores
+              unit: "semaphores"
+              chart_type: area
+              dimensions:
+                - name: semaphores
+            - name: system.ipc_semaphore_arrays
+              description: IPC Semaphore Arrays
+              unit: "arrays"
+              chart_type: area
+              dimensions:
+                - name: arrays
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.ipc.shm
+      monitored_instance:
+        name: kern.ipc.shm
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "memory.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect shared memory information."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: kern.ipc.shm
+              description: Enable or disable shared memory metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics give status about current shared memory segments."
+          labels: []
+          metrics:
+            - name: system.ipc_shared_mem_segs
+              description: IPC Shared Memory Segments
+              unit: "segments"
+              chart_type: area
+              dimensions:
+                - name: segments
+            - name: system.ipc_shared_mem_size
+              description: IPC Shared Memory Segments Size
+              unit: "KiB"
+              chart_type: area
+              dimensions:
+                - name: allocated
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: kern.ipc.msq
+      monitored_instance:
+        name: kern.ipc.msq
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect number of IPC message Queues"
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: kern.ipc.msq
+              description: Enable or disable IPC message queue metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show statistics IPC messages statistics."
+          labels: []
+          metrics:
+            - name: system.ipc_msq_queues
+              description: Number of IPC Message Queues
+              unit: "queues"
+              chart_type: area
+              dimensions:
+                - name: queues
+            - name: system.ipc_msq_messages
+              description: Number of Messages in IPC Message Queues
+              unit: "messages"
+              chart_type: area
+              dimensions:
+                - name: messages
+            - name: system.ipc_msq_size
+              description: Size of IPC Message Queues
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: allocated
+                - name: used
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: uptime
+      monitored_instance:
+        name: uptime
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Show period of time server is up."
+        method_description: "The plugin calls `clock_gettime` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: vm.loadavg
+              description: Enable or disable load average metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "How long the system is running."
+          labels: []
+          metrics:
+            - name: system.uptime
+              description: System Uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.isr
+      monitored_instance:
+        name: net.isr
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information about system softnet stat."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.isr]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: netisr
+              description: Enable or disable general vision about softnet stat metrics.
+              default_value: yes
+              required: false
+            - name: netisr per core
+              description: Enable or disable softnet stat metric per core.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 1min_netdev_backlog_exceeded
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        metric: system.softnet_stat
+        info: average number of dropped packets in the last minute due to exceeded net.core.netdev_max_backlog
+        os: "linux"
+      - name: 1min_netdev_budget_ran_outs
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        metric: system.softnet_stat
+        info:
+          average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last
+          minute (this can be a cause for dropped packets)
+        os: "linux"
+      - name: 10min_netisr_backlog_exceeded
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        metric: system.softnet_stat
+        info: average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets)
+        os: "freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show statistics about softnet stats."
+          labels: []
+          metrics:
+            - name: system.softnet_stat
+              description: System softnet_stat
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: dispatched
+                - name: hybrid_dispatched
+                - name: qdrops
+                - name: queued
+        - name: core
+          description: ""
+          labels: []
+          metrics:
+            - name: cpu.softnet_stat
+              description: Per CPU netisr statistics
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: dispatched
+                - name: hybrid_dispatched
+                - name: qdrops
+                - name: queued
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: devstat
+      monitored_instance:
+        name: devstat
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "hard-drive.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information per hard disk available on host."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:kern.devstat]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: enable new disks detected at runtime
+              description: Enable or disable possibility to detect new disks.
+              default_value: auto
+              required: false
+            - name: performance metrics for pass devices
+              description: Enable or disable metrics for disks with type `PASS`.
+              default_value: auto
+              required: false
+            - name: total bandwidth for all disks
+              description: Enable or disable total bandwidth metric for all disks.
+              default_value: yes
+              required: false
+            - name: bandwidth for all disks
+              description: Enable or disable bandwidth for all disks metric.
+              default_value: auto
+              required: false
+            - name: operations for all disks
+              description: Enable or disable operations for all disks metric.
+              default_value: auto
+              required: false
+            - name: queued operations for all disks
+              description: Enable or disable queued operations for all disks  metric.
+              default_value: auto
+              required: false
+            - name: utilization percentage for all disks
+              description: Enable or disable utilization percentage for all disks metric.
+              default_value: auto
+              required: false
+            - name: i/o time for all disks
+              description: Enable or disable I/O time for all disks metric.
+              default_value: auto
+              required: false
+            - name: average completed i/o time for all disks
+              description: Enable or disable average completed I/O time for all disks metric.
+              default_value: auto
+              required: false
+            - name: average completed i/o bandwidth for all disks
+              description: Enable or disable average completed I/O bandwidth for all disks metric.
+              default_value: auto
+              required: false
+            - name: average service time for all disks
+              description: Enable or disable average service time for all disks metric.
+              default_value: auto
+              required: false
+            - name: disable by default disks matching
+              description: Do not create charts for disks listed.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 10min_disk_utilization
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.util
+        info: average percentage of time ${label:device} disk was busy over the last 10 minutes
+        os: "linux freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics give a general vision about I/O events on disks."
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: io
+                - name: out
+        - name: disk
+          description: ""
+          labels: []
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: frees
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: other
+                - name: frees
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: "operations"
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: "% of time working"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: other
+                - name: frees
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: other
+                - name: frees
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+                - name: frees
+            - name: disk.svctm
+              description: Average Service Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: svctm
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.tcp.states
+      monitored_instance:
+        name: net.inet.tcp.states
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ""
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: net.inet.tcp.states
+              description: Enable or disable TCP state metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: tcp_connections
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf
+        metric: ipv4.tcpsock
+        info: IPv4 TCP connections utilization
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "A counter for TCP connections."
+          labels: []
+          metrics:
+            - name: ipv4.tcpsock
+              description: IPv4 TCP Connections
+              unit: "active connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.tcp.stats
+      monitored_instance:
+        name: net.inet.tcp.stats
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect overall information about TCP connections."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.tcp.stats]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: ipv4 TCP packets
+              description: Enable or disable ipv4 TCP packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 TCP errors
+              description: Enable or disable pv4 TCP errors metric.
+              default_value: yes
+              required: false
+            - name: ipv4 TCP handshake issues
+              description: Enable or disable ipv4 TCP handshake issue metric.
+              default_value: yes
+              required: false
+            - name: TCP connection aborts
+              description: Enable or disable TCP connection aborts metric.
+              default_value: auto
+              required: false
+            - name: TCP out-of-order queue
+              description: Enable or disable TCP out-of-order queue metric.
+              default_value: auto
+              required: false
+            - name: TCP SYN cookies
+              description: Enable or disable TCP SYN cookies metric.
+              default_value: auto
+              required: false
+            - name: TCP listen issues
+              description: Enable or disable TCP listen issues metric.
+              default_value: auto
+              required: false
+            - name: ECN packets
+              description: Enable or disable ECN packets metric.
+              default_value: auto
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 1m_ipv4_tcp_resets_sent
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of sent TCP RESETS over the last minute
+        os: "linux"
+      - name: 10s_ipv4_tcp_resets_sent
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info:
+          average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has
+          crashed. Netdata will not send a clear notification for this alarm.
+        os: "linux"
+      - name: 1m_ipv4_tcp_resets_received
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info: average number of received TCP RESETS over the last minute
+        os: "linux freebsd"
+      - name: 10s_ipv4_tcp_resets_received
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        metric: ipv4.tcphandshake
+        info:
+          average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed.
+          Netdata will not send a clear notification for this alarm.
+        os: "linux freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show TCP connections statistics."
+          labels: []
+          metrics:
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.tcperrors
+              description: IPv4 TCP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrs
+                - name: InCsumErrors
+                - name: RetransSegs
+            - name: ipv4.tcphandshake
+              description: IPv4 TCP Handshake Issues
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: EstabResets
+                - name: ActiveOpens
+                - name: PassiveOpens
+                - name: AttemptFails
+            - name: ipv4.tcpconnaborts
+              description: TCP Connection Aborts
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: baddata
+                - name: userclosed
+                - name: nomemory
+                - name: timeout
+                - name: linger
+            - name: ipv4.tcpofo
+              description: TCP Out-Of-Order Queue
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: inqueue
+            - name: ipv4.tcpsyncookies
+              description: TCP SYN Cookies
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: failed
+            - name: ipv4.tcplistenissues
+              description: TCP Listen Socket Issues
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: overflows
+            - name: ipv4.ecnpkts
+              description: IPv4 ECN Statistics
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InCEPkts
+                - name: InECT0Pkts
+                - name: InECT1Pkts
+                - name: OutECT0Pkts
+                - name: OutECT1Pkts
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.udp.stats
+      monitored_instance:
+        name: net.inet.udp.stats
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information about UDP connections."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.udp.stats]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: ipv4 UDP packets
+              description: Enable or disable ipv4 UDP packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 UDP errors
+              description: Enable or disable ipv4 UDP errors metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: 1m_ipv4_udp_receive_buffer_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        metric: ipv4.udperrors
+        info: average number of UDP receive buffer errors over the last minute
+        os: "linux freebsd"
+      - name: 1m_ipv4_udp_send_buffer_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        metric: ipv4.udperrors
+        info: average number of UDP send buffer errors over the last minute
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show UDP connections statistics."
+          labels: []
+          metrics:
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udperrors
+              description: IPv4 UDP Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: NoPorts
+                - name: RcvbufErrors
+                - name: InCsumErrors
+                - name: IgnoredMulti
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.icmp.stats
+      monitored_instance:
+        name: net.inet.icmp.stats
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information about ICMP traffic."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.icmp.stats]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: IPv4 ICMP packets
+              description: Enable or disable IPv4 ICMP packets metric.
+              default_value: yes
+              required: false
+            - name: IPv4 ICMP error
+              description: Enable or disable IPv4 ICMP error metric.
+              default_value: yes
+              required: false
+            - name: IPv4 ICMP messages
+              description: Enable or disable IPv4 ICMP messages metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show ICMP connections statistics."
+          labels: []
+          metrics:
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp_errors
+              description: IPv4 ICMP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Messages
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InEchos
+                - name: OutEchos
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet.ip.stats
+      monitored_instance:
+        name: net.inet.ip.stats
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect IP stats"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet.ip.stats]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: ipv4 packets
+              description: Enable or disable IPv4 packets metric.
+              default_value: yes
+              required: false
+            - name: ipv4 fragments sent
+              description: Enable or disable IPv4 fragments sent metric.
+              default_value: yes
+              required: false
+            - name: ipv4 fragments assembly
+              description: Enable or disable IPv4 fragments assembly metric.
+              default_value: yes
+              required: false
+            - name: ipv4 errors
+              description: Enable or disable IPv4 errors metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show IPv4 connections statistics."
+          labels: []
+          metrics:
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.fragsout
+              description: IPv4 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: created
+            - name: ipv4.fragsin
+              description: IPv4 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InUnknownProtos
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet6.ip6.stats
+      monitored_instance:
+        name: net.inet6.ip6.stats
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information abou IPv6 stats."
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet6.ip6.stats]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: ipv6 packets
+              description: Enable or disable ipv6 packet metric.
+              default_value: auto
+              required: false
+            - name: ipv6 fragments sent
+              description: Enable or disable ipv6 fragments sent metric.
+              default_value: auto
+              required: false
+            - name: ipv6 fragments assembly
+              description: Enable or disable ipv6 fragments assembly metric.
+              default_value: auto
+              required: false
+            - name: ipv6 errors
+              description: Enable or disable ipv6 errors metric.
+              default_value: auto
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show general information about IPv6 connections."
+          labels: []
+          metrics:
+            - name: ipv6.packets
+              description: IPv6 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivers
+            - name: ipv6.fragsout
+              description: IPv6 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv6.fragsin
+              description: IPv6 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: timeout
+                - name: all
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: InHdrErrors
+                - name: InAddrErrors
+                - name: InTruncatedPkts
+                - name: InNoRoutes
+                - name: OutNoRoutes
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: net.inet6.icmp6.stats
+      monitored_instance:
+        name: net.inet6.icmp6.stats
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information abou IPv6 ICMP"
+        method_description: "The plugin calls `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:net.inet6.icmp6.stats]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: icmp
+              description: Enable or disable ICMP metric.
+              default_value: auto
+              required: false
+            - name: icmp redirects
+              description: Enable or disable ICMP redirects metric.
+              default_value: auto
+              required: false
+            - name: icmp errors
+              description: Enable or disable ICMP errors metric.
+              default_value: auto
+              required: false
+            - name: icmp echos
+              description: Enable or disable ICMP echos metric.
+              default_value: auto
+              required: false
+            - name: icmp router
+              description: Enable or disable ICMP router metric.
+              default_value: auto
+              required: false
+            - name: icmp neighbor
+              description: Enable or disable ICMP neighbor metric.
+              default_value: auto
+              required: false
+            - name: icmp types
+              description: Enable or disable ICMP types metric.
+              default_value: auto
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "Collect IPv6 ICMP traffic statistics."
+          labels: []
+          metrics:
+            - name: ipv6.icmp
+              description: IPv6 ICMP Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmpredir
+              description: IPv6 ICMP Redirects
+              unit: "redirects/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmperrors
+              description: IPv6 ICMP Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: InErrors
+                - name: OutErrors
+                - name: InCsumErrors
+                - name: InDestUnreachs
+                - name: InPktTooBigs
+                - name: InTimeExcds
+                - name: InParmProblems
+                - name: OutDestUnreachs
+                - name: OutTimeExcds
+                - name: OutParmProblems
+            - name: ipv6.icmpechos
+              description: IPv6 ICMP Echo
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InEchos
+                - name: OutEchos
+                - name: InEchoReplies
+                - name: OutEchoReplies
+            - name: ipv6.icmprouter
+              description: IPv6 Router Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmpneighbor
+              description: IPv6 Neighbor Messages
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InSolicits
+                - name: OutSolicits
+                - name: InAdvertisements
+                - name: OutAdvertisements
+            - name: ipv6.icmptypes
+              description: IPv6 ICMP Types
+              unit: "messages/s"
+              chart_type: line
+              dimensions:
+                - name: InType1
+                - name: InType128
+                - name: InType129
+                - name: InType136
+                - name: OutType1
+                - name: OutType128
+                - name: OutType129
+                - name: OutType133
+                - name: OutType135
+                - name: OutType143
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: ipfw
+      monitored_instance:
+        name: ipfw
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "firewall.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information about FreeBSD firewall."
+        method_description: "The plugin uses RAW socket to communicate with kernel and collect data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:ipfw]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: counters for static rules
+              description: Enable or disable counters for static rules  metric.
+              default_value: yes
+              required: false
+            - name: number of dynamic rules
+              description: Enable or disable number of dynamic rules metric.
+              default_value: yes
+              required: false
+            - name: allocated memory
+              description: Enable or disable allocated memory metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "Theese metrics show FreeBSD firewall statistics."
+          labels: []
+          metrics:
+            - name: ipfw.mem
+              description: Memory allocated by rules
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: dynamic
+                - name: static
+            - name: ipfw.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per static rule
+            - name: ipfw.bytes
+              description: Bytes
+              unit: "bytes/s"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per static rule
+            - name: ipfw.active
+              description: Active rules
+              unit: "rules"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per dynamic rule
+            - name: ipfw.expired
+              description: Expired rules
+              unit: "rules"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per dynamic rule
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: getifaddrs
+      monitored_instance:
+        name: getifaddrs
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "network.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect traffic per network interface."
+        method_description: "The plugin calls `getifaddrs` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:getifaddrs]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: enable new interfaces detected at runtime
+              description: Enable or disable possibility to discover new interface after plugin starts.
+              default_value: auto
+              required: false
+            - name: total bandwidth for physical interfaces
+              description: Enable or disable total bandwidth for physical interfaces  metric.
+              default_value: auto
+              required: false
+            - name: total packets for physical interfaces
+              description: Enable or disable total packets for physical interfaces metric.
+              default_value: auto
+              required: false
+            - name: total bandwidth for ipv4 interface
+              description: Enable or disable total bandwidth for IPv4 interface metric.
+              default_value: auto
+              required: false
+            - name: total bandwidth for ipv6 interfaces
+              description: Enable or disable total bandwidth for ipv6 interfaces metric.
+              default_value: auto
+              required: false
+            - name: bandwidth for all interfaces
+              description: Enable or disable bandwidth for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: packets for all interfaces
+              description: Enable or disable packets for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: errors for all interfaces
+              description: Enable or disable errors for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: drops for all interfaces
+              description: Enable or disable drops for all interfaces metric.
+              default_value: auto
+              required: false
+            - name: collisions for all interface
+              description: Enable or disable collisions for all interface metric.
+              default_value: auto
+              required: false
+            - name: disable by default interfaces matching
+              description: Do not display data for intterfaces listed.
+              default_value: lo*
+              required: false
+            - name: set physical interfaces for system.net
+              description: Do not show network traffic for listed interfaces.
+              default_value: igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc*
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: interface_speed
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: network interface ${label:device} current speed
+        os: "*"
+      - name: 1m_received_traffic_overflow
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: average inbound utilization for the network interface ${label:device} over the last minute
+        os: "linux"
+      - name: 1m_sent_traffic_overflow
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.net
+        info: average outbound utilization for the network interface ${label:device} over the last minute
+        os: "linux"
+      - name: inbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: outbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: wifi_inbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: wifi_outbound_packets_dropped_ratio
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        os: "linux"
+      - name: 1m_received_packets_rate
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info: average number of packets received by the network interface ${label:device} over the last minute
+        os: "linux freebsd"
+      - name: 10s_received_packets_storm
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.packets
+        info:
+          ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
+          the last minute
+        os: "linux freebsd"
+      - name: interface_inbound_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.errors
+        info: number of inbound errors for the network interface ${label:device} in the last 10 minutes
+        os: "freebsd"
+      - name: interface_outbound_errors
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.errors
+        info: number of outbound errors for the network interface ${label:device} in the last 10 minutes
+        os: "freebsd"
+      - name: inbound_packets_dropped
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.drops
+        info: number of inbound dropped packets for the network interface ${label:device} in the last 10 minutes
+        os: "linux"
+      - name: outbound_packets_dropped
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        metric: net.drops
+        info: number of outbound dropped packets for the network interface ${label:device} in the last 10 minutes
+        os: "linux"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "General overview about network traffic."
+          labels: []
+          metrics:
+            - name: system.net
+              description: Network Traffic
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: system.packets
+              description: Network Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: system.ipv4
+              description: IPv4 Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: system.ipv6
+              description: IPv6 Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+        - name: network device
+          description: ""
+          labels: []
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: multicast_received
+                - name: multicast_sent
+            - name: net.errors
+              description: Interface Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.events
+              description: Network Interface Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: collisions
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: getmntinfo
+      monitored_instance:
+        name: getmntinfo
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "hard-drive.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect information per mount point."
+        method_description: "The plugin calls `getmntinfo` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:getmntinfo]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: enable new mount points detected at runtime
+              description: Cheeck new mount points during runtime.
+              default_value: auto
+              required: false
+            - name: space usage for all disks
+              description: Enable or disable space usage for all disks metric.
+              default_value: auto
+              required: false
+            - name: inodes usage for all disks
+              description: Enable or disable inodes usage for all disks metric.
+              default_value: auto
+              required: false
+            - name: exclude space metrics on paths
+              description: Do not show metrics for listed paths.
+              default_value: /proc/*
+              required: false
+            - name: exclude space metrics on filesystems
+              description: Do not monitor listed filesystems.
+              default_value: autofs procfs subfs devfs none
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: disk_space_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.space
+        info: disk ${label:mount_point} space utilization
+        os: "linux freebsd"
+      - name: disk_inode_usage
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        metric: disk.inodes
+        info: disk ${label:mount_point} inode utilization
+        os: "linux freebsd"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: mount point
+          description: "These metrics show detailss about mount point usages."
+          labels: []
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage for {mounted dir} [{mounted filesystem}]
+              unit: "GiB"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+            - name: disk.inodes
+              description: Disk Files (inodes) Usage for {mounted dir} [{mounted filesystem}]
+              unit: "inodes"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+                - name: reserved_for_root
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: zfs
+      monitored_instance:
+        name: zfs
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.freebsd
+        icon_filename: "filesystem.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: "Collect metrics for ZFS filesystem"
+        method_description: "The plugin uses `sysctl` function to collect necessary data."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd:zfs_arcstats]"
+          description: "The netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: show zero charts
+              description: Do not show charts with zero metrics.
+              default_value: no
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: zfs_memory_throttle
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
+        metric: zfs.memory_ops
+        info: number of times ZFS had to limit the ARC growth in the last 10 minutes
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show detailed information about ZFS filesystem."
+          labels: []
+          metrics:
+            - name: zfs.arc_size
+              description: ZFS ARC Size
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: arcsz
+                - name: target
+                - name: min
+                - name: max
+            - name: zfs.l2_size
+              description: ZFS L2 ARC Size
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: actual
+                - name: size
+            - name: zfs.reads
+              description: ZFS Reads
+              unit: "reads/s"
+              chart_type: area
+              dimensions:
+                - name: arc
+                - name: demand
+                - name: prefetch
+                - name: metadata
+                - name: l2
+            - name: zfs.bytes
+              description: ZFS ARC L2 Read/Write Rate
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: zfs.hits
+              description: ZFS ARC Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.hits_rate
+              description: ZFS ARC Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.dhits
+              description: ZFS Demand Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.dhits_rate
+              description: ZFS Demand Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.phits
+              description: ZFS Prefetch Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.phits_rate
+              description: ZFS Prefetch Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.mhits
+              description: ZFS Metadata Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.mhits_rate
+              description: ZFS Metadata Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.l2hits
+              description: ZFS L2 Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.l2hits_rate
+              description: ZFS L2 Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.list_hits
+              description: ZFS List Hits
+              unit: "hits/s"
+              chart_type: area
+              dimensions:
+                - name: mfu
+                - name: mfu_ghost
+                - name: mru
+                - name: mru_ghost
+            - name: zfs.arc_size_breakdown
+              description: ZFS ARC Size Breakdown
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: recent
+                - name: frequent
+            - name: zfs.memory_ops
+              description: ZFS Memory Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: throttled
+            - name: zfs.important_ops
+              description: ZFS Important Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: evict_skip
+                - name: deleted
+                - name: mutex_miss
+                - name: hash_collisions
+            - name: zfs.actual_hits
+              description: ZFS Actual Cache Hits
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.actual_hits_rate
+              description: ZFS Actual Cache Hits Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.demand_data_hits
+              description: ZFS Data Demand Efficiency
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.demand_data_hits_rate
+              description: ZFS Data Demand Efficiency Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.prefetch_data_hits
+              description: ZFS Data Prefetch Efficiency
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.prefetch_data_hits_rate
+              description: ZFS Data Prefetch Efficiency Rate
+              unit: "events/s"
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: zfs.hash_elements
+              description: ZFS ARC Hash Elements
+              unit: "elements"
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: zfs.hash_chains
+              description: ZFS ARC Hash Chains
+              unit: "chains"
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: zfs.trim_bytes
+              description: Successfully TRIMmed bytes
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: TRIMmed
+            - name: zfs.trim_requests
+              description: TRIM requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: successful
+                - name: failed
+                - name: unsupported

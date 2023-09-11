@@ -7,9 +7,11 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
-# OpenSIPS monitoring with Netdata
+# OpenSIPS collector
 
 ## Configuration
+
+If using [our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md), make sure `netdata-plugin-chartsd` is installed.
 
 Edit the `charts.d/opensips.conf` configuration file using `edit-config` from the Netdata [config
 directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.

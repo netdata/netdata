@@ -1,9 +1,13 @@
-# Install Netdata
-
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import { InstallRegexLink, InstallBoxRegexLink } from '@site/src/components/InstallRegexLink/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+# Install Netdata
+
+This document will guide you through installing the open-source Netdata monitoring Agent on Linux, Docker, Kubernetes, and many others, often with one command.
+
+Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment strategies](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/deployment-strategies.md) to understand what better suites your needs.
 
 ## Get started
 
@@ -19,7 +23,7 @@ Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` requi
 
 To install Netdata in minutes on your platform:
 
-1. Sign up to https://app.netdata.cloud/
+1. Sign up to <https://app.netdata.cloud/>
 2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
 3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
 
@@ -34,12 +38,6 @@ but we have some hints on what you might want to do next.
 Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options
 for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
 
-#### Agent user interface
-
-To access the UI provided by the locally installed agent, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
-the hostname/IP address of the remote node. You can also read more about
-[the agent dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
-
 #### Configuration
 
 Discover the recommended way to [configure Netdata's settings or behavior](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) using our built-in
@@ -53,10 +51,10 @@ learn more about [how data collectors work](https://github.com/netdata/netdata/b
 collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md)
 or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
-#### Alarms & notifications
+#### Alerts & notifications
 
-Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
-community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
+Netdata comes with hundreds of preconfigured alerts, designed by our monitoring gurus in parallel with our open-source
+community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
 [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
 #### Make your deployment production ready
@@ -85,14 +83,12 @@ To install, copy the script, paste it into your node's terminal, and hit `Enter`
   </TabItem>
 </Tabs>
 
-:::note
-If you plan to also claim the node to Netdata Cloud,
-make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
-You can leave the room id blank to have your node claimed to the default "All nodes" room.
-:::
+> ### Note
+>
+> If you plan to also claim the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space, and `YOUR_ROOM_ID` with the ID of the room you are claiming to.
+> You can leave the room id blank to have your node claimed to the default "All nodes" room.
 
-Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
+Jump up to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps in monitoring and
 troubleshooting with Netdata.
 
 ## Other installation methods
@@ -184,16 +180,16 @@ the community helps fix any bugs that might have been introduced in previous rel
 
 **Pros of using nightly releases:**
 
--   Get the latest features and bug fixes as soon as they're available
--   Receive security-related fixes immediately
--   Use stable, fully-tested code that's always improving
--   Leverage the same Netdata experience our community is using
+- Get the latest features and bug fixes as soon as they're available
+- Receive security-related fixes immediately
+- Use stable, fully-tested code that's always improving
+- Leverage the same Netdata experience our community is using
 
 **Pros of using stable releases:**
 
--   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
+- Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata
     installation
--   Retain more control over the Netdata version you use
+- Retain more control over the Netdata version you use
 
 ### Anonymous statistics
 
@@ -205,6 +201,27 @@ _actively_ contributing to Netdata's future.
 ### Troubleshooting and known issues
 
 We are tracking a few issues related to installation and packaging.
+
+#### Installs on hosts without IPv4 connectivity
+
+Our regular installation process requires access to a number of GitHub services that do not have IPv6 connectivity. As
+such, using the kickstart install script on such hosts generally does not work, and will typically fail with an
+error from cURL or wget about connection timeouts. You can check if your system is affected by this by attempting
+to connect to (or ping) `https://api.github.com/`. Failing to connect indicates that you are affected by this issue.
+
+There are three potential workarounds for this:
+
+1. You can configure your system with a proper IPv6 transition mechanism, such as NAT64. GitHub’s anachronisms
+   affect many projects other than just Netdata, and there are unfortunately a number of other services out there
+   that do not provide IPv6 connectivity, so taking this route is likely to save you time in the future as well.
+2. If you are using a system that we publish native packages for (see our [platform support
+   policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md) for more details),
+   you can manually set up our native package repositories as outlined in our [native package install
+   documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md). Our official
+   package repositories do provide service over IPv6, so they work without issue on hosts without IPv4 connectivity.
+3. If neither of the above options work for you, you can still install using our [offline installation
+   instructions](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md), though
+   do note that the offline install source must be prepared from a system with IPv4 connectivity.
 
 #### Older distributions (Ubuntu 14.04, Debian 8, CentOS 6) and OpenSSL
 
@@ -225,7 +242,7 @@ PowerTools, to gather hard dependencies. See the [CentOS 6](https://github.com/n
 
 #### Access to file is not permitted
 
-If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web//index.html` when you try to
+If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web/index.html` when you try to
 visit the Agent dashboard at `http://NODE:19999`, you need to update Netdata's permissions to match those of your
 system.
 
@@ -242,7 +259,7 @@ These files need to have the same user and group used to install your netdata. S
 `netdata` and group `netdata`, in this scenario you will need to run the following command to fix the error:
 
 ```bash
-# chown -R netdata.netdata /usr/share/netdata/web
+# chown -R netdata:netdata /usr/share/netdata/web
 ```
 
 #### Multiple versions of OpenSSL
@@ -256,5 +273,3 @@ both.
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
 errors](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
-
-

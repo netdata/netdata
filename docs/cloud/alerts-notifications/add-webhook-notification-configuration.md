@@ -4,12 +4,12 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ## Prerequisites
 
-To add discord notification configurations you need
+To add webhook notification configurations you need:
 
 - A Netdata Cloud account
 - Access to the space as an **administrator**
 - Space needs to be on **Pro** plan or higher
-- Have an app that allows you to receive webhooks following a predefined schema, for mode details check [how to create the webhook service](#webhook-service)
+- Have an app that allows you to receive webhooks following a predefined schema, for more details check [how to create the webhook service](#webhook-service)
 
 ## Steps
 
@@ -24,8 +24,8 @@ To add discord notification configurations you need
       - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
    1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For webhook:
       - Webhook URL - webhook URL is the url of the service that Netdata will send notifications to. In order to keep the communication secured, we only accept HTTPS urls. Check [how to create the webhook service](#webhook-service).
-      - Extra headers - these are optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL. For mode details check [Extra headers](#extra-headers)
-      - Authentication Mechanism - Netdata webhook integration supports 3 different authentication mechanisms. For mode details check [Authentication mechanisms](#authentication-mechanisms):
+      - Extra headers - these are optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL. For more details check [Extra headers](#extra-headers)
+      - Authentication Mechanism - Netdata webhook integration supports 3 different authentication mechanisms. For more details check [Authentication mechanisms](#authentication-mechanisms):
          - Mutual TLS (recommended) - default authentication mechanism used if no other method is selected.
          - Basic - the client sends a request with an Authorization header that includes a base64-encoded string in the format **username:password**. These will settings will be required inputs.
          - Bearer - the client sends a request with an Authorization header that includes a **bearer token**. This setting will be a required input.
@@ -42,23 +42,23 @@ Netdata webhook integration service will send alert notifications to the destina
 
 The notification content sent to the destination service will be a JSON object having these properties:
 
-| field   | type   | description |
-| :--     | :--    | :--         |
-| message | string | A summary message of the alert. |
-| alarm | string | The alarm the notification is about. |
-| info | string | Additional info related with the alert. |
-| chart | string | The chart associated with the alert. |
-| context | string | The chart context. |
-| space | string | The space where the node that raised the alert is assigned. |
-| rooms | object[object(string,string)] | Object with list of rooms names and urls where the node belongs to. |
-| family | string | Context family. |
-| class | string | Classification of the alert, e.g. "Error". |
-| severity | string | Alert severity, can be one of "warning", "critical" or "clear". |
-| date | string | Date of the alert in ISO8601 format. |
-| duration | string |  Duration the alert has been raised. |
-| additional_active_critical_alerts | integer | Number of additional critical alerts currently existing on the same node. |
-| additional_active_warning_alerts | integer | Number of additional warning alerts currently existing on the same node. |
-| alarm_url | string | Netdata Cloud URL for this alarm. |
+| field                             | type                          | description                                                               |
+|:----------------------------------|:------------------------------|:--------------------------------------------------------------------------|
+| message                           | string                        | A summary message of the alert.                                           |
+| alarm                             | string                        | The alert the notification is about.                                      |
+| info                              | string                        | Additional info related with the alert.                                   |
+| chart                             | string                        | The chart associated with the alert.                                      |
+| context                           | string                        | The chart context.                                                        |
+| space                             | string                        | The space where the node that raised the alert is assigned.               |
+| rooms                             | object[object(string,string)] | Object with list of rooms names and urls where the node belongs to.       |
+| family                            | string                        | Context family.                                                           |
+| class                             | string                        | Classification of the alert, e.g. "Error".                                |
+| severity                          | string                        | Alert severity, can be one of "warning", "critical" or "clear".           |
+| date                              | string                        | Date of the alert in ISO8601 format.                                      |
+| duration                          | string                        | Duration the alert has been raised.                                       |
+| additional_active_critical_alerts | integer                       | Number of additional critical alerts currently existing on the same node. |
+| additional_active_warning_alerts  | integer                       | Number of additional warning alerts currently existing on the same node.  |
+| alarm_url                         | string                        | Netdata Cloud URL for this alert.                                         |
 
 ### Extra headers
 
@@ -66,9 +66,9 @@ When setting up a webhook integration, the user can specify a set of headers to 
 
 By default, the following headers will be sent in the HTTP request
 
-|            **Header**            | **Value**                 |
-|:-------------------------------:|-----------------------------|
-|     Content-Type             | application/json        |
+|  **Header**  | **Value**        |
+|:------------:|------------------|
+| Content-Type | application/json |
 
 ### Authentication mechanisms
 
@@ -134,13 +134,13 @@ nsjoQAm6OwpTN5362vE9SYu1twz7KdzBlUkDhePEOgQkWfLHBJWwB+PvB1j/cUA3
 ```bash
 server {
     listen 443 ssl default_server;
-    
+
     # ... existing SSL configuration for server authentication ...
     ssl_verify_client on;
     ssl_client_certificate /path/to/Netdata_CA.pem;
 
     location / {
-        if ($ssl_client_s_dn !~ "CN=api.netdata.cloud") {
+        if ($ssl_client_s_dn !~ "CN=app.netdata.cloud") {
             return 403;
         }
        # ... existing location configuration ...
@@ -158,7 +158,7 @@ Listen 443
     SSLCACertificateFile "/path/to/Netdata_CA.pem"
 </VirtualHost>
 <Directory /var/www/>
-    Require expr "%{SSL_CLIENT_S_DN_CN} == 'api.netdata.cloud'"
+    Require expr "%{SSL_CLIENT_S_DN_CN} == 'app.netdata.cloud'"
     # ... existing directory configuration ...
 </Directory>
 ```

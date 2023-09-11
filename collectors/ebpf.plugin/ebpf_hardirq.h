@@ -3,6 +3,12 @@
 #ifndef NETDATA_EBPF_HARDIRQ_H
 #define NETDATA_EBPF_HARDIRQ_H 1
 
+// Module description
+#define NETDATA_EBPF_HARDIRQ_MODULE_DESC "Show time spent servicing individual hardware interrupt requests (hard IRQs)."
+
+#include <stdint.h>
+#include "libnetdata/avl/avl.h"
+
 /*****************************************************************
  *  copied from kernel-collectors repo, with modifications needed
  *  for inclusion here.
@@ -14,12 +20,6 @@
 typedef struct hardirq_ebpf_key {
     int irq;
 } hardirq_ebpf_key_t;
-
-typedef struct hardirq_ebpf_val {
-    uint64_t latency;
-    uint64_t ts;
-    char name[NETDATA_HARDIRQ_NAME_LEN];
-} hardirq_ebpf_val_t;
 
 enum hardirq_ebpf_static {
     HARDIRQ_EBPF_STATIC_APIC_THERMAL,
@@ -37,6 +37,11 @@ enum hardirq_ebpf_static {
     HARDIRQ_EBPF_STATIC_END
 };
 
+enum hardirq_maps {
+    HARDIRQ_MAP_LATENCY,
+    HARDIRQ_MAP_LATENCY_STATIC
+};
+
 typedef struct hardirq_ebpf_static_val {
     uint64_t latency;
     uint64_t ts;
@@ -45,6 +50,9 @@ typedef struct hardirq_ebpf_static_val {
 /*****************************************************************
  * below this is eBPF plugin-specific code.
  *****************************************************************/
+
+// ARAL Name
+#define NETDATA_EBPF_HARDIRQ_ARAL_NAME "ebpf_harddirq"
 
 #define NETDATA_EBPF_MODULE_NAME_HARDIRQ "hardirq"
 #define NETDATA_HARDIRQ_CONFIG_FILE "hardirq.conf"

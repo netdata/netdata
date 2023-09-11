@@ -1,12 +1,3 @@
-<!--
-title: "Export metrics to Graphite providers"
-description: "Archive your Agent's metrics to a any Graphite database provider for long-term storage, further analysis, or correlation with data from other sources."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/graphite/README.md"
-sidebar_label: "Graphite"
-learn_status: "Published"
-learn_rel_path: "Integrations/Export"
--->
-
 # Export metrics to Graphite providers
 
 You can use the Graphite connector for
@@ -121,7 +112,7 @@ exporting charts to your Graphite dashboard!
 You can also show these exporting engine metrics on Netdata Cloud. If you don't have an account already, 
 go [sign in](https://app.netdata.cloud) and get started for free.
 
-Add more metrics to a War Room's Nodes view by clicking on the **Add metric** button, then typing `exporting` into the
+Add more metrics to a War Room's Nodes tab by clicking on the **Add metric** button, then typing `exporting` into the
 context field. Choose the exporting contexts you want to add, then click **Add**. You'll see these charts alongside any
 others you've customized in Netdata Cloud.
 

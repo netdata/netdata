@@ -1,14 +1,3 @@
-<!--
-title: "Configure the Netdata Agent"
-description: "Netdata is zero-configuration for most users, but complex infrastructures may require you to tweak some of the Agent's granular settings."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/configure/nodes.md"
-sidebar_label: "Configuration"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
-sidebar_position: 30
--->
-
 # Configure the Netdata Agent
 
 Netdata's zero-configuration collection, storage, and visualization features work for many users, infrastructures, and
@@ -53,7 +42,7 @@ exist.
   **Application** charts from [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) or
   [`ebpf.plugin`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md).
 - `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
-- `health_alarm_notify.conf` enables and configures [alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
+- `health_alarm_notify.conf` enables and configures [alert notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 - `statsd.d/` is a directory for configuring Netdata's [statsd collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
 - `stream.conf` configures [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) between separate nodes running the Agent.
 - `.environment` is a hidden file that describes the environment in which the Netdata Agent is installed, including the
@@ -74,31 +63,32 @@ See [configure agent containers](https://github.com/netdata/netdata/blob/master/
 
 The **recommended way to easily and safely edit Netdata's configuration** is with the `edit-config` script. This script
 opens existing Netdata configuration files using your system's `$EDITOR`. If the file doesn't yet exist in your config
-directory, the script copies the stock version from `/usr/lib/netdata/conf.d` and opens it for editing.
+directory, the script copies the stock version from `/usr/lib/netdata/conf.d` (or wherever the symlink `orig` under the config directory leads to)
+to the proper place in the config directory and opens the copy for editing. 
 
-Run `edit-config` without any options to see details on its usage and a list of all the configuration files you can
-edit.
+If you have trouble running the script, you can manually copy the file and edit the copy.
+
+e.g. `cp /usr/lib/netdata/conf.d/go.d/bind.conf /etc/netdata/go.d/bind.conf; vi /etc/netdata/go.d/bind.conf`
+
+Run `edit-config` without options, to see details on its usage, or `edit-config --list` to see a list of all the configuration 
+files you can edit.
 
 ```bash
-./edit-config
 USAGE:
-  ./edit-config FILENAME
+  ./edit-config [options] FILENAME
 
   Copy and edit the stock config file named: FILENAME
   if FILENAME is already copied, it will be edited as-is.
 
-  The EDITOR shell variable is used to define the editor to be used.
-
-  Stock config files at: '/usr/lib/netdata/conf.d'
+  Stock config files at: '/etc/netdata/../../usr/lib/netdata/conf.d'
   User  config files at: '/etc/netdata'
 
-  Available files in '/usr/lib/netdata/conf.d' to copy and edit:
+  The editor to use can be specified either by setting the EDITOR
+  environment variable, or by using the --editor option.
 
-./apps_groups.conf                  ./health.d/phpfpm.conf
-./aws_kinesis.conf                  ./health.d/pihole.conf
-./charts.d/ap.conf                  ./health.d/portcheck.conf
-./charts.d/apcupsd.conf             ./health.d/postgres.conf
-...
+  The file to edit can also be specified using the --file option.
+
+  For a list of known config files, run './edit-config --list'
 ```
 
 To edit `netdata.conf`, run `./edit-config netdata.conf`. You may need to elevate your privileges with `sudo` or another

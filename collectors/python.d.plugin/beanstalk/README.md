@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Message brokers"
 -->
 
-# Beanstalk monitoring with Netdata
+# Beanstalk collector
 
 Provides server and tube-level statistics.
 

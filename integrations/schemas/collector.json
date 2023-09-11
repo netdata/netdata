@@ -1,0 +1,411 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Netdata agent collector metadata.",
+  "properties": {
+    "plugin_name": {
+      "type": "string"
+    },
+    "modules": {
+      "description": "A list of module templates",
+      "items": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "plugin_name": {
+                "type": "string",
+                "description": "Plugin name (e.g. apps.plugin, proc.plugin, go.d.plugin). It must match the name of the executable file in the plugins.d directory."
+              },
+              "module_name": {
+                "type": "string",
+                "description": "Module name (e.g. apache, /proc/stat, httpcheck). It usually has the same name as the module configuration file (external plugin) or the section name in netdata.conf (internal plugin)."
+              },
+              "monitored_instance": {
+                "$ref": "./shared.json#/$defs/instance"
+              },
+              "keywords": {
+                "$ref": "./shared.json#/$defs/keywords"
+              },
+              "related_resources": {
+                "type": "object",
+                "description": "Available related resources for the monitored instance.",
+                "properties": {
+                  "integrations": {
+                    "type": "object",
+                    "description": "All collectors that provide additional metrics for the monitored instance. This may include generic collectors, e.g. 'httpcheck' for web servers to monitor specific endpoints.",
+                    "properties": {
+                      "list": {
+                        "type": "array",
+                        "description": "List of related integrations.",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "plugin_name": {
+                              "type": "string",
+                              "description": "Related integration plugin name."
+                            },
+                            "module_name": {
+                              "type": "string",
+                              "description": "Related integration module name."
+                            }
+                          },
+                          "required": [
+                            "plugin_name",
+                            "module_name"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "list"
+                    ]
+                  }
+                },
+                "required": [
+                  "integrations"
+                ]
+              },
+              "info_provided_to_referring_integrations": {
+                "type": "object",
+                "description": "Information that this collector can provide about itself when other integrations mention it. This text will not be appear on this collector's page.",
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "description": "TODO"
+                  }
+                },
+                "required": [
+                  "description"
+                ]
+              },
+              "most_popular": {
+                "type": "boolean",
+                "description": "Whether or not the integration is to be flagged as most-popular, meaning it will show up at the top of the menu."
+              },
+              "community": {
+                "type": "boolean",
+                "description": "Whether or not the integration should be flagged as community."
+              }
+            },
+            "required": [
+              "plugin_name",
+              "module_name",
+              "monitored_instance",
+              "keywords",
+              "related_resources",
+              "info_provided_to_referring_integrations",
+              "most_popular"
+            ]
+          },
+          "overview": {
+            "type": "object",
+            "properties": {
+              "data_collection": {
+                "type": "object",
+                "description": "An overview of the collected metrics and a detailed description of the data collection method.",
+                "properties": {
+                  "metrics_description": {
+                    "type": "string",
+                    "description": "Brief description of what metrics are collected. A suggested approach here is to talk about the areas covered (e.g. health, performance, errors) and the metric scopes."
+                  },
+                  "method_description": {
+                    "type": "string",
+                    "description": "Description of how metrics are collected (e.g. HTTP requests, establish a TCP connection and send a command, a specific binary execution). A suggested approach here is to provide a detailed description of how the collector gathers metrics: how many connections are established, exact requests/commands executed, exact endpoints used."
+                  }
+                },
+                "required": [
+                  "metrics_description",
+                  "method_description"
+                ]
+              },
+              "supported_platforms": {
+                "type": "object",
+                "description": "Supported OS/platforms. By default, all platforms supported by Netdata are considered supported. See https://learn.netdata.cloud/docs/installing/platform-support-policy#currently-supported-platforms.",
+                "properties": {
+                  "include": {
+                    "type": "array",
+                    "description": "Only supported OS/platforms. Platforms supported by Netdata will be ignored, only those listed are considered supported.",
+                    "items": {
+                      "type": "string",
+                      "minLength": 2
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "description": "Unsupported OS/platforms. The result set is all platforms supported by Netdata except for those excluded.",
+                    "items": {
+                      "type": "string",
+                      "minLength": 2
+                    }
+                  }
+                },
+                "required": [
+                  "include",
+                  "exclude"
+                ]
+              },
+              "multi_instance": {
+                "type": "boolean",
+                "description": "Whether this collector supports collecting metrics from multiple (for example, local and remote) instances."
+              },
+              "additional_permissions": {
+                "type": "object",
+                "description": "Information about additional permissions other than those required by the Netdata process (e.g. setuid, specific Linux capabilities).",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "description"
+                ]
+              },
+              "default_behavior": {
+                "type": "object",
+                "description": "Descriptions of how the data collector works with the default configuration.",
+                "properties": {
+                  "auto_detection": {
+                    "type": "object",
+                    "description": "Information about detecting (discovering) monitored instances with default configuration. Example: tries to connect to Apache running on localhost on ports 80, 443 and 8080.",
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "description"
+                    ]
+                  },
+                  "limits": {
+                    "type": "object",
+                    "description": "Information about limiting data collection, taking into account the default values of any configuration settings that restrict data collection (including filtering metrics).",
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "description"
+                    ]
+                  },
+                  "performance_impact": {
+                    "type": "object",
+                    "description": "Information about the known impact on the performance of the monitored application or system.",
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "description"
+                    ]
+                  }
+                },
+                "required": [
+                  "auto_detection",
+                  "limits",
+                  "performance_impact"
+                ]
+              }
+            },
+            "required": [
+              "data_collection",
+              "supported_platforms",
+              "multi_instance",
+              "additional_permissions",
+              "default_behavior"
+            ]
+          },
+          "setup": {
+            "$ref": "./shared.json#/$defs/full_setup"
+          },
+          "troubleshooting": {
+            "$ref": "./shared.json#/$defs/troubleshooting"
+          },
+          "alerts": {
+            "type": "array",
+            "description": "The list of configured alerts shipped with Netdata for this collector.",
+            "items": {
+              "type": "object",
+              "description": "Information about the configured alert.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template)."
+                },
+                "link": {
+                  "type": "string",
+                  "description": "Link to github .conf file that this alert originates from"
+                },
+                "metric": {
+                  "type": "string",
+                  "description": "Alert's 'on' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-on)."
+                },
+                "info": {
+                  "type": "string",
+                  "description": "Alert's 'info' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-info)."
+                },
+                "os": {
+                  "type": "string",
+                  "description": "Alert's 'os' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-os)."
+                }
+              },
+              "required": [
+                "name",
+                "link",
+                "metric",
+                "info"
+              ]
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Collected metrics grouped by scope. The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.",
+            "properties": {
+              "folding": {
+                "$ref": "./shared.json#/$defs/_folding"
+              },
+              "description": {
+                "type": "string",
+                "description": "General description of collected metrics/scopes."
+              },
+              "availability": {
+                "type": "array",
+                "description": "Metrics collection availability conditions. Some metrics are only available when certain conditions are met. For example, Apache exposes additional metrics when Extended status is configured, Consul exposes different set of metrics depends on its mode. This field should list the available conditions that will later be matched for each of the metrics.",
+                "items": {
+                  "type": "string",
+                  "description": "Availability condition name."
+                }
+              },
+              "scopes": {
+                "type": "array",
+                "description": "List of scopes and their metrics.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Scope name."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Scope description."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "description": "Label set of the scope.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Label name."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Label description."
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description"
+                        ]
+                      }
+                    },
+                    "metrics": {
+                      "type": "array",
+                      "description": "List of collected metrics (chart contexts) in the scope.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Metric name (chart context)."
+                          },
+                          "availability": {
+                            "type": "array",
+                            "description": "Metric collection availability conditions. An empty list means that it is available for all conditions defined in 'metrics.availability'.",
+                            "items": {
+                              "type": "string",
+                              "description": "Availability condition name."
+                            }
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Metric description (chart title)."
+                          },
+                          "unit": {
+                            "type": "string",
+                            "description": "Metric description (chart unit)."
+                          },
+                          "chart_type": {
+                            "type": "string",
+                            "description": "Metric description (chart type).",
+                            "enum": [
+                              "line",
+                              "area",
+                              "stacked"
+                            ]
+                          },
+                          "dimensions": {
+                            "type": "array",
+                            "description": "",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "description": "Dimension name."
+                                }
+                              },
+                              "required": [
+                                "name"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "unit",
+                          "chart_type",
+                          "dimensions"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "description",
+                    "labels",
+                    "metrics"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "folding",
+              "description",
+              "availability",
+              "scopes"
+            ]
+          }
+        },
+        "required": [
+          "meta",
+          "overview",
+          "setup",
+          "troubleshooting",
+          "alerts",
+          "metrics"
+        ]
+      }
+    }
+  },
+  "required": [
+    "plugin_name",
+    "modules"
+  ]
+}

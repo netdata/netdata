@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_VFS_H
 #define NETDATA_EBPF_VFS_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_VFS "vfs"
+#define NETDATA_EBPF_VFS_MODULE_DESC "Monitor VFS (Virtual File System) functions. This thread is integrated with apps and cgroup."
 
 #define NETDATA_DIRECTORY_VFS_CONFIG_FILE "vfs.conf"
 
@@ -68,6 +69,9 @@
 #define NETDATA_SYSTEMD_VFS_OPEN_ERROR_CONTEXT "services.vfs_open_error"
 #define NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT "services.vfs_fsync"
 #define NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT "services.vfs_fsync_error"
+
+// ARAL name
+#define NETDATA_EBPF_VFS_ARAL_NAME "ebpf_vfs"
 
 typedef struct netdata_publish_vfs {
     uint64_t pid_tgid;
@@ -163,8 +167,6 @@ enum netdata_vfs_calls_name {
 
     NETDATA_VFS_END_LIST
 };
-
-extern netdata_publish_vfs_t **vfs_pid;
 
 void *ebpf_vfs_thread(void *ptr);
 void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);

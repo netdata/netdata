@@ -10,6 +10,8 @@
 
 #include "daemon/global_statistics.h"
 
+#define DEFAULT_CHUNKED_RESPONSE_BUFFER_SIZE (4096)
+
 enum http_parse_state {
     HTTP_PARSE_INITIAL = 0,
     HTTP_PARSE_HEADERS,
@@ -29,10 +31,27 @@ static const char *http_req_type_to_str(http_req_type_t req) {
     }
 }
 
+#define TRANSFER_ENCODING_CHUNKED (-2)
+
 typedef struct {
     enum http_parse_state state;
     int content_length;
     int http_code;
+
+    // for chunked data only
+    char *chunked_response;
+    size_t chunked_response_size;
+    size_t chunked_response_written;
+
+    enum chunked_content_state {
+        CHUNKED_CONTENT_CHUNK_SIZE = 0,
+        CHUNKED_CONTENT_CHUNK_DATA,
+        CHUNKED_CONTENT_CHUNK_END_CRLF,
+        CHUNKED_CONTENT_FINAL_CRLF
+    } chunked_content_state;
+
+    size_t chunk_size;
+    size_t chunk_got;
 } http_parse_ctx;
 
 #define HTTP_PARSE_CTX_INITIALIZER { .state = HTTP_PARSE_INITIAL, .content_length = -1, .http_code = 0 }
@@ -50,17 +69,40 @@ static inline void http_parse_ctx_clear(http_parse_ctx *ctx) {
 #define HTTP_LINE_TERM "\x0D\x0A"
 #define RESP_PROTO "HTTP/1.1 "
 #define HTTP_KEYVAL_SEPARATOR ": "
-#define HTTP_HDR_BUFFER_SIZE 256
+#define HTTP_HDR_BUFFER_SIZE 1024
 #define PORT_STR_MAX_BYTES 12
 
-static void process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
+static int process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const char *val)
 {
-    // currently we care only about content-length
-    // but in future the way this is written
-    // it can be extended
+    // currently we care only about specific headers
+    // we can skip the rest
     if (!strcmp("content-length", key)) {
+        if (parse_ctx->content_length == TRANSFER_ENCODING_CHUNKED) {
+            netdata_log_error("Content-length and transfer-encoding: chunked headers are mutually exclusive");
+            return 1;
+        }
+        if (parse_ctx->content_length != -1) {
+            netdata_log_error("Duplicate content-length header");
+            return 1;
+        }
         parse_ctx->content_length = atoi(val);
+        if (parse_ctx->content_length < 0) {
+            netdata_log_error("Invalid content-length %d", parse_ctx->content_length);
+            return 1;
+        }
+        return 0;
     }
+    if (!strcmp("transfer-encoding", key)) {
+        if (!strcmp("chunked", val)) {
+            if (parse_ctx->content_length != -1) {
+                netdata_log_error("Content-length and transfer-encoding: chunked headers are mutually exclusive");
+                return 1;
+            }
+            parse_ctx->content_length = TRANSFER_ENCODING_CHUNKED;
+        }
+        return 0;
+    }
+    return 0;
 }
 
 static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
@@ -70,17 +112,17 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     char buf_val[HTTP_HDR_BUFFER_SIZE];
     char *ptr = buf_key;
     if (!rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx_end)) {
-        error("CRLF expected");
+        netdata_log_error("CRLF expected");
         return 1;
     }
 
     char *separator = rbuf_find_bytes(buf, HTTP_KEYVAL_SEPARATOR, strlen(HTTP_KEYVAL_SEPARATOR), &idx);
     if (!separator) {
-        error("Missing Key/Value separator");
+        netdata_log_error("Missing Key/Value separator");
         return 1;
     }
     if (idx >= HTTP_HDR_BUFFER_SIZE) {
-        error("Key name is too long");
+        netdata_log_error("Key name is too long");
         return 1;
     }
 
@@ -90,7 +132,7 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     rbuf_bump_tail(buf, strlen(HTTP_KEYVAL_SEPARATOR));
     idx_end -= strlen(HTTP_KEYVAL_SEPARATOR) + idx;
     if (idx_end >= HTTP_HDR_BUFFER_SIZE) {
-        error("Value of key \"%s\" too long", buf_key);
+        netdata_log_error("Value of key \"%s\" too long", buf_key);
         return 1;
     }
 
@@ -100,9 +142,103 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     for (ptr = buf_key; *ptr; ptr++)
         *ptr = tolower(*ptr);
 
-    process_http_hdr(parse_ctx, buf_key, buf_val);
+    if (process_http_hdr(parse_ctx, buf_key, buf_val))
+        return 1;
 
     return 0;
+}
+
+static inline void chunked_response_buffer_grow_by(http_parse_ctx *parse_ctx, size_t size)
+{
+    if (unlikely(parse_ctx->chunked_response_size == 0)) {
+        parse_ctx->chunked_response = mallocz(size);
+        parse_ctx->chunked_response_size = size;
+        return;
+    }
+    parse_ctx->chunked_response = reallocz((void *)parse_ctx->chunked_response, parse_ctx->chunked_response_size + size);
+    parse_ctx->chunked_response_size += size;
+}
+
+static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
+{
+    int idx;
+    size_t bytes_to_copy;
+
+    do {
+        switch (parse_ctx->chunked_content_state) {
+            case CHUNKED_CONTENT_CHUNK_SIZE:
+                if (!rbuf_find_bytes(buf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM), &idx)) {
+                    if (rbuf_bytes_available(buf) >= rbuf_get_capacity(buf))
+                        return PARSE_ERROR;
+                    return NEED_MORE_DATA;
+                }
+                if (idx == 0) {
+                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_FINAL_CRLF;
+                    continue;
+                }
+                if (idx >= HTTP_HDR_BUFFER_SIZE) {
+                    netdata_log_error("Chunk size is too long");
+                    return PARSE_ERROR;
+                }
+                char buf_size[HTTP_HDR_BUFFER_SIZE];
+                rbuf_pop(buf, buf_size, idx);
+                buf_size[idx] = 0;
+                long chunk_size = strtol(buf_size, NULL, 16);
+                if (chunk_size < 0 || chunk_size == LONG_MAX) {
+                    netdata_log_error("Chunk size out of range");
+                    return PARSE_ERROR;
+                }
+                parse_ctx->chunk_size = chunk_size;
+                if (parse_ctx->chunk_size == 0) {
+                    if (errno == EINVAL) {
+                        netdata_log_error("Invalid chunk size");
+                        return PARSE_ERROR;
+                    }
+                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
+                    continue;
+                }
+                parse_ctx->chunk_got = 0;
+                chunked_response_buffer_grow_by(parse_ctx, parse_ctx->chunk_size);
+                rbuf_bump_tail(buf, strlen(HTTP_LINE_TERM));
+                parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_DATA;
+                // fallthrough
+            case CHUNKED_CONTENT_CHUNK_DATA:
+                if (!(bytes_to_copy = rbuf_bytes_available(buf)))
+                    return NEED_MORE_DATA;
+                if (bytes_to_copy > parse_ctx->chunk_size - parse_ctx->chunk_got)
+                    bytes_to_copy = parse_ctx->chunk_size - parse_ctx->chunk_got;
+                rbuf_pop(buf, parse_ctx->chunked_response + parse_ctx->chunked_response_written, bytes_to_copy);
+                parse_ctx->chunk_got += bytes_to_copy;
+                parse_ctx->chunked_response_written += bytes_to_copy;
+                if (parse_ctx->chunk_got != parse_ctx->chunk_size)
+                    continue;
+                parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_END_CRLF;
+                // fallthrough
+            case CHUNKED_CONTENT_FINAL_CRLF:
+            case CHUNKED_CONTENT_CHUNK_END_CRLF:
+                if (rbuf_bytes_available(buf) < strlen(HTTP_LINE_TERM))
+                    return NEED_MORE_DATA;
+                char buf_crlf[strlen(HTTP_LINE_TERM)];
+                rbuf_pop(buf, buf_crlf, strlen(HTTP_LINE_TERM));
+                if (memcmp(buf_crlf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM))) {
+                    netdata_log_error("CRLF expected");
+                    return PARSE_ERROR;
+                }
+                if (parse_ctx->chunked_content_state == CHUNKED_CONTENT_FINAL_CRLF) {
+                    if (parse_ctx->chunked_response_size != parse_ctx->chunked_response_written)
+                        netdata_log_error("Chunked response size mismatch");
+                    chunked_response_buffer_grow_by(parse_ctx, 1);
+                    parse_ctx->chunked_response[parse_ctx->chunked_response_written] = 0;
+                    return PARSE_SUCCESS;
+                }
+                if (parse_ctx->chunk_size == 0) {
+                    parse_ctx->chunked_content_state = CHUNKED_CONTENT_FINAL_CRLF;
+                    continue;
+                }
+                parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_SIZE;
+                continue;
+        }
+    } while(1);
 }
 
 static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
@@ -116,22 +252,22 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
         switch (parse_ctx->state) {
             case HTTP_PARSE_INITIAL:
                 if (rbuf_memcmp_n(buf, RESP_PROTO, strlen(RESP_PROTO))) {
-                    error("Expected response to start with \"%s\"", RESP_PROTO);
+                    netdata_log_error("Expected response to start with \"%s\"", RESP_PROTO);
                     return PARSE_ERROR;
                 }
                 rbuf_bump_tail(buf, strlen(RESP_PROTO));
                 if (rbuf_pop(buf, rc, 4) != 4) {
-                    error("Expected HTTP status code");
+                    netdata_log_error("Expected HTTP status code");
                     return PARSE_ERROR;
                 }
                 if (rc[3] != ' ') {
-                    error("Expected space after HTTP return code");
+                    netdata_log_error("Expected space after HTTP return code");
                     return PARSE_ERROR;
                 }
                 rc[3] = 0;
                 parse_ctx->http_code = atoi(rc);
                 if (parse_ctx->http_code < 100 || parse_ctx->http_code >= 600) {
-                    error("HTTP code not in range 100 to 599");
+                    netdata_log_error("HTTP code not in range 100 to 599");
                     return PARSE_ERROR;
                 }
 
@@ -154,6 +290,9 @@ static int parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
                 break;
             case HTTP_PARSE_CONTENT:
                 // replies like CONNECT etc. do not have content
+                if (parse_ctx->content_length == TRANSFER_ENCODING_CHUNKED)
+                    return process_chunked_content(buf, parse_ctx);
+
                 if (parse_ctx->content_length < 0)
                     return PARSE_SUCCESS;
 
@@ -186,7 +325,7 @@ typedef struct https_req_ctx {
 
 static int https_req_check_timedout(https_req_ctx_t *ctx) {
     if (now_realtime_sec() > ctx->req_start_time + ctx->request->timeout_s) {
-        error("request timed out");
+        netdata_log_error("request timed out");
         return 1;
     }
     return 0;
@@ -220,12 +359,12 @@ static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     do {
         int ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
-            error("poll error");
+            netdata_log_error("poll error");
             return 1;
         }
         if (ret == 0) {
             if (https_req_check_timedout(ctx)) {
-                error("Poll timed out");
+                netdata_log_error("Poll timed out");
                 return 2;
             }
             continue;
@@ -235,7 +374,7 @@ static int socket_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
         if (ret > 0) {
             ctx->written += ret;
         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            error("Error writing to socket");
+            netdata_log_error("Error writing to socket");
             return 3;
         }
     } while (ctx->written < data_len);
@@ -250,12 +389,12 @@ static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
     do {
         int ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
-            error("poll error");
+            netdata_log_error("poll error");
             return 1;
         }
         if (ret == 0) {
             if (https_req_check_timedout(ctx)) {
-                error("Poll timed out");
+                netdata_log_error("Poll timed out");
                 return 2;
             }
             continue;
@@ -275,7 +414,7 @@ static int ssl_write_all(https_req_ctx_t *ctx, char *data, size_t data_len) {
                     ctx->poll_fd.events |= POLLOUT;
                     break;
                 default:
-                    error("SSL_write Err: %s", _ssl_err_tos(ret));
+                    netdata_log_error("SSL_write Err: %s", _ssl_err_tos(ret));
                     return 3;
             }
         }
@@ -299,12 +438,12 @@ static int read_parse_response(https_req_ctx_t *ctx) {
     do {
         ret = poll(&ctx->poll_fd, 1, POLL_TO_MS);
         if (ret < 0) {
-            error("poll error");
+            netdata_log_error("poll error");
             return 1;
         }
         if (ret == 0) {
             if (https_req_check_timedout(ctx)) {
-                error("Poll timed out");
+                netdata_log_error("Poll timed out");
                 return 2;
             }
             if (!ctx->ssl_ctx)
@@ -312,41 +451,43 @@ static int read_parse_response(https_req_ctx_t *ctx) {
         }
         ctx->poll_fd.events = 0;
 
-        ptr = rbuf_get_linear_insert_range(ctx->buf_rx, &size);
+        do {
+            ptr = rbuf_get_linear_insert_range(ctx->buf_rx, &size);
 
-        if (ctx->ssl_ctx)
-            ret = SSL_read(ctx->ssl, ptr, size);
-        else
-            ret = read(ctx->sock, ptr, size);
+            if (ctx->ssl_ctx)
+                ret = SSL_read(ctx->ssl, ptr, size);
+            else
+                ret = read(ctx->sock, ptr, size);
 
-        if (ret > 0) {
-            rbuf_bump_head(ctx->buf_rx, ret);
-        } else {
-            if (ctx->ssl_ctx) {
-                ret = SSL_get_error(ctx->ssl, ret);
-                switch (ret) {
-                    case SSL_ERROR_WANT_READ:
-                        ctx->poll_fd.events |= POLLIN;
-                        break;
-                    case SSL_ERROR_WANT_WRITE:
-                        ctx->poll_fd.events |= POLLOUT;
-                        break;
-                    default:
-                        error("SSL_read Err: %s", _ssl_err_tos(ret));
-                        return 3;
-                }
+            if (ret > 0) {
+                rbuf_bump_head(ctx->buf_rx, ret);
             } else {
-                if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                    error("write error");
-                    return 3;
+                if (ctx->ssl_ctx) {
+                    ret = SSL_get_error(ctx->ssl, ret);
+                    switch (ret) {
+                        case SSL_ERROR_WANT_READ:
+                            ctx->poll_fd.events |= POLLIN;
+                            break;
+                        case SSL_ERROR_WANT_WRITE:
+                            ctx->poll_fd.events |= POLLOUT;
+                            break;
+                        default:
+                            netdata_log_error("SSL_read Err: %s", _ssl_err_tos(ret));
+                            return 3;
+                    }
+                } else {
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        netdata_log_error("write error");
+                        return 3;
+                    }
+                    ctx->poll_fd.events |= POLLIN;
                 }
-                ctx->poll_fd.events |= POLLIN;
             }
-        }
+        } while (ctx->poll_fd.events == 0 && rbuf_bytes_free(ctx->buf_rx) > 0);
     } while (!(ret = parse_http_response(ctx->buf_rx, &ctx->parse_ctx)));
 
     if (ret != PARSE_SUCCESS) {
-        error("Error parsing HTTP response");
+        netdata_log_error("Error parsing HTTP response");
         return 1;
     }
 
@@ -373,7 +514,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
             buffer_strcat(hdr, "POST ");
             break;
         default:
-            error("Unknown HTTPS request type!");
+            netdata_log_error("Unknown HTTPS request type!");
             rc = 1;
             goto err_exit;
     }
@@ -419,14 +560,14 @@ static int handle_http_request(https_req_ctx_t *ctx) {
 
     // Send the request
     if (https_client_write_all(ctx, hdr->buffer, hdr->len)) {
-        error("Couldn't write HTTP request header into SSL connection");
+        netdata_log_error("Couldn't write HTTP request header into SSL connection");
         rc = 2;
         goto err_exit;
     }
 
     if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
         if (https_client_write_all(ctx, ctx->request->payload, ctx->request->payload_size)) {
-            error("Couldn't write payload into SSL connection");
+            netdata_log_error("Couldn't write payload into SSL connection");
             rc = 3;
             goto err_exit;
         }
@@ -434,7 +575,9 @@ static int handle_http_request(https_req_ctx_t *ctx) {
 
     // Read The Response
     if (read_parse_response(ctx)) {
-        error("Error reading or parsing response from server");
+        netdata_log_error("Error reading or parsing response from server");
+        if (ctx->parse_ctx.chunked_response)
+            freez(ctx->parse_ctx.chunked_response);
         rc = 4;
         goto err_exit;
     }
@@ -456,7 +599,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
         err_cert = X509_STORE_CTX_get_current_cert(ctx);
         err_str = X509_NAME_oneline(X509_get_subject_name(err_cert), NULL, 0);
 
-        error("Cert Chain verify error:num=%d:%s:depth=%d:%s", err,
+        netdata_log_error("Cert Chain verify error:num=%d:%s:depth=%d:%s", err,
                  X509_verify_cert_error_string(err), depth, err_str);
 
         free(err_str);
@@ -466,7 +609,7 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)
     {
         preverify_ok = 1;
-        error("Self Signed Certificate Accepted as the agent was built with ACLK_SSL_ALLOW_SELF_SIGNED");
+        netdata_log_error("Self Signed Certificate Accepted as the agent was built with ACLK_SSL_ALLOW_SELF_SIGNED");
     }
 #endif
 
@@ -486,7 +629,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
 
     ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE);
     if (!ctx->buf_rx) {
-        error("Couldn't allocate buffer for RX data");
+        netdata_log_error("Couldn't allocate buffer for RX data");
         goto exit_req_ctx;
     }
 
@@ -494,12 +637,12 @@ int https_request(https_req_t *request, https_req_response_t *response) {
 
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout);
     if (ctx->sock < 0) {
-        error("Error connecting TCP socket to \"%s\"", connect_host);
+        netdata_log_error("Error connecting TCP socket to \"%s\"", connect_host);
         goto exit_buf_rx;
     }
 
     if (fcntl(ctx->sock, F_SETFL, fcntl(ctx->sock, F_GETFL, 0) | O_NONBLOCK) == -1) {
-        error("Error setting O_NONBLOCK to TCP socket.");
+        netdata_log_error("Error setting O_NONBLOCK to TCP socket.");
         goto exit_sock;
     }
 
@@ -517,39 +660,44 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         req.proxy_password = request->proxy_password;
         ctx->request = &req;
         if (handle_http_request(ctx)) {
-            error("Failed to CONNECT with proxy");
+            netdata_log_error("Failed to CONNECT with proxy");
             goto exit_sock;
         }
         if (ctx->parse_ctx.http_code != 200) {
-            error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
+            netdata_log_error("Proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
             goto exit_sock;
         }
-        info("Proxy accepted CONNECT upgrade");
+        netdata_log_info("Proxy accepted CONNECT upgrade");
     }
     ctx->request = request;
 
-    ctx->ssl_ctx = security_initialize_openssl_client();
+    ctx->ssl_ctx = netdata_ssl_create_client_ctx(0);
     if (ctx->ssl_ctx==NULL) {
-        error("Cannot allocate SSL context");
+        netdata_log_error("Cannot allocate SSL context");
         goto exit_sock;
     }
 
     if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
-        error("Error setting default verify paths");
+        netdata_log_error("Error setting default verify paths");
         goto exit_CTX;
     }
     SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
 
     ctx->ssl = SSL_new(ctx->ssl_ctx);
     if (ctx->ssl==NULL) {
-        error("Cannot allocate SSL");
+        netdata_log_error("Cannot allocate SSL");
+        goto exit_CTX;
+    }
+
+    if (!SSL_set_tlsext_host_name(ctx->ssl, connect_host)) {
+        netdata_log_error("Error setting TLS SNI host");
         goto exit_CTX;
     }
 
     SSL_set_fd(ctx->ssl, ctx->sock);
     ret = SSL_connect(ctx->ssl);
     if (ret != -1 && ret != 1) {
-        error("SSL could not connect");
+        netdata_log_error("SSL could not connect");
         goto exit_SSL;
     }
     if (ret == -1) {
@@ -557,23 +705,27 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         // consult SSL_connect documentation for details
         int ec = SSL_get_error(ctx->ssl, ret);
         if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
-            error("Failed to start SSL connection");
+            netdata_log_error("Failed to start SSL connection");
             goto exit_SSL;
         }
     }
 
     // The actual request here
     if (handle_http_request(ctx)) {
-        error("Couldn't process request");
+        netdata_log_error("Couldn't process request");
         goto exit_SSL;
     }
     response->http_code = ctx->parse_ctx.http_code;
+    if (ctx->parse_ctx.content_length == TRANSFER_ENCODING_CHUNKED) {
+        response->payload_size = ctx->parse_ctx.chunked_response_size;
+        response->payload = ctx->parse_ctx.chunked_response;
+    }
     if (ctx->parse_ctx.content_length > 0) {
         response->payload_size = ctx->parse_ctx.content_length;
         response->payload = mallocz(response->payload_size + 1);
         ret = rbuf_pop(ctx->buf_rx, response->payload, response->payload_size);
         if (ret != (int)response->payload_size) {
-            error("Payload size doesn't match remaining data on the buffer!");
+            netdata_log_error("Payload size doesn't match remaining data on the buffer!");
             response->payload_size = ret;
         }
         // normally we take payload as it is and copy it
@@ -584,7 +736,7 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         // only exact data without affixed 0x00
         ((char*)response->payload)[response->payload_size] = 0; // mallocz(response->payload_size + 1);
     }
-    info("HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
+    netdata_log_info("HTTPS \"%s\" request to \"%s\" finished with HTTP code: %d", http_req_type_to_str(ctx->request->request_type), ctx->request->host, response->http_code);
 
     rc = 0;
 
@@ -627,16 +779,16 @@ static int parse_host_port(url_t *url) {
     if (ptr) {
         size_t port_len = strlen(ptr + 1);
         if (!port_len) {
-            error(URL_PARSER_LOG_PREFIX ": specified but no port number");
+            netdata_log_error(URL_PARSER_LOG_PREFIX ": specified but no port number");
             return 1;
         }
         if (port_len > 5 /* MAX port length is 5digit long in decimal */) {
-            error(URL_PARSER_LOG_PREFIX "port # is too long");
+            netdata_log_error(URL_PARSER_LOG_PREFIX "port # is too long");
             return 1;
         }
         *ptr = 0;
         if (!strlen(url->host)) {
-            error(URL_PARSER_LOG_PREFIX "host empty after removing port");
+            netdata_log_error(URL_PARSER_LOG_PREFIX "host empty after removing port");
             return 1;
         }
         url->port = atoi (ptr + 1);
@@ -672,7 +824,7 @@ int url_parse(const char *url, url_t *parsed) {
 
     if (end) {
         if (end == start) {
-            error (URL_PARSER_LOG_PREFIX "found " URI_PROTO_SEPARATOR " without protocol specified");
+            netdata_log_error(URL_PARSER_LOG_PREFIX "found " URI_PROTO_SEPARATOR " without protocol specified");
             return 1;
         }
 
@@ -685,7 +837,7 @@ int url_parse(const char *url, url_t *parsed) {
         end = start + strlen(start);
     
     if (start == end) {
-        error(URL_PARSER_LOG_PREFIX "Host empty");
+        netdata_log_error(URL_PARSER_LOG_PREFIX "Host empty");
         return 1;
     }
 

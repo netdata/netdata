@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Traefik monitoring with Netdata
+# Traefik collector
 
 Uses the `health` API to provide statistics.
 

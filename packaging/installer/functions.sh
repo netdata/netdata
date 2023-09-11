@@ -845,10 +845,12 @@ restart_netdata() {
 # install netdata logrotate
 
 install_netdata_logrotate() {
+  src="${NETDATA_PREFIX}/usr/lib/netdata/system/logrotate/netdata"
+
   if [ "${UID}" -eq 0 ]; then
     if [ -d /etc/logrotate.d ]; then
       if [ ! -f /etc/logrotate.d/netdata ]; then
-        run cp system/logrotate/netdata /etc/logrotate.d/netdata
+        run cp "${src}" /etc/logrotate.d/netdata
       fi
 
       if [ -f /etc/logrotate.d/netdata ]; then
@@ -916,32 +918,29 @@ portable_add_user() {
   [ -z "${homedir}" ] && homedir="/tmp"
 
   # Check if user exists
-  if cut -d ':' -f 1 < /etc/passwd | grep "^${username}$" 1> /dev/null 2>&1; then
-    echo >&2 "User '${username}' already exists."
-    return 0
+  if command -v getent > /dev/null 2>&1; then
+    if getent passwd "${username}" > /dev/null 2>&1; then
+        echo >&2 "User '${username}' already exists."
+        return 0
+    fi
+  else
+    if cut -d ':' -f 1 < /etc/passwd | grep "^${username}$" 1> /dev/null 2>&1; then
+        echo >&2 "User '${username}' already exists."
+        return 0
+    fi
   fi
 
   echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
   nologin="$(command -v nologin || echo '/bin/false')"
 
-  # Linux
   if command -v useradd 1> /dev/null 2>&1; then
     run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
-  fi
-
-  # FreeBSD
-  if command -v pw 1> /dev/null 2>&1; then
+  elif command -v pw 1> /dev/null 2>&1; then
     run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
-  fi
-
-  # BusyBox
-  if command -v adduser 1> /dev/null 2>&1; then
+  elif command -v adduser 1> /dev/null 2>&1; then
     run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
-  fi
-
-  # mac OS
-  if command -v sysadminctl 1> /dev/null 2>&1; then
+  elif command -v sysadminctl 1> /dev/null 2>&1; then
     run sysadminctl -addUser "${username}" && return 0
   fi
 
@@ -964,20 +963,11 @@ portable_add_group() {
   # Linux
   if command -v groupadd 1> /dev/null 2>&1; then
     run groupadd -r "${groupname}" && return 0
-  fi
-
-  # FreeBSD
-  if command -v pw 1> /dev/null 2>&1; then
+  elif command -v pw 1> /dev/null 2>&1; then
     run pw groupadd "${groupname}" && return 0
-  fi
-
-  # BusyBox
-  if command -v addgroup 1> /dev/null 2>&1; then
+  elif command -v addgroup 1> /dev/null 2>&1; then
     run addgroup "${groupname}" && return 0
-  fi
-
-  # mac OS
-  if command -v dseditgroup 1> /dev/null 2>&1; then
+  elif command -v dseditgroup 1> /dev/null 2>&1; then
     dseditgroup -o create "${groupname}" && return 0
   fi
 
@@ -1008,20 +998,11 @@ portable_add_user_to_group() {
     # Linux
     if command -v usermod 1> /dev/null 2>&1; then
       run usermod -a -G "${groupname}" "${username}" && return 0
-    fi
-
-    # FreeBSD
-    if command -v pw 1> /dev/null 2>&1; then
+    elif command -v pw 1> /dev/null 2>&1; then
       run pw groupmod "${groupname}" -m "${username}" && return 0
-    fi
-
-    # BusyBox
-    if command -v addgroup 1> /dev/null 2>&1; then
+    elif command -v addgroup 1> /dev/null 2>&1; then
       run addgroup "${username}" "${groupname}" && return 0
-    fi
-
-    # mac OS
-    if command -v dseditgroup 1> /dev/null 2>&1; then
+    elif command -v dseditgroup 1> /dev/null 2>&1; then
       dseditgroup -u "${username}" "${groupname}" && return 0
     fi
 

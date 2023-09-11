@@ -1,55 +1,72 @@
-<!--
-title: "PushBullet agent alert notifications"
-sidebar_label: "PushBullet"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/pushbullet/README.md"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Integrations/Notify/Agent alert notifications"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
--->
+# Pushbullet Agent alert notifications
 
-# PushBullet agent alert notifications
+Learn how to send notifications to Pushbullet using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
-Will look like this on your browser:
-![image](https://cloud.githubusercontent.com/assets/4300670/19109636/278b1c0c-8aee-11e6-8a09-7fc94fdbfec8.png)
+> ### Note
+>
+> This file assumes you have read the [Introduction to Agent alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md), detailing how the Netdata Agent's alert notification method works.
 
-And like this on your Android device:
+This is what it will look like this on your browser:
+![image](https://user-images.githubusercontent.com/70198089/229842827-e9c93e44-3c86-4ab6-9b44-d8b36a00b015.png)
 
-![image](https://cloud.githubusercontent.com/assets/4300670/19109635/278a1dde-8aee-11e6-9984-0bc87a13312d.png)
+And this is what it will look like on your Android device:
+
+![image](https://user-images.githubusercontent.com/70198089/229842936-ea7e8f92-a353-43ca-a993-b1cc08e8508b.png)
+
+## Prerequisites
 
 You will need:
 
-1.  Sign up and log in to [pushbullet.com](https://www.pushbullet.com/)
-2.  Create a new access token in your [account settings](https://www.pushbullet.com/#settings/account).
-3.  Fill in the `PUSHBULLET_ACCESS_TOKEN` with the newly generated access token.
-4.  Add the recipient emails or channel tags (each channel tag must be prefixed with #, e.g. #channeltag) to `DEFAULT_RECIPIENT_PUSHBULLET`.
-    > 🚨 The pushbullet notification service will send emails to the email recipient, regardless of if they have a pushbullet account.
+- a Pushbullet access token that can be created in your [account settings](https://www.pushbullet.com/#settings/account)
+- terminal access to the Agent you wish to configure
 
-To add notification channels, run `/etc/netdata/edit-config health_alarm_notify.conf` 
+## Configure Netdata to send alert notifications to Pushbullet
 
-You can change the configuration like this:
+> ### Info
+>
+> This file mentions editing configuration files.  
+>
+> - To edit configuration files in a safe way, we provide the [`edit config` script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) located in your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> Note that to run the script you need to be inside your Netdata config directory.
+>
+> It is recommended to use this way for configuring Netdata.
 
+Edit `health_alarm_notify.conf`, changes to this file do not require restarting Netdata:
+
+1. Set `Send_PUSHBULLET` to `YES`.
+2. Set `PUSHBULLET_ACCESS_TOKEN` to the token you generated.
+3. Set `DEFAULT_RECIPIENT_PUSHBULLET` to the email (e.g. `example@domain.com`) or the channel tag (e.g. `#channel`) you want the alert notifications to be sent to.  
+
+   > ### Note
+   >
+   > Please note that the Pushbullet notification service will send emails to the email recipient, regardless of if they have a Pushbullet account or not.
+
+   You can define multiple entries like this: `user1@email.com user2@email.com`.  
+   All roles will default to this variable if left unconfigured.
+4. While optional, you can also set `PUSHBULLET_SOURCE_DEVICE` to the identifier of the sending device.
+
+You can then have different recipients per **role**, by editing `DEFAULT_RECIPIENT_PUSHBULLET` with the recipients you want, in the following entries at the bottom of the same file:
+
+```conf
+role_recipients_pushbullet[sysadmin]="user1@email.com"
+role_recipients_pushbullet[domainadmin]="user2@mail.com"
+role_recipients_pushbullet[dba]="#channel1"
+role_recipients_pushbullet[webmaster]="#channel2"
+role_recipients_pushbullet[proxyadmin]="user3@mail.com"
+role_recipients_pushbullet[sitemgr]="user4@mail.com"
 ```
-###############################################################################
+
+An example of a working configuration would be:
+
+```conf
+#------------------------------------------------------------------------------
 # pushbullet (pushbullet.com) push notification options
 
-# multiple recipients (a combination of email addresses or channel tags) can be given like this:
-#                  "user1@email.com user2@mail.com #channel1 #channel2"
-
-# enable/disable sending pushbullet notifications
 SEND_PUSHBULLET="YES"
-
-# Signup and Login to pushbullet.com
-# To get your Access Token, go to https://www.pushbullet.com/#settings/account
-# And create a new access token
-# Then just set the recipients emails and/or channel tags (channel tags must be prefixed with #)
-# Please note that the if an email in the DEFAULT_RECIPIENT_PUSHBULLET does
-# not have a pushbullet account, the pushbullet service will send an email
-# to that address instead
-
-# Without an access token, Netdata cannot send pushbullet notifications.
-PUSHBULLET_ACCESS_TOKEN="o.Sometokenhere"
+PUSHBULLET_ACCESS_TOKEN="XXXXXXXXX"
 DEFAULT_RECIPIENT_PUSHBULLET="admin1@example.com admin3@somemail.com #examplechanneltag #anotherchanneltag"
 ```
 
+## Test the notification method
 
+To test this alert notification method refer to the ["Testing Alert Notifications"](https://github.com/netdata/netdata/blob/master/health/notifications/README.md#testing-alert-notifications) section of the Agent alert notifications page.

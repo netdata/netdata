@@ -5,7 +5,31 @@ on:
   push: # Master branch checks only validate the build and generate artifacts for testing.
     branches:
       - master
-  pull_request: null # PR checks only validate the build and generate artifacts for testing.
+  pull_request: # PR checks only validate the build and generate artifacts for testing.
+    paths: # This MUST be kept in-sync with the paths-ignore key for the build-dummy.yml workflow.
+      - '**.c'
+      - '**.cc'
+      - '**.h'
+      - '**.hh'
+      - '**.in'
+      - '!netdata.spec.in'
+      - 'configure.ac'
+      - 'netdata-installer.sh'
+      - '**/Makefile*'
+      - 'Makefile*'
+      - '.github/workflows/build.yml'
+      - '.github/scripts/build-static.sh'
+      - '.github/scripts/get-static-cache-key.sh'
+      - '.github/scripts/gen-matrix-build.py'
+      - '.github/scripts/run-updater-check.sh'
+      - 'build/**'
+      - 'packaging/makeself/**'
+      - 'packaging/installer/**'
+      - 'aclk/aclk-schemas/'
+      - 'ml/dlib/'
+      - 'mqtt_websockets'
+      - 'web/server/h2o/libh2o'
+      - '!**.md'
   workflow_dispatch: # Dispatch runs build and validate, then push to the appropriate storage location.
     inputs:
       type:
@@ -28,7 +52,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -41,7 +65,7 @@ jobs:
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh
+          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh
       - name: Build
         id: build
         run: |
@@ -103,7 +127,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -116,7 +140,7 @@ jobs:
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly'
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' netdata-installer.sh packaging/makeself/install-or-update.sh
+          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Get Cache Key
         if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')
         id: cache-key
@@ -179,7 +203,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Prepare tools
         id: prepare
         run: |
@@ -228,7 +252,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
@@ -327,7 +351,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Fetch test environment
@@ -407,7 +431,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Fetch dist tarball artifacts
         id: fetch-tarball
         uses: actions/download-artifact@v3
@@ -471,7 +495,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Prepare Environment
         id: prepare
         run: mkdir -p artifacts
@@ -495,6 +519,7 @@ jobs:
           mv ../static-archive/* . || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
           cp ../packaging/version ./latest-version.txt || exit 1
+          cp ../integrations/integrations.js ./integrations.js || exit 1
           sha256sum -b ./* > sha256sums.txt || exit 1
           cat sha256sums.txt
       - name: Store Artifacts
@@ -544,7 +569,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Fetch artifacts
         id: fetch
         uses: actions/download-artifact@v3
@@ -598,7 +623,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Fetch artifacts
         id: fetch-artifacts
         uses: actions/download-artifact@v3
@@ -659,10 +684,10 @@ jobs:
           credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
       - name: Setup GCS
         id: gcs-setup
-        uses: google-github-actions/setup-gcloud@v1.1.0
+        uses: google-github-actions/setup-gcloud@v1.1.1
       - name: Upload Artifacts
         id: upload
-        uses: google-github-actions/upload-cloud-storage@v1.0.0
+        uses: google-github-actions/upload-cloud-storage@v1.0.3
         with:
           destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
           gzip: false
@@ -700,12 +725,12 @@ jobs:
     steps:
       - name: Checkout Main Repo
         id: checkout-main
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: main
       - name: Checkout Nightly Repo
         id: checkout-nightly
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: netdata/netdata-nightlies
           path: nightlies
@@ -729,7 +754,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run'
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/integrations.js'
           owner: netdata
           repo: netdata-nightlies
           body: Netdata nightly build for ${{ steps.version.outputs.date }}.
@@ -786,7 +811,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Retrieve Artifacts
         id: fetch
         uses: actions/download-artifact@v3
@@ -799,7 +824,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run'
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/integrations.js'
           draft: true
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}

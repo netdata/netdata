@@ -148,7 +148,7 @@ char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id) {
     if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
         int r = mkdir(ret, 0775);
         if(r != 0 && errno != EEXIST)
-            error("Cannot create directory '%s'", ret);
+            netdata_log_error("Cannot create directory '%s'", ret);
     }
 
     return ret;

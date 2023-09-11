@@ -212,7 +212,7 @@ static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
     dfe_start_read(rrdhost_root_index, host) {
         if(!host->node_id) continue;
 
-        if(uuid_compare(uuid, *host->node_id) == 0)
+        if(uuid_memcmp(&uuid, host->node_id) == 0)
             break;
     }
     dfe_done(host);
@@ -224,25 +224,26 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 
     if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
-        error("RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
-              cmd->claim_id, cmd->node_id,
-              localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-              cmd->claim_id);
+        netdata_log_error("RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
+                          cmd->claim_id, cmd->node_id,
+                          localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+                          cmd->claim_id);
 
         return;
     }
 
     RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
-        error("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
-              cmd->claim_id, cmd->node_id);
+        netdata_log_error("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
+                          cmd->claim_id,
+                          cmd->node_id);
 
         return;
     }
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        info("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', while node '%s' has an active context streaming.",
-              cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
+        netdata_log_info("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', while node '%s' has an active context streaming.",
+                         cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         // disable it temporarily, so that our worker will not attempt to send messages in parallel
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
@@ -251,8 +252,8 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     uint64_t our_version_hash = rrdcontext_version_hash(host);
 
     if(cmd->version_hash != our_version_hash) {
-        error("RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". Sending snapshot of all contexts.",
-              cmd->version_hash, rrdhost_hostname(host), our_version_hash);
+        netdata_log_error("RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". Sending snapshot of all contexts.",
+                          cmd->version_hash, rrdhost_hostname(host), our_version_hash);
 
 #ifdef ENABLE_ACLK
         // prepare the snapshot
@@ -278,32 +279,32 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     char node_str[UUID_STR_LEN];
     uuid_unparse_lower(*host->node_id, node_str);
-    log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, rrdhost_hostname(host));
+    netdata_log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, rrdhost_hostname(host));
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
     struct stop_streaming_ctxs *cmd = ptr;
 
     if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
-        error("RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
-              cmd->claim_id, cmd->node_id,
-              localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-              cmd->claim_id);
+        netdata_log_error("RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
+                          cmd->claim_id, cmd->node_id,
+                          localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+                          cmd->claim_id);
 
         return;
     }
 
     RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
-        error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
-              cmd->claim_id, cmd->node_id);
+        netdata_log_error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
+                          cmd->claim_id, cmd->node_id);
 
         return;
     }
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but node '%s' does not have active context streaming. Ignoring command.",
-              cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
+        netdata_log_error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but node '%s' does not have active context streaming. Ignoring command.",
+                          cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         return;
     }
@@ -312,68 +313,13 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
-// ----------------------------------------------------------------------------
-// weights API
+bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before) {
+    if(unlikely(!rca)) return false;
 
-static void metric_entry_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct metric_entry *t = value;
-    t->rca = rrdcontext_acquired_dup(t->rca);
-    t->ria = rrdinstance_acquired_dup(t->ria);
-    t->rma = rrdmetric_acquired_dup(t->rma);
-}
-static void metric_entry_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct metric_entry *t = value;
-    rrdcontext_release(t->rca);
-    rrdinstance_release(t->ria);
-    rrdmetric_release(t->rma);
-}
-static bool metric_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
-    internal_fatal("RRDCONTEXT: %s() detected a conflict on a metric pointer!", __FUNCTION__);
-    return false;
-}
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
-DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contexts) {
-    if(!host || !host->rrdctx.contexts)
-        return NULL;
-
-    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext, 0);
-    dictionary_register_insert_callback(dict, metric_entry_insert_callback, NULL);
-    dictionary_register_delete_callback(dict, metric_entry_delete_callback, NULL);
-    dictionary_register_conflict_callback(dict, metric_entry_conflict_callback, NULL);
-
-    RRDCONTEXT *rc;
-    dfe_start_reentrant(host->rrdctx.contexts, rc) {
-        if(rrd_flag_is_deleted(rc))
-            continue;
-
-        if(contexts && !simple_pattern_matches_string(contexts, rc->id))
-            continue;
-
-        RRDINSTANCE *ri;
-        dfe_start_read(rc->rrdinstances, ri) {
-            if(rrd_flag_is_deleted(ri))
-                continue;
-
-            RRDMETRIC *rm;
-            dfe_start_read(ri->rrdmetrics, rm) {
-                if(rrd_flag_is_deleted(rm))
-                    continue;
-
-                struct metric_entry tmp = {
-                    .rca = (RRDCONTEXT_ACQUIRED *)rc_dfe.item,
-                    .ria = (RRDINSTANCE_ACQUIRED *)ri_dfe.item,
-                    .rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item,
-                };
-
-                char buffer[20 + 1];
-                ssize_t len = snprintfz(buffer, 20, "%p", rm);
-                dictionary_set_advanced(dict, buffer, len + 1, &tmp, sizeof(struct metric_entry), NULL);
-            }
-            dfe_done(rm);
-        }
-        dfe_done(ri);
-    }
-    dfe_done(rc);
-
-    return dict;
+    if(rrd_flag_is_collected(rc))
+        return query_matches_retention(after, before, rc->first_time_s, before > rc->last_time_s ? before : rc->last_time_s, 1);
+    else
+        return query_matches_retention(after, before, rc->first_time_s, rc->last_time_s, 1);
 }

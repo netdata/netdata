@@ -27,13 +27,13 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## B
 
-- [**Bookmarks**](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md#manage-spaces): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all War Rooms in a Space, so any users in your Space will be able to see and use them.
+- [**Bookmarks**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#manage-spaces): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all War Rooms in a Space, so any users in your Space will be able to see and use them.
 
 ## C
 
 - [**Child**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#streaming-basics): A node, running Netdata, that streams metric data to one or more parent.
 
-- [**Cloud** or **Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+- [**Cloud** or **Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
 - [**Collector**](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology): A catch-all term for any Netdata process that gathers metrics from an endpoint.
 
@@ -91,7 +91,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Kickstart** or **Kickstart Script**](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md): An automatic one-line installation script named 'kickstart.sh' that works on all Linux distributions and macOS.
 
-- [**Kubernetes Dashboard** or **Kubernetes View**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
+- [**Kubernetes Dashboard** or **Kubernetes Tab**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
 
 ## M
 
@@ -114,7 +114,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Netdata Agent** or **Agent**](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
-- [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+- [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
 - [**Netdata Functions** or **Functions**](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
@@ -126,7 +126,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## O
 
-- [**Obsoletion**(of nodes)](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md#obsoleting-offline-nodes-from-a-space): Removing nodes from a space.
+- [**Obsoletion**(of nodes)](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#obsoleting-offline-nodes-from-a-space): Removing nodes from a space.
 
 - [**Orchestrators**](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
 
@@ -146,7 +146,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Replication Streaming**](https://github.com/netdata/netdata/blob/master/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
-- [**Room** or **War Room**](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**Room** or **War Room**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## S
 
@@ -154,7 +154,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 <!-- No link for this file in current structure. - **Snapshots** https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md: An image of your dashboard at any given time, whicn can be imiported into any other node running Netdata or used to genereated a PDF file for your records. -->
 
-- [**Space**](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
+- [**Space**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 
 ## T
 
@@ -173,7 +173,7 @@ even thousands of nodes. There are no actual bottlenecks especially if you retai
 
 ## W
 
-- [**War Room** or **Room**](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**War Room** or **Room**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## Z
 

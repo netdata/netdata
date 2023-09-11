@@ -1,0 +1,133 @@
+plugin_name: nfacct.plugin
+modules:
+  - meta:
+      plugin_name: nfacct.plugin
+      module_name: nfacct.plugin
+      monitored_instance:
+        name: Netfilter
+        link: 'https://www.netfilter.org/'
+        categories:
+          - data-collection.linux-systems.firewall-metrics
+        icon_filename: 'netfilter.png'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: 'Monitor Netfilter metrics for optimal packet filtering and manipulation. Keep tabs on packet counts, dropped packets, and error rates to secure network operations.'
+        method_description: 'Netdata uses libmnl (https://www.netfilter.org/projects/libmnl/index.html) to collect information.'
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: 'This plugin needs setuid.'
+      default_behavior:
+        auto_detection:
+          description: 'This plugin uses socket to connect with netfilter to collect data'
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list:
+          - title: Install required packages
+            description: |
+              Install `libmnl-dev` and `libnetfilter-acct-dev` using the package manager of your system.
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:nfacct]'
+          description: 'This is netdata main configuration file'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additinal parameters for collector
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: ""
+          labels: []
+          metrics:
+            - name: netfilter.netlink_new
+              description: Connection Tracker New Connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: new
+                - name: ignore
+                - name: invalid
+            - name: netfilter.netlink_changes
+              description: Connection Tracker Changes
+              unit: "changes/s"
+              chart_type: line
+              dimensions:
+                - name: insert
+                - name: delete
+                - name: delete_list
+            - name: netfilter.netlink_search
+              description: Connection Tracker Searches
+              unit: "searches/s"
+              chart_type: line
+              dimensions:
+                - name: searched
+                - name: search_restart
+                - name: found
+            - name: netfilter.netlink_errors
+              description: Connection Tracker Errors
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: icmp_error
+                - name: insert_failed
+                - name: drop
+                - name: early_drop
+            - name: netfilter.netlink_expect
+              description: Connection Tracker Expectations
+              unit: "expectations/s"
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: deleted
+                - name: new
+            - name: netfilter.nfacct_packets
+              description: Netfilter Accounting Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per nfacct object
+            - name: netfilter.nfacct_bytes
+              description: Netfilter Accounting Bandwidth
+              unit: "kilobytes/s"
+              chart_type: line
+              dimensions:
+                - name: a dimension per nfacct object

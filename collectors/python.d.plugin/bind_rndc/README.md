@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# ISC Bind monitoring with Netdata
+# ISC Bind collector
 
 Collects Name server summary performance statistics using `rndc` tool.
 

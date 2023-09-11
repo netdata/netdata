@@ -898,14 +898,14 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     RRDSET *st = NULL;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
 
         // name and value are now the parameters
         // they are not null and not empty
@@ -1040,7 +1040,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             units = rrdset_units(st);
     }
 
-    debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
+    netdata_log_debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
           , w->id
           , chart
           , alarm?alarm:""
@@ -1055,9 +1055,12 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     if(rc) {
         if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = now_realtime_sec() + refresh;
+            w->response.data->date = now_realtime_sec();
+            w->response.data->expires = w->response.data->date + refresh;
+            buffer_cacheable(w->response.data);
         }
-        else buffer_no_cacheable(w->response.data);
+        else
+            buffer_no_cacheable(w->response.data);
 
         if(!value_color) {
             switch(rc->status) {

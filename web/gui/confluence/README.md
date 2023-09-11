@@ -73,7 +73,7 @@ like this (type `{html` for the html box to appear - you need the confluence htm
 
 ### Add a few badges
 
-Then, go to your Netdata and copy an alarm badge (the `<embed>` version of it):
+Then, go to your Netdata and copy an alert badge (the `<embed>` version of it):
 
 ![copy-embed-badge](https://user-images.githubusercontent.com/2662304/34329562-dddea37e-e90d-11e7-9830-041a9f6a5984.gif)
 
@@ -85,10 +85,10 @@ Hit **update** and you will get this:
 
 ![screenshot from 2017-12-25 00-56-58](https://user-images.githubusercontent.com/2662304/34329573-8d4237cc-e90e-11e7-80bf-6c260456c690.png)
 
-This badge is now auto-refreshing. It will update itself based on the update frequency of the alarm.
+This badge is now auto-refreshing. It will update itself based on the update frequency of the alert.
 
 > Keep in mind you can add badges with custom Netdata queries too. Netdata automatically creates badges for all the
-> alarms, but every chart, every dimension on every chart, can be used for a badge. And Netdata badges are quite
+> alerts, but every chart, every dimension on every chart, can be used for a badge. And Netdata badges are quite
 > powerful! Check [Creating Badges](https://github.com/netdata/netdata/blob/master/web/api/badges/README.md) for more information on badges.
 
 So, let's create a table and add this badge for both our web servers:

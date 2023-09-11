@@ -20,6 +20,8 @@ include:
   - &alpine
     distro: alpine
     version: edge
+    support_type: Community
+    notes: ''
     eol_check: false
     env_prep: |
       apk add -U bash
@@ -28,20 +30,30 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
+    version: "3.18"
+    support_type: Core
+    notes: ''
+    eol_check: true
+  - <<: *alpine
     version: "3.17"
+    support_type: Intermediate
+    notes: ''
     eol_check: true
   - <<: *alpine
     version: "3.16"
+    support_type: Intermediate
+    notes: ''
     eol_check: true
   - <<: *alpine
     version: "3.15"
-    eol_check: true
-  - <<: *alpine
-    version: "3.14"
+    support_type: Intermediate
+    notes: ''
     eol_check: true
 
   - distro: archlinux
     version: latest
+    support_type: Intermediate
+    notes: ''
     eol_check: false
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
@@ -51,6 +63,8 @@ include:
   - &alma
     distro: almalinux
     version: "9"
+    support_type: Core
+    notes: ''
     jsonc_removal: |
       dnf remove -y json-c-devel
     eol_check: true
@@ -74,8 +88,30 @@ include:
         - el/8Server
         - el/8Client
 
+  - &amzn
+    distro: amazonlinux
+    version: "2"
+    support_type: Core
+    notes: ''
+    eol_check: 'amazon-linux'
+    packages: &amzn_packages
+      type: rpm
+      repo_distro: amazonlinux/2
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: false
+  - <<: *amzn
+    version: "2023"
+    packages:
+      <<: *amzn_packages
+      repo_distro: amazonlinux/2023
+
   - distro: centos
     version: "7"
+    support_type: Core
+    notes: ''
     eol_check: false
     packages:
       type: rpm
@@ -88,9 +124,35 @@ include:
     test:
       ebpf-core: false
 
+  - &centos_stream
+    distro: centos-stream
+    base_image: 'quay.io/centos/centos:stream9'
+    version: '9'
+    support_type: 'Community'
+    notes: ''
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    eol_check: true
+    packages: &cs_packages
+      type: rpm
+      repo_distro: el/c9s
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *centos_stream
+    version: '8'
+    base_image: 'quay.io/centos/centos:stream8'
+    packages:
+      <<: *cs_packages
+      repo_distro: el/c8s
+
   - &debian
     distro: debian
     version: "12"
+    support_type: Core
+    notes: ''
     base_image: debian:bookworm
     eol_check: true
     env_prep: |
@@ -126,45 +188,59 @@ include:
 
   - &fedora
     distro: fedora
-    version: "37"
+    version: "38"
+    support_type: Core
+    notes: ''
     eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/37
+      repo_distro: fedora/38
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
   - <<: *fedora
-    version: "36"
+    version: "37"
     packages:
       <<: *fedora_packages
-      repo_distro: fedora/36
+      repo_distro: fedora/37
     test:
       ebpf-core: true
 
   - &opensuse
     distro: opensuse
-    version: "15.4"
+    version: "15.5"
+    support_type: Core
+    notes: ''
     eol_check: true
-    base_image: opensuse/leap:15.4
+    base_image: opensuse/leap:15.5
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/15.4
+      repo_distro: opensuse/leap:15.5
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
+  - <<: *opensuse
+    version: "15.4"
+    support_type: Core
+    notes: ''
+    base_image: opensuse/leap:15.4
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.4
 
   - &oracle
     distro: oraclelinux
     version: "8"
+    support_type: Core
+    notes: ''
     eol_check: true
     jsonc_removal: |
       dnf remove -y json-c-devel
@@ -184,7 +260,9 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "22.10"
+    version: "22.04"
+    support_type: Core
+    notes: ''
     eol_check: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
@@ -192,7 +270,7 @@ include:
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/kinetic
+      repo_distro: ubuntu/jammy
       arches:
         - amd64
         - armhf
@@ -200,24 +278,67 @@ include:
     test:
       ebpf-core: true
   - <<: *ubuntu
-    version: "22.04"
+    version: "23.04"
     packages:
       <<: *ubuntu_packages
-      repo_distro: ubuntu/jammy
+      repo_distro: ubuntu/lunar
   - <<: *ubuntu
     version: "20.04"
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
-  - <<: *ubuntu
-    version: "18.04"
+no_include: # Info for platforms not covered in CI
+  - distro: docker
+    version: "19.03 or newer"
+    support_type: Core
+    notes: ''
     packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/bionic
       arches:
-        - i386
-        - amd64
-        - armhf
-        - arm64
-    test:
-      ebpf-core: false
+        - linux/i386
+        - linux/amd64
+        - linux/arm/v7
+        - linux/arm64
+        - linux/ppc64le
+
+  - distro: clearlinux
+    version: latest
+    support_type: Community
+    notes: ''
+
+  - &rhel
+    distro: rhel
+    version: "9.x"
+    support_type: Core
+    notes: ''
+    packages:
+      arches:
+        - x86_64
+        - aarch64
+  - <<: *rhel
+    version: "8.x"
+  - <<: *rhel
+    version: "7.x"
+    packages:
+      arches:
+        - x86_64
+
+  - &freebsd
+    distro: freebsd
+    version: 13-STABLE
+    support_type: Community
+    notes: ''
+
+  - &macos
+    distro: macos
+    version: '13'
+    support_type: Community
+    notes: ''
+  - <<: *macos
+    version: '12'
+  - <<: *macos
+    version: '11'
+
+  - distro: gentoo
+    version: latest
+    support_type: Community
+    notes: ''

@@ -109,19 +109,19 @@ typedef struct error_with_limit {
 #define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) error_int(0, "IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_fatal(condition, args...) do { if(unlikely(condition)) fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
-#define debug(type, args...) debug_dummy()
+#define netdata_log_debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
 #define internal_fatal(args...) debug_dummy()
 #endif
 
-#define info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_info(args...)    info_int(1, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define infoerr(args...) error_int(0, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
-#define error(args...)   error_int(0, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_error(args...)   error_int(0, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_infoerr(args...) error_int(1, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)   error_int(1, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define error_limit(erl, args...)   error_limit_int(erl, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
@@ -134,8 +134,8 @@ void info_int( int is_collector, const char *file, const char *function, const u
 void error_int( int is_collector, const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);
 void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, unsigned long line __maybe_unused, const char *fmt, ... ) PRINTFLIKE(6, 7);;
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
-void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
-void log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
+void netdata_log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
+void netdata_log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
 
 #ifdef ENABLE_ACLK
 void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);

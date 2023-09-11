@@ -3,10 +3,14 @@
 #ifndef NETDATA_EBPF_FILESYSTEM_H
 #define NETDATA_EBPF_FILESYSTEM_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_FILESYSTEM "filesystem"
+#define NETDATA_EBPF_FS_MODULE_DESC "Monitor filesystem latency for: btrfs, ext4, nfs, xfs and zfs."
 
 #include "ebpf.h"
+#ifdef LIBBPF_MAJOR_VERSION
+#include "includes/filesystem.skel.h"
+#endif
 
 #define NETDATA_FS_MAX_DIST_NAME 64UL
 
@@ -40,6 +44,16 @@ enum netdata_filesystem_flags {
 enum netdata_filesystem_table {
     NETDATA_MAIN_FS_TABLE,
     NETDATA_ADDR_FS_TABLE
+};
+
+enum netdata_filesystem_localfs_idx {
+    NETDATA_FS_LOCALFS_EXT4,
+    NETDATA_FS_LOCALFS_XFS,
+    NETDATA_FS_LOCALFS_NFS,
+    NETDATA_FS_LOCALFS_ZFS,
+    NETDATA_FS_LOCALFS_BTRFS,
+
+    NETDATA_FS_LOCALFS_END,
 };
 
 void *ebpf_filesystem_thread(void *ptr);

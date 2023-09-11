@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Exim monitoring with Netdata
+# Exim collector
 
 Simple module executing `exim -bpc` to grab exim queue.
 This command can take a lot of time to finish its execution thus it is not recommended to run it every second.

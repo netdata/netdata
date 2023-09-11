@@ -11,6 +11,21 @@ extern "C" {
 #include <config.h>
 #endif
 
+#ifdef ENABLE_LZ4
+#define ENABLE_RRDPUSH_COMPRESSION 1
+#endif
+
+#ifdef ENABLE_OPENSSL
+#define ENABLE_HTTPS 1
+#endif
+
+#ifdef HAVE_LIBDATACHANNEL
+#define ENABLE_WEBRTC 1
+#endif
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 #define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
 
 #if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
@@ -176,9 +191,7 @@ extern "C" {
 #include <stdint.h>
 #endif
 
-#ifdef NETDATA_WITH_ZLIB
 #include <zlib.h>
-#endif
 
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
@@ -258,16 +271,17 @@ size_t judy_aral_structures(void);
 
 #define DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, item, prev, next)                          \
     do {                                                                                       \
+                                                                                               \
+        (item)->next = NULL;                                                                   \
+                                                                                               \
         if(likely(head)) {                                                                     \
             (item)->prev = (head)->prev;                                                       \
             (head)->prev->next = (item);                                                       \
             (head)->prev = (item);                                                             \
-            (item)->next = NULL;                                                               \
         }                                                                                      \
         else {                                                                                 \
+            (item)->prev = (item);                                                             \
             (head) = (item);                                                                   \
-            (head)->prev = (head);                                                             \
-            (head)->next = NULL;                                                               \
         }                                                                                      \
                                                                                                \
     } while (0)
@@ -366,14 +380,130 @@ size_t judy_aral_structures(void);
 
 // ---------------------------------------------------------------------------------------------
 
+#include "storage_number/storage_number.h"
+
+typedef struct storage_point {
+    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
+    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
+    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
+
+    // end_time - start_time = point duration
+    time_t start_time_s;    // the time the point starts
+    time_t end_time_s;      // the time the point ends
+
+    uint32_t count;         // the number of original points aggregated
+    uint32_t anomaly_count; // the number of original points found anomalous
+
+    SN_FLAGS flags;         // flags stored with the point
+} STORAGE_POINT;
+
+#define storage_point_unset(x)                     do { \
+    (x).min = (x).max = (x).sum = NAN;                  \
+    (x).count = 0;                                      \
+    (x).anomaly_count = 0;                              \
+    (x).flags = SN_FLAG_NONE;                           \
+    (x).start_time_s = 0;                               \
+    (x).end_time_s = 0;                                 \
+    } while(0)
+
+#define storage_point_empty(x, start_s, end_s)     do { \
+    (x).min = (x).max = (x).sum = NAN;                  \
+    (x).count = 1;                                      \
+    (x).anomaly_count = 0;                              \
+    (x).flags = SN_FLAG_NONE;                           \
+    (x).start_time_s = start_s;                         \
+    (x).end_time_s = end_s;                             \
+    } while(0)
+
+#define STORAGE_POINT_UNSET (STORAGE_POINT){ .min = NAN, .max = NAN, .sum = NAN, .count = 0, .anomaly_count = 0, .flags = SN_FLAG_NONE, .start_time_s = 0, .end_time_s = 0 }
+
+#define storage_point_is_unset(x) (!(x).count)
+#define storage_point_is_gap(x) (!netdata_double_isnumber((x).sum))
+#define storage_point_is_zero(x) (!(x).count || (netdata_double_is_zero((x).min) && netdata_double_is_zero((x).max) && netdata_double_is_zero((x).sum) && (x).anomaly_count == 0))
+
+#define storage_point_merge_to(dst, src) do {           \
+        if(storage_point_is_unset(dst))                 \
+            (dst) = (src);                              \
+                                                        \
+        else if(!storage_point_is_unset(src) &&         \
+                !storage_point_is_gap(src)) {           \
+                                                        \
+            if((src).start_time_s < (dst).start_time_s) \
+                (dst).start_time_s = (src).start_time_s;\
+                                                        \
+            if((src).end_time_s > (dst).end_time_s)     \
+                (dst).end_time_s = (src).end_time_s;    \
+                                                        \
+            if((src).min < (dst).min)                   \
+                (dst).min = (src).min;                  \
+                                                        \
+            if((src).max > (dst).max)                   \
+                (dst).max = (src).max;                  \
+                                                        \
+            (dst).sum += (src).sum;                     \
+                                                        \
+            (dst).count += (src).count;                 \
+            (dst).anomaly_count += (src).anomaly_count; \
+                                                        \
+            (dst).flags |= (src).flags & SN_FLAG_RESET; \
+        }                                               \
+} while(0)
+
+#define storage_point_add_to(dst, src) do {             \
+        if(storage_point_is_unset(dst))                 \
+            (dst) = (src);                              \
+                                                        \
+        else if(!storage_point_is_unset(src) &&         \
+                !storage_point_is_gap(src)) {           \
+                                                        \
+            if((src).start_time_s < (dst).start_time_s) \
+                (dst).start_time_s = (src).start_time_s;\
+                                                        \
+            if((src).end_time_s > (dst).end_time_s)     \
+                (dst).end_time_s = (src).end_time_s;    \
+                                                        \
+            (dst).min += (src).min;                     \
+            (dst).max += (src).max;                     \
+            (dst).sum += (src).sum;                     \
+                                                        \
+            (dst).count += (src).count;                 \
+            (dst).anomaly_count += (src).anomaly_count; \
+                                                        \
+            (dst).flags |= (src).flags & SN_FLAG_RESET; \
+        }                                               \
+} while(0)
+
+#define storage_point_make_positive(sp) do {            \
+        if(!storage_point_is_unset(sp) &&               \
+           !storage_point_is_gap(sp)) {                 \
+                                                        \
+            if(unlikely(signbit((sp).sum)))             \
+                (sp).sum = -(sp).sum;                   \
+                                                        \
+            if(unlikely(signbit((sp).min)))             \
+                (sp).min = -(sp).min;                   \
+                                                        \
+            if(unlikely(signbit((sp).max)))             \
+                (sp).max = -(sp).max;                   \
+                                                        \
+            if(unlikely((sp).min > (sp).max)) {         \
+                NETDATA_DOUBLE t = (sp).min;            \
+                (sp).min = (sp).max;                    \
+                (sp).max = t;                           \
+            }                                           \
+        }                                               \
+} while(0)
+
+#define storage_point_anomaly_rate(sp) \
+    (NETDATA_DOUBLE)(storage_point_is_unset(sp) ? 0.0 : (NETDATA_DOUBLE)((sp).anomaly_count) * 100.0 / (NETDATA_DOUBLE)((sp).count))
+
+#define storage_point_average_value(sp) \
+    ((sp).count ? (sp).sum / (NETDATA_DOUBLE)((sp).count) : 0.0)
+
+// ---------------------------------------------------------------------------------------------
 
 void netdata_fix_chart_id(char *s);
 void netdata_fix_chart_name(char *s);
-
-void strreverse(char* begin, char* end);
-char *mystrsep(char **ptr, char *s);
-char *trim(char *s); // remove leading and trailing spaces; may return NULL
-char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
 
 int madvise_sequential(void *mem, size_t len);
 int madvise_random(void *mem, size_t len);
@@ -448,7 +578,7 @@ void recursive_config_double_dir_load(
         , void *data
         , size_t depth
 );
-char *read_by_filename(char *filename, long *file_size);
+char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
 /* fix for alpine linux */
@@ -471,28 +601,182 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #endif
 
-#define error_report(x, args...) do { errno = 0; error(x, ##args); } while(0)
+#define error_report(x, args...) do { errno = 0; netdata_log_error(x, ##args); } while(0)
 
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
+#ifdef ENV32BIT
+
+typedef struct bitmapX {
+    uint32_t bits;
+    uint32_t data[];
+} BITMAPX;
+
 typedef struct bitmap256 {
-    uint64_t data[4];
+    uint32_t bits;
+    uint32_t data[256 / 32];
 } BITMAP256;
 
-bool bitmap256_get_bit(BITMAP256 *ptr, uint8_t idx);
-void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
+typedef struct bitmap1024 {
+    uint32_t bits;
+    uint32_t data[1024 / 32];
+} BITMAP1024;
+
+static inline BITMAPX *bitmapX_create(uint32_t bits) {
+    BITMAPX *bmp = (BITMAPX *)callocz(1, sizeof(BITMAPX) + sizeof(uint32_t) * ((bits + 31) / 32));
+    uint32_t *p = (uint32_t *)&bmp->bits;
+    *p = bits;
+    return bmp;
+}
+
+#define bitmapX_get_bit(ptr, idx) ((ptr)->data[(idx) >> 5] & (1U << ((idx) & 31)))
+#define bitmapX_set_bit(ptr, idx, value) do {           \
+    register uint32_t _bitmask = 1U << ((idx) & 31);    \
+    if (value)                                          \
+        (ptr)->data[(idx) >> 5] |= _bitmask;            \
+    else                                                \
+        (ptr)->data[(idx) >> 5] &= ~_bitmask;           \
+} while(0)
+
+#else // 64bit version of bitmaps
+
+typedef struct bitmapX {
+    uint32_t bits;
+    uint64_t data[];
+} BITMAPX;
+
+typedef struct bitmap256 {
+    uint32_t bits;
+    uint64_t data[256 / 64];
+} BITMAP256;
+
+typedef struct bitmap1024 {
+    uint32_t bits;
+    uint64_t data[1024 / 64];
+} BITMAP1024;
+
+static inline BITMAPX *bitmapX_create(uint32_t bits) {
+    BITMAPX *bmp = (BITMAPX *)callocz(1, sizeof(BITMAPX) + sizeof(uint64_t) * ((bits + 63) / 64));
+    bmp->bits = bits;
+    return bmp;
+}
+
+#define bitmapX_get_bit(ptr, idx) ((ptr)->data[(idx) >> 6] & (1ULL << ((idx) & 63)))
+#define bitmapX_set_bit(ptr, idx, value) do {           \
+    register uint64_t _bitmask = 1ULL << ((idx) & 63);  \
+    if (value)                                          \
+        (ptr)->data[(idx) >> 6] |= _bitmask;            \
+    else                                                \
+        (ptr)->data[(idx) >> 6] &= ~_bitmask;           \
+} while(0)
+
+#endif // 64bit version of bitmaps
+
+#define BITMAPX_INITIALIZER(wanted_bits) { .bits = (wanted_bits), .data = {0} }
+#define BITMAP256_INITIALIZER (BITMAP256)BITMAPX_INITIALIZER(256)
+#define BITMAP1024_INITIALIZER (BITMAP1024)BITMAPX_INITIALIZER(1024)
+#define bitmap256_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
+#define bitmap256_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
+#define bitmap1024_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
+#define bitmap1024_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
+
 
 #define COMPRESSION_MAX_MSG_SIZE 0x4000
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
+int pluginsd_isspace(char c);
 int config_isspace(char c);
-int pluginsd_space(char c);
+int group_by_label_isspace(char c);
 
-size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char));
-size_t pluginsd_split_words(char *str, char **words, size_t max_words);
+extern bool isspace_map_pluginsd[256];
+extern bool isspace_map_config[256];
+extern bool isspace_map_group_by_label[256];
+
+static inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words, bool *isspace_map) {
+    char *s = str, quote = 0;
+    size_t i = 0;
+
+    // skip all white space
+    while (unlikely(isspace_map[(uint8_t)*s]))
+        s++;
+
+    if(unlikely(!*s)) {
+        words[i] = NULL;
+        return 0;
+    }
+
+    // check for quote
+    if (unlikely(*s == '\'' || *s == '"')) {
+        quote = *s; // remember the quote
+        s++;        // skip the quote
+    }
+
+    // store the first word
+    words[i++] = s;
+
+    // while we have something
+    while (likely(*s)) {
+        // if it is an escape
+        if (unlikely(*s == '\\' && s[1])) {
+            s += 2;
+            continue;
+        }
+
+        // if it is a quote
+        else if (unlikely(*s == quote)) {
+            quote = 0;
+            *s = ' ';
+            continue;
+        }
+
+        // if it is a space
+        else if (unlikely(quote == 0 && isspace_map[(uint8_t)*s])) {
+            // terminate the word
+            *s++ = '\0';
+
+            // skip all white space
+            while (likely(isspace_map[(uint8_t)*s]))
+                s++;
+
+            // check for a quote
+            if (unlikely(*s == '\'' || *s == '"')) {
+                quote = *s; // remember the quote
+                s++;        // skip the quote
+            }
+
+            // if we reached the end, stop
+            if (unlikely(!*s))
+                break;
+
+            // store the next word
+            if (likely(i < max_words))
+                words[i++] = s;
+            else
+                break;
+        }
+
+        // anything else
+        else
+            s++;
+    }
+
+    if (likely(i < max_words))
+        words[i] = NULL;
+
+    return i;
+}
+
+#define quoted_strings_splitter_query_group_by_label(str, words, max_words) \
+        quoted_strings_splitter(str, words, max_words, isspace_map_group_by_label)
+
+#define quoted_strings_splitter_config(str, words, max_words) \
+        quoted_strings_splitter(str, words, max_words, isspace_map_config)
+
+#define quoted_strings_splitter_pluginsd(str, words, max_words) \
+        quoted_strings_splitter(str, words, max_words, isspace_map_pluginsd)
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {
-    if (index >= num_words)
+    if (unlikely(index >= num_words))
         return NULL;
 
     return words[index];
@@ -514,10 +798,13 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
+
+#define XXH_INLINE_ALL
+#include "xxhash.h"
+
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
 #include "os.h"
-#include "storage_number/storage_number.h"
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"
@@ -550,11 +837,14 @@ extern char *netdata_configured_host_prefix;
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
-#include "parser/parser.h"
+#include "yaml.h"
+#include "http/http_defs.h"
+#include "gorilla/gorilla.h"
+#include "facets/facets.h"
+#include "dyn_conf/dyn_conf.h"
 
-// BEWARE: Outside of the C code this also exists in alarm-notify.sh
-#define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
-#define DEFAULT_CLOUD_UI_URL "https://app.netdata.cloud"
+// BEWARE: this exists in alarm-notify.sh
+#define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
 
 #define RRD_STORAGE_TIERS 5
 
@@ -646,6 +936,32 @@ typedef enum {
     TIMING_STEP_END2_PROPAGATE,
     TIMING_STEP_END2_STORE,
 
+    TIMING_STEP_FREEIPMI_CTX_CREATE,
+    TIMING_STEP_FREEIPMI_DSR_CACHE_DIR,
+    TIMING_STEP_FREEIPMI_SENSOR_CONFIG_FILE,
+    TIMING_STEP_FREEIPMI_SENSOR_READINGS_BY_X,
+    TIMING_STEP_FREEIPMI_READ_record_id,
+    TIMING_STEP_FREEIPMI_READ_sensor_number,
+    TIMING_STEP_FREEIPMI_READ_sensor_type,
+    TIMING_STEP_FREEIPMI_READ_sensor_name,
+    TIMING_STEP_FREEIPMI_READ_sensor_state,
+    TIMING_STEP_FREEIPMI_READ_sensor_units,
+    TIMING_STEP_FREEIPMI_READ_sensor_bitmask_type,
+    TIMING_STEP_FREEIPMI_READ_sensor_bitmask,
+    TIMING_STEP_FREEIPMI_READ_sensor_bitmask_strings,
+    TIMING_STEP_FREEIPMI_READ_sensor_reading_type,
+    TIMING_STEP_FREEIPMI_READ_sensor_reading,
+    TIMING_STEP_FREEIPMI_READ_event_reading_type_code,
+    TIMING_STEP_FREEIPMI_READ_record_type,
+    TIMING_STEP_FREEIPMI_READ_record_type_class,
+    TIMING_STEP_FREEIPMI_READ_sel_state,
+    TIMING_STEP_FREEIPMI_READ_event_direction,
+    TIMING_STEP_FREEIPMI_READ_event_type_code,
+    TIMING_STEP_FREEIPMI_READ_event_offset_type,
+    TIMING_STEP_FREEIPMI_READ_event_offset,
+    TIMING_STEP_FREEIPMI_READ_event_offset_string,
+    TIMING_STEP_FREEIPMI_READ_manufacturer_id,
+
     // terminator
     TIMING_STEP_MAX,
 } TIMING_STEP;
@@ -666,6 +982,15 @@ typedef enum {
 #define timing_report() debug_dummy()
 #endif
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
+
+int hash256_string(const unsigned char *string, size_t size, char *hash);
+
+extern bool unittest_running;
+#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
+
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running);
+
+int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size);
 
 # ifdef __cplusplus
 }

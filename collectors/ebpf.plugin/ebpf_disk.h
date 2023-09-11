@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_DISK_H
 #define NETDATA_EBPF_DISK_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DISK "disk"
+#define NETDATA_EBPF_DISK_MODULE_DESC "Monitor disk latency independent of filesystem."
 
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/ebpf/ebpf.h"
@@ -54,9 +55,7 @@ typedef struct netdata_ebpf_disks {
     struct netdata_ebpf_disks *next;
 } netdata_ebpf_disks_t;
 
-enum ebpf_disk_tables {
-    NETDATA_DISK_READ
-};
+enum ebpf_disk_tables { NETDATA_DISK_IO };
 
 typedef struct block_key {
     uint32_t bin;

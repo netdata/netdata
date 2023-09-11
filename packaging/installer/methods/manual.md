@@ -94,8 +94,8 @@ Netdata plugins and various aspects of Netdata can be enabled or benefit when th
 
 | package |description|
 |:-----:|-----------|
-| `bash`|for shell plugins and **alarm notifications**|
-| `curl`|for shell plugins and **alarm notifications**|
+| `bash`|for shell plugins and **alert notifications**|
+| `curl`|for shell plugins and **alert notifications**|
 | `iproute` or `iproute2`|for monitoring **Linux traffic QoS**<br/>use `iproute2` if `iproute` reports as not available or obsolete|
 | `python`|for most of the external plugins|
 | `python-yaml`|used for monitoring **beanstalkd**|
@@ -226,11 +226,3 @@ Our current build process unfortunately has some issues when using certain confi
 If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`, and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully functional install. 
 
 In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
-
-## What's next?
-
-When you're finished with installation, check out [how to monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), or skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
-
-Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
-solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
-external databases, and more.

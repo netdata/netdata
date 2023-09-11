@@ -45,15 +45,15 @@ void add_host_info(
     label->set_name("__name__");
     label->set_value(name);
 
-    label = timeseries->add_labels();
-    label->set_name("instance");
-    label->set_value(instance);
-
     if (application) {
         label = timeseries->add_labels();
         label->set_name("application");
         label->set_value(application);
     }
+
+    label = timeseries->add_labels();
+    label->set_name("instance");
+    label->set_value(instance);
 
     if (version) {
         label = timeseries->add_labels();
@@ -118,15 +118,15 @@ void add_metric(
     label->set_name("chart");
     label->set_value(chart);
 
-    label = timeseries->add_labels();
-    label->set_name("family");
-    label->set_value(family);
-
     if (dimension) {
         label = timeseries->add_labels();
         label->set_name("dimension");
         label->set_value(dimension);
     }
+
+    label = timeseries->add_labels();
+    label->set_name("family");
+    label->set_value(family);
 
     label = timeseries->add_labels();
     label->set_name("instance");

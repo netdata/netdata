@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Databases"
 -->
 
-# RethinkDB monitoring with Netdata
+# RethinkDB collector
 
 Collects database server and cluster statistics.
 

@@ -1,0 +1,5 @@
+/etc/default/netdata
+/etc/init.d/netdata
+/etc/logrotate.d/netdata
+/etc/netdata/netdata.conf
+/etc/netdata/netdata-updater.conf

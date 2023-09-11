@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_MDFLUSH_H
 #define NETDATA_EBPF_MDFLUSH_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_MDFLUSH "mdflush"
+#define NETDATA_EBPF_MD_MODULE_DESC "Show information about multi-device software flushes."
 
 // charts
 #define NETDATA_MDFLUSH_GLOBAL_CHART "mdflush"
@@ -33,8 +34,15 @@ typedef struct netdata_mdflush {
     uint64_t cnt;
 } netdata_mdflush_t;
 
+enum netdata_mdflush_targets {
+    NETDATA_MD_FLUSH_REQUEST,
+
+    NETDATA_MD_FLUSH_END
+};
+
 void *ebpf_mdflush_thread(void *ptr);
 
 extern struct config mdflush_config;
+extern netdata_ebpf_targets_t mdflush_targets[];
 
 #endif

@@ -120,8 +120,9 @@ container names. To do this, ensure `podman system service` is running and Netda
 to `/run/podman/podman.sock` (the default permissions as specified by upstream are `0600`, with owner `root`, so you
 will have to adjust the configuration).
 
-[docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) can also be used to give Netdata restricted
-access to the socket. Note that `PODMAN_HOST` in Netdata's environment should be set to the proxy's URL in this case.
+[Docker Socket Proxy (HAProxy)](https://github.com/Tecnativa/docker-socket-proxy) or [CetusGuard](https://github.com/hectorm/cetusguard)
+can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment should
+be set to the proxy's URL in this case.
 
 ### Charts with zero metrics
 
@@ -138,10 +139,10 @@ chart instead of `auto` to enable it permanently. For example:
 You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero
 metrics for all internal Netdata plugins.
 
-### Alarms
+### Alerts
 
-CPU and memory limits are watched and used to rise alarms. Memory usage for every cgroup is checked against `ram`
-and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alarms is available in `health.d/cgroups.conf`
+CPU and memory limits are watched and used to rise alerts. Memory usage for every cgroup is checked against `ram`
+and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alerts is available in `health.d/cgroups.conf`
 file.
 
 ## Monitoring systemd services
@@ -263,7 +264,7 @@ Network interfaces and cgroups (containers) are self-cleaned. When a network int
 a few errors in error.log complaining about files it cannot find, but immediately:
 
 1. It will detect this is a removed container or network interface
-2. It will freeze/pause all alarms for them
+2. It will freeze/pause all alerts for them
 3. It will mark their charts as obsolete
 4. Obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
 5. Existing dashboard sessions will continue to see them, but of course they will not refresh

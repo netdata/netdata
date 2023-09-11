@@ -36,13 +36,22 @@ fi
 cd "${NETDATA_MAKESELF_PATH}/tmp/openssl" || exit 1
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
-    run ./config -static no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl
+    sed -i "s/disable('static', 'pic', 'threads');/disable('static', 'pic');/" Configure
+    run ./config -static threads no-tests --prefix=/openssl-static --openssldir=/opt/netdata/etc/ssl
     run make -j "$(nproc)"
 fi
 
 run make -j "$(nproc)" install_sw
 
+if [ -d "/openssl-static/lib" ]; then
+  cd "/openssl-static" || exit 1
+  ln -s "lib" "lib64" || true
+  cd - || exit 1
+fi
+
 store_cache openssl "${NETDATA_MAKESELF_PATH}/tmp/openssl"
+
+perl configdata.pm --dump
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

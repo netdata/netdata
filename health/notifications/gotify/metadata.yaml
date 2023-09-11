@@ -1,0 +1,60 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-gotify'
+  meta:
+    name: 'Gotify'
+    link: 'https://gotify.net/'
+    categories:
+      - notify.agent
+    icon_filename: 'gotify.png'
+  keywords:
+    - gotify
+  overview:
+    notification_description: |
+      [Gotify](https://gotify.net/) is a self-hosted push notification service created for sending and receiving messages in real time.
+      You can send alerts to your Gotify instance using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - An application token. You can generate a new token in the Gotify Web UI.
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_GOTIFY'
+            default_value: 'YES'
+            description: "Set `SEND_GOTIFY` to YES"
+            required: true
+          - name: 'GOTIFY_APP_TOKEN'
+            default_value: ''
+            description: "set `GOTIFY_APP_TOKEN` to the app token you generated."
+            required: true
+          - name: 'GOTIFY_APP_URL'
+            default_value: ''
+            description: "Set `GOTIFY_APP_URL` to point to your Gotify instance, for example `https://push.example.domain/`"
+            required: true
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              SEND_GOTIFY="YES"
+              GOTIFY_APP_TOKEN="XXXXXXXXXXXXXXX"
+              GOTIFY_APP_URL="https://push.example.domain/"
+  troubleshooting:
+    problems:
+      list: []

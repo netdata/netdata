@@ -180,10 +180,15 @@ get_os_release() {
   eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" "${os_release_file}")"
   for x in "${ID}" ${ID_LIKE}; do
     case "${x,,}" in
-      almalinux | alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
+      almalinux | alpine | arch | centos | clear-linux-os | debian | fedora | gentoo | manjaro | opensuse-leap | opensuse-tumbleweed | ol | rhel | rocky | sabayon | sles | suse | ubuntu)
         distribution="${x}"
-        version="${VERSION_ID}"
-        codename="${VERSION}"
+        if [[ "${ID}" = "opensuse-tumbleweed" ]]; then
+          version="tumbleweed"
+          codename="tumbleweed"
+        else
+          version="${VERSION_ID}"
+          codename="${VERSION}"
+        fi
         detection="${os_release_file}"
         break
         ;;
@@ -192,9 +197,10 @@ get_os_release() {
         ;;
     esac
   done
-  [ -z "${distribution}" ] && echo >&2 "Cannot find valid distribution in: ${ID} ${ID_LIKE}" && return 1
+  [[ -z "${distribution}" ]] && echo >&2 "Cannot find valid distribution in: \
+${ID} ${ID_LIKE}" && return 1
 
-  [ -z "${distribution}" ] && return 1
+  [[ -z "${distribution}" ]] && return 1
   return 0
 }
 
@@ -404,9 +410,9 @@ detect_package_manager_from_distribution() {
     centos* | clearos* | rocky* | almalinux*)
       package_installer=""
       tree="centos"
-      [ -n "${yum}" ] && package_installer="install_yum"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
-      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
+      [[ -n "${yum}" ]] && package_installer="install_yum"
+      [[ -n "${dnf}" ]] && package_installer="install_dnf"
+      if [[ "${IGNORE_INSTALLED}" -eq 0 ]] && [[ -z "${package_installer}" ]]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -415,9 +421,9 @@ detect_package_manager_from_distribution() {
     fedora* | redhat* | red\ hat* | rhel*)
       package_installer=
       tree="rhel"
-      [ -n "${yum}" ] && package_installer="install_yum"
-      [ -n "${dnf}" ] && package_installer="install_dnf"
-      if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${package_installer}" ]; then
+      [[ -n "${yum}" ]] && package_installer="install_yum"
+      [[ -n "${dnf}" ]] && package_installer="install_dnf"
+      if [[ "${IGNORE_INSTALLED}" -eq 0 ]] && [[ -z "${package_installer}" ]]; then
         echo >&2 "command 'yum' or 'dnf' is required to install packages on a '${distribution} ${version}' system."
         exit 1
       fi
@@ -676,6 +682,20 @@ declare -A pkg_json_c_dev=(
   ['default']="json-c-devel"
 )
 
+#TODO:: clearlinux ?
+declare -A pkg_libyaml_dev=(
+  ['alpine']="yaml-dev"
+  ['arch']="libyaml"
+  ['clearlinux']="yaml-dev"
+  ['debian']="libyaml-dev"
+  ['gentoo']="dev-libs/libyaml"
+  ['sabayon']="dev-libs/libyaml"
+  ['suse']="libyaml-devel"
+  ['freebsd']="libyaml"
+  ['macos']="libyaml"
+  ['default']="libyaml-devel"
+)
+
 declare -A pkg_libatomic=(
   ['arch']="NOTREQUIRED"
   ['clearlinux']="NOTREQUIRED"
@@ -687,6 +707,19 @@ declare -A pkg_libatomic=(
   ['suse']="libatomic1"
   ['ubuntu']="libatomic1"
   ['default']="libatomic"
+)
+
+declare -A pkg_libsystemd_dev=(
+  ['alpine']="NOTREQUIRED"
+  ['arch']="NOTREQUIRED" # inherently present on systems actually using systemd
+  ['clearlinux']="system-os-dev"
+  ['debian']="libsystemd-dev"
+  ['freebsd']="NOTREQUIRED"
+  ['gentoo']="NOTREQUIRED" # inherently present on systems actually using systemd
+  ['macos']="NOTREQUIRED"
+  ['sabayon']="NOTREQUIRED" # inherently present on systems actually using systemd
+  ['ubuntu']="libsystemd-dev"
+  ['default']="systemd-devel"
 )
 
 declare -A pkg_bridge_utils=(
@@ -1227,6 +1260,8 @@ packages() {
     suitable_package libuuid-dev
     suitable_package libmnl-dev
     suitable_package json-c-dev
+    suitable_package libyaml-dev
+    suitable_package libsystemd-dev
   fi
 
   # -------------------------------------------------------------------------
@@ -1708,6 +1743,7 @@ install_zypper() {
   fi
 
   local opts="--ignore-unknown"
+  local install_opts="--allow-downgrade"
   if [ "${NON_INTERACTIVE}" -eq 1 ]; then
     echo >&2 "Running in non-interactive mode"
     # http://unix.stackexchange.com/questions/82016/how-to-use-zypper-in-bash-scripts-for-someone-coming-from-apt-get
@@ -1715,9 +1751,8 @@ install_zypper() {
   fi
 
   read -r -a zypper_opts <<< "$opts"
-
   # install the required packages
-  run ${sudo} zypper "${zypper_opts[@]}" install "${@}"
+  run ${sudo} zypper "${zypper_opts[@]}" install "${install_opts}" "${@}"
 }
 
 # -----------------------------------------------------------------------------

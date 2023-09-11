@@ -8,7 +8,7 @@ To enable Discord notifications you need:
 
 - A Netdata Cloud account
 - Access to the space as an **administrator**
-- Have a Discord server able to receive webhook integrations. For mode details check [how to configure this on Discord](#settings-on-discord)
+- Have a Discord server able to receive webhook integrations. For more details check [how to configure this on Discord](#settings-on-discord)
 
 ## Steps
 

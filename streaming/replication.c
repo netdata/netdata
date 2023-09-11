@@ -40,9 +40,9 @@ static struct replication_query_statistics replication_queries = {
 };
 
 struct replication_query_statistics replication_get_query_statistics(void) {
-    netdata_spinlock_lock(&replication_queries.spinlock);
+    spinlock_lock(&replication_queries.spinlock);
     struct replication_query_statistics ret = replication_queries;
-    netdata_spinlock_unlock(&replication_queries.spinlock);
+    spinlock_unlock(&replication_queries.spinlock);
     return ret;
 }
 
@@ -96,7 +96,7 @@ struct replication_query {
     size_t points_read;
     size_t points_generated;
 
-    struct storage_engine_query_ops *ops;
+    STORAGE_ENGINE_BACKEND backend;
     struct replication_request *rq;
 
     size_t dimensions;
@@ -144,7 +144,7 @@ static struct replication_query *replication_query_prepare(
     }
 
     if(q->query.enable_streaming) {
-        netdata_spinlock_lock(&st->data_collection_lock);
+        spinlock_lock(&st->data_collection_lock);
         q->query.locked_data_collection = true;
 
         if (st->last_updated.tv_sec > q->query.before) {
@@ -162,13 +162,13 @@ static struct replication_query *replication_query_prepare(
         }
     }
 
-    q->ops = &st->rrdhost->db[0].eng->api.query_ops;
+    q->backend = st->rrdhost->db[0].eng->backend;
 
     // prepare our array of dimensions
     size_t count = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if (unlikely(!rd || !rd_dfe.item || !rd->exposed))
+        if (unlikely(!rd || !rd_dfe.item || !rrddim_check_exposed(rd)))
             continue;
 
         if (unlikely(rd_dfe.counter >= q->dimensions)) {
@@ -184,7 +184,7 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        q->ops->init(rd->tiers[0].db_metric_handle, &d->handle, q->query.after, q->query.before,
+        storage_engine_query_init(q->backend, rd->tiers[0].db_metric_handle, &d->handle, q->query.after, q->query.before,
                      q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
         d->enabled = true;
         d->skip = false;
@@ -198,7 +198,7 @@ static struct replication_query *replication_query_prepare(
         q->query.execute = false;
 
         if(q->query.locked_data_collection) {
-            netdata_spinlock_unlock(&st->data_collection_lock);
+            spinlock_unlock(&st->data_collection_lock);
             q->query.locked_data_collection = false;
         }
 
@@ -216,20 +216,20 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
     NUMBER_ENCODING encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st){
-        if (!rd->exposed) continue;
+        if (!rrddim_check_exposed(rd)) continue;
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '",
                            sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
         buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
         buffer_fast_strcat(wb, "' ", 2);
-        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
-                                    (usec_t) rd->last_collected_time.tv_usec);
+        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->collector.last_collected_time.tv_sec * USEC_PER_SEC +
+                                    (usec_t) rd->collector.last_collected_time.tv_usec);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_int64_encoded(wb, encoding, rd->last_collected_value);
+        buffer_print_int64_encoded(wb, encoding, rd->collector.last_collected_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->last_calculated_value);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_calculated_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->last_stored_value);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_stored_value);
         buffer_fast_strcat(wb, "\n", 1);
     }
     rrddim_foreach_done(rd);
@@ -248,7 +248,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
         replication_send_chart_collection_state(wb, q->st, q->query.capabilities);
 
     if(q->query.locked_data_collection) {
-        netdata_spinlock_unlock(&q->st->data_collection_lock);
+        spinlock_unlock(&q->st->data_collection_lock);
         q->query.locked_data_collection = false;
     }
 
@@ -260,7 +260,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
         struct replication_dimension *d = &q->data[i];
         if (unlikely(!d->enabled)) continue;
 
-        q->ops->finalize(&d->handle);
+        storage_engine_query_finalize(&d->handle);
 
         dictionary_acquired_item_release(d->dict, d->rda);
 
@@ -269,12 +269,18 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
     }
 
     if(executed) {
-        netdata_spinlock_lock(&replication_queries.spinlock);
+        spinlock_lock(&replication_queries.spinlock);
         replication_queries.queries_started += queries;
         replication_queries.queries_finished += queries;
         replication_queries.points_read += q->points_read;
         replication_queries.points_generated += q->points_generated;
-        netdata_spinlock_unlock(&replication_queries.spinlock);
+
+        if(q->st && q->st->rrdhost->sender) {
+            struct sender_state *s = q->st->rrdhost->sender;
+            s->replication.latest_completed_before_t = q->query.before;
+        }
+
+        spinlock_unlock(&replication_queries.spinlock);
     }
 
     __atomic_sub_fetch(&replication_buffers_allocated, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension), __ATOMIC_RELAXED);
@@ -292,7 +298,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
         struct replication_dimension *d = &q->data[i];
         if(unlikely(!d->enabled)) continue;
 
-        time_t new_before = q->ops->align_to_optimal_before(&d->handle);
+        time_t new_before = storage_engine_align_to_optimal_before(&d->handle);
         if (!expanded_before || new_before < expanded_before)
             expanded_before = new_before;
     }
@@ -311,7 +317,6 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
     time_t after = q->query.after;
     time_t before = q->query.before;
     size_t dimensions = q->dimensions;
-    struct storage_engine_query_ops *ops = q->ops;
     time_t wall_clock_time = q->wall_clock_time;
 
     bool finished_with_gap = false;
@@ -331,8 +336,8 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             // fetch the first valid point for the dimension
             int max_skip = 1000;
-            while(d->sp.end_time_s < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
-                d->sp = ops->next_metric(&d->handle);
+            while(d->sp.end_time_s < now && !storage_engine_query_is_finished(&d->handle) && max_skip-- >= 0) {
+                d->sp = storage_engine_query_next_metric(&d->handle);
                 points_read++;
             }
 
@@ -645,7 +650,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     buffer_fast_strcat(wb, "\n", 1);
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
-    sender_commit(host->sender, wb);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_REPLICATION);
     worker_is_busy(WORKER_JOB_CLEANUP);
 
     if(enable_streaming) {
@@ -673,7 +678,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     }
 
     if(locked_data_collection)
-        netdata_spinlock_unlock(&st->data_collection_lock);
+        spinlock_unlock(&st->data_collection_lock);
 
     return enable_streaming;
 }
@@ -792,9 +797,9 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
               rrdset_id(st), r->wanted.start_streaming ? "true" : "false",
               (unsigned long long)r->wanted.after, (unsigned long long)r->wanted.before);
 
-    int ret = r->caller.callback(buffer, r->caller.data);
+    ssize_t ret = r->caller.callback(buffer, r->caller.data);
     if (ret < 0) {
-        error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %d)",
+        netdata_log_error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
               rrdhost_hostname(r->host), rrdset_id(r->st), ret);
         return false;
     }
@@ -1051,11 +1056,11 @@ static inline bool replication_recursive_lock_mode(char mode) {
 
     if(mode == 'L') { // (L)ock
         if(++recursions == 1)
-            netdata_spinlock_lock(&replication_globals.spinlock);
+            spinlock_lock(&replication_globals.spinlock);
     }
     else if(mode == 'U') { // (U)nlock
         if(--recursions == 0)
-            netdata_spinlock_unlock(&replication_globals.spinlock);
+            spinlock_unlock(&replication_globals.spinlock);
     }
     else if(mode == 'C') { // (C)heck
         if(recursions > 0)
@@ -1091,7 +1096,7 @@ void replication_set_next_point_in_time(time_t after, size_t unique_id) {
 // ----------------------------------------------------------------------------
 // replication sort entry management
 
-static struct replication_sort_entry *replication_sort_entry_create(struct replication_request *rq) {
+static inline struct replication_sort_entry *replication_sort_entry_create(struct replication_request *rq) {
     struct replication_sort_entry *rse = aral_mallocz(replication_globals.aral_rse);
     __atomic_add_fetch(&replication_globals.atomic.memory, sizeof(struct replication_sort_entry), __ATOMIC_RELAXED);
 
@@ -1115,7 +1120,7 @@ static void replication_sort_entry_destroy(struct replication_sort_entry *rse) {
 }
 
 static void replication_sort_entry_add(struct replication_request *rq) {
-    if(rrdpush_sender_replication_buffer_full_get(rq->sender)) {
+    if(unlikely(rrdpush_sender_replication_buffer_full_get(rq->sender))) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
         rq->not_indexed_preprocessing = false;
@@ -1467,6 +1472,9 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .not_indexed_preprocessing = false,
     };
 
+    if(!sender->replication.oldest_request_after_t || rq.after < sender->replication.oldest_request_after_t)
+        sender->replication.oldest_request_after_t = rq.after;
+
     if(start_streaming && rrdpush_sender_get_buffer_used_percent(sender) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
         replication_execute_request(&rq, false);
 
@@ -1598,7 +1606,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     dfe_done(host);
 
     size_t executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
-    info("REPLICATION SUMMARY: finished, executed %zu replication requests, %zu charts pending replication",
+    netdata_log_info("REPLICATION SUMMARY: finished, executed %zu replication requests, %zu charts pending replication",
          executed - replication_globals.main_thread.last_executed, errors);
     replication_globals.main_thread.last_executed = executed;
 }
@@ -1830,7 +1838,7 @@ static void replication_main_cleanup(void *ptr) {
     }
     freez(replication_globals.main_thread.threads_ptrs);
     replication_globals.main_thread.threads_ptrs = NULL;
-    __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t *), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t), __ATOMIC_RELAXED);
 
     aral_destroy(replication_globals.aral_rse);
     replication_globals.aral_rse = NULL;
@@ -1852,14 +1860,14 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
     int threads = config_get_number(CONFIG_SECTION_DB, "replication threads", 1);
     if(threads < 1 || threads > MAX_REPLICATION_THREADS) {
-        error("replication threads given %d is invalid, resetting to 1", threads);
+        netdata_log_error("replication threads given %d is invalid, resetting to 1", threads);
         threads = 1;
     }
 
     if(--threads) {
         replication_globals.main_thread.threads = threads;
         replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(netdata_thread_t *));
-        __atomic_add_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t *), __ATOMIC_RELAXED);
+        __atomic_add_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t), __ATOMIC_RELAXED);
 
         for(int i = 0; i < threads ;i++) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];

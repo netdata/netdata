@@ -10,13 +10,15 @@
 
 // For each MACHINE-URL pair we keep this
 struct registry_machine_url {
-    REGISTRY_URL *url;          // de-duplicated URL
+    STRING *url;                // de-duplicated URL
 
     uint8_t flags;
 
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
+
+    struct registry_machine_url *prev, *next;
 };
 typedef struct registry_machine_url REGISTRY_MACHINE_URL;
 
@@ -26,7 +28,7 @@ struct registry_machine {
 
     uint32_t links;             // the number of REGISTRY_PERSON_URL linked to this machine
 
-    DICTIONARY *machine_urls;   // MACHINE_URL *
+    REGISTRY_MACHINE_URL *machine_urls;   // MACHINE_URL *
 
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this
@@ -35,9 +37,12 @@ struct registry_machine {
 typedef struct registry_machine REGISTRY_MACHINE;
 
 REGISTRY_MACHINE *registry_machine_find(const char *machine_guid);
-REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when);
+REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, STRING *u, time_t when);
 REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t when);
-REGISTRY_MACHINE *registry_machine_get(const char *machine_guid, time_t when);
-REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when);
+REGISTRY_MACHINE *registry_machine_find_or_create(const char *machine_guid, time_t when, bool is_dummy);
+REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, STRING *url, time_t when);
+
+REGISTRY_MACHINE_URL *registry_machine_url_find(REGISTRY_MACHINE *m, STRING *url);
+void registry_machine_url_unlink_from_machine_and_free(REGISTRY_MACHINE *m, REGISTRY_MACHINE_URL *mu);
 
 #endif //NETDATA_REGISTRY_MACHINE_H

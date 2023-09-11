@@ -21,10 +21,9 @@ int init_opentsdb_telnet_instance(struct instance *instance)
     instance->connector_specific_data = connector_specific_data;
 
 #ifdef ENABLE_HTTPS
-    connector_specific_data->flags = NETDATA_SSL_START;
-    connector_specific_data->conn = NULL;
+    connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+        netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
 #endif
 
@@ -47,7 +46,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for opentsdb telnet exporting connector instance %s", instance->config.name);
         return 1;
     }
 
@@ -77,10 +76,9 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     struct simple_connector_data *connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
 #ifdef ENABLE_HTTPS
-    connector_specific_data->flags = NETDATA_SSL_START;
-    connector_specific_data->conn = NULL;
+    connector_specific_data->ssl = NETDATA_SSL_UNSET_CONNECTION;
     if (instance->config.options & EXPORTING_OPTION_USE_TLS) {
-        security_start_ssl(NETDATA_SSL_CONTEXT_EXPORTING);
+        netdata_ssl_initialize_ctx(NETDATA_SSL_EXPORTING_CTX);
     }
 #endif
     instance->connector_specific_data = connector_specific_data;
@@ -104,7 +102,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 
     instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
+        netdata_log_error("EXPORTING: cannot create buffer for opentsdb HTTP exporting connector instance %s", instance->config.name);
         return 1;
     }
 
@@ -192,8 +190,8 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
         instance->config.prefix,
         chart_name,
         dimension_name,
-        (unsigned long long)rd->last_collected_time.tv_sec,
-        rd->last_collected_value,
+        (unsigned long long)rd->collector.last_collected_time.tv_sec,
+        rd->collector.last_collected_value,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
         (host->tags) ? rrdhost_tags(host) : "",
@@ -334,8 +332,8 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         instance->config.prefix,
         chart_name,
         dimension_name,
-        (unsigned long long)rd->last_collected_time.tv_sec,
-        rd->last_collected_value,
+        (unsigned long long)rd->collector.last_collected_time.tv_sec,
+        rd->collector.last_collected_value,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (host->tags) ? " " : "",
         (host->tags) ? rrdhost_tags(host) : "",

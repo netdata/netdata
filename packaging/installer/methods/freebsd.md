@@ -16,20 +16,41 @@ learn_rel_path: "Installation/Install on specific environments"
 > PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md) with your recommended
 > improvements or changes. Thank you!
 
-## Install latest version
+## Install dependencies
 
-This is how to install the latest Netdata version on FreeBSD:
-
-Install required packages (**need root permission**):
+This step needs root privileges.
 
 ```sh
 pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof liblz4 libuv json-c cmake gmake
 ```
 
+Please respond in the affirmative for any relevant prompts during the installation process. 
+
+## Install Netdata
+
+The simplest method is to use the single line [kickstart script](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart)
+
+If you have a Netdata cloud account then clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
+
+```sh
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <CLAIM_TOKEN> --claim-url https://app.netdata.cloud
+```
+Please respond in the affirmative for any relevant prompts during the installation process. 
+
+Once the installation is completed, you should be able to start monitoring the FreeBSD server using Netdata. 
+
+![image](https://user-images.githubusercontent.com/24860547/202489210-3c5a3346-8f53-4b7b-9832-f9383b34d864.png)
+
+Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
+
+## Manual installation
+
+If you would prefer to manually install Netdata, the following steps can help you do this.
+
 Download Netdata:
 
 ```sh
-fetch https://github.com/netdata/netdata/releases/download/v1.26.0/netdata-v1.26.0.tar.gz
+fetch https://github.com/netdata/netdata/releases/download/v1.36.1/netdata-v1.36.1.tar.gz
 ```
 
 > ⚠️ Verify the latest version by either navigating to [Netdata's latest

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Storage"
 -->
 
-# HP Smart Storage Arrays monitoring with Netdata
+# HP Smart Storage Arrays collector
 
 Monitors controller, cache module, logical and physical drive state and temperature using `ssacli` tool.
 

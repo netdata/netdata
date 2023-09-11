@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
+#define NETDATA_EBPF_DC_MODULE_DESC "Monitor file access using directory cache. This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_DC_HIT_CHART "dc_hit_ratio"
@@ -27,6 +28,9 @@
 #define NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT "services.dc_reference"
 #define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
 #define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
+
+// ARAL name
+#define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
 
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,

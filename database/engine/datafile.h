@@ -21,7 +21,7 @@ struct rrdengine_instance;
 #endif
 
 #define MIN_DATAFILE_SIZE   (4LU * 1024LU * 1024LU)
-#define MAX_DATAFILES (65536) /* Supports up to 64TiB for now */
+#define MAX_DATAFILES (65536 * 4) /* Supports up to 64TiB for now */
 #define TARGET_DATAFILES (50)
 
 typedef enum __attribute__ ((__packed__)) {
@@ -74,14 +74,14 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
 void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 
-void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
+void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool having_lock);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 int close_data_file(struct rrdengine_datafile *datafile);
 int unlink_data_file(struct rrdengine_datafile *datafile);
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);
 int create_data_file(struct rrdengine_datafile *datafile);
-int create_new_datafile_pair(struct rrdengine_instance *ctx);
+int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock);
 int init_data_files(struct rrdengine_instance *ctx);
 void finalize_data_files(struct rrdengine_instance *ctx);
 

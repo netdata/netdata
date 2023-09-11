@@ -65,9 +65,7 @@ populates its dashboard with more than 250 charts.
 Open your browser of choice and navigate to `http://NODE:19999/`, replacing `NODE` with the IP address of your Raspberry
 Pi. Not sure what that IP is? Try running `hostname -I | awk '{print $1}'` from the Pi itself.
 
-You'll see Netdata's dashboard and a few hundred real-time,
-[interactive](https://learn.netdata.cloud/guides/step-by-step/step-02#interact-with-charts) charts. Feel free to
-explore, but let's turn our attention to installing Pi-hole.
+You'll see Netdata's dashboard and a few hundred real-time, interactive charts. Feel free to explore, but let's turn our attention to installing Pi-hole.
 
 ## Install Pi-Hole
 
@@ -142,24 +140,3 @@ Use our [database sizing
 calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 and the [Database configuration documentation](https://github.com/netdata/netdata/blob/master/database/README.md) to help you determine the right
 setting for your Raspberry Pi.
-
-## What's next?
-
-Now that you're monitoring Pi-hole and your Raspberry Pi with Netdata, you can extend its capabilities even further, or
-configure Netdata to more specific goals.
-
-Most importantly, you can always install additional services and instantly collect metrics from many of them with our
-[300+ integrations](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
-
--   [Optimize performance](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md) using tweaks developed for IoT devices.
--   [Stream Raspberry Pi metrics](https://github.com/netdata/netdata/blob/master/streaming/README.md) to a parent host for easy access or longer-term storage.
--   [Tweak alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) for either Pi-hole or the health of your Raspberry Pi.
--   [Export metrics to external databases](https://github.com/netdata/netdata/blob/master/exporting/README.md) with the exporting engine.
-
-Or, head over to [our guides](https://learn.netdata.cloud/guides/) for even more experiments and insights into
-troubleshooting the health of your systems and services.
-
-If you have any questions about using Netdata to monitor your Raspberry Pi, Pi-hole, or any other applications, head on
-over to our [community forum](https://community.netdata.cloud/).
-
-

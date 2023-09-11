@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
-# MegaRAID controller monitoring with Netdata
+# MegaRAID controller collector
 
 Collects adapter, physical drives and battery stats using `megacli` command-line tool.
 

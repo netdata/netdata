@@ -10,6 +10,7 @@
 #include <linux/btf.h>
 #endif
 #include <stdlib.h> // Necessary for stdtoul
+#include "libnetdata/aral/aral.h"
 
 #define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
 #define NETDATA_KALLSYMS "/proc/kallsyms"
@@ -39,7 +40,10 @@
 
 #define EBPF_CFG_PROGRAM_PATH "btf path"
 
+#define EBPF_CFG_MAPS_PER_CORE "maps per core"
+
 #define EBPF_CFG_UPDATE_EVERY "update every"
+#define EBPF_CFG_LIFETIME "lifetime"
 #define EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT 10
 #define EBPF_CFG_PID_SIZE "pid table size"
 #define EBPF_CFG_APPLICATION "apps"
@@ -76,6 +80,7 @@
  *
  */
 enum netdata_ebpf_kernel_versions {
+    NETDATA_EBPF_KERNEL_4_06 = 263680,  //  264960 = 4 * 65536 +  6 * 256
     NETDATA_EBPF_KERNEL_4_11 = 264960,  //  264960 = 4 * 65536 + 15 * 256
     NETDATA_EBPF_KERNEL_4_14 = 265728,  //  264960 = 4 * 65536 + 14 * 256
     NETDATA_EBPF_KERNEL_4_15 = 265984,  //  265984 = 4 * 65536 + 15 * 256
@@ -176,6 +181,17 @@ enum netdata_controller {
     NETDATA_CONTROLLER_APPS_ENABLED,
     NETDATA_CONTROLLER_APPS_LEVEL,
 
+    // These index show the number of elements
+    // stored inside hash tables.
+    //
+    // We have indexes to count increase and
+    // decrease events, because __sync_fetch_and_sub
+    // generates compilation errors.
+    NETDATA_CONTROLLER_PID_TABLE_ADD,
+    NETDATA_CONTROLLER_PID_TABLE_DEL,
+    NETDATA_CONTROLLER_TEMP_TABLE_ADD,
+    NETDATA_CONTROLLER_TEMP_TABLE_DEL,
+
     NETDATA_CONTROLLER_END
 };
 
@@ -195,6 +211,9 @@ typedef struct ebpf_local_maps {
     uint32_t user_input;
     uint32_t type;
     int map_fd;
+#ifdef LIBBPF_MAJOR_VERSION
+    enum bpf_map_type map_type;
+#endif
 } ebpf_local_maps_t;
 
 typedef struct ebpf_specify_name {
@@ -238,7 +257,19 @@ typedef struct ebpf_plugin_stats {
     uint32_t retprobes;   // Number of kretprobes loaded
     uint32_t tracepoints; // Number of tracepoints used
     uint32_t trampolines; // Number of trampolines used
+
+    uint64_t memlock_kern; // The same information reported by bpftool, but it is not accurated
+                           // https://lore.kernel.org/linux-mm/20230112155326.26902-5-laoar.shao@gmail.com/T/
+    uint32_t hash_tables; // Number of hash tables used on the system.
+
+    uint32_t hash_percpu; // Number of threads running per cpu maps
+    uint32_t hash_unique; // Number of threads running an unique map for all cores.
 } ebpf_plugin_stats_t;
+
+typedef enum ebpf_stats_action {
+    EBPF_ACTION_STAT_ADD,
+    EBPF_ACTION_STAT_REMOVE,
+} ebpf_stats_action_t;
 
 typedef enum netdata_apps_integration_flags {
     NETDATA_EBPF_APPS_FLAG_NO,
@@ -246,10 +277,34 @@ typedef enum netdata_apps_integration_flags {
     NETDATA_EBPF_APPS_FLAG_CHART_CREATED
 } netdata_apps_integration_flags_t;
 
+#define NETDATA_EBPF_CHART_MEM_LENGTH 48
+#define NETDATA_EBPF_STAT_DIMENSION_MEMORY "memory"
+#define NETDATA_EBPF_STAT_DIMENSION_ARAL "aral"
+
+enum ebpf_threads_status {
+    NETDATA_THREAD_EBPF_RUNNING,            // started by plugin
+    NETDATA_THREAD_EBPF_FUNCTION_RUNNING,   // started by function
+    NETDATA_THREAD_EBPF_STOPPING,           // stopping thread
+    NETDATA_THREAD_EBPF_STOPPED,            // thread stopped
+    NETDATA_THREAD_EBPF_NOT_RUNNING         // thread was never started
+};
+
+enum ebpf_global_table_values {
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD, // Count elements added inside PID table
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL, // Count elements removed from PID table
+    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_ADD, // Count elements added inside TEMP table
+    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_DEL,  // Count elements removed from TEMP table
+
+    NETDATA_EBPF_GLOBAL_TABLE_STATUS_END
+};
+
+typedef uint64_t netdata_idx_t;
+
 typedef struct ebpf_module {
     const char *thread_name;
     const char *config_name;
-    int enabled;
+    const char *thread_description;
+    enum ebpf_threads_status enabled;
     void *(*start_routine)(void *);
     int update_every;
     int global_charts;
@@ -271,7 +326,22 @@ typedef struct ebpf_module {
     struct bpf_link **probe_links;
     struct bpf_object *objects;
     struct netdata_static_thread *thread;
+
+    // charts
+    char memory_usage[NETDATA_EBPF_CHART_MEM_LENGTH];
+    char memory_allocations[NETDATA_EBPF_CHART_MEM_LENGTH];
+    int maps_per_core;
+
+    // period to run
+    uint32_t running_time; // internal usage, this is used to reset a value when a new request happens.
+    uint32_t lifetime;
+
+    netdata_idx_t hash_table_stats[NETDATA_EBPF_GLOBAL_TABLE_STATUS_END];
 } ebpf_module_t;
+
+#define EBPF_DEFAULT_LIFETIME 300
+// This will be present until all functions are merged. The deadline is planned for 68 years since plugin start
+#define EBPF_NON_FUNCTION_LIFE_TIME UINT_MAX
 
 int ebpf_get_kernel_version();
 int get_redhat_release();
@@ -301,9 +371,20 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
 typedef struct netdata_ebpf_histogram {
     char *name;
     char *title;
+    char *ctx;
     int order;
     uint64_t histogram[NETDATA_EBPF_HIST_MAX_BINS];
 } netdata_ebpf_histogram_t;
+
+enum fs_btf_counters {
+    NETDATA_KEY_BTF_READ,
+    NETDATA_KEY_BTF_WRITE,
+    NETDATA_KEY_BTF_OPEN,
+    NETDATA_KEY_BTF_SYNC_ATTR,
+    NETDATA_KEY_BTF_OPEN2,
+
+    NETDATA_FS_BTF_END
+};
 
 typedef struct ebpf_filesystem_partitions {
     char *filesystem;
@@ -323,6 +404,15 @@ typedef struct ebpf_filesystem_partitions {
 
     ebpf_addresses_t addresses;
     uint64_t kernels;
+    ebpf_local_maps_t *fs_maps;
+
+    // BPF structure
+#ifdef LIBBPF_MAJOR_VERSION
+    struct filesystem_bpf *fs_obj;
+#else
+    void *fs_obj;
+#endif
+    const char *functions[NETDATA_FS_BTF_END];
 } ebpf_filesystem_partitions_t;
 
 typedef struct ebpf_sync_syscalls {
@@ -340,6 +430,7 @@ typedef struct ebpf_sync_syscalls {
 #else
     void *sync_obj;
 #endif
+    ebpf_local_maps_t *sync_maps;
 } ebpf_sync_syscalls_t;
 
 void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
@@ -366,6 +457,15 @@ void ebpf_adjust_thread_load(ebpf_module_t *mod, struct btf *file);
 struct btf *ebpf_parse_btf_file(const char *filename);
 struct btf *ebpf_load_btf_file(char *path, char *filename);
 int ebpf_is_function_inside_btf(struct btf *file, char *function);
+void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w);
+void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver);
 #endif
+
+void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps,
+                                           ebpf_stats_action_t action);
+void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action);
+int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
+void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio);
+void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
 
 #endif /* NETDATA_EBPF_H */

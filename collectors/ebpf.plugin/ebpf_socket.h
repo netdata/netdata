@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
+#define NETDATA_EBPF_SOCKET_MODULE_DESC "Monitors TCP and UDP bandwidth. This thread is integrated with apps and cgroup."
 
 // Vector indexes
 #define NETDATA_UDP_START 3
@@ -159,6 +160,9 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "services.net_retransmit"
 #define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "services.net_udp_recv"
 #define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "services.net_udp_send"
+
+// ARAL name
+#define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"
 
 typedef struct ebpf_socket_publish_apps {
     // Data read
@@ -363,9 +367,7 @@ void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connect
 void parse_network_viewer_section(struct config *cfg);
 void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void parse_service_name_section(struct config *cfg);
-void ebpf_socket_release(ebpf_socket_publish_apps_t *stat);
 
-extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
 extern struct config socket_config;
 extern netdata_ebpf_targets_t socket_targets[];
 

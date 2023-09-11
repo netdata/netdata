@@ -3,7 +3,7 @@
 #include "ssv.h"
 
 void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, const char *separator, const char *suffix) {
-    //info("RRD2SSV(): %s: BEGIN", r->st->id);
+    //netdata_log_info("RRD2SSV(): %s: BEGIN", r->st->id);
     long i;
 
     buffer_strcat(wb, prefix);
@@ -41,5 +41,5 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
             buffer_print_netdata_double(wb, v);
     }
     buffer_strcat(wb, suffix);
-    //info("RRD2SSV(): %s: END", r->st->id);
+    //netdata_log_info("RRD2SSV(): %s: END", r->st->id);
 }

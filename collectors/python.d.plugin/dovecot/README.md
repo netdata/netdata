@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Dovecot monitoring with Netdata
+# Dovecot collector
 
 Provides statistics information from Dovecot server.
 

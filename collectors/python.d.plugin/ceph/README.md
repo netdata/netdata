@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Storage"
 -->
 
-# CEPH monitoring with Netdata
+# CEPH collector
 
 Monitors the ceph cluster usage and consumption data of a server, and produces:
 

@@ -1,20 +1,8 @@
-<!--
-title: "Monitor Nginx or Apache web server log files with Netdata"
-sidebar_label: "Monitor Nginx or Apache web server log files with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/collect-apache-nginx-web-logs.md
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Miscellaneous"
--->
+# Monitor Nginx or Apache web server log files
 
-# Monitor Nginx or Apache web server log files with Netdata
+Parsing web server log files with Netdata, revealing the volume of redirects, requests and other metrics, can give you a better overview of your infrastructure.
 
-Log files have been a critical resource for developers and system administrators who want to understand the health and
-performance of their web servers, and Netdata is taking important steps to make them even more valuable.
-
-By parsing web server log files with Netdata, and seeing the volume of redirects, requests, or server errors over time,
-you can better understand what's happening on your infrastructure. Too many bad requests? Maybe a recent deploy missed a
-few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
+Too many bad requests? Maybe a recent deploy missed a few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
 
 You can use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage, and the whole parser is faster than
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
@@ -106,13 +94,13 @@ We do have [extensive
 documentation](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#custom-log-format) on how
 to build custom parsing for Nginx and Apache logs.
 
-## Tweak web log collector alarms
+## Tweak web log collector alerts
 
-Over time, we've created some default alarms for web log monitoring. These alarms are designed to work only when your
+Over time, we've created some default alerts for web log monitoring. These alerts are designed to work only when your
 web server is receiving more than 120 requests per minute. Otherwise, there's simply not enough data to make conclusions
 about what is "too few" or "too many."
 
--   [web log alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/web_log.conf).
+-   [web log alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/web_log.conf).
 
 You can also edit this file directly with `edit-config`:
 
@@ -120,5 +108,5 @@ You can also edit this file directly with `edit-config`:
 ./edit-config health.d/weblog.conf
 ```
 
-For more information about editing the defaults or writing new alarm entities, see our 
+For more information about editing the defaults or writing new alert entities, see our 
 [health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md).

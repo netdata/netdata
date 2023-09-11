@@ -13,10 +13,10 @@ This module finds the max value in the time-frame given.
 
 ## how to use
 
-Use it in alarms like this:
+Use it in alerts like this:
 
 ```
- alarm: my_alarm
+ alarm: my_alert
     on: my_chart
 lookup: max -1m unaligned of my_dimension
   warn: $this > 1000

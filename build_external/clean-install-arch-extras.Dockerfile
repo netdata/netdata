@@ -45,8 +45,8 @@ RUN rm -rf autom4te.cache
 RUN rm -rf .git/
 RUN find . -type f >/opt/netdata/manifest
 
-RUN CFLAGS="-Og -g -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1\
-    -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --require-cloud --disable-lto
+RUN CFLAGS="-Og -g -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1\
+    -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --require-cloud --disable-lto
 
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log

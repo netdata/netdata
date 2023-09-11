@@ -29,7 +29,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -116,7 +116,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
@@ -125,7 +125,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
-          workflow: Build
+          workflow: build.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
       - name: Failure Notification
@@ -151,7 +151,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
@@ -160,7 +160,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
-          workflow: Docker
+          workflow: docker.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}"}'
       - name: Failure Notification
@@ -186,7 +186,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
@@ -195,7 +195,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
-          workflow: Packages
+          workflow: packaging.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
       - name: Failure Notification

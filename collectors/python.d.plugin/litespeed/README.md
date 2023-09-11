@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Application Performance Monitoring"
 -->
 
-# LiteSpeed monitoring with Netdata
+# LiteSpeed collector
 
 Collects web server performance metrics for network, connection, requests, and cache.  
 

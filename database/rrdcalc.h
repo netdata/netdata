@@ -28,6 +28,8 @@ typedef enum {
     RRDCALC_FLAG_FROM_TEMPLATE              = (1 << 10), // the rrdcalc has been created from a template
 } RRDCALC_FLAGS;
 
+void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flags);
+
 typedef enum {
     // This list uses several other options from RRDR_OPTIONS for db lookups.
     // To add an item here, you need to reserve a bit in RRDR_OPTIONS.
@@ -109,6 +111,9 @@ struct rrdcalc {
     STRING *host_labels;                 // the label read from an alarm file
     SIMPLE_PATTERN *host_labels_pattern; // the simple pattern of labels
 
+    STRING *chart_labels;                 // the chart label read from an alarm file
+    SIMPLE_PATTERN *chart_labels_pattern; // the simple pattern of chart labels
+
     // ------------------------------------------------------------------------
     // runtime information
 
@@ -117,6 +122,7 @@ struct rrdcalc {
 
     NETDATA_DOUBLE value;           // the current value of the alarm
     NETDATA_DOUBLE old_value;       // the previous value of the alarm
+    NETDATA_DOUBLE last_status_change_value; // the value at the last status change
 
     RRDCALC_FLAGS run_flags;        // check RRDCALC_FLAG_*
 
@@ -133,6 +139,7 @@ struct rrdcalc {
     int delay_up_current;           // the current up notification delay duration
     int delay_down_current;         // the current down notification delay duration
     int delay_last;                 // the last delay we used
+    ALARM_ENTRY *ae;                // last alarm entry
 
     // ------------------------------------------------------------------------
     // variables this alarm exposes to the rest of the alarms
@@ -168,6 +175,7 @@ struct rrdcalc {
 #define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
 #define rrdcalc_foreachdim(rc) string2str((rc)->foreach_dimension)
 #define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
+#define rrdcalc_chart_labels(rc) string2str((rc)->chart_labels)
 
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \
     dfe_start_read((host)->rrdcalc_root_index, rc) \
@@ -206,6 +214,8 @@ struct alert_config {
     STRING *options;
     STRING *repeat;
     STRING *host_labels;
+    STRING *chart_labels;
+    STRING *source;
 
     STRING *p_db_lookup_dimensions;
     STRING *p_db_lookup_method;
@@ -230,7 +240,7 @@ const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
 void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
 
-uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
 void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
 int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
 

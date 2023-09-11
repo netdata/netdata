@@ -1,0 +1,109 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Netdata Integrations file",
+    "properties": {
+        "categories": {
+            "type": "object",
+            "description": "A list defining all the available categories for the integrations.",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "description": "",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": "ID of the category, can be found in integrations/categories.yaml for every category."
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Text that will be presented below the category title, or that will be accompanying the category in the UI in any form."
+                            },
+                            "priority": {
+                                "type": "integer",
+                                "description": "Priority of the category. A number expressing where the category should be in the menu. Currently, a static number gets assigned to all categories, with a higher priority one for the most-popular flagged categories."
+                            },
+                            "children": {
+                                "type": "array",
+                                "description": "an array that recursively has the same elements as the parent.",
+                                "items": {
+                                    "$ref": "#"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "integrations": {
+            "type": "array",
+            "description": "A list of integration elements, combination of metadata.yaml and other sources.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "A unique string identifier for the integration."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "categories": {
+                        "type": "array",
+                        "description": "an array of categories that the integration belongs to",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "category_id": {
+                                    "type": "string",
+                                    "description": "The category_ID for this integration. This is the category ID mentioned inside integrations/category.yaml, for the respective category."
+                                },
+                                "priority": {
+                                    "type": "integer",
+                                    "description": "Priority for this specific category. Will control where the integration will be positioned in this category"
+                                }
+                            }
+                        }
+                    },
+                    "icon": {
+                        "type": "string",
+                        "description": "path to the icon for this integration."
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "description": "An array of terms related to the integration.",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "overview": {
+                        "type": "string",
+                        "description": "The text that will go in the top of the page, in markdown format."
+                    },
+                    "metrics": {
+                        "type": "string",
+                        "description": "Metrics section rendered in markdown format."
+                    },
+                    "alerts": {
+                        "type": "string",
+                        "description": "Alerts section rendered in markdown format."
+                    },
+                    "setup": {
+                        "type": "string",
+                        "description": "Setup section rendered in markdown format."
+                    },
+                    "troubleshooting": {
+                        "type": "string",
+                        "description": "troubleshooting section rendered in markdown format."
+                    },
+                    "related_resources": {
+                        "type": "string",
+                        "description": "Related Resources section rendered in markdown format."
+                    }
+                }
+            }
+        }
+    }
+}

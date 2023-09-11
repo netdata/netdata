@@ -4,7 +4,7 @@
 #include "csv.h"
 
 void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
-    //info("RRD2CSV(): %s: BEGIN", r->st->id);
+    //netdata_log_info("RRD2CSV(): %s: BEGIN", r->st->id);
     long c, i;
     const long used = (long)r->d;
 
@@ -61,7 +61,6 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
     }
 
     // for each line in the array
-    NETDATA_DOUBLE total = 1;
     for(i = start; i != end ;i += step) {
         NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
@@ -80,26 +79,9 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         else {
             // generate the local date time
             struct tm tmbuf, *tm = localtime_r(&now, &tmbuf);
-            if(!tm) { error("localtime() failed."); continue; }
+            if(!tm) {
+                netdata_log_error("localtime() failed."); continue; }
             buffer_date(wb, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
-        }
-
-        int set_min_max = 0;
-        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-            total = 0;
-            for(c = 0; c < used ;c++) {
-                if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-
-                NETDATA_DOUBLE n = cn[c];
-
-                if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                    n = -n;
-
-                total += n;
-            }
-            // prevent a division by zero
-            if(total == 0) total = 1;
-            set_min_max = 1;
         }
 
         // for each dimension
@@ -117,27 +99,11 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
                 else
                     buffer_strcat(wb, "null");
             }
-            else {
-                if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
-                    n = -n;
-
-                if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
-                    n = n * 100 / total;
-
-                    if(unlikely(set_min_max)) {
-                        r->view.min = r->view.max = n;
-                        set_min_max = 0;
-                    }
-
-                    if(n < r->view.min) r->view.min = n;
-                    if(n > r->view.max) r->view.max = n;
-                }
-
+            else
                 buffer_print_netdata_double(wb, n);
-            }
         }
 
         buffer_strcat(wb, endline);
     }
-    //info("RRD2CSV(): %s: END", r->st->id);
+    //netdata_log_info("RRD2CSV(): %s: END", r->st->id);
 }

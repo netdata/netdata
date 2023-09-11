@@ -193,7 +193,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
 
         for (int i = 0; i < aclk_stats_cfg.query_thread_count; i++) {
             if (snprintfz(dim_name, MAX_DIM_NAME, "Query %d", i) < 0)
-                error("snprintf encoding error");
+                netdata_log_error("snprintf encoding error");
             aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
     }
@@ -463,7 +463,7 @@ void aclk_stats_msg_puback(uint16_t id)
 
     if (unlikely(!pub_time[id])) {
         ACLK_STATS_UNLOCK;
-        error("Received PUBACK for unknown message?!");
+        netdata_log_error("Received PUBACK for unknown message?!");
         return;
     }
 

@@ -91,7 +91,7 @@ int setup_rrdhost()
 
     st->rrddim_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
-    st->dimensions = dictionary_set_advanced(st->rrddim_root_index, "dimension_id", -1, NULL, sizeof(RRDDIM), st);
+    st->dimensions = dictionary_set_advanced(st->rrddim_root_index, "dimension_id", -1, NULL, rrddim_size(), st);
 
     return 0;
 }

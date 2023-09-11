@@ -348,7 +348,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
     int found = 0, preferred = 0;
 
-    char *first_result = mallocz(result_size);
+    char *first_result = mallocz(result_size + 1);
 
     DIR *dir = opendir(path);
     if (!dir) {
@@ -454,7 +454,7 @@ failed:
 }
 
 static inline char *get_disk_name(unsigned long major, unsigned long minor, char *disk) {
-    char result[FILENAME_MAX + 1] = "";
+    char result[FILENAME_MAX + 2] = "";
 
     if(!path_to_device_mapper || !*path_to_device_mapper || !get_disk_name_from_path(path_to_device_mapper, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
         if(!path_to_device_label || !*path_to_device_label || !get_disk_name_from_path(path_to_device_label, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
@@ -615,8 +615,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // read device uuid if it is an LVM volume
     if (!strncmp(d->device, "dm-", 3)) {
         char uuid_filename[FILENAME_MAX + 1];
-        snprintfz(uuid_filename, FILENAME_MAX, path_to_sys_devices_virtual_block_device, disk);
-        strncat(uuid_filename, "/dm/uuid", FILENAME_MAX);
+        int size = snprintfz(uuid_filename, FILENAME_MAX, path_to_sys_devices_virtual_block_device, disk);
+        strncat(uuid_filename, "/dm/uuid", FILENAME_MAX - size);
 
         char device_uuid[RRD_ID_LENGTH_MAX + 1];
         if (!read_file(uuid_filename, device_uuid, RRD_ID_LENGTH_MAX) && !strncmp(device_uuid, "LVM-", 4)) {

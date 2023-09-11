@@ -7,6 +7,11 @@
 
 struct web_client;
 
+CONTEXTS_V2_OPTIONS web_client_api_request_v2_context_options(char *o);
+CONTEXTS_V2_ALERT_STATUS web_client_api_request_v2_alert_status(char *o);
+void web_client_api_request_v2_contexts_options_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_OPTIONS options);
+void web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_ALERT_STATUS options);
+
 RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
 void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options);
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options);
@@ -24,11 +29,14 @@ int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *
 int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);
 int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
-int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
+int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint);
 int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
 
 void web_client_api_v1_init(void);
 void web_client_api_v1_management_init(void);
+
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key);
+void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb, const char *key);
 
 extern char *api_secret;
 

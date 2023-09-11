@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#include "libnetdata/libnetdata.h"
+
 // non-existing structs instead of voids
 // to enable type checking at compile time
 typedef struct storage_instance STORAGE_INSTANCE;
@@ -21,6 +23,8 @@ typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
+typedef struct rrdlabels RRDLABELS;
+
 typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
@@ -30,9 +34,9 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 typedef struct rrdset_acquired RRDSET_ACQUIRED;
 typedef struct rrddim_acquired RRDDIM_ACQUIRED;
 
-typedef struct ml_host ml_host_t;
-typedef struct ml_chart ml_chart_t;
-typedef struct ml_dimension ml_dimension_t;
+typedef struct ml_host rrd_ml_host_t;
+typedef struct ml_chart rrd_ml_chart_t;
+typedef struct ml_dimension rrd_ml_dimension_t;
 
 typedef enum __attribute__ ((__packed__)) {
     QUERY_SOURCE_UNKNOWN = 0,
@@ -95,6 +99,14 @@ extern RRD_MEMORY_MODE default_rrd_memory_mode;
 const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 
+struct ml_metrics_statistics {
+    size_t anomalous;
+    size_t normal;
+    size_t trained;
+    size_t pending;
+    size_t silenced;
+};
+
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
 #include "web/api/queries/rrdr.h"
@@ -103,34 +115,28 @@ RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 #include "rrddimvar.h"
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
+#include "rrdlabels.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
 
 typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 
+typedef enum __attribute__ ((__packed__)) {
+    STORAGE_ENGINE_BACKEND_RRDDIM = 1,
+    STORAGE_ENGINE_BACKEND_DBENGINE = 2,
+} STORAGE_ENGINE_BACKEND;
+
+#define is_valid_backend(backend) ((backend) >= STORAGE_ENGINE_BACKEND_RRDDIM && (backend) <= STORAGE_ENGINE_BACKEND_DBENGINE)
+
 // iterator state for RRD dimension data queries
 struct storage_engine_query_handle {
     time_t start_time_s;
     time_t end_time_s;
     STORAGE_PRIORITY priority;
-    STORAGE_QUERY_HANDLE* handle;
+    STORAGE_ENGINE_BACKEND backend;
+    STORAGE_QUERY_HANDLE *handle;
 };
-
-typedef struct storage_point {
-    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
-    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
-    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
-
-    // end_time - start_time = point duration
-    time_t start_time_s;    // the time the point starts
-    time_t end_time_s;      // the time the point ends
-
-    size_t count;           // the number of original points aggregated
-    size_t anomaly_count;   // the number of original points found anomalous
-
-    SN_FLAGS flags;         // flags stored with the point
-} STORAGE_POINT;
 
 // ----------------------------------------------------------------------------
 // chart types
@@ -177,18 +183,18 @@ extern time_t rrdset_free_obsolete_time_s;
 
 #if defined(ENV32BIT)
 #define MIN_LIBUV_WORKER_THREADS 8
-#define MAX_LIBUV_WORKER_THREADS 64
+#define MAX_LIBUV_WORKER_THREADS 128
 #define RESERVED_LIBUV_WORKER_THREADS 3
 #else
 #define MIN_LIBUV_WORKER_THREADS 16
-#define MAX_LIBUV_WORKER_THREADS 128
+#define MAX_LIBUV_WORKER_THREADS 1024
 #define RESERVED_LIBUV_WORKER_THREADS 6
 #endif
 
 extern int libuv_worker_threads;
 extern bool ieee754_doubles;
 
-#define RRD_ID_LENGTH_MAX 200
+#define RRD_ID_LENGTH_MAX 1000
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -232,13 +238,15 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
     RRDDIM_OPTION_HIDDEN                            = (1 << 0), // this dimension will not be offered to callers
     RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
     RRDDIM_OPTION_BACKFILLED_HIGH_TIERS             = (1 << 2), // when set, we have backfilled higher tiers
+    RRDDIM_OPTION_UPDATED                           = (1 << 3), // single-threaded collector updated flag
+    RRDDIM_OPTION_EXPOSED                           = (1 << 4), // single-threaded collector exposed flag
 
     // this is 8-bit
 } RRDDIM_OPTIONS;
 
-#define rrddim_option_check(rd, option) ((rd)->options & (option))
-#define rrddim_option_set(rd, option)   (rd)->options |= (option)
-#define rrddim_option_clear(rd, option) (rd)->options &= ~(option)
+#define rrddim_option_check(rd, option) ((rd)->collector.options & (option))
+#define rrddim_option_set(rd, option)   (rd)->collector.options |= (option)
+#define rrddim_option_clear(rd, option) (rd)->collector.options &= ~(option)
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum __attribute__ ((__packed__)) rrddim_flags {
@@ -260,75 +268,22 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
 #define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_SEQ_CST)
 #define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
-typedef enum __attribute__ ((__packed__)) rrdlabel_source {
-    RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
-    RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
-    RRDLABEL_SRC_K8S        = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
-    RRDLABEL_SRC_ACLK       = (1 << 3), // set when this label is found from ACLK (RRDLABEL_SRC_AUTO should also be set)
-
-    // more sources can be added here
-
-    RRDLABEL_FLAG_PERMANENT = (1 << 29), // set when this label should never be removed (can be overwritten though)
-    RRDLABEL_FLAG_OLD       = (1 << 30), // marks for rrdlabels internal use - they are not exposed outside rrdlabels
-    RRDLABEL_FLAG_NEW       = (1 << 31)  // marks for rrdlabels internal use - they are not exposed outside rrdlabels
-} RRDLABEL_SRC;
-
-#define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT)
-
-size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length);
-
-DICTIONARY *rrdlabels_create(void);
-void rrdlabels_destroy(DICTIONARY *labels_dict);
-void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
-void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
-void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
-void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb, const char *key);
-void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const char *key);
-void rrdlabels_get_value_strcpyz(DICTIONARY *labels, char *dst, size_t dst_len, const char *key);
-STRING *rrdlabels_get_value_string_dup(DICTIONARY *labels, const char *key);
-STRING *rrdlabels_get_value_to_buffer_or_unset(DICTIONARY *labels, BUFFER *wb, const char *key, const char *unset);
-void rrdlabels_flush(DICTIONARY *labels_dict);
-
-void rrdlabels_unmark_all(DICTIONARY *labels);
-void rrdlabels_remove_all_unmarked(DICTIONARY *labels);
-
-int rrdlabels_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
-int rrdlabels_sorted_walkthrough_read(DICTIONARY *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
-
-void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
-bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
-
-bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches);
-int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
-void rrdlabels_to_buffer_json_members(DICTIONARY *labels, BUFFER *wb);
-
-void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
-void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);
-
-void reload_host_labels(void);
-void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels);
-void rrdset_save_rrdlabels_to_sql(RRDSET *st);
-void rrdhost_set_is_parent_label(int count);
-int rrdlabels_unittest(void);
-
-// unfortunately this break when defined in exporting_engine.h
-bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
-
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
-typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
+typedef struct storage_collect_handle {
+    STORAGE_ENGINE_BACKEND backend;
+} STORAGE_COLLECT_HANDLE;
 
 // ----------------------------------------------------------------------------
 // Storage tier data for every dimension
 
 struct rrddim_tier {
     STORAGE_POINT virtual_point;
-    size_t tier_grouping;
+    STORAGE_ENGINE_BACKEND backend;
+    uint32_t tier_grouping;
     time_t next_point_end_time_s;
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
-    struct storage_engine_collect_ops *collect_ops;
-    struct storage_engine_query_ops *query_ops;
 };
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
@@ -346,50 +301,18 @@ struct rrddim {
     STRING *name;                                   // the name of this dimension (as presented to user)
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
-    RRDDIM_OPTIONS options;                         // permanent configuration options
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // run time changing status flags
 
-    bool updated;                                   // 1 when the dimension has been updated since the last processing
-    bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
-
-    collected_number multiplier;                    // the multiplier of the collected values
-    collected_number divisor;                       // the divider of the collected values
-
-    int update_every;                               // every how many seconds is this updated
-                                                    // TODO - remove update_every from rrddim
-                                                    //        it is always the same in rrdset
+    int32_t multiplier;                             // the multiplier of the collected values
+    int32_t divisor;                                // the divider of the collected values
 
     // ------------------------------------------------------------------------
     // operational state members
 
-    ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
-
-    // ------------------------------------------------------------------------
-    // linking to siblings and parents
-
     struct rrdset *rrdset;
-
+    rrd_ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
     RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
-
-    // ------------------------------------------------------------------------
-    // data collection members
-
-    struct rrddim_tier tiers[RRD_STORAGE_TIERS];   // our tiers of databases
-
-    struct timeval last_collected_time;             // when was this dimension last updated
-                                                    // this is actual date time we updated the last_collected_value
-                                                    // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
-
-    size_t collections_counter;                     // the number of times we added values to this rrddim
-    collected_number collected_value_max;           // the absolute maximum of the collected value
-
-    NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
-    NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
-    NETDATA_DOUBLE last_stored_value;               // the last value as stored in the database (after interpolation)
-
-    collected_number collected_value;               // the current value, as collected - resets to 0 after being used
-    collected_number last_collected_value;          // the last value that was collected, after being processed
 
 #ifdef NETDATA_LOG_COLLECTION_ERRORS
     usec_t rrddim_store_metric_last_ut;             // the timestamp we last called rrddim_store_metric()
@@ -402,13 +325,51 @@ struct rrddim {
     // TODO - they should be managed by storage engine
     //        (RRDDIM_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
-    size_t memsize;                                 // the memory allocated for this dimension (without RRDDIM)
-    void *rd_on_file;                               // pointer to the header written on disk
-    storage_number *db;                             // the array of values
+    struct {
+        size_t memsize;                             // the memory allocated for this dimension (without RRDDIM)
+        void *rd_on_file;                           // pointer to the header written on disk
+        storage_number *data;                       // the array of values
+    } db;
+
+    // ------------------------------------------------------------------------
+    // data collection members
+
+    struct {
+        RRDDIM_OPTIONS options;                         // permanent configuration options
+
+        uint32_t counter;                               // the number of times we added values to this rrddim
+
+        collected_number collected_value;               // the current value, as collected - resets to 0 after being used
+        collected_number collected_value_max;           // the absolute maximum of the collected value
+        collected_number last_collected_value;          // the last value that was collected, after being processed
+
+        struct timeval last_collected_time;             // when was this dimension last updated
+                                                        // this is actual date time we updated the last_collected_value
+                                                        // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
+
+        NETDATA_DOUBLE calculated_value;                // the current calculated value, after applying the algorithm - resets to zero after being used
+        NETDATA_DOUBLE last_calculated_value;           // the last calculated value processed
+
+        NETDATA_DOUBLE last_stored_value;               // the last value as stored in the database (after interpolation)
+    } collector;
+
+    // ------------------------------------------------------------------------
+
+    struct rrddim_tier tiers[];                     // our tiers of databases
 };
+
+size_t rrddim_size(void);
 
 #define rrddim_id(rd) string2str((rd)->id)
 #define rrddim_name(rd) string2str((rd) ->name)
+
+#define rrddim_check_updated(rd) ((rd)->collector.options & RRDDIM_OPTION_UPDATED)
+#define rrddim_set_updated(rd) (rd)->collector.options |= RRDDIM_OPTION_UPDATED
+#define rrddim_clear_updated(rd) (rd)->collector.options &= ~RRDDIM_OPTION_UPDATED
+
+#define rrddim_check_exposed(rd) ((rd)->collector.options & RRDDIM_OPTION_EXPOSED)
+#define rrddim_set_exposed(rd) (rd)->collector.options |= RRDDIM_OPTION_EXPOSED
+#define rrddim_clear_exposed(rd) (rd)->collector.options &= ~RRDDIM_OPTION_EXPOSED
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 const char *rrddim_cache_filename(RRDDIM *rd);
@@ -426,82 +387,257 @@ size_t rrddim_memory_file_header_size(void);
 
 void rrddim_memory_file_save(RRDDIM *rd);
 
-// ----------------------------------------------------------------------------
-
-#define storage_point_unset(x)                     do { \
-    (x).min = (x).max = (x).sum = NAN;                  \
-    (x).count = 0;                                      \
-    (x).anomaly_count = 0;                              \
-    (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time_s = 0;                               \
-    (x).end_time_s = 0;                                 \
-    } while(0)
-
-#define storage_point_empty(x, start_s, end_s)     do { \
-    (x).min = (x).max = (x).sum = NAN;                  \
-    (x).count = 1;                                      \
-    (x).anomaly_count = 0;                              \
-    (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time_s = start_s;                         \
-    (x).end_time_s = end_s;                             \
-    } while(0)
-
-#define STORAGE_POINT_UNSET { .min = NAN, .max = NAN, .sum = NAN, .count = 0, .anomaly_count = 0, .flags = SN_FLAG_NONE, .start_time_s = 0, .end_time_s = 0 }
-
-#define storage_point_is_unset(x) (!(x).count)
-#define storage_point_is_gap(x) (!netdata_double_isnumber((x).sum))
-
 // ------------------------------------------------------------------------
-// function pointers that handle data collection
-struct storage_engine_collect_ops {
-    // an initialization function to run before starting collection
-    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+// DATA COLLECTION STORAGE OPS
 
-    // run this to store each metric into the database
-    void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
-                         NETDATA_DOUBLE max_value, uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance, uuid_t *uuid) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
-    // run this to flush / reset the current data collection sequence
-    void (*flush)(STORAGE_COLLECT_HANDLE *collection_handle);
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metrics_group_get(db_instance, uuid);
+#endif
+    return rrddim_metrics_group_get(db_instance, uuid);
+}
 
-    // a finalization function to run after collection is over
-    // returns 1 if it's safe to delete the dimension
-    int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
+void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
-    void (*change_collection_frequency)(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_metrics_group_release(db_instance, smg);
+    else
+#endif
+        rrddim_metrics_group_release(db_instance, smg);
+}
 
-    STORAGE_METRICS_GROUP *(*metrics_group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-    void (*metrics_group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *sa);
-};
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_init(db_metric_handle, update_every, smg);
+#endif
+    return rrddim_collect_init(db_metric_handle, update_every, smg);
+}
+
+void rrdeng_store_metric_next(
+        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
+        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+
+void rrddim_collect_store_metric(
+        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
+        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+
+static inline void storage_engine_store_metric(
+        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
+        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags) {
+    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_next(collection_handle, point_in_time_ut,
+                                        n, min_value, max_value,
+                                        count, anomaly_count, flags);
+#endif
+    return rrddim_collect_store_metric(collection_handle, point_in_time_ut,
+                                       n, min_value, max_value,
+                                       count, anomaly_count, flags);
+}
+
+size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_max(db_instance);
+#endif
+
+    return 0;
+}
+
+size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_used(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
+}
+
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance);
+static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_global_first_time_s(db_instance);
+#endif
+
+    return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
+}
+
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
+static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_currently_collected_metrics(db_instance);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
+}
+
+void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
+void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
+static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
+    if(unlikely(!collection_handle))
+        return;
+
+    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_flush_current_page(collection_handle);
+    else
+#endif
+        rrddim_store_metric_flush(collection_handle);
+}
+
+int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+// a finalization function to run after collection is over
+// returns 1 if it's safe to delete the dimension
+static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
+    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_finalize(collection_handle);
+#endif
+
+    return rrddim_collect_finalize(collection_handle);
+}
+
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
+static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
+    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_change_collection_frequency(collection_handle, update_every);
+    else
+#endif
+        rrddim_store_metric_change_collection_frequency(collection_handle, update_every);
+}
+
 
 // ----------------------------------------------------------------------------
+// STORAGE ENGINE QUERY OPS
 
-// function pointers that handle database queries
-struct storage_engine_query_ops {
-    // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
+time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+time_t rrddim_query_oldest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle);
+static inline time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND backend  __maybe_unused, STORAGE_METRIC_HANDLE *db_metric_handle) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
-    // run this to load each metric number from the database
-    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metric_oldest_time(db_metric_handle);
+#endif
+    return rrddim_query_oldest_time_s(db_metric_handle);
+}
 
-    // run this to test if the series of next_metric() database queries is finished
-    int (*is_finished)(struct storage_engine_query_handle *handle);
+time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle);
+static inline time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_METRIC_HANDLE *db_metric_handle) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
-    // run this after finishing a series of load_metric() database queries
-    void (*finalize)(struct storage_engine_query_handle *handle);
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metric_latest_time(db_metric_handle);
+#endif
+    return rrddim_query_latest_time_s(db_metric_handle);
+}
 
-    // get the timestamp of the last entry of this metric
-    time_t (*latest_time_s)(STORAGE_METRIC_HANDLE *db_metric_handle);
+void rrdeng_load_metric_init(
+        STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle,
+                time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
-    // get the timestamp of the first entry of this metric
-    time_t (*oldest_time_s)(STORAGE_METRIC_HANDLE *db_metric_handle);
+void rrddim_query_init(
+        STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle,
+                time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
-    // adapt 'before' timestamp to the optimal for the query
-    // can only move 'before' ahead (to the future)
-    time_t (*align_to_optimal_before)(struct storage_engine_query_handle *handle);
-};
+static inline void storage_engine_query_init(
+        STORAGE_ENGINE_BACKEND backend __maybe_unused,
+        STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle,
+                time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority) {
+    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
-typedef struct storage_engine STORAGE_ENGINE;
+#ifdef ENABLE_DBENGINE
+    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_load_metric_init(db_metric_handle, handle, start_time_s, end_time_s, priority);
+    else
+#endif
+        rrddim_query_init(db_metric_handle, handle, start_time_s, end_time_s, priority);
+}
+
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
+STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handle);
+static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *handle) {
+    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_next(handle);
+#endif
+    return rrddim_query_next_metric(handle);
+}
+
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
+int rrddim_query_is_finished(struct storage_engine_query_handle *handle);
+static inline int storage_engine_query_is_finished(struct storage_engine_query_handle *handle) {
+    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_is_finished(handle);
+#endif
+    return rrddim_query_is_finished(handle);
+}
+
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
+void rrddim_query_finalize(struct storage_engine_query_handle *handle);
+static inline void storage_engine_query_finalize(struct storage_engine_query_handle *handle) {
+    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_load_metric_finalize(handle);
+    else
+#endif
+        rrddim_query_finalize(handle);
+}
+
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
+time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
+static inline time_t storage_engine_align_to_optimal_before(struct storage_engine_query_handle *handle) {
+    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_align_to_optimal_before(handle);
+#endif
+    return rrddim_query_align_to_optimal_before(handle);
+}
 
 // ------------------------------------------------------------------------
 // function pointers for all APIs provided by a storage engine
@@ -512,17 +648,14 @@ typedef struct storage_engine_api {
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
     bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *db_instance, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
-
-    // operations
-    struct storage_engine_collect_ops collect_ops;
-    struct storage_engine_query_ops query_ops;
 } STORAGE_ENGINE_API;
 
-struct storage_engine {
+typedef struct storage_engine {
+    STORAGE_ENGINE_BACKEND backend;
     RRD_MEMORY_MODE id;
     const char* name;
     STORAGE_ENGINE_API api;
-};
+} STORAGE_ENGINE;
 
 STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode);
 STORAGE_ENGINE* storage_engine_find(const char* name);
@@ -532,13 +665,6 @@ STORAGE_ENGINE* storage_engine_find(const char* name);
 
 #define rrddim_foreach_read(rd, st) \
     dfe_start_read((st)->rrddim_root_index, rd)
-
-#define rrddim_foreach_write(rd, st) \
-    dfe_start_write((st)->rrddim_root_index, rd)
-
-#define rrddim_foreach_reentrant(rd, st) \
-    dfe_start_reentrant((st)->rrddim_root_index, rd)
-
 #define rrddim_foreach_done(rd) \
     dfe_done(rd)
 
@@ -567,9 +693,7 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_HIDDEN                           = (1 << 12), // if set, do not show this chart on the dashboard, but use it for exporting
     RRDSET_FLAG_SYNC_CLOCK                       = (1 << 13), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
     RRDSET_FLAG_OBSOLETE_DIMENSIONS              = (1 << 14), // this is marked by the collector/module when a chart has obsolete dimensions
-                                                              // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
-                                                              // least rrdset_free_obsolete_time seconds ago.
-    RRDSET_FLAG_ARCHIVED                         = (1 << 15),
+
     RRDSET_FLAG_METADATA_UPDATE                  = (1 << 16), // Mark that metadata needs to be stored
     RRDSET_FLAG_ANOMALY_DETECTION                = (1 << 18), // flag to identify anomaly detection charts.
     RRDSET_FLAG_INDEXED_ID                       = (1 << 19), // the rrdset is indexed by its id
@@ -615,18 +739,15 @@ struct rrdset {
     STRING *plugin_name;                            // the name of the plugin that generated this
     STRING *module_name;                            // the name of the plugin module that generated this
 
-    RRDSET_TYPE chart_type;                         // line, area, stacked
+    int32_t priority;                               // the sorting priority of this chart
+    int32_t update_every;                           // data collection frequency
 
-    long priority;                                  // the sorting priority of this chart
-
-    int update_every;                               // data collection frequency
-
-    DICTIONARY *rrdlabels;                          // chart labels
+    RRDLABELS *rrdlabels;                           // chart labels
     DICTIONARY *rrdsetvar_root_index;               // chart variables
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
 
-    ml_chart_t *ml_chart;
+    RRDSET_TYPE chart_type;                         // line, area, stacked
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -635,6 +756,8 @@ struct rrdset {
     RRD_MEMORY_MODE rrd_memory_mode;                // the db mode of this rrdset
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
+
+    rrd_ml_chart_t *ml_chart;
 
     STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
 
@@ -651,11 +774,10 @@ struct rrdset {
 
     SPINLOCK data_collection_lock;
 
-    size_t counter;                                 // the number of times we added values to this database
-    size_t counter_done;                            // the number of times rrdset_done() has been called
+    uint32_t counter;                               // the number of times we added values to this database
+    uint32_t counter_done;                          // the number of times rrdset_done() has been called
 
     time_t last_accessed_time_s;                    // the last time this RRDSET has been accessed
-
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
     struct timeval last_updated;                    // when this data set was last updated (updated every time the rrd_stats_done() function)
@@ -675,18 +797,15 @@ struct rrdset {
     // TODO - they should be managed by storage engine
     //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
-    char *cache_dir;                                // the directory to store dimensions
-    void *st_on_file;                               // compatibility with V019 RRDSET files
+    struct {
+        char *cache_dir;                                // the directory to store dimensions
+        void *st_on_file;                               // compatibility with V019 RRDSET files
 
-    // ------------------------------------------------------------------------
-    // db mode RAM, SAVE, MAP, ALLOC, NONE specifics
-    // TODO - they should be managed by storage engine
-    //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
+        int32_t entries;                                // total number of entries in the data set
 
-    long entries;                                   // total number of entries in the data set
-
-    long current_entry;                             // the entry that is currently being updated
-                                                    // it goes around in a round-robin fashion
+        int32_t current_entry;                          // the entry that is currently being updated
+        // it goes around in a round-robin fashion
+    } db;
 
     // ------------------------------------------------------------------------
     // exporting to 3rd party time-series members
@@ -707,14 +826,16 @@ struct rrdset {
     const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
 
     struct {
-        netdata_rwlock_t rwlock;                    // protection for RRDCALC *base
+        RW_SPINLOCK spinlock;                       // protection for RRDCALC *base
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
 
     struct {
-        size_t pos;
-        size_t size;
-        size_t used;
+        SPINLOCK spinlock; // used only for cleanup
+        pid_t collector_tid;
+        bool set;
+        uint32_t pos;
+        uint32_t size;
         RRDDIM_ACQUIRED **rda;
     } pluginsd;
 
@@ -773,35 +894,42 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE m
 // and may lead to missing information.
 
 typedef enum __attribute__ ((__packed__)) rrdhost_flags {
+
+    // Careful not to overlap with rrdhost_options to avoid bugs if
+    // rrdhost_flags_xxx is used instead of rrdhost_option_xxx or vice-versa
     // Orphan, Archived and Obsolete flags
-    RRDHOST_FLAG_ORPHAN                         = (1 << 10), // this host is orphan (not receiving data)
-    RRDHOST_FLAG_ARCHIVED                       = (1 << 11), // The host is archived, no collected charts yet
-    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 12), // the host has pending chart obsoletions
-    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 13), // the host has pending dimension obsoletions
+    RRDHOST_FLAG_ORPHAN                         = (1 << 8), // this host is orphan (not receiving data)
+    RRDHOST_FLAG_ARCHIVED                       = (1 << 9), // The host is archived, no collected charts yet
+    RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 10), // the host has pending chart obsoletions
+    RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 11), // the host has pending dimension obsoletions
 
     // Streaming sender
-    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 14), // the host has initialized rrdpush structures
-    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 15), // When set, the sender thread is running
-    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 16), // When set, the host is connected to a parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 17), // when set, rrdset_done() should push metrics to parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 18), // when set, we have logged the status of metrics streaming
+    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 12), // the host has initialized rrdpush structures
+    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 13), // When set, the sender thread is running
+    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 14), // When set, the host is connected to a parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 15), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 16), // when set, we have logged the status of metrics streaming
 
     // Health
-    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 20), // contains charts and dims with uninitialized variables
-    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 21), // the host has initialized health structures
+    RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 17), // contains charts and dims with uninitialized variables
+    RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 18), // the host has initialized health structures
 
     // Exporting
-    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 22), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 23), // don't send it to external databases
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 19), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 20), // don't send it to external databases
 
     // ACLK
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
-    // Metadata
-    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_LABELS                = (1 << 26), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_INFO                  = (1 << 27), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // set when the receiver part is disconnected
 
+    // Metadata
+    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_INFO                  = (1 << 25), // metadata needs to be stored in the database
+    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // metadata needs to be stored in the database
+    RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS       = (1 << 27), // metadata needs to be stored in the database
+
+    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
     RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 29), // set when the receiver part is disconnected
 } RRDHOST_FLAGS;
 
@@ -829,6 +957,8 @@ typedef enum __attribute__ ((__packed__)) {
     RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
 
     RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
+
+    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 6), // when set, this host is a virtual one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -846,7 +976,9 @@ struct alarm_entry {
     uint32_t unique_id;
     uint32_t alarm_id;
     uint32_t alarm_event_id;
+    usec_t global_id;
     uuid_t config_hash_id;
+    uuid_t transition_id;
 
     time_t when;
     time_t duration;
@@ -855,6 +987,7 @@ struct alarm_entry {
     STRING *name;
     STRING *chart;
     STRING *chart_context;
+    STRING *chart_name;
     STRING *family;
 
     STRING *classification;
@@ -896,12 +1029,11 @@ struct alarm_entry {
 };
 
 #define ae_name(ae) string2str((ae)->name)
-#define ae_chart_name(ae) string2str((ae)->chart)
+#define ae_chart_id(ae) string2str((ae)->chart)
+#define ae_chart_name(ae) string2str((ae)->chart_name)
 #define ae_chart_context(ae) string2str((ae)->chart_context)
 #define ae_family(ae) string2str((ae)->family)
 #define ae_classification(ae) string2str((ae)->classification)
-#define ae_component(ae) string2str((ae)->component)
-#define ae_type(ae) string2str((ae)->type)
 #define ae_exec(ae) string2str((ae)->exec)
 #define ae_recipient(ae) string2str((ae)->recipient)
 #define ae_source(ae) string2str((ae)->source)
@@ -915,18 +1047,19 @@ typedef struct alarm_log {
     uint32_t next_alarm_id;
     unsigned int count;
     unsigned int max;
+    uint32_t health_log_history;                   // the health log history in seconds to be kept in db
     ALARM_ENTRY *alarms;
-    netdata_rwlock_t alarm_log_rwlock;
+    RW_SPINLOCK spinlock;
 } ALARM_LOG;
 
 typedef struct health {
-    unsigned int health_enabled;                   // 1 when this host has health enabled
     time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
     STRING *health_default_exec;                   // the full path of the alarms notifications program
     STRING *health_default_recipient;              // the default recipient for all alarms
-    size_t health_log_entries_written;             // the number of alarm events written to the alarms event log
+    int health_log_entries_written;                // the number of alarm events written to the alarms event log
     uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
     uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
+    unsigned int health_enabled;                   // 1 when this host has health enabled
 } HEALTH;
 
 // ----------------------------------------------------------------------------
@@ -970,7 +1103,7 @@ struct rrdhost_system_info {
     int mc_version;
 };
 
-struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels);
+struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels);
 
 struct rrdhost {
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
@@ -993,8 +1126,8 @@ struct rrdhost {
     RRDHOST_FLAGS flags;                            // runtime flags about this RRDHOST (atomics on this)
     RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
-    int rrd_update_every;                           // the update frequency of the host
-    long rrd_history_entries;                       // the number of history entries for the host's charts
+    int32_t rrd_update_every;                       // the update frequency of the host
+    int32_t rrd_history_entries;                    // the number of history entries for the host's charts
 
     RRD_MEMORY_MODE rrd_memory_mode;                // the configured memory more for the charts of this host
                                                     // the actual per tier is at .db[tier].mode
@@ -1005,7 +1138,7 @@ struct rrdhost {
         RRD_MEMORY_MODE mode;                       // the db mode for this tier
         STORAGE_ENGINE *eng;                        // the storage engine API for this tier
         STORAGE_INSTANCE *instance;                 // the db instance for this tier
-        size_t tier_grouping;                       // tier 0 iterations aggregated on this tier
+        uint32_t tier_grouping;                     // tier 0 iterations aggregated on this tier
     } db[RRD_STORAGE_TIERS];
 
     struct rrdhost_system_info *system_info;        // information collected from the host environment
@@ -1019,16 +1152,21 @@ struct rrdhost {
     struct rrdpush_destinations *destination;       // the current destination from the above list
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
+    int32_t rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step
     size_t rrdpush_receiver_replicating_charts;     // the number of charts currently being replicated from a child
+    NETDATA_DOUBLE rrdpush_receiver_replication_percent; // the % of replication completion
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
-    void *dbsync_worker;
+    void *aclk_sync_host_config;
+
+    uint32_t rrdpush_receiver_connection_counter;   // the number of times this receiver has connected
+    uint32_t rrdpush_sender_connection_counter;     // the number of times this sender has connected
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
@@ -1059,6 +1197,7 @@ struct rrdhost {
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
+    size_t health_transitions;                      // the number of times an alert changed state
 
     // ------------------------------------------------------------------------
     // locks
@@ -1067,11 +1206,11 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // ML handle
-    ml_host_t *ml_host;
+    rrd_ml_host_t *ml_host;
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
-    DICTIONARY *rrdlabels;
+    RRDLABELS *rrdlabels;
 
     // ------------------------------------------------------------------------
     // Support for functions
@@ -1091,7 +1230,15 @@ struct rrdhost {
         DICTIONARY *contexts;
         DICTIONARY *hub_queue;
         DICTIONARY *pp_queue;
+        uint32_t metrics;
+        uint32_t instances;
     } rrdctx;
+
+    struct {
+        SPINLOCK spinlock;
+        time_t first_time_s;
+        time_t last_time_s;
+    } retention;
 
     uuid_t  host_uuid;                              // Global GUID for this host
     uuid_t  *node_id;                               // Cloud node_id
@@ -1126,8 +1273,15 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
 
+#define rrdhost_is_online(host) ((host) == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
+bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
+
 extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
+
+RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid);
+RRDHOST *rrdhost_acquired_to_rrdhost(RRDHOST_ACQUIRED *rha);
+void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
 
 // ----------------------------------------------------------------------------
 
@@ -1164,6 +1318,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
+RRDHOST *find_host_by_node_id(char *node_id);
 
 RRDHOST *rrdhost_find_or_create(
         const char *hostname
@@ -1236,13 +1391,16 @@ void rrdset_update_heterogeneous_flag(RRDSET *st);
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s);
 
 RRDSET *rrdset_find(RRDHOST *host, const char *id);
+
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
+RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
+
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
 /* This will not return charts that are archived */
 static inline RRDSET *rrdset_find_active_localhost(const char *id)
 {
     RRDSET *st = rrdset_find_localhost(id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
     return st;
 }
 
@@ -1252,8 +1410,6 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
 static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id)
 {
     RRDSET *st = rrdset_find_bytype_localhost(type, id);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
     return st;
 }
 
@@ -1263,8 +1419,6 @@ RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
 static inline RRDSET *rrdset_find_active_byname_localhost(const char *name)
 {
     RRDSET *st = rrdset_find_byname_localhost(name);
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)))
-        return NULL;
     return st;
 }
 
@@ -1280,9 +1434,8 @@ void rrdset_is_obsolete(RRDSET *st);
 void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
-#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st))
-#define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st))
+#define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && rrdset_number_of_dimensions(st) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
+#define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && rrdset_number_of_dimensions(st))
 
 time_t rrddim_first_entry_s(RRDDIM *rd);
 time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier);
@@ -1295,6 +1448,8 @@ time_t rrdset_last_entry_s(RRDSET *st);
 time_t rrdset_last_entry_s_of_tier(RRDSET *st, size_t tier);
 
 void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_s, time_t *last_time_s, time_t now_s, size_t tier);
+
+void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
@@ -1313,8 +1468,8 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 
 int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name);
 int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
-int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
-int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
+int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier);
+int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor);
 
 RRDDIM *rrddim_find(RRDSET *st, const char *id);
 RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id);
@@ -1350,6 +1505,8 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 // Miscellaneous functions
 
 char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
+void reload_host_labels(void);
+void rrdhost_set_is_parent_label(void);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions
@@ -1358,12 +1515,12 @@ void rrdset_delete_files(RRDSET *st);
 void rrdset_save(RRDSET *st);
 void rrdset_free(RRDSET *st);
 
+void rrddim_free(RRDSET *st, RRDDIM *rd);
+
 #ifdef NETDATA_RRD_INTERNALS
 
 char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id);
 const char *rrdset_cache_dir(RRDSET *st);
-
-void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 void rrdset_reset(RRDSET *st);
 void rrdset_delete_obsolete_dimensions(RRDSET *st);
@@ -1377,6 +1534,20 @@ void set_host_properties(
 
 size_t get_tier_grouping(size_t tier);
 void store_metric_collection_completed(void);
+
+static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
+    time_t first_time_s = 0, last_time_s = 0;
+    spinlock_lock(&host->retention.spinlock);
+    first_time_s = host->retention.first_time_s;
+    last_time_s = host->retention.last_time_s;
+    spinlock_unlock(&host->retention.spinlock);
+
+    if(from)
+        *from = first_time_s;
+
+    if(to)
+        *to = online ? now : last_time_s;
+}
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

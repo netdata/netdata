@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Apps"
 -->
 
-# Tor monitoring with Netdata
+# Tor collector
 
 Connects to the Tor control port to collect traffic statistics.
 

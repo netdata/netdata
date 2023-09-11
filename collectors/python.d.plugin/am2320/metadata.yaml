@@ -1,0 +1,135 @@
+plugin_name: python.d.plugin
+modules:
+  - meta:
+      plugin_name: python.d.plugin
+      module_name: am2320
+      monitored_instance:
+        name: AM2320
+        link: 'https://learn.adafruit.com/adafruit-am2320-temperature-humidity-i2c-sensor/overview'
+        categories:
+          - data-collection.hardware-devices-and-sensors
+        icon_filename: 'microchip.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - temperature
+        - am2320
+        - sensor
+        - humidity
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: 'This collector monitors AM2320 sensor metrics about temperature and humidity.'
+        method_description: 'It retrieves temperature and humidity values by contacting an AM2320 sensor over i2c.'
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ''
+      default_behavior:
+        auto_detection:
+          description: 'Assuming prerequisites are met, the collector will try to connect to the sensor via i2c'
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list:
+          - title: 'Sensor connection to a Raspberry Pi'
+            description: |
+              Connect the am2320 to the Raspberry Pi I2C pins
+              
+              Raspberry Pi 3B/4 Pins:
+              
+              - Board 3.3V (pin 1) to sensor VIN (pin 1)
+              - Board SDA (pin 3) to sensor SDA (pin 2)
+              - Board GND (pin 6) to sensor GND (pin 3)
+              - Board SCL (pin 5) to sensor SCL (pin 4)
+              
+              You may also need to add two I2C pullup resistors if your board does not already have them. The Raspberry Pi does have internal pullup resistors but it doesn't hurt to add them anyway. You can use 2.2K - 10K but we will just use 10K. The resistors go from VDD to SCL and SDA each.
+          - title: 'Software requirements'
+            description: |
+              Install the Adafruit Circuit Python AM2320 library:
+              
+              `sudo pip3 install adafruit-circuitpython-am2320`
+      configuration:
+        file:
+          name: python.d/am2320.conf
+        options:
+          description: |
+            There are 2 sections:
+            
+            * Global variables
+            * One or more JOBS that can define multiple different instances to monitor.
+            
+            The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+            
+            Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+            
+            Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update_every
+              description: Sets the default data collection frequency.
+              default_value: 5
+              required: false
+            - name: priority
+              description: Controls the order of charts at the netdata dashboard.
+              default_value: 60000
+              required: false
+            - name: autodetection_retry
+              description: Sets the job re-check interval in seconds.
+              default_value: 0
+              required: false
+            - name: penalty
+              description: Indicates whether to apply penalty to update_every in case of failures.
+              default_value: yes
+              required: false
+            - name: name
+              description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
+              default_value: ''
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: "Config"
+          list:
+            - name: Local sensor
+              description: A basic JOB configuration
+              config: |
+                local_sensor:
+                  name: 'Local AM2320'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: am2320.temperature
+              description: Temperature
+              unit: "celsius"
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: am2320.humidity
+              description: Relative Humidity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: humidity

@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
-# Postfix monitoring with Netdata
+# Postfix collector
 
 Monitors MTA email queue statistics using [postqueue](http://www.postfix.org/postqueue.1.html) tool.
 

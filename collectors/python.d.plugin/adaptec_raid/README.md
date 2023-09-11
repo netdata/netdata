@@ -7,7 +7,7 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/Hardware"
 -->
 
-# Adaptec RAID controller monitoring with Netdata
+# Adaptec RAID controller collector
 
 Collects logical and physical devices metrics using `arcconf` command-line utility.
 

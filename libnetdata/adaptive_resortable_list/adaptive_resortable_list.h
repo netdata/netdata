@@ -94,7 +94,7 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely((base->fast + base->slow) % (base->expected + base->allocated) == 0 && (base->fast + base->slow) > (base->expected + base->allocated) * base->iteration))
-        info("ARL '%s': Did you forget to call arl_begin()?", base->name);
+        netdata_log_info("ARL '%s': Did you forget to call arl_begin()?", base->name);
 #endif
 
     // it should be the first entry (pointed by base->next_keyword)

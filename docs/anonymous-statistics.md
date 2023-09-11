@@ -8,8 +8,8 @@ learn_rel_path: "Configuration"
 
 # Anonymous telemetry events
 
-By default, Netdata collects anonymous usage information from the open-source monitoring agent using the open-source
-product analytics platform [PostHog](https://github.com/PostHog/posthog). We use their [cloud enterprise platform](https://posthog.com/product).
+By default, Netdata collects anonymous usage information from the open-source monitoring agent. For agent events like start,stop,crash etc we use our own cloud function in GCP. For frontend telemetry (pageviews etc.) on the agent dashboard itself we use the open-source
+product analytics platform [PostHog](https://github.com/PostHog/posthog).
 
 We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
 
@@ -23,7 +23,7 @@ We use the statistics gathered from this information for two purposes:
 
 Netdata collects usage information via two different channels:
 
--   **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
+-   **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
 -   **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
 
 You can opt-out from sending anonymous statistics to Netdata through three different [opt-out mechanisms](#opt-out).
@@ -52,7 +52,7 @@ variable is controlled via the [opt-out mechanism](#opt-out).
 ## Agent Backend - Anonymous Statistics Script
 
 Every time the daemon is started or stopped and every time a fatal condition is encountered, Netdata uses the anonymous
-statistics script to collect system information and send it to the Netdata PostHog via an http call. The information collected for all
+statistics script to collect system information and send it to the Netdata telemetry cloud function via an http call. The information collected for all
 events is:
 
 -   Netdata version

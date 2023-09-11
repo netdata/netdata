@@ -1,14 +1,6 @@
-<!--
-title: "How to build native (DEB/RPM) packages locally for testing"
-sidebar_label: "How to build native (DEB/RPM) packages locally for testing"
-description: Instructions for developers who need to build native packages locally for testing.
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/building-native-packages-locally.md
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Installation/Package maintainers"
--->
+# Build native (DEB/RPM) packages for testing
 
-# How to build native (DEB/RPM) packages locally for testing
+This document provides instructions for developers who need to build native packages locally for testing.
 
 ## Requirements
 

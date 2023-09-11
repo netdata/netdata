@@ -41,12 +41,42 @@ static struct {
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
-        , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
         , {"details"           , 0    , RRDR_OPTION_SHOW_DETAILS}
         , {"debug"             , 0    , RRDR_OPTION_DEBUG}
+        , {"plan"              , 0    , RRDR_OPTION_DEBUG}
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
-        , {"annotations"       , 0    , RRDR_OPTION_JW_ANNOTATIONS}
+        , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
+        , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
         , {NULL                , 0    , 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    CONTEXTS_V2_OPTIONS value;
+} contexts_v2_options[] = {
+          {"minify"           , 0    , CONTEXT_V2_OPTION_MINIFY}
+        , {"debug"            , 0    , CONTEXT_V2_OPTION_DEBUG}
+        , {"config"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_CONFIGURATIONS}
+        , {"instances"        , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES}
+        , {"values"           , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_VALUES}
+        , {"summary"          , 0    , CONTEXT_V2_OPTION_ALERTS_WITH_SUMMARY}
+        , {NULL               , 0    , 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    CONTEXTS_V2_ALERT_STATUS value;
+} contexts_v2_alert_status[] = {
+          {"uninitialized"    , 0    , CONTEXT_V2_ALERT_UNINITIALIZED}
+        , {"undefined"        , 0    , CONTEXT_V2_ALERT_UNDEFINED}
+        , {"clear"            , 0    , CONTEXT_V2_ALERT_CLEAR}
+        , {"raised"           , 0    , CONTEXT_V2_ALERT_RAISED}
+        , {"active"           , 0    , CONTEXT_V2_ALERT_RAISED}
+        , {"warning"          , 0    , CONTEXT_V2_ALERT_WARNING}
+        , {"critical"         , 0    , CONTEXT_V2_ALERT_CRITICAL}
+        , {NULL               , 0    , 0}
 };
 
 static struct {
@@ -57,6 +87,7 @@ static struct {
         {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
         , {DATASOURCE_FORMAT_DATATABLE_JSONP, 0 , DATASOURCE_DATATABLE_JSONP}
         , {DATASOURCE_FORMAT_JSON           , 0 , DATASOURCE_JSON}
+        , {DATASOURCE_FORMAT_JSON2          , 0 , DATASOURCE_JSON2}
         , {DATASOURCE_FORMAT_JSONP          , 0 , DATASOURCE_JSONP}
         , {DATASOURCE_FORMAT_SSV            , 0 , DATASOURCE_SSV}
         , {DATASOURCE_FORMAT_CSV            , 0 , DATASOURCE_CSV}
@@ -67,7 +98,9 @@ static struct {
         , {DATASOURCE_FORMAT_SSV_COMMA      , 0 , DATASOURCE_SSV_COMMA}
         , {DATASOURCE_FORMAT_CSV_JSON_ARRAY , 0 , DATASOURCE_CSV_JSON_ARRAY}
         , {DATASOURCE_FORMAT_CSV_MARKDOWN   , 0 , DATASOURCE_CSV_MARKDOWN}
-        , {                                 NULL, 0, 0}
+
+        // terminator
+        , {NULL, 0, 0}
 };
 
 static struct {
@@ -87,8 +120,14 @@ static struct {
 void web_client_api_v1_init(void) {
     int i;
 
+    for(i = 0; contexts_v2_alert_status[i].name ; i++)
+        contexts_v2_alert_status[i].hash = simple_hash(contexts_v2_alert_status[i].name);
+
     for(i = 0; api_v1_data_options[i].name ; i++)
         api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
+
+    for(i = 0; contexts_v2_options[i].name ; i++)
+        contexts_v2_options[i].hash = simple_hash(contexts_v2_options[i].name);
 
     for(i = 0; api_v1_data_formats[i].name ; i++)
         api_v1_data_formats[i].hash = simple_hash(api_v1_data_formats[i].name);
@@ -122,11 +161,11 @@ char *get_mgmt_api_key(void) {
     if(fd != -1) {
         char buf[GUID_LEN + 1];
         if(read(fd, buf, GUID_LEN) != GUID_LEN)
-            error("Failed to read management API key from '%s'", api_key_filename);
+            netdata_log_error("Failed to read management API key from '%s'", api_key_filename);
         else {
             buf[GUID_LEN] = '\0';
             if(regenerate_guid(buf, guid) == -1) {
-                error("Failed to validate management API key '%s' from '%s'.",
+                netdata_log_error("Failed to validate management API key '%s' from '%s'.",
                       buf, api_key_filename);
 
                 guid[0] = '\0';
@@ -146,12 +185,12 @@ char *get_mgmt_api_key(void) {
         // save it
         fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
         if(fd == -1) {
-            error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
+            netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
             goto temp_key;
         }
 
         if(write(fd, guid, GUID_LEN) != GUID_LEN) {
-            error("Cannot write the unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file with enough space left.", api_key_filename);
+            netdata_log_error("Cannot write the unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file with enough space left.", api_key_filename);
             close(fd);
             goto temp_key;
         }
@@ -162,7 +201,7 @@ char *get_mgmt_api_key(void) {
     return guid;
 
 temp_key:
-    info("You can still continue to use the alarm management API using the authorization token %s during this Netdata session only.", guid);
+    netdata_log_info("You can still continue to use the alarm management API using the authorization token %s during this Netdata session only.", guid);
     return guid;
 }
 
@@ -171,10 +210,10 @@ void web_client_api_v1_management_init(void) {
 }
 
 inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
-    RRDR_OPTIONS ret = 0x00000000;
+    RRDR_OPTIONS ret = 0;
     char *tok;
 
-    while(o && *o && (tok = mystrsep(&o, ", |"))) {
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
         if(!*tok) continue;
 
         uint32_t hash = simple_hash(tok);
@@ -188,6 +227,78 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
     }
 
     return ret;
+}
+
+inline CONTEXTS_V2_OPTIONS web_client_api_request_v2_context_options(char *o) {
+    CONTEXTS_V2_OPTIONS ret = 0;
+    char *tok;
+
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
+        if(!*tok) continue;
+
+        uint32_t hash = simple_hash(tok);
+        int i;
+        for(i = 0; contexts_v2_options[i].name ; i++) {
+            if (unlikely(hash == contexts_v2_options[i].hash && !strcmp(tok, contexts_v2_options[i].name))) {
+                ret |= contexts_v2_options[i].value;
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
+
+inline CONTEXTS_V2_ALERT_STATUS web_client_api_request_v2_alert_status(char *o) {
+    CONTEXTS_V2_ALERT_STATUS ret = 0;
+    char *tok;
+
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
+        if(!*tok) continue;
+
+        uint32_t hash = simple_hash(tok);
+        int i;
+        for(i = 0; contexts_v2_alert_status[i].name ; i++) {
+            if (unlikely(hash == contexts_v2_alert_status[i].hash && !strcmp(tok, contexts_v2_alert_status[i].name))) {
+                ret |= contexts_v2_alert_status[i].value;
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
+
+void web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_ALERT_STATUS options) {
+    buffer_json_member_add_array(wb, key);
+
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; contexts_v2_alert_status[i].name ; i++) {
+        if (unlikely((contexts_v2_alert_status[i].value & options) && !(contexts_v2_alert_status[i].value & used))) {
+            const char *name = contexts_v2_alert_status[i].name;
+            used |= contexts_v2_alert_status[i].value;
+
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+
+    buffer_json_array_close(wb);
+}
+
+void web_client_api_request_v2_contexts_options_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_OPTIONS options) {
+    buffer_json_member_add_array(wb, key);
+
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; contexts_v2_options[i].name ; i++) {
+        if (unlikely((contexts_v2_options[i].value & options) && !(contexts_v2_options[i].value & used))) {
+            const char *name = contexts_v2_options[i].name;
+            used |= contexts_v2_options[i].value;
+
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+
+    buffer_json_array_close(wb);
 }
 
 void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
@@ -229,7 +340,7 @@ void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RR
     *write = *end = '\0';
 }
 
-inline DATASOURCE_FORMAT web_client_api_request_v1_data_format(char *name) {
+inline uint32_t web_client_api_request_v1_data_format(char *name) {
     uint32_t hash = simple_hash(name);
     int i;
 
@@ -258,11 +369,11 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 int web_client_api_request_v1_alarms_select (char *url) {
     int all = 0;
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        if(!strcmp(value, "all")) all = 1;
-        else if(!strcmp(value, "active")) all = 0;
+        if(!strcmp(value, "all") || !strcmp(value, "all=true")) all = 1;
+        else if(!strcmp(value, "active") || !strcmp(value, "active=true")) all = 0;
     }
 
     return all;
@@ -296,14 +407,14 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     buffer_sprintf(w->response.data, "[");
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
 
         char* p = value;
         if(!strcmp(name, "status")) {
@@ -337,10 +448,10 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     char *chart = NULL;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -350,7 +461,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    health_alarm_log2json(host, w->response.data, after, chart);
+    sql_health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
 
@@ -361,10 +472,10 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -415,10 +526,10 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -479,10 +590,10 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
@@ -533,7 +644,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 0);
+    charts2json(host, w->response.data, 0);
     return HTTP_RESP_OK;
 }
 
@@ -543,7 +654,7 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
 
 // returns the HTTP code
 static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
-    debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = HTTP_RESP_BAD_REQUEST;
     BUFFER *dimensions = NULL;
@@ -575,14 +686,14 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
     RRDR_OPTIONS options = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if(!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
         // name and value are now the parameters
         // they are not null and not empty
@@ -624,10 +735,10 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             char *tqx_name, *tqx_value;
 
             while(value) {
-                tqx_value = mystrsep(&value, ";");
+                tqx_value = strsep_skip_consecutive_separators(&value, ";");
                 if(!tqx_value || !*tqx_value) continue;
 
-                tqx_name = mystrsep(&tqx_value, ":");
+                tqx_name = strsep_skip_consecutive_separators(&tqx_value, ":");
                 if(!tqx_name || !*tqx_name) continue;
                 if(!tqx_value || !*tqx_value) continue;
 
@@ -697,7 +808,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .contexts = context,
             .instances = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
-            .timeout = timeout,
+            .timeout_ms = timeout,
             .points = points,
             .format = format,
             .options = options,
@@ -709,6 +820,8 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .labels = chart_labels_filter,
             .query_source = QUERY_SOURCE_API_DATA,
             .priority = STORAGE_PRIORITY_NORMAL,
+            .interrupt_callback = web_client_interrupt_callback,
+            .interrupt_callback_data = w,
     };
     qt = query_target_create(&qtr);
 
@@ -718,29 +831,22 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         goto cleanup;
     }
 
-    if (timeout) {
-        struct timeval now;
-        now_realtime_timeval(&now);
-        int inqueue = (int)dt_usec(&w->tv_in, &now) / 1000;
-        timeout -= inqueue;
-        if (timeout <= 0) {
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Query timeout exceeded");
-            ret = HTTP_RESP_BACKEND_FETCH_FAILED;
-            goto cleanup;
-        }
+    web_client_timeout_checkpoint_set(w, timeout);
+    if(web_client_timeout_checkpoint_and_check(w, NULL)) {
+        ret = w->response.code;
+        goto cleanup;
     }
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
-        debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
     }
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(responseHandler == NULL)
             responseHandler = "google.visualization.Query.setResponse";
 
-        debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
                 w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
         );
 
@@ -777,6 +883,11 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
     else if(format == DATASOURCE_JSONP)
         buffer_strcat(w->response.data, ");");
 
+    if(qt->internal.relative)
+        buffer_no_cacheable(w->response.data);
+    else
+        buffer_cacheable(w->response.data);
+
 cleanup:
     query_target_release(qt);
     onewayalloc_destroy(owa);
@@ -794,7 +905,7 @@ cleanup:
 // /api/v1/registry?action=delete&machine=${machine_guid}&name=${hostname}&url=${url}&delete_url=${delete_url}
 //
 // Search for the URLs of a machine:
-// /api/v1/registry?action=search&machine=${machine_guid}&name=${hostname}&url=${url}&for=${machine_guid}
+// /api/v1/registry?action=search&for=${machine_guid}
 //
 // Impersonate:
 // /api/v1/registry?action=switch&machine=${machine_guid}&name=${hostname}&url=${url}&to=${new_person_guid}
@@ -821,16 +932,17 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 */
     }
 
-    char person_guid[GUID_LEN + 1] = "";
-
-    debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
+    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
     // TODO
     // The browser may send multiple cookies with our id
 
+    char person_guid[UUID_STR_LEN] = "";
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie)
-        strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], 36);
+        strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
+    else if(extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)) != BEARER_STATUS_EXTRACTED_FROM_HEADER)
+        person_guid[0] = '\0';
 
     char action = '\0';
     char *machine_guid = NULL,
@@ -847,14 +959,14 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     buffer_no_cacheable(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name) continue;
         if (!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
 
         uint32_t hash = simple_hash(name);
 
@@ -867,7 +979,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
             else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
 #ifdef NETDATA_INTERNAL_CHECKS
-            else error("unknown registry action '%s'", value);
+            else netdata_log_error("unknown registry action '%s'", value);
 #endif /* NETDATA_INTERNAL_CHECKS */
         }
 /*
@@ -897,7 +1009,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
                 to_person_guid = value;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
-        else error("unused registry URL parameter '%s' with value '%s'", name, value);
+        else netdata_log_error("unused registry URL parameter '%s' with value '%s'", name, value);
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
@@ -919,10 +1031,12 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return web_client_permission_denied(w);
     }
 
+    buffer_no_cacheable(w->response.data);
+
     switch(action) {
         case 'A':
             if(unlikely(!machine_guid || !machine_url || !url_name)) {
-                error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
+                netdata_log_error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Access request.");
                 return HTTP_RESP_BAD_REQUEST;
@@ -933,7 +1047,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
         case 'D':
             if(unlikely(!machine_guid || !machine_url || !delete_url)) {
-                error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
+                netdata_log_error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Delete request.");
                 return HTTP_RESP_BAD_REQUEST;
@@ -943,19 +1057,19 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
-            if(unlikely(!machine_guid || !machine_url || !search_machine_guid)) {
-                error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
+            if(unlikely(!search_machine_guid)) {
+                netdata_log_error("Invalid registry request - search requires these parameters: for ('%s')", search_machine_guid?search_machine_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
                 return HTTP_RESP_BAD_REQUEST;
             }
 
             web_client_enable_tracking_required(w);
-            return registry_request_search_json(host, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
+            return registry_request_search_json(host, w, person_guid, search_machine_guid);
 
         case 'W':
             if(unlikely(!machine_guid || !machine_url || !to_person_guid)) {
-                error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
+                netdata_log_error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Switch request.");
                 return HTTP_RESP_BAD_REQUEST;
@@ -974,8 +1088,8 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "alarms");
+void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
 
     size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
@@ -1045,8 +1159,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
-static inline void host_labels2json(RRDHOST *host, BUFFER *wb) {
-    buffer_json_member_add_object(wb, "host_labels");
+void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {
+    buffer_json_member_add_object(wb, key);
     rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
     buffer_json_object_close(wb);
 }
@@ -1085,7 +1199,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
 
 extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
     buffer_json_member_add_string(wb, "uid", host->machine_guid);
@@ -1093,7 +1207,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_uint64(wb, "hosts-available", rrdhost_hosts_available());
     web_client_api_request_v1_info_mirrored_hosts(wb);
 
-    web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
+    web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
     buffer_json_member_add_string_or_empty(wb, "os_name", host->system_info->host_os_name);
     buffer_json_member_add_string_or_empty(wb, "os_id", host->system_info->host_os_id);
@@ -1126,16 +1240,11 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_type", host->system_info->cloud_instance_type);
     buffer_json_member_add_string_or_omit(wb, "cloud_instance_region", host->system_info->cloud_instance_region);
 
-    host_labels2json(host, wb);
+    host_labels2json(host, wb, "host_labels");
     host_functions2json(host, wb);
     host_collectors(host, wb);
 
-#ifdef DISABLE_CLOUD
-    buffer_json_member_add_boolean(wb, "cloud-enabled", false);
-#else
-    buffer_json_member_add_boolean(wb, "cloud-enabled",
-                   appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", true));
-#endif
+    buffer_json_member_add_boolean(wb, "cloud-enabled", netdata_cloud_enabled);
 
 #ifdef ENABLE_ACLK
     buffer_json_member_add_boolean(wb, "cloud-available", true);
@@ -1161,12 +1270,12 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
-#ifdef  ENABLE_COMPRESSION
+#ifdef  ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression",
                                    host->sender && stream_has_capability(host->sender, STREAM_CAP_COMPRESSION));
-#else
+#else // ! ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression", false);
-#endif  //ENABLE_COMPRESSION
+#endif  // ENABLE_RRDPUSH_COMPRESSION
 
 #ifdef ENABLE_HTTPS
     buffer_json_member_add_boolean(wb, "https-enabled", true);
@@ -1191,7 +1300,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #if defined(ENABLE_ML)
     buffer_json_member_add_object(wb, "ml-info");
-    ml_get_host_info(host, wb);
+    ml_host_get_info(host, wb);
     buffer_json_object_close(wb);
 #endif
 
@@ -1204,19 +1313,18 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     (void) url;
 
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    char *s = ml_get_host_runtime_info(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    ml_host_get_detection_info(host, wb);
+    buffer_json_finalize(wb);
+
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
 
@@ -1224,26 +1332,21 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
     (void) url;
 
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    char *s = ml_get_host_models(host);
-    if (!s)
-        s = strdupz("{\"error\": \"json string is empty\" }\n");
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_strcat(wb, s);
+    ml_host_get_models(host, wb);
     buffer_no_cacheable(wb);
 
-    freez(s);
     return HTTP_RESP_OK;
 }
-#endif
+#endif // ENABLE_ML
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -1257,7 +1360,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(url);
     UNUSED(host);
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1271,105 +1374,29 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     return HTTP_RESP_OK;
 }
 
-static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format) {
-    if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
-
-    long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
-    RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
-    int options_count = 0;
-    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
-    int timeout = 0;
-    size_t tier = 0;
-    const char *group_options = NULL, *contexts_str = NULL;
-
-    while (url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value)
-            continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name)
-            continue;
-        if (!value || !*value)
-            continue;
-
-        if (!strcmp(name, "baseline_after"))
-            baseline_after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "baseline_before"))
-            baseline_before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "after") || !strcmp(name, "highlight_after"))
-            after = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "before") || !strcmp(name, "highlight_before"))
-            before = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "points") || !strcmp(name, "max_points"))
-            points = (long long) strtoul(value, NULL, 0);
-
-        else if (!strcmp(name, "timeout"))
-            timeout = (int) strtoul(value, NULL, 0);
-
-        else if(!strcmp(name, "group"))
-            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
-
-        else if(!strcmp(name, "options")) {
-            if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
-            options |= web_client_api_request_v1_data_options(value);
-            options_count++;
-        }
-
-        else if(!strcmp(name, "method"))
-            method = weights_string_to_method(value);
-
-        else if(!strcmp(name, "context") || !strcmp(name, "contexts"))
-            contexts_str = value;
-
-        else if(!strcmp(name, "tier")) {
-            tier = str2ul(value);
-            if(tier < storage_tiers)
-                options |= RRDR_OPTION_SELECTED_TIER;
-            else
-                tier = 0;
-        }
-    }
-
-    BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
-
-    SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v",
-                                                                      SIMPLE_PATTERN_EXACT, true) : NULL;
-
-    int ret = web_api_v1_weights(host, wb, method, format, group, group_options, baseline_after, baseline_before, after, before, points, options, contexts, tier, timeout);
-
-    simple_pattern_free(contexts);
-    return ret;
-}
-
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, default_metric_correlations_method, WEIGHTS_FORMAT_CHARTS);
+    return web_client_api_request_weights(host, w, url, default_metric_correlations_method,
+                                          WEIGHTS_FORMAT_CHARTS, 1);
 }
 
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_v1_weights_internal(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE,
+                                          WEIGHTS_FORMAT_CONTEXTS, 1);
 }
 
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     int timeout = 0;
     const char *function = NULL;
 
     while (url) {
-        char *value = mystrsep(&url, "&");
+        char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value)
             continue;
 
-        char *name = mystrsep(&value, "=");
+        char *name = strsep_skip_consecutive_separators(&value, "=");
         if (!name || !*name)
             continue;
 
@@ -1390,14 +1417,14 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     host_functions2json(host, wb);
     buffer_json_finalize(wb);
 
@@ -1473,7 +1500,7 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
 }
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1497,53 +1524,66 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
-#ifdef NETDATA_DEV_MODE
-#define ACL_DEV_OPEN_ACCESS WEB_CLIENT_ACL_DASHBOARD
-#else
-#define ACL_DEV_OPEN_ACCESS 0
-#endif
+#define HLT_MGM "manage/health"
+int web_client_api_request_v1_mgmt(RRDHOST *host, struct web_client *w, char *url) {
+    const char *haystack = buffer_tostring(w->url_path_decoded);
+    char *needle;
+
+    buffer_flush(w->response.data);
+
+    if ((needle = strstr(haystack, HLT_MGM)) == NULL) {
+        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        return HTTP_RESP_NOT_FOUND;
+    }
+    needle += strlen(HLT_MGM);
+    if (*needle != '\0') {
+        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        return HTTP_RESP_NOT_FOUND;
+    }
+    return web_client_api_request_v1_mgmt_health(host, w, url);
+}
 
 static struct web_api_command api_commands_v1[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_info                       },
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_data                       },
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_chart                      },
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_charts                     },
-        { "context",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_context                    },
-        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_contexts                   },
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info,     0                     },
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data,     0                     },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_chart,    0                     },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_charts,   0                     },
+        { "context",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_context,  0                     },
+        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts, 0                     },
 
         // registry checks the ACL by itself, so we allow everything
-        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,               web_client_api_request_v1_registry, 0                     },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_badge },
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge, 0 },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms                     },
-        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarms_values             },
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_log                 },
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_variables           },
-        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_alarm_count               },
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms,          0              },
+        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values,   0              },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log,       0              },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables, 0              },
+        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count,     0              },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics,      0              },
 
 #if defined(ENABLE_ML)
-        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
-        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info, 0                      },
+        // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
-        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_aclk_state            },
-        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_metric_correlations   },
-        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_weights               },
+        {"manage",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_mgmt, 1 },
+        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state, 0            },
+        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations, 0   },
+        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights, 0               },
 
-        { "function",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
-        { "functions",            0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+        {"function",             0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
+        {"functions",            0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
 
-        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_dbengine_stats },
+        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
 
         // terminator
-        { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL },
+        { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL, 0 },
 };
 
-inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
     static int initialized = 0;
 
     if(unlikely(initialized == 0)) {
@@ -1553,5 +1593,5 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
             api_commands_v1[i].hash = simple_hash(api_commands_v1[i].command);
     }
 
-    return web_client_api_request_vX(host, w, url, api_commands_v1);
+    return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v1);
 }

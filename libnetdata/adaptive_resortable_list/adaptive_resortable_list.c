@@ -78,16 +78,16 @@ void arl_begin(ARL_BASE *base) {
         // do these checks after the ARL has been sorted
 
         if(unlikely(base->relinkings > (base->expected + base->allocated)))
-            info("ARL '%s' has %zu relinkings with %zu expected and %zu allocated entries. Is the source changing so fast?"
+            netdata_log_info("ARL '%s' has %zu relinkings with %zu expected and %zu allocated entries. Is the source changing so fast?"
                  , base->name, base->relinkings, base->expected, base->allocated);
 
         if(unlikely(base->slow > base->fast))
-            info("ARL '%s' has %zu fast searches and %zu slow searches. Is the source really changing so fast?"
+            netdata_log_info("ARL '%s' has %zu fast searches and %zu slow searches. Is the source really changing so fast?"
                  , base->name, base->fast, base->slow);
 
         /*
         if(unlikely(base->iteration % 60 == 0)) {
-            info("ARL '%s' statistics: iteration %zu, expected %zu, wanted %zu, allocated %zu, fred %zu, relinkings %zu, found %zu, added %zu, fast %zu, slow %zu"
+            netdata_log_info("ARL '%s' statistics: iteration %zu, expected %zu, wanted %zu, allocated %zu, fred %zu, relinkings %zu, found %zu, added %zu, fast %zu, slow %zu"
                  , base->name
                  , base->iteration
                  , base->expected
@@ -242,7 +242,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(base->iteration % 60 == 0 && e->flags & ARL_ENTRY_FLAG_FOUND))
-        info("ARL '%s': entry '%s' is already found. Did you forget to call arl_begin()?", base->name, s);
+        netdata_log_info("ARL '%s': entry '%s' is already found. Did you forget to call arl_begin()?", base->name, s);
 #endif
 
     e->flags |= ARL_ENTRY_FLAG_FOUND;

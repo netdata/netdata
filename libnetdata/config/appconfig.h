@@ -88,6 +88,7 @@
 #define CONFIG_SECTION_ENV_VARS           "environment variables"
 #define CONFIG_SECTION_SQLITE             "sqlite"
 #define CONFIG_SECTION_WEB                "web"
+#define CONFIG_SECTION_WEBRTC             "webrtc"
 #define CONFIG_SECTION_STATSD             "statsd"
 #define CONFIG_SECTION_PLUGINS            "plugins"
 #define CONFIG_SECTION_CLOUD              "cloud"

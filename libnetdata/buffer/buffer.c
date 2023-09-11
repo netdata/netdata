@@ -15,6 +15,7 @@ void buffer_reset(BUFFER *wb) {
     wb->options = 0;
     wb->date = 0;
     wb->expires = 0;
+    buffer_no_cacheable(wb);
 
     buffer_overflow_check(wb);
 }
@@ -107,7 +108,7 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
     do {
         need += space_remaining * 2;
 
-        debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
+        netdata_log_debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
         buffer_need_bytes(wb, need);
 
         space_remaining = wb->size - wb->len - 1;
@@ -131,7 +132,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
     do {
         need += space_remaining * 2;
 
-        debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
+        netdata_log_debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
         buffer_need_bytes(wb, need);
 
         space_remaining = wb->size - wb->len - 1;
@@ -246,7 +247,7 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
 {
     BUFFER *b;
 
-    debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
+    netdata_log_debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
 
     b = callocz(1, sizeof(BUFFER));
     b->buffer = mallocz(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
@@ -254,6 +255,7 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
     b->size = size;
     b->content_type = CT_TEXT_PLAIN;
     b->statistics = statistics;
+    buffer_no_cacheable(b);
     buffer_overflow_init(b);
     buffer_overflow_check(b);
 
@@ -268,7 +270,7 @@ void buffer_free(BUFFER *b) {
 
     buffer_overflow_check(b);
 
-    debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
+    netdata_log_debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
 
     if(b->statistics)
         __atomic_sub_fetch(b->statistics, b->size + sizeof(BUFFER) + sizeof(BUFFER_OVERFLOW_EOF) + 2, __ATOMIC_RELAXED);
@@ -290,7 +292,7 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     size_t optimal = (b->size > 5*1024*1024) ? b->size / 2 : b->size;
     if(optimal > wanted) wanted = optimal;
 
-    debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
+    netdata_log_debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
 
     b->buffer = reallocz(b->buffer, b->size + wanted + sizeof(BUFFER_OVERFLOW_EOF) + 2);
     b->size += wanted;
@@ -305,16 +307,19 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
 // ----------------------------------------------------------------------------
 
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth,
-                       bool add_anonymous_object, bool minify) {
+                       bool add_anonymous_object, BUFFER_JSON_OPTIONS options) {
     strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
     strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
-    wb->json.minify = minify;
+    wb->json.options = options;
     wb->json.depth = (int8_t)(depth - 1);
     _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 
     if(add_anonymous_object)
         buffer_fast_strcat(wb, "{", 1);
+
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_no_cacheable(wb);
 }
 
 void buffer_json_finalize(BUFFER *wb) {
@@ -334,7 +339,7 @@ void buffer_json_finalize(BUFFER *wb) {
         }
     }
 
-    if(!wb->json.minify)
+    if(!(wb->json.options & BUFFER_JSON_OPTIONS_MINIFY))
         buffer_fast_strcat(wb, "\n", 1);
 }
 
@@ -365,8 +370,8 @@ static int buffer_expect(BUFFER *wb, const char *expected) {
     const char *generated = buffer_tostring(wb);
 
     if(strcmp(generated, expected) != 0) {
-        error("BUFFER: mismatch.\nGenerated:\n%s\nExpected:\n%s\n",
-              generated, expected);
+        netdata_log_error("BUFFER: mismatch.\nGenerated:\n%s\nExpected:\n%s\n",
+                          generated, expected);
         return 1;
     }
 
@@ -383,8 +388,8 @@ static int buffer_uint64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, uint64_
 
     uint64_t v = str2ull_encoded(buffer_tostring(wb));
     if(v != value) {
-        error("BUFFER: string '%s' does resolves to %llu, expected %llu",
-              buffer_tostring(wb), (unsigned long long)v, (unsigned long long)value);
+        netdata_log_error("BUFFER: string '%s' does resolves to %llu, expected %llu",
+                          buffer_tostring(wb), (unsigned long long)v, (unsigned long long)value);
         errors++;
     }
     buffer_flush(wb);
@@ -401,8 +406,8 @@ static int buffer_int64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, int64_t 
 
     int64_t v = str2ll_encoded(buffer_tostring(wb));
     if(v != value) {
-        error("BUFFER: string '%s' does resolves to %lld, expected %lld",
-              buffer_tostring(wb), (long long)v, (long long)value);
+        netdata_log_error("BUFFER: string '%s' does resolves to %lld, expected %lld",
+                          buffer_tostring(wb), (long long)v, (long long)value);
         errors++;
     }
     buffer_flush(wb);
@@ -419,8 +424,8 @@ static int buffer_double_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA
 
     NETDATA_DOUBLE v = str2ndd_encoded(buffer_tostring(wb), NULL);
     if(v != value) {
-        error("BUFFER: string '%s' does resolves to %.12f, expected %.12f",
-              buffer_tostring(wb), v, value);
+        netdata_log_error("BUFFER: string '%s' does resolves to %.12f, expected %.12f",
+                          buffer_tostring(wb), v, value);
         errors++;
     }
     buffer_flush(wb);
@@ -485,13 +490,13 @@ int buffer_unittest(void) {
 
     buffer_flush(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_finalize(wb);
     errors += buffer_expect(wb, "{\n}\n");
 
     buffer_flush(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_string(wb, "hello", "world");
     buffer_json_member_add_string(wb, "alpha", "this: \" is a double quote");
     buffer_json_member_add_object(wb, "object1");
@@ -503,3 +508,11 @@ int buffer_unittest(void) {
     return errors;
 }
 
+#ifdef ENABLE_H2O
+h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb) {
+    h2o_iovec_t ret;
+    ret.base = wb->buffer;
+    ret.len = wb->len;
+    return ret;
+}
+#endif

@@ -19,7 +19,7 @@ typedef enum {
     CHART_RESET,
     RETENTION_UPDATED,
     UPDATE_NODE_INFO,
-    ALARM_LOG_HEALTH,
+    ALARM_PROVIDE_CHECKPOINT,
     ALARM_PROVIDE_CFG,
     ALARM_SNAPSHOT,
     UPDATE_NODE_COLLECTORS,
@@ -79,7 +79,7 @@ void aclk_queue_unlock(void);
     if (likely(query->data.bin_payload.payload)) {                                                                     \
         aclk_queue_query(query);                                                                                       \
     } else {                                                                                                           \
-        error("Failed to generate payload (%s)", __FUNCTION__);                                                        \
+        netdata_log_error("Failed to generate payload (%s)", __FUNCTION__);                                            \
         aclk_query_free(query);                                                                                        \
     }
 

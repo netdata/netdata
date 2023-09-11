@@ -34,31 +34,6 @@ struct rrdeng_cmd;
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
-typedef struct page_details_control {
-    struct rrdengine_instance *ctx;
-    struct metric *metric;
-
-    struct completion prep_completion;
-    struct completion page_completion;   // sync between the query thread and the workers
-
-    Pvoid_t page_list_JudyL;        // the list of page details
-    unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
-    bool workers_should_stop;       // true when the query thread left and the workers should stop
-    bool prep_done;
-
-    SPINLOCK refcount_spinlock;     // spinlock to protect refcount
-    int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
-    size_t executed_with_gaps;
-
-    time_t start_time_s;
-    time_t end_time_s;
-    STORAGE_PRIORITY priority;
-
-    time_t optimal_end_time_s;
-} PDC;
-
-PDC *pdc_get(void);
-
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
     // if a page does not have one of these, it is considered unroutable
@@ -98,6 +73,34 @@ typedef enum __attribute__ ((__packed__)) {
 } PDC_PAGE_STATUS;
 
 #define PDC_PAGE_QUERY_GLOBAL_SKIP_LIST (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED)
+
+typedef struct page_details_control {
+    struct rrdengine_instance *ctx;
+    struct metric *metric;
+
+    struct completion prep_completion;
+    struct completion page_completion;   // sync between the query thread and the workers
+
+    Pvoid_t page_list_JudyL;        // the list of page details
+    unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
+    bool workers_should_stop;       // true when the query thread left and the workers should stop
+    bool prep_done;
+
+    PDC_PAGE_STATUS common_status;
+    size_t pages_to_load_from_disk;
+
+    SPINLOCK refcount_spinlock;     // spinlock to protect refcount
+    int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
+    size_t executed_with_gaps;
+
+    time_t start_time_s;
+    time_t end_time_s;
+    STORAGE_PRIORITY priority;
+
+    time_t optimal_end_time_s;
+} PDC;
+
+PDC *pdc_get(void);
 
 struct page_details {
     struct {
@@ -181,14 +184,17 @@ typedef enum __attribute__ ((__packed__)) {
 } RRDENG_COLLECT_PAGE_FLAGS;
 
 struct rrdeng_collect_handle {
+    struct storage_collect_handle common; // has to be first item
+
+    RRDENG_COLLECT_PAGE_FLAGS page_flags;
+    RRDENG_COLLECT_HANDLE_OPTIONS options;
+    uint8_t type;
+
     struct metric *metric;
     struct pgc_page *page;
     void *data;
     size_t data_size;
     struct pg_alignment *alignment;
-    RRDENG_COLLECT_HANDLE_OPTIONS options;
-    uint8_t type;
-    RRDENG_COLLECT_PAGE_FLAGS page_flags;
     uint32_t page_entries_max;
     uint32_t page_position;                   // keep track of the current page size, to make sure we don't exceed it
     usec_t page_start_time_ut;
@@ -359,6 +365,11 @@ struct rrdengine_instance {
     } datafiles;
 
     struct {
+        RW_SPINLOCK spinlock;
+        Pvoid_t JudyL;
+    } njfv2idx;
+
+    struct {
         unsigned last_fileno;                       // newest index of datafile and journalfile
         unsigned last_flush_fileno;                 // newest index of datafile received data
 
@@ -372,6 +383,8 @@ struct rrdengine_instance {
         bool migration_to_v2_running;
         bool now_deleting_files;
         unsigned extents_currently_being_flushed;   // non-zero until we commit data to disk (both datafile and journal file)
+
+        time_t first_time_s;
     } atomic;
 
     struct {
@@ -514,5 +527,9 @@ static inline time_t max_acceptable_collected_time(void) {
 }
 
 void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
+
+static inline int journal_metric_uuid_compare(const void *key, const void *metric) {
+    return uuid_memcmp((uuid_t *)key, &(((struct journal_metric_list *) metric)->uuid));
+}
 
 #endif /* NETDATA_RRDENGINE_H */

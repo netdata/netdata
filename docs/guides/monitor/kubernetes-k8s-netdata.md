@@ -1,14 +1,6 @@
-<!--
-title: "Kubernetes monitoring with Netdata: Overview and visualizations"
-sidebar_label: "Kubernetes monitoring with Netdata: Overview and visualizations"
-description: "Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granularity."
-image: /img/seo/guides/monitor/kubernetes-k8s-netdata.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/kubernetes-k8s-netdata.md
-learn_status: "Published"
-learn_rel_path: "Miscellaneous"
--->
+# Kubernetes monitoring with Netdata
 
-# Kubernetes monitoring with Netdata: Overview and visualizations
+This document gives an overview of what visualizations Netdata provides on Kubernetes deployments.
 
 At Netdata, we've built Kubernetes monitoring tools that add visibility without complexity while also helping you
 actively troubleshoot anomalies or outages. This guide walks you through each of the visualizations and offers best
@@ -140,7 +132,7 @@ visualizations](https://user-images.githubusercontent.com/1153921/109049195-349f
 
 ### Health map
 
-The first visualization is the [health map](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes#health-map),
+The first visualization is the [health map](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md#health-map),
 which places each container into its own box, then varies the intensity of their color to visualize the resource
 utilization. By default, the health map shows the **average CPU utilization as a percentage of the configured limit**
 for every container in your cluster.

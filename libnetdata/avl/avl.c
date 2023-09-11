@@ -316,34 +316,36 @@ int avl_traverse(avl_tree_type *tree, int (*callback)(void * /*entry*/, void * /
 // ---------------------------
 // locks
 
-void avl_read_lock(avl_tree_lock *t) {
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-    netdata_mutex_lock(&t->mutex);
-#else
+static inline void avl_read_lock(avl_tree_lock *t) {
+#if defined(AVL_LOCK_WITH_RWLOCK)
     netdata_rwlock_rdlock(&t->rwlock);
+#else
+    rw_spinlock_read_lock(&t->rwlock);
 #endif
-#endif /* AVL_WITHOUT_PTHREADS */
 }
 
-void avl_write_lock(avl_tree_lock *t) {
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-    netdata_mutex_lock(&t->mutex);
-#else
+static inline void avl_write_lock(avl_tree_lock *t) {
+#if defined(AVL_LOCK_WITH_RWLOCK)
     netdata_rwlock_wrlock(&t->rwlock);
+#else
+    rw_spinlock_write_lock(&t->rwlock);
 #endif
-#endif /* AVL_WITHOUT_PTHREADS */
 }
 
-void avl_unlock(avl_tree_lock *t) {
-#ifndef AVL_WITHOUT_PTHREADS
-#ifdef AVL_LOCK_WITH_MUTEX
-    netdata_mutex_unlock(&t->mutex);
-#else
+static inline void avl_read_unlock(avl_tree_lock *t) {
+#if defined(AVL_LOCK_WITH_RWLOCK)
     netdata_rwlock_unlock(&t->rwlock);
+#else
+    rw_spinlock_read_unlock(&t->rwlock);
 #endif
-#endif /* AVL_WITHOUT_PTHREADS */
+}
+
+static inline void avl_write_unlock(avl_tree_lock *t) {
+#if defined(AVL_LOCK_WITH_RWLOCK)
+    netdata_rwlock_unlock(&t->rwlock);
+#else
+    rw_spinlock_write_unlock(&t->rwlock);
+#endif
 }
 
 // ---------------------------
@@ -352,63 +354,46 @@ void avl_unlock(avl_tree_lock *t) {
 void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/)) {
     avl_init(&tree->avl_tree, compar);
 
-#ifndef AVL_WITHOUT_PTHREADS
-    int lock;
-
-#ifdef AVL_LOCK_WITH_MUTEX
-    lock = netdata_mutex_init(&tree->mutex, NULL);
+#if defined(AVL_LOCK_WITH_RWLOCK)
+    if(netdata_rwlock_init(&tree->rwlock) != 0)
+        fatal("Failed to initialize AVL rwlock");
 #else
-    lock = netdata_rwlock_init(&tree->rwlock);
+    rw_spinlock_init(&tree->rwlock);
 #endif
-
-    if(lock != 0)
-        fatal("Failed to initialize AVL mutex/rwlock, error: %d", lock);
-
-#endif /* AVL_WITHOUT_PTHREADS */
 }
 
-void avl_destroy_lock(avl_tree_lock *tree) {
-#ifndef AVL_WITHOUT_PTHREADS
-    int lock;
-
-#ifdef AVL_LOCK_WITH_MUTEX
-    lock = netdata_mutex_destroy(&tree->mutex);
-#else
-    lock = netdata_rwlock_destroy(&tree->rwlock);
+void avl_destroy_lock(avl_tree_lock *tree __maybe_unused) {
+#if defined(AVL_LOCK_WITH_RWLOCK)
+    if(netdata_rwlock_destroy(&tree->rwlock) != 0)
+        fatal("Failed to destroy AVL rwlock");
 #endif
-
-    if(lock != 0)
-        fatal("Failed to destroy AVL mutex/rwlock, error: %d", lock);
-
-#endif /* AVL_WITHOUT_PTHREADS */
 }
 
 avl_t *avl_search_lock(avl_tree_lock *tree, avl_t *item) {
     avl_read_lock(tree);
     avl_t *ret = avl_search(&tree->avl_tree, item);
-    avl_unlock(tree);
+    avl_read_unlock(tree);
     return ret;
 }
 
 avl_t * avl_remove_lock(avl_tree_lock *tree, avl_t *item) {
     avl_write_lock(tree);
     avl_t *ret = avl_remove(&tree->avl_tree, item);
-    avl_unlock(tree);
+    avl_write_unlock(tree);
     return ret;
 }
 
 avl_t *avl_insert_lock(avl_tree_lock *tree, avl_t *item) {
     avl_write_lock(tree);
     avl_t * ret = avl_insert(&tree->avl_tree, item);
-    avl_unlock(tree);
+    avl_write_unlock(tree);
     return ret;
 }
 
 int avl_traverse_lock(avl_tree_lock *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
-    int ret;
     avl_read_lock(tree);
-    ret = avl_traverse(&tree->avl_tree, callback, data);
-    avl_unlock(tree);
+    int ret = avl_traverse(&tree->avl_tree, callback, data);
+    avl_read_unlock(tree);
     return ret;
 }
 

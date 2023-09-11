@@ -3,8 +3,9 @@
 #ifndef NETDATA_EBPF_CACHESTAT_H
 #define NETDATA_EBPF_CACHESTAT_H 1
 
-// Module name
+// Module name & description
 #define NETDATA_EBPF_MODULE_NAME_CACHESTAT "cachestat"
+#define NETDATA_EBPF_CACHESTAT_MODULE_DESC "Monitor Linux page cache internal functions. This thread is integrated with apps and cgroup."
 
 // charts
 #define NETDATA_CACHESTAT_HIT_RATIO_CHART "cachestat_ratio"
@@ -32,6 +33,9 @@
 #define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "services.cachestat_dirties"
 #define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "services.cachestat_hits"
 #define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "services.cachestat_misses"
+
+// ARAL Name
+#define NETDATA_EBPF_CACHESTAT_ARAL_NAME "ebpf_cachestat"
 
 // variables
 enum cachestat_counters {

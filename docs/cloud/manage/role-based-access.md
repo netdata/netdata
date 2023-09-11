@@ -1,4 +1,4 @@
-# Role-Based Access model"
+# Role-Based Access model
 
 Netdata Cloud's role-based-access mechanism allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
 
@@ -9,12 +9,12 @@ being able to join any room. We also aligned the offered roles to the target aud
 
 | **Role** | **Community** | **Pro** | **Business** | **Early Bird** |
 | :-- | :--: | :--: | :--: | :--: |
-| **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings.</p><p>Provides access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| **Managers**<p>This role allows users to manage War Rooms and Users.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | - | :heavy_check_mark: | - |
-| **Troubleshooters**<p>This role is for users that will be just focused on using Netdata to troubleshoot, not manage entities.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | :heavy_check_mark: | :heavy_check_mark: | - |
-| **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms and only the Nodes that appear in those War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: | - |
-| **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: | - |
-| **Member** ⚠️ Legacy role<p>This role allows users to manage War Rooms and invite fellow Member teammates.</p><p>These users cannot see all War Rooms in the Space but can see all Nodes since they are always on the _All Nodes_ room.</p>| - | - | - | :heavy_check_mark: | 
+| **Administrators**<p>Users with this role can control Spaces, War Rooms, Nodes, Users and Billing.</p><p>They can also access any War Room in the Space.</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| **Managers**<p>Users with this role can manage War Rooms and Users.</p><p>They can access any War Room in the Space.</p> | - | - | :heavy_check_mark: | - |
+| **Troubleshooters**<p>Users with this role can use Netdata to troubleshoot, not manage entities.</p><p>They can access any War Room in the Space.</p> | - | :heavy_check_mark: | :heavy_check_mark: | - |
+| **Observers**<p>Users with this role can only view data in specific War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: | - |
+| **Billing**<p>Users with this role can handle billing options and invoices.</p> | - | - | :heavy_check_mark: | - |
+| **Member** ⚠️ Legacy role<p>Users with this role can create War Rooms and invite other Members.</p><p>They can only see the War Rooms they belong to and all Nodes in the All Nodes room.</p>| - | - | - | :heavy_check_mark: | 
 
 ## What happens to the previous Member role?
 
@@ -84,6 +84,13 @@ In more detail, you can find on the following tables which functionalities are a
 | Edit configuration | :heavy_check_mark: | - | - | - | - | - | Some exceptions apply depending on [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#available-actions-per-notification-methods-based-on-service-level) |
 | Delete configuration | :heavy_check_mark: | - | - | - | - | - | |
 | Edit personal level notification settings | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | [Manage user notification settings](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-user-notification-settings) |
+| See space alert notification silencing rules | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
+| Add new space alert notification silencing rule | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
+| Enable/Disable space alert notification silencing rule | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - |  |
+| Edit space alert notification silencing rule | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
+| Delete space alert notification silencing rule | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
+| See, add, edit or delete personal level alert notification silencing rule | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - | |
+
 
 Notes:
 * Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-classification))

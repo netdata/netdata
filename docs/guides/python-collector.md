@@ -1,16 +1,3 @@
-<!--
-title: "Develop a custom data collector in Python"
-sidebar_label: "Develop a custom data collector in Python"
-description: "Learn how write a custom data collector in Python, which you'll use to collect metrics from and monitor any application that isn't supported out of the box."
-image: /img/seo/guides/python-collector.png
-author: "Panagiotis Papaioannou"
-author_title: "University of Patras"
-author_img: "/img/authors/panagiotis-papaioannou.jpg"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/python-collector.md
-learn_status: "Published"
-learn_rel_path: "Developers/External plugins/python.d.plugin"
--->
-
 # Develop a custom data collector in Python
 
 The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) to 
@@ -22,10 +9,15 @@ In this tutorial, you'll learn how to leverage the [Python programming language]
 custom data collector for the Netdata Agent. Follow along with your own dataset, using the techniques and best practices
 covered here, or use the included examples for collecting and organizing either random or weather data.
 
+## Disclaimer
+
 If you're comfortable with Golang, consider instead writing a module for the [go.d.plugin](https://github.com/netdata/go.d.plugin).
 Golang is more performant, easier to maintain, and simpler for users since it doesn't require a particular runtime on the node to
 execute. Python plugins require Python on the machine to be executed. Netdata uses Go as the platform of choice for
 production-grade collectors.
+
+We generally do not accept contributions of Python modules to the GitHub project netdata/netdata. If you write a Python collector and
+want to make it available for other users, you should create the pull request in https://github.com/netdata/community.
 
 ## What you need to get started
 
@@ -535,6 +527,8 @@ You can find the source code for the above examples on [GitHub](https://github.c
 
 ## Pull Request Checklist for Python Plugins
 
+Pull requests should be created in https://github.com/netdata/community.
+
 This is a generic checklist for submitting a new Python plugin for Netdata.  It is by no means comprehensive.
 
 At minimum, to be buildable and testable, the PR needs to include:
@@ -546,7 +540,7 @@ At minimum, to be buildable and testable, the PR needs to include:
 -   A makefile for the plugin at `collectors/python.d.plugin/<module_dir>/Makefile.inc`.  Check an existing plugin for what this should look like.
 -   A line in `collectors/python.d.plugin/Makefile.am` including the above-mentioned makefile. Place it with the other plugin includes (please keep the includes sorted alphabetically).
 -   Optionally, chart information in `web/gui/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
--   Optionally, some default alarm configurations for your collector in `health/health.d/<module_name>.conf` and a line adding `<module_name>.conf` in `health/Makefile.am`.
+-   Optionally, some default alert configurations for your collector in `health/health.d/<module_name>.conf` and a line adding `<module_name>.conf` in `health/Makefile.am`.
 
 ## Framework class reference
 

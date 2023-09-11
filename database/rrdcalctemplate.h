@@ -74,6 +74,9 @@ struct rrdcalctemplate {
     STRING *host_labels;                 // the label read from an alarm file
     SIMPLE_PATTERN *host_labels_pattern; // the simple pattern of labels
 
+    STRING *chart_labels;                 // the chart label read from an alarm file
+    SIMPLE_PATTERN *chart_labels_pattern; // the simple pattern of chart labels
+
     // ------------------------------------------------------------------------
     // expressions related to the alarm
 
@@ -107,6 +110,7 @@ struct rrdcalctemplate {
 #define rrdcalctemplate_dimensions(rt) string2str((rt)->dimensions)
 #define rrdcalctemplate_foreachdim(rt) string2str((rt)->foreach_dimension)
 #define rrdcalctemplate_host_labels(rt) string2str((rt)->host_labels)
+#define rrdcalctemplate_chart_labels(rt) string2str((rt)->chart_labels)
 
 #define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after)
 

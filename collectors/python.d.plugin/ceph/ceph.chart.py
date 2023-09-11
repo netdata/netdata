@@ -331,7 +331,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'df',
             'format': 'json'
-        }), '')[1].decode('utf-8'))
+        }), b'')[1].decode('utf-8'))
 
     def _get_osd_df(self):
         """
@@ -341,7 +341,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd df',
             'format': 'json'
-        }), '')[1].decode('utf-8').replace('-nan', '"-nan"'))
+        }), b'')[1].decode('utf-8').replace('-nan', '"-nan"'))
 
     def _get_osd_perf(self):
         """
@@ -351,7 +351,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd perf',
             'format': 'json'
-        }), '')[1].decode('utf-8'))
+        }), b'')[1].decode('utf-8'))
 
     def _get_osd_pool_stats(self):
         """
@@ -363,7 +363,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd pool stats',
             'format': 'json'
-        }), '')[1].decode('utf-8'))
+        }), b'')[1].decode('utf-8'))
 
 
 def get_osd_perf_infos(osd_perf):
