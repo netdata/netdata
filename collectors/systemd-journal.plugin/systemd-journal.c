@@ -540,16 +540,14 @@ static void function_systemd_journal(const char *transaction, char *function, ch
                         buffer_json_member_add_string(wb, "id", "default");
                         buffer_json_member_add_string(wb, "name", "default");
                     }
-                    buffer_json_object_close(wb);
+                    buffer_json_object_close(wb); // options object
                 }
-                buffer_json_array_close(wb);
+                buffer_json_array_close(wb); // options array
             }
-            buffer_json_object_close(wb);
+            buffer_json_object_close(wb); // required params object
         }
-        buffer_json_array_close(wb); // required_params
-        buffer_json_member_add_array(wb, "sources");
-        buffer_json_add_array_item_string(wb, "default");
-        buffer_json_array_close(wb); // sources
+        buffer_json_array_close(wb); // required_params array
+
         buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
         buffer_json_member_add_string(wb, "type", "table");
         buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
