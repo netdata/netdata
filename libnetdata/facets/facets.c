@@ -37,6 +37,7 @@ typedef struct facet_value {
     const char *name;
 
     bool selected;
+    bool empty;
 
     uint32_t rows_matching_facet_value;
     uint32_t final_facet_value_counter;
@@ -46,6 +47,8 @@ typedef struct facet_value {
 } FACET_VALUE;
 
 struct facet_key {
+    FACETS *facets;
+
     const char *name;
 
     DICTIONARY *values;
@@ -61,8 +64,13 @@ struct facet_key {
     struct {
         char hash[FACET_STRING_HASH_SIZE];
         bool updated;
+        bool empty;
         BUFFER *b;
     } current_value;
+
+    struct {
+        FACET_VALUE *empty_value;
+    } empty_value;
 
     uint32_t order;
 
@@ -117,9 +125,6 @@ struct facets {
     struct {
         FACET_ROW *last_added;
 
-        size_t evaluated;
-        size_t matched;
-
         size_t first;
         size_t forwards;
         size_t backwards;
@@ -128,6 +133,32 @@ struct facets {
         size_t prepends;
         size_t appends;
         size_t shifts;
+
+        struct {
+            size_t evaluated;
+            size_t matched;
+            size_t created;
+            size_t reused;
+        } rows;
+
+        struct {
+            size_t registered;
+            size_t unique;
+        } keys;
+
+        struct {
+            size_t registered;
+            size_t transformed;
+            size_t dynamic;
+            size_t empty;
+            size_t indexed;
+            size_t inserts;
+            size_t conflicts;
+        } values;
+
+        struct {
+            size_t searches;
+        } fts;
     } operations;
 };
 
@@ -721,6 +752,8 @@ static void facet_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
         v->name = strdupz(v->name);
         facet_value_is_used(k, v);
     }
+
+    k->facets->operations.values.inserts++;
 }
 
 static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -737,6 +770,8 @@ static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
 
     internal_fatal(v->name && nv->name && strcmp(v->name, nv->name) != 0, "value hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
                    dictionary_acquired_item_name(item));
+
+    k->facets->operations.values.conflicts++;
 
     return false;
 }
@@ -768,6 +803,8 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     FACET_KEY *k = value;
     FACETS *facets = data;
 
+    k->facets = facets;
+
     if(!(k->options & FACET_KEY_OPTION_REORDER))
         k->order = facets->order++;
 
@@ -783,6 +820,9 @@ static void facet_key_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     k->current_value.b = buffer_create(0, NULL);
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->keys_ll, k, prev, next);
+
+    facets->operations.keys.registered++;
+    facets->operations.keys.unique++;
 }
 
 static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -803,6 +843,8 @@ static bool facet_key_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         k->order = facets->order++;
         k->options &= ~FACET_KEY_OPTION_REORDER;
     }
+
+    facets->operations.keys.registered++;
 
     return false;
 }
@@ -938,32 +980,60 @@ void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *v
 // ----------------------------------------------------------------------------
 
 static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *k) {
+    facets->operations.values.registered++;
+
     if(!k->current_value.updated)
         buffer_flush(k->current_value.b);
 
-    if(k->transform.cb)
+    if(k->transform.cb) {
+        facets->operations.values.transformed++;
         k->transform.cb(facets, k->current_value.b, k->transform.data);
+    }
 
     if(!k->current_value.updated) {
         buffer_fast_strcat(k->current_value.b, FACET_VALUE_UNSET, sizeof(FACET_VALUE_UNSET) - 1);
         k->current_value.updated = true;
+        k->current_value.empty = true;
+        facets->operations.values.empty++;
     }
+    else
+        k->current_value.empty = false;
 
 //    bool found = false;
 //    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
 //        found = true;
 
-    if(facets->query && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
+    if(facets->query && !k->current_value.empty && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
+        facets->operations.fts.searches++;
         if(simple_pattern_matches(facets->query, buffer_tostring(k->current_value.b)))
             facets->keys_matched_by_query++;
     }
 
     if(k->values) {
-        FACET_VALUE tk = {
-            .name = buffer_tostring(k->current_value.b),
-        };
-        facets_string_hash(tk.name, buffer_strlen(k->current_value.b), k->current_value.hash);
-        dictionary_set(k->values, k->current_value.hash, &tk, sizeof(tk));
+        if(k->current_value.empty) {
+            strcpy(k->current_value.hash, "0");
+
+            FACET_VALUE tk = {
+                    .name = FACET_VALUE_UNSET,
+            };
+
+            if(k->empty_value.empty_value) {
+                facet_value_conflict_callback(NULL, k->empty_value.empty_value, &tk, k);
+            }
+            else {
+                FACET_VALUE *tkv = dictionary_set(k->values, k->current_value.hash, &tk, sizeof(tk));
+                tkv->empty = true;
+                k->empty_value.empty_value = tkv;
+            }
+        }
+        else {
+            FACET_VALUE tk = {
+                    .name = buffer_tostring(k->current_value.b),
+            };
+            facets_string_hash(tk.name, buffer_strlen(k->current_value.b), k->current_value.hash);
+            dictionary_set(k->values, k->current_value.hash, &tk, sizeof(tk));
+            facets->operations.values.indexed++;
+        }
     }
     else {
         k->key_found_in_row++;
@@ -997,7 +1067,7 @@ static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item __ma
     FACET_ROW *row = data; (void)row;
 
     rkv->wb = buffer_create(0, NULL);
-    buffer_strcat(rkv->wb, rkv->tmp && *rkv->tmp ? rkv->tmp : FACET_VALUE_UNSET);
+    buffer_strcat(rkv->wb, rkv->tmp);
 }
 
 static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -1006,7 +1076,7 @@ static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __
     FACET_ROW *row = data; (void)row;
 
     buffer_flush(rkv->wb);
-    buffer_strcat(rkv->wb, n_rkv->tmp && *n_rkv->tmp ? n_rkv->tmp : FACET_VALUE_UNSET);
+    buffer_strcat(rkv->wb, n_rkv->tmp);
 
     return false;
 }
@@ -1029,14 +1099,17 @@ static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row) {
 static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into) {
     FACET_ROW *row;
 
-    if(into)
+    if(into) {
         row = into;
+        facets->operations.rows.reused++;
+    }
     else {
         row = callocz(1, sizeof(FACET_ROW));
         row->dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_FIXED_SIZE, NULL, sizeof(FACET_ROW_KEY_VALUE));
         dictionary_register_insert_callback(row->dict, facet_row_key_value_insert_callback, row);
         dictionary_register_conflict_callback(row->dict, facet_row_key_value_conflict_callback, row);
         dictionary_register_delete_callback(row->dict, facet_row_key_value_delete_callback, row);
+        facets->operations.rows.created++;
     }
 
     row->usec = usec;
@@ -1044,9 +1117,9 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
     FACET_KEY *k;
     dfe_start_read(facets->keys, k) {
         FACET_ROW_KEY_VALUE t = {
-                .tmp = (k->current_value.updated && buffer_strlen(k->current_value.b)) ?
-                        buffer_tostring(k->current_value.b) : FACET_VALUE_UNSET,
+                .tmp = (k->current_value.updated) ? buffer_tostring(k->current_value.b) : FACET_VALUE_UNSET,
                 .wb = NULL,
+                .empty = k->current_value.empty,
         };
         dictionary_set(row->dict, k->name, &t, sizeof(t));
     }
@@ -1086,7 +1159,7 @@ static void facets_row_keep_first_entry(FACETS *facets, usec_t usec) {
 }
 
 static void facets_row_keep(FACETS *facets, usec_t usec) {
-    facets->operations.matched++;
+    facets->operations.rows.matched++;
 
     if(facets->anchor.key) {
         // we have an anchor key
@@ -1193,7 +1266,7 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     if(facets->query && facets->keys_filtered_by_query && !facets->keys_matched_by_query)
         goto cleanup;
 
-    facets->operations.evaluated++;
+    facets->operations.rows.evaluated++;
 
     uint32_t total_keys = 0;
     uint32_t selected_by = 0;
@@ -1399,9 +1472,14 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                         rkv = dictionary_set(row->dict, k->name, NULL, sizeof(*rkv));
 
                     k->dynamic.cb(facets, wb, rkv, row, k->dynamic.data);
+                    facets->operations.values.dynamic++;
                 }
-                else
-                	buffer_json_add_array_item_string(wb, rkv ? buffer_tostring(rkv->wb) : FACET_VALUE_UNSET);
+                else {
+                    if(!rkv || rkv->empty)
+                        buffer_json_add_array_item_string(wb, FACET_VALUE_UNSET);
+                    else
+                        buffer_json_add_array_item_string(wb, buffer_tostring(rkv->wb));
+                }
             }
             dfe_done(k);
             buffer_json_array_close(wb); // each row
@@ -1458,8 +1536,8 @@ void facets_report(FACETS *facets, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "items");
     {
-        buffer_json_member_add_uint64(wb, "evaluated", facets->operations.evaluated);
-        buffer_json_member_add_uint64(wb, "matched", facets->operations.matched);
+        buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
+        buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
         buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
         buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
         buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
@@ -1477,7 +1555,36 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         buffer_json_member_add_uint64(wb, "prepends", facets->operations.prepends);
         buffer_json_member_add_uint64(wb, "appends", facets->operations.appends);
         buffer_json_member_add_uint64(wb, "shifts", facets->operations.shifts);
+        buffer_json_member_add_object(wb, "rows");
+        {
+            buffer_json_member_add_uint64(wb, "created", facets->operations.rows.created);
+            buffer_json_member_add_uint64(wb, "reused", facets->operations.rows.reused);
+            buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
+            buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
+        }
+        buffer_json_object_close(wb); // rows
+        buffer_json_member_add_object(wb, "keys");
+        {
+            buffer_json_member_add_uint64(wb, "registered", facets->operations.keys.registered);
+            buffer_json_member_add_uint64(wb, "unique", facets->operations.keys.unique);
+        }
+        buffer_json_object_close(wb); // keys
+        buffer_json_member_add_object(wb, "values");
+        {
+            buffer_json_member_add_uint64(wb, "registered", facets->operations.values.registered);
+            buffer_json_member_add_uint64(wb, "transformed", facets->operations.values.transformed);
+            buffer_json_member_add_uint64(wb, "dynamic", facets->operations.values.dynamic);
+            buffer_json_member_add_uint64(wb, "empty", facets->operations.values.empty);
+            buffer_json_member_add_uint64(wb, "indexed", facets->operations.values.indexed);
+            buffer_json_member_add_uint64(wb, "inserts", facets->operations.values.inserts);
+            buffer_json_member_add_uint64(wb, "conflicts", facets->operations.values.conflicts);
+        }
+        buffer_json_object_close(wb); // values
+        buffer_json_member_add_object(wb, "fts");
+        {
+            buffer_json_member_add_uint64(wb, "searches", facets->operations.fts.searches);
+        }
+        buffer_json_object_close(wb); // fts
     }
     buffer_json_object_close(wb); // items
-
 }
