@@ -3,10 +3,12 @@
 #ifndef NETDATA_EBPF_FUNCTIONS_H
 #define NETDATA_EBPF_FUNCTIONS_H 1
 
+#ifdef NETDATA_DEV_MODE
 // Common
-inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
+static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
     fprintf(stdout, "%s \"%s\" 10 \"%s\"\n", PLUGINSD_KEYWORD_FUNCTION, NAME, DESC);
 }
+#endif
 
 // configuration file & description
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"

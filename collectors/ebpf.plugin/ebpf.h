@@ -31,6 +31,7 @@
 #include "daemon/main.h"
 
 #include "ebpf_apps.h"
+#include "ebpf_functions.h"
 #include "ebpf_cgroup.h"
 
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
