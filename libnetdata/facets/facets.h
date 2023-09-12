@@ -65,7 +65,7 @@ void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *v
 void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, usec_t before_ut);
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value);
-void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len);
+void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len, const char *value, size_t value_len);
 
 void facets_report(FACETS *facets, BUFFER *wb);
 void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys);

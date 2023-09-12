@@ -31,6 +31,13 @@ inline void facets_string_hash(const char *src, size_t len, char *out) {
     out[FACET_STRING_HASH_SIZE - 1] = '\0';
 }
 
+static inline void facets_zero_hash(char *out) {
+    for(int i = 0; i < FACET_STRING_HASH_SIZE ;i++)
+        out[i] = '0';
+
+    out[FACET_STRING_HASH_SIZE - 1] = '\0';
+}
+
 // ----------------------------------------------------------------------------
 
 typedef struct facet_value {
@@ -912,15 +919,19 @@ void facets_accepted_param(FACETS *facets, const char *param) {
     dictionary_set(facets->accepted_params, param, NULL, 0);
 }
 
-inline FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options) {
+static inline FACET_KEY *facets_register_key_name_length(FACETS *facets, const char *key, size_t key_length, FACET_KEY_OPTIONS options) {
     FACET_KEY tk = {
             .name = key,
             .options = options,
             .default_selected_for_values = true,
     };
     char hash[FACET_STRING_HASH_SIZE];
-    facets_string_hash(tk.name, strlen(key), hash);
+    facets_string_hash(tk.name, key_length, hash);
     return dictionary_set(facets->keys, hash, &tk, sizeof(tk));
+}
+
+inline FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options) {
+    return facets_register_key_name_length(facets, key, strlen(key), options);
 }
 
 inline FACET_KEY *facets_register_key_name_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data) {
@@ -1011,7 +1022,7 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
 
     if(k->values) {
         if(k->current_value.empty) {
-            strcpy(k->current_value.hash, "0");
+            facets_zero_hash(k->current_value.hash);
 
             FACET_VALUE tk = {
                     .name = FACET_VALUE_UNSET,
@@ -1050,8 +1061,8 @@ void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
     facets_check_value(facets, k);
 }
 
-void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len) {
-    FACET_KEY *k = facets_register_key_name(facets, key, 0);
+void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len, const char *value, size_t value_len) {
+    FACET_KEY *k = facets_register_key_name_length(facets, key, key_len, 0);
     buffer_flush(k->current_value.b);
     buffer_strncat(k->current_value.b, value, value_len);
     k->current_value.updated = true;
@@ -1255,6 +1266,7 @@ void facets_rows_begin(FACETS *facets) {
         k->key_found_in_row = 0;
         k->key_values_selected_in_row = 0;
         k->current_value.updated = false;
+        k->current_value.empty = false;
         k->current_value.hash[0] = '\0';
     }
     // dfe_done(k);

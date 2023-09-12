@@ -125,7 +125,7 @@ int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t be
                 key_copy[key_length - 1] = '\0';
 
                 size_t value_length = length - key_length; // without '\0'
-                facets_add_key_value_length(facets, key_copy, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
+                facets_add_key_value_length(facets, key_copy, key_length - 1, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
             }
 
             facets_row_finished(facets, msg_ut);
