@@ -39,6 +39,9 @@ modules:
     setup:
       prerequisites:
         list:
+          - title: 'Required python module'
+            description: |
+              The `stem` python library needs to be installed.
           - title: 'Required Tor configuration'
             description: |
               Add to /etc/tor/torrc:
