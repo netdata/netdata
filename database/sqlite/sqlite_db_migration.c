@@ -330,7 +330,7 @@ static int do_migration_v11_v12(sqlite3 *database, const char *name)
 
     if (table_exists_in_database("health_log_detail") && !column_exists_in_table("health_log_detail", "summary") &&
         table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
-        rc = init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v11_v12[0]);
+        rc = init_database_batch(database, &database_migrate_v11_v12[0]);
 
     if (!rc) {
         snprintfz(sql, 2047, "UPDATE health_log_detail SET summary = (select name from health_log where health_log_id = health_log_detail.health_log_id);");
