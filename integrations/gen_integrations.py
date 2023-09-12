@@ -17,6 +17,7 @@ GO_REPO = 'netdata/go.d.plugin'
 INTEGRATIONS_PATH = Path(__file__).parent
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
+JSON_PATH = INTEGRATIONS_PATH / 'integrations.json'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
 REPO_PATH = INTEGRATIONS_PATH.parent
 SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
@@ -617,6 +618,13 @@ def render_integrations(categories, integrations):
     OUTPUT_PATH.write_text(data)
 
 
+def render_json(categories, integrations):
+    JSON_PATH.write_text(json.dumps({
+        'categories': categories,
+        'integrations': integrations,
+    }))
+
+
 def main():
     categories = load_categories()
     distros = load_yaml(DISTROS_FILE)
@@ -632,6 +640,7 @@ def main():
 
     integrations = collectors + deploy + exporters + notifications
     render_integrations(categories, integrations)
+    render_json(categories, integrations)
 
 
 if __name__ == '__main__':
