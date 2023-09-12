@@ -2,12 +2,15 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.3...HEAD)
 
 **Merged pull requests:**
 
+- improved facets info [\#15936](https://github.com/netdata/netdata/pull/15936) ([ktsaou](https://github.com/ktsaou))
 - fix memory leak on prometheus exporter and code cleanup [\#15929](https://github.com/netdata/netdata/pull/15929) ([ktsaou](https://github.com/ktsaou))
+- systemd-journal and facets: info and sources [\#15928](https://github.com/netdata/netdata/pull/15928) ([ktsaou](https://github.com/ktsaou))
 - systemd-journal and facets improvements [\#15926](https://github.com/netdata/netdata/pull/15926) ([ktsaou](https://github.com/ktsaou))
+- add specific info on how to access the dashboards [\#15925](https://github.com/netdata/netdata/pull/15925) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Reduce workload during cleanup [\#15919](https://github.com/netdata/netdata/pull/15919) ([stelfrag](https://github.com/stelfrag))
 - Replace \_ with spaces for name variable for ntfy [\#15909](https://github.com/netdata/netdata/pull/15909) ([MAH69IK](https://github.com/MAH69IK))
 - python.d/sensors: Increase voltage limits 127 -\> 400 [\#15905](https://github.com/netdata/netdata/pull/15905) ([kylemanna](https://github.com/kylemanna))
@@ -90,6 +93,10 @@
 - Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 - Metadata cleanup improvements [\#15462](https://github.com/netdata/netdata/pull/15462) ([stelfrag](https://github.com/stelfrag))
 - Fix build with --disable-https [\#15395](https://github.com/netdata/netdata/pull/15395) ([MrZammler](https://github.com/MrZammler))
+
+## [v1.42.3](https://github.com/netdata/netdata/tree/v1.42.3) (2023-09-11)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.2...v1.42.3)
 
 ## [v1.42.2](https://github.com/netdata/netdata/tree/v1.42.2) (2023-08-28)
 
@@ -424,10 +431,6 @@
 - format the sdr cache filenames [\#15361](https://github.com/netdata/netdata/pull/15361) ([ktsaou](https://github.com/ktsaou))
 - fix\(freeipmi\): set sensor state on every reading [\#15360](https://github.com/netdata/netdata/pull/15360) ([ilyam8](https://github.com/ilyam8))
 - documentation update for the release of the new UI [\#15359](https://github.com/netdata/netdata/pull/15359) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Rename multi module yamls to same name but wuth prefix [\#15356](https://github.com/netdata/netdata/pull/15356) ([Ancairon](https://github.com/Ancairon))
-- Update dashboard to version v3.0.1. [\#15352](https://github.com/netdata/netdata/pull/15352) ([netdatabot](https://github.com/netdatabot))
-- Fix installation type command [\#15351](https://github.com/netdata/netdata/pull/15351) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- agent alert notifications redirect [\#15350](https://github.com/netdata/netdata/pull/15350) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 

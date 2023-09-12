@@ -39,6 +39,16 @@ modules:
     setup:
       prerequisites:
         list:
+          - title: "Enable the go_expvar collector"
+            description: |
+              The `go_expvar` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+
+              ```bash
+              cd /etc/netdata   # Replace this path with your Netdata config directory, if different
+              sudo ./edit-config python.d.conf
+              ```
+
+              Change the value of the `go_expvar` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
           - title: "Sample `expvar` usage in a Go application"
             description: |
               The `expvar` package exposes metrics over HTTP and is very easy to use.

@@ -23,7 +23,7 @@ jobs:
       python: ${{ steps.python.outputs.run }}
     steps:
       - name: Clone repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
@@ -76,7 +76,7 @@ jobs:
       security-events: write
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
@@ -103,7 +103,7 @@ jobs:
       security-events: write
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0

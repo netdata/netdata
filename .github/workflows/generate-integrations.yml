@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Checkout Agent
         id: checkout-agent
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
           submodules: recursive
@@ -37,7 +37,7 @@ jobs:
         run: echo "go_ref=$(cat packaging/go.d.version)" >> "${GITHUB_ENV}"
       - name: Checkout Go
         id: checkout-go
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
           path: go.d.plugin
