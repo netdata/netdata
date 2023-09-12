@@ -588,7 +588,7 @@ int connect_to_one_of_destinations(
         if(d->postpone_reconnection_until > now)
             continue;
 
-        netdata_log_info(
+        internal_error(true,
             "STREAM %s: connecting to '%s' (default port: %d)...",
             rrdhost_hostname(host),
             string2str(d->destination),

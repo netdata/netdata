@@ -377,6 +377,7 @@ struct {
     const char *error;
     int worker_job_id;
     time_t postpone_reconnect_seconds;
+    bool prevent_log;
 } stream_responses[] = {
     {
         .response = START_STREAMING_PROMPT_VN,
@@ -413,6 +414,7 @@ struct {
         .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 60 * 60, // the IP may change, try it every hour
+        .prevent_log = true,
     },
     {
         .response = START_STREAMING_ERROR_ALREADY_STREAMING,
@@ -422,6 +424,7 @@ struct {
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 2 * 60, // 2 minutes
+        .prevent_log = true,
     },
     {
         .response = START_STREAMING_ERROR_NOT_PERMITTED,
@@ -469,6 +472,7 @@ struct {
         .error = "remote node response is not understood, is it Netdata?",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 1 * 60, // 1 minute
+        .prevent_log = false,
     }
 };
 
@@ -498,6 +502,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
         return true;
     }
 
+    bool prevent_log = stream_responses[i].prevent_log;
     const char *error = stream_responses[i].error;
     int worker_job_id = stream_responses[i].worker_job_id;
     time_t delay = stream_responses[i].postpone_reconnect_seconds;
@@ -509,8 +514,13 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     char buf[LOG_DATE_LENGTH];
     log_date(buf, LOG_DATE_LENGTH, host->destination->postpone_reconnection_until);
-    netdata_log_error("STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
-          rrdhost_hostname(host), s->connected_to, error, delay, buf);
+
+    if(prevent_log)
+        internal_error(true, "STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
+                       rrdhost_hostname(host), s->connected_to, error, delay, buf);
+    else
+        netdata_log_error("STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
+                          rrdhost_hostname(host), s->connected_to, error, delay, buf);
 
     return false;
 }

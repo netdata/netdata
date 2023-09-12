@@ -534,7 +534,8 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     timing_step(TIMING_STEP_DBENGINE_MRG_UPDATE);
 }
 
-static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, usec_t point_in_time_ut, const char *msg) {
+static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __maybe_unused, usec_t point_in_time_ut __maybe_unused, const char *msg __maybe_unused) {
+#ifdef NETDATA_INTERNAL_CHECKS
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     char uuid[UUID_STR_LEN + 1];
     uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
@@ -562,6 +563,9 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, us
     );
 
     buffer_free(wb);
+#else
+    ;
+#endif
 }
 
 void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
