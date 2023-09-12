@@ -24,7 +24,7 @@ def generate_category_from_name(category_fragment, category_array):
                     # print(fragment, category_fragment[i+1])
                     dummy_id = dummy_id + "." + category_fragment[i+1]
                     # print(dummy_id)
-                except:
+                except IndexError:
                     return category_name.split("/", 1)[1]
                 category_array = category['children']
                 break
@@ -128,7 +128,7 @@ endmeta-->
                 else:
                     try:
                         symlink_dict.pop(path)
-                    except Exception as e:
+                    except KeyError:
                         # We don't need to print something here.
                         pass
 
@@ -136,7 +136,7 @@ endmeta-->
             print("Exception in collector md construction", e, integration['id'])
 
     # kind of specific if clause, so we can avoid running excessive code in the go repo
-    elif integration['integration_type'] == "exporter" and not "go.d.plugin" in os.getcwd():
+    elif integration['integration_type'] == "exporter" and "go.d.plugin" not in os.getcwd():
         try:
             # initiate the variables for the exporter
             meta_yaml = integration['edit_link'].replace("blob", "edit")
@@ -192,14 +192,14 @@ endmeta-->
                 else:
                     try:
                         symlink_dict.pop(path)
-                    except Exception as e:
+                    except KeyError:
                         # We don't need to print something here.
                         pass
         except Exception as e:
             print("Exception in exporter md construction", e, integration['id'])
 
     # kind of specific if clause, so we can avoid running excessive code in the go repo
-    elif integration['integration_type'] == "notification" and not "go.d.plugin" in os.getcwd():
+    elif integration['integration_type'] == "notification" and "go.d.plugin" not in os.getcwd():
         try:
             # initiate the variables for the notification method
             meta_yaml = integration['edit_link'].replace("blob", "edit")
