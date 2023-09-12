@@ -44,7 +44,14 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: "Install charts.d plugin and enable the sensors collector"
+            description: |
+              If using our official native DEB/RPM packages, make sure `netdata-plugin-chartsd` is installed.
+
+              The `sensors` collector is disabled by default.
+
+              To enable the collector, you need to edit the configuration file of `charts.d/sensors.conf` in `/etc/netdata`. You can do so by using the `edit-config` script. Uncomment the `sensors`, option and set the value to `force`.
       configuration:
         file:
           name: charts.d/sensors.conf
