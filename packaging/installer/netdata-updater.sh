@@ -433,7 +433,6 @@ download() {
 
 get_netdata_latest_tag() {
   url="${1}/latest"
-  dest="${2}"
 
   check_for_curl
 
@@ -457,7 +456,7 @@ get_netdata_latest_tag() {
     fi
   fi
 
-  echo "${tag}" > "${dest}"
+  echo "${tag}"
 }
 
 newer_commit_date() {
@@ -545,9 +544,9 @@ parse_version() {
 
 get_latest_version() {
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-    get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}" /dev/stdout
+    get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}"
   else
-    get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}" /dev/stdout
+    get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}"
   fi
 }
 
@@ -622,11 +621,11 @@ set_tarball_urls() {
   fi
 
   if [ "$1" = "stable" ]; then
-    latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}" /dev/stdout)"
+    latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
     export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
   else
-    tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}" /dev/stdout)"
+    tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
     export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/sha256sums.txt"
   fi
