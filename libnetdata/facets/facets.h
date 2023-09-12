@@ -11,13 +11,14 @@ typedef enum __attribute__((packed)) {
 } FACETS_ANCHOR_DIRECTION;
 
 typedef enum __attribute__((packed)) {
-    FACET_KEY_OPTION_FACET      = (1 << 0), // filterable values
-    FACET_KEY_OPTION_NO_FACET   = (1 << 1), // non-filterable value
-    FACET_KEY_OPTION_STICKY     = (1 << 2), // should be sticky in the table
-    FACET_KEY_OPTION_VISIBLE    = (1 << 3), // should be in the default table
-    FACET_KEY_OPTION_FTS        = (1 << 4), // the key is filterable by full text search (FTS)
-    FACET_KEY_OPTION_MAIN_TEXT  = (1 << 5), // full width and wrap
-    FACET_KEY_OPTION_REORDER    = (1 << 6), // give the key a new order id on first encounter
+    FACET_KEY_OPTION_FACET          = (1 << 0), // filterable values
+    FACET_KEY_OPTION_NO_FACET       = (1 << 1), // non-filterable value
+    FACET_KEY_OPTION_NEVER_FACET    = (1 << 2), // never enable this field as facet
+    FACET_KEY_OPTION_STICKY         = (1 << 3), // should be sticky in the table
+    FACET_KEY_OPTION_VISIBLE        = (1 << 4), // should be in the default table
+    FACET_KEY_OPTION_FTS            = (1 << 5), // the key is filterable by full text search (FTS)
+    FACET_KEY_OPTION_MAIN_TEXT      = (1 << 6), // full width and wrap
+    FACET_KEY_OPTION_REORDER        = (1 << 7), // give the key a new order id on first encounter
 } FACET_KEY_OPTIONS;
 
 typedef struct facet_row_key_value {

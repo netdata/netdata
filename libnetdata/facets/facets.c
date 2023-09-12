@@ -711,12 +711,12 @@ static inline void facet_value_is_used(FACET_KEY *k, FACET_VALUE *v) {
 static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k) {
     bool included = true, excluded = false;
 
-    if(k->options & (FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_NO_FACET)) {
+    if(k->options & (FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_NO_FACET | FACET_KEY_OPTION_NEVER_FACET)) {
         if(k->options & FACET_KEY_OPTION_FACET) {
             included = true;
             excluded = false;
         }
-        else if(k->options & FACET_KEY_OPTION_NO_FACET) {
+        else if(k->options & (FACET_KEY_OPTION_NO_FACET | FACET_KEY_OPTION_NEVER_FACET)) {
             included = false;
             excluded = true;
         }
@@ -1179,14 +1179,16 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
         switch (facets->anchor.direction) {
             default:
             case FACETS_ANCHOR_DIRECTION_BACKWARD:
-                if (usec < facets->anchor.key) {
+                // we need to keep only the smaller timestamps
+                if (usec >= facets->anchor.key) {
                     facets->operations.skips_before++;
                     return;
                 }
                 break;
 
             case FACETS_ANCHOR_DIRECTION_FORWARD:
-                if (usec > facets->anchor.key) {
+                // we need to keep only the bigger timestamps
+                if (usec <= facets->anchor.key) {
                     facets->operations.skips_after++;
                     return;
                 }
@@ -1460,7 +1462,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                     RRDF_FIELD_SORT_ASCENDING,
                     NULL,
                     RRDF_FIELD_SUMMARY_COUNT,
-                    k->values ? RRDF_FIELD_FILTER_FACET : RRDF_FIELD_FILTER_NONE,
+                    (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE : RRDF_FIELD_FILTER_FACET,
                     options,
                     FACET_VALUE_UNSET);
         }
