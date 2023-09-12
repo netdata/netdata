@@ -835,6 +835,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                     }
                     else if (ret == 0) {
                         // poll() timed out, the connection is not established within the specified timeout.
+                        errno = 0;
                         netdata_log_error("Timed out while connecting to '%s', port '%s'.", hostBfr, servBfr);
                         close(fd);
                         fd = -1;
