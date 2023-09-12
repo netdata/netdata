@@ -812,12 +812,14 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     if (unlikely(handle->now_s > rrddim_handle->end_time_s))
         return false;
 
-    size_t entries;
+    size_t entries = 0;
     handle->page = pg_cache_lookup_next(ctx, handle->pdc, handle->now_s, handle->dt_s, &entries);
-    if (unlikely(!handle->page))
-        return false;
 
-    internal_fatal(pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE, "Empty page returned");
+    internal_fatal((handle->page && pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE) || !entries,
+                   "A page was returned, but it is empty - pg_cache_lookup_next() should be handling this case");
+
+    if (unlikely(!handle->page || pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE || !entries))
+        return false;
 
     time_t page_start_time_s = pgc_page_start_time_s(handle->page);
     time_t page_end_time_s = pgc_page_end_time_s(handle->page);

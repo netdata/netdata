@@ -96,7 +96,7 @@ int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t be
     size_t excess_rows_allowed = 100;
 
     if(sd_journal_seek_realtime_usec(j, before_ut) < 0) {
-        netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to %llu", before_ut);
+        netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to " PRIu64, before_ut);
         if(sd_journal_seek_tail(j) < 0) {
             netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to journal's tail");
             goto finalize;
