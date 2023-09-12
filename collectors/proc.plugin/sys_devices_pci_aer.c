@@ -268,6 +268,11 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
                     title = "PCI Root-Port Advanced Error Reporting (AER) Fatal Errors";
                     context = "pci.rootport_aer_fatal";
                     break;
+
+                default:
+                    title = "Unknown PCI Advanced Error Reporting";
+                    context = "pci.unknown_aer";
+                    break;
             }
 
             char id[RRD_ID_LENGTH_MAX + 1];
