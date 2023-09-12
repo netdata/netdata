@@ -502,7 +502,7 @@ int aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_usr, char **mqtt_p
     }
 
     // Decrypt Challenge / Get response
-    unsigned char *response_plaintext;
+    unsigned char *response_plaintext = NULL;
     int response_plaintext_bytes = private_decrypt(p_key, challenge, challenge_bytes, &response_plaintext);
     if (response_plaintext_bytes < 0) {
         netdata_log_error("Couldn't decrypt the challenge received");
