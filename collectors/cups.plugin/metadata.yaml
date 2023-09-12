@@ -37,7 +37,7 @@ modules:
       prerequisites:
         list:
           - title: Minimum setup
-            description: "The CUPS server must be installed and running."
+            description: "The CUPS server must be installed and running. If you installed `netdata` using a package manager, it is also necessary to install the package `netdata-plugin-cups`."
       configuration:
         file:
           name: "netdata.conf"
