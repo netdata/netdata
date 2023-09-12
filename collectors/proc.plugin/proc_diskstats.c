@@ -20,8 +20,8 @@ static struct disk {
     char *disk_by_id;
     char *model;
     char *serial;
-    bool rotational;
-    bool removable;
+//    bool rotational;
+//    bool removable;
     uint32_t hash;
     unsigned long major;
     unsigned long minor;
@@ -505,6 +505,7 @@ static inline char *get_disk_by_id(char *device) {
             continue;
 
         if(strncmp(entry->d_name, "md-uuid-", 8) == 0 ||
+                strncmp(entry->d_name, "dm-uuid-", 8) == 0 ||
                 strncmp(entry->d_name, "nvme-eui.", 9) == 0 ||
                 strncmp(entry->d_name, "wwn-", 4) == 0 ||
                 strncmp(entry->d_name, "lvm-pv-uuid-", 12) == 0)
@@ -556,27 +557,27 @@ static inline char *get_disk_serial(char *device) {
     return strdupz(buffer);
 }
 
-static inline bool get_disk_rotational(char *device) {
-    char path[256 + 1];
-    char buffer[256 + 1];
-
-    snprintfz(path, 256, "%s/%s/queue/rotational", path_to_sys_block, device);
-    if(read_file(path, buffer, 256) != 0)
-        return false;
-
-    return buffer[0] == '1';
-}
-
-static inline bool get_disk_removable(char *device) {
-    char path[256 + 1];
-    char buffer[256 + 1];
-
-    snprintfz(path, 256, "%s/%s/removable", path_to_sys_block, device);
-    if(read_file(path, buffer, 256) != 0)
-        return false;
-
-    return buffer[0] == '1';
-}
+//static inline bool get_disk_rotational(char *device) {
+//    char path[256 + 1];
+//    char buffer[256 + 1];
+//
+//    snprintfz(path, 256, "%s/%s/queue/rotational", path_to_sys_block, device);
+//    if(read_file(path, buffer, 256) != 0)
+//        return false;
+//
+//    return buffer[0] == '1';
+//}
+//
+//static inline bool get_disk_removable(char *device) {
+//    char path[256 + 1];
+//    char buffer[256 + 1];
+//
+//    snprintfz(path, 256, "%s/%s/removable", path_to_sys_block, device);
+//    if(read_file(path, buffer, 256) != 0)
+//        return false;
+//
+//    return buffer[0] == '1';
+//}
 
 static void get_disk_config(struct disk *d) {
     int def_enable = global_enable_new_disks_detected_at_runtime;
@@ -706,8 +707,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     d->disk_by_id = get_disk_by_id(disk);
     d->model = get_disk_model(disk);
     d->serial = get_disk_serial(disk);
-    d->rotational = get_disk_rotational(disk);
-    d->removable = get_disk_removable(disk);
+//    d->rotational = get_disk_rotational(disk);
+//    d->removable = get_disk_removable(disk);
     d->hash = simple_hash(d->device);
     d->major = major;
     d->minor = minor;
@@ -971,8 +972,8 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "id", d->disk_by_id, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "model", d->model, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "serial", d->serial, RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->rrdlabels, "rotational", d->rotational ? "true" : "false", RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->rrdlabels, "removable", d->removable ? "true" : "false", RRDLABEL_SRC_AUTO);
+//    rrdlabels_add(st->rrdlabels, "rotational", d->rotational ? "true" : "false", RRDLABEL_SRC_AUTO);
+//    rrdlabels_add(st->rrdlabels, "removable", d->removable ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     switch (d->type) {
         default:
