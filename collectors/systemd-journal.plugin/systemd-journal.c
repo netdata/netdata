@@ -90,52 +90,71 @@ int systemd_journal_query(BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t be
     uint64_t first_msg_ut = 0;
     bool timed_out = false;
     size_t row_counter = 0;
-    sd_journal_seek_realtime_usec(j, before_ut);
-    SD_JOURNAL_FOREACH_BACKWARDS(j) {
-            row_counter++;
 
-            uint64_t msg_ut;
-            sd_journal_get_realtime_usec(j, &msg_ut);
+    // the entries are not guaranteed to be sorted, so we process up to 100 entries beyond
+    // the end of the query to find possibly useful logs for our time-frame
+    size_t excess_rows_allowed = 100;
 
-            if(unlikely(!first_msg_ut)) {
-                if(msg_ut == if_modified_since) {
-                    sd_journal_close(j);
-                    return HTTP_RESP_NOT_MODIFIED;
-                }
+    if(sd_journal_seek_realtime_usec(j, before_ut) < 0) {
+        netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to %llu", before_ut);
+        if(sd_journal_seek_tail(j) < 0) {
+            netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to journal's tail");
+            goto finalize;
+        }
+    }
+    while (sd_journal_previous(j) > 0) {
+        row_counter++;
 
-                first_msg_ut = msg_ut;
+        uint64_t msg_ut;
+        sd_journal_get_realtime_usec(j, &msg_ut);
+
+        if(unlikely(!first_msg_ut)) {
+            if(msg_ut == if_modified_since) {
+                sd_journal_close(j);
+                return HTTP_RESP_NOT_MODIFIED;
             }
 
-            if (msg_ut < after_ut)
-                break;
-
-            const void *data;
-            size_t length;
-            SD_JOURNAL_FOREACH_DATA(j, data, length) {
-                const char *key = data;
-                const char *equal = strchr(key, '=');
-                if(unlikely(!equal))
-                    continue;
-
-                const char *value = ++equal;
-                size_t key_length = value - key; // including '\0'
-
-                char key_copy[key_length];
-                memcpy(key_copy, key, key_length - 1);
-                key_copy[key_length - 1] = '\0';
-
-                size_t value_length = length - key_length; // without '\0'
-                facets_add_key_value_length(facets, key_copy, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
-            }
-
-            facets_row_finished(facets, msg_ut);
-
-            if((row_counter % 100) == 0 && now_monotonic_usec() > stop_monotonic_ut) {
-                timed_out = true;
-                break;
-            }
+            first_msg_ut = msg_ut;
         }
 
+        if (msg_ut > before_ut)
+            continue;
+
+        if (msg_ut < after_ut) {
+            if(--excess_rows_allowed == 0)
+                break;
+
+            continue;
+        }
+
+        const void *data;
+        size_t length;
+        SD_JOURNAL_FOREACH_DATA(j, data, length) {
+            const char *key = data;
+            const char *equal = strchr(key, '=');
+            if(unlikely(!equal))
+                continue;
+
+            const char *value = ++equal;
+            size_t key_length = value - key; // including '\0'
+
+            char key_copy[key_length];
+            memcpy(key_copy, key, key_length - 1);
+            key_copy[key_length - 1] = '\0';
+
+            size_t value_length = length - key_length; // without '\0'
+            facets_add_key_value_length(facets, key_copy, key_length - 1, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
+        }
+
+        facets_row_finished(facets, msg_ut);
+
+        if((row_counter % 100) == 0 && now_monotonic_usec() > stop_monotonic_ut) {
+            timed_out = true;
+            break;
+        }
+    }
+
+finalize:
     sd_journal_close(j);
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -369,11 +388,11 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     // register the fields in the order you want them on the dashboard
 
     facets_register_dynamic_key_name(facets, "ND_JOURNAL_PROCESS",
-                                     FACET_KEY_OPTION_NO_FACET | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
+                                     FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
                                      systemd_journal_dynamic_row_id, NULL);
 
     facets_register_key_name(facets, "MESSAGE",
-                             FACET_KEY_OPTION_NO_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE |
+                             FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE |
                              FACET_KEY_OPTION_FTS);
 
     facets_register_key_name_transformation(facets, "PRIORITY", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
@@ -654,6 +673,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         char buf[] = "systemd-journal after:-864000 before:0 last:500";
+        // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, "", 0, 30);
         exit(1);
     }

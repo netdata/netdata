@@ -16,10 +16,10 @@ struct timespec {
 typedef int clockid_t;
 #endif
 
-typedef unsigned long long nsec_t;
-typedef unsigned long long msec_t;
-typedef unsigned long long usec_t;
-typedef long long susec_t;
+typedef uint64_t nsec_t;
+typedef uint64_t msec_t;
+typedef uint64_t usec_t;
+typedef int64_t  susec_t;
 
 typedef struct heartbeat {
     usec_t realtime;
