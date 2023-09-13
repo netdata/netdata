@@ -779,9 +779,9 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
-        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_socket_clean_judy_array_unsafe();
-        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
