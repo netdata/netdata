@@ -90,8 +90,8 @@ modules:
             enabled: true
             title: Config
           list: |
-            - name: Basic
-              description: Default configuration.
+            - name: Default configuration
+              description: When plugin configuration is not modifyed, plugin will collect data according the following pattern: It will not keep unmounted disks looking for mount point status every 15 seconds, but it update charts very second. Filesystems and paths listed in exclude options won't be collected, and data for inode and disk space will be collected when it is possible.
               config: |
                 [plugin:proc:diskspace]
                   remove charts of unmounted disks = yes
