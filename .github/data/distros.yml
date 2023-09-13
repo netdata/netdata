@@ -99,16 +99,6 @@ include:
       <<: *amzn_packages
       repo_distro: amazonlinux/2023
 
-  - distro: archlinux
-    version: latest
-    support_type: Intermediate
-    notes: ''
-    eol_check: false
-    env_prep: |
-      pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
-    test:
-      ebpf-core: true
-
   - distro: centos
     version: "7"
     support_type: Core
@@ -148,11 +138,6 @@ include:
     packages:
       <<: *cs_packages
       repo_distro: el/c8s
-
-  - distro: clearlinux
-    version: latest
-    support_type: Community
-    notes: ''
 
   - &debian
     distro: debian
@@ -216,27 +201,6 @@ include:
     test:
       ebpf-core: true
 
-  - &freebsd
-    distro: freebsd
-    version: 13-STABLE
-    support_type: Community
-    notes: ''
-
-  - distro: gentoo
-    version: latest
-    support_type: Community
-    notes: ''
-
-  - &macos
-    distro: macos
-    version: '13'
-    support_type: Community
-    notes: ''
-  - <<: *macos
-    version: '12'
-  - <<: *macos
-    version: '11'
-
   - &opensuse
     distro: opensuse
     version: "15.5"
@@ -285,23 +249,6 @@ include:
       <<: *oracle_packages
       repo_distro: ol/9
 
-  - &rhel
-    distro: rhel
-    version: "9.x"
-    support_type: Core
-    notes: ''
-    packages:
-      arches:
-        - x86_64
-        - aarch64
-  - <<: *rhel
-    version: "8.x"
-  - <<: *rhel
-    version: "7.x"
-    packages:
-      arches:
-        - x86_64
-
   - &ubuntu
     distro: ubuntu
     version: "22.04"
@@ -333,6 +280,21 @@ include:
       repo_distro: ubuntu/focal
 
 no_include: # Info for platforms not covered in CI
+  - distro: archlinux
+    version: latest
+    support_type: Intermediate
+    notes: ''
+    eol_check: false
+    env_prep: |
+      pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
+    test:
+      ebpf-core: true
+
+  - distro: clearlinux
+    version: latest
+    support_type: Community
+    notes: ''
+
   - distro: docker
     version: "19.03 or newer"
     support_type: Core
@@ -344,3 +306,41 @@ no_include: # Info for platforms not covered in CI
         - linux/arm/v7
         - linux/arm64
         - linux/ppc64le
+
+  - &freebsd
+    distro: freebsd
+    version: 13-STABLE
+    support_type: Community
+    notes: ''
+
+  - distro: gentoo
+    version: latest
+    support_type: Community
+    notes: ''
+
+  - &macos
+    distro: macos
+    version: '13'
+    support_type: Community
+    notes: ''
+  - <<: *macos
+    version: '12'
+  - <<: *macos
+    version: '11'
+
+  - &rhel
+    distro: rhel
+    version: "9.x"
+    support_type: Core
+    notes: ''
+    packages:
+      arches:
+        - x86_64
+        - aarch64
+  - <<: *rhel
+    version: "8.x"
+  - <<: *rhel
+    version: "7.x"
+    packages:
+      arches:
+        - x86_64
