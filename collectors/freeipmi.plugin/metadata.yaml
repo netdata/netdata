@@ -160,14 +160,18 @@ modules:
             enabled: true
             title: "Config"
           list:
-            - name: 5 second update rate and SEL collection
-              description: Append to `command options =` the settings you need. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
+            - name: Decrease data collection frequency
+              description: Basic example decreasing data collection frequency. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
               config: |
                 [plugin:freeipmi]
-                  update every = 5
-                  command options = sel
+                  update every = 10
               folding:
                 enabled: false
+            - name: Disable SEL collection
+              description: Append to `command options =` the options you need.
+              config: |
+                [plugin:freeipmi]
+                  command options = no-sel
             - name: Ignore specific sensors
               description: |
                 Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`.
