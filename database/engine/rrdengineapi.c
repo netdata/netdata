@@ -815,7 +815,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     size_t entries = 0;
     handle->page = pg_cache_lookup_next(ctx, handle->pdc, handle->now_s, handle->dt_s, &entries);
 
-    internal_fatal((handle->page && pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE) || !entries,
+    internal_fatal(handle->page && (pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE || !entries),
                    "A page was returned, but it is empty - pg_cache_lookup_next() should be handling this case");
 
     if (unlikely(!handle->page || pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE || !entries))

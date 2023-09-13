@@ -1,6 +1,6 @@
 #include "facets.h"
 
-#define HISTOGRAM_COLUMNS 60
+#define HISTOGRAM_COLUMNS 100
 
 static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
 
@@ -1472,7 +1472,20 @@ void facets_report(FACETS *facets, BUFFER *wb) {
 
     buffer_json_member_add_array(wb, "data");
     {
+        usec_t last_usec = 0;
+
         for(FACET_ROW *row = facets->base ; row ;row = row->next) {
+
+            internal_fatal(
+                    facets->anchor.key && (
+                        (facets->anchor.direction == FACETS_ANCHOR_DIRECTION_BACKWARD && row->usec >= facets->anchor.key) ||
+                        (facets->anchor.direction == FACETS_ANCHOR_DIRECTION_FORWARD && row->usec <= facets->anchor.key)
+                    ), "Wrong data returned related to %s anchor!", facets->anchor.direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
+
+            internal_fatal(last_usec && row->usec > last_usec, "Wrong order of data returned!");
+
+            last_usec = row->usec;
+
             buffer_json_add_array_item_array(wb); // each row
             buffer_json_add_array_item_uint64(wb, row->usec);
 
