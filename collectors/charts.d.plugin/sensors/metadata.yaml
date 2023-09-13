@@ -45,10 +45,11 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: "Install charts.d plugin and enable the sensors collector"
+          - title: "Install charts.d plugin"
             description: |
               If using our official native DEB/RPM packages, make sure `netdata-plugin-chartsd` is installed.
-
+          - title: "Enable the sensors collector"
+            description: |
               The `sensors` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `charts.d.conf` file.
 
               ```bash
