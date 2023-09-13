@@ -89,16 +89,16 @@
     distro: 'rhel'
   quick_start: -1
 - <<: *linux
-  id: deploy-almalinux
+  id: deploy-rockylinux
   meta:
     <<: *linux_meta
-    name: Alma Linux
-    link: https://almalinux.org/
-    icon_filename: 'alma.png'
+    name: Rocky Linux
+    link: https://rockylinux.org/
+    icon_filename: 'rocky.svg'
   most_popular: false
   platform_info:
     group: 'include'
-    distro: 'almalinux'
+    distro: 'rockylinux'
   quick_start: -1
 - <<: *linux
   id: deploy-alpinelinux
