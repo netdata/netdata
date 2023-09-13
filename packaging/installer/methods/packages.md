@@ -20,6 +20,21 @@ When using the kickstart script, you can force usage of native DEB or RPM packag
 `--native-only` when invoking the script. This will cause it to only attempt to use native packages for the install,
 and fail if it cannot do so.
 
+
+
+> ### Note
+> 
+> Since July 2022, Netdata moved the shipping process of native packages from Package Cloud to it's private hosted 
+> repo. We still maintain the Package Cloud repo though. This is important to understand when you gonna try to manually config 
+> your repo to receive packages. Let's assume that you want to install repoconfig for your Fedora 3X distro. 
+> You find the following `repoconfigs`:
+>
+> - `netdata-repo-1-2.noarch.rpm` : You will receive packages for the `stable` channel of the Agent from our Package Cloud 
+> - `netdata-repo-2-1.noarch.rpm` : You will receive packages for the `stable` channel of the Agent from our self-hosted repo (repo.netdata.cloud)
+> - `netdata-repo-edge-1-2.noarch.rpm` : You will receive packages for the `nightly` channel of the Agent from our Package Cloud 
+> - `netdata-repo-edge-2-1.noarch.rpm` : You will receive packages for the `nightly` channel of the Agent from our self-hosted repo (repo.netdata.cloud)
+
+
 ## Manual setup of RPM packages.
 
 Netdata’s official RPM repositories are hosted at https://repo.netdata.cloud/repos. We provide four groups of
