@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sys
 
 from copy import deepcopy
@@ -66,6 +67,9 @@ NOTIFICATION_RENDER_KEYS = [
     'setup',
     'troubleshooting',
 ]
+
+CUSTOM_TAG_PATTERN = re.compile('\\{% if .*?%\\}.*?\\{% /if %\\}|\\{%.*?%\\}', flags=re.DOTALL)
+FIXUP_BLANK_PATTERN = re.compile('\\\\\\n *\\n')
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
 DEBUG = os.environ.get('DEBUG', False)
@@ -500,6 +504,7 @@ def render_collectors(categories, collectors, ids):
                 if 'variables' in item['meta']['monitored_instance']:
                     template = get_jinja_env().from_string(data)
                     data = template.render(variables=item['meta']['monitored_instance']['variables'])
+                    template = get_jinja_env().from_string(clean_data)
                     clean_data = template.render(variables=item['meta']['monitored_instance']['variables'])
             else:
                 data = ''
@@ -548,8 +553,17 @@ def render_deploy(distros, categories, deploy, ids):
         data = template.render(entries=entries, clean=False)
         clean_data = template.render(entries=entries, clean=True)
 
+        for method in clean_item['methods']:
+            for command in method['commands']:
+                command['command'] = CUSTOM_TAG_PATTERN.sub(command['command'], '')
+                command['command'] = FIXUP_BLANK_PATTERN.sub(command['command'], '')
+
         item['platform_info'] = data
         clean_item['platform_info'] = clean_data
+
+        if 'clean_additional_info' in item:
+            clean_item['additional_info'] = item['clean_additional_info']
+            del item['clean_additional_info'], clean_item['clean_additional_info']
 
         for k in ['_src_path', '_repo', '_index']:
             del item[k], clean_item[k]
@@ -585,7 +599,7 @@ def render_exporters(categories, exporters, ids):
                     template = get_jinja_env().from_string(data)
                     data = template.render(variables=item['meta']['variables'], clean=False)
                     template = get_jinja_env().from_string(clean_data)
-                    clean_data = template.render(variables=['meta']['variables'], clean=True)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
             else:
                 data = ''
                 clean_data = ''
