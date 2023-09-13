@@ -41,6 +41,20 @@ should give you clues as to why the collector isn't working.
   ./charts.d.plugin debug 1 [[ entry.meta.module_name ]]
   ```
 
+[% elif entry.meta.plugin_name == 'xenstat.plugin' %]
+- Run the `xenstat.plugin` to debug the collector:
+
+  ```bash
+  ./xenstat.plugin debug 1 [[ entry.meta.module_name ]]
+  ```
+
+[% elif entry.meta.plugin_name == 'nfacct.plugin' %]
+- Run the `nfacct.plugin` to debug the collector:
+
+  ```bash
+  ./nfacct.plugin debug 1 [[ entry.meta.module_name ]]
+  ```
+
 [% endif %]
 [% else %]
 [% if entry.troubleshooting.problems.list %]
