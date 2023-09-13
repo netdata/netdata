@@ -325,7 +325,7 @@ and `145`.
 The following options are available:
 
 -   `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
--   `resolve hostname ips`: nable resolving IPs to hostnames. It is disabled by default because it can be too slow.
+-   `resolve hostname ips`: Enable resolving IPs to hostnames. It is disabled by default because it can be too slow.
 -   `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
     all names are read from /etc/services.
 -   `ports`: Define the destination ports for Netdata to monitor.
@@ -333,11 +333,9 @@ The following options are available:
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
     range of IPs, or use CIDR values.
 
-The table for the traffic are created using the destination IPs and ports of the sockets by default. This can be
-changed setting `resolve service names = yes`, after this Netdata will fill function tables with
-the table for traffic is created using the destination IPs and ports of the sockets by default.
-This can be changed by setting `resolve service names = yes`. After this, Netdata will fill function tables with the
-`service name` whenever it is possible to resolve them.
+By default the traffic table is created using the destination IPs and ports of the sockets. This can be
+changed, so that Netdata uses service names (if possible), by specifying `resolve service name = yes` in the configuration
+section.
 
 #### `[service name]`
 
