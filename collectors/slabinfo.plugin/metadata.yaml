@@ -50,7 +50,9 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Minimum setup
+            description: "If you installed `netdata` using a package manager, it is also necessary to install the package `netdata-plugin-slabinfo`."
       configuration:
         file:
           name: "netdata.conf"
