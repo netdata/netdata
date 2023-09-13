@@ -516,7 +516,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
 
         // Connections
-        connections = values->data.udp.call_udp_sent;
+        connections = values->data.udp.call_udp_sent + values->data.udp.call_udp_received;
     } else {
         // Protocol
         buffer_json_add_array_item_string(wb, "UNSPEC");
