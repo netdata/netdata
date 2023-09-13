@@ -510,7 +510,7 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
         buffer_json_add_array_item_string(wb, "UDP");
 
         // Bytes received
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.call_udp_received);
+        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_received);
 
         // Bytes sent
         buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
