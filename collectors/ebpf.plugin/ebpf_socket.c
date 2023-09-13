@@ -1686,7 +1686,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
 
         // Get PID structure
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyHSArray;
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key.pid);
         if (!pid_ptr) {
             goto end_socket_loop;
@@ -1695,7 +1695,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         // Get Socket structure
         rw_spinlock_write_lock(&pid_ptr->socket_stats.rw_spinlock);
         netdata_socket_plus_t **socket_pptr = (netdata_socket_plus_t **)ebpf_judy_insert_unsafe(
-            &pid_ptr->socket_stats.JudyHSArray, values[0].first_timestamp);
+            &pid_ptr->socket_stats.JudyLArray, values[0].first_timestamp);
         netdata_socket_plus_t *socket_ptr = *socket_pptr;
         bool translate = false;
         if (likely(*socket_pptr == NULL)) {
@@ -1715,7 +1715,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
                     socket_ptr->last_update = update_time;
                 else if ((update_time - socket_ptr->last_update) > em->update_every) {
                     // Socket was not updated since last read
-                    JudyLDel(&pid_ptr->socket_stats.JudyHSArray, values[0].first_timestamp, PJE0);
+                    JudyLDel(&pid_ptr->socket_stats.JudyLArray, values[0].first_timestamp, PJE0);
                     aral_freez(aral_socket_table, socket_ptr);
                 }
             } else // First time

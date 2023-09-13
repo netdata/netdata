@@ -551,22 +551,22 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
  **/
 static void ebpf_socket_clean_judy_array_unsafe()
 {
-    if (!ebpf_judy_pid.index.JudyHSArray)
+    if (!ebpf_judy_pid.index.JudyLArray)
         return;
 
     Pvoid_t *pid_value, *socket_value;
     Word_t local_pid = 0, local_socket = 0;
     bool first_pid = true, first_socket = true;
-    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyHSArray, &local_pid, &first_pid))) {
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
         rw_spinlock_write_lock(&pid_ptr->socket_stats.rw_spinlock);
-        if (pid_ptr->socket_stats.JudyHSArray) {
-            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_socket, &first_socket))) {
+        if (pid_ptr->socket_stats.JudyLArray) {
+            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
                 netdata_socket_plus_t *socket_clean = *socket_value;
                 aral_freez(aral_socket_table, socket_clean);
             }
-            JudyLFreeArray(&pid_ptr->socket_stats.JudyHSArray, PJE0);
-            pid_ptr->socket_stats.JudyHSArray = NULL;
+            JudyLFreeArray(&pid_ptr->socket_stats.JudyLArray, PJE0);
+            pid_ptr->socket_stats.JudyLArray = NULL;
         }
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
     }
@@ -589,13 +589,13 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
     Pvoid_t *pid_value, *socket_value;
     Word_t local_pid = 0;
     bool first_pid = true;
-    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyHSArray, &local_pid, &first_pid))) {
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
         bool first_socket = true;
         Word_t local_timestamp = 0;
         rw_spinlock_read_lock(&pid_ptr->socket_stats.rw_spinlock);
-        if (pid_ptr->socket_stats.JudyHSArray) {
-            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_timestamp, &first_socket))) {
+        if (pid_ptr->socket_stats.JudyLArray) {
+            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_timestamp, &first_socket))) {
                 netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
                 ebpf_fill_function_buffer(buf, values, pid_ptr->cmdline);
             }
@@ -627,7 +627,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
     // thread was not initialized or Array was reset
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_SOCKET_OPEN_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
-        !ebpf_judy_pid.index.JudyHSArray){
+        !ebpf_judy_pid.index.JudyLArray){
         netdata_socket_plus_t fake_values = { };
 
         ebpf_socket_fill_fake_socket(&fake_values);

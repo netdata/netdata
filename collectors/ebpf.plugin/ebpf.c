@@ -641,7 +641,7 @@ ebpf_network_viewer_options_t network_viewer_opt;
 ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .threads = 0, .tracepoints = 0,
                                          .probes = 0, .retprobes = 0, .trampolines = 0, .memlock_kern = 0,
                                          .hash_tables = 0};
-netdata_ebpf_judy_pid_t ebpf_judy_pid = {.pid_table = NULL, .index = {.JudyHSArray = NULL}};
+netdata_ebpf_judy_pid_t ebpf_judy_pid = {.pid_table = NULL, .index = {.JudyLArray = NULL}};
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
@@ -709,7 +709,7 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
         pid_ptr = *pid_pptr;
 
         pid_ptr->cmdline = NULL;
-        pid_ptr->socket_stats.JudyHSArray = NULL;
+        pid_ptr->socket_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->socket_stats.rw_spinlock);
     }
 

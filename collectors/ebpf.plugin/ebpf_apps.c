@@ -869,7 +869,7 @@ cleanup:
     p->cmdline = strdupz(p->comm);
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyHSArray, p->pid);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
     if (pid_ptr)
         pid_ptr->cmdline = p->cmdline;
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
@@ -1192,19 +1192,19 @@ static inline void del_pid_entry(pid_t pid)
     freez(p->cmdline_filename);
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyHSArray, p->pid);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
     if (pid_ptr) {
-        if (pid_ptr->socket_stats.JudyHSArray) {
+        if (pid_ptr->socket_stats.JudyLArray) {
             Word_t local_socket = 0;
             Pvoid_t *socket_value;
             bool first_socket = true;
-            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyHSArray, &local_socket, &first_socket))) {
+            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
                 netdata_socket_plus_t *socket_clean = *socket_value;
                 aral_freez(aral_socket_table, socket_clean);
             }
-            JudyLFreeArray(&pid_ptr->socket_stats.JudyHSArray, PJE0);
+            JudyLFreeArray(&pid_ptr->socket_stats.JudyLArray, PJE0);
         }
-        JudyLDel(&ebpf_judy_pid.index.JudyHSArray, p->pid, PJE0);
+        JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
