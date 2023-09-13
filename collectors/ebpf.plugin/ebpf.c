@@ -1973,7 +1973,7 @@ static void ebpf_parse_service_list(void **out, char *service)
         serv = getservbyname((const char *)service, "udp");
 
     if (!serv) {
-        netdata_log_info("Cannot resolv the service '%s' with protocols TCP and UDP, it will be ignored", service);
+        netdata_log_info("Cannot resolve the service '%s' with protocols TCP and UDP, it will be ignored", service);
         return;
     }
 
@@ -2587,7 +2587,7 @@ void parse_network_viewer_section(struct config *cfg)
         value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_HOSTNAMES, NULL);
         ebpf_link_hostnames(value);
     } else {
-        netdata_log_info("Name resolution is disabled, collector will not parser \"hostnames\" list.");
+        netdata_log_info("Name resolution is disabled, collector will not parse \"hostnames\" list.");
     }
 
     value = appconfig_get(cfg,
