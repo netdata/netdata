@@ -17,7 +17,7 @@ arch_order:  # sort order for per-architecture jobs in CI
   - arm64
   - aarch64
 include:
-# This matrix element builds packages for EL, Alma, Rocky
+# This matrix element builds packages for EL, Alma & Rocky
   - &rocky
     distro: rockylinux
     version: "9"
@@ -236,7 +236,7 @@ include:
     version: '12'
   - <<: *macos
     version: '11'
-    
+
   - &opensuse
     distro: opensuse
     version: "15.5"
@@ -331,8 +331,6 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
-
-
 
 no_include: # Info for platforms not covered in CI
   - distro: docker
