@@ -39,7 +39,7 @@ The following table gives you an overview of the possible _Installation types_ y
 | binpkg-deb           | DEB based native packages shipped from Netdata's repos.                                                                                               |
 | kickstart-build      | Build from source with the kickstart script's `--build-only` option.                                                                                  |
 | kickstart-static     | Installed the static builds, shipped from netdata via the kickstart script's (option: `--static-only`).                                               |
-| manual-static-<arch> | Manually installed the Agent static binaries by fetching our tarballs and manually install them. (Offline installation are part of this category)     |
+| manual-static-ARCH   | Manually installed the Agent static binaries by fetching our tarballs and manually install them. (Offline installation are part of this category)     |
 | legacy-build         | Used for pre-existing kickstart.sh or netdata-installer.sh installations. This exist because we cannot determine how the install originally happened. |
 | legacy-static        | Same as legacy-build, but for static installs.                                                                                                        |
 | oci                  | Installed using our official Docker images, though not necessarily running on Docker                                                                  |
