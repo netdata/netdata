@@ -446,9 +446,7 @@ get_netdata_latest_tag() {
 
   # Fallback case for simpler local testing.
   if echo "${tag}" | grep -Eq 'latest/?$'; then
-    _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt || true
-
-    if [ -r ./ndupdate-version.txt ]; then
+    if _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt; then
       tag="$(cat ./ndupdate-version.txt)"
       rm -f ./ndupdate-version.txt
     else
