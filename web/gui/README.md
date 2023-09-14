@@ -13,8 +13,8 @@ Learn more about how dashboards work and how they're populated using the `dashbo
 overview](https://github.com/netdata/netdata/blob/master/web/README.md).
 
 By default, Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and
-navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If you're unsure, try
-`http://localhost:19999` first.
+navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If installed on localhost,
+you can access it through `http://localhost:19999`.
 
 Netdata uses an [internal, static-threaded web server](https://github.com/netdata/netdata/blob/master/web/server/README.md) to host the HTML, CSS, and JavaScript
 files that make up the local Agent dashboard. You don't have to configure anything to access it, although you can adjust

@@ -11,18 +11,20 @@ typedef enum __attribute__((packed)) {
 } FACETS_ANCHOR_DIRECTION;
 
 typedef enum __attribute__((packed)) {
-    FACET_KEY_OPTION_FACET      = (1 << 0), // filterable values
-    FACET_KEY_OPTION_NO_FACET   = (1 << 1), // non-filterable value
-    FACET_KEY_OPTION_STICKY     = (1 << 2), // should be sticky in the table
-    FACET_KEY_OPTION_VISIBLE    = (1 << 3), // should be in the default table
-    FACET_KEY_OPTION_FTS        = (1 << 4), // the key is filterable by full text search (FTS)
-    FACET_KEY_OPTION_MAIN_TEXT  = (1 << 5), // full width and wrap
-    FACET_KEY_OPTION_REORDER    = (1 << 6), // give the key a new order id on first encounter
+    FACET_KEY_OPTION_FACET          = (1 << 0), // filterable values
+    FACET_KEY_OPTION_NO_FACET       = (1 << 1), // non-filterable value
+    FACET_KEY_OPTION_NEVER_FACET    = (1 << 2), // never enable this field as facet
+    FACET_KEY_OPTION_STICKY         = (1 << 3), // should be sticky in the table
+    FACET_KEY_OPTION_VISIBLE        = (1 << 4), // should be in the default table
+    FACET_KEY_OPTION_FTS            = (1 << 5), // the key is filterable by full text search (FTS)
+    FACET_KEY_OPTION_MAIN_TEXT      = (1 << 6), // full width and wrap
+    FACET_KEY_OPTION_REORDER        = (1 << 7), // give the key a new order id on first encounter
 } FACET_KEY_OPTIONS;
 
 typedef struct facet_row_key_value {
     const char *tmp;
     BUFFER *wb;
+    bool empty;
 } FACET_ROW_KEY_VALUE;
 
 typedef struct facet_row {
@@ -64,7 +66,7 @@ void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *v
 void facets_set_histogram(FACETS *facets, const char *chart, usec_t after_ut, usec_t before_ut);
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value);
-void facets_add_key_value_length(FACETS *facets, const char *key, const char *value, size_t value_len);
+void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len, const char *value, size_t value_len);
 
 void facets_report(FACETS *facets, BUFFER *wb);
 void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys);

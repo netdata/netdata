@@ -588,7 +588,7 @@ int connect_to_one_of_destinations(
         if(d->postpone_reconnection_until > now)
             continue;
 
-        netdata_log_info(
+        internal_error(true,
             "STREAM %s: connecting to '%s' (default port: %d)...",
             rrdhost_hostname(host),
             string2str(d->destination),
@@ -1166,6 +1166,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             // another receiver is already connected
             // try again later
 
+#ifdef NETDATA_INTERNAL_CHECKS
             char msg[200 + 1];
             snprintfz(msg, 200,
                       "multiple connections for same host, "
@@ -1176,6 +1177,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                     rpt,
                     msg,
                     "ALREADY CONNECTED");
+#endif
 
             // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
             buffer_flush(w->response.data);

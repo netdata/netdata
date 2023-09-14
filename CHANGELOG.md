@@ -2,12 +2,27 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.3...HEAD)
 
 **Merged pull requests:**
 
+- Clarifying the possible installation types [\#15958](https://github.com/netdata/netdata/pull/15958) ([tkatsoulas](https://github.com/tkatsoulas))
+- fix journal direction parsing [\#15957](https://github.com/netdata/netdata/pull/15957) ([ktsaou](https://github.com/ktsaou))
+- facets and journal improvements [\#15956](https://github.com/netdata/netdata/pull/15956) ([ktsaou](https://github.com/ktsaou))
+- Fix CID 400366 [\#15953](https://github.com/netdata/netdata/pull/15953) ([stelfrag](https://github.com/stelfrag))
+- Update descriptions. [\#15952](https://github.com/netdata/netdata/pull/15952) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update slabinfo metadata [\#15951](https://github.com/netdata/netdata/pull/15951) ([thiagoftsm](https://github.com/thiagoftsm))
+- Disk Labels [\#15949](https://github.com/netdata/netdata/pull/15949) ([ktsaou](https://github.com/ktsaou))
+- streaming logs [\#15948](https://github.com/netdata/netdata/pull/15948) ([ktsaou](https://github.com/ktsaou))
+- Integrations: Add a note to enable the collectors [\#15945](https://github.com/netdata/netdata/pull/15945) ([MrZammler](https://github.com/MrZammler))
+- Add description about packages [\#15941](https://github.com/netdata/netdata/pull/15941) ([thiagoftsm](https://github.com/thiagoftsm))
+- facets optimizations [\#15940](https://github.com/netdata/netdata/pull/15940) ([ktsaou](https://github.com/ktsaou))
+- improved facets info [\#15936](https://github.com/netdata/netdata/pull/15936) ([ktsaou](https://github.com/ktsaou))
+- feat: Adds access control configuration for ntfy [\#15932](https://github.com/netdata/netdata/pull/15932) ([miversen33](https://github.com/miversen33))
 - fix memory leak on prometheus exporter and code cleanup [\#15929](https://github.com/netdata/netdata/pull/15929) ([ktsaou](https://github.com/ktsaou))
+- systemd-journal and facets: info and sources [\#15928](https://github.com/netdata/netdata/pull/15928) ([ktsaou](https://github.com/ktsaou))
 - systemd-journal and facets improvements [\#15926](https://github.com/netdata/netdata/pull/15926) ([ktsaou](https://github.com/ktsaou))
+- add specific info on how to access the dashboards [\#15925](https://github.com/netdata/netdata/pull/15925) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Reduce workload during cleanup [\#15919](https://github.com/netdata/netdata/pull/15919) ([stelfrag](https://github.com/stelfrag))
 - Replace \_ with spaces for name variable for ntfy [\#15909](https://github.com/netdata/netdata/pull/15909) ([MAH69IK](https://github.com/MAH69IK))
 - python.d/sensors: Increase voltage limits 127 -\> 400 [\#15905](https://github.com/netdata/netdata/pull/15905) ([kylemanna](https://github.com/kylemanna))
@@ -25,6 +40,7 @@
 - allow any field to be a facet [\#15880](https://github.com/netdata/netdata/pull/15880) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#15879](https://github.com/netdata/netdata/pull/15879) ([netdatabot](https://github.com/netdatabot))
 - use the newer XXH3 128bits algorithm, instead of the classic XXH128 [\#15878](https://github.com/netdata/netdata/pull/15878) ([ktsaou](https://github.com/ktsaou))
+- Skip copying environment/install-type files when checking existing installs. [\#15876](https://github.com/netdata/netdata/pull/15876) ([Ferroin](https://github.com/Ferroin))
 - ML add new `delete old models param` to readme [\#15873](https://github.com/netdata/netdata/pull/15873) ([andrewm4894](https://github.com/andrewm4894))
 - Update SQLITE version to 3.42.0 [\#15870](https://github.com/netdata/netdata/pull/15870) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#15867](https://github.com/netdata/netdata/pull/15867) ([netdatabot](https://github.com/netdatabot))
@@ -90,6 +106,10 @@
 - Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 - Metadata cleanup improvements [\#15462](https://github.com/netdata/netdata/pull/15462) ([stelfrag](https://github.com/stelfrag))
 - Fix build with --disable-https [\#15395](https://github.com/netdata/netdata/pull/15395) ([MrZammler](https://github.com/MrZammler))
+
+## [v1.42.3](https://github.com/netdata/netdata/tree/v1.42.3) (2023-09-11)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.2...v1.42.3)
 
 ## [v1.42.2](https://github.com/netdata/netdata/tree/v1.42.2) (2023-08-28)
 
@@ -350,8 +370,6 @@
 - Store and transmit chart\_name to cloud in alert events [\#15441](https://github.com/netdata/netdata/pull/15441) ([MrZammler](https://github.com/MrZammler))
 - Refactor RRD code. [\#15423](https://github.com/netdata/netdata/pull/15423) ([vkalintiris](https://github.com/vkalintiris))
 - Add initial tooling for generating integrations.js file. [\#15406](https://github.com/netdata/netdata/pull/15406) ([Ferroin](https://github.com/Ferroin))
-- Add linux powercap metrics collector [\#15364](https://github.com/netdata/netdata/pull/15364) ([fhriley](https://github.com/fhriley))
-- systemd-journal plugin [\#15363](https://github.com/netdata/netdata/pull/15363) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
@@ -411,23 +429,6 @@
 - update http response code descriptions [\#15379](https://github.com/netdata/netdata/pull/15379) ([ktsaou](https://github.com/ktsaou))
 - Suppress H2O compilation warnings [\#15378](https://github.com/netdata/netdata/pull/15378) ([stelfrag](https://github.com/stelfrag))
 - update bundled v2 dashboard [\#15377](https://github.com/netdata/netdata/pull/15377) ([ilyam8](https://github.com/ilyam8))
-- health: fix windows alarms for vnodes [\#15376](https://github.com/netdata/netdata/pull/15376) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity issues [\#15375](https://github.com/netdata/netdata/pull/15375) ([stelfrag](https://github.com/stelfrag))
-- Update bundled v2 dashboard. [\#15374](https://github.com/netdata/netdata/pull/15374) ([Ferroin](https://github.com/Ferroin))
-- Update libbpf version \(1.2.2\) [\#15373](https://github.com/netdata/netdata/pull/15373) ([thiagoftsm](https://github.com/thiagoftsm))
-- simplify collector schema by moving some props under meta [\#15372](https://github.com/netdata/netdata/pull/15372) ([ilyam8](https://github.com/ilyam8))
-- dont log error on opening .environment [\#15371](https://github.com/netdata/netdata/pull/15371) ([ilyam8](https://github.com/ilyam8))
-- Add most-popular entry in oneOf of categories in definitions.json [\#15370](https://github.com/netdata/netdata/pull/15370) ([Ancairon](https://github.com/Ancairon))
-- Rename log\_access and log\_health [\#15368](https://github.com/netdata/netdata/pull/15368) ([MrZammler](https://github.com/MrZammler))
-- move not really related props single-module.json -\> definitions.json [\#15366](https://github.com/netdata/netdata/pull/15366) ([ilyam8](https://github.com/ilyam8))
-- Add keys to integrations schema, categories, icon path, plus some fixes [\#15365](https://github.com/netdata/netdata/pull/15365) ([Ancairon](https://github.com/Ancairon))
-- format the sdr cache filenames [\#15361](https://github.com/netdata/netdata/pull/15361) ([ktsaou](https://github.com/ktsaou))
-- fix\(freeipmi\): set sensor state on every reading [\#15360](https://github.com/netdata/netdata/pull/15360) ([ilyam8](https://github.com/ilyam8))
-- documentation update for the release of the new UI [\#15359](https://github.com/netdata/netdata/pull/15359) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Rename multi module yamls to same name but wuth prefix [\#15356](https://github.com/netdata/netdata/pull/15356) ([Ancairon](https://github.com/Ancairon))
-- Update dashboard to version v3.0.1. [\#15352](https://github.com/netdata/netdata/pull/15352) ([netdatabot](https://github.com/netdatabot))
-- Fix installation type command [\#15351](https://github.com/netdata/netdata/pull/15351) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- agent alert notifications redirect [\#15350](https://github.com/netdata/netdata/pull/15350) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 

@@ -46,7 +46,9 @@ modules:
             description: |
               If you have not previously used IPMI on your system, you will probably need to run the ipmimonitoring command as root to initialize IPMI settings so that the Netdata plugin works correctly. It should return information about available sensors on the system.
 
-              In some distributions libipmimonitoring.pc is located in a non-standard directory, which can cause building the plugin to fail when building Netdata from source. In that case you should find the file and link it to the standard pkg-config directory. Usually, running sudo ln -s /usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc resolves this issue.
+              In some distributions libipmimonitoring.pc is located in a non-standard directory, which can cause building the plugin to fail when building Netdata from source. In that case you should find the file and linking it to the standard pkg-config directory. Usually, running sudo ln -s /usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc resolves this issue.
+
+              If you installed `netdata` using a package manager, it is also necessary to install the package `netdata-plugin-freeimpi`.
       configuration:
         file:
           name: "netdata.conf"
