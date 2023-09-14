@@ -34,7 +34,7 @@
 #define JOURNAL_PARAMETER_HISTOGRAM             "histogram"
 #define JOURNAL_PARAMETER_DIRECTION             "direction"
 #define JOURNAL_PARAMETER_IF_MODIFIED_SINCE     "if_modified_since"
-#define JOURNAL_PARAMETER_DATA_ONLY_IF_NOT_MODIFIED_SINCE "data_only_if_not_modified_since"
+#define JOURNAL_PARAMETER_DATA_ONLY             "data_only"
 #define JOURNAL_PARAMETER_SOURCE                "source"
 #define JOURNAL_PARAMETER_INFO                  "info"
 
@@ -307,16 +307,14 @@ bool systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec
     if(!netdata_systemd_journal_seek_to(j, seek_to))
         return false;
 
-    usec_t first_msg_ut;
+    usec_t first_msg_ut = 0;
     while (sd_journal_previous(j) > 0) {
         usec_t msg_ut;
         if(sd_journal_get_realtime_usec(j, &msg_ut) < 0)
             continue;
 
-        if(!first_msg_ut) {
-            first_msg_ut = msg_ut;
-            break;
-        }
+        first_msg_ut = msg_ut;
+        break;
     }
 
     return first_msg_ut != last_modified;
@@ -325,7 +323,7 @@ bool systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec
 static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
                                          usec_t after_ut, usec_t before_ut,
                                          usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
-                                         usec_t if_modified_since, usec_t data_only_if_not_modified_since,
+                                         usec_t if_modified_since, bool data_only,
                                          usec_t stop_monotonic_ut) {
     sd_journal *j = netdata_open_systemd_journal();
     if(!j)
@@ -335,7 +333,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
 
     ND_SD_JOURNAL_STATUS status;
 
-    if(data_only_if_not_modified_since && !systemd_journal_check_if_modified_since(j, before_ut, data_only_if_not_modified_since)) {
+    if(data_only && anchor /* && !systemd_journal_check_if_modified_since(j, if_modified_since, data_only) */) {
         facets_data_only_mode(facets);
 
         // we can do a data-only query
@@ -610,7 +608,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     facets_accepted_param(facets, JOURNAL_PARAMETER_FACETS);
     facets_accepted_param(facets, JOURNAL_PARAMETER_HISTOGRAM);
     facets_accepted_param(facets, JOURNAL_PARAMETER_IF_MODIFIED_SINCE);
-    facets_accepted_param(facets, JOURNAL_PARAMETER_DATA_ONLY_IF_NOT_MODIFIED_SINCE);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_DATA_ONLY);
 
     // register the fields in the order you want them on the dashboard
 
@@ -639,10 +637,10 @@ static void function_systemd_journal(const char *transaction, char *function, ch
                                             netdata_systemd_journal_transform_gid, gids);
 
     bool info = false;
+    bool data_only = false;
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
     usec_t if_modified_since = 0;
-    usec_t data_only_if_not_modified_since = 0;
     size_t last = 0;
     FACETS_ANCHOR_DIRECTION direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     const char *query = NULL;
@@ -664,6 +662,9 @@ static void function_systemd_journal(const char *transaction, char *function, ch
         else if(strcmp(keyword, JOURNAL_PARAMETER_INFO) == 0) {
             info = true;
         }
+        else if(strcmp(keyword, JOURNAL_PARAMETER_DATA_ONLY) == 0) {
+            data_only = true;
+        }
         else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {
             source = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
         }
@@ -675,9 +676,6 @@ static void function_systemd_journal(const char *transaction, char *function, ch
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":", sizeof(JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":") - 1) == 0) {
             if_modified_since = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_IF_MODIFIED_SINCE ":") - 1], NULL);
-        }
-        else if(strncmp(keyword, JOURNAL_PARAMETER_DATA_ONLY_IF_NOT_MODIFIED_SINCE ":", sizeof(JOURNAL_PARAMETER_DATA_ONLY_IF_NOT_MODIFIED_SINCE ":") - 1) == 0) {
-            data_only_if_not_modified_since = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_DATA_ONLY_IF_NOT_MODIFIED_SINCE ":") - 1], NULL);
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_ANCHOR ":", sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1) == 0) {
             anchor = str2ull(&keyword[sizeof(JOURNAL_PARAMETER_ANCHOR ":") - 1], NULL);
@@ -813,7 +811,7 @@ static void function_systemd_journal(const char *transaction, char *function, ch
 
     response = netdata_systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                              anchor, direction, last,
-                                             if_modified_since, data_only_if_not_modified_since,
+                                             if_modified_since, data_only,
                                              now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
 
     if(response != HTTP_RESP_OK) {
