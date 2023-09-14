@@ -6,7 +6,7 @@ PROTOBUF_BUILD_PATH="${1}/externaldeps/protobuf/protobuf-$(cat "${1}/packaging/p
 mkdir -p "${1}/externaldeps/protobuf" || exit 1
 curl -sSL --connect-timeout 10 --retry 3 "https://github.com/protocolbuffers/protobuf/releases/download/v$(cat "${1}/packaging/protobuf.version")/${PROTOBUF_TARBALL}" > "${PROTOBUF_TARBALL}" || exit 1
 sha256sum -c "${1}/packaging/protobuf.checksums" || exit 1
-tar -xzf "${PROTOBUF_TARBALL}" -C "${1}/externaldeps/protobuf" || exit 1
+tar -xz --no-same-owner -f "${PROTOBUF_TARBALL}" -C "${1}/externaldeps/protobuf" || exit 1
 OLDPWD="${PWD}"
 cd "${PROTOBUF_BUILD_PATH}" || exit 1
 ./configure --disable-shared --without-zlib --disable-dependency-tracking --with-pic || exit 1
