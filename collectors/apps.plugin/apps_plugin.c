@@ -4575,7 +4575,7 @@ static int check_capabilities() {
 }
 #endif
 
-static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 
 #define PROCESS_FILTER_CATEGORY "category:"
 #define PROCESS_FILTER_USER "user:"
@@ -5560,7 +5560,7 @@ static void *reader_main(void *arg __maybe_unused) {
 
 //                internal_error(true, "Received function '%s', transaction '%s', timeout %d", function, transaction, timeout);
 
-                netdata_mutex_lock(&mutex);
+                netdata_mutex_lock(&stdout_mutex);
 
                 if(strncmp(function, "processes", strlen("processes")) == 0)
                     function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
@@ -5569,7 +5569,7 @@ static void *reader_main(void *arg __maybe_unused) {
                                                            "No function with this name found in apps.plugin.");
 
                 fflush(stdout);
-                netdata_mutex_unlock(&mutex);
+                netdata_mutex_unlock(&stdout_mutex);
 
 //                internal_error(true, "Done with function '%s', transaction '%s', timeout %d", function, transaction, timeout);
             }
@@ -5692,7 +5692,7 @@ int main(int argc, char **argv) {
 
     netdata_thread_t reader_thread;
     netdata_thread_create(&reader_thread, "APPS_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
-    netdata_mutex_lock(&mutex);
+    netdata_mutex_lock(&stdout_mutex);
 
     APPS_PLUGIN_GLOBAL_FUNCTIONS();
 
@@ -5701,7 +5701,7 @@ int main(int argc, char **argv) {
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(; !apps_plugin_exit ; global_iterations_counter++) {
-        netdata_mutex_unlock(&mutex);
+        netdata_mutex_unlock(&stdout_mutex);
 
 #ifdef NETDATA_PROFILING
 #warning "compiling for profiling"
@@ -5712,16 +5712,16 @@ int main(int argc, char **argv) {
 #else
         usec_t dt = heartbeat_next(&hb, step);
 #endif
-        netdata_mutex_lock(&mutex);
+        netdata_mutex_lock(&stdout_mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
         if (unlikely(poll(&pollfd, 1, 0) < 0)) {
-            netdata_mutex_unlock(&mutex);
+            netdata_mutex_unlock(&stdout_mutex);
             netdata_thread_cancel(reader_thread);
             fatal("Cannot check if a pipe is available");
         }
         if (unlikely(pollfd.revents & POLLERR)) {
-            netdata_mutex_unlock(&mutex);
+            netdata_mutex_unlock(&stdout_mutex);
             netdata_thread_cancel(reader_thread);
             fatal("Received error on read pipe.");
         }
@@ -5732,7 +5732,7 @@ int main(int argc, char **argv) {
         if(!collect_data_for_all_processes()) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
-            netdata_mutex_unlock(&mutex);
+            netdata_mutex_unlock(&stdout_mutex);
             netdata_thread_cancel(reader_thread);
             exit(1);
         }
@@ -5769,5 +5769,5 @@ int main(int argc, char **argv) {
 
         debug_log("done Loop No %zu", global_iterations_counter);
     }
-    netdata_mutex_unlock(&mutex);
+    netdata_mutex_unlock(&stdout_mutex);
 }

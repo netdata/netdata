@@ -55,7 +55,7 @@
     "|IMAGE_NAME"                               \
     ""
 
-static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
 DICTIONARY *uids = NULL;
@@ -853,16 +853,17 @@ static void *reader_main(void *arg __maybe_unused) {
                 int timeout = str2i(timeout_s);
                 if(timeout <= 0) timeout = SYSTEMD_JOURNAL_DEFAULT_TIMEOUT;
 
-                netdata_mutex_lock(&mutex);
+                netdata_mutex_lock(&stdout_mutex);
 
                 if(strncmp(function, SYSTEMD_JOURNAL_FUNCTION_NAME, strlen(SYSTEMD_JOURNAL_FUNCTION_NAME)) == 0)
                     function_systemd_journal(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
-                else
+                else {
                     pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
                                                            "No function with this name found in systemd-journal.plugin.");
+                }
 
                 fflush(stdout);
-                netdata_mutex_unlock(&mutex);
+                netdata_mutex_unlock(&stdout_mutex);
             }
         }
         else
@@ -919,16 +920,16 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     usec_t step = 1000 * USEC_PER_MS;
     bool tty = isatty(fileno(stderr)) == 1;
 
-    netdata_mutex_lock(&mutex);
+    netdata_mutex_lock(&stdout_mutex);
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
             SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(iteration = 0; 1 ; iteration++) {
-        netdata_mutex_unlock(&mutex);
+        netdata_mutex_unlock(&stdout_mutex);
         heartbeat_next(&hb, step);
-        netdata_mutex_lock(&mutex);
+        netdata_mutex_lock(&stdout_mutex);
 
         if(!tty)
             fprintf(stdout, "\n");
