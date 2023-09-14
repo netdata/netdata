@@ -879,7 +879,6 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_cpu;
     RRDDIM *rd_mem_usage;
     RRDDIM *rd_mem_failcnt;
     RRDDIM *rd_swap_usage;
@@ -2863,7 +2862,6 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_cpu = NULL,
         *st_mem_usage = NULL,
         *st_mem_failcnt = NULL,
         *st_swap_usage = NULL,
@@ -2892,26 +2890,6 @@ void update_systemd_services_charts(
         *st_merged_ops_write = NULL;
 
     // create the charts
-
-    if (unlikely(do_cpu && !st_cpu)) {
-        char title[CHART_TITLE_MAX + 1];
-        snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (100%% = 1 core)");
-
-        st_cpu = rrdset_create_localhost(
-                "services"
-                , "cpu"
-                , NULL
-                , "cpu"
-                , "services.cpu"
-                , title
-                , "percentage"
-                , PLUGIN_CGROUPS_NAME
-                , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD
-                , update_every
-                , RRDSET_TYPE_STACKED
-        );
-    }
 
     if (unlikely(do_mem_usage && !st_mem_usage)) {
         st_mem_usage = rrdset_create_localhost(
@@ -3325,22 +3303,41 @@ void update_systemd_services_charts(
 
     // update the values
     struct cgroup *cg;
+    // TODO: Remove constant (1000) when all charts are moved.
+    static int prio = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 1000;
     for(cg = cgroup_root; cg ; cg = cg->next) {
         if(unlikely(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg)))
             continue;
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
-            if(unlikely(!cg->rd_cpu)){
-
-
-                if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                    cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
-                } else {
-                    cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
-                }
+            if (unlikely(!cg->st_cpu)) {
+                cg->st_cpu = rrdset_create_localhost("services",
+                                                     "cpu",
+                                                     NULL,
+                                                     "cpu",
+                                                     "services.cpu",
+                                                     "Systemd Services CPU utilization (100%% = 1 core)",
+                                                     "percentage",
+                                                     PLUGIN_CGROUPS_NAME,
+                                                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
+                                                     prio++,
+                                                     update_every,
+                                                     RRDSET_TYPE_STACKED
+                    );
             }
 
-            rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
+            if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+            } else {
+                rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            // complete the iteration
+            rrddim_set(cg->st_cpu, "user", cg->cpuacct_stat.user);
+            rrddim_set(cg->st_cpu, "system", cg->cpuacct_stat.system);
+            rrdset_done(cg->st_cpu);
         }
 
         if(likely(do_mem_usage && cg->memory.updated_usage_in_bytes)) {
@@ -3486,10 +3483,6 @@ void update_systemd_services_charts(
             rrddim_set_by_pointer(st_merged_ops_write, cg->rd_io_merged_write, cg->io_merged.Write);
         }
     }
-
-    // complete the iteration
-    if(likely(do_cpu))
-        rrdset_done(st_cpu);
 
     if(likely(do_mem_usage))
         rrdset_done(st_mem_usage);
