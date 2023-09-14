@@ -372,8 +372,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
 }
 
 static void netdata_systemd_journal_function_help(const char *transaction) {
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
-    fprintf(stdout,
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_sprintf(wb,
             "%s / %s\n"
             "\n"
             "%s\n"
@@ -411,7 +411,12 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             , -SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION
             , SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY
     );
-    pluginsd_function_result_end_to_stdout();
+
+    netdata_mutex_lock(&stdout_mutex);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
+    netdata_mutex_unlock(&stdout_mutex);
+
+    buffer_free(wb);
 }
 
 static const char *syslog_facility_to_name(int facility) {
@@ -812,14 +817,16 @@ static void function_systemd_journal(const char *transaction, char *function, ch
                                              now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
 
     if(response != HTTP_RESP_OK) {
+        netdata_mutex_lock(&stdout_mutex);
         pluginsd_function_json_error_to_stdout(transaction, response, "failed");
+        netdata_mutex_unlock(&stdout_mutex);
         goto cleanup;
     }
 
 output:
-    pluginsd_function_result_begin_to_stdout(transaction, response, "application/json", expires);
-    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
-    pluginsd_function_result_end_to_stdout();
+    netdata_mutex_lock(&stdout_mutex);
+    pluginsd_function_result_to_stdout(transaction, response, "application/json", expires, wb);
+    netdata_mutex_unlock(&stdout_mutex);
 
 cleanup:
     facets_destroy(facets);
@@ -853,17 +860,14 @@ static void *reader_main(void *arg __maybe_unused) {
                 int timeout = str2i(timeout_s);
                 if(timeout <= 0) timeout = SYSTEMD_JOURNAL_DEFAULT_TIMEOUT;
 
-                netdata_mutex_lock(&stdout_mutex);
-
                 if(strncmp(function, SYSTEMD_JOURNAL_FUNCTION_NAME, strlen(SYSTEMD_JOURNAL_FUNCTION_NAME)) == 0)
                     function_systemd_journal(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else {
+                    netdata_mutex_lock(&stdout_mutex);
                     pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
                                                            "No function with this name found in systemd-journal.plugin.");
+                    netdata_mutex_unlock(&stdout_mutex);
                 }
-
-                fflush(stdout);
-                netdata_mutex_unlock(&stdout_mutex);
             }
         }
         else
