@@ -652,9 +652,9 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
     buffer_json_member_add_object(wb, "view");
     {
         char title[1024 + 1] = "Events Distribution";
-        FACET_KEY *k = dictionary_get(facets->keys, facets->histogram.chart);
-        if(k && k->name)
-            snprintfz(title, 1024, "Events Distribution by %s", k->name);
+        FACET_KEY *kt = dictionary_get(facets->keys, facets->histogram.chart);
+        if(kt && kt->name)
+            snprintfz(title, 1024, "Events Distribution by %s", kt->name);
 
         buffer_json_member_add_string(wb, "title", title);
         buffer_json_member_add_time_t(wb, "update_every", facets->histogram.slot_width_ut / USEC_PER_SEC);
