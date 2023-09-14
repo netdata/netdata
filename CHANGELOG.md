@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Clarifying the possible installation types [\#15958](https://github.com/netdata/netdata/pull/15958) ([tkatsoulas](https://github.com/tkatsoulas))
+- fix journal direction parsing [\#15957](https://github.com/netdata/netdata/pull/15957) ([ktsaou](https://github.com/ktsaou))
+- facets and journal improvements [\#15956](https://github.com/netdata/netdata/pull/15956) ([ktsaou](https://github.com/ktsaou))
+- Fix CID 400366 [\#15953](https://github.com/netdata/netdata/pull/15953) ([stelfrag](https://github.com/stelfrag))
+- Update descriptions. [\#15952](https://github.com/netdata/netdata/pull/15952) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update slabinfo metadata [\#15951](https://github.com/netdata/netdata/pull/15951) ([thiagoftsm](https://github.com/thiagoftsm))
 - Disk Labels [\#15949](https://github.com/netdata/netdata/pull/15949) ([ktsaou](https://github.com/ktsaou))
 - streaming logs [\#15948](https://github.com/netdata/netdata/pull/15948) ([ktsaou](https://github.com/ktsaou))
 - Integrations: Add a note to enable the collectors [\#15945](https://github.com/netdata/netdata/pull/15945) ([MrZammler](https://github.com/MrZammler))
@@ -423,11 +429,6 @@
 - update http response code descriptions [\#15379](https://github.com/netdata/netdata/pull/15379) ([ktsaou](https://github.com/ktsaou))
 - Suppress H2O compilation warnings [\#15378](https://github.com/netdata/netdata/pull/15378) ([stelfrag](https://github.com/stelfrag))
 - update bundled v2 dashboard [\#15377](https://github.com/netdata/netdata/pull/15377) ([ilyam8](https://github.com/ilyam8))
-- health: fix windows alarms for vnodes [\#15376](https://github.com/netdata/netdata/pull/15376) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity issues [\#15375](https://github.com/netdata/netdata/pull/15375) ([stelfrag](https://github.com/stelfrag))
-- Update bundled v2 dashboard. [\#15374](https://github.com/netdata/netdata/pull/15374) ([Ferroin](https://github.com/Ferroin))
-- Update libbpf version \(1.2.2\) [\#15373](https://github.com/netdata/netdata/pull/15373) ([thiagoftsm](https://github.com/thiagoftsm))
-- simplify collector schema by moving some props under meta [\#15372](https://github.com/netdata/netdata/pull/15372) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
