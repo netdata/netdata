@@ -1,6 +1,6 @@
 # Getting started with Netdata Cloud On-Prem
 Helm chart for the Netdata Cloud On-Prem installation on Kubernetes is available at ECR registry.
-ECR registry is private, so you need to login first. Credentials are sent by our Marketing team. If you do not have them, please contact our marketing team - marketing@netdata.cloud.
+ECR registry is private, so you need to login first. Credentials are sent by our Product team. If you do not have them, please contact our marketing team - info@netdata.cloud.
 
 Firstly credentials must be set for authentication with AWS's ECR:
 ```bash
