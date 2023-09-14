@@ -880,7 +880,6 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_mem_usage;
     RRDDIM *rd_mem_failcnt;
     RRDDIM *rd_swap_usage;
 
@@ -2904,23 +2903,6 @@ void update_systemd_services_charts(
 
     // create the charts
 
-    if (unlikely(do_mem_usage && !st_mem_usage)) {
-        st_mem_usage = rrdset_create_localhost(
-                "services"
-                , "mem_usage"
-                , NULL
-                , "mem"
-                , "services.mem_usage"
-                , "Systemd Services Used Memory"
-                , "MiB"
-                , PLUGIN_CGROUPS_NAME
-                , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 10
-                , update_every
-                , RRDSET_TYPE_STACKED
-        );
-    }
-
     if(likely(do_mem_detailed)) {
         if(unlikely(!st_mem_detailed_rss)) {
             st_mem_detailed_rss = rrdset_create_localhost(
@@ -3326,9 +3308,8 @@ void update_systemd_services_charts(
         type[0] = '\0';
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
             if (unlikely(!cg->st_cpu)) {
-
                 cg->st_cpu = rrdset_create_localhost(
-                                                     cgroup_chart_type(type, services_chart_id_prefix, cg->chart_id, RRD_ID_LENGTH_MAX),
+                                                     cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX),
                                                      "cpu",
                                                      NULL,
                                                      "cpu",
@@ -3357,11 +3338,28 @@ void update_systemd_services_charts(
             rrdset_done(cg->st_cpu);
         }
 
-        if(likely(do_mem_usage && cg->memory.updated_usage_in_bytes)) {
-            if(unlikely(!cg->rd_mem_usage))
-                cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+        if (unlikely(do_mem_usage && cg->memory.updated_usage_in_bytes)) {
+            if (unlikely(!cg->st_mem_usage)) {
+                cg->st_mem_usage = rrdset_create_localhost(
+                    cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX)
+                    , "mem_usage"
+                    , NULL
+                    , "mem"
+                    , "services.mem_usage"
+                    , "Systemd Services Used Memory"
+                    , "MiB"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
+                    , prio++
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+                    );
 
-            rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes);
+                rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes);
+            rrdset_done(st_mem_usage);
         }
 
         if(likely(do_mem_detailed && cg->memory.updated_detailed)) {
@@ -3500,9 +3498,6 @@ void update_systemd_services_charts(
             rrddim_set_by_pointer(st_merged_ops_write, cg->rd_io_merged_write, cg->io_merged.Write);
         }
     }
-
-    if(likely(do_mem_usage))
-        rrdset_done(st_mem_usage);
 
     if(unlikely(do_mem_detailed)) {
         rrdset_done(st_mem_detailed_cache);
