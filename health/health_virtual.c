@@ -129,7 +129,7 @@ void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv) {
     buffer_json_member_add_object(wb, "configuration"                  );
 
     DICTIONARY *dict_rcvs = NULL;
-    dict_rcvs = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dict_rcvs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
     //TODO get from the v2 nodes which one to run on
     health_config_setup_rc_from_api(wb, localhost, dict_rcvs, hv);
