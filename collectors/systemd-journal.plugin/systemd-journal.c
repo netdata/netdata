@@ -369,7 +369,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
 
     facets_report(facets, wb);
 
-    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + data_only ? 3600 : 0);
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + (data_only ? 3600 : 0));
     buffer_json_finalize(wb);
 
     return status == ND_SD_JOURNAL_FAILED_TO_SEEK ? HTTP_RESP_INTERNAL_SERVER_ERROR : HTTP_RESP_OK;
