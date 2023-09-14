@@ -906,6 +906,12 @@ struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict,
         .content_free = NULL,
         .content_length = 0
     };
+#ifndef NETDATA_TEST_DYNCFG
+    resp.content = "DYNCFG is disabled (as it is for now developer only feature). This will be enabled by default when ready for technical preview.";
+    resp.content_length = strlen(resp.content);
+    resp.status = HTTP_RESP_PRECOND_FAIL;
+    return resp;
+#endif
     if (plugin == NULL) {
         handle_dyncfg_root(plugins_dict, &resp, method);
         return resp;

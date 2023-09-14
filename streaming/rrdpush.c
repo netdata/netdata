@@ -96,6 +96,9 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
             STREAM_HAS_COMPRESSION |
+#ifdef NETDATA_TEST_DYNCFG
+            STREAM_CAP_DYNCFG |
+#endif
             (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
             (ml_capability ? STREAM_CAP_DATA_WITH_ML : 0) |
             0;
@@ -466,11 +469,11 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
 }
 
 // TODO enable this macro before release
-#define bail_if_no_cap(cap);
-/*    if(unlikely(!stream_has_capability(host->sender, cap))) { \
-          netdata_log_error("STREAM %s [send]: cannot send job status update - parent does not support it.", rrdhost_hostname(host)); \
-          return; \
-      }*/
+#define bail_if_no_cap(cap) \
+    if(unlikely(!stream_has_capability(host->sender, cap))) { \
+        netdata_log_error("STREAM %s [send]: cannot send job status update - parent does not support it.", rrdhost_hostname(host)); \
+        return; \
+    }
 
 #define dyncfg_check_can_push(host) \
     if(unlikely(!rrdhost_can_send_definitions_to_parent(host))) \
@@ -1401,6 +1404,7 @@ static struct {
     { STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     { STREAM_CAP_IEEE754, "IEEE754" },
     { STREAM_CAP_DATA_WITH_ML, "ML" },
+    { STREAM_CAP_DYNCFG, "DYN_CFG" },
     { 0 , NULL },
 };
 
