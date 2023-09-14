@@ -880,9 +880,6 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_mem_failcnt;
-    RRDDIM *rd_swap_usage;
-
     RRDDIM *rd_mem_detailed_cache;
     RRDDIM *rd_mem_detailed_rss;
     RRDDIM *rd_mem_detailed_mapped;
@@ -2874,8 +2871,6 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_mem_failcnt = NULL,
-
         *st_mem_detailed_cache = NULL,
         *st_mem_detailed_rss = NULL,
         *st_mem_detailed_mapped = NULL,
@@ -3039,23 +3034,6 @@ void update_systemd_services_charts(
                     , RRDSET_TYPE_STACKED
             );
         }
-    }
-
-    if(unlikely(do_mem_failcnt && !st_mem_failcnt)) {
-        st_mem_failcnt = rrdset_create_localhost(
-                "services"
-                , "mem_failcnt"
-                , NULL
-                , "mem"
-                , "services.mem_failcnt"
-                , "Systemd Services Memory Limit Failures"
-                , "failures"
-                , PLUGIN_CGROUPS_NAME
-                , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 110
-                , update_every
-                , RRDSET_TYPE_STACKED
-        );
     }
 
     if(likely(do_io)) {
@@ -3355,6 +3333,31 @@ void update_systemd_services_charts(
             rrdset_done(cg->st_mem_usage);
         }
 
+        if(likely(do_mem_failcnt && cg->memory.updated_failcnt)) {
+            if (unlikely(do_mem_failcnt && !cg->st_mem_failcnt)) {
+                cg->st_mem_failcnt = rrdset_create_localhost(
+                    cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX)
+                    , "mem_failcnt"
+                    , NULL
+                    , "mem"
+                    , "systemd.services.mem_failcnt"
+                    , "Systemd Services Memory Limit Failures"
+                    , "failures"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
+                    , prio++
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+                    );
+
+                rrddim_add(cg->st_mem_failcnt, "fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set(cg->st_mem_failcnt, "fail", cg->memory.failcnt);
+            rrdset_done(cg->st_mem_failcnt);
+        }
+
+
         if(likely(do_mem_detailed && cg->memory.updated_detailed)) {
             if(unlikely(!cg->rd_mem_detailed_rss))
                 cg->rd_mem_detailed_rss = rrddim_add(st_mem_detailed_rss, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -3395,13 +3398,6 @@ void update_systemd_services_charts(
                 cg->rd_mem_detailed_pgpgout = rrddim_add(st_mem_detailed_pgpgout, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_detailed_pgpgout, cg->rd_mem_detailed_pgpgout, cg->memory.total_pgpgout);
-        }
-
-        if(likely(do_mem_failcnt && cg->memory.updated_failcnt)) {
-            if(unlikely(!cg->rd_mem_failcnt))
-                cg->rd_mem_failcnt = rrddim_add(st_mem_failcnt, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_set_by_pointer(st_mem_failcnt, cg->rd_mem_failcnt, cg->memory.failcnt);
         }
 
         if(likely(do_io && cg->io_service_bytes.updated)) {
@@ -3487,9 +3483,6 @@ void update_systemd_services_charts(
         rrdset_done(st_mem_detailed_pgpgin);
         rrdset_done(st_mem_detailed_pgpgout);
     }
-
-    if(likely(do_mem_failcnt))
-        rrdset_done(st_mem_failcnt);
 
     if(likely(do_io)) {
         rrdset_done(st_io_read);
