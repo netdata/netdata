@@ -3,7 +3,7 @@
 #include "dyn_conf.h"
 
 #define DYN_CONF_PATH_MAX (4096)
-#define DYN_CONF_DIR VARLIB_DIR "/etc"
+#define DYN_CONF_DIR VARLIB_DIR "/dynconf"
 
 #define DYN_CONF_JOB_SCHEMA "job_schema"
 #define DYN_CONF_SCHEMA "schema"
