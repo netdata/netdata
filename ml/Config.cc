@@ -29,7 +29,7 @@ void ml_config_load(ml_config_t *cfg) {
     unsigned min_train_samples = config_get_number(config_section_ml, "minimum num samples to train", 1 * 900);
     unsigned train_every = config_get_number(config_section_ml, "train every", 3 * 3600);
 
-    unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 9);
+    unsigned num_models_to_use = config_get_number(config_section_ml, "number of models per dimension", 18);
     unsigned delete_models_older_than = config_get_number(config_section_ml, "delete models older than", 60 * 60 * 24 * 7);
 
     unsigned diff_n = config_get_number(config_section_ml, "num samples to diff", 1);
