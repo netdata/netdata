@@ -253,14 +253,16 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
         if(first_key)
             buffer_json_add_array_item_string(wb, first_key);
 
-        FACET_VALUE *v;
-        dfe_start_read(k->values, v) {
-            if(unlikely(!v->histogram))
-                continue;
+        if(k && k->values) {
+            FACET_VALUE *v;
+            dfe_start_read(k->values, v){
+                if (unlikely(!v->histogram))
+                    continue;
 
-            buffer_json_add_array_item_string(wb, v->name);
+                buffer_json_add_array_item_string(wb, v->name);
+            }
+            dfe_done(v);
         }
-        dfe_done(v);
     }
     buffer_json_array_close(wb); // key
 }
@@ -268,14 +270,16 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
 static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        FACET_VALUE *v;
-        dfe_start_read(k->values, v) {
-            if(unlikely(!v->histogram))
-                continue;
+        if(k && k->values) {
+            FACET_VALUE *v;
+            dfe_start_read(k->values, v){
+                if (unlikely(!v->histogram))
+                    continue;
 
-            buffer_json_add_array_item_string(wb, "events");
+                buffer_json_add_array_item_string(wb, "events");
+            }
+            dfe_done(v);
         }
-        dfe_done(v);
     }
     buffer_json_array_close(wb); // key
 }
@@ -283,14 +287,16 @@ static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __may
 static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        FACET_VALUE *v;
-        dfe_start_read(k->values, v) {
-            if(unlikely(!v->histogram))
-                continue;
+        if(k && k->values) {
+            FACET_VALUE *v;
+            dfe_start_read(k->values, v){
+                if (unlikely(!v->histogram))
+                    continue;
 
-            buffer_json_add_array_item_uint64(wb, v->min);
+                buffer_json_add_array_item_uint64(wb, v->min);
+            }
+            dfe_done(v);
         }
-        dfe_done(v);
     }
     buffer_json_array_close(wb); // key
 }
@@ -298,14 +304,16 @@ static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        FACET_VALUE *v;
-        dfe_start_read(k->values, v) {
-                    if(unlikely(!v->histogram))
-                        continue;
+        if(k && k->values) {
+            FACET_VALUE *v;
+            dfe_start_read(k->values, v){
+                if (unlikely(!v->histogram))
+                    continue;
 
-                    buffer_json_add_array_item_uint64(wb, v->max);
-                }
-        dfe_done(v);
+                buffer_json_add_array_item_uint64(wb, v->max);
+            }
+            dfe_done(v);
+        }
     }
     buffer_json_array_close(wb); // key
 }
@@ -313,14 +321,16 @@ static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        FACET_VALUE *v;
-        dfe_start_read(k->values, v) {
-            if(unlikely(!v->histogram))
-                continue;
+        if(k && k->values) {
+            FACET_VALUE *v;
+            dfe_start_read(k->values, v){
+                if (unlikely(!v->histogram))
+                    continue;
 
-            buffer_json_add_array_item_double(wb, (double)v->sum / (double)facets->histogram.slots);
+                buffer_json_add_array_item_double(wb, (double) v->sum / (double) facets->histogram.slots);
+            }
+            dfe_done(v);
         }
-        dfe_done(v);
     }
     buffer_json_array_close(wb); // key
 }
@@ -328,14 +338,16 @@ static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        FACET_VALUE *v;
-        dfe_start_read(k->values, v) {
-            if(unlikely(!v->histogram))
-                continue;
+        if(k && k->values) {
+            FACET_VALUE *v;
+            dfe_start_read(k->values, v){
+                if (unlikely(!v->histogram))
+                    continue;
 
-            buffer_json_add_array_item_uint64(wb, 0);
+                buffer_json_add_array_item_uint64(wb, 0);
+            }
+            dfe_done(v);
         }
-        dfe_done(v);
     }
     buffer_json_array_close(wb); // key
 }
@@ -343,14 +355,16 @@ static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint32_t sum) {
     buffer_json_member_add_array(wb, key);
     {
-        FACET_VALUE *v;
-        dfe_start_read(k->values, v) {
-            if(unlikely(!v->histogram))
-                continue;
+        if(k && k->values) {
+            FACET_VALUE *v;
+            dfe_start_read(k->values, v){
+                if (unlikely(!v->histogram))
+                    continue;
 
-            buffer_json_add_array_item_double(wb, (double)v->sum * 100.0 / (double)sum);
+                buffer_json_add_array_item_double(wb, (double) v->sum * 100.0 / (double) sum);
+            }
+            dfe_done(v);
         }
-        dfe_done(v);
     }
     buffer_json_array_close(wb); // key
 }
@@ -359,7 +373,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
     size_t dimensions = 0;
     uint32_t min = UINT32_MAX, max = 0, sum = 0, count = 0;
 
-    {
+    if(k && k->values) {
         FACET_VALUE *v;
         dfe_start_read(k->values, v){
             if (unlikely(!v->histogram))
@@ -395,9 +409,6 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         dfe_done(v);
     }
 
-    if(!dimensions)
-        return;
-
     buffer_json_member_add_object(wb, "summary");
     {
         buffer_json_member_add_array(wb, "nodes");
@@ -414,26 +425,33 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                     buffer_json_member_add_string(wb, "msg", "");
                 }
                 buffer_json_object_close(wb); // st
-                buffer_json_member_add_object(wb, "is");
-                {
-                    buffer_json_member_add_uint64(wb, "sl", 1);
-                    buffer_json_member_add_uint64(wb, "qr", 1);
+
+                if(dimensions) {
+                    buffer_json_member_add_object(wb, "is");
+                    {
+                        buffer_json_member_add_uint64(wb, "sl", 1);
+                        buffer_json_member_add_uint64(wb, "qr", 1);
+                    }
+                    buffer_json_object_close(wb); // is
+
+                    buffer_json_member_add_object(wb, "ds");
+                    {
+                        buffer_json_member_add_uint64(wb, "sl", dimensions);
+                        buffer_json_member_add_uint64(wb, "qr", dimensions);
+                    }
+                    buffer_json_object_close(wb); // ds
                 }
-                buffer_json_object_close(wb); // is
-                buffer_json_member_add_object(wb, "ds");
-                {
-                    buffer_json_member_add_uint64(wb, "sl", dimensions);
-                    buffer_json_member_add_uint64(wb, "qr", dimensions);
+
+                if(count) {
+                    buffer_json_member_add_object(wb, "sts");
+                    {
+                        buffer_json_member_add_uint64(wb, "min", min);
+                        buffer_json_member_add_uint64(wb, "max", max);
+                        buffer_json_member_add_double(wb, "avg", (double) sum / (double) count);
+                        buffer_json_member_add_double(wb, "con", 100.0);
+                    }
+                    buffer_json_object_close(wb); // sts
                 }
-                buffer_json_object_close(wb); // ds
-                buffer_json_member_add_object(wb, "sts");
-                {
-                    buffer_json_member_add_uint64(wb, "min", min);
-                    buffer_json_member_add_uint64(wb, "max", max);
-                    buffer_json_member_add_double(wb, "avg", (double)sum / (double)count);
-                    buffer_json_member_add_double(wb, "con", 100.0);
-                }
-                buffer_json_object_close(wb); // sts
             }
             buffer_json_object_close(wb); // node
         }
@@ -444,26 +462,33 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
             buffer_json_add_array_item_object(wb); // context
             {
                 buffer_json_member_add_string(wb, "id", "facets.histogram");
-                buffer_json_member_add_object(wb, "is");
-                {
-                    buffer_json_member_add_uint64(wb, "sl", 1);
-                    buffer_json_member_add_uint64(wb, "qr", 1);
+
+                if(dimensions) {
+                    buffer_json_member_add_object(wb, "is");
+                    {
+                        buffer_json_member_add_uint64(wb, "sl", 1);
+                        buffer_json_member_add_uint64(wb, "qr", 1);
+                    }
+                    buffer_json_object_close(wb); // is
+
+                    buffer_json_member_add_object(wb, "ds");
+                    {
+                        buffer_json_member_add_uint64(wb, "sl", dimensions);
+                        buffer_json_member_add_uint64(wb, "qr", dimensions);
+                    }
+                    buffer_json_object_close(wb); // ds
                 }
-                buffer_json_object_close(wb); // is
-                buffer_json_member_add_object(wb, "ds");
-                {
-                    buffer_json_member_add_uint64(wb, "sl", dimensions);
-                    buffer_json_member_add_uint64(wb, "qr", dimensions);
+
+                if(count) {
+                    buffer_json_member_add_object(wb, "sts");
+                    {
+                        buffer_json_member_add_uint64(wb, "min", min);
+                        buffer_json_member_add_uint64(wb, "max", max);
+                        buffer_json_member_add_double(wb, "avg", (double) sum / (double) count);
+                        buffer_json_member_add_double(wb, "con", 100.0);
+                    }
+                    buffer_json_object_close(wb); // sts
                 }
-                buffer_json_object_close(wb); // ds
-                buffer_json_member_add_object(wb, "sts");
-                {
-                    buffer_json_member_add_uint64(wb, "min", min);
-                    buffer_json_member_add_uint64(wb, "max", max);
-                    buffer_json_member_add_double(wb, "avg", (double)sum / (double)count);
-                    buffer_json_member_add_double(wb, "con", 100.0);
-                }
-                buffer_json_object_close(wb); // sts
             }
             buffer_json_object_close(wb); // context
         }
@@ -475,27 +500,33 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
             {
                 buffer_json_member_add_string(wb, "id", "facets.histogram");
                 buffer_json_member_add_uint64(wb, "ni", 0);
-                buffer_json_member_add_object(wb, "ds");
-                {
-                    buffer_json_member_add_uint64(wb, "sl", dimensions);
-                    buffer_json_member_add_uint64(wb, "qr", dimensions);
+
+                if(dimensions) {
+                    buffer_json_member_add_object(wb, "ds");
+                    {
+                        buffer_json_member_add_uint64(wb, "sl", dimensions);
+                        buffer_json_member_add_uint64(wb, "qr", dimensions);
+                    }
+                    buffer_json_object_close(wb); // ds
                 }
-                buffer_json_object_close(wb); // ds
-                buffer_json_member_add_object(wb, "sts");
-                {
-                    buffer_json_member_add_uint64(wb, "min", min);
-                    buffer_json_member_add_uint64(wb, "max", max);
-                    buffer_json_member_add_double(wb, "avg", (double)sum / (double)count);
-                    buffer_json_member_add_double(wb, "con", 100.0);
+
+                if(count) {
+                    buffer_json_member_add_object(wb, "sts");
+                    {
+                        buffer_json_member_add_uint64(wb, "min", min);
+                        buffer_json_member_add_uint64(wb, "max", max);
+                        buffer_json_member_add_double(wb, "avg", (double) sum / (double) count);
+                        buffer_json_member_add_double(wb, "con", 100.0);
+                    }
+                    buffer_json_object_close(wb); // sts
                 }
-                buffer_json_object_close(wb); // sts
             }
             buffer_json_object_close(wb); // instance
         }
         buffer_json_array_close(wb); // instances
 
         buffer_json_member_add_array(wb, "dimensions");
-        {
+        if(dimensions && k && k->values) {
             size_t pri = 0;
             FACET_VALUE *v;
             dfe_start_read(k->values, v) {
@@ -543,24 +574,28 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
             buffer_json_member_add_uint64(wb, "qr", 1);
         }
         buffer_json_object_close(wb); // nodes
-        buffer_json_member_add_object(wb, "contexts");
-        {
-            buffer_json_member_add_uint64(wb, "sl", 1);
-            buffer_json_member_add_uint64(wb, "qr", 1);
+
+        if(dimensions) {
+            buffer_json_member_add_object(wb, "contexts");
+            {
+                buffer_json_member_add_uint64(wb, "sl", 1);
+                buffer_json_member_add_uint64(wb, "qr", 1);
+            }
+            buffer_json_object_close(wb); // contexts
+            buffer_json_member_add_object(wb, "instances");
+            {
+                buffer_json_member_add_uint64(wb, "sl", 1);
+                buffer_json_member_add_uint64(wb, "qr", 1);
+            }
+            buffer_json_object_close(wb); // instances
+
+            buffer_json_member_add_object(wb, "dimensions");
+            {
+                buffer_json_member_add_uint64(wb, "sl", dimensions);
+                buffer_json_member_add_uint64(wb, "qr", dimensions);
+            }
+            buffer_json_object_close(wb); // dimension
         }
-        buffer_json_object_close(wb); // contexts
-        buffer_json_member_add_object(wb, "instances");
-        {
-            buffer_json_member_add_uint64(wb, "sl", 1);
-            buffer_json_member_add_uint64(wb, "qr", 1);
-        }
-        buffer_json_object_close(wb); // instances
-        buffer_json_member_add_object(wb, "dimensions");
-        {
-            buffer_json_member_add_uint64(wb, "sl", dimensions);
-            buffer_json_member_add_uint64(wb, "qr", dimensions);
-        }
-        buffer_json_object_close(wb); // dimension
     }
     buffer_json_object_close(wb); // totals
 
@@ -577,7 +612,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         buffer_json_object_close(wb); // point
 
         buffer_json_member_add_array(wb, "data");
-        {
+        if(k && k->values) {
             usec_t t = facets->histogram.after_ut;
             for(uint32_t i = 0; i < facets->histogram.slots ;i++) {
                 buffer_json_add_array_item_array(wb); // row
@@ -585,8 +620,8 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                     buffer_json_add_array_item_time_ms(wb, t / USEC_PER_SEC);
 
                     FACET_VALUE *v;
-                    dfe_start_read(k->values, v) {
-                        if(unlikely(!v->histogram))
+                    dfe_start_read(k->values, v){
+                        if (unlikely(!v->histogram))
                             continue;
 
                         buffer_json_add_array_item_array(wb); // point
@@ -1615,17 +1650,15 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                 k = dictionary_get(facets->keys, id);
             }
 
-            if(k && k->values) {
-                buffer_json_member_add_object(wb, "histogram");
-                {
-                    buffer_json_member_add_string(wb, "id", id);
-                    buffer_json_member_add_string(wb, "name", k->name);
-                    buffer_json_member_add_object(wb, "chart");
-                    facets_histogram_generate(facets, k, wb);
-                    buffer_json_object_close(wb);
-                }
-                buffer_json_object_close(wb); // histogram
+            buffer_json_member_add_object(wb, "histogram");
+            {
+                buffer_json_member_add_string(wb, "id", id);
+                buffer_json_member_add_string(wb, "name", k->name);
+                buffer_json_member_add_object(wb, "chart");
+                facets_histogram_generate(facets, k, wb);
+                buffer_json_object_close(wb);
             }
+            buffer_json_object_close(wb); // histogram
         }
     }
 
