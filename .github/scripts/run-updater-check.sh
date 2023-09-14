@@ -12,7 +12,7 @@ echo "::group::>>> Pre-Update Netdata Build Info"
 netdata -W buildinfo
 echo "::endgroup::"
 echo ">>> Updating Netdata..."
-export NETDATA_BASE_URL="http://localhost:8080/artifacts/" # Pull the tarball from the local web server.
+export NETDATA_BASE_URL="http://localhost:8080/artifacts" # Pull the tarball from the local web server.
 echo NETDATA_MAJOR_VERSION_UPDATES=1 > /etc/netdata/netdata-updater.conf
 timeout 3600 /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update
 

@@ -448,6 +448,11 @@ get_netdata_latest_tag() {
   if echo "${tag}" | grep -Eq 'latest/?$'; then
     if _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt; then
       tag="$(cat ./ndupdate-version.txt)"
+
+      if grep -q 'Not Found' ./ndupdate-version.txt; then
+        tag="latest"
+      fi
+
       rm -f ./ndupdate-version.txt
     else
       tag="latest"
