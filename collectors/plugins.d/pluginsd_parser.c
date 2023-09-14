@@ -2438,9 +2438,9 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
 }
 
 static inline PARSER_RC pluginsd_register_job_common(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused, const char *plugin_name) {
-    dyncfg_job_flg_t flags = atol(words[3]);
-    if (flags < 0)
+    if (atol(words[3]) < 0)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "invalid flags");
+    dyncfg_job_flg_t flags = atol(words[3]);
     if (SERVING_PLUGINSD(parser))
         flags |= JOB_FLG_PLUGIN_PUSHED;
     else
