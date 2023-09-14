@@ -1405,6 +1405,8 @@ void health_config_setup_rc_from_api_do_calc(BUFFER *wb, RRDCALC *rcv, char *cal
     } else {
         buffer_json_member_add_string(wb, "calc_error", expression_strerror(error));
     }
+
+    parse_variables_and_store_in_health_rrdvars(calc, HEALTH_CONF_MAX_LINE);
 }
 
 void health_config_setup_rc_from_api_do_warn(BUFFER *wb, RRDCALC *rcv, char *warn)
@@ -1425,6 +1427,8 @@ void health_config_setup_rc_from_api_do_warn(BUFFER *wb, RRDCALC *rcv, char *war
     } else {
         buffer_json_member_add_string(wb, "warn_error", expression_strerror(error));
     }
+
+    parse_variables_and_store_in_health_rrdvars(warn, HEALTH_CONF_MAX_LINE);
 }
 
 void health_config_setup_rc_from_api_do_crit(BUFFER *wb, RRDCALC *rcv, char *crit)
@@ -1445,6 +1449,8 @@ void health_config_setup_rc_from_api_do_crit(BUFFER *wb, RRDCALC *rcv, char *cri
     } else {
         buffer_json_member_add_string(wb, "crit_error", expression_strerror(error));
     }
+
+    parse_variables_and_store_in_health_rrdvars(crit, HEALTH_CONF_MAX_LINE);
 }
 
 void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, DICTIONARY *dict_rcvs, struct health_virtual *hv)
@@ -1452,13 +1458,17 @@ void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, DICTIONARY *dict
     RRDCALC *rcv = callocz(1, sizeof(RRDCALC));
     rcv->name = string_strdupz("virtual");
 
+    if (!health_rrdvars)
+        health_rrdvars = health_rrdvariables_create();
+
     if (hv->chart) {
         buffer_json_member_add_string(wb, "chart", hv->chart);
         RRDSET *st;
         rrdset_foreach_read(st, host) {
-            if (strcmp(hv->chart, string2str(st->id)) && strcmp(hv->chart, string2str(st->name)))
+            if (strcmp(hv->chart, string2str(st->id)) && strcmp(hv->chart, string2str(st->name))) {
+                // also store variables from other charts if needed
                 continue;
-            else {
+            } else {
                 rcv->chart = string_dup(st->id);
                 rcv->rrdset = st;
                 rcv->units = string_dup(st->units);
@@ -1466,7 +1476,8 @@ void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, DICTIONARY *dict
                 health_config_setup_rc_from_api_do_calc(wb, rcv, hv->calc);
                 health_config_setup_rc_from_api_do_warn(wb, rcv, hv->warn);
                 health_config_setup_rc_from_api_do_crit(wb, rcv, hv->crit);
- 
+                rrdvar_store_for_chart(host, st);
+
                 dictionary_set(dict_rcvs, string2str(st->id), rcv, sizeof(RRDCALC));
                 break;
             }
@@ -1486,6 +1497,7 @@ void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, DICTIONARY *dict
                 health_config_setup_rc_from_api_do_calc(wb, rcv, hv->calc);
                 health_config_setup_rc_from_api_do_warn(wb, rcv, hv->warn);
                 health_config_setup_rc_from_api_do_crit(wb, rcv, hv->crit);
+                rrdvar_store_for_chart(host, st);
 
                 dictionary_set(dict_rcvs, string2str(st->id), rcv, sizeof(RRDCALC));
                 rcv = callocz(1, sizeof(RRDCALC));

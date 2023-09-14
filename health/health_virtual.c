@@ -154,4 +154,7 @@ void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv) {
     dfe_done(rcv);
     buffer_json_object_close(wb);
     buffer_json_object_close(wb);
+
+    //free rcv
+    //free rrdvars
 }
