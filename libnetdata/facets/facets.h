@@ -18,7 +18,8 @@ typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_VISIBLE        = (1 << 4), // should be in the default table
     FACET_KEY_OPTION_FTS            = (1 << 5), // the key is filterable by full text search (FTS)
     FACET_KEY_OPTION_MAIN_TEXT      = (1 << 6), // full width and wrap
-    FACET_KEY_OPTION_REORDER        = (1 << 7), // give the key a new order id on first encounter
+    FACET_KEY_OPTION_RICH_TEXT      = (1 << 7),
+    FACET_KEY_OPTION_REORDER        = (1 << 8), // give the key a new order id on first encounter
 } FACET_KEY_OPTIONS;
 
 typedef enum __attribute__((packed)) {
@@ -58,6 +59,7 @@ typedef enum __attribute__((packed)) {
     FACETS_OPTION_ALL_KEYS_FTS          = (1 << 1), // all keys are searchable by full text search
     FACETS_OPTION_DISABLE_ALL_FACETS    = (1 << 2),
     FACETS_OPTION_DISABLE_HISTOGRAM     = (1 << 3),
+    FACETS_OPTION_DATA_ONLY             = (1 << 4),
 } FACETS_OPTIONS;
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);

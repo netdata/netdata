@@ -651,7 +651,12 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
     buffer_json_member_add_object(wb, "view");
     {
-        buffer_json_member_add_string(wb, "title", "Events Distribution");
+        char title[1024 + 1] = "Events Distribution";
+        FACET_KEY *k = dictionary_get(facets->keys, facets->histogram.chart);
+        if(k && k->name)
+            snprintfz(title, 1024, "Events Distribution by %s", k->name);
+
+        buffer_json_member_add_string(wb, "title", title);
         buffer_json_member_add_time_t(wb, "update_every", facets->histogram.slot_width_ut / USEC_PER_SEC);
         buffer_json_member_add_time_t(wb, "after", facets->histogram.after_ut / USEC_PER_SEC);
         buffer_json_member_add_time_t(wb, "before", facets->histogram.before_ut / USEC_PER_SEC);
@@ -997,7 +1002,7 @@ void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity
 }
 
 void facets_data_only_mode(FACETS *facets) {
-    facets->options |= FACETS_OPTION_DISABLE_ALL_FACETS | FACETS_OPTION_DISABLE_HISTOGRAM;
+    facets->options |= FACETS_OPTION_DISABLE_ALL_FACETS | FACETS_OPTION_DISABLE_HISTOGRAM | FACETS_OPTION_DATA_ONLY;
 }
 
 // ----------------------------------------------------------------------------
@@ -1405,16 +1410,20 @@ void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool w
 }
 
 void facets_report(FACETS *facets, BUFFER *wb) {
-    buffer_json_member_add_boolean(wb, "show_ids", false);
-    buffer_json_member_add_boolean(wb, "has_history", true);
+    if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
+        buffer_json_member_add_boolean(wb, "show_ids", false);   // do not show the column ids to the user
+        buffer_json_member_add_boolean(wb, "has_history", true); // enable date-time picker with after-before
 
-    buffer_json_member_add_object(wb, "pagination");
-    buffer_json_member_add_boolean(wb, "enabled", true);
-    buffer_json_member_add_string(wb, "key", "anchor");
-    buffer_json_member_add_string(wb, "column", "timestamp");
-    buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "pagination");
+        {
+            buffer_json_member_add_boolean(wb, "enabled", true);
+            buffer_json_member_add_string(wb, "key", "anchor");
+            buffer_json_member_add_string(wb, "column", "timestamp");
+        }
+        buffer_json_object_close(wb); // pagination
 
-    facets_accepted_parameters_to_json_array(facets, wb, true);
+        facets_accepted_parameters_to_json_array(facets, wb, true);
+    }
 
     if(!(facets->options & FACETS_OPTION_DISABLE_ALL_FACETS)) {
         buffer_json_member_add_array(wb, "facets");
@@ -1456,68 +1465,71 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         buffer_json_array_close(wb); // facets
     }
 
-    buffer_json_member_add_object(wb, "columns");
-    {
-        size_t field_id = 0;
-        buffer_rrdf_table_add_field(
-                wb, field_id++,
-                "timestamp", "Timestamp",
-                RRDF_FIELD_TYPE_TIMESTAMP,
-                RRDF_FIELD_VISUAL_VALUE,
-                RRDF_FIELD_TRANSFORM_DATETIME_USEC, 0, NULL, NAN,
-                RRDF_FIELD_SORT_DESCENDING,
-                NULL,
-                RRDF_FIELD_SUMMARY_COUNT,
-                RRDF_FIELD_FILTER_RANGE,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
-                NULL);
-
-        buffer_rrdf_table_add_field(
-                wb, field_id++,
-                "rowOptions", "rowOptions",
-                RRDF_FIELD_TYPE_NONE,
-                RRDR_FIELD_VISUAL_ROW_OPTIONS,
-                RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                RRDF_FIELD_SORT_FIXED,
-                NULL,
-                RRDF_FIELD_SUMMARY_COUNT,
-                RRDF_FIELD_FILTER_NONE,
-                RRDR_FIELD_OPTS_DUMMY,
-                NULL);
-
-        FACET_KEY *k;
-        dfe_start_read(facets->keys, k) {
-            RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_NONE;
-            bool visible = k->options & (FACET_KEY_OPTION_VISIBLE|FACET_KEY_OPTION_STICKY);
-
-            if((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values))
-                visible = true;
-
-            if(!visible)
-                visible = simple_pattern_matches(facets->visible_keys, k->name);
-
-            if(visible)
-                options |= RRDF_FIELD_OPTS_VISIBLE;
-
-            if(k->options & FACET_KEY_OPTION_MAIN_TEXT)
-                options |= RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_WRAP;
+    if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
+        buffer_json_member_add_object(wb, "columns");
+        {
+            size_t field_id = 0;
+            buffer_rrdf_table_add_field(
+                    wb, field_id++,
+                    "timestamp", "Timestamp",
+                    RRDF_FIELD_TYPE_TIMESTAMP,
+                    RRDF_FIELD_VISUAL_VALUE,
+                    RRDF_FIELD_TRANSFORM_DATETIME_USEC, 0, NULL, NAN,
+                    RRDF_FIELD_SORT_DESCENDING,
+                    NULL,
+                    RRDF_FIELD_SUMMARY_COUNT,
+                    RRDF_FIELD_FILTER_RANGE,
+                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                    NULL);
 
             buffer_rrdf_table_add_field(
                     wb, field_id++,
-                    k_dfe.name, k->name ? k->name : k_dfe.name,
-                    RRDF_FIELD_TYPE_STRING,
-                    RRDF_FIELD_VISUAL_VALUE,
+                    "rowOptions", "rowOptions",
+                    RRDF_FIELD_TYPE_NONE,
+                    RRDR_FIELD_VISUAL_ROW_OPTIONS,
                     RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                    RRDF_FIELD_SORT_ASCENDING,
+                    RRDF_FIELD_SORT_FIXED,
                     NULL,
                     RRDF_FIELD_SUMMARY_COUNT,
-                    (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE : RRDF_FIELD_FILTER_FACET,
-                    options,
-                    FACET_VALUE_UNSET);
+                    RRDF_FIELD_FILTER_NONE,
+                    RRDR_FIELD_OPTS_DUMMY,
+                    NULL);
+
+            FACET_KEY *k;
+            dfe_start_read(facets->keys, k){
+                        RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_NONE;
+                        bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
+
+                        if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values))
+                            visible = true;
+
+                        if (!visible)
+                            visible = simple_pattern_matches(facets->visible_keys, k->name);
+
+                        if (visible)
+                            options |= RRDF_FIELD_OPTS_VISIBLE;
+
+                        if (k->options & FACET_KEY_OPTION_MAIN_TEXT)
+                            options |= RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_WRAP;
+
+                        buffer_rrdf_table_add_field(
+                                wb, field_id++,
+                                k_dfe.name, k->name ? k->name : k_dfe.name,
+                                RRDF_FIELD_TYPE_STRING,
+                                (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE,
+                                RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                RRDF_FIELD_SORT_ASCENDING,
+                                NULL,
+                                RRDF_FIELD_SUMMARY_COUNT,
+                                (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE
+                                                                            : RRDF_FIELD_FILTER_FACET,
+                                options,
+                                FACET_VALUE_UNSET);
+                    }
+            dfe_done(k);
         }
-        dfe_done(k);
+        buffer_json_object_close(wb); // columns
     }
-    buffer_json_object_close(wb); // columns
 
     buffer_json_member_add_array(wb, "data");
     {
@@ -1568,9 +1580,11 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     }
     buffer_json_array_close(wb); // data
 
-    buffer_json_member_add_string(wb, "default_sort_column", "timestamp");
-    buffer_json_member_add_array(wb, "default_charts");
-    buffer_json_array_close(wb);
+    if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
+        buffer_json_member_add_string(wb, "default_sort_column", "timestamp");
+        buffer_json_member_add_array(wb, "default_charts");
+        buffer_json_array_close(wb);
+    }
 
     if(facets->histogram.enabled && !(facets->options & FACETS_OPTION_DISABLE_HISTOGRAM)) {
         const char *first_histogram = NULL;
@@ -1615,16 +1629,18 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         }
     }
 
-    buffer_json_member_add_object(wb, "items");
-    {
-        buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
-        buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
-        buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
-        buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
-        buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
-        buffer_json_member_add_uint64(wb, "after", facets->operations.skips_after + facets->operations.shifts);
+    if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
+        buffer_json_member_add_object(wb, "items");
+        {
+            buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
+            buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
+            buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
+            buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
+            buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
+            buffer_json_member_add_uint64(wb, "after", facets->operations.skips_after + facets->operations.shifts);
+        }
+        buffer_json_object_close(wb); // items
     }
-    buffer_json_object_close(wb); // items
 
     buffer_json_member_add_object(wb, "stats");
     {

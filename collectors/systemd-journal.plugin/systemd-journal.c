@@ -301,8 +301,11 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(sd_journal *j, 
     return ND_SD_JOURNAL_OK;
 }
 
-bool systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t last_modified) {
+bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t last_modified) {
     // return true, if data have been modified since the timestamp
+
+    if(!last_modified || !seek_to)
+        return false;
 
     if(!netdata_systemd_journal_seek_to(j, seek_to))
         return false;
@@ -333,7 +336,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
 
     ND_SD_JOURNAL_STATUS status;
 
-    if(data_only && anchor /* && !systemd_journal_check_if_modified_since(j, if_modified_since, data_only) */) {
+    if(data_only && anchor /* && !netdata_systemd_journal_check_if_modified_since(j, before_ut, if_modified_since) */) {
         facets_data_only_mode(facets);
 
         // we can do a data-only query
@@ -357,13 +360,16 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
     buffer_json_member_add_uint64(wb, "status", status == ND_SD_JOURNAL_FAILED_TO_SEEK ? HTTP_RESP_INTERNAL_SERVER_ERROR : HTTP_RESP_OK);
     buffer_json_member_add_boolean(wb, "partial", status != ND_SD_JOURNAL_OK);
     buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_time_t(wb, "update_every", 1);
-    buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
-    buffer_json_member_add_uint64(wb, "last_modified", last_modified);
+
+    if(!data_only) {
+        buffer_json_member_add_time_t(wb, "update_every", 1);
+        buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
+        buffer_json_member_add_uint64(wb, "last_modified", last_modified);
+    }
 
     facets_report(facets, wb);
 
-    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec());
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + data_only ? 3600 : 0);
     buffer_json_finalize(wb);
 
     return status == ND_SD_JOURNAL_FAILED_TO_SEEK ? HTTP_RESP_INTERNAL_SERVER_ERROR : HTTP_RESP_OK;
@@ -587,6 +593,12 @@ static void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
 
+static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
+    buffer_json_add_array_item_object(json_array);
+    buffer_json_member_add_string(json_array, "value", buffer_tostring(rkv->wb));
+    buffer_json_object_close(json_array);
+}
+
 static void function_systemd_journal(const char *transaction, char *function, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
@@ -617,8 +629,13 @@ static void function_systemd_journal(const char *transaction, char *function, ch
                                      netdata_systemd_journal_dynamic_row_id, NULL);
 
     facets_register_key_name(facets, "MESSAGE",
-                             FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE |
-                             FACET_KEY_OPTION_FTS);
+                                     FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT |
+                                     FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+
+//    facets_register_dynamic_key_name(facets, "MESSAGE",
+//                             FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_RICH_TEXT |
+//                             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
+//                             netdata_systemd_journal_rich_message, NULL);
 
     facets_register_key_name_transformation(facets, "PRIORITY", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
                                             netdata_systemd_journal_transform_priority, NULL);
