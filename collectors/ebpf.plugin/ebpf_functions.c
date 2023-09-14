@@ -37,9 +37,8 @@ ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
 static void ebpf_function_thread_manipulation_help(const char *transaction) {
-    pthread_mutex_lock(&lock);
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
-    fprintf(stdout, "%s",
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_sprintf(wb, "%s",
             "ebpf.plugin / thread\n"
             "\n"
             "Function `thread` allows user to control eBPF threads.\n"
@@ -59,9 +58,12 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
             "Filters can be combined. Each filter can be given only one time.\n"
             "Process thread is not controlled by functions until we finish the creation of functions per thread..\n"
             );
-    pluginsd_function_result_end_to_stdout();
-    fflush(stdout);
+
+    pthread_mutex_lock(&lock);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
     pthread_mutex_unlock(&lock);
+
+    buffer_free(wb);
 }
 
 
@@ -79,12 +81,9 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
  * @param msg          the error message
  */
 static void ebpf_function_error(const char *transaction, int code, const char *msg) {
-    char buffer[PLUGINSD_LINE_MAX + 1];
-    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
-
-    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
-    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    pluginsd_function_result_end_to_stdout();
+    pthread_mutex_lock(&lock);
+    pluginsd_function_json_error_to_stdout(transaction, code, msg);
+    pthread_mutex_unlock(&lock);
 }
 
 /*****************************************************************
@@ -350,12 +349,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
     // Lock necessary to avoid race condition
     pthread_mutex_lock(&lock);
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
-
-    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
-
-    pluginsd_function_result_end_to_stdout();
-    fflush(stdout);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
     pthread_mutex_unlock(&lock);
 
     buffer_free(wb);

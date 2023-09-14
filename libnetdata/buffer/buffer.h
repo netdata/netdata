@@ -938,10 +938,12 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_OPTS_VISIBLE      = (1 << 1), // the field should be visible by default
     RRDF_FIELD_OPTS_STICKY       = (1 << 2), // the field should be sticky
     RRDF_FIELD_OPTS_FULL_WIDTH   = (1 << 3), // the field should get full width
-    RRDF_FIELD_OPTS_WRAP         = (1 << 4), // the field should get full width
+    RRDF_FIELD_OPTS_WRAP         = (1 << 4), // the field should wrap
+    RRDR_FIELD_OPTS_DUMMY        = (1 << 5), // not a presentable field
 } RRDF_FIELD_OPTIONS;
 
 typedef enum __attribute__((packed)) {
+    RRDF_FIELD_TYPE_NONE,
     RRDF_FIELD_TYPE_INTEGER,
     RRDF_FIELD_TYPE_STRING,
     RRDF_FIELD_TYPE_DETAIL_STRING,
@@ -954,6 +956,9 @@ typedef enum __attribute__((packed)) {
 static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
     switch(type) {
         default:
+        case RRDF_FIELD_TYPE_NONE:
+            return "none";
+
         case RRDF_FIELD_TYPE_INTEGER:
             return "integer";
 
@@ -978,10 +983,11 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
 }
 
 typedef enum __attribute__((packed)) {
-    RRDF_FIELD_VISUAL_VALUE,    // show the value, possibly applying a transformation
-    RRDF_FIELD_VISUAL_BAR,      // show the value and a bar, respecting the max field to fill the bar at 100%
-    RRDF_FIELD_VISUAL_PILL,     //
-    RRDF_FIELD_VISUAL_MARKDOC,  //
+    RRDF_FIELD_VISUAL_VALUE,        // show the value, possibly applying a transformation
+    RRDF_FIELD_VISUAL_BAR,          // show the value and a bar, respecting the max field to fill the bar at 100%
+    RRDF_FIELD_VISUAL_PILL,         //
+    RRDF_FIELD_VISUAL_RICH,         //
+    RRDR_FIELD_VISUAL_ROW_OPTIONS,  // this is a dummy column that is used for row options
 } RRDF_FIELD_VISUAL;
 
 static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) {
@@ -996,8 +1002,11 @@ static inline const char *rrdf_field_visual_to_string(RRDF_FIELD_VISUAL visual) 
         case RRDF_FIELD_VISUAL_PILL:
             return "pill";
 
-        case RRDF_FIELD_VISUAL_MARKDOC:
-            return "markdoc";
+        case RRDF_FIELD_VISUAL_RICH:
+            return "richValue";
+
+        case RRDR_FIELD_VISUAL_ROW_OPTIONS:
+            return "rowOptions";
     }
 }
 
@@ -1144,6 +1153,9 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
 
         buffer_json_member_add_boolean(wb, "full_width", options & RRDF_FIELD_OPTS_FULL_WIDTH);
         buffer_json_member_add_boolean(wb, "wrap", options & RRDF_FIELD_OPTS_WRAP);
+
+        if(options & RRDR_FIELD_OPTS_DUMMY)
+            buffer_json_member_add_boolean(wb, "dummy", true);
     }
     buffer_json_object_close(wb);
 }
