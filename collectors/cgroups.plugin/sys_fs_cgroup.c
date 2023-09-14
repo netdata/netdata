@@ -2875,7 +2875,6 @@ void update_systemd_services_charts(
 ) {
     static RRDSET
         *st_mem_failcnt = NULL,
-        *st_swap_usage = NULL,
 
         *st_mem_detailed_cache = NULL,
         *st_mem_detailed_rss = NULL,
@@ -3054,23 +3053,6 @@ void update_systemd_services_charts(
                 , PLUGIN_CGROUPS_NAME
                 , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                 , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 110
-                , update_every
-                , RRDSET_TYPE_STACKED
-        );
-    }
-
-    if (do_swap_usage && !st_swap_usage) {
-        st_swap_usage = rrdset_create_localhost(
-                "services"
-                , "swap_usage"
-                , NULL
-                , "swap"
-                , "services.swap_usage"
-                , "Systemd Services Swap Memory Used"
-                , "MiB"
-                , PLUGIN_CGROUPS_NAME
-                , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 100
                 , update_every
                 , RRDSET_TYPE_STACKED
         );
@@ -3312,7 +3294,7 @@ void update_systemd_services_charts(
                                                      "cpu",
                                                      NULL,
                                                      "cpu",
-                                                     "services.cpu",
+                                                     "systemd.services.cpu",
                                                      "Systemd Services CPU utilization (100%% = 1 core)",
                                                      "percentage",
                                                      PLUGIN_CGROUPS_NAME,
@@ -3344,7 +3326,7 @@ void update_systemd_services_charts(
                     , "mem_usage"
                     , NULL
                     , "mem"
-                    , "services.mem_usage"
+                    , "systemd.services.memory"
                     , "Systemd Services Used Memory"
                     , "MiB"
                     , PLUGIN_CGROUPS_NAME
@@ -3355,9 +3337,21 @@ void update_systemd_services_charts(
                     );
 
                 rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                if (likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes))
+                    rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes);
+            if (likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes)) {
+                if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                    rrddim_set(cg->st_mem_usage,
+                               "swap",
+                               cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
+                               cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
+                } else {
+                    rrddim_set(cg->st_mem_usage, "swap", cg->memory.msw_usage_in_bytes);
+                }
+            }
             rrdset_done(cg->st_mem_usage);
         }
 
@@ -3408,21 +3402,6 @@ void update_systemd_services_charts(
                 cg->rd_mem_failcnt = rrddim_add(st_mem_failcnt, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_failcnt, cg->rd_mem_failcnt, cg->memory.failcnt);
-        }
-
-        if(likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes)) {
-            if(unlikely(!cg->rd_swap_usage))
-                cg->rd_swap_usage = rrddim_add(st_swap_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-
-            if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                rrddim_set_by_pointer(
-                    st_swap_usage,
-                    cg->rd_swap_usage,
-                    cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
-                        cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) : 0);
-            } else {
-                rrddim_set_by_pointer(st_swap_usage, cg->rd_swap_usage, cg->memory.msw_usage_in_bytes);
-            }
         }
 
         if(likely(do_io && cg->io_service_bytes.updated)) {
@@ -3511,9 +3490,6 @@ void update_systemd_services_charts(
 
     if(likely(do_mem_failcnt))
         rrdset_done(st_mem_failcnt);
-
-    if(likely(do_swap_usage))
-        rrdset_done(st_swap_usage);
 
     if(likely(do_io)) {
         rrdset_done(st_io_read);
