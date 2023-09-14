@@ -2874,7 +2874,6 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_mem_usage = NULL,
         *st_mem_failcnt = NULL,
         *st_swap_usage = NULL,
 
@@ -3359,7 +3358,7 @@ void update_systemd_services_charts(
             }
 
             rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes);
-            rrdset_done(st_mem_usage);
+            rrdset_done(cg->st_mem_usage);
         }
 
         if(likely(do_mem_detailed && cg->memory.updated_detailed)) {
