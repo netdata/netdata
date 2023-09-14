@@ -375,58 +375,6 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid)
     return -1;
 }
 
-/**
- * Read socket statistic
- *
- * Read information from kernel ring to user ring.
- *
- * @param ep    the table with all process stats values.
- * @param fd    the file descriptor mapped from kernel
- * @param ef    a pointer for the functions mapped from dynamic library
- * @param pids  the list of pids associated to a target.
- *
- * @return
- */
-size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct ebpf_pid_on_target *pids)
-{
-    size_t count = 0;
-    while (pids) {
-        uint32_t current_pid = pids->pid;
-        if (!ebpf_read_hash_table(ep[current_pid], fd, current_pid))
-            count++;
-
-        pids = pids->next;
-    }
-
-    return count;
-}
-
-/**
- * Read bandwidth statistic using hash table
- *
- * @param out                   the output tensor that will receive the information.
- * @param fd                    the file descriptor that has the data
- * @param bpf_map_lookup_elem   a pointer for the function to read the data
- * @param bpf_map_get_next_key  a pointer fo the function to read the index.
- */
-size_t read_bandwidth_statistic_using_hash_table(ebpf_bandwidth_t **out, int fd)
-{
-    size_t count = 0;
-    uint32_t key = 0;
-    uint32_t next_key = 0;
-
-    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        ebpf_bandwidth_t *eps = out[next_key];
-        if (!eps) {
-            eps = callocz(1, sizeof(ebpf_process_stat_t));
-            out[next_key] = eps;
-        }
-        ebpf_read_hash_table(eps, fd, next_key);
-    }
-
-    return count;
-}
-
 /*****************************************************************
  *
  *  FUNCTIONS CALLED FROM COLLECTORS
@@ -887,6 +835,7 @@ static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
 {
     static char cmdline[MAX_CMDLINE + 1];
 
+    int ret = 0;
     if (unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
@@ -909,20 +858,23 @@ static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
             cmdline[i] = ' ';
     }
 
-    if (p->cmdline)
-        freez(p->cmdline);
-    p->cmdline = strdupz(cmdline);
-
     debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
 
-    return 1;
+    ret = 1;
 
 cleanup:
     // copy the command to the command line
     if (p->cmdline)
         freez(p->cmdline);
     p->cmdline = strdupz(p->comm);
-    return 0;
+
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
+    if (pid_ptr)
+        pid_ptr->cmdline = p->cmdline;
+    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+    return ret;
 }
 
 /**
@@ -1238,6 +1190,24 @@ static inline void del_pid_entry(pid_t pid)
     freez(p->status_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
+
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
+    if (pid_ptr) {
+        if (pid_ptr->socket_stats.JudyLArray) {
+            Word_t local_socket = 0;
+            Pvoid_t *socket_value;
+            bool first_socket = true;
+            while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_socket, &first_socket))) {
+                netdata_socket_plus_t *socket_clean = *socket_value;
+                aral_freez(aral_socket_table, socket_clean);
+            }
+            JudyLFreeArray(&pid_ptr->socket_stats.JudyLArray, PJE0);
+        }
+        JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
+    }
+    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
     freez(p->cmdline);
     ebpf_pid_stat_release(p);
 
@@ -1279,12 +1249,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
  */
 void cleanup_variables_from_other_threads(uint32_t pid)
 {
-    // Clean socket structures
-    if (socket_bandwidth_curr) {
-        ebpf_socket_release(socket_bandwidth_curr[pid]);
-        socket_bandwidth_curr[pid] = NULL;
-    }
-
     // Clean cachestat structure
     if (cachestat_pid) {
         ebpf_cachestat_release(cachestat_pid[pid]);
