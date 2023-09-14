@@ -38,6 +38,7 @@
 // cgroup globals
 
 static char cgroup_chart_id_prefix[] = "cgroup_";
+static char services_chart_id_prefix[] = "services_";
 
 static int is_inside_k8s = 0;
 
@@ -2799,6 +2800,18 @@ static void cgroup_discovery_cleanup(void *ptr) {
     service_exits();
 }
 
+static inline char *cgroup_chart_type(char *buffer, const char *prefix, const char *id, size_t len) {
+    if(buffer[0]) return buffer;
+
+    if(id[0] == '\0' || (id[0] == '/' && id[1] == '\0'))
+        strncpy(buffer, "cgroup_root", len);
+    else
+        snprintfz(buffer, len, "%s%s", prefix, id);
+
+    netdata_fix_chart_id(buffer);
+    return buffer;
+}
+
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
@@ -3305,13 +3318,17 @@ void update_systemd_services_charts(
     struct cgroup *cg;
     // TODO: Remove constant (1000) when all charts are moved.
     static int prio = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 1000;
+    char type[RRD_ID_LENGTH_MAX + 1];
     for(cg = cgroup_root; cg ; cg = cg->next) {
         if(unlikely(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg)))
             continue;
 
+        type[0] = '\0';
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
             if (unlikely(!cg->st_cpu)) {
-                cg->st_cpu = rrdset_create_localhost("services",
+
+                cg->st_cpu = rrdset_create_localhost(
+                                                     cgroup_chart_type(type, services_chart_id_prefix, cg->chart_id, RRD_ID_LENGTH_MAX),
                                                      "cpu",
                                                      NULL,
                                                      "cpu",
@@ -3533,18 +3550,6 @@ void update_systemd_services_charts(
         rrdset_done(st_merged_ops_read);
         rrdset_done(st_merged_ops_write);
     }
-}
-
-static inline char *cgroup_chart_type(char *buffer, const char *prefix, const char *id, size_t len) {
-    if(buffer[0]) return buffer;
-
-    if(id[0] == '\0' || (id[0] == '/' && id[1] == '\0'))
-        strncpy(buffer, "cgroup_root", len);
-    else
-        snprintfz(buffer, len, "%s%s", prefix, id);
-
-    netdata_fix_chart_id(buffer);
-    return buffer;
 }
 
 static inline void update_cpu_limits(char **filename, unsigned long long *value, struct cgroup *cg) {
