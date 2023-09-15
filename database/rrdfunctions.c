@@ -786,9 +786,10 @@ void rrdfunction_inflight_transaction_cancel(RRDFUNCTION_INFLIGHT_TRANSACTION *f
 
 void rrdfunction_inflight_transaction_cancel_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction) {
     RRDFUNCTION_INFLIGHT_TRANSACTION *ftr = dictionary_get_and_acquire_item(idx, transaction);
-    if(ftr)
+    if(ftr) {
         rrdfunction_inflight_transaction_cancel(ftr);
-    dictionary_acquired_item_release(idx, ftr);
+        dictionary_acquired_item_release(idx, ftr);
+    }
 }
 
 bool rrdfunction_inflight_transaction_is_cancelled(const void *is_cancelled_cb_data) {
