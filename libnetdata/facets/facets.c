@@ -187,7 +187,7 @@ static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
     static int array_size = sizeof(valid_durations_s) / sizeof(valid_durations_s[0]);
 
     usec_t duration_ut = before_ut - after_ut;
-    usec_t bar_width_ut = 1 * 60 * USEC_PER_SEC;
+    usec_t bar_width_ut = 1 * USEC_PER_SEC;
 
     for (int i = array_size - 1; i >= 0; --i) {
         if (duration_ut / (valid_durations_s[i] * USEC_PER_SEC) >= HISTOGRAM_COLUMNS) {
