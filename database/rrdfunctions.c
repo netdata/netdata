@@ -283,9 +283,9 @@ struct rrd_collector_function {
     STRING *help;
     int timeout;                    // the default timeout of the function
 
-    function_execute_at_collector function;
+    rrdfunction_execute_cb_t execute_cb;
 
-    void *collector_data;
+    void *execute_cb_data;
     struct rrd_collector *collector;
 };
 
@@ -387,8 +387,8 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    if(rdcf->function != new_rdcf->function) {
-        rdcf->function = new_rdcf->function;
+    if(rdcf->execute_cb != new_rdcf->execute_cb) {
+        rdcf->execute_cb = new_rdcf->execute_cb;
         changed = true;
     }
 
@@ -411,8 +411,8 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    if(rdcf->collector_data != new_rdcf->collector_data) {
-        rdcf->collector_data = new_rdcf->collector_data;
+    if(rdcf->execute_cb_data != new_rdcf->execute_cb_data) {
+        rdcf->execute_cb_data = new_rdcf->execute_cb_data;
         changed = true;
     }
 
@@ -436,7 +436,7 @@ void rrdfunctions_destroy(RRDHOST *host) {
 }
 
 void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
-                                bool sync, function_execute_at_collector function, void *collector_data) {
+                                bool sync, rrdfunction_execute_cb_t execute_cb, void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function
     // to create a GLOBAL function
@@ -451,8 +451,8 @@ void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int
         .sync = sync,
         .timeout = timeout,
         .options = (st)?RRD_FUNCTION_LOCAL:RRD_FUNCTION_GLOBAL,
-        .function = function,
-        .collector_data = collector_data,
+        .execute_cb = execute_cb,
+        .execute_cb_data = execute_cb_data,
         .help = string_strdupz(help),
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions, key, &tmp, sizeof(tmp));
@@ -636,7 +636,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
     tp.tv_sec += (time_t)timeout;
 
     if(rdcf->sync) {
-        code = rdcf->function(wb, timeout, key, rdcf->collector_data, NULL, NULL, NULL, NULL);
+        code = rdcf->execute_cb(wb, timeout, key, rdcf->execute_cb_data, NULL, NULL, NULL, NULL);
     }
     else {
         struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
@@ -648,7 +648,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
         bool we_should_free = true;
         BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
         temp_wb->content_type = wb->content_type;
-        code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, tmp, NULL, NULL);
+        code = rdcf->execute_cb(temp_wb, timeout, key, rdcf->execute_cb_data, rrd_call_function_signal_when_ready, tmp, NULL, NULL);
         if (code == HTTP_RESP_OK) {
             netdata_mutex_lock(&tmp->mutex);
 
@@ -699,7 +699,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 }
 
 int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-    rrd_call_function_async_callback callback, void *callback_data) {
+                            rrdfunction_result_callback_t result_cb, void *result_cb_data) {
     int code;
 
     struct rrd_collector_function *rdcf = NULL;
@@ -712,7 +712,7 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     if(timeout <= 0)
         timeout = rdcf->timeout;
 
-    code = rdcf->function(wb, timeout, key, rdcf->collector_data, callback, callback_data, NULL, NULL);
+    code = rdcf->execute_cb(wb, timeout, key, rdcf->execute_cb_data, result_cb, result_cb_data, NULL, NULL);
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(wb))
@@ -869,8 +869,8 @@ bool rrdfunction_inflight_transaction_is_cancelled(RRDFUNCTION_INFLIGHT_TRANSACT
 
 int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
                                void *collector_data __maybe_unused,
-                               function_data_ready_callback callback, void *callback_data,
-                               function_is_cancelled_callback is_cancelled, void *cancel_data) {
+                               rrdfunction_result_callback_t result_cb, void *result_cb_data,
+                               rrdfunction_is_cancelled_cb_t is_cancelled, void *cancel_data) {
 
     time_t now = now_realtime_sec();
 
@@ -1496,8 +1496,8 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
-    if(callback)
-        callback(wb, response, callback_data);
+    if(result_cb)
+        result_cb(wb, response, result_cb_data);
 
     return response;
 }

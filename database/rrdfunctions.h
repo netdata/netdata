@@ -24,20 +24,21 @@ void rrdfunctions_destroy(RRDHOST *host);
 void rrd_collector_started(void);
 void rrd_collector_finished(void);
 
-typedef void (*function_data_ready_callback)(BUFFER *wb, int code, void *callback_data);
-typedef bool (*function_is_cancelled_callback)(void *cancel_data);
+typedef void (*rrdfunction_result_callback_t)(BUFFER *wb, int code, void *callback_data);
+typedef bool (*rrdfunction_is_cancelled_cb_t)(void *cancel_data);
 
-typedef int (*function_execute_at_collector)(BUFFER *wb, int timeout, const char *function, void *collector_data,
-                                             function_data_ready_callback callback, void *callback_data,
-                                             function_is_cancelled_callback function_cancel_check, void *cancel_data);
+typedef int (*rrdfunction_execute_cb_t)(BUFFER *wb, int timeout, const char *function, void *collector_data,
+                                        rrdfunction_result_callback_t result_cb, void *result_cb_data,
+                                        rrdfunction_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data);
+
 
 void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
-                                bool sync, function_execute_at_collector function, void *collector_data);
+                                bool sync, rrdfunction_execute_cb_t execute_cb, void *execute_cb_data);
 
 int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name);
 
-typedef void (*rrd_call_function_async_callback)(BUFFER *wb, int code, void *callback_data);
-int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name, rrd_call_function_async_callback, void *callback_data);
+int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
+                            rrdfunction_result_callback_t result_cb, void *result_cb_data);
 
 void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);
@@ -52,8 +53,8 @@ const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 int rrdhost_function_streaming(BUFFER *wb, int timeout, const char *function, void *collector_data,
-                               function_data_ready_callback callback, void *callback_data,
-                               function_is_cancelled_callback is_cancelled, void *cancel_data);
+                               rrdfunction_result_callback_t result_cb, void *result_cb_data,
+                               rrdfunction_is_cancelled_cb_t is_cancelled, void *cancel_data);
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 
