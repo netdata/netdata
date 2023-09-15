@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- facets histogram: do not send db retention for facets [\#15974](https://github.com/netdata/netdata/pull/15974) ([ktsaou](https://github.com/ktsaou))
+- facets histogram when empty [\#15970](https://github.com/netdata/netdata/pull/15970) ([ktsaou](https://github.com/ktsaou))
+- facets: do not shadow local variable [\#15968](https://github.com/netdata/netdata/pull/15968) ([ktsaou](https://github.com/ktsaou))
+- Skip trying to preserve file owners when bundling external code. [\#15966](https://github.com/netdata/netdata/pull/15966) ([Ferroin](https://github.com/Ferroin))
+- fix using undefined var when loading job statuses in python.d [\#15965](https://github.com/netdata/netdata/pull/15965) ([ilyam8](https://github.com/ilyam8))
+- facets: data-only queries [\#15961](https://github.com/netdata/netdata/pull/15961) ([ktsaou](https://github.com/ktsaou))
 - Clarifying the possible installation types [\#15958](https://github.com/netdata/netdata/pull/15958) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix journal direction parsing [\#15957](https://github.com/netdata/netdata/pull/15957) ([ktsaou](https://github.com/ktsaou))
 - facets and journal improvements [\#15956](https://github.com/netdata/netdata/pull/15956) ([ktsaou](https://github.com/ktsaou))
@@ -15,6 +21,7 @@
 - Disk Labels [\#15949](https://github.com/netdata/netdata/pull/15949) ([ktsaou](https://github.com/ktsaou))
 - streaming logs [\#15948](https://github.com/netdata/netdata/pull/15948) ([ktsaou](https://github.com/ktsaou))
 - Integrations: Add a note to enable the collectors [\#15945](https://github.com/netdata/netdata/pull/15945) ([MrZammler](https://github.com/MrZammler))
+- Integrations: Add a note to install charts.d plugin [\#15943](https://github.com/netdata/netdata/pull/15943) ([MrZammler](https://github.com/MrZammler))
 - Add description about packages [\#15941](https://github.com/netdata/netdata/pull/15941) ([thiagoftsm](https://github.com/thiagoftsm))
 - facets optimizations [\#15940](https://github.com/netdata/netdata/pull/15940) ([ktsaou](https://github.com/ktsaou))
 - improved facets info [\#15936](https://github.com/netdata/netdata/pull/15936) ([ktsaou](https://github.com/ktsaou))
@@ -55,6 +62,7 @@
 - Add a chart that groups anomaly rate by chart type. [\#15856](https://github.com/netdata/netdata/pull/15856) ([vkalintiris](https://github.com/vkalintiris))
 - fix packaging static build openssl 32bit [\#15855](https://github.com/netdata/netdata/pull/15855) ([ilyam8](https://github.com/ilyam8))
 - fix packaging mark stable static build [\#15854](https://github.com/netdata/netdata/pull/15854) ([ilyam8](https://github.com/ilyam8))
+- eBPF socket function [\#15850](https://github.com/netdata/netdata/pull/15850) ([thiagoftsm](https://github.com/thiagoftsm))
 - Facets histograms [\#15846](https://github.com/netdata/netdata/pull/15846) ([ktsaou](https://github.com/ktsaou))
 - reworked pluginsd caching of RDAs to avoid crashes [\#15845](https://github.com/netdata/netdata/pull/15845) ([ktsaou](https://github.com/ktsaou))
 - Fix static build SSL [\#15842](https://github.com/netdata/netdata/pull/15842) ([ktsaou](https://github.com/ktsaou))
@@ -420,15 +428,6 @@
 - dont add all nodes to registry action hello [\#15390](https://github.com/netdata/netdata/pull/15390) ([ktsaou](https://github.com/ktsaou))
 - Revert "dont add all nodes to registry action hello" [\#15389](https://github.com/netdata/netdata/pull/15389) ([ktsaou](https://github.com/ktsaou))
 - dont add all nodes to registry action hello [\#15388](https://github.com/netdata/netdata/pull/15388) ([ktsaou](https://github.com/ktsaou))
-- update bundled v2 dashboard; make v2 the default dashboard [\#15386](https://github.com/netdata/netdata/pull/15386) ([ilyam8](https://github.com/ilyam8))
-- Create categories.yaml [\#15385](https://github.com/netdata/netdata/pull/15385) ([Ancairon](https://github.com/Ancairon))
-- Fix CodeQL alert  [\#15384](https://github.com/netdata/netdata/pull/15384) ([stelfrag](https://github.com/stelfrag))
-- Add missing files to web/gui/Makefile.am. [\#15383](https://github.com/netdata/netdata/pull/15383) ([Ferroin](https://github.com/Ferroin))
-- Updates on JSON schemas [\#15382](https://github.com/netdata/netdata/pull/15382) ([Ancairon](https://github.com/Ancairon))
-- Build optimizations [\#15381](https://github.com/netdata/netdata/pull/15381) ([tkatsoulas](https://github.com/tkatsoulas))
-- update http response code descriptions [\#15379](https://github.com/netdata/netdata/pull/15379) ([ktsaou](https://github.com/ktsaou))
-- Suppress H2O compilation warnings [\#15378](https://github.com/netdata/netdata/pull/15378) ([stelfrag](https://github.com/stelfrag))
-- update bundled v2 dashboard [\#15377](https://github.com/netdata/netdata/pull/15377) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
