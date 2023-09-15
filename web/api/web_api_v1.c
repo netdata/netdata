@@ -1384,6 +1384,14 @@ int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char 
                                           WEIGHTS_FORMAT_CONTEXTS, 1);
 }
 
+bool web_client_interrupt_function_callback(const void *data) {
+    struct web_client *w = (struct web_client *)data;
+    if(w->interrupt.callback && w->interrupt.callback(w, w->interrupt.callback_data))
+        return true;
+
+    return false;
+}
+
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     if (!netdata_ready)
         return HTTP_RESP_SERVICE_UNAVAILABLE;
@@ -1412,7 +1420,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    return rrd_call_function_and_wait(host, wb, timeout, function);
+    return rrd_call_function_and_wait(host, wb, timeout, function, web_client_interrupt_function_callback, w);
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {

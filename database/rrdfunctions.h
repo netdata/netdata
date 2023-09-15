@@ -14,7 +14,7 @@ void rrdfunction_inflight_transaction_done(RRDFUNCTION_INFLIGHT_INDEX *idx, RRDF
 void rrdfunction_inflight_transaction_done_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction);
 void rrdfunction_inflight_transaction_cancel(RRDFUNCTION_INFLIGHT_TRANSACTION *ftr);
 void rrdfunction_inflight_transaction_cancel_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction);
-bool rrdfunction_inflight_transaction_is_cancelled(RRDFUNCTION_INFLIGHT_TRANSACTION *ftr);
+bool rrdfunction_inflight_transaction_is_cancelled(const void *is_cancelled_cb_data);
 
 #include "rrd.h"
 
@@ -24,21 +24,23 @@ void rrdfunctions_destroy(RRDHOST *host);
 void rrd_collector_started(void);
 void rrd_collector_finished(void);
 
-typedef void (*rrdfunction_result_callback_t)(BUFFER *wb, int code, void *callback_data);
-typedef bool (*rrdfunction_is_cancelled_cb_t)(void *cancel_data);
+typedef void (*rrdfunction_result_callback_t)(BUFFER *wb, int code, void *result_cb_data);
+typedef bool (*rrdfunction_is_cancelled_cb_t)(const void *is_cancelled_cb_data);
 
 typedef int (*rrdfunction_execute_cb_t)(BUFFER *wb, int timeout, const char *function, void *collector_data,
                                         rrdfunction_result_callback_t result_cb, void *result_cb_data,
-                                        rrdfunction_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data);
+                                        rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
 
 
 void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
                                 bool sync, rrdfunction_execute_cb_t execute_cb, void *execute_cb_data);
 
-int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name);
+int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
+                               rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
 
 int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-                            rrdfunction_result_callback_t result_cb, void *result_cb_data);
+                            rrdfunction_result_callback_t result_cb, void *result_cb_data,
+                            rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
 
 void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);
@@ -54,7 +56,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 int rrdhost_function_streaming(BUFFER *wb, int timeout, const char *function, void *collector_data,
                                rrdfunction_result_callback_t result_cb, void *result_cb_data,
-                               rrdfunction_is_cancelled_cb_t is_cancelled, void *cancel_data);
+                               rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 
