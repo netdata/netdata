@@ -880,7 +880,6 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_mem_detailed_mapped;
     RRDDIM *rd_mem_detailed_writeback;
     RRDDIM *rd_mem_detailed_pgpgin;
     RRDDIM *rd_mem_detailed_pgpgout;
@@ -2869,7 +2868,6 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_mem_detailed_mapped = NULL,
         *st_mem_detailed_writeback = NULL,
         *st_mem_detailed_pgfault = NULL,
         *st_mem_detailed_pgmajfault = NULL,
@@ -2893,23 +2891,6 @@ void update_systemd_services_charts(
     // create the charts
 
     if(likely(do_mem_detailed)) {
-        if(unlikely(!st_mem_detailed_mapped)) {
-            st_mem_detailed_mapped = rrdset_create_localhost(
-                    "services"
-                    , "mem_mapped"
-                    , NULL
-                    , "mem"
-                    , "services.mem_mapped"
-                    , "Systemd Services Mapped Memory"
-                    , "MiB"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 30
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        }
-
         if(unlikely(!st_mem_detailed_writeback)) {
             st_mem_detailed_writeback = rrdset_create_localhost(
                     "services"
@@ -3343,16 +3324,15 @@ void update_systemd_services_charts(
                 rrdset_update_rrdlabels(cg->st_mem, cg->chart_labels);
                 rrddim_add(cg->st_mem, "rss", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "cache", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(cg->st_mem, "mapped_file", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(cg->st_mem, "rss_huge", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set(cg->st_mem, "rss", cg->memory.total_rss);
             rrddim_set(cg->st_mem, "cache", cg->memory.total_cache);
+            rrddim_set(cg->st_mem, "mapped_file", cg->memory.total_mapped_file);
+            rrddim_set(cg->st_mem, "rss_huge", cg->memory.total_rss_huge);
             rrdset_done(cg->st_mem);
-
-            if(unlikely(!cg->rd_mem_detailed_mapped))
-                cg->rd_mem_detailed_mapped = rrddim_add(st_mem_detailed_mapped, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-
-            rrddim_set_by_pointer(st_mem_detailed_mapped, cg->rd_mem_detailed_mapped, cg->memory.total_mapped_file);
 
             if(unlikely(!cg->rd_mem_detailed_writeback))
                 cg->rd_mem_detailed_writeback = rrddim_add(st_mem_detailed_writeback, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -3454,7 +3434,6 @@ void update_systemd_services_charts(
     }
 
     if(unlikely(do_mem_detailed)) {
-        rrdset_done(st_mem_detailed_mapped);
         rrdset_done(st_mem_detailed_writeback);
         rrdset_done(st_mem_detailed_pgfault);
         rrdset_done(st_mem_detailed_pgmajfault);
