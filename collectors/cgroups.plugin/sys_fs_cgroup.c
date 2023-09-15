@@ -2784,6 +2784,14 @@ static inline char *cgroup_chart_type(char *buffer, const char *prefix, const ch
     return buffer;
 }
 
+static inline void cgroup_add_service_label(RRDLABELS *labels)
+{
+    if (rrdlabels_exist(labels, "services"))
+        return;
+
+    rrdlabels_add(labels, "service", "yes", RRDLABEL_SRC_AUTO);
+}
+
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
@@ -2855,6 +2863,7 @@ void update_systemd_services_charts(
         if(unlikely(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg)))
             continue;
 
+        cgroup_add_service_label(cg->chart_labels);
         type[0] = '\0';
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
             if (unlikely(!cg->st_cpu)) {
@@ -2872,6 +2881,7 @@ void update_systemd_services_charts(
                                                      update_every,
                                                      RRDSET_TYPE_STACKED
                     );
+
                 rrdset_update_rrdlabels(cg->st_cpu, cg->chart_labels);
                 if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
