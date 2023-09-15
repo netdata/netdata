@@ -600,6 +600,40 @@ static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, 
 }
 
 static void function_systemd_journal(const char *transaction, char *function, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+    static struct {
+        BUFFER *tmp;
+        BUFFER *wb;
+        BUFFER *function;
+        int response;
+        time_t expires;
+    } cache = {
+            .tmp = NULL,
+            .wb = NULL,
+            .function = NULL,
+            .response = 0,
+            .expires = 0,
+    };
+
+    if(unlikely(!cache.wb)) {
+        cache.tmp = buffer_create(0, NULL);
+        cache.wb = buffer_create(0, NULL);
+        cache.function = buffer_create(0, NULL);
+    }
+
+    if(buffer_strlen(cache.function) && buffer_strlen(cache.wb) && strcmp(buffer_tostring(cache.function), function) == 0) {
+        // repeated the same request
+        netdata_mutex_lock(&stdout_mutex);
+        if(cache.response == HTTP_RESP_OK)
+            pluginsd_function_result_to_stdout(transaction, cache.response, "application/json", cache.expires, cache.wb);
+        else
+            pluginsd_function_json_error_to_stdout(transaction, cache.response, "failed");
+        netdata_mutex_unlock(&stdout_mutex);
+        return;
+    }
+
+    buffer_flush(cache.tmp);
+    buffer_strcat(cache.tmp, function);
+
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
@@ -837,6 +871,14 @@ static void function_systemd_journal(const char *transaction, char *function, ch
         netdata_mutex_unlock(&stdout_mutex);
         goto cleanup;
     }
+
+    // keep this response in the cache
+    cache.response = response;
+    cache.expires = expires;
+    buffer_flush(cache.wb);
+    buffer_fast_strcat(cache.wb, buffer_tostring(wb), buffer_strlen(wb));
+    buffer_flush(cache.function);
+    buffer_fast_strcat(cache.function, buffer_tostring(cache.tmp), buffer_strlen(cache.tmp));
 
 output:
     netdata_mutex_lock(&stdout_mutex);
