@@ -4661,10 +4661,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
             "Filters can be combined. Each filter can be given only one time.\n"
             );
 
-    netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
-    netdata_mutex_unlock(&stdout_mutex);
-
     buffer_free(wb);
 }
 
@@ -4701,31 +4698,24 @@ static void function_processes(const char *transaction, char *function __maybe_u
         if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_CATEGORY)]);
             if(!category) {
-                netdata_mutex_lock(&stdout_mutex);
                 pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
                                                        "No category with that name found.");
-                netdata_mutex_unlock(&stdout_mutex);
-
                 return;
             }
         }
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
-                netdata_mutex_lock(&stdout_mutex);
                 pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
                                                        "No user with that name found.");
-                netdata_mutex_unlock(&stdout_mutex);
                 return;
             }
         }
         else if(strncmp(keyword, PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &keyword[strlen(PROCESS_FILTER_GROUP)]);
             if(!group) {
-                netdata_mutex_lock(&stdout_mutex);
                 pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
                                                        "No group with that name found.");
-                netdata_mutex_unlock(&stdout_mutex);
                 return;
             }
         }
@@ -4751,9 +4741,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
         else {
             char msg[PLUGINSD_LINE_MAX];
             snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
-            netdata_mutex_lock(&stdout_mutex);
             pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, msg);
-            netdata_mutex_unlock(&stdout_mutex);
             return;
         }
     }
@@ -5536,9 +5524,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
-    netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
-    netdata_mutex_unlock(&stdout_mutex);
 
     buffer_free(wb);
 }
@@ -5574,14 +5560,16 @@ static void *reader_main(void *arg __maybe_unused) {
 
 //                internal_error(true, "Received function '%s', transaction '%s', timeout %d", function, transaction, timeout);
 
+                netdata_mutex_lock(&stdout_mutex);
+
                 if(strncmp(function, "processes", strlen("processes")) == 0)
                     function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
                 else {
-                    netdata_mutex_lock(&stdout_mutex);
                     pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
                                                            "No function with this name found in apps.plugin.");
-                    netdata_mutex_unlock(&stdout_mutex);
                 }
+
+                netdata_mutex_unlock(&stdout_mutex);
 
 //                internal_error(true, "Done with function '%s', transaction '%s', timeout %d", function, transaction, timeout);
             }
