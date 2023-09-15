@@ -3203,7 +3203,7 @@ void update_systemd_services_charts(
                     update_every,
                     RRDSET_TYPE_STACKED);
 
-                rrdset_update_rrdlabels(cg->st_queued_ops, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_merged_ops, cg->chart_labels);
                 rrddim_add(cg->st_merged_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_merged_ops, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
