@@ -880,12 +880,10 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_throttle_io_read;
     RRDDIM *rd_throttle_io_serviced_read;
     RRDDIM *rd_io_queued_read;
     RRDDIM *rd_io_merged_read;
 
-    RRDDIM *rd_throttle_io_write;
     RRDDIM *rd_throttle_io_serviced_write;
     RRDDIM *rd_io_queued_write;
     RRDDIM *rd_io_merged_write;
@@ -2858,60 +2856,20 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_throttle_io_read = NULL,
         *st_throttle_ops_read = NULL,
         *st_queued_ops_read = NULL,
         *st_merged_ops_read = NULL,
 
-        *st_throttle_io_write = NULL,
         *st_throttle_ops_write = NULL,
         *st_queued_ops_write = NULL,
         *st_merged_ops_write = NULL;
 
     // create the charts
 
-    if(likely(do_throttle_io)) {
-        if(unlikely(!st_throttle_io_read)) {
-
-            st_throttle_io_read = rrdset_create_localhost(
-                    "services"
-                    , "throttle_io_read"
-                    , NULL
-                    , "disk"
-                    , "services.throttle_io_read"
-                    , "Systemd Services Throttle Disk Read Bandwidth"
-                    , "KiB/s"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 160
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-
-        }
-
-        if(unlikely(!st_throttle_io_write)) {
-            st_throttle_io_write = rrdset_create_localhost(
-                    "services"
-                    , "throttle_io_write"
-                    , NULL
-                    , "disk"
-                    , "services.throttle_io_write"
-                    , "Systemd Services Throttle Disk Write Bandwidth"
-                    , "KiB/s"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 170
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        }
-    }
-
     if(likely(do_throttle_ops)) {
         if(unlikely(!st_throttle_ops_read)) {
             st_throttle_ops_read = rrdset_create_localhost(
-                    "services"
+                "services"
                     , "throttle_io_ops_read"
                     , NULL
                     , "disk"
@@ -3231,7 +3189,7 @@ void update_systemd_services_charts(
         if(likely(do_io && cg->io_service_bytes.updated)) {
             if (unlikely(!cg->st_io)) {
                 cg->st_io = rrdset_create_localhost(
-                    "services"
+                    cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX)
                     , "io"
                     , NULL
                     , "disk"
@@ -3258,12 +3216,12 @@ void update_systemd_services_charts(
         if(likely(do_io_ops && cg->io_serviced.updated)) {
             if(unlikely(!cg->st_serviced_ops)) {
                 cg->st_serviced_ops = rrdset_create_localhost(
-                    "services"
-                        , "io_ops_read"
+                    cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX)
+                        , "io_ops"
                         , NULL
                         , "disk"
-                        , "services.io_ops_read"
-                        , "Systemd Services Disk Read Write Operations"
+                        , "systemd.services.io_ops"
+                        , "Systemd Services Disk Read/Write Operations"
                         , "operations/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
@@ -3282,15 +3240,28 @@ void update_systemd_services_charts(
         }
 
         if(likely(do_throttle_io && cg->throttle_io_service_bytes.updated)) {
-            if(unlikely(!cg->rd_throttle_io_read))
-                cg->rd_throttle_io_read = rrddim_add(st_throttle_io_read, cg->chart_id, cg->chart_title, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
+            if(unlikely(!cg->st_throttle_io)) {
+                cg->st_throttle_io = rrdset_create_localhost(
+                    cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX),
+                    "throttle_io",
+                    NULL,
+                    "disk",
+                    "systemd.services.throttle_io",
+                    "Systemd Services Throttle Disk Read/Write Bandwidth",
+                    "KiB/s",
+                    PLUGIN_CGROUPS_NAME,
+                    PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
+                    prio++,
+                    update_every,
+                    RRDSET_TYPE_STACKED);
 
-            rrddim_set_by_pointer(st_throttle_io_read, cg->rd_throttle_io_read, cg->throttle_io_service_bytes.Read);
-
-            if(unlikely(!cg->rd_throttle_io_write))
-                cg->rd_throttle_io_write = rrddim_add(st_throttle_io_write, cg->chart_id, cg->chart_title, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_set_by_pointer(st_throttle_io_write, cg->rd_throttle_io_write, cg->throttle_io_service_bytes.Write);
+                rrdset_update_rrdlabels(cg->st_throttle_io, cg->chart_labels);
+                rrddim_add(cg->st_throttle_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_throttle_io, "write", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
+            }
+            rrddim_set(cg->st_throttle_io, "write", cg->throttle_io_service_bytes.Write);
+            rrddim_set(cg->st_throttle_io, "read", cg->throttle_io_service_bytes.Read);
+            rrdset_done(cg->st_throttle_io);
         }
 
         if(likely(do_throttle_ops && cg->throttle_io_serviced.updated)) {
@@ -3328,11 +3299,6 @@ void update_systemd_services_charts(
 
             rrddim_set_by_pointer(st_merged_ops_write, cg->rd_io_merged_write, cg->io_merged.Write);
         }
-    }
-
-    if(likely(do_throttle_io)) {
-        rrdset_done(st_throttle_io_read);
-        rrdset_done(st_throttle_io_write);
     }
 
     if(likely(do_throttle_ops)) {
