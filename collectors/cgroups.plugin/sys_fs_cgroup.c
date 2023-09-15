@@ -880,10 +880,7 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_io_queued_read;
     RRDDIM *rd_io_merged_read;
-
-    RRDDIM *rd_io_queued_write;
     RRDDIM *rd_io_merged_write;
 
     struct cgroup *next;
@@ -2854,51 +2851,10 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_queued_ops_read = NULL,
         *st_merged_ops_read = NULL,
-
-        *st_queued_ops_write = NULL,
         *st_merged_ops_write = NULL;
 
     // create the charts
-
-    if(likely(do_queued_ops)) {
-        if(unlikely(!st_queued_ops_read)) {
-            st_queued_ops_read = rrdset_create_localhost(
-                    "services"
-                    , "queued_io_ops_read"
-                    , NULL
-                    , "disk"
-                    , "services.queued_io_ops_read"
-                    , "Systemd Services Queued Disk Read Operations"
-                    , "operations/s"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 200
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        }
-
-        if(unlikely(!st_queued_ops_write)) {
-
-            st_queued_ops_write = rrdset_create_localhost(
-                    "services"
-                    , "queued_io_ops_write"
-                    , NULL
-                    , "disk"
-                    , "services.queued_io_ops_write"
-                    , "Systemd Services Queued Disk Write Operations"
-                    , "operations/s"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 210
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        }
-    }
-
     if(likely(do_merged_ops)) {
         if(unlikely(!st_merged_ops_read)) {
             st_merged_ops_read = rrdset_create_localhost(
@@ -3252,15 +3208,28 @@ void update_systemd_services_charts(
         }
 
         if(likely(do_queued_ops && cg->io_queued.updated)) {
-            if(unlikely(!cg->rd_io_queued_read))
-                cg->rd_io_queued_read = rrddim_add(st_queued_ops_read, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            if(unlikely(!cg->st_queued_ops)) {
+                cg->st_queued_ops = rrdset_create_localhost(
+                    cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX),
+                    "queued_io_ops",
+                    NULL,
+                    "disk",
+                    "services.queued_io_ops_read",
+                    "Systemd Services Queued Disk Read/Write Operations",
+                    "operations/s",
+                    PLUGIN_CGROUPS_NAME,
+                    PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
+                    prio++,
+                    update_every,
+                    RRDSET_TYPE_STACKED);
 
-            rrddim_set_by_pointer(st_queued_ops_read, cg->rd_io_queued_read, cg->io_queued.Read);
-
-            if(unlikely(!cg->rd_io_queued_write))
-                cg->rd_io_queued_write = rrddim_add(st_queued_ops_write, cg->chart_id, cg->chart_title, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_set_by_pointer(st_queued_ops_write, cg->rd_io_queued_write, cg->io_queued.Write);
+                rrdset_update_rrdlabels(cg->st_queued_ops, cg->chart_labels);
+                rrddim_add(cg->st_queued_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_queued_ops, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            rrddim_set(cg->st_queued_ops, "write", cg->io_queued.Write);
+            rrddim_set(cg->st_queued_ops, "read", cg->io_queued.Read);
+            rrdset_done(cg->st_queued_ops);
         }
 
         if(likely(do_merged_ops && cg->io_merged.updated)) {
@@ -3274,11 +3243,6 @@ void update_systemd_services_charts(
 
             rrddim_set_by_pointer(st_merged_ops_write, cg->rd_io_merged_write, cg->io_merged.Write);
         }
-    }
-
-    if(likely(do_queued_ops)) {
-        rrdset_done(st_queued_ops_read);
-        rrdset_done(st_queued_ops_write);
     }
 
     if(likely(do_merged_ops)) {
