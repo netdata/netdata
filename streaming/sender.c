@@ -993,9 +993,10 @@ void execute_commands(struct sender_state *s) {
                 tmp->ftr = rrdfunction_inflight_transaction_register_by_id(s->rrdfunctions_inflight_index, transaction);
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
 
-                int code = rrd_call_function_async(s->host, wb, timeout, function,
-                                                   stream_execute_function_callback, tmp,
-                                                   rrdfunction_inflight_transaction_is_cancelled, tmp->ftr);
+                int code = rrd_call_function_async_from_streaming(s->host, wb, timeout, function,
+                                                                  stream_execute_function_callback, tmp,
+                                                                  rrdfunction_inflight_transaction_is_cancelled,
+                                                                  tmp->ftr);
                 if(code != HTTP_RESP_OK) {
                     if (!buffer_strlen(wb))
                         rrd_call_function_error(wb, "Failed to route request to collector", code);

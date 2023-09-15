@@ -619,8 +619,8 @@ static void rrd_call_function_signal_when_ready(BUFFER *temp_wb __maybe_unused, 
     }
 }
 
-int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-                               rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data) {
+int rrd_call_function_and_wait_from_api(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
+                                        rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data) {
     int code;
 
     struct rrd_collector_function *rdcf = NULL;
@@ -640,8 +640,8 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
     if(rdcf->sync) {
         code = rdcf->execute_cb(wb, timeout, key, rdcf->execute_cb_data,
-                                NULL, NULL,
-                                is_cancelled_cb, is_cancelled_cb_data);
+                                NULL, NULL,                             // no callback needed, it is synchronous
+                                is_cancelled_cb, is_cancelled_cb_data); // it is ok to pass these, we block the caller
     }
     else {
         struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
@@ -659,7 +659,10 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
         code = rdcf->execute_cb(temp_wb, timeout, key, rdcf->execute_cb_data,
                                 rrd_call_function_signal_when_ready, tmp,
-                                is_cancelled_cb, is_cancelled_cb_data);
+                                NULL, NULL);
+                                // IMPORTANT: do not pass the is_cancel_cb() here,
+                                // because we may exit before the function finishes
+                                // so, whatever the is_cancel_cb() is doing may crash
 
         if (code == HTTP_RESP_OK) {
             netdata_mutex_lock(&tmp->mutex);
@@ -710,9 +713,9 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
     return code;
 }
 
-int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-                            rrdfunction_result_callback_t result_cb, void *result_cb_data,
-                            rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data) {
+int rrd_call_function_async_from_streaming(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
+                                           rrdfunction_result_callback_t result_cb, void *result_cb_data,
+                                           rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data) {
     int code;
 
     struct rrd_collector_function *rdcf = NULL;
@@ -725,7 +728,9 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     if(timeout <= 0)
         timeout = rdcf->timeout;
 
-    code = rdcf->execute_cb(wb, timeout, key, rdcf->execute_cb_data, result_cb, result_cb_data, is_cancelled_cb, is_cancelled_cb_data);
+    code = rdcf->execute_cb(wb, timeout, key, rdcf->execute_cb_data,
+                            result_cb, result_cb_data,
+                            is_cancelled_cb, is_cancelled_cb_data);
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(wb))

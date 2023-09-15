@@ -35,12 +35,12 @@ typedef int (*rrdfunction_execute_cb_t)(BUFFER *wb, int timeout, const char *fun
 void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
                                 bool sync, rrdfunction_execute_cb_t execute_cb, void *execute_cb_data);
 
-int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-                               rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
+int rrd_call_function_and_wait_from_api(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
+                                        rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
 
-int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-                            rrdfunction_result_callback_t result_cb, void *result_cb_data,
-                            rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
+int rrd_call_function_async_from_streaming(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
+                                           rrdfunction_result_callback_t result_cb, void *result_cb_data,
+                                           rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data);
 
 void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);

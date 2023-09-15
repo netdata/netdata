@@ -1420,7 +1420,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    return rrd_call_function_and_wait(host, wb, timeout, function, web_client_interrupt_function_callback, w);
+    return rrd_call_function_and_wait_from_api(host, wb, timeout, function, web_client_interrupt_function_callback, w);
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
