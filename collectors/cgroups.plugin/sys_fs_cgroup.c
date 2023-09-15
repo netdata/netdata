@@ -2786,10 +2786,10 @@ static inline char *cgroup_chart_type(char *buffer, const char *prefix, const ch
 
 static inline void cgroup_add_service_label(RRDLABELS *labels)
 {
-    if (rrdlabels_exist(labels, "services"))
+    if (rrdlabels_exist(labels, "systemd_services"))
         return;
 
-    rrdlabels_add(labels, "service", "yes", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "systemd_services", "yes", RRDLABEL_SRC_AUTO);
 }
 
 void cgroup_discovery_worker(void *ptr)
