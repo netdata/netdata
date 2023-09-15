@@ -3123,7 +3123,6 @@ void update_systemd_services_charts(
                                                      RRDSET_TYPE_STACKED
                     );
                 rrdset_update_rrdlabels(cg->st_cpu, cg->chart_labels);
-
                 if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
@@ -3158,12 +3157,12 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_mem_usage, cg->chart_labels);
                 rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
-                if (likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes))
+                if (likely(do_swap_usage))
                     rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes);
-            if (likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes)) {
+            if (likely(do_swap_usage) {
                 if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                     rrddim_set(cg->st_mem_usage,
                                "swap",
@@ -3249,11 +3248,11 @@ void update_systemd_services_charts(
                     );
 
                 rrdset_update_rrdlabels(cg->st_mem, cg->chart_labels);
-                rrddim_add(cg->st_writeback, "write_back", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(cg->st_writeback, "writeback", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(cg->st_writeback, "dirty", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set(cg->st_writeback, "write_back", cg->memory.total_writeback);
+            rrddim_set(cg->st_writeback, "writeback", cg->memory.total_writeback);
             rrddim_set(cg->st_writeback, "dirty", cg->memory.total_dirty);
             rrdset_done(cg->st_writeback);
 
@@ -3285,7 +3284,7 @@ void update_systemd_services_charts(
             if(unlikely(!cg->st_mem_activity)) {
                 cg->st_mem_activity = rrdset_create_localhost(
                     cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX)
-                    , "mem_pgpgin"
+                    , "mem_activity"
                     , NULL
                     , "mem"
                     , "systemd.services.memory.activity"
