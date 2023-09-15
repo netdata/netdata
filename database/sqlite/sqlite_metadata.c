@@ -20,13 +20,14 @@
 
 #define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
 
-#define SQL_STORE_HOST_INFO "INSERT OR REPLACE INTO host " \
-        "(host_id, hostname, registry_hostname, update_every, os, timezone," \
-        "tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, program_version," \
-        "entries, health_enabled) " \
-        "values (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, " \
-        "@abbrev_timezone, @utc_offset, @program_name, @program_version, " \
-        "@entries, @health_enabled);"
+#define SQL_STORE_HOST_INFO                                                                                            \
+    "INSERT OR REPLACE INTO host "                                                                                     \
+    "(host_id, hostname, registry_hostname, update_every, os, timezone, tags, hops, memory_mode, "                     \
+    "abbrev_timezone, utc_offset, program_name, program_version,"                                                      \
+    "entries, health_enabled, last_connected) "                                                                        \
+    "VALUES (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, "     \
+    "@abbrev_timezone, @utc_offset, @program_name, @program_version, "                                                 \
+    "@entries, @health_enabled, @last_connected);"
 
 #define SQL_STORE_CHART "insert or replace into chart (chart_id, host_id, type, id, " \
     "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
@@ -361,6 +362,10 @@ static int store_host_metadata(RRDHOST *host)
         goto bind_fail;
 
     rc = sqlite3_bind_int(res, ++param, (int ) host->health.health_enabled);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, (int ) host->last_connected);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

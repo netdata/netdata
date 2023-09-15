@@ -104,6 +104,11 @@ const char *database_migrate_v12_v13_hash[] = {
     NULL
 };
 
+const char *database_migrate_v12_v13[] = {
+    "ALTER TABLE host ADD last_connected INT NOT NULL DEFAULT 0;",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
@@ -364,6 +369,17 @@ static int do_migration_v12_v13(sqlite3 *database, const char *name)
 
     return rc;
 }
+
+static int do_migration_v12_v13(sqlite3 *database, const char *name)
+{
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (!column_exists_in_table("host", "last_connected"))
+        return init_database_batch(database, &database_migrate_v11_v12[0]);
+
+    return 0;
+}
+
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
