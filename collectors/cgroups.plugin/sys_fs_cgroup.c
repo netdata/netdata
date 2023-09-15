@@ -880,8 +880,6 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_mem_detailed_cache;
-    RRDDIM *rd_mem_detailed_rss;
     RRDDIM *rd_mem_detailed_mapped;
     RRDDIM *rd_mem_detailed_writeback;
     RRDDIM *rd_mem_detailed_pgpgin;
@@ -2871,7 +2869,6 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_mem_detailed_cache = NULL,
         *st_mem_detailed_mapped = NULL,
         *st_mem_detailed_writeback = NULL,
         *st_mem_detailed_pgfault = NULL,
@@ -3246,14 +3243,15 @@ void update_systemd_services_charts(
                                                      update_every,
                                                      RRDSET_TYPE_STACKED
                     );
-            }
+                rrdset_update_rrdlabels(cg->st_cpu, cg->chart_labels);
 
-            if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
-            } else {
-                rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                    rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                }
             }
 
             // complete the iteration
@@ -3279,6 +3277,7 @@ void update_systemd_services_charts(
                     , RRDSET_TYPE_STACKED
                     );
 
+                rrdset_update_rrdlabels(cg->st_mem_usage, cg->chart_labels);
                 rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                 if (likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes))
                     rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
@@ -3315,6 +3314,7 @@ void update_systemd_services_charts(
                     , RRDSET_TYPE_STACKED
                     );
 
+                rrdset_update_rrdlabels(cg->st_mem_failcnt, cg->chart_labels);
                 rrddim_add(cg->st_mem_failcnt, "fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
 
@@ -3340,6 +3340,7 @@ void update_systemd_services_charts(
                     , RRDSET_TYPE_STACKED
                     );
 
+                rrdset_update_rrdlabels(cg->st_mem, cg->chart_labels);
                 rrddim_add(cg->st_mem, "rss", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "cache", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
             }
