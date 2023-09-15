@@ -735,8 +735,10 @@ struct inflight_function {
     int timeout;
     BUFFER *destination_wb;
     STRING *function;
-    void (*callback)(BUFFER *wb, int code, void *callback_data);
+    function_data_ready_callback callback;
     void *callback_data;
+    function_is_cancelled_callback is_cancelled;
+    void *cancel_data;
     usec_t timeout_ut;
     usec_t started_ut;
     usec_t sent_ut;
@@ -754,7 +756,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     char buffer[2048 + 1];
     snprintfz(buffer, 2048, "%s %s %d \"%s\"\n",
                       pf->payload ? "FUNCTION_PAYLOAD" : "FUNCTION",
-                      dictionary_acquired_item_name(item),
+                      dictionary_acquired_item_name(item), // our transaction id
                       pf->timeout,
                       string2str(pf->function));
 
@@ -828,7 +830,19 @@ static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
     parser->inflight.smaller_timeout = 0;
     struct inflight_function *pf;
     dfe_start_write(parser->inflight.functions, pf) {
-        if (pf->timeout_ut < now) {
+        if(pf->is_cancelled && pf->is_cancelled(pf->cancel_data)) {
+            internal_error(true,
+                           "FUNCTION '%s' removing cancelled transaction '%s', after %llu usec.",
+                           string2str(pf->function), pf_dfe.name, now - pf->started_ut);
+
+            pf->code = rrd_call_function_error(pf->destination_wb,
+                                               "Client closed request",
+                                               HTTP_RESP_CLIENT_CLOSED_REQUEST);
+
+            dictionary_del(parser->inflight.functions, pf_dfe.name);
+        }
+
+        else if (pf->timeout_ut < now) {
             internal_error(true,
                            "FUNCTION '%s' removing expired transaction '%s', after %llu usec.",
                            string2str(pf->function), pf_dfe.name, now - pf->started_ut);
@@ -849,7 +863,10 @@ static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
 
 // this is the function that is called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
-static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
+static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout,
+                                              const char *function, void *collector_data,
+                                              function_data_ready_callback callback, void *callback_data,
+                                              function_is_cancelled_callback function_cancel_check, void *cancel_data) {
     PARSER  *parser = collector_data;
 
     usec_t now = now_realtime_usec();
@@ -862,6 +879,8 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
         .function = string_strdupz(function),
         .callback = callback,
         .callback_data = callback_data,
+        .is_cancelled = function_cancel_check,
+        .cancel_data = cancel_data,
         .payload = NULL
     };
 
@@ -887,6 +906,10 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
     dictionary_write_unlock(parser->inflight.functions);
 
     return HTTP_RESP_OK;
+}
+
+static inline PARSER_RC pluginsd_function_cancel(char **words, size_t num_words, PARSER *parser) {
+    ;
 }
 
 static inline PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
@@ -2416,6 +2439,9 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 
         case 42:
             return pluginsd_function_result_begin(words, num_words, parser);
+
+        case 43:
+            return pluginsd_function_cancel(words, num_words, parser);
 
         case 51:
             return pluginsd_label(words, num_words, parser);

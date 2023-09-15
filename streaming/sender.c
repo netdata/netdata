@@ -912,6 +912,7 @@ struct inflight_stream_function {
     struct sender_state *sender;
     STRING *transaction;
     usec_t received_ut;
+    RRDFUNCTION_INFLIGHT_TRANSACTION *ftr;
 };
 
 void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
@@ -940,6 +941,8 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
                        buffer_strlen(func_wb),
                        now_realtime_usec() - tmp->received_ut);
     }
+
+    rrdfunction_inflight_transaction_done(s->rrdfunctions_inflight_index, tmp->ftr);
     string_freez(tmp->transaction);
     buffer_free(func_wb);
     freez(tmp);
@@ -987,6 +990,7 @@ void execute_commands(struct sender_state *s) {
                 tmp->received_ut = now_realtime_usec();
                 tmp->sender = s;
                 tmp->transaction = string_strdupz(transaction);
+                tmp->ftr = rrdfunction_inflight_transaction_register_by_id(s->rrdfunctions_inflight_index, transaction);
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
@@ -996,6 +1000,14 @@ void execute_commands(struct sender_state *s) {
 
                     stream_execute_function_callback(wb, code, tmp);
                 }
+            }
+        }
+        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
+            worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
+
+            char *transaction = get_word(words, num_words, 1);
+            if(transaction && *transaction) {
+                rrdfunction_inflight_transaction_cancel_by_id(s->rrdfunctions_inflight_index, transaction);
             }
         }
         else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {

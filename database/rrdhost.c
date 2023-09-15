@@ -1149,6 +1149,8 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
 
     spinlock_init(&host->sender->spinlock);
     replication_init_sender(host->sender);
+
+    host->sender->rrdfunctions_inflight_index = rrdfunction_inflight_create_index();
 }
 
 static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
@@ -1160,9 +1162,14 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
 
     rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
+
 #ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_compressor_destroy(&host->sender->compressor);
 #endif
+
+    rrdfunction_inflight_destroy_index(host->sender->rrdfunctions_inflight_index);
+    host->sender->rrdfunctions_inflight_index = NULL;
+
     replication_cleanup_sender(host->sender);
 
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);

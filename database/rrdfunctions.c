@@ -283,8 +283,7 @@ struct rrd_collector_function {
     STRING *help;
     int timeout;                    // the default timeout of the function
 
-    int (*function)(BUFFER *wb, int timeout, const char *function, void *collector_data,
-                    function_data_ready_callback callback, void *callback_data);
+    function_execute_at_collector function;
 
     void *collector_data;
     struct rrd_collector *collector;
@@ -637,7 +636,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
     tp.tv_sec += (time_t)timeout;
 
     if(rdcf->sync) {
-        code = rdcf->function(wb, timeout, key, rdcf->collector_data, NULL, NULL);
+        code = rdcf->function(wb, timeout, key, rdcf->collector_data, NULL, NULL, NULL, NULL);
     }
     else {
         struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
@@ -649,7 +648,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
         bool we_should_free = true;
         BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
         temp_wb->content_type = wb->content_type;
-        code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, tmp);
+        code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, tmp, NULL, NULL);
         if (code == HTTP_RESP_OK) {
             netdata_mutex_lock(&tmp->mutex);
 
@@ -713,7 +712,7 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     if(timeout <= 0)
         timeout = rdcf->timeout;
 
-    code = rdcf->function(wb, timeout, key, rdcf->collector_data, callback, callback_data);
+    code = rdcf->function(wb, timeout, key, rdcf->collector_data, callback, callback_data, NULL, NULL);
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(wb))
@@ -806,10 +805,73 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
     dfe_done(t);
 }
 
+// ----------------------------------------------------------------------------
+
+struct rrdfunction_inflight_request {
+    bool cancelled;
+};
+
+RRDFUNCTION_INFLIGHT_INDEX *rrdfunction_inflight_create_index(void) {
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    return dict;
+}
+
+void rrdfunction_inflight_destroy_index(RRDFUNCTION_INFLIGHT_INDEX *idx) {
+    dictionary_destroy(idx);
+}
+
+RRDFUNCTION_INFLIGHT_TRANSACTION *rrdfunction_inflight_transaction_register_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction) {
+    struct rrdfunction_inflight_request t = {
+            .cancelled = false,
+    };
+    return dictionary_set_and_acquire_item(idx, transaction, &t, sizeof(t));
+}
+
+RRDFUNCTION_INFLIGHT_TRANSACTION *rrdfunction_inflight_transaction_register(RRDFUNCTION_INFLIGHT_INDEX *idx) {
+    char transaction[UUID_STR_LEN];
+    uuid_t uuid;
+    uuid_generate_random(uuid);
+    uuid_unparse_lower(uuid, transaction);
+
+    return rrdfunction_inflight_transaction_register_by_id(idx, transaction);
+}
+
+void rrdfunction_inflight_transaction_done(RRDFUNCTION_INFLIGHT_INDEX *idx, RRDFUNCTION_INFLIGHT_TRANSACTION *ftr) {
+    const char *transaction = dictionary_acquired_item_name(ftr);
+    dictionary_del(idx, transaction);
+    dictionary_acquired_item_release(idx, ftr);
+    dictionary_garbage_collect(idx);
+}
+
+void rrdfunction_inflight_transaction_done_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction) {
+    dictionary_del(idx, transaction);
+    dictionary_garbage_collect(idx);
+}
+
+void rrdfunction_inflight_transaction_cancel(RRDFUNCTION_INFLIGHT_TRANSACTION *ftr) {
+    struct rrdfunction_inflight_request *t = dictionary_acquired_item_value(ftr);
+    __atomic_store_n(&t->cancelled, true, __ATOMIC_RELAXED);
+}
+
+void rrdfunction_inflight_transaction_cancel_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction) {
+    RRDFUNCTION_INFLIGHT_TRANSACTION *ftr = dictionary_get_and_acquire_item(idx, transaction);
+    if(ftr)
+        rrdfunction_inflight_transaction_cancel(ftr);
+    dictionary_acquired_item_release(idx, ftr);
+}
+
+bool rrdfunction_inflight_transaction_is_cancelled(RRDFUNCTION_INFLIGHT_TRANSACTION *ftr) {
+    struct rrdfunction_inflight_request *t = dictionary_acquired_item_value(ftr);
+    return __atomic_load_n(&t->cancelled, __ATOMIC_RELAXED);
+}
+
+// ----------------------------------------------------------------------------
 
 int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
                                void *collector_data __maybe_unused,
-                               function_data_ready_callback callback __maybe_unused, void *callback_data __maybe_unused) {
+                               function_data_ready_callback callback, void *callback_data,
+                               function_is_cancelled_callback is_cancelled, void *cancel_data) {
+
     time_t now = now_realtime_sec();
 
     buffer_flush(wb);
@@ -1428,8 +1490,14 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
 
-    if(callback)
-        callback(wb, HTTP_RESP_OK, callback_data);
+    int response = HTTP_RESP_OK;
+    if(is_cancelled && is_cancelled(cancel_data)) {
+        buffer_flush(wb);
+        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
+    }
 
-    return HTTP_RESP_OK;
+    if(callback)
+        callback(wb, response, callback_data);
+
+    return response;
 }

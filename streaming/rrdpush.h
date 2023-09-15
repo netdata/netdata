@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/common.h"
 #include "web/server/web_client.h"
+#include "database/rrdfunctions.h"
 #include "database/rrd.h"
 
 #define CONNECTED_TO_SIZE 100
@@ -274,6 +275,8 @@ struct sender_state {
         bool shutdown;
         STREAM_HANDSHAKE reason;
     } exit;
+
+    RRDFUNCTION_INFLIGHT_INDEX *rrdfunctions_inflight_index;
 
     struct {
         DICTIONARY *requests;                   // de-duplication of replication requests, per chart
