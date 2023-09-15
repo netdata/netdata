@@ -880,7 +880,6 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_mem_detailed_writeback;
     RRDDIM *rd_mem_detailed_pgpgin;
     RRDDIM *rd_mem_detailed_pgpgout;
     RRDDIM *rd_mem_detailed_pgfault;
@@ -2891,24 +2890,6 @@ void update_systemd_services_charts(
     // create the charts
 
     if(likely(do_mem_detailed)) {
-        if(unlikely(!st_mem_detailed_writeback)) {
-            st_mem_detailed_writeback = rrdset_create_localhost(
-                    "services"
-                    , "mem_writeback"
-                    , NULL
-                    , "mem"
-                    , "services.mem_writeback"
-                    , "Systemd Services Writeback Memory"
-                    , "MiB"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 50
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-
-        }
-
         if(unlikely(!st_mem_detailed_pgfault)) {
             st_mem_detailed_pgfault = rrdset_create_localhost(
                     "services"
@@ -3334,10 +3315,30 @@ void update_systemd_services_charts(
             rrddim_set(cg->st_mem, "rss_huge", cg->memory.total_rss_huge);
             rrdset_done(cg->st_mem);
 
-            if(unlikely(!cg->rd_mem_detailed_writeback))
-                cg->rd_mem_detailed_writeback = rrddim_add(st_mem_detailed_writeback, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            if(unlikely(!cg->st_writeback)) {
+                cg->st_writeback = rrdset_create_localhost(
+                    cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX)
+                    , "mem_writeback"
+                    , NULL
+                    , "mem"
+                    , "systemd.services.memory.writeback"
+                    , "Systemd Services Writeback Memory"
+                    , "MiB"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
+                    , prio++
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+                    );
 
-            rrddim_set_by_pointer(st_mem_detailed_writeback, cg->rd_mem_detailed_writeback, cg->memory.total_writeback);
+                rrdset_update_rrdlabels(cg->st_mem, cg->chart_labels);
+                rrddim_add(cg->st_writeback, "write_back", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(cg->st_writeback, "dirty", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set(cg->st_writeback, "write_back", cg->memory.total_writeback);
+            rrddim_set(cg->st_writeback, "dirty", cg->memory.total_dirty);
+            rrdset_done(cg->st_writeback);
 
             if(unlikely(!cg->rd_mem_detailed_pgfault))
                 cg->rd_mem_detailed_pgfault = rrddim_add(st_mem_detailed_pgfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
