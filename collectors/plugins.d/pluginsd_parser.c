@@ -895,10 +895,6 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
     return HTTP_RESP_OK;
 }
 
-static inline PARSER_RC pluginsd_function_cancel(char **words, size_t num_words, PARSER *parser) {
-    ;
-}
-
 static inline PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     // a plugin or a child is registering a function
 
@@ -2428,9 +2424,6 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 
         case 42:
             return pluginsd_function_result_begin(words, num_words, parser);
-
-        case 43:
-            return pluginsd_function_cancel(words, num_words, parser);
 
         case 51:
             return pluginsd_label(words, num_words, parser);
