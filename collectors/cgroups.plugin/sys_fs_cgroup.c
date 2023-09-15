@@ -880,9 +880,6 @@ struct cgroup {
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     // services
-    RRDDIM *rd_mem_detailed_pgfault;
-    RRDDIM *rd_mem_detailed_pgmajfault;
-
     RRDDIM *rd_io_service_bytes_read;
     RRDDIM *rd_io_serviced_read;
     RRDDIM *rd_throttle_io_read;
@@ -2865,9 +2862,6 @@ void update_systemd_services_charts(
         , int do_merged_ops
 ) {
     static RRDSET
-        *st_mem_detailed_pgfault = NULL,
-        *st_mem_detailed_pgmajfault = NULL,
-
         *st_io_read = NULL,
         *st_io_serviced_read = NULL,
         *st_throttle_io_read = NULL,
@@ -2883,44 +2877,6 @@ void update_systemd_services_charts(
         *st_merged_ops_write = NULL;
 
     // create the charts
-
-    if(likely(do_mem_detailed)) {
-        if(unlikely(!st_mem_detailed_pgfault)) {
-            st_mem_detailed_pgfault = rrdset_create_localhost(
-                    "services"
-                    , "mem_pgfault"
-                    , NULL
-                    , "mem"
-                    , "services.mem_pgfault"
-                    , "Systemd Services Memory Minor Page Faults"
-                    , "MiB/s"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 60
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        }
-
-        if(unlikely(!st_mem_detailed_pgmajfault)) {
-            st_mem_detailed_pgmajfault = rrdset_create_localhost(
-                    "services"
-                    , "mem_pgmajfault"
-                    , NULL
-                    , "mem"
-                    , "services.mem_pgmajfault"
-                    , "Systemd Services Memory Major Page Faults"
-                    , "MiB/s"
-                    , PLUGIN_CGROUPS_NAME
-                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
-                    , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 70
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        }
-
-    }
-
     if(likely(do_io)) {
         if(unlikely(!st_io_read)) {
             st_io_read = rrdset_create_localhost(
@@ -3301,15 +3257,30 @@ void update_systemd_services_charts(
             rrddim_set(cg->st_writeback, "dirty", cg->memory.total_dirty);
             rrdset_done(cg->st_writeback);
 
-            if(unlikely(!cg->rd_mem_detailed_pgfault))
-                cg->rd_mem_detailed_pgfault = rrddim_add(st_mem_detailed_pgfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+            if(unlikely(!cg->st_pgfaults)) {
+                cg->st_pgfaults = rrdset_create_localhost(
+                      cgroup_chart_type(type, services_chart_id_prefix, cg->chart_title, RRD_ID_LENGTH_MAX)
+                    , "mem_pgfault"
+                    , NULL
+                    , "mem"
+                    , "systemd.services.memory.page_faults"
+                    , "Systemd Services Memory Minor and Major Page Faults"
+                    , "MiB/s"
+                    , PLUGIN_CGROUPS_NAME
+                    , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
+                    , prio++
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+                    );
 
-            rrddim_set_by_pointer(st_mem_detailed_pgfault, cg->rd_mem_detailed_pgfault, cg->memory.total_pgfault);
+                rrdset_update_rrdlabels(cg->st_pgfaults, cg->chart_labels);
+                rrddim_add(cg->st_pgfaults, "minor", NULL, system_page_size, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(cg->st_pgfaults, "major", NULL, system_page_size, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+            }
 
-            if(unlikely(!cg->rd_mem_detailed_pgmajfault))
-                cg->rd_mem_detailed_pgmajfault = rrddim_add(st_mem_detailed_pgmajfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_set_by_pointer(st_mem_detailed_pgmajfault, cg->rd_mem_detailed_pgmajfault, cg->memory.total_pgmajfault);
+            rrddim_set(cg->st_pgfaults, "minor", cg->memory.total_pgfault);
+            rrddim_set(cg->st_pgfaults, "major", cg->memory.total_pgmajfault);
+            rrdset_done(cg->st_pgfaults);
 
             if(unlikely(!cg->st_mem_activity)) {
                 cg->st_mem_activity = rrdset_create_localhost(
@@ -3327,14 +3298,14 @@ void update_systemd_services_charts(
                     , RRDSET_TYPE_STACKED
                     );
 
-                rrdset_update_rrdlabels(cg->st_mem, cg->chart_labels);
-                rrddim_add(cg->st_writeback, "in", NULL, system_page_size, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
-                rrddim_add(cg->st_writeback, "out", NULL, system_page_size, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                rrdset_update_rrdlabels(cg->st_mem_activity, cg->chart_labels);
+                rrddim_add(cg->st_mem_activity, "in", NULL, system_page_size, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(cg->st_mem_activity, "out", NULL, system_page_size, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set(cg->st_writeback, "in", cg->memory.total_pgpgin);
-            rrddim_set(cg->st_writeback, "out", cg->memory.total_pgpgout);
-            rrdset_done(cg->st_writeback);
+            rrddim_set(cg->st_mem_activity, "in", cg->memory.total_pgpgin);
+            rrddim_set(cg->st_mem_activity, "out", cg->memory.total_pgpgout);
+            rrdset_done(cg->st_mem_activity);
         }
 
         if(likely(do_io && cg->io_service_bytes.updated)) {
@@ -3408,11 +3379,6 @@ void update_systemd_services_charts(
 
             rrddim_set_by_pointer(st_merged_ops_write, cg->rd_io_merged_write, cg->io_merged.Write);
         }
-    }
-
-    if(unlikely(do_mem_detailed)) {
-        rrdset_done(st_mem_detailed_pgfault);
-        rrdset_done(st_mem_detailed_pgmajfault);
     }
 
     if(likely(do_io)) {
