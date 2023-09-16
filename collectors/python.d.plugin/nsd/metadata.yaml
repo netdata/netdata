@@ -40,6 +40,9 @@ modules:
     setup:
       prerequisites:
         list:
+          - title: NSD version
+            description: |
+              The version of `nsd` must be 4.0+.
           - title: Provide Netdata the permissions to run the command
             description: |
               Netdata must have permissions to run the `nsd-control stats_noreset` command.
