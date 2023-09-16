@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- update go.d.plugin to v0.55.0 [\#15981](https://github.com/netdata/netdata/pull/15981) ([ilyam8](https://github.com/ilyam8))
+- bump UI to v6.37.1 [\#15980](https://github.com/netdata/netdata/pull/15980) ([ilyam8](https://github.com/ilyam8))
+- apps.plugin function is not thread safe [\#15978](https://github.com/netdata/netdata/pull/15978) ([ktsaou](https://github.com/ktsaou))
+- Facets: fixes 5 [\#15976](https://github.com/netdata/netdata/pull/15976) ([ktsaou](https://github.com/ktsaou))
 - facets histogram: do not send db retention for facets [\#15974](https://github.com/netdata/netdata/pull/15974) ([ktsaou](https://github.com/ktsaou))
 - facets histogram when empty [\#15970](https://github.com/netdata/netdata/pull/15970) ([ktsaou](https://github.com/ktsaou))
 - facets: do not shadow local variable [\#15968](https://github.com/netdata/netdata/pull/15968) ([ktsaou](https://github.com/ktsaou))
@@ -20,6 +24,7 @@
 - Update slabinfo metadata [\#15951](https://github.com/netdata/netdata/pull/15951) ([thiagoftsm](https://github.com/thiagoftsm))
 - Disk Labels [\#15949](https://github.com/netdata/netdata/pull/15949) ([ktsaou](https://github.com/ktsaou))
 - streaming logs [\#15948](https://github.com/netdata/netdata/pull/15948) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#15946](https://github.com/netdata/netdata/pull/15946) ([netdatabot](https://github.com/netdatabot))
 - Integrations: Add a note to enable the collectors [\#15945](https://github.com/netdata/netdata/pull/15945) ([MrZammler](https://github.com/MrZammler))
 - Integrations: Add a note to install charts.d plugin [\#15943](https://github.com/netdata/netdata/pull/15943) ([MrZammler](https://github.com/MrZammler))
 - Add description about packages [\#15941](https://github.com/netdata/netdata/pull/15941) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -424,10 +429,6 @@
 - Make yamls pass the schema, and use decided temporary naming scheme [\#15401](https://github.com/netdata/netdata/pull/15401) ([Ancairon](https://github.com/Ancairon))
 - collector meta schema: global config examples folding + per example [\#15398](https://github.com/netdata/netdata/pull/15398) ([ilyam8](https://github.com/ilyam8))
 - packaging: fix arch detection in update\_static [\#15396](https://github.com/netdata/netdata/pull/15396) ([ilyam8](https://github.com/ilyam8))
-- add expiration to bearer token response [\#15392](https://github.com/netdata/netdata/pull/15392) ([ktsaou](https://github.com/ktsaou))
-- dont add all nodes to registry action hello [\#15390](https://github.com/netdata/netdata/pull/15390) ([ktsaou](https://github.com/ktsaou))
-- Revert "dont add all nodes to registry action hello" [\#15389](https://github.com/netdata/netdata/pull/15389) ([ktsaou](https://github.com/ktsaou))
-- dont add all nodes to registry action hello [\#15388](https://github.com/netdata/netdata/pull/15388) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
