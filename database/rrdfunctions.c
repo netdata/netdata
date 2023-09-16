@@ -383,22 +383,27 @@ static void rrd_collector_release(struct rrd_collector *rdc) {
         rrd_collector_free(rdc);
 }
 
-static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
-                                          void *rrdhost __maybe_unused) {
+static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *rrdhost) {
+    RRDHOST *host = rrdhost; (void)host;
     struct rrd_collector_function *rdcf = func;
 
     rrd_collector_started();
     rdcf->collector = rrd_collector_acquire();
+
+    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
+                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 }
 
-static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
+static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
                                           void *rrdhost __maybe_unused) {
     struct rrd_collector_function *rdcf = func;
     rrd_collector_release(rdcf->collector);
 }
 
-static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
-                                            void *new_func __maybe_unused, void *rrdhost __maybe_unused) {
+static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
+                                            void *new_func, void *rrdhost) {
+    RRDHOST *host = rrdhost; (void)host;
     struct rrd_collector_function *rdcf = func;
     struct rrd_collector_function *new_rdcf = new_func;
 
@@ -441,6 +446,10 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         rdcf->collector_data = new_rdcf->collector_data;
         changed = true;
     }
+
+    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
+                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 
     return changed;
 }
@@ -485,6 +494,8 @@ void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int
 
     if(st)
         dictionary_view_set(st->functions_view, key, item);
+    else
+        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_acquired_item_release(host->functions, item);
 }
@@ -506,6 +517,8 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
 }
 
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
+    rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
     struct rrd_collector_function *tmp;
     dfe_start_read(host->functions, tmp) {
         if(!(tmp->options & RRD_FUNCTION_GLOBAL))
