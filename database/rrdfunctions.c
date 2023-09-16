@@ -734,7 +734,7 @@ void rrd_functions_inflight_destroy(void) {
     rrd_functions_inflight_requests = NULL;
 }
 
-static void rrd_function_inflight_register_canceller_cb(void *register_canceller_cb_data, rrd_function_canceller_cb_t canceller_cb, void *canceller_cb_data) {
+static void rrd_async_function_register_canceller_cb(void *register_canceller_cb_data, rrd_function_canceller_cb_t canceller_cb, void *canceller_cb_data) {
     struct rrd_function_inflight *r = register_canceller_cb_data;
     r->canceller.cb = canceller_cb;
     r->canceller.data = canceller_cb_data;
@@ -770,7 +770,7 @@ static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
     freez(tmp);
 }
 
-static void rrd_call_function_signal_when_ready(BUFFER *temp_wb __maybe_unused, int code, void *callback_data) {
+static void rrd_async_function_signal_when_ready(BUFFER *temp_wb __maybe_unused, int code, void *callback_data) {
     struct rrd_function_call_wait *tmp = callback_data;
     bool we_should_free = false;
 
@@ -814,7 +814,7 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
     int code = r->rdcf->execute_cb(r->result.wb, r->timeout, r->sanitized_cmd, r->rdcf->execute_cb_data,
                                    rrd_inflight_async_nowait_function_finished, r,
                                    rrd_inflight_async_nowait_function_is_cancelled, r,
-                                   rrd_function_inflight_register_canceller_cb, r);
+                                   rrd_async_function_register_canceller_cb, r);
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(r->result.wb))
@@ -849,13 +849,13 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
 
     int code = r->rdcf->execute_cb(temp_wb, r->timeout, r->sanitized_cmd, r->rdcf->execute_cb_data,
                                    // we overwrite the result callbacks,
-                                   // so that we can cleanup the allocations made
-                                   rrd_call_function_signal_when_ready, tmp,
+                                   // so that we can clean up the allocations made
+                                   rrd_async_function_signal_when_ready, tmp,
                                    // IMPORTANT: do not pass the is_cancelled_cb() here,
                                    // because we may exit before the function finishes
                                    // so, whatever the is_cancelled_cb() is doing may crash
                                    NULL, NULL,
-                                   rrd_function_inflight_register_canceller_cb, r);
+                                   rrd_async_function_register_canceller_cb, r);
 
     if (code == HTTP_RESP_OK) {
         netdata_mutex_lock(&tmp->mutex);
