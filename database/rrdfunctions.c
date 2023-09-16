@@ -323,13 +323,9 @@ static void rrd_collector_free(struct rrd_collector *rdc) {
 
 // called once per collector
 void rrd_collector_started(void) {
-    if(likely(thread_rrd_collector)) {
-        thread_rrd_collector->tid = gettid();
-        thread_rrd_collector->running = true;
-        return;
-    }
+    if(!thread_rrd_collector)
+        thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
 
-    thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
     thread_rrd_collector->tid = gettid();
     thread_rrd_collector->running = true;
 }
