@@ -390,9 +390,9 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
     rrd_collector_started();
     rdcf->collector = rrd_collector_acquire();
 
-    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
-                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
-                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
+//    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+//                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
+//                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 }
 
 static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
@@ -447,9 +447,9 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
-                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
-                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
+//    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+//                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
+//                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 
     return changed;
 }
