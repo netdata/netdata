@@ -310,8 +310,11 @@ struct rrd_collector {
 static __thread struct rrd_collector *thread_rrd_collector = NULL;
 
 static void rrd_collector_free(struct rrd_collector *rdc) {
+    if(rdc->running)
+        return;
+
     int32_t expected = 0;
-    if(likely(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))) {
+    if(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
         // the collector is still referenced by charts.
         // leave it hanging there, the last chart will actually free it.
         return;
@@ -341,15 +344,42 @@ void rrd_collector_finished(void) {
 }
 
 static struct rrd_collector *rrd_collector_acquire(void) {
-    __atomic_add_fetch(&thread_rrd_collector->refcount, 1, __ATOMIC_SEQ_CST);
+    rrd_collector_started();
+
+    int32_t expected = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED), wanted = 0;
+    do {
+        if(expected < 0 || !thread_rrd_collector->running) {
+            internal_fatal(true, "FUNCTIONS: Trying to acquire a collector that is exiting.");
+            return thread_rrd_collector;
+        }
+
+        wanted = expected + 1;
+
+    } while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount, &expected, wanted, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+
     return thread_rrd_collector;
 }
 
 static void rrd_collector_release(struct rrd_collector *rdc) {
     if(unlikely(!rdc)) return;
 
-    int32_t refcount = __atomic_sub_fetch(&rdc->refcount, 1, __ATOMIC_SEQ_CST);
-    if(refcount == 0 && !rdc->running)
+    int32_t expected = __atomic_load_n(&rdc->refcount, __ATOMIC_RELAXED), wanted = 0;
+    do {
+        if(expected < 0) {
+            internal_fatal(true, "FUNCTIONS: Trying to release a collector that is exiting.");
+            return;
+        }
+
+        if(expected == 0) {
+            internal_fatal(true, "FUNCTIONS: Trying to release a collector that is not acquired.");
+            return;
+        }
+
+        wanted = expected - 1;
+
+    } while(!__atomic_compare_exchange_n(&rdc->refcount, &expected, wanted, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+
+    if(wanted == 0)
         rrd_collector_free(rdc);
 }
 
