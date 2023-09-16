@@ -45,7 +45,7 @@ modules:
       prerequisites:
         list:
           - title: Create a read-only `netdata` user, to monitor the `/status` endpoint.
-            description: You will need this configuring the collector
+            description: This is necessary for configuring the collector.
       configuration:
         file:
           name: "python.d/tomcat.conf"
