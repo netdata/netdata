@@ -353,14 +353,11 @@ static void rrd_collector_release(struct rrd_collector *rdc) {
         rrd_collector_free(rdc);
 }
 
-static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
+static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
                                           void *rrdhost __maybe_unused) {
     struct rrd_collector_function *rdcf = func;
 
-    if(!thread_rrd_collector)
-        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.",
-              __FUNCTION__, dictionary_acquired_item_name(item));
-
+    rrd_collector_started();
     rdcf->collector = rrd_collector_acquire();
 }
 
@@ -375,9 +372,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     struct rrd_collector_function *rdcf = func;
     struct rrd_collector_function *new_rdcf = new_func;
 
-    if(!thread_rrd_collector)
-        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.",
-              __FUNCTION__, dictionary_acquired_item_name(item));
+    rrd_collector_started();
 
     bool changed = false;
 
@@ -565,20 +560,22 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
     char *s = NULL;
 
     *rdcf = NULL;
-    while(!(*rdcf) && buffer[0]) {
-        *rdcf = dictionary_get(host->functions, buffer);
-        if(*rdcf) break;
+    if(host->functions) {
+        while (!(*rdcf) && buffer[0]) {
+            *rdcf = dictionary_get(host->functions, buffer);
+            if (*rdcf) break;
 
-        // if s == NULL, set it to the end of the buffer
-        // this should happen only the first time
-        if(unlikely(!s))
-            s = &buffer[key_length - 1];
+            // if s == NULL, set it to the end of the buffer
+            // this should happen only the first time
+            if (unlikely(!s))
+                s = &buffer[key_length - 1];
 
-        // skip a word from the end
-        while(s >= buffer && !isspace(*s)) *s-- = '\0';
+            // skip a word from the end
+            while (s >= buffer && !isspace(*s)) *s-- = '\0';
 
-        // skip all spaces
-        while(s >= buffer && isspace(*s)) *s-- = '\0';
+            // skip all spaces
+            while (s >= buffer && isspace(*s)) *s-- = '\0';
+        }
     }
 
     buffer_flush(wb);
