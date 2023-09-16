@@ -990,7 +990,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
             }
             foreach_rrdcalctemplate_done(rt);
 
-            if (health_variable_check(health_rrdvars, st, rd))
+            if (health_variable_check(health_rrdvars, st, rd) || rrdset_flag_check(st, RRDSET_FLAG_HAS_RRDCALC_LINKED))
                 rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
