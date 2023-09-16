@@ -1384,14 +1384,6 @@ int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char 
                                           WEIGHTS_FORMAT_CONTEXTS, 1);
 }
 
-bool web_client_interrupt_function_callback(void *data) {
-    struct web_client *w = data;
-    if(w->interrupt.callback && w->interrupt.callback(w, w->interrupt.callback_data))
-        return true;
-
-    return false;
-}
-
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     if (!netdata_ready)
         return HTTP_RESP_SERVICE_UNAVAILABLE;
@@ -1422,7 +1414,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
     return rrd_function_run(host, wb, timeout, function, true, NULL,
                             NULL, NULL,
-                            web_client_interrupt_function_callback, w);
+                            web_client_interrupt_callback, w);
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {

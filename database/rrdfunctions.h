@@ -14,6 +14,7 @@ typedef int (*rrd_function_execute_cb_t)(BUFFER *wb, int timeout, const char *fu
                                          rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
                                          rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data);
 
+void rrd_functions_inflight_init(void);
 void rrdfunctions_host_init(RRDHOST *host);
 void rrdfunctions_host_destroy(RRDHOST *host);
 

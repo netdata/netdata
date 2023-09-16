@@ -858,6 +858,8 @@ void pluginsd_function_cancel(void *data) {
         if(look_for == t) {
             const char *transaction = t_dfe.name;
 
+            internal_error(true, "PLUGINSD: sending function cancellation to plugin for transaction '%s'", transaction);
+
             char buffer[2048 + 1];
             snprintfz(buffer, 2048, "%s %s\n",
                       PLUGINSD_KEYWORD_FUNCTION_CANCEL,

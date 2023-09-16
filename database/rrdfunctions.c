@@ -723,6 +723,9 @@ static DICTIONARY *rrd_functions_inflight_requests = NULL;
 
 static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rrd_function_inflight *r = value;
+
+    internal_error(true, "FUNCTIONS: transaction '%s' finished", r->transaction);
+
     freez((void *)r->transaction);
     freez((void *)r->cmd);
     freez((void *)r->sanitized_cmd);
@@ -767,14 +770,13 @@ struct rrd_function_call_wait {
     int code;
 };
 
-static void rrd_inflight_function_release(RRDHOST *host, const DICTIONARY_ITEM *host_function_acquired, const char *transaction) {
-    dictionary_acquired_item_release(host->functions, host_function_acquired);
+static void rrd_inflight_function_cleanup(RRDHOST *host, const DICTIONARY_ITEM *host_function_acquired, const char *transaction) {
     dictionary_del(rrd_functions_inflight_requests, transaction);
     dictionary_garbage_collect(rrd_functions_inflight_requests);
 }
 
 static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
-    rrd_inflight_function_release(tmp->host, tmp->host_function_acquired, tmp->transaction);
+    rrd_inflight_function_cleanup(tmp->host, tmp->host_function_acquired, tmp->transaction);
     freez(tmp->transaction);
 
     pthread_cond_destroy(&tmp->cond);
@@ -814,10 +816,10 @@ static void rrd_inflight_async_nowait_function_finished(BUFFER *wb, int code, vo
     if(r->result.cb)
         r->result.cb(wb, code, r->result.data);
 
-    rrd_inflight_function_release(r->host, r->host_function_acquired, r->transaction);
+    rrd_inflight_function_cleanup(r->host, r->host_function_acquired, r->transaction);
 }
 
-static bool rrd_inflight_async_nowait_function_is_cancelled(void *data) {
+static bool rrd_inflight_async_function_is_cancelled(void *data) {
     struct rrd_function_inflight *r = data;
     return __atomic_load_n(&r->cancelled, __ATOMIC_RELAXED);
 }
@@ -825,14 +827,14 @@ static bool rrd_inflight_async_nowait_function_is_cancelled(void *data) {
 static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_inflight *r) {
     int code = r->rdcf->execute_cb(r->result.wb, r->timeout, r->sanitized_cmd, r->rdcf->execute_cb_data,
                                    rrd_inflight_async_nowait_function_finished, r,
-                                   rrd_inflight_async_nowait_function_is_cancelled, r,
+                                   rrd_inflight_async_function_is_cancelled, r,
                                    rrd_async_function_register_canceller_cb, r);
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(r->result.wb))
             rrd_call_function_error(r->result.wb, "Failed to send request to the collector.", code);
 
-        rrd_inflight_function_release(r->host, r->host_function_acquired, r->transaction);
+        rrd_inflight_function_cleanup(r->host, r->host_function_acquired, r->transaction);
     }
 
     return code;
@@ -841,7 +843,8 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
 static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     struct timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
-    tp.tv_sec += (time_t)r->timeout;
+    usec_t now_ut = tp.tv_sec * USEC_PER_SEC + tp.tv_nsec / NSEC_PER_USEC;
+    usec_t end_ut = now_ut + r->timeout * USEC_PER_SEC;
 
     struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
     tmp->free_with_signal = false;
@@ -863,20 +866,45 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                                    // we overwrite the result callbacks,
                                    // so that we can clean up the allocations made
                                    rrd_async_function_signal_when_ready, tmp,
-                                   // IMPORTANT: do not pass the is_cancelled_cb() here,
-                                   // because we may exit before the function finishes
-                                   // so, whatever the is_cancelled_cb() is doing may crash
-                                   NULL, NULL,
+                                   rrd_inflight_async_function_is_cancelled, r,
                                    rrd_async_function_register_canceller_cb, r);
 
     if (code == HTTP_RESP_OK) {
         netdata_mutex_lock(&tmp->mutex);
 
+        bool cancelled = false;
         int rc = 0;
-        while (rc == 0 && !tmp->data_are_ready) {
+        while (rc == 0 && !cancelled && !tmp->data_are_ready) {
+            clock_gettime(CLOCK_REALTIME, &tp);
+            now_ut = tp.tv_sec * USEC_PER_SEC + tp.tv_nsec / NSEC_PER_USEC;
+
+            if(now_ut >= end_ut) {
+                rc = ETIMEDOUT;
+                break;
+            }
+
+            tp.tv_nsec += 10 * NSEC_PER_MSEC;
+            if(tp.tv_nsec > (long)(1 * NSEC_PER_SEC)) {
+                tp.tv_sec++;
+                tp.tv_nsec -= 1 * NSEC_PER_SEC;
+            }
+
             // the mutex is unlocked within pthread_cond_timedwait()
             rc = pthread_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
             // the mutex is again ours
+
+            if(rc == ETIMEDOUT) {
+                rc = 0;
+                if (!tmp->data_are_ready && r->is_cancelled.cb &&
+                    r->is_cancelled.cb(r->is_cancelled.data)) {
+                    internal_error(true, "FUNCTIONS: transaction '%s' is cancelled while waiting for response",
+                                   r->transaction);
+                    rc = 0;
+                    cancelled = true;
+                    rrd_function_cancel(r->transaction);
+                    break;
+                }
+            }
         }
 
         if (tmp->data_are_ready) {
@@ -892,14 +920,20 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
 
             code = tmp->code;
         }
-        else if (rc == ETIMEDOUT) {
+        else if (rc == ETIMEDOUT || cancelled) {
             // timeout
             // we will go away and let the callback free the structure
             tmp->free_with_signal = true;
             we_should_free = false;
-            code = rrd_call_function_error(r->result.wb,
-                                           "Timeout while waiting for a response from the collector.",
-                                           HTTP_RESP_GATEWAY_TIMEOUT);
+
+            if(cancelled)
+                code = rrd_call_function_error(r->result.wb,
+                                               "Request cancelled",
+                                               HTTP_RESP_CLIENT_CLOSED_REQUEST);
+            else
+                code = rrd_call_function_error(r->result.wb,
+                                               "Timeout while waiting for a response from the collector.",
+                                               HTTP_RESP_GATEWAY_TIMEOUT);
         }
         else
             code = rrd_call_function_error(r->result.wb,
@@ -1017,11 +1051,14 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
         return code;
     }
     r->used = true;
+    internal_error(true, "FUNCTIONS: transaction '%s' started", r->transaction);
 
     return rrd_call_function_async(r, wait);
 }
 
 void rrd_function_cancel(const char *transaction) {
+    internal_error(true, "FUNCTIONS: request to cancel transaction '%s'", transaction);
+
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
     if(!item) {
         netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the transaction is not running.",
