@@ -721,13 +721,12 @@ struct rrd_function_inflight {
 
 static DICTIONARY *rrd_functions_inflight_requests = NULL;
 
-static bool rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rrd_function_inflight *r = value;
-    freez(r->transaction);
-    freez(r->cmd);
-    freez(r->sanitized_cmd);
+    freez((void *)r->transaction);
+    freez((void *)r->cmd);
+    freez((void *)r->sanitized_cmd);
     dictionary_acquired_item_release(r->host->functions, r->host_function_acquired);
-    return false;
 }
 
 void rrd_functions_inflight_init(void) {
@@ -1011,10 +1010,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
     if(r->used) {
         netdata_log_info("FUNCTIONS: duplicate transaction '%s', function: '%s'", t.transaction, t.cmd);
         code = rrd_call_function_error(result_wb, "duplicate transaction", HTTP_RESP_BAD_REQUEST);
-        freez(t->transaction);
-        freez(t->cmd);
-        freez(t->sanitized_cmd);
-        dictionary_acquired_item_release(r->host->functions, t->host_function_acquired);
+        freez((void *)t.transaction);
+        freez((void *)t.cmd);
+        freez((void *)t.sanitized_cmd);
+        dictionary_acquired_item_release(r->host->functions, t.host_function_acquired);
         return code;
     }
     r->used = true;
