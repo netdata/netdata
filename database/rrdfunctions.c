@@ -669,6 +669,8 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
 // ----------------------------------------------------------------------------
 
 struct rrd_function_inflight {
+    bool used;
+
     RRDHOST *host;
     const char *transaction;
     const char *cmd;
@@ -719,11 +721,22 @@ struct rrd_function_inflight {
 
 static DICTIONARY *rrd_functions_inflight_requests = NULL;
 
+static bool rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct rrd_function_inflight *r = value;
+    freez(r->transaction);
+    freez(r->cmd);
+    freez(r->sanitized_cmd);
+    dictionary_acquired_item_release(r->host->functions, r->host_function_acquired);
+    return false;
+}
+
 void rrd_functions_inflight_init(void) {
     if(rrd_functions_inflight_requests)
         return;
 
     rrd_functions_inflight_requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrd_function_inflight));
+
+    dictionary_register_delete_callback(rrd_functions_inflight_requests, rrd_functions_inflight_delete_cb, NULL);
 }
 
 void rrd_functions_inflight_destroy(void) {
@@ -974,6 +987,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
 
     // put the request into the inflight requests
     struct rrd_function_inflight t = {
+            .used = false,
             .host = host,
             .cmd = strdupz(cmd),
             .sanitized_cmd = strdupz(sanitized_cmd),
@@ -994,6 +1008,16 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
             }
     };
     struct rrd_function_inflight *r = dictionary_set(rrd_functions_inflight_requests, transaction, &t, sizeof(t));
+    if(r->used) {
+        netdata_log_info("FUNCTIONS: duplicate transaction '%s', function: '%s'", t.transaction, t.cmd);
+        code = rrd_call_function_error(result_wb, "duplicate transaction", HTTP_RESP_BAD_REQUEST);
+        freez(t->transaction);
+        freez(t->cmd);
+        freez(t->sanitized_cmd);
+        dictionary_acquired_item_release(r->host->functions, t->host_function_acquired);
+        return code;
+    }
+    r->used = true;
 
     return rrd_call_function_async(r, wait);
 }
