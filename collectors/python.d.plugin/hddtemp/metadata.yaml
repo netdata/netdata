@@ -105,7 +105,7 @@ modules:
         examples:
           folding:
             enabled: true
-            title: ""
+            title: "Config"
           list:
             - name: Basic
               description: A basic example configuration.
