@@ -277,13 +277,13 @@ typedef enum __attribute__((packed)) {
     // this is 8-bit
 } RRD_FUNCTION_OPTIONS;
 
-struct rrd_collector_function {
+struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
     RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
     STRING *help;
     int timeout;                    // the default timeout of the function
 
-    rrdfunction_execute_cb_t execute_cb;
+    rrd_function_execute_cb_t execute_cb;
 
     void *execute_cb_data;
     struct rrd_collector *collector;
@@ -338,6 +338,22 @@ void rrd_collector_finished(void) {
         return;
 
     thread_rrd_collector->running = false;
+
+    // wait for functions to finish
+    int32_t running = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED);
+    if(running > 0) {
+        netdata_log_error("FUNCTIONS: delaying exit of collector on tid %d for %" PRIi32 " functions to finish.",
+                          thread_rrd_collector->tid, running);
+
+        usec_t give_up_ut = now_monotonic_usec() + 5 * USEC_PER_SEC;
+        while((running = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED)) > 0 &&now_monotonic_usec() < give_up_ut)
+            sleep_usec(100 * USEC_PER_MS);
+
+        if(running > 0)
+            netdata_log_error("FUNCTIONS: gave up on collector on tid %d - %" PRIi32 " functions are still running.",
+                              thread_rrd_collector->tid, running);
+    }
+
     rrd_collector_free(thread_rrd_collector);
     thread_rrd_collector = NULL;
 }
@@ -384,7 +400,7 @@ static void rrd_collector_release(struct rrd_collector *rdc) {
 
 static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *rrdhost) {
     RRDHOST *host = rrdhost; (void)host;
-    struct rrd_collector_function *rdcf = func;
+    struct rrd_host_function *rdcf = func;
 
     rrd_collector_started();
     rdcf->collector = rrd_collector_acquire();
@@ -396,21 +412,24 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
 
 static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
                                           void *rrdhost __maybe_unused) {
-    struct rrd_collector_function *rdcf = func;
+    struct rrd_host_function *rdcf = func;
     rrd_collector_release(rdcf->collector);
 }
 
 static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
                                             void *new_func, void *rrdhost) {
     RRDHOST *host = rrdhost; (void)host;
-    struct rrd_collector_function *rdcf = func;
-    struct rrd_collector_function *new_rdcf = new_func;
+    struct rrd_host_function *rdcf = func;
+    struct rrd_host_function *new_rdcf = new_func;
 
     rrd_collector_started();
 
     bool changed = false;
 
     if(rdcf->collector != thread_rrd_collector) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed collector from %d to %d",
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host), rdcf->collector->tid, thread_rrd_collector->tid);
+
         struct rrd_collector *old_rdc = rdcf->collector;
         rdcf->collector = rrd_collector_acquire();
         rrd_collector_release(old_rdc);
@@ -418,11 +437,17 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     }
 
     if(rdcf->execute_cb != new_rdcf->execute_cb) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed execute callback",
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
         rdcf->execute_cb = new_rdcf->execute_cb;
         changed = true;
     }
 
     if(rdcf->help != new_rdcf->help) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed help text",
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
         STRING *old = rdcf->help;
         rdcf->help = new_rdcf->help;
         string_freez(old);
@@ -432,16 +457,25 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         string_freez(new_rdcf->help);
 
     if(rdcf->timeout != new_rdcf->timeout) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed timeout",
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
         rdcf->timeout = new_rdcf->timeout;
         changed = true;
     }
 
     if(rdcf->sync != new_rdcf->sync) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed sync/async mode",
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
         rdcf->sync = new_rdcf->sync;
         changed = true;
     }
 
     if(rdcf->execute_cb_data != new_rdcf->execute_cb_data) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed execute callback data",
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
         rdcf->execute_cb_data = new_rdcf->execute_cb_data;
         changed = true;
     }
@@ -453,24 +487,23 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     return changed;
 }
 
-
-void rrdfunctions_init(RRDHOST *host) {
+void rrdfunctions_host_init(RRDHOST *host) {
     if(host->functions) return;
 
     host->functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                 &dictionary_stats_category_functions, sizeof(struct rrd_collector_function));
+                                                 &dictionary_stats_category_functions, sizeof(struct rrd_host_function));
 
     dictionary_register_insert_callback(host->functions, rrd_functions_insert_callback, host);
     dictionary_register_delete_callback(host->functions, rrd_functions_delete_callback, host);
     dictionary_register_conflict_callback(host->functions, rrd_functions_conflict_callback, host);
 }
 
-void rrdfunctions_destroy(RRDHOST *host) {
+void rrdfunctions_host_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
 }
 
-void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
-                                bool sync, rrdfunction_execute_cb_t execute_cb, void *execute_cb_data) {
+void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
+                      bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function
     // to create a GLOBAL function
@@ -481,7 +514,7 @@ void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int
     char key[PLUGINSD_LINE_MAX + 1];
     sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
 
-    struct rrd_collector_function tmp = {
+    struct rrd_host_function tmp = {
         .sync = sync,
         .timeout = timeout,
         .options = (st)?RRD_FUNCTION_LOCAL:RRD_FUNCTION_GLOBAL,
@@ -503,7 +536,7 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     if(!st->functions_view)
         return;
 
-    struct rrd_collector_function *tmp;
+    struct rrd_host_function *tmp;
     dfe_start_read(st->functions_view, tmp) {
         buffer_sprintf(wb
                        , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\"\n"
@@ -518,7 +551,7 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
-    struct rrd_collector_function *tmp;
+    struct rrd_host_function *tmp;
     dfe_start_read(host->functions, tmp) {
         if(!(tmp->options & RRD_FUNCTION_GLOBAL))
             continue;
@@ -531,20 +564,6 @@ void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
         );
     }
     dfe_done(tmp);
-}
-
-struct rrd_function_call_wait {
-    bool free_with_signal;
-    bool data_are_ready;
-    netdata_mutex_t mutex;
-    pthread_cond_t cond;
-    int code;
-};
-
-static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
-    pthread_cond_destroy(&tmp->cond);
-    netdata_mutex_destroy(&tmp->mutex);
-    freez(tmp);
 }
 
 struct {
@@ -595,17 +614,28 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     return code;
 }
 
-static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, struct rrd_collector_function **rdcf) {
+static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
 
     strncpyz(buffer, name, MAX_FUNCTION_LENGTH);
     char *s = NULL;
 
-    *rdcf = NULL;
+    bool found = false;
+    *item = NULL;
     if(host->functions) {
-        while (!(*rdcf) && buffer[0]) {
-            *rdcf = dictionary_get(host->functions, buffer);
-            if (*rdcf) break;
+        while (buffer[0]) {
+            if((*item = dictionary_get_and_acquire_item(host->functions, buffer))) {
+                found = true;
+
+                struct rrd_host_function *rdcf = dictionary_acquired_item_value(*item);
+                if(rdcf->collector->running) {
+                    break;
+                }
+                else {
+                    dictionary_acquired_item_release(host->functions, *item);
+                    *item = NULL;
+                }
+            }
 
             // if s == NULL, set it to the end of the buffer
             // this should happen only the first time
@@ -622,16 +652,123 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
 
     buffer_flush(wb);
 
-    if(!(*rdcf))
-        return rrd_call_function_error(wb, "No collector is supplying this function on this host at this time.", HTTP_RESP_NOT_FOUND);
-
-    if(!(*rdcf)->collector->running)
-        return rrd_call_function_error(wb, "The collector that registered this function, is not currently running.", HTTP_RESP_SERVICE_UNAVAILABLE);
+    if(!(*item)) {
+        if(found)
+            return rrd_call_function_error(wb,
+                                           "The collector that registered this function, is not currently running.",
+                                           HTTP_RESP_SERVICE_UNAVAILABLE);
+        else
+            return rrd_call_function_error(wb,
+                                           "No collector is supplying this function on this host at this time.",
+                                           HTTP_RESP_NOT_FOUND);
+    }
 
     return HTTP_RESP_OK;
 }
 
 // ----------------------------------------------------------------------------
+
+struct rrd_function_inflight {
+    RRDHOST *host;
+    const char *transaction;
+    const char *cmd;
+    const char *sanitized_cmd;
+    size_t sanitized_cmd_length;
+    int timeout;
+    bool cancelled;
+
+    const DICTIONARY_ITEM *host_function_acquired;
+
+    // the collector
+    // we acquire this structure at the beginning,
+    // and we release it at the end
+    struct rrd_host_function *rdcf;
+
+    struct {
+        BUFFER *wb;
+
+        // in async mode,
+        // the function to call to send the result back
+        rrd_function_result_callback_t cb;
+        void *data;
+    } result;
+
+    struct {
+        // to be called in sync mode
+        // while the function is running
+        // to check if the function has been cancelled
+        rrd_function_is_cancelled_cb_t cb;
+        void *data;
+    } is_cancelled;
+
+    struct {
+        // to be called in async mode
+        // to register a canceller
+        // that will be used to signal the function to cancel
+        rrd_function_register_canceller_cb_t cb;
+        void *data;
+    } register_canceller;
+
+    struct {
+        // to be registered by the function itself
+        // used to signal the function to cancel
+        rrd_function_canceller_cb_t cb;
+        void *data;
+    } canceller;
+};
+
+static DICTIONARY *rrd_functions_inflight_requests = NULL;
+
+void rrd_functions_inflight_init(void) {
+    if(rrd_functions_inflight_requests)
+        return;
+
+    rrd_functions_inflight_requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrd_function_inflight));
+}
+
+void rrd_functions_inflight_destroy(void) {
+    if(!rrd_functions_inflight_requests)
+        return;
+
+    dictionary_destroy(rrd_functions_inflight_requests);
+    rrd_functions_inflight_requests = NULL;
+}
+
+static void rrd_function_inflight_register_canceller_cb(void *register_canceller_cb_data, rrd_function_canceller_cb_t canceller_cb, void *canceller_cb_data) {
+    struct rrd_function_inflight *r = register_canceller_cb_data;
+    r->canceller.cb = canceller_cb;
+    r->canceller.data = canceller_cb_data;
+}
+
+// ----------------------------------------------------------------------------
+// waiting for async function completion
+
+struct rrd_function_call_wait {
+    RRDHOST *host;
+    const DICTIONARY_ITEM *host_function_acquired;
+    char *transaction;
+
+    bool free_with_signal;
+    bool data_are_ready;
+    netdata_mutex_t mutex;
+    pthread_cond_t cond;
+    int code;
+};
+
+static void rrd_inflight_function_release(RRDHOST *host, const DICTIONARY_ITEM *host_function_acquired, const char *transaction) {
+    dictionary_acquired_item_release(host->functions, host_function_acquired);
+    dictionary_del(rrd_functions_inflight_requests, transaction);
+    dictionary_garbage_collect(rrd_functions_inflight_requests);
+}
+
+static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
+    rrd_inflight_function_release(tmp->host, tmp->host_function_acquired, tmp->transaction);
+    freez(tmp->transaction);
+
+    pthread_cond_destroy(&tmp->cond);
+    netdata_mutex_destroy(&tmp->mutex);
+    freez(tmp);
+}
 
 static void rrd_call_function_signal_when_ready(BUFFER *temp_wb __maybe_unused, int code, void *callback_data) {
     struct rrd_function_call_wait *tmp = callback_data;
@@ -659,194 +796,244 @@ static void rrd_call_function_signal_when_ready(BUFFER *temp_wb __maybe_unused, 
     }
 }
 
-int rrd_call_function_and_wait_from_api(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-                                        rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data) {
-    int code;
+static void rrd_inflight_async_nowait_function_finished(BUFFER *wb, int code, void *data) {
+    struct rrd_function_inflight *r = data;
 
-    struct rrd_collector_function *rdcf = NULL;
+    if(r->result.cb)
+        r->result.cb(wb, code, r->result.data);
 
-    char key[PLUGINSD_LINE_MAX + 1];
-    size_t key_length = sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
-    code = rrd_call_function_find(host, wb, key, key_length, &rdcf);
-    if(code != HTTP_RESP_OK)
-        return code;
+    rrd_inflight_function_release(r->host, r->host_function_acquired, r->transaction);
+}
 
-    if(timeout <= 0)
-        timeout = rdcf->timeout;
+static bool rrd_inflight_async_nowait_function_is_cancelled(void *data) {
+    struct rrd_function_inflight *r = data;
+    return __atomic_load_n(&r->cancelled, __ATOMIC_RELAXED);
+}
 
-    struct timespec tp;
-    clock_gettime(CLOCK_REALTIME, &tp);
-    tp.tv_sec += (time_t)timeout;
+static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_inflight *r) {
+    int code = r->rdcf->execute_cb(r->result.wb, r->timeout, r->sanitized_cmd, r->rdcf->execute_cb_data,
+                                   rrd_inflight_async_nowait_function_finished, r,
+                                   rrd_inflight_async_nowait_function_is_cancelled, r,
+                                   rrd_function_inflight_register_canceller_cb, r);
 
-    if(rdcf->sync) {
-        code = rdcf->execute_cb(wb, timeout, key, rdcf->execute_cb_data,
-                                NULL, NULL,                             // no callback needed, it is synchronous
-                                is_cancelled_cb, is_cancelled_cb_data); // it is ok to pass these, we block the caller
-    }
-    else {
-        struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
-        tmp->free_with_signal = false;
-        tmp->data_are_ready = false;
-        netdata_mutex_init(&tmp->mutex);
-        pthread_cond_init(&tmp->cond, NULL);
+    if(code != HTTP_RESP_OK) {
+        if (!buffer_strlen(r->result.wb))
+            rrd_call_function_error(r->result.wb, "Failed to send request to the collector.", code);
 
-        // we need a temporary BUFFER, because we may timeout and the caller supplied one may vanish
-        // so, we create a new one we guarantee will survive until the collector finishes...
-
-        bool we_should_free = true;
-        BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
-        temp_wb->content_type = wb->content_type;
-
-        code = rdcf->execute_cb(temp_wb, timeout, key, rdcf->execute_cb_data,
-                                rrd_call_function_signal_when_ready, tmp,
-                                NULL, NULL);
-                                // IMPORTANT: do not pass the is_cancel_cb() here,
-                                // because we may exit before the function finishes
-                                // so, whatever the is_cancel_cb() is doing may crash
-
-        if (code == HTTP_RESP_OK) {
-            netdata_mutex_lock(&tmp->mutex);
-
-            int rc = 0;
-            while (rc == 0 && !tmp->data_are_ready) {
-                // the mutex is unlocked within pthread_cond_timedwait()
-                rc = pthread_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
-                // the mutex is again ours
-            }
-
-            if (tmp->data_are_ready) {
-                // we have a response
-                buffer_fast_strcat(wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
-                wb->content_type = temp_wb->content_type;
-                wb->expires = temp_wb->expires;
-
-                if(wb->expires)
-                    buffer_cacheable(wb);
-                else
-                    buffer_no_cacheable(wb);
-
-                code = tmp->code;
-            }
-            else if (rc == ETIMEDOUT) {
-                // timeout
-                // we will go away and let the callback free the structure
-                tmp->free_with_signal = true;
-                we_should_free = false;
-                code = rrd_call_function_error(wb, "Timeout while waiting for a response from the collector.", HTTP_RESP_GATEWAY_TIMEOUT);
-            }
-            else
-                code = rrd_call_function_error(wb, "Failed to get the response from the collector.", HTTP_RESP_INTERNAL_SERVER_ERROR);
-
-            netdata_mutex_unlock(&tmp->mutex);
-        }
-        else {
-            if(!buffer_strlen(wb))
-                rrd_call_function_error(wb, "Failed to send request to the collector.", code);
-        }
-
-        if (we_should_free) {
-            rrd_function_call_wait_free(tmp);
-            buffer_free(temp_wb);
-        }
+        rrd_inflight_function_release(r->host, r->host_function_acquired, r->transaction);
     }
 
     return code;
 }
 
-int rrd_call_function_async_from_streaming(RRDHOST *host, BUFFER *wb, int timeout, const char *name,
-                                           rrdfunction_result_callback_t result_cb, void *result_cb_data,
-                                           rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data) {
-    int code;
+static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
+    struct timespec tp;
+    clock_gettime(CLOCK_REALTIME, &tp);
+    tp.tv_sec += (time_t)r->timeout;
 
-    struct rrd_collector_function *rdcf = NULL;
-    char key[PLUGINSD_LINE_MAX + 1];
-    size_t key_length = sanitize_function_text(key, name, PLUGINSD_LINE_MAX);
-    code = rrd_call_function_find(host, wb, key, key_length, &rdcf);
-    if(code != HTTP_RESP_OK)
-        return code;
+    struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
+    tmp->free_with_signal = false;
+    tmp->data_are_ready = false;
+    tmp->host = r->host;
+    tmp->host_function_acquired = r->host_function_acquired;
+    tmp->transaction = strdupz(r->transaction);
+    netdata_mutex_init(&tmp->mutex);
+    pthread_cond_init(&tmp->cond, NULL);
 
-    if(timeout <= 0)
-        timeout = rdcf->timeout;
+    // we need a temporary BUFFER, because we may time out and the caller supplied one may vanish
+    // so, we create a new one we guarantee will survive until the collector finishes...
 
-    code = rdcf->execute_cb(wb, timeout, key, rdcf->execute_cb_data,
-                            result_cb, result_cb_data,
-                            is_cancelled_cb, is_cancelled_cb_data);
+    bool we_should_free = true;
+    BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
+    temp_wb->content_type = r->result.wb->content_type;
 
-    if(code != HTTP_RESP_OK) {
-        if (!buffer_strlen(wb))
-            rrd_call_function_error(wb, "Failed to send request to the collector.", code);
+    int code = r->rdcf->execute_cb(temp_wb, r->timeout, r->sanitized_cmd, r->rdcf->execute_cb_data,
+                                   // we overwrite the result callbacks,
+                                   // so that we can cleanup the allocations made
+                                   rrd_call_function_signal_when_ready, tmp,
+                                   // IMPORTANT: do not pass the is_cancelled_cb() here,
+                                   // because we may exit before the function finishes
+                                   // so, whatever the is_cancelled_cb() is doing may crash
+                                   NULL, NULL,
+                                   rrd_function_inflight_register_canceller_cb, r);
+
+    if (code == HTTP_RESP_OK) {
+        netdata_mutex_lock(&tmp->mutex);
+
+        int rc = 0;
+        while (rc == 0 && !tmp->data_are_ready) {
+            // the mutex is unlocked within pthread_cond_timedwait()
+            rc = pthread_cond_timedwait(&tmp->cond, &tmp->mutex, &tp);
+            // the mutex is again ours
+        }
+
+        if (tmp->data_are_ready) {
+            // we have a response
+            buffer_fast_strcat(r->result.wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
+            r->result.wb->content_type = temp_wb->content_type;
+            r->result.wb->expires = temp_wb->expires;
+
+            if(r->result.wb->expires)
+                buffer_cacheable(r->result.wb);
+            else
+                buffer_no_cacheable(r->result.wb);
+
+            code = tmp->code;
+        }
+        else if (rc == ETIMEDOUT) {
+            // timeout
+            // we will go away and let the callback free the structure
+            tmp->free_with_signal = true;
+            we_should_free = false;
+            code = rrd_call_function_error(r->result.wb,
+                                           "Timeout while waiting for a response from the collector.",
+                                           HTTP_RESP_GATEWAY_TIMEOUT);
+        }
+        else
+            code = rrd_call_function_error(r->result.wb,
+                                           "Internal error while communicating with the collector",
+                                           HTTP_RESP_INTERNAL_SERVER_ERROR);
+
+        netdata_mutex_unlock(&tmp->mutex);
+    }
+    else {
+        if(!buffer_strlen(r->result.wb))
+            rrd_call_function_error(r->result.wb, "The collector returned an error.", code);
+    }
+
+    if (we_should_free) {
+        rrd_function_call_wait_free(tmp);
+        buffer_free(temp_wb);
     }
 
     return code;
+}
+
+static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool wait) {
+    if(wait)
+        return rrd_call_function_async_and_wait(r);
+    else
+        return rrd_call_function_async_and_dont_wait(r);
 }
 
 // ----------------------------------------------------------------------------
 
-struct rrdfunction_inflight_request {
-    bool cancelled;
-};
+int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *cmd,
+                     bool wait, const char *transaction,
+                     rrd_function_result_callback_t result_cb, void *result_cb_data,
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data) {
 
-RRDFUNCTION_INFLIGHT_INDEX *rrdfunction_inflight_create_index(void) {
-    DICTIONARY *dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
-    return dict;
-}
+    int code;
+    char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
+    const DICTIONARY_ITEM *host_function_acquired = NULL;
 
-void rrdfunction_inflight_destroy_index(RRDFUNCTION_INFLIGHT_INDEX *idx) {
-    dictionary_destroy(idx);
-}
+    // ------------------------------------------------------------------------
+    // find the function
 
-RRDFUNCTION_INFLIGHT_TRANSACTION *rrdfunction_inflight_transaction_register_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction) {
-    struct rrdfunction_inflight_request t = {
-            .cancelled = false,
-    };
-    return dictionary_set_and_acquire_item(idx, transaction, &t, sizeof(t));
-}
+    size_t sanitized_cmd_length = sanitize_function_text(sanitized_cmd, cmd, PLUGINSD_LINE_MAX);
+    code = rrd_call_function_find(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
+    if(code != HTTP_RESP_OK)
+        return code;
 
-RRDFUNCTION_INFLIGHT_TRANSACTION *rrdfunction_inflight_transaction_register(RRDFUNCTION_INFLIGHT_INDEX *idx) {
-    uuid_t uuid;
-    uuid_generate_random(uuid);
+    struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
-    char transaction[UUID_STR_LEN];
-    uuid_unparse_lower(uuid, transaction);
+    if(timeout <= 0)
+        timeout = rdcf->timeout;
 
-    return rrdfunction_inflight_transaction_register_by_id(idx, transaction);
-}
 
-void rrdfunction_inflight_transaction_done(RRDFUNCTION_INFLIGHT_INDEX *idx, RRDFUNCTION_INFLIGHT_TRANSACTION *ftr) {
-    const char *transaction = dictionary_acquired_item_name(ftr);
-    dictionary_del(idx, transaction);
-    dictionary_acquired_item_release(idx, ftr);
-    dictionary_garbage_collect(idx);
-}
+    // ------------------------------------------------------------------------
+    // the function can only be executed in sync mode
 
-void rrdfunction_inflight_transaction_done_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction) {
-    dictionary_del(idx, transaction);
-    dictionary_garbage_collect(idx);
-}
+    if(rdcf->sync) {
+        // the caller has to wait
 
-void rrdfunction_inflight_transaction_cancel(RRDFUNCTION_INFLIGHT_TRANSACTION *ftr) {
-    struct rrdfunction_inflight_request *t = dictionary_acquired_item_value(ftr);
-    __atomic_store_n(&t->cancelled, true, __ATOMIC_RELAXED);
-}
+        code = rdcf->execute_cb(result_wb, timeout, sanitized_cmd, rdcf->execute_cb_data,
+                                NULL, NULL,                             // no callback needed, it is synchronous
+                                is_cancelled_cb, is_cancelled_cb_data,  // it is ok to pass these, we block the caller
+                                NULL, NULL);                            // no need to pass, we will wait
 
-void rrdfunction_inflight_transaction_cancel_by_id(RRDFUNCTION_INFLIGHT_INDEX *idx, const char *transaction) {
-    RRDFUNCTION_INFLIGHT_TRANSACTION *ftr = dictionary_get_and_acquire_item(idx, transaction);
-    if(ftr) {
-        rrdfunction_inflight_transaction_cancel(ftr);
-        dictionary_acquired_item_release(idx, ftr);
+        if (code != HTTP_RESP_OK && !buffer_strlen(result_wb))
+            rrd_call_function_error(result_wb, "Collector reported error.", code);
+
+        dictionary_acquired_item_release(host->functions, host_function_acquired);
+        return code;
     }
+
+
+    // ------------------------------------------------------------------------
+    // the function can only be executed in async mode
+    // put the function into the inflight requests
+
+    char uuid_str[UUID_STR_LEN];
+    if(!transaction) {
+        uuid_t uuid;
+        uuid_generate_random(uuid);
+        uuid_unparse_lower(uuid, uuid_str);
+        transaction = uuid_str;
+    }
+
+    // put the request into the inflight requests
+    struct rrd_function_inflight t = {
+            .host = host,
+            .cmd = strdupz(cmd),
+            .sanitized_cmd = strdupz(sanitized_cmd),
+            .sanitized_cmd_length = sanitized_cmd_length,
+            .transaction = strdupz(transaction),
+            .timeout = timeout,
+            .cancelled = false,
+            .host_function_acquired = host_function_acquired,
+            .rdcf = rdcf,
+            .result = {
+                    .wb = result_wb,
+                    .cb = result_cb,
+                    .data = result_cb_data,
+            },
+            .is_cancelled = {
+                    .cb = is_cancelled_cb,
+                    .data = is_cancelled_cb_data,
+            }
+    };
+    struct rrd_function_inflight *r = dictionary_set(rrd_functions_inflight_requests, transaction, &t, sizeof(t));
+
+    return rrd_call_function_async(r, wait);
 }
 
-bool rrdfunction_inflight_transaction_is_cancelled(const void *is_cancelled_cb_data) {
-    RRDFUNCTION_INFLIGHT_TRANSACTION *ftr = is_cancelled_cb_data;
-    struct rrdfunction_inflight_request *t = dictionary_acquired_item_value(ftr);
-    return __atomic_load_n(&t->cancelled, __ATOMIC_RELAXED);
+void rrd_function_cancel(const char *transaction) {
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
+    if(!item) {
+        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the transaction is not running.",
+                         transaction);
+        return;
+    }
+
+    struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
+
+    bool cancelled = __atomic_load_n(&r->cancelled, __ATOMIC_RELAXED);
+    if(cancelled) {
+        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but it is already cancelled.",
+                         transaction);
+        goto cleanup;
+    }
+
+    __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
+
+    if(!r->rdcf->collector->running) {
+        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the collector is not running.",
+                         transaction);
+        goto cleanup;
+    }
+
+    if(r->canceller.cb)
+        r->canceller.cb(r->canceller.data);
+
+cleanup:
+    dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
 }
 
 // ----------------------------------------------------------------------------
 
 static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident, const char *kq, const char *sq) {
-    struct rrd_collector_function *t;
+    struct rrd_host_function *t;
     dfe_start_read(functions, t) {
         if(!t->collector->running) continue;
 
@@ -881,7 +1068,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "functions");
 
-    struct rrd_collector_function *t;
+    struct rrd_host_function *t;
     dfe_start_read(host->functions, t) {
         if(!t->collector->running) continue;
 
@@ -904,7 +1091,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size) {
     if(!rrdset_functions_view || !dst) return;
 
-    struct rrd_collector_function *t;
+    struct rrd_host_function *t;
     dfe_start_read(rrdset_functions_view, t) {
         if(!t->collector->running) continue;
 
@@ -916,7 +1103,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
 void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help) {
     if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
 
-    struct rrd_collector_function *t;
+    struct rrd_host_function *t;
     dfe_start_read(host->functions, t) {
         if(!t->collector->running) continue;
 
@@ -932,8 +1119,9 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
 
 int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
                                void *collector_data __maybe_unused,
-                               rrdfunction_result_callback_t result_cb, void *result_cb_data,
-                               rrdfunction_is_cancelled_cb_t is_cancelled_cb, const void *is_cancelled_cb_data) {
+                               rrd_function_result_callback_t result_cb, void *result_cb_data,
+                               rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                               rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data) {
 
     time_t now = now_realtime_sec();
 

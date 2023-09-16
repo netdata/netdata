@@ -276,8 +276,6 @@ struct sender_state {
         STREAM_HANDSHAKE reason;
     } exit;
 
-    RRDFUNCTION_INFLIGHT_INDEX *rrdfunctions_inflight_index;
-
     struct {
         DICTIONARY *requests;                   // de-duplication of replication requests, per chart
         time_t oldest_request_after_t;          // the timestamp of the oldest replication request

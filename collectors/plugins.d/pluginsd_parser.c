@@ -735,12 +735,13 @@ struct inflight_function {
     int timeout;
     STRING *function;
     BUFFER *result_body_wb;
-    rrdfunction_result_callback_t result_cb;
+    rrd_function_result_callback_t result_cb;
     void *result_cb_data;
     usec_t timeout_ut;
     usec_t started_ut;
     usec_t sent_ut;
     const char *payload;
+    PARSER *parser;
 };
 
 static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void *func, void *parser_ptr) {
@@ -849,13 +850,41 @@ static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
     dfe_done(pf);
 }
 
+void pluginsd_function_cancel(void *data) {
+    struct inflight_function *look_for = data, *t;
+
+    bool sent = false;
+    dfe_start_read(look_for->parser->inflight.functions, t) {
+        if(look_for == t) {
+            const char *transaction = t_dfe.name;
+
+            char buffer[2048 + 1];
+            snprintfz(buffer, 2048, "%s %s\n",
+                      PLUGINSD_KEYWORD_FUNCTION_CANCEL,
+                      transaction);
+
+            // send the command to the plugin
+            ssize_t ret = send_to_plugin(buffer, t->parser);
+            if(ret < 0)
+                sent = true;
+
+            break;
+        }
+    }
+    dfe_done(t);
+
+    if(sent <= 0)
+        netdata_log_error("PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
+}
+
 // this is the function that is called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
 static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, const char *function,
                                         void *execute_cb_data,
-                                        rrdfunction_result_callback_t result_cb, void *result_cb_data,
-                                        rrdfunction_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
-                                        const void *is_cancelled_cb_data __maybe_unused) {
+                                        rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                        rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
+                                        void *is_cancelled_cb_data __maybe_unused,
+                                        rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data) {
     PARSER  *parser = execute_cb_data;
 
     usec_t now = now_realtime_usec();
@@ -868,7 +897,8 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
         .function = string_strdupz(function),
         .result_cb = result_cb,
         .result_cb_data = result_cb_data,
-        .payload = NULL
+        .payload = NULL,
+        .parser = parser,
     };
 
     uuid_t uuid;
@@ -881,7 +911,9 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
 
     // if there is any error, our dictionary callbacks will call the caller callback to notify
     // the caller about the error - no need for error handling here.
-    dictionary_set(parser->inflight.functions, transaction, &tmp, sizeof(struct inflight_function));
+    void *t = dictionary_set(parser->inflight.functions, transaction, &tmp, sizeof(struct inflight_function));
+    if(register_cancel_cb)
+        register_cancel_cb(register_cancel_db_data, pluginsd_function_cancel, t);
 
     if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
         parser->inflight.smaller_timeout = tmp.timeout_ut;
@@ -934,7 +966,7 @@ static inline PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER
             timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
     }
 
-    rrd_collector_add_function(host, st, name, timeout, help, false, pluginsd_function_execute_cb, parser);
+    rrd_function_add(host, st, name, timeout, help, false, pluginsd_function_execute_cb, parser);
 
     parser->user.data_collections_count++;
 
