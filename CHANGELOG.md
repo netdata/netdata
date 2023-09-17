@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Functions: allow collectors to be restarted [\#15983](https://github.com/netdata/netdata/pull/15983) ([ktsaou](https://github.com/ktsaou))
+- Metadata fixes for some collectors [\#15982](https://github.com/netdata/netdata/pull/15982) ([Ancairon](https://github.com/Ancairon))
 - update go.d.plugin to v0.55.0 [\#15981](https://github.com/netdata/netdata/pull/15981) ([ilyam8](https://github.com/ilyam8))
 - bump UI to v6.37.1 [\#15980](https://github.com/netdata/netdata/pull/15980) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin function is not thread safe [\#15978](https://github.com/netdata/netdata/pull/15978) ([ktsaou](https://github.com/ktsaou))
@@ -118,7 +120,6 @@
 - Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
 - Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 - Metadata cleanup improvements [\#15462](https://github.com/netdata/netdata/pull/15462) ([stelfrag](https://github.com/stelfrag))
-- Fix build with --disable-https [\#15395](https://github.com/netdata/netdata/pull/15395) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.42.3](https://github.com/netdata/netdata/tree/v1.42.3) (2023-09-11)
 
