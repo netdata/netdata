@@ -891,7 +891,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         bool cancelled = false;
-        char buf[] = "systemd-journal after:-864000 before:0 last:500";
+        char buf[] = "systemd-journal after:-2592000 before:0 last:500";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, 30, &cancelled);
         exit(1);

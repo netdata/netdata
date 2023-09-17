@@ -3,13 +3,18 @@
 
 #define HISTOGRAM_COLUMNS 100
 
-static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
-
 // ----------------------------------------------------------------------------
 
-static inline void uint64_to_char(uint64_t num, char *out) {
-    static const char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
+static const char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
 
+#ifdef ENV64BIT // 64 bit
+
+#define FACET_STRING_HASH_SIZE 12
+#define FACETS_HASH XXH64_hash_t
+#define FACETS_HASH_FUNCTION(src, len) XXH3_64bits(src, len)
+#define FACETS_HASH_ZERO (FACETS_HASH)0
+
+static inline void facets_hash_to_str(uint64_t num, char *out) {
     out[10] = id_encoding_characters[num & 63]; num >>= 6;
     out[9]  = id_encoding_characters[num & 63]; num >>= 6;
     out[8]  = id_encoding_characters[num & 63]; num >>= 6;
@@ -23,25 +28,47 @@ static inline void uint64_to_char(uint64_t num, char *out) {
     out[0]  = id_encoding_characters[num & 63];
 }
 
-inline void facets_string_hash(const char *src, size_t len, char *out) {
-    XXH128_hash_t hash = XXH3_128bits(src, len);
+#else // 32 bit
 
-    uint64_to_char(hash.high64, out);
-    uint64_to_char(hash.low64, &out[11]);  // Starts right after the first 64-bit encoded string
+#define FACET_STRING_HASH_SIZE 6
+#define FACETS_HASH XXH32_hash_t
+#define FACETS_HASH_FUNCTION(src, len) XXH32(src, len, 0)
+#define FACETS_HASH_ZERO (FACETS_HASH)0
 
-    out[FACET_STRING_HASH_SIZE - 1] = '\0';
+static inline void facets_hash_to_str(uint32_t num, char *out) {
+    out[5] = id_encoding_characters[num & 63]; num >>= 6;
+    out[4] = id_encoding_characters[num & 63]; num >>= 6;
+    out[3] = id_encoding_characters[num & 63]; num >>= 6;
+    out[2] = id_encoding_characters[num & 63]; num >>= 6;
+    out[1] = id_encoding_characters[num & 63]; num >>= 6;
+    out[0] = id_encoding_characters[num & 63];
 }
 
-static inline void facets_zero_hash(char *out) {
+#endif
+
+static inline FACETS_HASH facets_string_hash(const char *src, size_t len, char *out) {
+    FACETS_HASH hash = FACETS_HASH_FUNCTION(src, len);
+
+    facets_hash_to_str(hash, out);
+
+    out[FACET_STRING_HASH_SIZE - 1] = '\0';
+
+    return hash;
+}
+
+static inline FACETS_HASH facets_zero_hash(char *out) {
     for(int i = 0; i < FACET_STRING_HASH_SIZE ;i++)
         out[i] = '0';
 
     out[FACET_STRING_HASH_SIZE - 1] = '\0';
+
+    return FACETS_HASH_ZERO;
 }
 
 // ----------------------------------------------------------------------------
 
 typedef struct facet_value {
+    FACETS_HASH hash;
     const char *name;
 
     bool selected;
@@ -54,12 +81,14 @@ typedef struct facet_value {
     uint32_t min, max, sum;
 } FACET_VALUE;
 
+
+#define FACETS_VALUES_INDEX DICTIONARY
+
 struct facet_key {
     FACETS *facets;
 
+    FACETS_HASH hash;
     const char *name;
-
-    DICTIONARY *values;
 
     FACET_KEY_OPTIONS options;
 
@@ -70,14 +99,21 @@ struct facet_key {
     uint32_t key_values_selected_in_row;
 
     struct {
-        char hash[FACET_STRING_HASH_SIZE];
+        bool enabled;
+        FACETS_VALUES_INDEX *dict;
+    } values;
+
+    struct {
+        FACETS_HASH hash;
+        char hash_str[FACET_STRING_HASH_SIZE];
         bool updated;
         bool empty;
         BUFFER *b;
+        FACET_VALUE *v;
     } current_value;
 
     struct {
-        FACET_VALUE *empty_value;
+        FACET_VALUE *v;
     } empty_value;
 
     uint32_t order;
@@ -176,6 +212,122 @@ struct facets {
 
 // ----------------------------------------------------------------------------
 
+static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
+static inline void facet_value_is_used(FACET_KEY *k, FACET_VALUE *v);
+
+// ----------------------------------------------------------------------------
+
+#define foreach_value_in_key(k, v) dfe_start_read(k->values.dict, v)
+#define foreach_value_in_key_done(v) dfe_done(v)
+
+static void facet_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    FACET_VALUE *v = value;
+    FACET_KEY *k = data;
+
+    if(!v->selected)
+        v->selected = k->default_selected_for_values;
+
+    if(v->name) {
+        // an actual value, not a filter
+        v->name = strdupz(v->name);
+        facet_value_is_used(k, v);
+    }
+
+    k->facets->operations.values.inserts++;
+}
+
+static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
+    FACET_VALUE *v = old_value;
+    FACET_VALUE *nv = new_value;
+    FACET_KEY *k = data;
+
+    if(!v->name && nv->name)
+        // an actual value, not a filter
+        v->name = strdupz(nv->name);
+
+    if(v->name)
+        facet_value_is_used(k, v);
+
+    internal_fatal(v->name && nv->name && strcmp(v->name, nv->name) != 0, "value hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
+                   dictionary_acquired_item_name(item));
+
+    k->facets->operations.values.conflicts++;
+
+    return false;
+}
+
+static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    FACET_VALUE *v = value;
+    freez(v->histogram);
+    freez((char *)v->name);
+}
+
+static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
+    k->values.dict = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(FACET_VALUE));
+    dictionary_register_insert_callback(k->values.dict, facet_value_insert_callback, k);
+    dictionary_register_conflict_callback(k->values.dict, facet_value_conflict_callback, k);
+    dictionary_register_delete_callback(k->values.dict, facet_value_delete_callback, k);
+}
+
+static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
+    dictionary_destroy(k->values.dict);
+    k->values.enabled = false;
+}
+
+static inline void FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(FACET_KEY *k) {
+    k->current_value.hash = facets_zero_hash(k->current_value.hash_str);
+
+    FACET_VALUE tk = {
+            .hash = k->current_value.hash,
+            .name = FACET_VALUE_UNSET,
+    };
+
+    if(k->empty_value.v) {
+        facet_value_conflict_callback(NULL, k->empty_value.v, &tk, k);
+        k->current_value.v = k->empty_value.v;
+    }
+    else {
+        FACET_VALUE *tkv = dictionary_set(k->values.dict, k->current_value.hash_str, &tk, sizeof(tk));
+        tkv->empty = true;
+        k->empty_value.v = tkv;
+        k->current_value.v = tkv;
+    }
+}
+
+static inline void FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(FACET_KEY *k) {
+    FACET_VALUE tk = {
+            .name = buffer_tostring(k->current_value.b),
+    };
+    tk.hash = facets_string_hash(tk.name, buffer_strlen(k->current_value.b), k->current_value.hash_str);
+    k->current_value.v = dictionary_set(k->values.dict, k->current_value.hash_str, &tk, sizeof(tk));
+    k->facets->operations.values.indexed++;
+}
+
+static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, const char *value_id) {
+    FACET_VALUE tv = {
+            .selected = true,
+    };
+    dictionary_set(k->values.dict, value_id, &tv, sizeof(tv));
+}
+
+static FACET_VALUE *FACET_VALUE_GET_CURRENT_VALUE(FACET_KEY *k) {
+    if(k->current_value.v)
+        return k->current_value.v;
+
+    if(!k->current_value.hash_str[0])
+        k->current_value.hash = facets_string_hash(
+                buffer_tostring(k->current_value.b),
+                buffer_strlen(k->current_value.b), k->current_value.hash_str);
+
+    FACET_VALUE *v = dictionary_get(k->values.dict, k->current_value.hash_str);
+
+    return v;
+}
+
+// ----------------------------------------------------------------------------
+
 static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
     // Array of valid durations in seconds
     static time_t valid_durations_s[] = {
@@ -254,15 +406,15 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
         if(first_key)
             buffer_json_add_array_item_string(wb, first_key);
 
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             FACET_VALUE *v;
-            dfe_start_read(k->values, v){
+            foreach_value_in_key(k, v) {
                 if (unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_string(wb, v->name);
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
@@ -271,15 +423,15 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
 static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             FACET_VALUE *v;
-            dfe_start_read(k->values, v){
+            foreach_value_in_key(k, v) {
                 if (unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_string(wb, "events");
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
@@ -288,15 +440,15 @@ static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __may
 static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             FACET_VALUE *v;
-            dfe_start_read(k->values, v){
+            foreach_value_in_key(k, v) {
                 if (unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_uint64(wb, v->min);
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
@@ -305,15 +457,15 @@ static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             FACET_VALUE *v;
-            dfe_start_read(k->values, v){
+            foreach_value_in_key(k, v) {
                 if (unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_uint64(wb, v->max);
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
@@ -322,15 +474,15 @@ static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             FACET_VALUE *v;
-            dfe_start_read(k->values, v){
+            foreach_value_in_key(k, v) {
                 if (unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_double(wb, (double) v->sum / (double) facets->histogram.slots);
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
@@ -339,15 +491,15 @@ static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             FACET_VALUE *v;
-            dfe_start_read(k->values, v){
+            foreach_value_in_key(k, v) {
                 if (unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_uint64(wb, 0);
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
@@ -356,15 +508,15 @@ static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe
 static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint32_t sum) {
     buffer_json_member_add_array(wb, key);
     {
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             FACET_VALUE *v;
-            dfe_start_read(k->values, v){
+            foreach_value_in_key(k, v) {
                 if (unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_double(wb, (double) v->sum * 100.0 / (double) sum);
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
@@ -374,9 +526,9 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
     size_t dimensions = 0;
     uint32_t min = UINT32_MAX, max = 0, sum = 0, count = 0;
 
-    if(k && k->values) {
+    if(k && k->values.enabled) {
         FACET_VALUE *v;
-        dfe_start_read(k->values, v){
+        foreach_value_in_key(k, v) {
             if (unlikely(!v->histogram))
                 continue;
 
@@ -407,7 +559,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 v->sum += n;
             }
         }
-        dfe_done(v);
+        foreach_value_in_key_done(v);
     }
 
     buffer_json_member_add_object(wb, "summary");
@@ -527,10 +679,10 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         buffer_json_array_close(wb); // instances
 
         buffer_json_member_add_array(wb, "dimensions");
-        if(dimensions && k && k->values) {
+        if(dimensions && k && k->values.enabled) {
             size_t pri = 0;
             FACET_VALUE *v;
-            dfe_start_read(k->values, v) {
+            foreach_value_in_key(k, v) {
                 if(unlikely(!v->histogram))
                     continue;
 
@@ -555,7 +707,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 }
                 buffer_json_object_close(wb); // dimension
             }
-            dfe_done(v);
+            foreach_value_in_key_done(v);
         }
         buffer_json_array_close(wb); // dimensions
 
@@ -613,7 +765,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         buffer_json_object_close(wb); // point
 
         buffer_json_member_add_array(wb, "data");
-        if(k && k->values) {
+        if(k && k->values.enabled) {
             usec_t t = facets->histogram.after_ut;
             for(uint32_t i = 0; i < facets->histogram.slots ;i++) {
                 buffer_json_add_array_item_array(wb); // row
@@ -621,7 +773,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                     buffer_json_add_array_item_time_ms(wb, t / USEC_PER_SEC);
 
                     FACET_VALUE *v;
-                    dfe_start_read(k->values, v){
+                    foreach_value_in_key(k, v) {
                         if (unlikely(!v->histogram))
                             continue;
 
@@ -633,7 +785,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
                         buffer_json_array_close(wb); // point
                     }
-                    dfe_done(v);
+                    foreach_value_in_key_done(v);
                 }
                 buffer_json_array_close(wb); // row
 
@@ -792,64 +944,15 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k) {
 }
 
 // ----------------------------------------------------------------------------
-// FACET_VALUE dictionary hooks
-
-static void facet_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
-    FACET_VALUE *v = value;
-    FACET_KEY *k = data;
-
-    if(!v->selected)
-        v->selected = k->default_selected_for_values;
-
-    if(v->name) {
-        // an actual value, not a filter
-        v->name = strdupz(v->name);
-        facet_value_is_used(k, v);
-    }
-
-    k->facets->operations.values.inserts++;
-}
-
-static bool facet_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
-    FACET_VALUE *v = old_value;
-    FACET_VALUE *nv = new_value;
-    FACET_KEY *k = data;
-
-    if(!v->name && nv->name)
-        // an actual value, not a filter
-        v->name = strdupz(nv->name);
-
-    if(v->name)
-        facet_value_is_used(k, v);
-
-    internal_fatal(v->name && nv->name && strcmp(v->name, nv->name) != 0, "value hash conflict: '%s' and '%s' have the same hash '%s'", v->name, nv->name,
-                   dictionary_acquired_item_name(item));
-
-    k->facets->operations.values.conflicts++;
-
-    return false;
-}
-
-static void facet_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    FACET_VALUE *v = value;
-    freez(v->histogram);
-    freez((char *)v->name);
-}
-
-// ----------------------------------------------------------------------------
 // FACET_KEY dictionary hooks
 
 static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
-    if(k->values)
+    if(k->values.enabled)
         return;
 
     if(facets_key_is_facet(facets, k)) {
-        k->values = dictionary_create_advanced(
-                DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                NULL, sizeof(FACET_VALUE));
-        dictionary_register_insert_callback(k->values, facet_value_insert_callback, k);
-        dictionary_register_conflict_callback(k->values, facet_value_conflict_callback, k);
-        dictionary_register_delete_callback(k->values, facet_value_delete_callback, k);
+        FACETS_VALUES_INDEX_CREATE(k);
+        k->values.enabled = true;
     }
 }
 
@@ -909,7 +1012,7 @@ static void facet_key_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(facets->keys_ll, k, prev, next);
 
-    dictionary_destroy(k->values);
+    FACETS_VALUES_INDEX_DESTROY(k);
     buffer_free(k->current_value.b);
     freez((char *)k->name);
 }
@@ -973,7 +1076,7 @@ static inline FACET_KEY *facets_register_key_name_length(FACETS *facets, const c
             .default_selected_for_values = true,
     };
     char hash[FACET_STRING_HASH_SIZE];
-    facets_string_hash(tk.name, key_length, hash);
+    tk.hash = facets_string_hash(tk.name, key_length, hash);
     return dictionary_set(facets->keys, hash, &tk, sizeof(tk));
 }
 
@@ -1025,14 +1128,11 @@ inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, F
     return k;
 }
 
-void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_ids, FACET_KEY_OPTIONS options) {
+void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options) {
     FACET_KEY *k = facets_register_facet_id(facets, key_id, options);
     k->default_selected_for_values = false;
 
-    FACET_VALUE tv = {
-            .selected = true,
-    };
-    dictionary_set(k->values, value_ids, &tv, sizeof(tv));
+    FACET_VALUE_ADD_OR_UPDATE_SELECTED(k, value_id);
 }
 
 void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity) {
@@ -1075,31 +1175,11 @@ static inline void facets_check_value(FACETS *facets __maybe_unused, FACET_KEY *
             facets->current_row.keys_matched_by_query++;
     }
 
-    if(k->values) {
-        if(k->current_value.empty) {
-            facets_zero_hash(k->current_value.hash);
-
-            FACET_VALUE tk = {
-                    .name = FACET_VALUE_UNSET,
-            };
-
-            if(k->empty_value.empty_value) {
-                facet_value_conflict_callback(NULL, k->empty_value.empty_value, &tk, k);
-            }
-            else {
-                FACET_VALUE *tkv = dictionary_set(k->values, k->current_value.hash, &tk, sizeof(tk));
-                tkv->empty = true;
-                k->empty_value.empty_value = tkv;
-            }
-        }
-        else {
-            FACET_VALUE tk = {
-                    .name = buffer_tostring(k->current_value.b),
-            };
-            facets_string_hash(tk.name, buffer_strlen(k->current_value.b), k->current_value.hash);
-            dictionary_set(k->values, k->current_value.hash, &tk, sizeof(tk));
-            facets->operations.values.indexed++;
-        }
+    if(k->values.enabled) {
+        if(k->current_value.empty)
+            FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(k);
+        else
+            FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(k);
     }
     else {
         k->key_found_in_row++;
@@ -1325,7 +1405,9 @@ void facets_rows_begin(FACETS *facets) {
         k->key_values_selected_in_row = 0;
         k->current_value.updated = false;
         k->current_value.empty = false;
-        k->current_value.hash[0] = '\0';
+        k->current_value.hash = FACETS_HASH_ZERO;
+        k->current_value.hash_str[0] = '\0';
+        k->current_value.v = NULL;
     }
     // dfe_done(k);
 
@@ -1372,11 +1454,8 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
                 counted_by++;
 
             if(counted_by == total_keys) {
-                if(k->values) {
-                    if(!k->current_value.hash[0])
-                        facets_string_hash(buffer_tostring(k->current_value.b), buffer_strlen(k->current_value.b), k->current_value.hash);
-
-                    FACET_VALUE *v = dictionary_get(k->values, k->current_value.hash);
+                if(k->values.enabled) {
+                    FACET_VALUE *v = FACET_VALUE_GET_CURRENT_VALUE(k);
                     v->final_facet_value_counter++;
 
                     if(selected_by == total_keys)
@@ -1428,19 +1507,19 @@ void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool w
         if(facets->accepted_params) {
             void *t;
             dfe_start_read(facets->accepted_params, t) {
-                        buffer_json_add_array_item_string(wb, t_dfe.name);
-                    }
+                buffer_json_add_array_item_string(wb, t_dfe.name);
+            }
             dfe_done(t);
         }
 
         if(with_keys) {
             FACET_KEY *k;
             dfe_start_read(facets->keys, k){
-                        if (!k->values)
-                            continue;
+                if (!k->values.enabled)
+                    continue;
 
-                        buffer_json_add_array_item_string(wb, k_dfe.name);
-                    }
+                buffer_json_add_array_item_string(wb, k_dfe.name);
+            }
             dfe_done(k);
         }
     }
@@ -1469,7 +1548,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         {
             FACET_KEY *k;
             dfe_start_read(facets->keys, k) {
-                if(!k->values)
+                if(!k->values.enabled)
                     continue;
 
                 buffer_json_add_array_item_object(wb); // key
@@ -1484,7 +1563,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                     buffer_json_member_add_array(wb, "options");
                     {
                         FACET_VALUE *v;
-                        dfe_start_read(k->values, v) {
+                        foreach_value_in_key(k, v) {
                             buffer_json_add_array_item_object(wb);
                             {
                                 buffer_json_member_add_string(wb, "id", v_dfe.name);
@@ -1493,7 +1572,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                             }
                             buffer_json_object_close(wb);
                         }
-                        dfe_done(v);
+                        foreach_value_in_key_done(v);
                     }
                     buffer_json_array_close(wb); // options
                 }
@@ -1539,7 +1618,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                         RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_NONE;
                         bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
 
-                        if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values))
+                        if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values.enabled))
                             visible = true;
 
                         if (!visible)
@@ -1631,7 +1710,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         {
             FACET_KEY *k;
             dfe_start_read(facets->keys, k) {
-                if (!k->values)
+                if (!k->values.enabled)
                     continue;
 
                 if(unlikely(!first_histogram))
@@ -1649,7 +1728,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
         {
             const char *id = facets->histogram.chart;
             FACET_KEY *k = dictionary_get(facets->keys, id);
-            if(!k || !k->values) {
+            if(!k || !k->values.enabled) {
                 id = first_histogram;
                 k = dictionary_get(facets->keys, id);
             }
