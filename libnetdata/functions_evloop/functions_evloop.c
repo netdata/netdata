@@ -189,7 +189,7 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
                           rrd_functions_worker_globals_reader_main, wg);
 
     for(size_t i = 0; i < wg->workers ; i++) {
-        snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_WORK[%d]", wg->tag, i+1);
+        snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_WORK[%zu]", wg->tag, i+1);
         netdata_thread_create(&wg->worker_threads[i], tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
                               rrd_functions_worker_globals_worker_main, wg);
     }
