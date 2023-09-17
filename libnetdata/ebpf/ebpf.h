@@ -12,6 +12,11 @@
 #include <stdlib.h> // Necessary for stdtoul
 #include "libnetdata/aral/aral.h"
 
+// Constant defined inside kernel source (https://elixir.bootlin.com/linux/latest/source/include/linux/sched.h#L292)
+#ifndef TASK_COMM_LEN
+#define TASK_COMM_LEN 16
+#endif
+
 #define NETDATA_DEBUGFS "/sys/kernel/debug/tracing/"
 #define NETDATA_KALLSYMS "/proc/kallsyms"
 

@@ -269,6 +269,8 @@ extern ebpf_network_viewer_options_t network_viewer_opt;
  * Structure to store socket information
  */
 typedef struct netdata_socket {
+    char name[TASK_COMM_LEN];
+
     // Timestamp
     uint64_t first_timestamp;
     uint64_t current_timestamp;

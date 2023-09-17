@@ -25,6 +25,9 @@
 #define NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT "services.swap_write"
 
 typedef struct netdata_publish_swap {
+    uint64_t ct;
+    char name[TASK_COMM_LEN];
+
     uint64_t read;
     uint64_t write;
 } netdata_publish_swap_t;

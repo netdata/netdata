@@ -69,6 +69,9 @@ enum cachestat_tables {
 };
 
 typedef struct netdata_publish_cachestat_pid {
+    uint64_t ct;
+    char name[TASK_COMM_LEN];
+
     uint64_t add_to_page_cache_lru;
     uint64_t mark_page_accessed;
     uint64_t account_page_dirtied;
