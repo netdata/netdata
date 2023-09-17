@@ -28,8 +28,6 @@ static const uint8_t id_encoding_characters_reverse[256] = {
         ['6'] = 60, ['7'] = 61, ['8'] = 62, ['9'] = 63
 };
 
-#ifdef ENV64BIT // 64 bit
-
 #define FACET_STRING_HASH_SIZE 12
 #define FACETS_HASH XXH64_hash_t
 #define FACETS_HASH_FUNCTION(src, len) XXH3_64bits(src, len)
@@ -49,31 +47,21 @@ static inline void facets_hash_to_str(FACETS_HASH num, char *out) {
     out[0]  = id_encoding_characters[num & 63];
 }
 
-#else // 32 bit
-
-#define FACET_STRING_HASH_SIZE 6
-#define FACETS_HASH XXH32_hash_t
-#define FACETS_HASH_FUNCTION(src, len) XXH32(src, len, 0)
-#define FACETS_HASH_ZERO (FACETS_HASH)0
-
-static inline void facets_hash_to_str(FACETS_HASH num, char *out) {
-    out[5] = id_encoding_characters[num & 63]; num >>= 6;
-    out[4] = id_encoding_characters[num & 63]; num >>= 6;
-    out[3] = id_encoding_characters[num & 63]; num >>= 6;
-    out[2] = id_encoding_characters[num & 63]; num >>= 6;
-    out[1] = id_encoding_characters[num & 63]; num >>= 6;
-    out[0] = id_encoding_characters[num & 63];
-}
-
-#endif
-
 static inline FACETS_HASH str_to_facets_hash(const char *str) {
     FACETS_HASH num = 0;
+    int shifts = 6 * (FACET_STRING_HASH_SIZE - 2);
 
-    for(int i = 0; i < FACET_STRING_HASH_SIZE - 1; i++) {
-        FACETS_HASH char_index = id_encoding_characters_reverse[(uint8_t)str[i]];
-        num |= char_index << (6 * (FACET_STRING_HASH_SIZE - 2 - i));
-    }
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[0])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[1])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[2])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[3])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[4])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[5])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[6])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[7])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[8])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[9])])) << shifts; shifts -= 6;
+    num |= ((FACETS_HASH)(id_encoding_characters_reverse[(uint8_t)(str[10])])) << shifts;
 
     return num;
 }
@@ -84,10 +72,6 @@ static const char *hash_to_static_string(FACETS_HASH hash) {
     return hash_str;
 }
 
-static inline FACETS_HASH facets_hash(const char *src, size_t len) {
-    return FACETS_HASH_FUNCTION(src, len);
-}
-
 static inline bool is_valid_string_hash(const char *s) {
     if(strlen(s) != FACET_STRING_HASH_SIZE - 1) {
         netdata_log_error("The user supplied key '%s' does not have the right length for a facets hash.", s);
@@ -96,8 +80,10 @@ static inline bool is_valid_string_hash(const char *s) {
 
     uint8_t *t = (uint8_t *)s;
     while(*t) {
-        if(id_encoding_characters_reverse[*t] == 0 && *t != 'A')
+        if(id_encoding_characters_reverse[*t] == 0 && *t != 'A') {
+            netdata_log_error("The user supplied key '%s' contains invalid characters for a facets hash.", s);
             return false;
+        }
 
         t++;
     }
@@ -375,7 +361,7 @@ static inline void FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(FACET_KEY *k) {
 
 static inline void FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(FACET_KEY *k) {
     FACET_VALUE tv = {
-            .hash = facets_hash(buffer_tostring(k->current_value.b), buffer_strlen(k->current_value.b)),
+            .hash = FACETS_HASH_FUNCTION(buffer_tostring(k->current_value.b), buffer_strlen(k->current_value.b)),
             .name = buffer_tostring(k->current_value.b),
     };
     k->current_value.v = FACET_VALUE_ADD_TO_INDEX(k, &tv);
@@ -1192,7 +1178,7 @@ static inline FACET_KEY *facets_register_key_name_length(FACETS *facets, const c
             .options = options,
             .default_selected_for_values = true,
     };
-    tk.hash = facets_hash(tk.name, key_length);
+    tk.hash = FACETS_HASH_FUNCTION(tk.name, key_length);
     return FACETS_KEY_ADD_TO_INDEX(facets, &tk);
 }
 
