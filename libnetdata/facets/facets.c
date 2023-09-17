@@ -122,8 +122,6 @@ typedef struct facet_value {
 } FACET_VALUE;
 
 
-#define FACETS_VALUES_INDEX DICTIONARY
-
 struct facet_key {
     FACETS *facets;
 
@@ -140,7 +138,6 @@ struct facet_key {
 
     struct {
         bool enabled;
-        FACETS_VALUES_INDEX *dict;
         Pvoid_t judyL;
         FACET_VALUE *ll;
     } values;
