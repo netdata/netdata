@@ -78,7 +78,6 @@ static void ebpf_cachestat_disable_probe(struct cachestat_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_mark_buffer_dirty_kprobe, false);
-    bpf_program__set_autoload(obj->progs.netdata_release_task_kprobe, false);
 }
 
 /*
@@ -119,7 +118,6 @@ static void ebpf_cachestat_disable_trampoline(struct cachestat_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_mark_buffer_dirty_fentry, false);
-    bpf_program__set_autoload(obj->progs.netdata_release_task_fentry, false);
 }
 
 /*
@@ -175,9 +173,6 @@ static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
 
     bpf_program__set_attach_target(obj->progs.netdata_mark_buffer_dirty_fentry, 0,
                                    cachestat_targets[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY].name);
-
-    bpf_program__set_attach_target(obj->progs.netdata_release_task_fentry, 0,
-                                   EBPF_COMMON_FNCT_CLEAN_UP);
 }
 
 /**
@@ -234,13 +229,6 @@ static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
     if (ret)
         return -1;
 
-    obj->links.netdata_release_task_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_kprobe,
-                                                                        false,
-                                                                        EBPF_COMMON_FNCT_CLEAN_UP);
-    ret = libbpf_get_error(obj->links.netdata_release_task_kprobe);
-    if (ret)
-        return -1;
-
     return 0;
 }
 
@@ -277,19 +265,6 @@ static void ebpf_cachestat_set_hash_tables(struct cachestat_bpf *obj)
 }
 
 /**
- *  Disable Release Task
- *
- *  Disable release task when apps is not enabled.
- *
- *  @param obj is the main structure for bpf objects.
- */
-static void ebpf_cachestat_disable_release_task(struct cachestat_bpf *obj)
-{
-    bpf_program__set_autoload(obj->progs.netdata_release_task_kprobe, false);
-    bpf_program__set_autoload(obj->progs.netdata_release_task_fentry, false);
-}
-
-/**
  * Load and attach
  *
  * Load and attach the eBPF code in kernel.
@@ -315,9 +290,6 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
     }
 
     ebpf_cachestat_adjust_map(obj, em);
-
-    if (!em->apps_charts && !em->cgroup_charts)
-        ebpf_cachestat_disable_release_task(obj);
 
     int ret = cachestat_bpf__load(obj);
     if (ret) {
