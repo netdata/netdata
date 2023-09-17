@@ -23,6 +23,7 @@
 #define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (3 * 3600)
 #define SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY 200
 #define SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED     50
+#define SYSTEMD_JOURNAL_WORKER_THREADS          2
 
 #define JOURNAL_PARAMETER_HELP                  "help"
 #define JOURNAL_PARAMETER_AFTER                 "after"
@@ -95,6 +96,7 @@ typedef enum {
     ND_SD_JOURNAL_TIMED_OUT,
     ND_SD_JOURNAL_OK,
     ND_SD_JOURNAL_NOT_MODIFIED,
+    ND_SD_JOURNAL_CANCELLED,
 } ND_SD_JOURNAL_STATUS;
 
 static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timestamp) {
@@ -130,21 +132,38 @@ static inline void netdata_systemd_journal_process_row(sd_journal *j, FACETS *fa
     }
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t if_modified_since, usec_t stop_monotonic_ut, usec_t *last_modified) {
+static inline ND_SD_JOURNAL_STATUS check_stop(size_t row_counter, bool *cancelled, usec_t stop_monotonic_ut) {
+    if((row_counter % 100) == 0) {
+        if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
+            internal_error(true, "Function has been cancelled");
+            return ND_SD_JOURNAL_CANCELLED;
+        }
+
+        if(now_monotonic_usec() > stop_monotonic_ut) {
+            internal_error(true, "Function timed out");
+            return ND_SD_JOURNAL_TIMED_OUT;
+        }
+    }
+
+    return ND_SD_JOURNAL_OK;
+}
+
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t if_modified_since, usec_t stop_monotonic_ut, usec_t *last_modified, bool *cancelled) {
     if(!netdata_systemd_journal_seek_to(j, before_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
     usec_t first_msg_ut = 0;
-    bool timed_out = false;
     size_t row_counter = 0;
 
     // the entries are not guaranteed to be sorted, so we process up to 100 entries beyond
     // the end of the query to find possibly useful logs for our time-frame
     size_t excess_rows_allowed = SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED;
 
+    ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
+
     facets_rows_begin(facets);
-    while (sd_journal_previous(j) > 0) {
+    while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
         row_counter++;
 
         usec_t msg_ut;
@@ -174,10 +193,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(sd_journal *j, BUFFER *w
         netdata_systemd_journal_process_row(j, facets);
         facets_row_finished(facets, msg_ut);
 
-        if((row_counter % 100) == 0 && now_monotonic_usec() > stop_monotonic_ut) {
-            timed_out = true;
-            break;
-        }
+        status = check_stop(row_counter, cancelled, stop_monotonic_ut);
     }
 
     if(errors_no_timestamp)
@@ -185,18 +201,14 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(sd_journal *j, BUFFER *w
 
     *last_modified = first_msg_ut;
 
-    if(timed_out)
-        return ND_SD_JOURNAL_TIMED_OUT;
-
-    return ND_SD_JOURNAL_OK;
+    return status;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t anchor, size_t entries, usec_t stop_monotonic_ut) {
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t anchor, size_t entries, usec_t stop_monotonic_ut, bool *cancelled) {
     if(!netdata_systemd_journal_seek_to(j, anchor))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
-    bool timed_out = false;
     size_t row_counter = 0;
     size_t rows_added = 0;
 
@@ -204,8 +216,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(sd_journal *j, B
     // the end of the query to find possibly useful logs for our time-frame
     size_t excess_rows_allowed = SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED;
 
+    ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
+
     facets_rows_begin(facets);
-    while (sd_journal_next(j) > 0) {
+    while (status == ND_SD_JOURNAL_OK && sd_journal_next(j) > 0) {
         row_counter++;
 
         usec_t msg_ut;
@@ -231,27 +245,20 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(sd_journal *j, B
         facets_row_finished(facets, msg_ut);
         rows_added++;
 
-        if((row_counter % 100) == 0 && now_monotonic_usec() > stop_monotonic_ut) {
-            timed_out = true;
-            break;
-        }
+        status = check_stop(row_counter, cancelled, stop_monotonic_ut);
     }
 
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
-    if(timed_out)
-        return ND_SD_JOURNAL_TIMED_OUT;
-
-    return ND_SD_JOURNAL_OK;
+    return status;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t anchor, size_t entries, usec_t stop_monotonic_ut) {
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t anchor, size_t entries, usec_t stop_monotonic_ut, bool *cancelled) {
     if(!netdata_systemd_journal_seek_to(j, anchor))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
-    bool timed_out = false;
     size_t row_counter = 0;
     size_t rows_added = 0;
 
@@ -259,8 +266,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(sd_journal *j, 
     // the end of the query to find possibly useful logs for our time-frame
     size_t excess_rows_allowed = SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED;
 
+    ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
+
     facets_rows_begin(facets);
-    while (sd_journal_previous(j) > 0) {
+    while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
         row_counter++;
 
         usec_t msg_ut;
@@ -286,19 +295,13 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(sd_journal *j, 
         facets_row_finished(facets, msg_ut);
         rows_added++;
 
-        if((row_counter % 100) == 0 && now_monotonic_usec() > stop_monotonic_ut) {
-            timed_out = true;
-            break;
-        }
+        status = check_stop(row_counter, cancelled, stop_monotonic_ut);
     }
 
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
-    if(timed_out)
-        return ND_SD_JOURNAL_TIMED_OUT;
-
-    return ND_SD_JOURNAL_OK;
+    return status;
 }
 
 bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t last_modified) {
@@ -327,7 +330,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
                                          usec_t after_ut, usec_t before_ut,
                                          usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
                                          usec_t if_modified_since, bool data_only,
-                                         usec_t stop_monotonic_ut) {
+                                         usec_t stop_monotonic_ut,
+                                         bool *cancelled) {
     sd_journal *j = netdata_open_systemd_journal();
     if(!j)
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -341,23 +345,36 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
 
         // we can do a data-only query
         if(direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = netdata_systemd_journal_query_data_forward(j, wb, facets, after_ut, before_ut, anchor, entries, stop_monotonic_ut);
+            status = netdata_systemd_journal_query_data_forward(j, wb, facets, after_ut, before_ut, anchor, entries, stop_monotonic_ut, cancelled);
         else
-            status = netdata_systemd_journal_query_data_backward(j, wb, facets, after_ut, before_ut, anchor, entries, stop_monotonic_ut);
+            status = netdata_systemd_journal_query_data_backward(j, wb, facets, after_ut, before_ut, anchor, entries, stop_monotonic_ut, cancelled);
     }
     else {
         // we have to do a full query
         status = netdata_systemd_journal_query_full(j, wb, facets,
                                                     after_ut, before_ut, if_modified_since,
-                                                    stop_monotonic_ut, &last_modified);
+                                                    stop_monotonic_ut, &last_modified, cancelled);
     }
 
     sd_journal_close(j);
 
-    if(status == ND_SD_JOURNAL_NOT_MODIFIED)
-        return HTTP_RESP_NOT_MODIFIED;
+    if(status != ND_SD_JOURNAL_OK && status != ND_SD_JOURNAL_TIMED_OUT) {
+        buffer_flush(wb);
 
-    buffer_json_member_add_uint64(wb, "status", status == ND_SD_JOURNAL_FAILED_TO_SEEK ? HTTP_RESP_INTERNAL_SERVER_ERROR : HTTP_RESP_OK);
+        switch (status) {
+            case ND_SD_JOURNAL_CANCELLED:
+                return HTTP_RESP_CLIENT_CLOSED_REQUEST;
+
+            case ND_SD_JOURNAL_NOT_MODIFIED:
+                return HTTP_RESP_NOT_MODIFIED;
+
+            default:
+            case ND_SD_JOURNAL_FAILED_TO_SEEK:
+                return HTTP_RESP_INTERNAL_SERVER_ERROR;
+        }
+    }
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_boolean(wb, "partial", status != ND_SD_JOURNAL_OK);
     buffer_json_member_add_string(wb, "type", "table");
 
@@ -372,7 +389,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + (data_only ? 3600 : 0));
     buffer_json_finalize(wb);
 
-    return status == ND_SD_JOURNAL_FAILED_TO_SEEK ? HTTP_RESP_INTERNAL_SERVER_ERROR : HTTP_RESP_OK;
+    return HTTP_RESP_OK;
 }
 
 static void netdata_systemd_journal_function_help(const char *transaction) {
@@ -599,7 +616,7 @@ static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, 
     buffer_json_object_close(json_array);
 }
 
-static void function_systemd_journal(const char *transaction, char *function, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
     static struct {
         BUFFER *tmp;
         BUFFER *wb;
@@ -863,7 +880,8 @@ static void function_systemd_journal(const char *transaction, char *function, ch
     response = netdata_systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                              anchor, direction, last,
                                              if_modified_since, data_only,
-                                             now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC);
+                                             now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC,
+                                             cancelled);
 
     if(response != HTTP_RESP_OK) {
         netdata_mutex_lock(&stdout_mutex);
@@ -890,8 +908,69 @@ cleanup:
     buffer_free(wb);
 }
 
+struct worker_job {
+    bool used;
+    bool running;
+    bool cancelled;
+    char *cmd;
+    const char *transaction;
+    time_t timeout;
+};
+DICTIONARY *worker_queue = NULL;
+pthread_mutex_t worker_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t worker_cond_var = PTHREAD_COND_INITIALIZER;
+
+static void *worker_main(void *arg __maybe_unused) {
+    while (true) {
+        pthread_mutex_lock(&worker_mutex);
+
+        while (dictionary_entries(worker_queue) == 0) {
+            pthread_cond_wait(&worker_cond_var, &worker_mutex);
+        }
+
+        const DICTIONARY_ITEM *acquired = NULL;
+        struct worker_job *j;
+        dfe_start_write(worker_queue, j) {
+            if(j->running || j->cancelled)
+                continue;
+
+            acquired = dictionary_acquired_item_dup(worker_queue, j_dfe.item);
+            j->running = true;
+            break;
+        }
+        dfe_done(j);
+
+        pthread_mutex_unlock(&worker_mutex);
+
+        if(acquired) {
+            j = dictionary_acquired_item_value(acquired);
+            function_systemd_journal(j->transaction, j->cmd, j->timeout, &j->cancelled);
+            dictionary_del(worker_queue, j->transaction);
+            dictionary_acquired_item_release(worker_queue, acquired);
+            dictionary_garbage_collect(worker_queue);
+        }
+    }
+    return NULL;
+}
+
+void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct worker_job *j = value;
+    freez((void *)j->cmd);
+    freez((void *)j->transaction);
+}
+
 static void *reader_main(void *arg __maybe_unused) {
     char buffer[PLUGINSD_LINE_MAX + 1];
+
+    worker_queue = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_delete_callback(worker_queue, worker_queue_delete_cb, NULL);
+
+    netdata_thread_t worker_threads[SYSTEMD_JOURNAL_WORKER_THREADS];
+    for(size_t i = 0; i < SYSTEMD_JOURNAL_WORKER_THREADS ; i++) {
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "SDJ_WORK[%d]", i+1);
+        netdata_thread_create(&worker_threads[i], tag, NETDATA_THREAD_OPTION_DONT_LOG, worker_main, NULL);
+    }
 
     char *s = NULL;
     while(!plugin_should_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
@@ -917,8 +996,26 @@ static void *reader_main(void *arg __maybe_unused) {
                 int timeout = str2i(timeout_s);
                 if(timeout <= 0) timeout = SYSTEMD_JOURNAL_DEFAULT_TIMEOUT;
 
-                if(strncmp(function, SYSTEMD_JOURNAL_FUNCTION_NAME, strlen(SYSTEMD_JOURNAL_FUNCTION_NAME)) == 0)
-                    function_systemd_journal(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
+                if(strncmp(function, SYSTEMD_JOURNAL_FUNCTION_NAME, strlen(SYSTEMD_JOURNAL_FUNCTION_NAME)) == 0) {
+                    struct worker_job t = {
+                            .cmd = strdupz(function),
+                            .transaction = strdupz(transaction),
+                            .running = false,
+                            .cancelled = false,
+                            .timeout = timeout,
+                            .used = false,
+                    };
+                    struct worker_job *j = dictionary_set(worker_queue, transaction, &t, sizeof(t));
+                    if(j->used) {
+                        netdata_log_error("Received duplicate function transaction '%s'", transaction);
+                        freez((void *)t.cmd);
+                        freez((void *)t.transaction);
+                    }
+                    else {
+                        j->used = true;
+                        pthread_cond_signal(&worker_cond_var);
+                    }
+                }
                 else {
                     netdata_mutex_lock(&stdout_mutex);
                     pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
@@ -926,6 +1023,19 @@ static void *reader_main(void *arg __maybe_unused) {
                     netdata_mutex_unlock(&stdout_mutex);
                 }
             }
+        }
+        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
+            char *transaction = get_word(words, num_words, 1);
+            const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(worker_queue, transaction);
+            if(acquired) {
+                struct worker_job *j = dictionary_acquired_item_value(acquired);
+                __atomic_store_n(&j->cancelled, true, __ATOMIC_RELAXED);
+                dictionary_acquired_item_release(worker_queue, acquired);
+                dictionary_del(worker_queue, transaction);
+                dictionary_garbage_collect(worker_queue);
+            }
+            else
+                netdata_log_error("Received CANCEL for transaction '%s', but it not available here", transaction);
         }
         else
             netdata_log_error("Received unknown command: %s", keyword?keyword:"(unset)");
@@ -962,9 +1072,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // debug
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
+        bool cancelled = false;
         char buf[] = "systemd-journal after:-864000 before:0 last:500";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
-        function_systemd_journal("123", buf, "", 0, 30);
+        function_systemd_journal("123", buf, 30, &cancelled);
         exit(1);
     }
 
