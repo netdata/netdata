@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #ifndef NETDATA_RRDFUNCTIONS_H
 #define NETDATA_RRDFUNCTIONS_H 1
 
@@ -52,7 +53,5 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout, const char *function, vo
                                rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data);
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
-
-// ----------------------------------------------------------------------------
 
 #endif // NETDATA_RRDFUNCTIONS_H

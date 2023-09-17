@@ -4677,7 +4677,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
-static void function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void function_processes(const char *transaction, char *function __maybe_unused, int timeout __maybe_unused, bool *cancelled __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -5531,62 +5531,6 @@ static void function_processes(const char *transaction, char *function __maybe_u
 
 static bool apps_plugin_exit = false;
 
-static void *reader_main(void *arg __maybe_unused) {
-    char buffer[PLUGINSD_LINE_MAX + 1];
-
-    char *s = NULL;
-    while(!apps_plugin_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
-
-        char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
-
-        const char *keyword = get_word(words, num_words, 0);
-
-        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
-
-            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                      keyword,
-                      transaction?transaction:"(unset)",
-                      timeout_s?timeout_s:"(unset)",
-                      function?function:"(unset)");
-            }
-            else {
-                int timeout = str2i(timeout_s);
-                if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
-
-//                internal_error(true, "Received function '%s', transaction '%s', timeout %d", function, transaction, timeout);
-
-                netdata_mutex_lock(&apps_and_stdout_mutex);
-
-                if(strncmp(function, "processes", strlen("processes")) == 0)
-                    function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
-                else {
-                    pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
-                                                           "No function with this name found in apps.plugin.");
-                }
-
-                netdata_mutex_unlock(&apps_and_stdout_mutex);
-
-//                internal_error(true, "Done with function '%s', transaction '%s', timeout %d", function, transaction, timeout);
-            }
-        }
-        else
-            netdata_log_error("Received unknown command: %s", keyword?keyword:"(unset)");
-    }
-
-    if(!s || feof(stdin) || ferror(stdin)) {
-        apps_plugin_exit = true;
-        netdata_log_error("Received error on stdin.");
-    }
-
-    exit(1);
-    return NULL;
-}
-
 int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
     stderror = stderr;
@@ -5690,10 +5634,17 @@ int main(int argc, char **argv) {
 
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max + 1);
 
-    netdata_thread_t reader_thread;
-    netdata_thread_create(&reader_thread, "APPS_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
-    netdata_mutex_lock(&apps_and_stdout_mutex);
+    // ------------------------------------------------------------------------
+    // the event loop for functions
 
+    struct functions_evloop_globals *wg =
+            functions_evloop_init(1, "APPS", &apps_and_stdout_mutex, &apps_plugin_exit);
+
+    functions_evloop_add_function(wg, "processes", function_processes, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+
+    // ------------------------------------------------------------------------
+
+    netdata_mutex_lock(&apps_and_stdout_mutex);
     APPS_PLUGIN_GLOBAL_FUNCTIONS();
 
     usec_t step = update_every * USEC_PER_SEC;
@@ -5717,12 +5668,10 @@ int main(int argc, char **argv) {
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
         if (unlikely(poll(&pollfd, 1, 0) < 0)) {
             netdata_mutex_unlock(&apps_and_stdout_mutex);
-            netdata_thread_cancel(reader_thread);
             fatal("Cannot check if a pipe is available");
         }
         if (unlikely(pollfd.revents & POLLERR)) {
             netdata_mutex_unlock(&apps_and_stdout_mutex);
-            netdata_thread_cancel(reader_thread);
             fatal("Received error on read pipe.");
         }
 
@@ -5733,7 +5682,6 @@ int main(int argc, char **argv) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
             netdata_mutex_unlock(&apps_and_stdout_mutex);
-            netdata_thread_cancel(reader_thread);
             exit(1);
         }
 

@@ -5,8 +5,6 @@
  *  GPL v3+
  */
 
-// TODO - 1) MARKDOC 2) HELP TEXT
-
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
@@ -841,7 +839,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_set_items(facets, last);
     facets_set_anchor(facets, anchor, direction);
     facets_set_query(facets, query);
-    facets_set_histogram(facets, chart ? chart : "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+    facets_set_histogram(facets, chart ? chart : "PRIORITY",
+                         after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
     response = netdata_systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                              anchor, direction, last,
@@ -866,146 +865,7 @@ cleanup:
     buffer_free(wb);
 }
 
-struct worker_job {
-    bool used;
-    bool running;
-    bool cancelled;
-    char *cmd;
-    const char *transaction;
-    time_t timeout;
-};
-DICTIONARY *worker_queue = NULL;
-pthread_mutex_t worker_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t worker_cond_var = PTHREAD_COND_INITIALIZER;
-
-static void *worker_main(void *arg __maybe_unused) {
-    while (true) {
-        pthread_mutex_lock(&worker_mutex);
-
-        while (dictionary_entries(worker_queue) == 0) {
-            pthread_cond_wait(&worker_cond_var, &worker_mutex);
-        }
-
-        const DICTIONARY_ITEM *acquired = NULL;
-        struct worker_job *j;
-        dfe_start_write(worker_queue, j) {
-            if(j->running || j->cancelled)
-                continue;
-
-            acquired = dictionary_acquired_item_dup(worker_queue, j_dfe.item);
-            j->running = true;
-            break;
-        }
-        dfe_done(j);
-
-        pthread_mutex_unlock(&worker_mutex);
-
-        if(acquired) {
-            j = dictionary_acquired_item_value(acquired);
-            function_systemd_journal(j->transaction, j->cmd, j->timeout, &j->cancelled);
-            dictionary_del(worker_queue, j->transaction);
-            dictionary_acquired_item_release(worker_queue, acquired);
-            dictionary_garbage_collect(worker_queue);
-        }
-    }
-    return NULL;
-}
-
-void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct worker_job *j = value;
-    freez((void *)j->cmd);
-    freez((void *)j->transaction);
-}
-
-static void *reader_main(void *arg __maybe_unused) {
-    char buffer[PLUGINSD_LINE_MAX + 1];
-
-    worker_queue = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
-    dictionary_register_delete_callback(worker_queue, worker_queue_delete_cb, NULL);
-
-    netdata_thread_t worker_threads[SYSTEMD_JOURNAL_WORKER_THREADS];
-    for(size_t i = 0; i < SYSTEMD_JOURNAL_WORKER_THREADS ; i++) {
-        char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "SDJ_WORK[%d]", i+1);
-        netdata_thread_create(&worker_threads[i], tag, NETDATA_THREAD_OPTION_DONT_LOG, worker_main, NULL);
-    }
-
-    char *s = NULL;
-    while(!plugin_should_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
-
-        char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
-
-        const char *keyword = get_word(words, num_words, 0);
-
-        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
-
-            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                                  keyword,
-                                  transaction?transaction:"(unset)",
-                                  timeout_s?timeout_s:"(unset)",
-                                  function?function:"(unset)");
-            }
-            else {
-                int timeout = str2i(timeout_s);
-                if(timeout <= 0) timeout = SYSTEMD_JOURNAL_DEFAULT_TIMEOUT;
-
-                if(strncmp(function, SYSTEMD_JOURNAL_FUNCTION_NAME, strlen(SYSTEMD_JOURNAL_FUNCTION_NAME)) == 0) {
-                    struct worker_job t = {
-                            .cmd = strdupz(function),
-                            .transaction = strdupz(transaction),
-                            .running = false,
-                            .cancelled = false,
-                            .timeout = timeout,
-                            .used = false,
-                    };
-                    struct worker_job *j = dictionary_set(worker_queue, transaction, &t, sizeof(t));
-                    if(j->used) {
-                        netdata_log_error("Received duplicate function transaction '%s'", transaction);
-                        freez((void *)t.cmd);
-                        freez((void *)t.transaction);
-                    }
-                    else {
-                        j->used = true;
-                        pthread_cond_signal(&worker_cond_var);
-                    }
-                }
-                else {
-                    netdata_mutex_lock(&stdout_mutex);
-                    pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
-                                                           "No function with this name found in systemd-journal.plugin.");
-                    netdata_mutex_unlock(&stdout_mutex);
-                }
-            }
-        }
-        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
-            char *transaction = get_word(words, num_words, 1);
-            const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(worker_queue, transaction);
-            if(acquired) {
-                struct worker_job *j = dictionary_acquired_item_value(acquired);
-                __atomic_store_n(&j->cancelled, true, __ATOMIC_RELAXED);
-                dictionary_acquired_item_release(worker_queue, acquired);
-                dictionary_del(worker_queue, transaction);
-                dictionary_garbage_collect(worker_queue);
-            }
-            else
-                netdata_log_error("Received CANCEL for transaction '%s', but it not available here", transaction);
-        }
-        else
-            netdata_log_error("Received unknown command: %s", keyword?keyword:"(unset)");
-    }
-
-    if(!s || feof(stdin) || ferror(stdin)) {
-        plugin_should_exit = true;
-        netdata_log_error("Received error on stdin.");
-    }
-
-    exit(1);
-}
+// ----------------------------------------------------------------------------
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     stderror = stderr;
@@ -1038,15 +898,20 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 
     // ------------------------------------------------------------------------
+    // the event loop for functions
 
-    netdata_thread_t reader_thread;
-    netdata_thread_create(&reader_thread, "SDJ_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
+    struct functions_evloop_globals *wg =
+            functions_evloop_init(SYSTEMD_JOURNAL_WORKER_THREADS, "SDJ", &stdout_mutex, &plugin_should_exit);
+
+    functions_evloop_add_function(wg, SYSTEMD_JOURNAL_FUNCTION_NAME, function_systemd_journal,
+                                  SYSTEMD_JOURNAL_DEFAULT_TIMEOUT);
+
 
     // ------------------------------------------------------------------------
 
     time_t started_t = now_monotonic_sec();
 
-    size_t iteration;
+    size_t iteration = 0;
     usec_t step = 1000 * USEC_PER_MS;
     bool tty = isatty(fileno(stderr)) == 1;
 
@@ -1056,7 +921,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for(iteration = 0; 1 ; iteration++) {
+    while(!plugin_should_exit) {
+        iteration++;
+
         netdata_mutex_unlock(&stdout_mutex);
         heartbeat_next(&hb, step);
         netdata_mutex_lock(&stdout_mutex);

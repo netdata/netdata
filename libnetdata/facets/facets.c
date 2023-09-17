@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "facets.h"
 
 #define HISTOGRAM_COLUMNS 100

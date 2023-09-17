@@ -15,6 +15,7 @@ SUBDIRS = \
     ebpf \
     eval \
     facets \
+    functions_evloop \
     json \
     july \
     health \
