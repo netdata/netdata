@@ -867,8 +867,8 @@ cleanup:
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
-    if (pid_ptr)
-        pid_ptr->cmdline = p->cmdline;
+    if (pid_ptr && pid_ptr->name[0] == '\0')
+        snprintfz(pid_ptr->name, TASK_COMM_LEN, "%s", p->cmdline);
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
     return ret;

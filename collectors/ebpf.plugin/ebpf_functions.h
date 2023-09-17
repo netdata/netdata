@@ -40,6 +40,8 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_FUNCTION_SOCKET_RESET "reset"
 #define EBPF_FUNCTION_SOCKET_INTERFACES "interfaces"
 
+#define EBPF_NOT_IDENFIED "not identified"
+
 void *ebpf_function_thread(void *ptr);
 
 #endif

@@ -709,7 +709,7 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 
         pid_ptr = *pid_pptr;
 
-        pid_ptr->cmdline = NULL;
+        pid_ptr->name[0] = '\0';
         pid_ptr->socket_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->socket_stats.rw_spinlock);
     }
