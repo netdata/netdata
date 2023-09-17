@@ -2,6 +2,8 @@
 #include "facets.h"
 
 #define HISTOGRAM_COLUMNS 100
+#define FACETS_KEYS_HASHTABLE_ENTRIES 1000
+#define FACETS_VALUES_HASHTABLE_ENTRIES 20
 
 // ----------------------------------------------------------------------------
 
@@ -118,6 +120,10 @@ typedef struct facet_value {
     uint32_t *histogram;
     uint32_t min, max, sum;
 
+    struct {
+        struct facet_value *next;
+    } parent_hashtable;
+
     struct facet_value *prev, *next;
 } FACET_VALUE;
 
@@ -138,7 +144,7 @@ struct facet_key {
 
     struct {
         bool enabled;
-        Pvoid_t judyL;
+        FACET_VALUE *hashtable[FACETS_VALUES_HASHTABLE_ENTRIES];
         FACET_VALUE *ll;
     } values;
 
@@ -166,6 +172,10 @@ struct facet_key {
         void *data;
     } transform;
 
+    struct {
+        struct facet_key *next;
+    } parent_hashtable;
+
     struct facet_key *prev, *next;
 };
 
@@ -187,8 +197,8 @@ struct facets {
     DICTIONARY *accepted_params;
 
     struct {
+        FACET_KEY *hashtable[FACETS_KEYS_HASHTABLE_ENTRIES];
         FACET_KEY *ll;
-        Pvoid_t judyL;
     } keys;
 
     FACET_ROW *base;    // double linked list of the selected facets rows
@@ -268,7 +278,6 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k);
 
 static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
     k->values.ll = NULL;
-    k->values.judyL = NULL;
 }
 
 static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
@@ -281,7 +290,7 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
         v = next;
     }
     k->values.ll = NULL;
-    JudyLFreeArray(&k->values.judyL, PJE0);
+    memset(k->values.hashtable, 0, sizeof(k->values.hashtable));
     k->values.enabled = false;
 }
 
@@ -300,16 +309,23 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, FACET_
     k->facets->operations.values.conflicts++;
 }
 
+static inline FACET_VALUE **facets_values_hashtable_slot(FACET_KEY *k, FACETS_HASH hash) {
+    size_t slot = hash % FACETS_VALUES_HASHTABLE_ENTRIES;
+    FACET_VALUE **v = &k->values.hashtable[slot];
+
+    while(*v && (*v)->hash != hash)
+        v = &((*v)->parent_hashtable.next);
+
+    return v;
+}
+
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, FACET_VALUE *tv) {
-    Pvoid_t *PValue = JudyLIns(&k->values.judyL, tv->hash, PJE0);
+    FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, tv->hash);
 
-    if (!PValue || PValue == PJERR)
-        fatal("FACETS: corrupted values judy array (while writing)");
-
-    if(*PValue) {
+    if(*v_ptr) {
         // already exists
 
-        FACET_VALUE *v = *PValue;
+        FACET_VALUE *v = *v_ptr;
         FACET_VALUE_ADD_CONFLICT(k, v, tv);
         return v;
     }
@@ -317,7 +333,7 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, FACET_VALUE *t
     // we have to add it
 
     FACET_VALUE *v = callocz(1, sizeof(*v));
-    *PValue = v;
+    *v_ptr = v;
 
     memcpy(v, tv, sizeof(*v));
 
@@ -400,7 +416,6 @@ static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
 }
 
 static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
-    facets->keys.judyL = NULL;
     facets->keys.ll = NULL;
 }
 
@@ -416,30 +431,32 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 
         k = next;
     }
-
+    memset(facets->keys.hashtable, 0, sizeof(facets->keys.hashtable));
     facets->keys.ll = NULL;
-    JudyLFreeArray(&facets->keys.judyL, PJE0);
+}
+
+static inline FACET_KEY **facets_keys_hashtable_slot(FACETS *facets, FACETS_HASH hash) {
+    size_t slot = hash % FACETS_KEYS_HASHTABLE_ENTRIES;
+    FACET_KEY **k = &facets->keys.hashtable[slot];
+
+    while(*k && (*k)->hash != hash)
+        k = &((*k)->parent_hashtable.next);
+
+    return k;
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
-    Pvoid_t *PValue = JudyLGet(facets->keys.judyL, hash, PJE0);
-
-    if(PValue == PJERR)
-        fatal("FACETS: corrupted judy array (while reading)");
-
-    return (PValue) ? *PValue : NULL;
+    FACET_KEY **k = facets_keys_hashtable_slot(facets, hash);
+    return *k;
 }
 
 static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACET_KEY *tk) {
-    Pvoid_t *PValue = JudyLIns(&facets->keys.judyL, tk->hash, PJE0);
+    FACET_KEY **k_ptr = facets_keys_hashtable_slot(facets, tk->hash);
 
-    if (!PValue || PValue == PJERR)
-        fatal("FACETS: corrupted keys judy array (while writing)");
-
-    if(*PValue) {
+    if(*k_ptr) {
         // already exists
 
-        FACET_KEY *k = *PValue;
+        FACET_KEY *k = *k_ptr;
 
         if(!k->name && tk->name) {
             // an actual value, not a filter
@@ -465,7 +482,7 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACET_KEY *tk) 
     // we have to add it
 
     FACET_KEY *k = callocz(1, sizeof(*k));
-    *PValue = k; // add it to the index
+    *k_ptr = k; // add it to the index
 
     memcpy(k, tk, sizeof(*k));
 
