@@ -193,14 +193,14 @@ jobs:
       - name: Docker Hub Login
         id: docker-hub-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: GitHub Container Registry Login
         id: ghcr-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -208,7 +208,7 @@ jobs:
       - name: Quay.io Login
         id: quay-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
@@ -305,14 +305,14 @@ jobs:
       - name: Docker Hub Login
         id: docker-hub-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: GitHub Container Registry Login
         id: ghcr-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -320,7 +320,7 @@ jobs:
       - name: Quay.io Login
         id: quay-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
