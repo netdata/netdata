@@ -15,7 +15,7 @@ on:
       - '**.hh'
       - '**.in'
       - 'netdata.spec.in'
-      - 'configure.ac'
+      - 'CMakeLists.txt'
       - '**/Makefile*'
       - 'Makefile*'
       - '.github/workflows/packaging.yml'

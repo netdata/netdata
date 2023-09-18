@@ -10,7 +10,7 @@ on:
       - '**.in'
       - '!netdata.spec.in'
       - '.dockerignore'
-      - 'configure.ac'
+      - 'CMakeLists.txt'
       - 'netdata-installer.sh'
       - '**/Makefile*'
       - 'Makefile*'

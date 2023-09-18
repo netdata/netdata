@@ -9,7 +9,7 @@ on:
       - '**.hh'
       - '**.in'
       - '!netdata.spec.in'
-      - 'configure.ac'
+      - 'CMakeLists.txt'
       - '**/Makefile*'
       - 'Makefile*'
       - '.gitignore'

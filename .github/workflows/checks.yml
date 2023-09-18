@@ -9,7 +9,7 @@ on:
       - '**.hh'
       - '**.in'
       - '!netdata.spec.in'
-      - 'configure.ac'
+      - 'CMakeLists.txt'
       - '**/Makefile*'
       - 'Makefile*'
       - '.gitignore'
@@ -29,7 +29,7 @@ on:
       - '**.hh'
       - '**.in'
       - '!netdata.spec.in'
-      - 'configure.ac'
+      - 'CMakeLists.txt'
       - '**/Makefile*'
       - 'Makefile*'
       - '.gitignore'
@@ -60,9 +60,8 @@ jobs:
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
           apk del openssl openssl-dev;
           apk add libressl libressl-dev;
-          autoreconf -ivf;
-          ./configure --disable-dependency-tracking;
-          make;'
+          cmake -S . -B ./cmake-build-debug;
+          cmake --build ./cmake-build-debug;'
   clang-checks:
     name: Clang
     runs-on: ubuntu-latest
