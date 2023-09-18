@@ -1098,7 +1098,7 @@ trap - EXIT
 progress "Compile netdata"
 
 # shellcheck disable=SC2086
-if ! run cmake --build "${NETDATA_BUILD_DIR}" -- -v; then
+if ! run cmake --build "${NETDATA_BUILD_DIR}" -- ${MAKEOPTS}; then
   fatal "Failed to build Netdata." I000B
 fi
 
