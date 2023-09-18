@@ -281,6 +281,8 @@ LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
 ENABLE_EBPF=1
+ENABLE_H2O=1
+ENABLE_CLOUD=1
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -358,7 +360,7 @@ while [ -n "${1}" ]; do
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         warning "Cloud explicitly enabled, ignoring --disable-cloud."
       else
-        NETDATA_ENABLE_CLOUD=0
+        ENABLE_CLOUD=0
         NETDATA_DISABLE_CLOUD=1
       fi
       ;;
@@ -366,7 +368,7 @@ while [ -n "${1}" ]; do
       if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
         warning "Cloud explicitly disabled, ignoring --require-cloud."
       else
-        NETDATA_ENABLE_CLOUD=1
+        ENABLE_CLOUD=1
         NETDATA_REQUIRE_CLOUD=1
       fi
       ;;
