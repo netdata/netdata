@@ -1103,6 +1103,38 @@ static void ebpf_function_cachestat_help(const char *transaction) {
 }
 
 /**
+ * Clean Judy array unsafe
+ *
+ * Clean all Judy Array allocated to show table when a function is called.
+ * Before to call this function it is necessary to lock `ebpf_judy_pid.index.rw_spinlock`.
+ **/
+static void ebpf_cachestat_clean_judy_array_unsafe()
+{
+    if (!ebpf_judy_pid.index.JudyLArray)
+        return;
+
+    Pvoid_t *pid_value, *cache_value;
+    Word_t local_pid = 0, local_cache = 0;
+    bool first_pid = true, first_cache = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        rw_spinlock_write_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+        if (pid_ptr->cachestat_stats.JudyLArray) {
+            while ((cache_value = JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_cache, &first_cache))) {
+                (void)cache_value;
+                /*
+                netdata_socket_plus_t *socket_clean = *cache_value;
+                aral_freez(aral_socket_table, socket_clean);
+                 */
+            }
+            JudyLFreeArray(&pid_ptr->cachestat_stats.JudyLArray, PJE0);
+            pid_ptr->cachestat_stats.JudyLArray = NULL;
+        }
+        rw_spinlock_write_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+    }
+}
+
+/**
  * Function: Socket
  *
  * Show information for sockets stored in hash tables.
@@ -1155,11 +1187,9 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
-        /*
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-        ebpf_socket_clean_judy_array_unsafe();
+        ebpf_cachestat_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
-         */
 
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
