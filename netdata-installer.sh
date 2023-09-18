@@ -991,7 +991,27 @@ if ! run cmake \
          -B "${NETDATA_BUILD_DIR}" \
          -DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}" \
          ${NETDATA_USER:+-DNETDATA_USER="${NETDATA_USER}"} \
-         ${NETDATA_CMAKE_OPTIONS}; then
+         -DENABLE_H2O=Off \
+         -DENABLE_DBENGINE=Off \
+         -DENABLE_CLOUD=Off \
+         -DENABLE_ACLK=Off \
+         -DENABLE_ML=Off \
+         -DENABLE_EXPORTING_MONGODB=Off \
+         -DENABLE_PLUGIN_DEBUGFS=Off \
+         -DENABLE_PLUGIN_APPS=Off \
+         -DENABLE_PLUGIN_FREEIPMI=Off \
+         -DENABLE_PLUGIN_NFACCT=Off \
+         -DENABLE_PLUGIN_XENSTAT=Off \
+         -DENABLE_PLUGIN_PERF=Off \
+         -DENABLE_PLUGIN_SLABINFO=Off \
+         -DENABLE_PLUGIN_CUPS=Off \
+         -DENABLE_PLUGIN_CGROUP_NETWORK=Off \
+         -DENABLE_PLUGIN_EBPF=Off \
+         -DENABLE_BUNDLED_JSONC=Off \
+         -DENABLE_BUNDLED_YAML=Off \
+         -DENABLE_BUNDLED_PROTOBUF=Off \
+         ; then
+#         ${NETDATA_CMAKE_OPTIONS}; then
   fatal "Failed to configure Netdata sources." I000A
 fi
 
