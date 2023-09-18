@@ -32,7 +32,7 @@ def construct_dict(array, integration):
     for element in array:
         try:
             cat_dict[element].append(integration)
-        except:
+        except KeyError:
             cat_dict[element] = []
             cat_dict[element].append(integration)
 
@@ -42,7 +42,7 @@ md = ""
 for integration in integrations:
     try:
         construct_dict(integration['meta']['monitored_instance']['categories'], integration)
-    except KeyError as e:
+    except KeyError:
         pass
 
 sorted_dict = dict(sorted(cat_dict.items()))
