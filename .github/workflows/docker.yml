@@ -50,7 +50,7 @@ jobs:
           submodules: recursive
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Test Build
         id: build
         uses: docker/build-push-action@v5
@@ -108,7 +108,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Build
         id: build
         uses: docker/build-push-action@v5
@@ -189,7 +189,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Docker Hub Login
         id: docker-hub-login
         if: github.repository == 'netdata/netdata'
@@ -301,7 +301,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Docker Hub Login
         id: docker-hub-login
         if: github.repository == 'netdata/netdata'
