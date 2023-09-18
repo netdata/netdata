@@ -58,6 +58,17 @@ netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru",
 static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_dirtied",
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
+struct netdata_static_thread ebpf_read_cachestat = {
+    .name = "EBPF_READ_CACHESTAT",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 #ifdef NETDATA_DEV_MODE
 int cachestat_disable_priority;
 #endif
@@ -517,6 +528,9 @@ static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    if (ebpf_read_cachestat.thread)
+        netdata_thread_cancel(*ebpf_read_cachestat.thread);
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -744,6 +758,44 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
 
         pids = pids->next;
     }
+}
+
+/**
+ * Cachestat thread
+ *
+ * Thread used to generate socket charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_cachestat_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    ebpf_read_cachestat_apps_table(maps_per_core);
+
+    int update_every = em->update_every;
+    int counter = update_every - 1;
+
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    usec_t period = update_every * USEC_PER_SEC;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        ebpf_read_cachestat_apps_table(maps_per_core);
+
+        counter = 0;
+    }
+
+    return NULL;
 }
 
 /**
@@ -1317,8 +1369,6 @@ static void cachestat_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_cachestat_read_global_tables(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
-        if (apps)
-            ebpf_read_cachestat_apps_table(maps_per_core);
 
         if (cgroups)
             ebpf_update_cachestat_cgroup(maps_per_core);
@@ -1541,6 +1591,13 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_global_labels(cachestat_counter_aggregated_data, cachestat_counter_publish_aggregated,
                        cachestat_counter_dimension_name, cachestat_counter_dimension_name,
                        algorithms, NETDATA_CACHESTAT_END);
+
+    ebpf_read_cachestat.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_cachestat.thread,
+                          ebpf_read_cachestat.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_cachestat_thread,
+                          em);
 
     pthread_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
