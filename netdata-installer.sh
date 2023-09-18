@@ -974,7 +974,6 @@ config_option() {
 }
 
 # the user netdata will run as
-# TODO: Needs CMake support
 if [ "$(id -u)" = "0" ]; then
   NETDATA_USER="$(config_option "global" "run as user" "netdata")"
   ROOT_USER="root"
@@ -991,6 +990,7 @@ if ! run cmake \
          -S ./ \
          -B "${NETDATA_BUILD_DIR}" \
          -DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}" \
+         ${NETDATA_USER:+-DNETDATA_USER="${NETDATA_USER}"} \
          ${NETDATA_CMAKE_OPTIONS}; then
   fatal "Failed to configure Netdata sources." I000A
 fi
