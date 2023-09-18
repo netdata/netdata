@@ -279,6 +279,8 @@ DONOTWAIT=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
+ENABLE_DBENGINE=1
+ENABLE_EBPF=1
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -286,10 +288,7 @@ while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
-    "--use-system-protobuf")
-      USE_SYSTEM_PROTOBUF=1
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_BUNDLED_PROTOBUF=Off}" | sed 's/$/ -DENABLE_BUNDLED_PROTOBUFF=Off/g')"
-    ;;
+    "--use-system-protobuf") USE_SYSTEM_PROTOBUF=1 ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
     "--dont-wait") DONOTWAIT=1 ;;
@@ -297,20 +296,18 @@ while [ -n "${1}" ]; do
     "--auto-update-type") ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
-    "--enable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_FREEIPMI=On)}" | sed 's/$/ -DENABLE_PLUGIN_FREEIPMI=On/g')" ;;
-    "--disable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_FREEIPMI=Off)}" | sed 's/$/ -DENABLE_PLUGIN_FREEIPMI=Off/g')" ;;
+    "--enable-plugin-freeipmi") ENABLE_FREEIPMI=1 ;;
+    "--disable-plugin-freeipmi") ENABLE_FREEIPMI=0 ;;
     "--disable-https")
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_DBENGINE=Off)}" | sed 's/$/ -DENABLE_DBENGINE=Off/g')"
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_H2O=Off)}" | sed 's/$/ -DENABLE_H2O=Off/g')"
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_CLOUD=Off)}" | sed 's/$/ -DENABLE_CLOUD=Off/g')"
+      ENABLE_DBENGINE=0
+      ENABLE_H2O=0
+      ENABLE_CLOUD=0
       ;;
-    "--disable-dbengine")
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_DBENGINE=Off)}" | sed 's/$/ -DENABLE_DBENGINE=Off/g')"
-      ;;
-    "--enable-plugin-nfacct") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_NFACCT=On)}" | sed 's/$/ -DENABLE_PLUGIN_NFACCT=On/g')" ;;
-    "--disable-plugin-nfacct") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_NFACCT=Off)}" | sed 's/$/ -DENABLE_PLUGIN_NFACCT=Off/g')" ;;
-    "--enable-plugin-xenstat") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_XENSTAT=On)}" | sed 's/$/ -DENABLE_PLUGIN_XENSTAT=On/g')" ;;
-    "--disable-plugin-xenstat") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_XENSTAT=Off)}" | sed 's/$/ -DENABLE_PLUGIN_XENSTAT=Off/g')" ;;
+    "--disable-dbengine") ENABLE_DBENGINE=0 ;;
+    "--enable-plugin-nfacct") ENABLE_NFACCT=1 ;;
+    "--disable-plugin-nfacct") ENABLE_NFACCT=0 ;;
+    "--enable-plugin-xenstat") ENABLE_XENSTAT=1 ;;
+    "--disable-plugin-xenstat") ENABLE_XENSTAT=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
@@ -324,26 +321,18 @@ while [ -n "${1}" ]; do
       # TODO: Needs CMake Support
       NETDATA_DISABLE_PROMETHEUS=1
       ;;
-    "--enable-exporting-mongodb" | "--enable-backend-mongodb")
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_EXPORTING_MONGODB=On)}" | sed 's/$/ -DENABLE_EXPORTING_MONGODB=On/g')" ;;
-    "--disable-exporting-mongodb" | "--disable-backend-mongodb")
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_EXPORTING_MONGODB=Off)}" | sed 's/$/ -DENABLE_EXPORTING_MONGODB=Off/g')" ;;
+    "--enable-exporting-mongodb" | "--enable-backend-mongodb") EXPORTER_MONGODB=1 ;;
+    "--disable-exporting-mongodb" | "--disable-backend-mongodb") EXPORTER_MONGODB=0 ;;
     "--enable-exporting-pubsub")
       # TODO: Needs CMake support
       ;;
     "--disable-exporting-pubsub")
       # TODO: Needs CMake support
       ;;
+    "--enable-ml") NETDATA_ENABLE_ML=1 ;;
+    "--disable-ml") NETDATA_ENABLE_ML=0 ;;
     "--enable-lto")
       # TODO: Needs CMake support
-      ;;
-    "--enable-ml")
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_ML=On)}" | sed 's/$/ -DENABLE_ML=On/g')"
-      NETDATA_ENABLE_ML=1
-      ;;
-    "--disable-ml")
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_ML=Off)}" | sed 's/$/ -DENABLE_ML=Off/g')"
-      NETDATA_ENABLE_ML=0
       ;;
     "--disable-lto")
       # TODO: Needs CMake support
@@ -353,8 +342,14 @@ while [ -n "${1}" ]; do
       ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
-    "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
-    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')" ;;
+    "--enable-ebpf")
+      ENABLE_EBPF=1
+      NETDATA_DISABLE_EBPF=0
+      ;;
+    "--disable-ebpf")
+      ENABLE_EBPF=0
+      NETDATA_DISABLE_EBPF=1
+      ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--one-time-build")
       # XXX: No longer supported
@@ -363,16 +358,16 @@ while [ -n "${1}" ]; do
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         warning "Cloud explicitly enabled, ignoring --disable-cloud."
       else
+        NETDATA_ENABLE_CLOUD=0
         NETDATA_DISABLE_CLOUD=1
-        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_CLOUD=Off)}" | sed 's/$/ -DENABLE_CLOUD=Off/g')"
       fi
       ;;
     "--require-cloud")
       if [ -n "${NETDATA_DISABLE_CLOUD}" ]; then
         warning "Cloud explicitly disabled, ignoring --require-cloud."
       else
+        NETDATA_ENABLE_CLOUD=1
         NETDATA_REQUIRE_CLOUD=1
-        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_CLOUD=On)}" | sed 's/$/ -DENABLE_CLOUD=On/g')"
       fi
       ;;
     "--build-json-c")
@@ -592,7 +587,7 @@ bundle_protobuf() {
   if [ -f "${PWD}/externaldeps/protobuf/.version" ] && [ "${PROTOBUF_PACKAGE_VERSION}" = "$(cat "${PWD}/externaldeps/protobuf/.version")" ]
   then
     echo >&2 "Found compiled protobuf, same version, not compiling it again. Remove file '${PWD}/externaldeps/protobuf/.version' to recompile."
-    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=On"
+    USE_SYSTEM_PROTOBUF=0
     return 0
   fi
 
@@ -610,7 +605,7 @@ bundle_protobuf() {
       echo "${PROTOBUF_PACKAGE_VERSION}" >"${PWD}/externaldeps/protobuf/.version" &&
       rm -rf "${tmp}"; then
       run_ok "protobuf built and prepared."
-      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=On"
+      USE_SYSTEM_PROTOBUF=0
     else
       run_failed "Failed to build protobuf. Netdata Cloud support will not be available in this build."
     fi
@@ -650,11 +645,14 @@ copy_jsonc() {
 bundle_jsonc() {
   # If --build-json-c flag or not json-c on system, then bundle our own json-c
   if [ -z "${NETDATA_BUILD_JSON_C}" ] && pkg-config json-c; then
+    NETDATA_BUILD_JSON_C=0
     return 0
   fi
 
   if [ -z "$(command -v cmake)" ]; then
     run_failed "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
+    NETDATA_BUILD_JSON_C=0
+    ENABLE_CLOUD=0
     return 0
   fi
 
@@ -677,11 +675,16 @@ bundle_jsonc() {
       copy_jsonc "${tmp}/json-c-json-c-${JSONC_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "JSON-C built and prepared."
+      NETDATA_BUILD_JSON_C=1
     else
       run_failed "Failed to build JSON-C, Netdata Cloud support will be disabled in this build."
+      NETDATA_BUILD_JSON_C=0
+      ENABLE_CLOUD=0
     fi
   else
     run_failed "Unable to fetch sources for JSON-C, Netdata Cloud support will be disabled in this build."
+    NETDATA_BUILD_JSON_C=0
+    ENABLE_CLOUD=0
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
@@ -714,11 +717,13 @@ copy_yaml() {
 
 bundle_yaml() {
   if pkg-config yaml-0.1; then
+    BUNDLE_YAML=0
     return 0
   fi
 
   if [ -z "$(command -v cmake)" ]; then
     run_failed "Could not find cmake, which is required to build YAML. Critical error."
+    BUNDLE_YAML=1
     return 0
   fi
 
@@ -741,11 +746,14 @@ bundle_yaml() {
       copy_yaml "${tmp}/yaml-${YAML_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "YAML built and prepared."
+      BUNDLE_YAML=1
     else
       run_failed "Failed to build YAML, critical error."
+      BUNDLE_YAML=0
     fi
   else
     run_failed "Unable to fetch sources for YAML, critical error."
+    BUNDLE_YAML=0
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
@@ -822,6 +830,7 @@ copy_libbpf() {
 
 bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+    ENABLE_EBPF=0
     return 0
   fi
 
@@ -829,7 +838,7 @@ bundle_libbpf() {
   libc="${EBPF_LIBC:-"$(detect_libc)"}"
   if [ -z "$libc" ]; then
     NETDATA_DISABLE_EBPF=1
-    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
+    ENABLE_EBPF=0
     return 0
   fi
 
@@ -911,6 +920,7 @@ bundle_ebpf_co_re() {
       else
         run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
         NETDATA_DISABLE_EBPF=1
+        ENABLE_EBPF=0
         NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
       fi
     fi
@@ -920,6 +930,7 @@ bundle_ebpf_co_re() {
     else
       run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"
       NETDATA_DISABLE_EBPF=1
+      ENABLE_EBPF=0
       NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
     fi
   fi
@@ -954,8 +965,44 @@ echo >&2
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Configuring Netdata."
 NETDATA_BUILD_DIR="${NETDATA_BUILD_DIR:-./cmake-build-release/}"
-
 rm -rf "${NETDATA_BUILD_DIR}"
+
+check_for_module() {
+  if [ -z "${pkgconf}" ]; then
+    pkgconf="$(command -v pkgconf 2>/dev/null)"
+    [ -z "${pkgconf}" ] && pkgconf="$(command -v pkg-config 2>/dev/null)"
+    [ -z "${pkgconf}" ] || fatal "Unable to find a usable pkgconf/pkg-config command, cannot build Netdata." I0013
+  fi
+
+  "${pkgconf}" "${1}"
+  return "${?}"
+}
+
+enable_feature() {
+  if [ "${1}" -eq 1 ]; then
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${2}=On"
+  else
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${2}=Off"
+  fi
+}
+
+check_for_feature() {
+  feature_name="${1}"
+  feature_state="${2}"
+  shift 2
+  feature_modules="${*}"
+
+  if [ -z "${feature_state}" ]; then
+    # shellcheck disable=SC2086
+    if check_for_module ${feature_modules}; then
+      feature_state=1
+    else
+      feature_state=0
+    fi
+  fi
+
+  enable_feature "${feature_name}" "${feature_state}"
+}
 
 # function to extract values from the config file
 config_option() {
@@ -985,33 +1032,57 @@ NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
+# Feature autodetection code starts here
+
+if [ "${USE_SYSTEM_PROTOBUF}" -eq 1 ]; then
+  NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=Off"
+else
+  NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=On"
+fi
+
+[ -z "${NETDATA_ENABLE_ML}" ] && NETDATA_ENABLE_ML=1
+enable_feature ML "${NETDATA_ENABLE_ML}"
+
+if command -v cups-config >/dev/null 2>&1 || check_for_module libcups || check_for_module cups; then
+  ENABLE_CUPS=1
+else
+  ENABLE_CUPS=0
+fi
+
+enable_feature PLUGIN_CUPS "${ENABLE_CUPS}"
+
+IS_LINUX=0
+[ "$(uname -s)" = "Linux" ] && IS_LINUX=1
+enable_feature PLUGIN_DEBUGFS "${IS_LINUX}"
+enable_feature PLUGIN_PERF "${IS_LINUX}"
+enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
+enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
+
+enable_feature ACLK "${ENABLE_CLOUD}"
+enable_feature CLOUD "${ENABLE_CLOUD}"
+enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C}"
+enable_feature BUNDLED_YAML "${BUNDLE_YAML}"
+enable_feature DBENGINE "${ENABLE_DBENGINE}"
+enable_feature H2O "${ENABLE_H2O}"
+enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
+
+enable_feature APPS 1
+
+check_for_feature EXPORTING_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
+checK_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
+check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT}" libnetfilter_acct libnml
+check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
+
+# End of feature autodetection code
+
 # shellcheck disable=SC2086
 if ! run cmake \
          -S ./ \
          -B "${NETDATA_BUILD_DIR}" \
          -DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}" \
          ${NETDATA_USER:+-DNETDATA_USER="${NETDATA_USER}"} \
-         -DENABLE_H2O=Off \
-         -DENABLE_DBENGINE=Off \
-         -DENABLE_CLOUD=Off \
-         -DENABLE_ACLK=Off \
-         -DENABLE_ML=Off \
-         -DENABLE_EXPORTING_MONGODB=Off \
-         -DENABLE_PLUGIN_DEBUGFS=Off \
-         -DENABLE_PLUGIN_APPS=Off \
-         -DENABLE_PLUGIN_FREEIPMI=Off \
-         -DENABLE_PLUGIN_NFACCT=Off \
-         -DENABLE_PLUGIN_XENSTAT=Off \
-         -DENABLE_PLUGIN_PERF=Off \
-         -DENABLE_PLUGIN_SLABINFO=Off \
-         -DENABLE_PLUGIN_CUPS=Off \
-         -DENABLE_PLUGIN_CGROUP_NETWORK=Off \
-         -DENABLE_PLUGIN_EBPF=Off \
-         -DENABLE_BUNDLED_JSONC=Off \
-         -DENABLE_BUNDLED_YAML=Off \
-         -DENABLE_BUNDLED_PROTOBUF=Off \
+         ${NETDATA_CMAKE_OPTIONS} \
          ; then
-#         ${NETDATA_CMAKE_OPTIONS}; then
   fatal "Failed to configure Netdata sources." I000A
 fi
 
