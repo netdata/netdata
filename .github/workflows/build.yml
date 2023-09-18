@@ -354,11 +354,6 @@ jobs:
       - name: Load test environment
         id: load
         run: docker load --input image.tar
-      - name: Regular build on ${{ matrix.distro }}
-        id: build-basic
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c 'autoreconf -ivf && ./configure --disable-dependency-tracking && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         id: build-no-cloud
         run: |
@@ -388,7 +383,6 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Fetch test environment: ${{ steps.fetch.outcome }}
               Load test environment: ${{ steps.load.outcome }}
-              Regular build: ${{ steps.build-basic.outcome }}
               netdata-installer, disable cloud: ${{ steps.build-no-cloud.outcome }}
               netdata-installer, require cloud: ${{ steps.build-cloud.outcome }}
               netdata-installer, no JSON-C: ${{ steps.build-no-jsonc.outcome }}
