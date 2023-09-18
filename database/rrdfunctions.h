@@ -50,7 +50,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 int rrdhost_function_streaming(BUFFER *wb, int timeout, const char *function, void *collector_data,
                                rrd_function_result_callback_t result_cb, void *result_cb_data,
                                rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                               rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data);
+                               rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data);
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 

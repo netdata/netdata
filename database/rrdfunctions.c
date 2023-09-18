@@ -757,7 +757,9 @@ struct rrd_function_call_wait {
     int code;
 };
 
-static void rrd_inflight_function_cleanup(RRDHOST *host, const DICTIONARY_ITEM *host_function_acquired, const char *transaction) {
+static void rrd_inflight_function_cleanup(RRDHOST *host __maybe_unused,
+                                          const DICTIONARY_ITEM *host_function_acquired __maybe_unused,
+                                          const char *transaction) {
     dictionary_del(rrd_functions_inflight_requests, transaction);
     dictionary_garbage_collect(rrd_functions_inflight_requests);
 }
@@ -1176,7 +1178,8 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                                void *collector_data __maybe_unused,
                                rrd_function_result_callback_t result_cb, void *result_cb_data,
                                rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                               rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data) {
+                               rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                               void *register_canceller_cb_data __maybe_unused) {
 
     time_t now = now_realtime_sec();
 

@@ -923,7 +923,7 @@ int mrg_unittest(void) {
     netdata_log_info("DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
          "%zu deletions, %zu wrong deletions, "
          "%zu successful searches, %zu wrong searches, "
-         "in %llu usecs",
+         "in %"PRIu64" usecs",
         stats.additions, stats.additions_duplicate,
         stats.deletions, stats.delete_misses,
         stats.search_hits, stats.search_misses,
