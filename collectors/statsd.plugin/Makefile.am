@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 dist_noinst_DATA = \
     README.md \
+    HTTP_API.md \
     $(NULL)
 
 statsdconfigdir=$(libconfigdir)/statsd.d

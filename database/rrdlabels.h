@@ -56,4 +56,6 @@ int rrdlabels_unittest(void);
 // unfortunately this break when defined in exporting_engine.h
 bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
 
+int rrdlabels_sorted_walkthrough_read(RRDLABELS *rrdlabels, int (*cb)(const char *key, const char *value, RRDLABEL_SRC src __maybe_unused, void *data), void *data);
+
 #endif /* NETDATA_RRDLABELS_H */
