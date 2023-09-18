@@ -31,10 +31,9 @@ recursive(categories[1]['children'])
 
 def construct_dict(array, integration):
     for element in array:
-        if element in cat_dict:
-            cat_dict[element].append(integration)
-        else:
-            cat_dict[element] = [integration]
+        if element not in cat_dict:
+            cat_dict[element] = list()
+        cat_dict[element].append(integration)
 
 
 md = ""
