@@ -14,7 +14,10 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 // configuration file & description
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"
 #define NETDATA_EBPF_FUNCTIONS_MODULE_DESC "Show information about current function status."
+
+// Common macros used witth functions
 #define NETDATA_EBPF_FUNCTIONS_COMMON_HELP "help"
+#define EBPF_FUNCTION_OPTION_PERIOD "period:"
 
 // function list
 #define EBPF_FUNCTION_THREAD "ebpf_thread"
@@ -35,7 +38,6 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 // socket constants
 #define EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION "Detailed information about open sockets."
 #define EBPF_FUNCTION_SOCKET_FAMILY "family:"
-#define EBPF_FUNCTION_SOCKET_PERIOD "period:"
 #define EBPF_FUNCTION_SOCKET_RESOLVE "resolve:"
 #define EBPF_FUNCTION_SOCKET_RANGE "range:"
 #define EBPF_FUNCTION_SOCKET_PORT "port:"

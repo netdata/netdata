@@ -1036,7 +1036,6 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
     }
 
     int i;
-    static int first_call = 1;
     if (!newly_added) {
         for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
             ebpf_module_t *current = &ebpf_modules[i];

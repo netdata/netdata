@@ -691,8 +691,8 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                 rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
                 ebpf_socket_clean_judy_array_unsafe();
             }
-        } else if (strncmp(keyword, EBPF_FUNCTION_SOCKET_PERIOD, sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1) == 0) {
-            name = &keyword[sizeof(EBPF_FUNCTION_SOCKET_PERIOD) - 1];
+        } else if (strncmp(keyword, EBPF_FUNCTION_OPTION_PERIOD, sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1) == 0) {
+            name = &keyword[sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1];
             pthread_mutex_lock(&ebpf_exit_cleanup);
             period = str2i(name);
             if (period > 0) {
@@ -1123,20 +1123,57 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
 {
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
-    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+    int period = -1;
 
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
 
-        if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
+        if (strncmp(keyword, EBPF_FUNCTION_OPTION_PERIOD, sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1];
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            period = str2i(name);
+            if (period > 0) {
+                em->lifetime = period;
+            } else
+                em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+
+#ifdef NETDATA_DEV_MODE
+            collector_info("Lifetime modified for %u", em->lifetime);
+#endif
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        } else if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
             ebpf_function_cachestat_help(transaction);
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
         }
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        // Cleanup when we already had a thread running
+        /*
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        ebpf_socket_clean_judy_array_unsafe();
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+         */
+
+        if (ebpf_function_start_thread(em, period)) {
+            ebpf_function_error(transaction,
+                                HTTP_RESP_INTERNAL_SERVER_ERROR,
+                                "Cannot start thread.");
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            return;
+        }
+    } else {
+        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
+            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+        }
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
