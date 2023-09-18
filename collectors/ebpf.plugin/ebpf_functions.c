@@ -20,14 +20,12 @@ static void ebpf_function_help(const char *transaction, char *message)
     BUFFER *wb = buffer_create(0, NULL);
     buffer_sprintf(wb, "%s",message);
 
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_to_stdout(transaction,
                                        HTTP_RESP_OK,
                                        "text/plain",
                                        now_realtime_sec() + 3600,
                                        wb);
     fflush(stdout);
-    pthread_mutex_unlock(&lock);
 
     buffer_free(wb);
 }
