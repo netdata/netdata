@@ -1139,17 +1139,13 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
  * @param function     function name and arguments given to thread.
- * @param line_buffer  buffer used to parse args
- * @param line_max     Number of arguments given
  * @param timeout      The function timeout
- * @param em           The structure with thread information
+ * @param cancelled    Variable used to store function status.
  */
 static void ebpf_function_cachestat_manipulation(const char *transaction,
-                                              char *function __maybe_unused,
-                                              char *line_buffer __maybe_unused,
-                                              int line_max __maybe_unused,
-                                              int timeout __maybe_unused,
-                                              ebpf_module_t *em)
+                                                char *function __maybe_unused,
+                                                int timeout __maybe_unused,
+                                                bool *cancelled __maybe_unused)
 {
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
