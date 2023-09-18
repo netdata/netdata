@@ -94,9 +94,7 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
             "Filters can be combined. Each filter can be given only one time.\n"
             );
 
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
-    pthread_mutex_unlock(&lock);
 
     buffer_free(wb);
 }
@@ -115,9 +113,7 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
  * @param msg          the error message
  */
 static void ebpf_function_error(const char *transaction, int code, const char *msg) {
-    pthread_mutex_lock(&lock);
     pluginsd_function_json_error_to_stdout(transaction, code, msg);
-    pthread_mutex_unlock(&lock);
 }
 
 /*****************************************************************
@@ -370,9 +366,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     buffer_json_finalize(wb);
 
     // Lock necessary to avoid race condition
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
-    pthread_mutex_unlock(&lock);
 
     buffer_free(wb);
 }
@@ -389,7 +383,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
 static void ebpf_function_socket_help(const char *transaction) {
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s",
             "ebpf.plugin / socket\n"
@@ -427,7 +420,6 @@ static void ebpf_function_socket_help(const char *transaction) {
     );
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
-    pthread_mutex_unlock(&lock);
 }
 
 /**
@@ -1058,14 +1050,12 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     buffer_json_finalize(wb);
 
     // Lock necessary to avoid race condition
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
 
     fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
 
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
-    pthread_mutex_unlock(&lock);
 
     buffer_free(wb);
 }
@@ -1109,6 +1099,7 @@ void *ebpf_function_thread(void *ptr)
             else {
                 int timeout = str2i(timeout_s);
                 rw_spinlock_write_lock(&rw_spinlock);
+                pthread_mutex_lock(&lock);
                 if (!strncmp(function, EBPF_FUNCTION_THREAD, sizeof(EBPF_FUNCTION_THREAD) - 1))
                     ebpf_function_thread_manipulation(transaction,
                                                       function,
@@ -1128,6 +1119,7 @@ void *ebpf_function_thread(void *ptr)
                                         HTTP_RESP_NOT_FOUND,
                                         "No function with this name found in ebpf.plugin.");
 
+                pthread_mutex_unlock(&lock);
                 rw_spinlock_write_unlock(&rw_spinlock);
             }
         }
