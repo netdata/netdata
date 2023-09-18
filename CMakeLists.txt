@@ -105,6 +105,43 @@ int main() {
 }
 " STRERROR_R_CHAR_P)
 
+# openssl/crypto
+if(NOT MACOS)
+        pkg_check_modules(CRYPTO libcrypto)
+        pkg_check_modules(OPENSSL REQUIRED openssl)
+else()
+        # I think this is moot because we can only use openssl 3.x
+        execute_process(COMMAND
+                        brew --prefix --installed openssl
+                        RESULT_VARIABLE BREW_OPENSSL
+                        OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
+                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+        if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
+                execute_process(COMMAND
+                                brew --prefix --installed openssl@3
+                                RESULT_VARIABLE BREW_OPENSSL
+                                OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
+                                OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+                if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
+                        execute_process(COMMAND
+                                        brew --prefix --installed openssl@1.1
+                                        RESULT_VARIABLE BREW_OPENSSL
+                                        OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
+                                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+                        if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
+                                message(FATAL_ERROR "Could not find openssl prefix with brew")
+                        endif()
+                endif()
+        endif()
+
+        set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
+        set(OPENSSL_CFLAGS_OTHER "")
+        set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+endif()
+
 #
 # source files
 #
@@ -851,7 +888,7 @@ if(ENABLE_BUNDLED_JSONC)
         set_property(TARGET jsonc PROPERTY
                      IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/externaldeps/jsonc/libjson-c.a")
 
-        target_include_directories(libnetdata AFTER PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/jsonc/json-c")
+        target_include_directories(libnetdata AFTER PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/jsonc")
         target_link_libraries(libnetdata PUBLIC jsonc)
 else()
         pkg_check_modules(JSONC REQUIRED json-c)
@@ -882,37 +919,35 @@ endif()
 pkg_check_modules(ZLIB REQUIRED zlib)
 target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${ZLIB_LIBRARIES})
+target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
 
 # lz4
 pkg_check_modules(LIBLZ4 REQUIRED liblz4)
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LIBRARIES})
+target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
 
 # uuid
 pkg_check_modules(UUID REQUIRED uuid)
 target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${UUID_LIBRARIES})
+target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
 
 # uv
 pkg_check_modules(LIBUV REQUIRED libuv)
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${LIBUV_LIBRARIES})
+target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
 # crypto
-pkg_check_modules(CRYPTO libcrypto)
 target_include_directories(libnetdata BEFORE PUBLIC ${CRYPTO_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${CRYPTO_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${CRYPTO_LIBRARIES})
+target_link_libraries(libnetdata PUBLIC ${CRYPTO_LDFLAGS})
 
 # openssl
-pkg_check_modules(OPENSSL REQUIRED openssl)
 target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${OPENSSL_LIBRARIES})
+target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
 
 # h2o
 target_link_libraries(libnetdata PUBLIC "$<$<BOOL:${ENABLE_H2O}>:h2o>")
