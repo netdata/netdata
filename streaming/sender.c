@@ -1001,7 +1001,7 @@ void execute_commands(struct sender_state *s) {
                 }
             }
         }
-        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
+        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
 
             char *transaction = get_word(words, num_words, 1);
