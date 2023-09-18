@@ -8,7 +8,6 @@
 // ----------------------------------------------------------------------------
 
 static const char id_encoding_characters[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ.abcdefghijklmnopqrstuvwxyz_0123456789";
-
 static const uint8_t id_encoding_characters_reverse[256] = {
         ['A'] = 0,  ['B'] = 1,  ['C'] = 2,  ['D'] = 3,
         ['E'] = 4,  ['F'] = 5,  ['G'] = 6,  ['H'] = 7,
@@ -80,7 +79,7 @@ static inline bool is_valid_string_hash(const char *s) {
 
     uint8_t *t = (uint8_t *)s;
     while(*t) {
-        if(id_encoding_characters_reverse[*t] == 0 && *t != 'A') {
+        if(id_encoding_characters_reverse[*t] == 0 && *t != id_encoding_characters[0]) {
             netdata_log_error("The user supplied key '%s' contains invalid characters for a facets hash.", s);
             return false;
         }
