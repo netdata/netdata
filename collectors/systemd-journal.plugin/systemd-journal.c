@@ -839,8 +839,13 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_set_items(facets, last);
     facets_set_anchor(facets, anchor, direction);
     facets_set_query(facets, query);
-    facets_set_histogram(facets, chart ? chart : "PRIORITY",
-                         after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+
+    if(chart && *chart)
+        facets_set_histogram_by_id(facets, chart,
+                                   after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+    else
+        facets_set_histogram_by_name(facets, "PRIORITY",
+                                   after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
     response = netdata_systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                              anchor, direction, last,
