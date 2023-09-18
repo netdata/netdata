@@ -375,7 +375,7 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
 void ebpf_read_global_table_stats(netdata_idx_t *stats, netdata_idx_t *values, int map_fd,
                                   int maps_per_core, uint32_t begin, uint32_t end);
 void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
-netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
+netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid, char *name);
 
 void parse_network_viewer_section(struct config *cfg);
 void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);

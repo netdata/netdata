@@ -697,8 +697,9 @@ void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key)
  *
  * @param judy_array a judy array where PID is the primary key
  * @param pid        pid stored.
+ * @param name       name read from kernel ring.
  */
-netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid)
+netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid, char *name)
 {
     netdata_ebpf_judy_pid_stats_t **pid_pptr =
         (netdata_ebpf_judy_pid_stats_t **)ebpf_judy_insert_unsafe(judy_array, pid);
@@ -709,9 +710,16 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 
         pid_ptr = *pid_pptr;
 
-        pid_ptr->name[0] = '\0';
+        if (!name)
+            pid_ptr->name[0] = '\0';
+        else
+            strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
+
         pid_ptr->socket_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->socket_stats.rw_spinlock);
+    } else {
+        if (pid_ptr->name[0] == '\0' && name)
+            strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
     }
 
     return pid_ptr;

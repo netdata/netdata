@@ -866,9 +866,9 @@ cleanup:
     p->cmdline = strdupz(p->comm);
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
-    if (pid_ptr && pid_ptr->name[0] == '\0')
-        snprintfz(pid_ptr->name, TASK_COMM_LEN, "%s", p->cmdline);
+    // This code exists to create an entry while the PR is developed.
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid, p->cmdline);
+    (void)pid_ptr;
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
     return ret;
@@ -1189,7 +1189,7 @@ static inline void del_pid_entry(pid_t pid)
     freez(p->cmdline_filename);
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid, NULL);
     if (pid_ptr) {
         if (pid_ptr->socket_stats.JudyLArray) {
             Word_t local_socket = 0;

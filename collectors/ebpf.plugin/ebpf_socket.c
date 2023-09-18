@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <sys/resource.h>
+#include <ctype.h>
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
@@ -1590,6 +1591,10 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
 
         if (w->external_origin)
             external_origin = NETDATA_EBPF_SRC_IP_ORIGIN_EXTERNAL;
+
+        if (!isascii(values[0].name[0]) && isascii(w->name[0])) {
+            strncpyz(values[0].name, values[1].name, TASK_COMM_LEN);
+        }
     }
 
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
@@ -1765,7 +1770,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         // Get PID structure
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key.pid);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key.pid, values->name);
         if (!pid_ptr) {
             goto end_socket_loop;
         }
