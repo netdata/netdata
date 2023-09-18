@@ -971,7 +971,7 @@ check_for_module() {
   if [ -z "${pkgconf}" ]; then
     pkgconf="$(command -v pkgconf 2>/dev/null)"
     [ -z "${pkgconf}" ] && pkgconf="$(command -v pkg-config 2>/dev/null)"
-    [ -z "${pkgconf}" ] || fatal "Unable to find a usable pkgconf/pkg-config command, cannot build Netdata." I0013
+    [ -z "${pkgconf}" ] && fatal "Unable to find a usable pkgconf/pkg-config command, cannot build Netdata." I0013
   fi
 
   "${pkgconf}" "${1}"
