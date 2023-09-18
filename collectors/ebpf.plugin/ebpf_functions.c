@@ -8,6 +8,31 @@
  *****************************************************************/
 
 /**
+ * Function Help
+ *
+ * Function used to deliver help for a specific function
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+ * @param message      the message that will be delivered for our useers.
+ */
+static void ebpf_function_help(const char *transaction, char *message)
+{
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_sprintf(wb, "%s",message);
+
+    pthread_mutex_lock(&lock);
+    pluginsd_function_result_to_stdout(transaction,
+                                       HTTP_RESP_OK,
+                                       "text/plain",
+                                       now_realtime_sec() + 3600,
+                                       wb);
+    fflush(stdout);
+    pthread_mutex_unlock(&lock);
+
+    buffer_free(wb);
+}
+
+/**
  * Function Start thread
  *
  * Start a specific thread after user request.
@@ -70,30 +95,26 @@ ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 static void ebpf_function_thread_manipulation_help(const char *transaction) {
-    BUFFER *wb = buffer_create(0, NULL);
-    buffer_sprintf(wb, "%s",
-            "ebpf.plugin / thread\n"
-            "\n"
-            "Function `thread` allows user to control eBPF threads.\n"
-            "\n"
-            "The following filters are supported:\n"
-            "\n"
-            "   thread:NAME\n"
-            "      Shows information for the thread NAME. Names are listed inside `ebpf.d.conf`.\n"
-            "\n"
-            "   enable:NAME:PERIOD\n"
-            "      Enable a specific thread named `NAME` to run a specific PERIOD in seconds. When PERIOD is not\n"
-            "      specified plugin will use the default 300 seconds\n"
-            "\n"
-            "   disable:NAME\n"
-            "      Disable a sp.\n"
-            "\n"
-            "Filters can be combined. Each filter can be given only one time.\n"
-            );
+    static char *thread_message = {
+        "ebpf.plugin / thread\n"
+        "\n"
+        "Function `thread` allows user to control eBPF threads.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   thread:NAME\n"
+        "      Shows information for the thread NAME. Names are listed inside `ebpf.d.conf`.\n"
+        "\n"
+        "   enable:NAME:PERIOD\n"
+        "      Enable a specific thread named `NAME` to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "   disable:NAME\n"
+        "      Disable a sp.\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time.\n"};
 
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
-
-    buffer_free(wb);
+    ebpf_function_help(transaction, thread_message);
 }
 */
 
@@ -380,44 +401,42 @@ static void ebpf_function_thread_manipulation(const char *transaction,
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static void ebpf_function_socket_help(const char *transaction) {
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
-    fprintf(stdout, "%s",
-            "ebpf.plugin / socket\n"
-            "\n"
-            "Function `socket` display information for all open sockets during ebpf.plugin runtime.\n"
-            "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
-            "resets completely the previous table and can show a clean data for the first request before to bring the\n"
-            "modified request.\n"
-            "\n"
-            "The following filters are supported:\n"
-            "\n"
-            "   family:FAMILY\n"
-            "      Shows information for the FAMILY specified. Option accepts IPV4, IPV6 and all, that is the default.\n"
-            "\n"
-            "   period:PERIOD\n"
-            "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
-            "      specified plugin will use the default 300 seconds\n"
-            "\n"
-            "   resolve:BOOL\n"
-            "      Resolve service name, default value is YES.\n"
-            "\n"
-            "   range:CIDR\n"
-            "      Show sockets that have only a specific destination. Default all addresses.\n"
-            "\n"
-            "   port:range\n"
-            "      Show sockets that have only a specific destination.\n"
-            "\n"
-            "   reset\n"
-            "      Send a reset to collector. When a collector receives this command, it uses everything defined in configuration file.\n"
-            "\n"
-            "   interfaces\n"
-            "      When the collector receives this command, it read all available interfaces on host.\n"
-            "\n"
-            "Filters can be combined. Each filter can be given only one time. Default all ports\n"
-    );
-    pluginsd_function_result_end_to_stdout();
-    fflush(stdout);
+static void ebpf_function_socket_help(const char *transaction)
+{
+    static char *socket_message = {
+        "ebpf.plugin / socket\n"
+        "\n"
+        "Function `socket` display information for all open sockets during ebpf.plugin runtime.\n"
+        "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+        "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+        "modified request.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   family:FAMILY\n"
+        "      Shows information for the FAMILY specified. Option accepts IPV4, IPV6 and all, that is the default.\n"
+        "\n"
+        "   period:PERIOD\n"
+        "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "   resolve:BOOL\n"
+        "      Resolve service name, default value is YES.\n"
+        "\n"
+        "   range:CIDR\n"
+        "      Show sockets that have only a specific destination. Default all addresses.\n"
+        "\n"
+        "   port:range\n"
+        "      Show sockets that have only a specific destination.\n"
+        "\n"
+        "   reset\n"
+        "      Send a reset to collector. When a collector receives this command, it uses everything defined in configuration file.\n"
+        "\n"
+        "   interfaces\n"
+        "      When the collector receives this command, it read all available interfaces on host.\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
+    ebpf_function_help(transaction, socket_message);
 }
 
 /**
@@ -1065,27 +1084,22 @@ static void ebpf_function_socket_manipulation(const char *transaction,
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
 static void ebpf_function_cachestat_help(const char *transaction) {
-    pthread_mutex_lock(&lock);
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
-    fprintf(stdout, "%s",
-            "ebpf.plugin / cachestat\n"
-            "\n"
-            "Function `cachestat` display access information for all processes running during ebpf.plugin runtime.\n"
-            "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
-            "resets completely the previous table and can show a clean data for the first request before to bring the\n"
-            "modified request.\n"
-            "\n"
-            "The following filters are supported:\n"
-            "\n"
-            "   period:PERIOD\n"
-            "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
-            "      specified plugin will use the default 300 seconds\n"
-            "\n"
-            "Filters can be combined. Each filter can be given only one time. Default all ports\n"
-    );
-    pluginsd_function_result_end_to_stdout();
-    fflush(stdout);
-    pthread_mutex_unlock(&lock);
+    static char *cachestat_message = {
+        "ebpf.plugin / cachestat\n"
+        "\n"
+        "Function `cachestat` display access information for all processes running during ebpf.plugin runtime.\n"
+        "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+        "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+        "modified request.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   period:PERIOD\n"
+        "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
+    ebpf_function_help(transaction, cachestat_message);
 }
 
 /**
