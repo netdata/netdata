@@ -995,13 +995,13 @@ check_for_feature() {
   if [ -z "${feature_state}" ]; then
     # shellcheck disable=SC2086
     if check_for_module ${feature_modules}; then
-      feature_state=1
+      enable_feature "${feature_name}" 1
     else
-      feature_state=0
+      enable_feature "${feature_name}" 0
     fi
+  else
+    enable_feature "${feature_name}" "${feature_state}"
   fi
-
-  enable_feature "${feature_name}" "${feature_state}"
 }
 
 # function to extract values from the config file
@@ -1069,7 +1069,7 @@ enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
 enable_feature APPS 1
 
 check_for_feature EXPORTING_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
-checK_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
+check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
 check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT}" libnetfilter_acct libnml
 check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
 
