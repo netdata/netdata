@@ -492,6 +492,9 @@ set(RRD_PLUGIN_FILES database/contexts/api_v1.c
                      database/sqlite/sqlite_aclk_alert.h
                      database/sqlite/sqlite3.c
                      database/sqlite/sqlite3.h
+                     database/sqlite/sqlite3recover.c
+                     database/sqlite/sqlite3recover.h
+                     database/sqlite/dbdata.c
                      database/KolmogorovSmirnovDist.c
                      database/KolmogorovSmirnovDist.h)
 
@@ -1367,9 +1370,16 @@ install(FILES system/netdata-updater.conf DESTINATION etc/netdata)
 
 install(PROGRAMS system/edit-config DESTINATION etc/netdata)
 
+#
+# TODO: check the following files for correct substitutions
+#
+configure_file(daemon/anonymous-statistics.sh.in daemon/anonymous-statistics.sh @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/daemon/anonymous-statistics.sh DESTINATION usr/libexec/netdata/plugins.d)
+
+configure_file(daemon/get-kubernetes-labels.sh.in daemon/get-kubernetes-labels.sh @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/daemon/get-kubernetes-labels.sh DESTINATION usr/libexec/netdata/plugins.d)
+
 install(PROGRAMS daemon/system-info.sh
-                 daemon/anonymous-statistics.sh
-                 daemon/get-kubernetes-labels.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
