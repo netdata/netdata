@@ -1068,50 +1068,30 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 void *ebpf_function_thread(void *ptr)
 {
     (void)ptr;
-    char buffer[PLUGINSD_LINE_MAX + 1];
 
-    char *s = NULL;
-    while(!ebpf_exit_plugin && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
-        char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
+    bool ebpf_function_plugin_exit = false;
+    struct functions_evloop_globals *wg = functions_evloop_init(1,
+                                                                "EBPF",
+                                                                &lock,
+                                                                &ebpf_function_plugin_exit);
 
-        const char *keyword = get_word(words, num_words, 0);
+    functions_evloop_add_function(wg,
+                                  "ebpf_socket",
+                                  ebpf_function_socket_manipulation,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
-        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while(!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                                  keyword,
-                                  transaction?transaction:"(unset)",
-                                  timeout_s?timeout_s:"(unset)",
-                                  function?function:"(unset)");
-            }
-            else {
-                int timeout = str2i(timeout_s);
-                pthread_mutex_lock(&lock);
-                if (!strncmp(function, EBPF_FUNCTION_SOCKET, sizeof(EBPF_FUNCTION_SOCKET) - 1))
-                    ebpf_function_socket_manipulation(transaction,
-                                                      function,
-                                                      timeout,
-                                                      NULL);
-                else
-                    ebpf_function_error(transaction,
-                                        HTTP_RESP_NOT_FOUND,
-                                        "No function with this name found in ebpf.plugin.");
-
-                pthread_mutex_unlock(&lock);
-            }
+        if (ebpf_function_plugin_exit) {
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            ebpf_stop_threads(0);
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            break;
         }
-        else
-            netdata_log_error("Received unknown command: %s", keyword ? keyword : "(unset)");
     }
 
-    if(!s || feof(stdin) || ferror(stdin)) {
-        ebpf_stop_threads(SIGQUIT);
-        netdata_log_error("Received error on stdin.");
-    }
     return NULL;
 }
