@@ -558,7 +558,7 @@ build_protobuf() {
     return 1
   fi
 
-  if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
+  if ! run eval "${env_cmd} make ${MAKEOPTS}"; then
     cd - > /dev/null || return 1
     return 1
   fi
@@ -633,7 +633,7 @@ build_jsonc() {
 
   cd "${1}" > /dev/null || exit 1
   run eval "${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF ."
-  run eval "${env_cmd} ${make} ${MAKEOPTS}"
+  run eval "${env_cmd} make ${MAKEOPTS}"
   cd - > /dev/null || return 1
 }
 
@@ -699,7 +699,7 @@ build_yaml() {
 
   cd "${1}" > /dev/null || return 1
   run eval "${env_cmd} ./configure --disable-shared --disable-dependency-tracking --with-pic"
-  run eval "${env_cmd} ${make} ${MAKEOPTS}"
+  run eval "${env_cmd} make ${MAKEOPTS}"
   cd - > /dev/null || return 1
 }
 
@@ -800,7 +800,7 @@ build_libbpf() {
   cd "${1}/src" > /dev/null || return 1
   mkdir root build
   # shellcheck disable=SC2086
-  run env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
+  run env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make ${MAKEOPTS} install
   cd - > /dev/null || return 1
 }
 

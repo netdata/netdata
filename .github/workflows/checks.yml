@@ -59,7 +59,7 @@ jobs:
           'apk add bash;
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
           apk del openssl openssl-dev;
-          apk add libressl libressl-dev;
+          apk add libressl libressl-dev protobuf-c-dev;
           cmake -S . -B ./cmake-build-debug;
           cmake --build ./cmake-build-debug;'
   clang-checks:
