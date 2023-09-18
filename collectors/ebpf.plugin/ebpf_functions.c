@@ -211,7 +211,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
             }
 
             show_specific_thread |= 1<<lem->thread_id;
-        } else if(strncmp(keyword, "help", 4) == 0) {
+        } else if(strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
             ebpf_function_thread_manipulation_help(transaction);
             return;
         }
@@ -224,7 +224,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", em->update_every);
-    buffer_json_member_add_string(wb, "help", EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
+    buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 
     // Collect data
     buffer_json_member_add_array(wb, "data");
@@ -734,7 +734,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
             ebpf_read_local_addresses_unsafe();
             rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
-        } else if (strncmp(keyword, "help", 4) == 0) {
+        } else if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
             ebpf_function_socket_help(transaction);
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
@@ -770,7 +770,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", em->update_every);
-    buffer_json_member_add_string(wb, "help", EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION);
+    buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION);
 
     // Collect data
     buffer_json_member_add_array(wb, "data");
@@ -1051,6 +1051,78 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     fflush(stdout);
 
     buffer_free(wb);
+}
+
+/*****************************************************************
+ *  EBPF CACHESTAT FUNCTION
+ *****************************************************************/
+
+/**
+ * Thread Help
+ *
+ * Shows help with all options accepted by thread function.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+*/
+static void ebpf_function_cachestat_help(const char *transaction) {
+    pthread_mutex_lock(&lock);
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
+    fprintf(stdout, "%s",
+            "ebpf.plugin / cachestat\n"
+            "\n"
+            "Function `cachestat` display access information for all processes running during ebpf.plugin runtime.\n"
+            "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+            "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+            "modified request.\n"
+            "\n"
+            "The following filters are supported:\n"
+            "\n"
+            "   period:PERIOD\n"
+            "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+            "      specified plugin will use the default 300 seconds\n"
+            "\n"
+            "Filters can be combined. Each filter can be given only one time. Default all ports\n"
+    );
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+    pthread_mutex_unlock(&lock);
+}
+
+/**
+ * Function: Socket
+ *
+ * Show information for sockets stored in hash tables.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+ * @param function     function name and arguments given to thread.
+ * @param line_buffer  buffer used to parse args
+ * @param line_max     Number of arguments given
+ * @param timeout      The function timeout
+ * @param em           The structure with thread information
+ */
+static void ebpf_function_cachestat_manipulation(const char *transaction,
+                                              char *function __maybe_unused,
+                                              char *line_buffer __maybe_unused,
+                                              int line_max __maybe_unused,
+                                              int timeout __maybe_unused,
+                                              ebpf_module_t *em)
+{
+    char *words[PLUGINSD_MAX_WORDS] = {NULL};
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
+    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+
+    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+        const char *keyword = get_word(words, num_words, i);
+        if (!keyword)
+            break;
+
+        if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
+            ebpf_function_cachestat_help(transaction);
+            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+            return;
+        }
+    }
+    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /*****************************************************************

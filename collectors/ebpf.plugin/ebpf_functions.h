@@ -14,10 +14,12 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 // configuration file & description
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"
 #define NETDATA_EBPF_FUNCTIONS_MODULE_DESC "Show information about current function status."
+#define NETDATA_EBPF_FUNCTIONS_COMMON_HELP "help"
 
 // function list
 #define EBPF_FUNCTION_THREAD "ebpf_thread"
 #define EBPF_FUNCTION_SOCKET "ebpf_socket"
+#define EBPF_FUNCTION_CACHESTAT "ebpf_cachestat"
 
 // thread constants
 #define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information about eBPF threads."
