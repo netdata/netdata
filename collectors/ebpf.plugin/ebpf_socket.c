@@ -1397,6 +1397,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
         w->charts_created |= 1<<EBPF_MODULE_SOCKET_IDX;
     }
     em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
+    fflush(stdout);
 }
 
 /*****************************************************************

@@ -986,8 +986,12 @@ void ebpf_stop_threads(int sig)
  * @param root   a pointer for the targets.
  */
 static inline void ebpf_create_apps_for_module(ebpf_module_t *em, struct ebpf_target *root) {
-    if (em->enabled < NETDATA_THREAD_EBPF_STOPPING && em->apps_charts && em->functions.apps_routine)
+    if (em->enabled < NETDATA_THREAD_EBPF_STOPPING && em->apps_charts && em->functions.apps_routine) {
+        em->apps_charts &= ~NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
         em->functions.apps_routine(em, root);
+        em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
+
+    }
 }
 
 /**
@@ -1032,6 +1036,7 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
     }
 
     int i;
+    static int first_call = 1;
     if (!newly_added) {
         for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
             ebpf_module_t *current = &ebpf_modules[i];
