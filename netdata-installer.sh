@@ -354,7 +354,7 @@ while [ -n "${1}" ]; do
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
-    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')" ;;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')" ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--one-time-build")
       # XXX: No longer supported
@@ -829,7 +829,7 @@ bundle_libbpf() {
   libc="${EBPF_LIBC:-"$(detect_libc)"}"
   if [ -z "$libc" ]; then
     NETDATA_DISABLE_EBPF=1
-    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')"
+    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
     return 0
   fi
 
@@ -911,7 +911,7 @@ bundle_ebpf_co_re() {
       else
         run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
         NETDATA_DISABLE_EBPF=1
-        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')"
+        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
       fi
     fi
   else
@@ -920,7 +920,7 @@ bundle_ebpf_co_re() {
     else
       run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"
       NETDATA_DISABLE_EBPF=1
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
     fi
   fi
 
