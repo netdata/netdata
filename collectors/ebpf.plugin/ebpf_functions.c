@@ -634,20 +634,16 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
  * @param function     function name and arguments given to thread.
- * @param line_buffer  buffer used to parse args
- * @param line_max     Number of arguments given
  * @param timeout      The function timeout
- * @param em           The structure with thread information
+ * @param cancelled    Variable used to store function status.
  */
 static void ebpf_function_socket_manipulation(const char *transaction,
                                               char *function __maybe_unused,
-                                              char *line_buffer __maybe_unused,
-                                              int line_max __maybe_unused,
                                               int timeout __maybe_unused,
-                                              ebpf_module_t *em)
+                                              bool *cancelled __maybe_unused)
 {
-    UNUSED(line_buffer);
     UNUSED(timeout);
+    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
 
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
@@ -1099,10 +1095,8 @@ void *ebpf_function_thread(void *ptr)
                 if (!strncmp(function, EBPF_FUNCTION_SOCKET, sizeof(EBPF_FUNCTION_SOCKET) - 1))
                     ebpf_function_socket_manipulation(transaction,
                                                       function,
-                                                      buffer,
-                                                      PLUGINSD_LINE_MAX + 1,
                                                       timeout,
-                                                      &ebpf_modules[EBPF_MODULE_SOCKET_IDX]);
+                                                      NULL);
                 else
                     ebpf_function_error(transaction,
                                         HTTP_RESP_NOT_FOUND,
