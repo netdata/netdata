@@ -1147,6 +1147,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
                                                 int timeout __maybe_unused,
                                                 bool *cancelled __maybe_unused)
 {
+    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     int period = -1;
