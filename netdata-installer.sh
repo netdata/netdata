@@ -867,11 +867,13 @@ bundle_libbpf() {
       copy_libbpf "${tmp}/libbpf-${LIBBPF_PACKAGE_VERSION}" &&
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
+      ENABLE_EBPF=1
     else
       if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
         fatal "failed to build libbpf." I0005
       else
         run_failed "Failed to build libbpf. eBPF support will be disabled"
+        ENABLE_EBPF=0
       fi
     fi
   else
@@ -879,6 +881,7 @@ bundle_libbpf() {
       fatal "Failed to fetch sources for libbpf." I0006
     else
       run_failed "Unable to fetch sources for libbpf. eBPF support will be disabled"
+      ENABLE_EBPF=0
     fi
   fi
 
@@ -914,6 +917,7 @@ bundle_ebpf_co_re() {
       copy_co_re "${tmp}" &&
       rm -rf "${tmp}"; then
       run_ok "libbpf built and prepared."
+      ENABLE_EBPF=1
     else
       if [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 0 ]; then
         fatal "Failed to get eBPF CO-RE files." I0007
