@@ -831,6 +831,7 @@ copy_libbpf() {
 bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
     ENABLE_EBPF=0
+    NETDATA_DISABLE_EBPF=1
     return 0
   fi
 
@@ -874,6 +875,7 @@ bundle_libbpf() {
       else
         run_failed "Failed to build libbpf. eBPF support will be disabled"
         ENABLE_EBPF=0
+        NETDATA_DISABLE_EBPF=1
       fi
     fi
   else
@@ -882,6 +884,7 @@ bundle_libbpf() {
     else
       run_failed "Unable to fetch sources for libbpf. eBPF support will be disabled"
       ENABLE_EBPF=0
+      NETDATA_DISABLE_EBPF=1
     fi
   fi
 
@@ -1070,7 +1073,7 @@ enable_feature DBENGINE "${ENABLE_DBENGINE}"
 enable_feature H2O "${ENABLE_H2O}"
 enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
 
-enable_feature APPS 1
+enable_feature PLUGIN_APPS 1
 
 check_for_feature EXPORTING_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
 check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
