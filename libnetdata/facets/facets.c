@@ -37,6 +37,7 @@ __attribute__((constructor)) void initialize_facets_id_encoding_characters_rever
 #define FACETS_HASH_ZERO (FACETS_HASH)0
 
 static inline void facets_hash_to_str(FACETS_HASH num, char *out) {
+    out[11] = '\0';
     out[10] = id_encoding_characters[num & 63]; num >>= 6;
     out[9]  = id_encoding_characters[num & 63]; num >>= 6;
     out[8]  = id_encoding_characters[num & 63]; num >>= 6;
