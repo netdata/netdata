@@ -5,15 +5,14 @@
 
 #include "../libnetdata.h"
 
-#ifndef HAVE_STRUCT_TIMESPEC
+#ifndef HAVE_CLOCK_GETTIME
 struct timespec {
     time_t tv_sec;  /* seconds */
     long   tv_nsec; /* nanoseconds */
 };
 #endif
 
-#ifndef HAVE_CLOCKID_T
-typedef int clockid_t;
+#ifndef HAVE_CLOCK_GETTIME
 #endif
 
 typedef uint64_t nsec_t;

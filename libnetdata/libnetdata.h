@@ -193,7 +193,7 @@ extern "C" {
 
 #include <zlib.h>
 
-#ifdef HAVE_CAPABILITY
+#ifdef HAVE_SYS_CAPABILITY_H
 #include <sys/capability.h>
 #endif
 

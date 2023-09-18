@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <sys/utsname.h>
 
+#include "ebpf.h"
 #include "../libnetdata.h"
 
 char *ebpf_user_config_dir = CONFIG_DIR;

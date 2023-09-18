@@ -44,7 +44,6 @@ typedef enum __attribute__((packed)) {
     BIB_CONTAINER_OS_VERSION,
     BIB_CONTAINER_OS_VERSION_ID,
     BIB_CONTAINER_OS_DETECTION,
-    BIB_FEATURE_BUILT_FOR,
     BIB_FEATURE_CLOUD,
     BIB_FEATURE_HEALTH,
     BIB_FEATURE_STREAMING,
@@ -65,24 +64,13 @@ typedef enum __attribute__((packed)) {
     BIB_CONNECTIVITY_WEBRTC,
     BIB_CONNECTIVITY_NATIVE_HTTPS,
     BIB_CONNECTIVITY_TLS_HOST_VERIFY,
-    BIB_LIB_LZ4,
-    BIB_LIB_ZLIB,
-    BIB_LIB_JUDY,
-    BIB_LIB_DLIB,
-    BIB_LIB_PROTOBUF,
     BIB_LIB_OPENSSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
     BIB_LIB_LIBCAP,
     BIB_LIB_LIBCRYPTO,
-    BIB_LIB_LIBM,
-    BIB_LIB_JEMALLOC,
-    BIB_LIB_TCMALLOC,
     BIB_PLUGIN_APPS,
-    BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
-    BIB_PLUGIN_LINUX_PROC,
-    BIB_PLUGIN_LINUX_TC,
     BIB_PLUGIN_LINUX_DISKSPACE,
     BIB_PLUGIN_FREEBSD,
     BIB_PLUGIN_MACOS,
@@ -452,14 +440,6 @@ static struct {
                 .json = "detection",
                 .value = "unknown",
         },
-        [BIB_FEATURE_BUILT_FOR] = {
-                .category = BIC_FEATURE,
-                .type = BIT_STRING,
-                .analytics = NULL,
-                .print = "Built For",
-                .json = "built-for",
-                .value = "unknown",
-        },
         [BIB_FEATURE_CLOUD] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
@@ -620,47 +600,6 @@ static struct {
                 .json = "tls-host-verify",
                 .value = NULL,
         },
-        [BIB_LIB_LZ4] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "LZ4 (extremely fast lossless compression algorithm)",
-                .json = "lz4",
-                .value = NULL,
-        },
-        [BIB_LIB_ZLIB] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "zlib",
-                .print = "zlib (lossless data-compression library)",
-                .json = "zlib",
-                .value = NULL,
-        },
-        [BIB_LIB_JUDY] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "Judy (high-performance dynamic arrays and hashtables)",
-                .json = "judy",
-                .status = true,
-                .value = "bundled",
-        },
-        [BIB_LIB_DLIB] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "dlib (robust machine learning toolkit)",
-                .json = "dlib",
-                .value = NULL,
-        },
-        [BIB_LIB_PROTOBUF] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "protobuf",
-                .print = "protobuf (platform-neutral data serialization protocol)",
-                .json = "protobuf",
-                .value = NULL,
-        },
         [BIB_LIB_OPENSSL] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
@@ -701,30 +640,6 @@ static struct {
                 .json = "libcrypto",
                 .value = NULL,
         },
-        [BIB_LIB_LIBM] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "libm",
-                .print = "libm (mathematical functions)",
-                .json = "libm",
-                .value = NULL,
-        },
-        [BIB_LIB_JEMALLOC] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "jemalloc",
-                .print = "jemalloc",
-                .json = "jemalloc",
-                .value = NULL,
-        },
-        [BIB_LIB_TCMALLOC] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "tcmalloc",
-                .print = "TCMalloc",
-                .json = "tcmalloc",
-                .value = NULL,
-        },
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
@@ -733,36 +648,12 @@ static struct {
                 .json = "apps",
                 .value = NULL,
         },
-        [BIB_PLUGIN_LINUX_CGROUPS] = {
-                .category = BIC_PLUGINS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "cgroups (monitor containers and VMs)",
-                .json = "cgroups",
-                .value = NULL,
-        },
         [BIB_PLUGIN_LINUX_CGROUP_NETWORK] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
                 .analytics = "cgroup Network Tracking",
                 .print = "cgroup-network (associate interfaces to CGROUPS)",
                 .json = "cgroup-network",
-                .value = NULL,
-        },
-        [BIB_PLUGIN_LINUX_PROC] = {
-                .category = BIC_PLUGINS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "proc (monitor Linux systems)",
-                .json = "proc",
-                .value = NULL,
-        },
-        [BIB_PLUGIN_LINUX_TC] = {
-                .category = BIC_PLUGINS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "tc (monitor Linux network QoS)",
-                .json = "tc",
                 .value = NULL,
         },
         [BIB_PLUGIN_LINUX_DISKSPACE] = {
@@ -1042,25 +933,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, program_version);
     build_info_set_value(BIB_PACKAGING_CONFIGURE_OPTIONS, CONFIGURE_COMMAND);
 
-#ifdef COMPILED_FOR_LINUX
-    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
-    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Linux");
-    build_info_set_status(BIB_PLUGIN_LINUX_CGROUPS, true);
-    build_info_set_status(BIB_PLUGIN_LINUX_PROC, true);
-    build_info_set_status(BIB_PLUGIN_LINUX_DISKSPACE, true);
-    build_info_set_status(BIB_PLUGIN_LINUX_TC, true);
-#endif
-#ifdef COMPILED_FOR_FREEBSD
-    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
-    build_info_set_value(BIB_FEATURE_BUILT_FOR, "FreeBSD");
-    build_info_set_status(BIB_PLUGIN_FREEBSD, true);
-#endif
-#ifdef COMPILED_FOR_MACOS
-    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
-    build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
-    build_info_set_status(BIB_PLUGIN_MACOS, true);
-#endif
-
 #ifdef ENABLE_ACLK
     build_info_set_status(BIB_FEATURE_CLOUD, true);
     build_info_set_status(BIB_CONNECTIVITY_ACLK, true);
@@ -1079,9 +951,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
     build_info_set_status(BIB_FEATURE_STREAMING_COMPRESSION, true);
-#ifdef ENABLE_LZ4
-    build_info_set_value(BIB_FEATURE_STREAMING_COMPRESSION, "lz4");
-#endif
 #endif
 
     build_info_set_status(BIB_FEATURE_CONTEXTS, true);
@@ -1114,26 +983,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_CONNECTIVITY_TLS_HOST_VERIFY, true);
 #endif
 
-#ifdef ENABLE_LZ4
-    build_info_set_status(BIB_LIB_LZ4, true);
-#endif
-
-    build_info_set_status(BIB_LIB_ZLIB, true);
-
-#ifdef HAVE_DLIB
-    build_info_set_status(BIB_LIB_DLIB, true);
-    build_info_set_value(BIB_LIB_DLIB, "bundled");
-#endif
-
-#ifdef HAVE_PROTOBUF
-    build_info_set_status(BIB_LIB_PROTOBUF, true);
-#ifdef BUNDLED_PROTOBUF
-    build_info_set_value(BIB_LIB_PROTOBUF, "bundled");
-#else
-    build_info_set_value(BIB_LIB_PROTOBUF, "system");
-#endif
-#endif
-
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif
@@ -1143,23 +992,14 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
 #endif
-#ifdef HAVE_CAPABILITY
+#ifdef HAVE_SYS_CAPABILITY_H
     build_info_set_status(BIB_LIB_LIBCAP, true);
 #endif
 #ifdef HAVE_CRYPTO
     build_info_set_status(BIB_LIB_LIBCRYPTO, true);
 #endif
-#ifdef STORAGE_WITH_MATH
-    build_info_set_status(BIB_LIB_LIBM, true);
-#endif
-#ifdef ENABLE_JEMALLOC
-    build_info_set_status(BIB_LIB_JEMALLOC, true);
-#endif
-#ifdef ENABLE_TCMALLOC
-    build_info_set_status(BIB_LIB_TCMALLOC, true);
-#endif
 
-#ifdef ENABLE_APPS_PLUGIN
+#ifdef ENABLE_PLUGIN_APPS
     build_info_set_status(BIB_PLUGIN_APPS, true);
 #endif
 #ifdef HAVE_SETNS
@@ -1171,28 +1011,28 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_PLUGIN_IDLEJITTER, true);
     build_info_set_status(BIB_PLUGIN_BASH, true);
 
-#ifdef ENABLE_DEBUGFS_PLUGIN
+#ifdef ENABLE_PLUGIN_DEBUGFS
     build_info_set_status(BIB_PLUGIN_DEBUGFS, true);
 #endif
-#ifdef HAVE_CUPS
+#ifdef ENABLE_PLUGIN_CUPS
     build_info_set_status(BIB_PLUGIN_CUPS, true);
 #endif
-#ifdef HAVE_LIBBPF
+#ifdef ENABLE_PLUGIN_EBPF
     build_info_set_status(BIB_PLUGIN_EBPF, true);
 #endif
-#ifdef HAVE_FREEIPMI
+#ifdef ENABLE_PLUGIN_FREEIPMI
     build_info_set_status(BIB_PLUGIN_FREEIPMI, true);
 #endif
-#ifdef HAVE_NFACCT
+#ifdef ENABLE_PLUGIN_NFACCT
     build_info_set_status(BIB_PLUGIN_NFACCT, true);
 #endif
-#ifdef ENABLE_PERF_PLUGIN
+#ifdef ENABLE_PLUGIN_PERF
     build_info_set_status(BIB_PLUGIN_PERF, true);
 #endif
-#ifdef ENABLE_SLABINFO
+#ifdef ENABLE_PLUGIN_SLABINFO
     build_info_set_status(BIB_PLUGIN_SLABINFO, true);
 #endif
-#ifdef HAVE_LIBXENSTAT
+#ifdef ENABLE_PLUGIN_XENSTAT
     build_info_set_status(BIB_PLUGIN_XEN, true);
 #endif
 #ifdef HAVE_XENSTAT_VBD_ERROR

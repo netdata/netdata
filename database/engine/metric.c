@@ -1,4 +1,6 @@
 #include "metric.h"
+#include "cache.h"
+#include "rrddiskprotocol.h"
 
 typedef int32_t REFCOUNT;
 #define REFCOUNT_DELETING (-100)
