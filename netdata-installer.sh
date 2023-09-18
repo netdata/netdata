@@ -279,7 +279,7 @@ DONOTWAIT=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
-NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
+NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
 while [ -n "${1}" ]; do
@@ -288,7 +288,7 @@ while [ -n "${1}" ]; do
     "--libs-are-really-here") LIBS_ARE_HERE=1 ;;
     "--use-system-protobuf")
       USE_SYSTEM_PROTOBUF=1
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--without-bundled-protobuf}" | sed 's/$/ --without-bundled-protobuf/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_BUNDLED_PROTOBUF=Off}" | sed 's/$/ -DENABLE_BUNDLED_PROTOBUFF=Off/g')"
     ;;
     "--dont-scrub-cflags-even-though-it-may-break-things") DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS=1 ;;
     "--dont-start-it") DONOTSTART=1 ;;
@@ -297,60 +297,74 @@ while [ -n "${1}" ]; do
     "--auto-update-type") ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
-    "--enable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-freeipmi)}" | sed 's/$/ --enable-plugin-freeipmi/g')" ;;
-    "--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-freeipmi)}" | sed 's/$/ --disable-plugin-freeipmi/g')" ;;
+    "--enable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DEABLE_PLUGIN_FREEIPMI=On)}" | sed 's/$/ -DEABLE_PLUGIN_FREEIPMI=On/g')" ;;
+    "--disable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DEABLE_PLUGIN_FREEIPMI=Off)}" | sed 's/$/ -DEABLE_PLUGIN_FREEIPMI=Off/g')" ;;
     "--disable-https")
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-openssl)}" | sed 's/$/ --disable-openssl/g')"
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-dbengine)}" | sed 's/$/ --disable-dbengine/g')"
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-kinesis)}" | sed 's/$/ --disable-exporting-kinesis/g')"
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-h2o)}" | sed 's/$/ --disable-h2o/g')"
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-cloud)}" | sed 's/$/ --disable-cloud/g')" ;;
-    "--disable-dbengine")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-dbengine)}" | sed 's/$/ --disable-dbengine/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_DBENGINE=Off)}" | sed 's/$/ -DENABLE_DBENGINE=Off/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_H2O=Off)}" | sed 's/$/ -DENABLE_H2O=Off/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_CLOUD=Off)}" | sed 's/$/ -DENABLE_CLOUD=Off/g')"
       ;;
-    "--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-nfacct)}" | sed 's/$/ --enable-plugin-nfacct/g')" ;;
-    "--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-nfacct)}" | sed 's/$/ --disable-plugin-nfacct/g')" ;;
-    "--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-plugin-xenstat)}" | sed 's/$/ --enable-plugin-xenstat/g')" ;;
-    "--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-plugin-xenstat)}" | sed 's/$/ --disable-plugin-xenstat/g')" ;;
+    "--disable-dbengine")
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_DBENGINE=Off)}" | sed 's/$/ -DENABLE_DBENGINE=Off/g')"
+      ;;
+    "--enable-plugin-nfacct") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_NFACCT=On)}" | sed 's/$/ -DENABLE_PLUGIN_NFACCT=On/g')" ;;
+    "--disable-plugin-nfacct") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_NFACCT=Off)}" | sed 's/$/ -DENABLE_PLUGIN_NFACCT=Off/g')" ;;
+    "--enable-plugin-xenstat") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_XENSTAT=On)}" | sed 's/$/ -DENABLE_PLUGIN_XENSTAT=On/g')" ;;
+    "--disable-plugin-xenstat") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_XENSTAT=Off)}" | sed 's/$/ -DENABLE_PLUGIN_XENSTAT=Off/g')" ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-kinesis)}" | sed 's/$/ --enable-exporting-kinesis/g')" ;;
+      # TODO: Needs CMake Support
+      ;;
     "--disable-exporting-kinesis" | "--disable-backend-kinesis")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-kinesis)}" | sed 's/$/ --disable-exporting-kinesis/g')" ;;
+      # TODO: Needs CMake Support
+      ;;
     "--enable-exporting-prometheus-remote-write" | "--enable-backend-prometheus-remote-write")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-prometheus-remote-write)}" | sed 's/$/ --enable-exporting-prometheus-remote-write/g')" ;;
+      # TODO: Needs CMake Support
+      ;;
     "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-prometheus-remote-write)}" | sed 's/$/ --disable-exporting-prometheus-remote-write/g')"
+      # TODO: Needs CMake Support
       NETDATA_DISABLE_PROMETHEUS=1
       ;;
     "--enable-exporting-mongodb" | "--enable-backend-mongodb")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-mongodb)}" | sed 's/$/ --enable-exporting-mongodb/g')" ;;
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_EXPORTING_MONGODB=On)}" | sed 's/$/ -DENABLE_EXPORTING_MONGODB=On/g')" ;;
     "--disable-exporting-mongodb" | "--disable-backend-mongodb")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-mongodb)}" | sed 's/$/ --disable-exporting-mongodb/g')" ;;
-    "--enable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-exporting-pubsub)}" | sed  's/$/ --enable-exporting-pubsub/g')" ;;
-    "--disable-exporting-pubsub") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-exporting-pubsub)}" | sed 's/$/ --disable-exporting-pubsub/g')" ;;
-    "--enable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-lto)}" | sed 's/$/ --enable-lto/g')" ;;
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_EXPORTING_MONGODB=Off)}" | sed 's/$/ -DENABLE_EXPORTING_MONGODB=Off/g')" ;;
+    "--enable-exporting-pubsub")
+      # TODO: Needs CMake support
+      ;;
+    "--disable-exporting-pubsub")
+      # TODO: Needs CMake support
+      ;;
+    "--enable-lto")
+      # TODO: Needs CMake support
+      ;;
     "--enable-ml")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-ml)}" | sed 's/$/ --enable-ml/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_ML=On)}" | sed 's/$/ -DENABLE_ML=On/g')"
       NETDATA_ENABLE_ML=1
       ;;
     "--disable-ml")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_ML=Off)}" | sed 's/$/ -DENABLE_ML=Off/g')"
       NETDATA_ENABLE_ML=0
       ;;
-    "--disable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-lto)}" | sed 's/$/ --disable-lto/g')" ;;
-    "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-x86-sse)}" | sed 's/$/ --disable-x86-sse/g')" ;;
+    "--disable-lto")
+      # TODO: Needs CMake support
+      ;;
+    "--disable-x86-sse")
+      # XXX: No longer supported.
+      ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
     "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf") NETDATA_DISABLE_EBPF=0 ;;
-    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')" ;;
+    "--disable-ebpf") NETDATA_DISABLE_EBPF=1 NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')" ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
-    "--one-time-build") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-dependency-tracking)}" | sed 's/$/ --disable-dependency-tracking/g')" ;;
+    "--one-time-build")
+      # XXX: No longer supported
+      ;;
     "--disable-cloud")
       if [ -n "${NETDATA_REQUIRE_CLOUD}" ]; then
         warning "Cloud explicitly enabled, ignoring --disable-cloud."
       else
         NETDATA_DISABLE_CLOUD=1
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-cloud)}" | sed 's/$/ --disable-cloud/g')"
+        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_CLOUD=Off)}" | sed 's/$/ -DENABLE_CLOUD=Off/g')"
       fi
       ;;
     "--require-cloud")
@@ -358,7 +372,7 @@ while [ -n "${1}" ]; do
         warning "Cloud explicitly disabled, ignoring --require-cloud."
       else
         NETDATA_REQUIRE_CLOUD=1
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-cloud)}" | sed 's/$/ --enable-cloud/g')"
+        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_CLOUD=On)}" | sed 's/$/ -DENABLE_CLOUD=On/g')"
       fi
       ;;
     "--build-json-c")
@@ -393,13 +407,6 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   NETDATA_DISABLE_TELEMETRY=1
 fi
 
-make="make"
-# See: https://github.com/netdata/netdata/issues/9163
-if [ "$(uname -s)" = "FreeBSD" ]; then
-  make="gmake"
-  NETDATA_CONFIGURE_OPTIONS="$NETDATA_CONFIGURE_OPTIONS --disable-dependency-tracking"
-fi
-
 if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   mega="$((1024 * 1024))"
   base=1024
@@ -417,7 +424,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   total_ram="$((total_ram * 1024))"
 
   if [ "${total_ram}" -le "$((base * mega))" ] && [ -z "${NETDATA_ENABLE_ML}" ]; then
-    NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
+    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_ML=Off)}" | sed 's/$/ -DENABLE_ML=Off/g')"
     NETDATA_ENABLE_ML=0
   fi
 
@@ -503,41 +510,9 @@ if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
 BANNER4
 fi
 
-have_autotools=
-if [ "$(type autoreconf 2> /dev/null)" ]; then
-  autoconf_maj_min() {
-    OLDIFS=$IFS
-    IFS=.-
-    maj=$1
-    min=$2
-
-    # shellcheck disable=SC2046
-    set -- $(autoreconf -V | sed -ne '1s/.* \([^ ]*\)$/\1/p')
-    # shellcheck disable=SC2086
-    eval $maj=\$1 $min=\$2
-    IFS=$OLDIFS
-  }
-  autoconf_maj_min AMAJ AMIN
-
-  if [ "$AMAJ" -gt 2 ]; then
-    have_autotools=Y
-  elif [ "$AMAJ" -eq 2 ] && [ "$AMIN" -ge 60 ]; then
-    have_autotools=Y
-  else
-    echo "Found autotools $AMAJ.$AMIN"
-  fi
-else
-  echo "No autotools found"
+if ! command -v cmake >/dev/null 2>&1; then
+    fatal "Could not find CMake, which is required to build Netdata." I0012
 fi
-
-if [ ! "$have_autotools" ]; then
-  if [ -f configure ]; then
-    echo "Will skip autoreconf step"
-  else
-    fatal "Could not find a usable version of GNU autotools, which is required for building Netdata. Version 2.60 or later of GNU autotools is required." I0001
-  fi
-fi
-
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
     printf '%s' "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
@@ -617,7 +592,7 @@ bundle_protobuf() {
   if [ -f "${PWD}/externaldeps/protobuf/.version" ] && [ "${PROTOBUF_PACKAGE_VERSION}" = "$(cat "${PWD}/externaldeps/protobuf/.version")" ]
   then
     echo >&2 "Found compiled protobuf, same version, not compiling it again. Remove file '${PWD}/externaldeps/protobuf/.version' to recompile."
-    NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=On"
     return 0
   fi
 
@@ -635,7 +610,7 @@ bundle_protobuf() {
       echo "${PROTOBUF_PACKAGE_VERSION}" >"${PWD}/externaldeps/protobuf/.version" &&
       rm -rf "${tmp}"; then
       run_ok "protobuf built and prepared."
-      NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --with-bundled-protobuf"
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=On"
     else
       run_failed "Failed to build protobuf. Netdata Cloud support will not be available in this build."
     fi
@@ -853,9 +828,9 @@ bundle_libbpf() {
   # When libc is not detected, we do not have necessity to compile libbpf and we should not do download of eBPF programs
   libc="${EBPF_LIBC:-"$(detect_libc)"}"
   if [ -z "$libc" ]; then
-      NETDATA_DISABLE_EBPF=1
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
-      return 0
+    NETDATA_DISABLE_EBPF=1
+    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')"
+    return 0
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling libbpf."
@@ -936,7 +911,7 @@ bundle_ebpf_co_re() {
       else
         run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
         NETDATA_DISABLE_EBPF=1
-        NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')"
       fi
     fi
   else
@@ -945,7 +920,7 @@ bundle_ebpf_co_re() {
     else
       run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"
       NETDATA_DISABLE_EBPF=1
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ebpf)}" | sed 's/$/ --disable-ebpf/g')"
+      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF/g')"
     fi
   fi
 
@@ -978,13 +953,9 @@ fi
 echo >&2
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Configuring Netdata."
-progress "Run autotools to configure the build environment"
+NETDATA_BUILD_DIR="${NETDATA_BUILD_DIR:-./cmake-build-release/}"
 
-if [ "$have_autotools" ]; then
-  if ! run autoreconf -ivf; then
-    fatal "Failed to prepare Netdata sources." I0009
-  fi
-fi
+rm -rf "${NETDATA_BUILD_DIR}"
 
 # function to extract values from the config file
 config_option() {
@@ -1003,6 +974,7 @@ config_option() {
 }
 
 # the user netdata will run as
+# TODO: Needs CMake support
 if [ "$(id -u)" = "0" ]; then
   NETDATA_USER="$(config_option "global" "run as user" "netdata")"
   ROOT_USER="root"
@@ -1015,19 +987,13 @@ NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
 # shellcheck disable=SC2086
-if ! run ./configure \
-         --prefix="${NETDATA_PREFIX}/usr" \
-         --sysconfdir="${NETDATA_PREFIX}/etc" \
-         --localstatedir="${NETDATA_PREFIX}/var" \
-         --libexecdir="${NETDATA_PREFIX}/usr/libexec" \
-         --libdir="${NETDATA_PREFIX}/usr/lib" \
-         --with-math \
-         --with-user="${NETDATA_USER}" \
-         ${NETDATA_CONFIGURE_OPTIONS} \
-         CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}"; then
+if ! run cmake \
+         -S ./ \
+         -B "${NETDATA_BUILD_DIR}" \
+         -DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}" \
+         ${NETDATA_CMAKE_OPTIONS}; then
   fatal "Failed to configure Netdata sources." I000A
 fi
-
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 
@@ -1037,15 +1003,11 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Building Netdata."
 
-progress "Cleanup compilation directory"
-
-run $make clean
-
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
 # shellcheck disable=SC2086
-if ! run $make ${MAKEOPTS}; then
+if ! run cmake --build "${NETDATA_BUILD_DIR}" -- -v; then
   fatal "Failed to build Netdata." I000B
 fi
 
@@ -1057,7 +1019,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
-if ! run $make install; then
+if ! run cmake --install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
 
@@ -1832,7 +1794,7 @@ LDFLAGS="${LDFLAGS}"
 MAKEOPTS="${MAKEOPTS}"
 NETDATA_TMPDIR="${TMPDIR}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
-NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
+NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="$(id -u)"
 NETDATA_GROUP="${NETDATA_GROUP}"
