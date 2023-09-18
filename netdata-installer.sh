@@ -979,10 +979,10 @@ check_for_module() {
 }
 
 enable_feature() {
-  if [ "${1}" -eq 1 ]; then
-    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${2}=On"
+  if [ "${2}" -eq 1 ]; then
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${1}=On"
   else
-    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${2}=Off"
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${1}=Off"
   fi
 }
 
