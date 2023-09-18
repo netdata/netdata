@@ -792,13 +792,13 @@ void ebpf_update_controller(int fd, ebpf_module_t *em)
 {
     uint32_t values[NETDATA_CONTROLLER_END] = {
         (em->apps_charts & NETDATA_EBPF_APPS_FLAG_YES) | em->cgroup_charts,
-        em->apps_level
+        em->apps_level, 0, 0, 0, 0
     };
     uint32_t key;
-    uint32_t end = (em->apps_level != NETDATA_APPS_NOT_SET) ? NETDATA_CONTROLLER_END : NETDATA_CONTROLLER_APPS_LEVEL;
+    uint32_t end = NETDATA_CONTROLLER_PID_TABLE_ADD;
 
     for (key = NETDATA_CONTROLLER_APPS_ENABLED; key < end; key++) {
-        int ret = bpf_map_update_elem(fd, &key, &values[key], 0);
+        int ret = bpf_map_update_elem(fd, &key, &values[key], BPF_ANY);
         if (ret)
             netdata_log_error("Add key(%u) for controller table failed.", key);
     }
@@ -855,7 +855,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
     uint32_t idx = ebpf_select_index(em->kernels, is_rhf, kver);
 
-    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode, is_rhf);
+    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode, is_rhf);
 
     // When this function is called ebpf.plugin is using legacy code, so we should reset the variable
     em->load &= ~ NETDATA_EBPF_LOAD_METHODS;
@@ -1269,7 +1269,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
 
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("The thread %s was configured with: mode = %s; update every = %d; apps = %s; cgroup = %s; ebpf type format = %s; ebpf co-re tracing = %s; collect pid = %s; maps per core = %s, lifetime=%u",
-         modules->thread_name,
+         modules->info.thread_name,
          load_mode,
          modules->update_every,
          (modules->apps_charts)?"enabled":"disabled",

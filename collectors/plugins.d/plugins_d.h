@@ -130,6 +130,14 @@ static inline void pluginsd_function_json_error_to_stdout(const char *transactio
     pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
     fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
     pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+}
+
+static inline void pluginsd_function_result_to_stdout(const char *transaction, int code, const char *content_type, time_t expires, BUFFER *result) {
+    pluginsd_function_result_begin_to_stdout(transaction, code, content_type, expires);
+    fwrite(buffer_tostring(result), buffer_strlen(result), 1, stdout);
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
 }
 
 #endif /* NETDATA_PLUGINS_D_H */

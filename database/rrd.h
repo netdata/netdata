@@ -709,6 +709,8 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 26), // a custom variable has been updated and needs to be exposed to parent
 
     RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 27), // when set, data collection is not available for this chart
+
+    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 28), // this chart has at least one rrdcal linked
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -931,6 +933,8 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
     RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 29), // set when the receiver part is disconnected
+
+    RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 30), // set when the host has updated global functions
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

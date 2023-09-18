@@ -28,7 +28,7 @@
         webpackPublicPath: "https://app.netdata.cloud",
         agentApiUrl: searchParams.get("agent") || getBasename(),
         posthogToken: "phc_hnhlqe6D2Q4IcQNrFItaqdXJAxQ8RcHkPAFAp74pubv",
-        version: "6.32.0",
+        version: "6.37.1",
         tracking: false,
         cookieDomain: ".netdata.cloud",
         onprem: false
@@ -205,5 +205,13 @@
             if (event.source !== iframe.contentWindow) return;
 
             if (event.data.status === "disabled") console.error("Your netdata registry is disabled! Check your configuration.")
+
+            if (event.data && event.data.person_guid) {
+              if (!window.localNetdataRegistry) {
+                window.localNetdataRegistry = {}
+              }
+
+              window.localNetdataRegistry.pg = event.data.person_guid
+            }
           });
         })</script></body></html>

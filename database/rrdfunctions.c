@@ -310,8 +310,11 @@ struct rrd_collector {
 static __thread struct rrd_collector *thread_rrd_collector = NULL;
 
 static void rrd_collector_free(struct rrd_collector *rdc) {
+    if(rdc->running)
+        return;
+
     int32_t expected = 0;
-    if(likely(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))) {
+    if(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
         // the collector is still referenced by charts.
         // leave it hanging there, the last chart will actually free it.
         return;
@@ -323,9 +326,9 @@ static void rrd_collector_free(struct rrd_collector *rdc) {
 
 // called once per collector
 void rrd_collector_started(void) {
-    if(likely(thread_rrd_collector)) return;
+    if(!thread_rrd_collector)
+        thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
 
-    thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
     thread_rrd_collector->tid = gettid();
     thread_rrd_collector->running = true;
 }
@@ -341,43 +344,70 @@ void rrd_collector_finished(void) {
 }
 
 static struct rrd_collector *rrd_collector_acquire(void) {
-    __atomic_add_fetch(&thread_rrd_collector->refcount, 1, __ATOMIC_SEQ_CST);
+    rrd_collector_started();
+
+    int32_t expected = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED), wanted = 0;
+    do {
+        if(expected < 0 || !thread_rrd_collector->running) {
+            internal_fatal(true, "FUNCTIONS: Trying to acquire a collector that is exiting.");
+            return thread_rrd_collector;
+        }
+
+        wanted = expected + 1;
+
+    } while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount, &expected, wanted, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+
     return thread_rrd_collector;
 }
 
 static void rrd_collector_release(struct rrd_collector *rdc) {
     if(unlikely(!rdc)) return;
 
-    int32_t refcount = __atomic_sub_fetch(&rdc->refcount, 1, __ATOMIC_SEQ_CST);
-    if(refcount == 0 && !rdc->running)
+    int32_t expected = __atomic_load_n(&rdc->refcount, __ATOMIC_RELAXED), wanted = 0;
+    do {
+        if(expected < 0) {
+            internal_fatal(true, "FUNCTIONS: Trying to release a collector that is exiting.");
+            return;
+        }
+
+        if(expected == 0) {
+            internal_fatal(true, "FUNCTIONS: Trying to release a collector that is not acquired.");
+            return;
+        }
+
+        wanted = expected - 1;
+
+    } while(!__atomic_compare_exchange_n(&rdc->refcount, &expected, wanted, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+
+    if(wanted == 0)
         rrd_collector_free(rdc);
 }
 
-static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
-                                          void *rrdhost __maybe_unused) {
+static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *rrdhost) {
+    RRDHOST *host = rrdhost; (void)host;
     struct rrd_collector_function *rdcf = func;
 
-    if(!thread_rrd_collector)
-        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.",
-              __FUNCTION__, dictionary_acquired_item_name(item));
-
+    rrd_collector_started();
     rdcf->collector = rrd_collector_acquire();
+
+//    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+//                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
+//                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 }
 
-static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
+static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
                                           void *rrdhost __maybe_unused) {
     struct rrd_collector_function *rdcf = func;
     rrd_collector_release(rdcf->collector);
 }
 
-static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func __maybe_unused,
-                                            void *new_func __maybe_unused, void *rrdhost __maybe_unused) {
+static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
+                                            void *new_func, void *rrdhost) {
+    RRDHOST *host = rrdhost; (void)host;
     struct rrd_collector_function *rdcf = func;
     struct rrd_collector_function *new_rdcf = new_func;
 
-    if(!thread_rrd_collector)
-        fatal("RRDSET_COLLECTOR: called %s() for function '%s' without calling rrd_collector_started() first.",
-              __FUNCTION__, dictionary_acquired_item_name(item));
+    rrd_collector_started();
 
     bool changed = false;
 
@@ -416,6 +446,10 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         rdcf->collector_data = new_rdcf->collector_data;
         changed = true;
     }
+
+//    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+//                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
+//                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 
     return changed;
 }
@@ -460,6 +494,8 @@ void rrd_collector_add_function(RRDHOST *host, RRDSET *st, const char *name, int
 
     if(st)
         dictionary_view_set(st->functions_view, key, item);
+    else
+        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_acquired_item_release(host->functions, item);
 }
@@ -481,6 +517,8 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
 }
 
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
+    rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
     struct rrd_collector_function *tmp;
     dfe_start_read(host->functions, tmp) {
         if(!(tmp->options & RRD_FUNCTION_GLOBAL))
@@ -565,20 +603,22 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
     char *s = NULL;
 
     *rdcf = NULL;
-    while(!(*rdcf) && buffer[0]) {
-        *rdcf = dictionary_get(host->functions, buffer);
-        if(*rdcf) break;
+    if(host->functions) {
+        while (!(*rdcf) && buffer[0]) {
+            *rdcf = dictionary_get(host->functions, buffer);
+            if (*rdcf) break;
 
-        // if s == NULL, set it to the end of the buffer
-        // this should happen only the first time
-        if(unlikely(!s))
-            s = &buffer[key_length - 1];
+            // if s == NULL, set it to the end of the buffer
+            // this should happen only the first time
+            if (unlikely(!s))
+                s = &buffer[key_length - 1];
 
-        // skip a word from the end
-        while(s >= buffer && !isspace(*s)) *s-- = '\0';
+            // skip a word from the end
+            while (s >= buffer && !isspace(*s)) *s-- = '\0';
 
-        // skip all spaces
-        while(s >= buffer && isspace(*s)) *s-- = '\0';
+            // skip all spaces
+            while (s >= buffer && isspace(*s)) *s-- = '\0';
+        }
     }
 
     buffer_flush(wb);
