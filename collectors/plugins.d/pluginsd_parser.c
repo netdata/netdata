@@ -886,7 +886,8 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
                                         rrd_function_result_callback_t result_cb, void *result_cb_data,
                                         rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
                                         void *is_cancelled_cb_data __maybe_unused,
-                                        rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data) {
+                                        rrd_function_register_canceller_cb_t register_canceller_cb,
+                                        void *register_canceller_db_data) {
     PARSER  *parser = execute_cb_data;
 
     usec_t now = now_realtime_usec();
@@ -914,8 +915,8 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
     // if there is any error, our dictionary callbacks will call the caller callback to notify
     // the caller about the error - no need for error handling here.
     void *t = dictionary_set(parser->inflight.functions, transaction, &tmp, sizeof(struct inflight_function));
-    if(register_cancel_cb)
-        register_cancel_cb(register_cancel_db_data, pluginsd_function_cancel, t);
+    if(register_canceller_cb)
+        register_canceller_cb(register_canceller_db_data, pluginsd_function_cancel, t);
 
     if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
         parser->inflight.smaller_timeout = tmp.timeout_ut;

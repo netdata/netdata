@@ -299,6 +299,7 @@ struct rrd_host_function {
 
 struct rrd_collector {
     int32_t refcount;
+    int32_t refcount_canceller;
     pid_t tid;
     bool running;
 };
@@ -330,7 +331,7 @@ void rrd_collector_started(void) {
         thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
 
     thread_rrd_collector->tid = gettid();
-    thread_rrd_collector->running = true;
+    __atomic_store_n(&thread_rrd_collector->running, true, __ATOMIC_RELAXED);
 }
 
 // called once per collector
@@ -338,33 +339,26 @@ void rrd_collector_finished(void) {
     if(!thread_rrd_collector)
         return;
 
-    thread_rrd_collector->running = false;
+    __atomic_store_n(&thread_rrd_collector->running, false, __ATOMIC_RELAXED);
 
-    // wait for functions to finish
-    int32_t running = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED);
-    if(running > 0) {
-        netdata_log_error("FUNCTIONS: delaying exit of collector on tid %d for %" PRIi32 " functions to finish.",
-                          thread_rrd_collector->tid, running);
-
-        usec_t give_up_ut = now_monotonic_usec() + 5 * USEC_PER_SEC;
-        while((running = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED)) > 0 &&now_monotonic_usec() < give_up_ut)
-            sleep_usec(100 * USEC_PER_MS);
-
-        if(running > 0)
-            netdata_log_error("FUNCTIONS: gave up on collector on tid %d - %" PRIi32 " functions are still running.",
-                              thread_rrd_collector->tid, running);
+    int32_t expected = 0;
+    while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount_canceller, &expected, -1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        expected = 0;
+        sleep_usec(1 * USEC_PER_MS);
     }
 
     rrd_collector_free(thread_rrd_collector);
     thread_rrd_collector = NULL;
 }
 
+#define rrd_collector_running(c) __atomic_load_n(&(c)->running, __ATOMIC_RELAXED)
+
 static struct rrd_collector *rrd_collector_acquire(void) {
     rrd_collector_started();
 
     int32_t expected = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED), wanted = 0;
     do {
-        if(expected < 0 || !thread_rrd_collector->running) {
+        if(expected < 0 || !rrd_collector_running(thread_rrd_collector)) {
             internal_fatal(true, "FUNCTIONS: Trying to acquire a collector that is exiting.");
             return thread_rrd_collector;
         }
@@ -629,7 +623,7 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
                 found = true;
 
                 struct rrd_host_function *rdcf = dictionary_acquired_item_value(*item);
-                if(rdcf->collector->running) {
+                if(rrd_collector_running(rdcf->collector)) {
                     break;
                 }
                 else {
@@ -705,14 +699,6 @@ struct rrd_function_inflight {
     } is_cancelled;
 
     struct {
-        // to be called in async mode
-        // to register a canceller
-        // that will be used to signal the function to cancel
-        rrd_function_register_canceller_cb_t cb;
-        void *data;
-    } register_canceller;
-
-    struct {
         // to be registered by the function itself
         // used to signal the function to cancel
         rrd_function_canceller_cb_t cb;
@@ -725,7 +711,7 @@ static DICTIONARY *rrd_functions_inflight_requests = NULL;
 static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rrd_function_inflight *r = value;
 
-    internal_error(true, "FUNCTIONS: transaction '%s' finished", r->transaction);
+    // internal_error(true, "FUNCTIONS: transaction '%s' finished", r->transaction);
 
     freez((void *)r->transaction);
     freez((void *)r->cmd);
@@ -750,7 +736,7 @@ void rrd_functions_inflight_destroy(void) {
     rrd_functions_inflight_requests = NULL;
 }
 
-static void rrd_async_function_register_canceller_cb(void *register_canceller_cb_data, rrd_function_canceller_cb_t canceller_cb, void *canceller_cb_data) {
+static void rrd_inflight_async_function_register_canceller_cb(void *register_canceller_cb_data, rrd_function_canceller_cb_t canceller_cb, void *canceller_cb_data) {
     struct rrd_function_inflight *r = register_canceller_cb_data;
     r->canceller.cb = canceller_cb;
     r->canceller.data = canceller_cb_data;
@@ -811,7 +797,7 @@ static void rrd_async_function_signal_when_ready(BUFFER *temp_wb __maybe_unused,
     }
 }
 
-static void rrd_inflight_async_nowait_function_finished(BUFFER *wb, int code, void *data) {
+static void rrd_inflight_async_function_nowait_finished(BUFFER *wb, int code, void *data) {
     struct rrd_function_inflight *r = data;
 
     if(r->result.cb)
@@ -827,9 +813,9 @@ static bool rrd_inflight_async_function_is_cancelled(void *data) {
 
 static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_inflight *r) {
     int code = r->rdcf->execute_cb(r->result.wb, r->timeout, r->sanitized_cmd, r->rdcf->execute_cb_data,
-                                   rrd_inflight_async_nowait_function_finished, r,
+                                   rrd_inflight_async_function_nowait_finished, r,
                                    rrd_inflight_async_function_is_cancelled, r,
-                                   rrd_async_function_register_canceller_cb, r);
+                                   rrd_inflight_async_function_register_canceller_cb, r);
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(r->result.wb))
@@ -864,11 +850,11 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     temp_wb->content_type = r->result.wb->content_type;
 
     int code = r->rdcf->execute_cb(temp_wb, r->timeout, r->sanitized_cmd, r->rdcf->execute_cb_data,
-                                   // we overwrite the result callbacks,
-                                   // so that we can clean up the allocations made
+            // we overwrite the result callbacks,
+            // so that we can clean up the allocations made
                                    rrd_async_function_signal_when_ready, tmp,
                                    rrd_inflight_async_function_is_cancelled, r,
-                                   rrd_async_function_register_canceller_cb, r);
+                                   rrd_inflight_async_function_register_canceller_cb, r);
 
     if (code == HTTP_RESP_OK) {
         netdata_mutex_lock(&tmp->mutex);
@@ -898,8 +884,8 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                 rc = 0;
                 if (!tmp->data_are_ready && r->is_cancelled.cb &&
                     r->is_cancelled.cb(r->is_cancelled.data)) {
-                    internal_error(true, "FUNCTIONS: transaction '%s' is cancelled while waiting for response",
-                                   r->transaction);
+//                    internal_error(true, "FUNCTIONS: transaction '%s' is cancelled while waiting for response",
+//                                   r->transaction);
                     rc = 0;
                     cancelled = true;
                     rrd_function_cancel(r->transaction);
@@ -1052,13 +1038,13 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
         return code;
     }
     r->used = true;
-    internal_error(true, "FUNCTIONS: transaction '%s' started", r->transaction);
+    // internal_error(true, "FUNCTIONS: transaction '%s' started", r->transaction);
 
     return rrd_call_function_async(r, wait);
 }
 
 void rrd_function_cancel(const char *transaction) {
-    internal_error(true, "FUNCTIONS: request to cancel transaction '%s'", transaction);
+    // internal_error(true, "FUNCTIONS: request to cancel transaction '%s'", transaction);
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
     if(!item) {
@@ -1078,14 +1064,22 @@ void rrd_function_cancel(const char *transaction) {
 
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
-    if(!r->rdcf->collector->running) {
-        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the collector is not running.",
-                         transaction);
-        goto cleanup;
-    }
+    int32_t expected = __atomic_load_n(&r->rdcf->collector->refcount_canceller, __ATOMIC_RELAXED);
+    int32_t wanted;
+    do {
+        if(expected < 0) {
+            netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the collector is not running.",
+                             transaction);
+            goto cleanup;
+        }
+
+        wanted = expected + 1;
+    } while(!__atomic_compare_exchange_n(&r->rdcf->collector->refcount_canceller, &expected, wanted, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
     if(r->canceller.cb)
         r->canceller.cb(r->canceller.data);
+
+    __atomic_sub_fetch(&r->rdcf->collector->refcount_canceller, 1, __ATOMIC_RELAXED);
 
 cleanup:
     dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
@@ -1096,7 +1090,7 @@ cleanup:
 static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident, const char *kq, const char *sq) {
     struct rrd_host_function *t;
     dfe_start_read(functions, t) {
-        if(!t->collector->running) continue;
+        if(!rrd_collector_running(t->collector)) continue;
 
         if(t_dfe.counter)
             buffer_strcat(wb, ",\n");
@@ -1131,7 +1125,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
 
     struct rrd_host_function *t;
     dfe_start_read(host->functions, t) {
-        if(!t->collector->running) continue;
+        if(!rrd_collector_running(t->collector)) continue;
 
         buffer_json_member_add_object(wb, t_dfe.name);
         buffer_json_member_add_string(wb, "help", string2str(t->help));
@@ -1154,7 +1148,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
 
     struct rrd_host_function *t;
     dfe_start_read(rrdset_functions_view, t) {
-        if(!t->collector->running) continue;
+        if(!rrd_collector_running(t->collector)) continue;
 
         dictionary_set(dst, t_dfe.name, value, value_size);
     }
@@ -1166,7 +1160,7 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
 
     struct rrd_host_function *t;
     dfe_start_read(host->functions, t) {
-        if(!t->collector->running) continue;
+        if(!rrd_collector_running(t->collector)) continue;
 
         if(help)
             *help = t->help;
