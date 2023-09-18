@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "cloud.netdata.android",
+      "sha256_cert_fingerprints": [
+        "1F:B8:9A:45:AD:83:76:DD:7E:A5:9A:07:82:4A:2F:99:3E:0D:EB:64:FA:50:76:59:65:3F:CC:38:7F:32:28:AA"
+      ]
+    }
+  }
+]

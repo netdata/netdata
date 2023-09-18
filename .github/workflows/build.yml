@@ -258,7 +258,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
       - name: Build test environment
         id: build1
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
         with:
           push: false
@@ -276,7 +276,7 @@ jobs:
       - name: Build test environment (attempt 2)
         if: ${{ steps.build1.outcome == 'failure' }}
         id: build2
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
         with:
           push: false
@@ -294,7 +294,7 @@ jobs:
       - name: Build test environment (attempt 3)
         if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
         id: build3
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           push: false
           load: false

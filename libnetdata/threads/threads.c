@@ -178,6 +178,7 @@ void rrdset_thread_rda_free(void);
 void sender_thread_buffer_free(void);
 void query_target_free(void);
 void service_exits(void);
+void rrd_collector_finished(void);
 
 static void thread_cleanup(void *ptr) {
     if(netdata_thread != ptr) {
@@ -188,6 +189,7 @@ static void thread_cleanup(void *ptr) {
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
         netdata_log_info("thread with task id %d finished", gettid());
 
+    rrd_collector_finished();
     sender_thread_buffer_free();
     rrdset_thread_rda_free();
     query_target_free();

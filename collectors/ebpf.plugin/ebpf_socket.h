@@ -4,14 +4,17 @@
 #include <stdint.h>
 #include "libnetdata/avl/avl.h"
 
+#include <sys/socket.h>
+#ifdef HAVE_NETDB_H
+#include <netdb.h>
+#endif
+
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SOCKET "socket"
 #define NETDATA_EBPF_SOCKET_MODULE_DESC "Monitors TCP and UDP bandwidth. This thread is integrated with apps and cgroup."
 
 // Vector indexes
 #define NETDATA_UDP_START 3
-
-#define NETDATA_SOCKET_READ_SLEEP_MS 800000ULL
 
 // config file
 #define NETDATA_NETWORK_CONFIG_FILE "network.conf"
@@ -21,18 +24,13 @@
 #define EBPF_CONFIG_RESOLVE_SERVICE "resolve service names"
 #define EBPF_CONFIG_PORTS "ports"
 #define EBPF_CONFIG_HOSTNAMES "hostnames"
-#define EBPF_CONFIG_BANDWIDTH_SIZE "bandwidth table size"
-#define EBPF_CONFIG_IPV4_SIZE "ipv4 connection table size"
-#define EBPF_CONFIG_IPV6_SIZE "ipv6 connection table size"
+#define EBPF_CONFIG_SOCKET_MONITORING_SIZE "socket monitoring table size"
 #define EBPF_CONFIG_UDP_SIZE "udp connection table size"
-#define EBPF_MAXIMUM_DIMENSIONS "maximum dimensions"
 
 enum ebpf_socket_table_list {
-    NETDATA_SOCKET_TABLE_BANDWIDTH,
     NETDATA_SOCKET_GLOBAL,
     NETDATA_SOCKET_LPORTS,
-    NETDATA_SOCKET_TABLE_IPV4,
-    NETDATA_SOCKET_TABLE_IPV6,
+    NETDATA_SOCKET_OPEN_SOCKET,
     NETDATA_SOCKET_TABLE_UDP,
     NETDATA_SOCKET_TABLE_CTRL
 };
@@ -122,13 +120,6 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS "bandwidth_udp_send"
 #define NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS "bandwidth_udp_recv"
 
-// Network viewer charts
-#define NETDATA_NV_OUTBOUND_BYTES "outbound_bytes"
-#define NETDATA_NV_OUTBOUND_PACKETS "outbound_packets"
-#define NETDATA_NV_OUTBOUND_RETRANSMIT "outbound_retransmit"
-#define NETDATA_NV_INBOUND_BYTES "inbound_bytes"
-#define NETDATA_NV_INBOUND_PACKETS "inbound_packets"
-
 // Port range
 #define NETDATA_MINIMUM_PORT_VALUE 1
 #define NETDATA_MAXIMUM_PORT_VALUE 65535
@@ -163,6 +154,8 @@ typedef enum ebpf_socket_idx {
 
 // ARAL name
 #define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"
+#define NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME "ebpf_pid_socket"
+#define NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME "ebpf_socket_tbl"
 
 typedef struct ebpf_socket_publish_apps {
     // Data read
@@ -246,10 +239,11 @@ typedef struct ebpf_network_viewer_hostname_list {
     struct ebpf_network_viewer_hostname_list *next;
 } ebpf_network_viewer_hostname_list_t;
 
-#define NETDATA_NV_CAP_VALUE 50L
 typedef struct ebpf_network_viewer_options {
+    RW_SPINLOCK rw_spinlock;
+
     uint32_t enabled;
-    uint32_t max_dim;   // Store value read from 'maximum dimensions'
+    uint32_t family;                                        // AF_INET, AF_INET6 or AF_UNSPEC (both)
 
     uint32_t hostname_resolution_enabled;
     uint32_t service_resolution_enabled;
@@ -275,98 +269,82 @@ extern ebpf_network_viewer_options_t network_viewer_opt;
  * Structure to store socket information
  */
 typedef struct netdata_socket {
-    uint64_t recv_packets;
-    uint64_t sent_packets;
-    uint64_t recv_bytes;
-    uint64_t sent_bytes;
-    uint64_t first; // First timestamp
-    uint64_t ct;   // Current timestamp
-    uint32_t retransmit; // It is never used with UDP
+    // Timestamp
+    uint64_t first_timestamp;
+    uint64_t current_timestamp;
+    // Socket additional info
     uint16_t protocol;
-    uint16_t reserved;
+    uint16_t family;
+    uint32_t external_origin;
+    struct {
+        uint32_t call_tcp_sent;
+        uint32_t call_tcp_received;
+        uint64_t tcp_bytes_sent;
+        uint64_t tcp_bytes_received;
+        uint32_t close;        //It is never used with UDP
+        uint32_t retransmit;   //It is never used with UDP
+        uint32_t ipv4_connect;
+        uint32_t ipv6_connect;
+    } tcp;
+
+    struct {
+        uint32_t call_udp_sent;
+        uint32_t call_udp_received;
+        uint64_t udp_bytes_sent;
+        uint64_t udp_bytes_received;
+    } udp;
 } netdata_socket_t;
 
-typedef struct netdata_plot_values {
-    // Values used in the previous iteration
-    uint64_t recv_packets;
-    uint64_t sent_packets;
-    uint64_t recv_bytes;
-    uint64_t sent_bytes;
-    uint32_t retransmit;
+typedef enum netdata_socket_flags {
+    NETDATA_SOCKET_FLAGS_ALREADY_OPEN = (1<<0)
+} netdata_socket_flags_t;
 
-    uint64_t last_time;
+typedef enum netdata_socket_src_ip_origin {
+    NETDATA_EBPF_SRC_IP_ORIGIN_LOCAL,
+    NETDATA_EBPF_SRC_IP_ORIGIN_EXTERNAL
+} netdata_socket_src_ip_origin_t;
 
-    // Values used to plot
-    uint64_t plot_recv_packets;
-    uint64_t plot_sent_packets;
-    uint64_t plot_recv_bytes;
-    uint64_t plot_sent_bytes;
-    uint16_t plot_retransmit;
-} netdata_plot_values_t;
+typedef struct netata_socket_plus {
+    netdata_socket_t data;           // Data read from database
+    uint32_t pid;
+    time_t last_update;
+    netdata_socket_flags_t flags;
+
+    struct  {
+        char src_ip[INET6_ADDRSTRLEN + 1];
+ //       uint16_t src_port;
+        char dst_ip[INET6_ADDRSTRLEN+ 1];
+        char dst_port[NI_MAXSERV + 1];
+    } socket_string;
+} netdata_socket_plus_t;
+
+enum netdata_udp_ports {
+    NETDATA_EBPF_UDP_PORT = 53
+};
+
+extern ARAL *aral_socket_table;
 
 /**
  * Index used together previous structure
  */
 typedef struct netdata_socket_idx {
     union netdata_ip_t saddr;
-    uint16_t sport;
+    //uint16_t sport;
     union netdata_ip_t daddr;
     uint16_t dport;
+    uint32_t pid;
 } netdata_socket_idx_t;
 
-// Next values were defined according getnameinfo(3)
-#define NETDATA_MAX_NETWORK_COMBINED_LENGTH 1018
-#define NETDATA_DOTS_PROTOCOL_COMBINED_LENGTH 5 // :TCP:
-#define NETDATA_DIM_LENGTH_WITHOUT_SERVICE_PROTOCOL 979
-
-#define NETDATA_INBOUND_DIRECTION (uint32_t)1
-#define NETDATA_OUTBOUND_DIRECTION (uint32_t)2
-/**
- * Allocate the maximum number of structures in the beginning, this can force the collector to use more memory
- * in the long term, on the other had it is faster.
- */
-typedef struct netdata_socket_plot {
-    // Search
-    avl_t avl;
-    netdata_socket_idx_t index;
-
-    // Current data
-    netdata_socket_t sock;
-
-    // Previous values and values used to write on chart.
-    netdata_plot_values_t plot;
-
-    int family;                     // AF_INET or AF_INET6
-    char *resolved_name;            // Resolve only in the first call
-    unsigned char resolved;
-
-    char *dimension_sent;
-    char *dimension_recv;
-    char *dimension_retransmit;
-
-    uint32_t flags;
-} netdata_socket_plot_t;
-
-#define NETWORK_VIEWER_CHARTS_CREATED (uint32_t)1
-typedef struct netdata_vector_plot {
-    netdata_socket_plot_t *plot;    // Vector used to plot charts
-
-    avl_tree_lock tree;             // AVL tree to speed up search
-    uint32_t last;                  // The 'other' dimension, the last chart accepted.
-    uint32_t next;                  // The next position to store in the vector.
-    uint32_t max_plot;              // Max number of elements to plot.
-    uint32_t last_plot;             // Last element plot
-
-    uint32_t flags;                 // Flags
-
-} netdata_vector_plot_t;
-
-void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
+void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *values);
-void parse_network_viewer_section(struct config *cfg);
-void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
-void parse_service_name_section(struct config *cfg);
+void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
+void ebpf_parse_service_name_section(struct config *cfg);
+void ebpf_parse_ips_unsafe(char *ptr);
+void ebpf_parse_ports(char *ptr);
+void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
+void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns);
+
 
 extern struct config socket_config;
 extern netdata_ebpf_targets_t socket_targets[];

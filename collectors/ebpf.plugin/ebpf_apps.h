@@ -150,24 +150,6 @@ typedef struct ebpf_process_stat {
     uint8_t removeme;
 } ebpf_process_stat_t;
 
-typedef struct ebpf_bandwidth {
-    uint32_t pid;
-
-    uint64_t first;              // First timestamp
-    uint64_t ct;                 // Last timestamp
-    uint64_t bytes_sent;         // Bytes sent
-    uint64_t bytes_received;     // Bytes received
-    uint64_t call_tcp_sent;      // Number of times tcp_sendmsg was called
-    uint64_t call_tcp_received;  // Number of times tcp_cleanup_rbuf was called
-    uint64_t retransmit;         // Number of times tcp_retransmit was called
-    uint64_t call_udp_sent;      // Number of times udp_sendmsg was called
-    uint64_t call_udp_received;  // Number of times udp_recvmsg was called
-    uint64_t close;              // Number of times tcp_close was called
-    uint64_t drop;               // THIS IS NOT USED FOR WHILE, we are in groom section
-    uint32_t tcp_v4_connection;  // Number of times tcp_v4_connection was called.
-    uint32_t tcp_v6_connection;  // Number of times tcp_v6_connection was called.
-} ebpf_bandwidth_t;
-
 /**
  * Internal function used to write debug messages.
  *
@@ -207,12 +189,6 @@ void cleanup_exited_pids();
 int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
 int get_pid_comm(pid_t pid, size_t n, char *dest);
-
-size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
-                                                           int fd,
-                                                           struct ebpf_pid_on_target *pids);
-
-size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct ebpf_pid_on_target *pids);
 
 void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
 void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);

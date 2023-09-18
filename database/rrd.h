@@ -931,6 +931,8 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
     RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 29), // set when the receiver part is disconnected
+
+    RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 30), // set when the host has updated global functions
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

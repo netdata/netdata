@@ -301,11 +301,27 @@ enum ebpf_global_table_values {
 typedef uint64_t netdata_idx_t;
 
 typedef struct ebpf_module {
-    const char *thread_name;
-    const char *config_name;
-    const char *thread_description;
+    // Constants used with module
+    struct {
+        const char *thread_name;
+        const char *config_name;
+        const char *thread_description;
+    } info;
+
+    // Helpers used with plugin
+    struct {
+        void *(*start_routine)(void *);                             // the thread function
+        void (*apps_routine)(struct ebpf_module *em, void *ptr);    // the apps charts
+        void (*fnct_routine)(BUFFER *bf, struct ebpf_module *em);   // the function used for exteernal requests
+        const char *fcnt_name;                                      // name given to cloud
+        const char *fcnt_desc;                                      // description given about function
+        const char *fcnt_thread_chart_name;
+        int order_thread_chart;
+        const char *fcnt_thread_lifetime_name;
+        int order_thread_lifetime;
+    } functions;
+
     enum ebpf_threads_status enabled;
-    void *(*start_routine)(void *);
     int update_every;
     int global_charts;
     netdata_apps_integration_flags_t apps_charts;
@@ -314,7 +330,6 @@ typedef struct ebpf_module {
     netdata_run_mode_t mode;
     uint32_t thread_id;
     int optional;
-    void (*apps_routine)(struct ebpf_module *em, void *ptr);
     ebpf_local_maps_t *maps;
     ebpf_specify_name_t *names;
     uint32_t pid_map_size;
