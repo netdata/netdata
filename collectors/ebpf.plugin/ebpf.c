@@ -3815,9 +3815,11 @@ static void ebpf_create_statistic_charts(int update_every)
                              NETDATA_EBPF_ORDER_STAT_THREADS,
                              update_every,
                              NULL);
+    /*
 #ifdef NETDATA_DEV_MODE
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 #endif
+     */
 
     ebpf_create_thread_chart(NETDATA_EBPF_LIFE_TIME,
                              "Time remaining for thread.",
@@ -3825,9 +3827,11 @@ static void ebpf_create_statistic_charts(int update_every)
                              NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
                              update_every,
                              NULL);
+    /*
 #ifdef NETDATA_DEV_MODE
     EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
 #endif
+     */
 
     int i,j;
     char name[256];

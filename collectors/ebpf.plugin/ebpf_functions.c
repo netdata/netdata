@@ -47,7 +47,6 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
  * @param thread_name name of the thread we are looking for.
  *
  * @return it returns a pointer for the module that has thread_name on success or NULL otherwise.
- */
 ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
@@ -58,6 +57,7 @@ ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
 
     return NULL;
 }
+ */
 
 /*****************************************************************
  *  EBPF HELP FUNCTIONS
@@ -69,7 +69,6 @@ ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
  * Shows help with all options accepted by thread function.
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
-*/
 static void ebpf_function_thread_manipulation_help(const char *transaction) {
     BUFFER *wb = buffer_create(0, NULL);
     buffer_sprintf(wb, "%s",
@@ -96,6 +95,7 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
 
     buffer_free(wb);
 }
+*/
 
 /*****************************************************************
  *  EBPF ERROR FUNCTIONS
@@ -129,7 +129,6 @@ static void ebpf_function_error(const char *transaction, int code, const char *m
  * @param line_max     Number of arguments given
  * @param timeout      The function timeout
  * @param em           The structure with thread information
- */
 static void ebpf_function_thread_manipulation(const char *transaction,
                                               char *function __maybe_unused,
                                               char *line_buffer __maybe_unused,
@@ -368,6 +367,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
 
     buffer_free(wb);
 }
+ */
 
 /*****************************************************************
  *  EBPF SOCKET FUNCTION
@@ -1071,7 +1071,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
  */
 void *ebpf_function_thread(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    (void)ptr;
     char buffer[PLUGINSD_LINE_MAX + 1];
 
     char *s = NULL;
@@ -1096,14 +1096,7 @@ void *ebpf_function_thread(void *ptr)
             else {
                 int timeout = str2i(timeout_s);
                 pthread_mutex_lock(&lock);
-                if (!strncmp(function, EBPF_FUNCTION_THREAD, sizeof(EBPF_FUNCTION_THREAD) - 1))
-                    ebpf_function_thread_manipulation(transaction,
-                                                      function,
-                                                      buffer,
-                                                      PLUGINSD_LINE_MAX + 1,
-                                                      timeout,
-                                                      em);
-                else if (!strncmp(function, EBPF_FUNCTION_SOCKET, sizeof(EBPF_FUNCTION_SOCKET) - 1))
+                if (!strncmp(function, EBPF_FUNCTION_SOCKET, sizeof(EBPF_FUNCTION_SOCKET) - 1))
                     ebpf_function_socket_manipulation(transaction,
                                                       function,
                                                       buffer,
