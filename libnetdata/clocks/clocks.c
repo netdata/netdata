@@ -299,7 +299,7 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
         usec_t tmp = (now_realtime_usec() * clock_realtime_resolution) % (tick / 2);
 
         error_limit_static_global_var(erl, 10, 0);
-        error_limit(&erl, "heartbeat randomness of %llu is too big for a tick of %llu - setting it to %llu", hb->randomness, tick, tmp);
+        error_limit(&erl, "heartbeat randomness of %"PRIu64" is too big for a tick of %"PRIu64" - setting it to %"PRIu64"", hb->randomness, tick, tmp);
         hb->randomness = tmp;
     }
 
@@ -326,12 +326,12 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     if(unlikely(now < next)) {
         errno = 0;
         error_limit_static_global_var(erl, 10, 0);
-        error_limit(&erl, "heartbeat clock: woke up %llu microseconds earlier than expected (can be due to the CLOCK_REALTIME set to the past).", next - now);
+        error_limit(&erl, "heartbeat clock: woke up %"PRIu64" microseconds earlier than expected (can be due to the CLOCK_REALTIME set to the past).", next - now);
     }
     else if(unlikely(now - next >  tick / 2)) {
         errno = 0;
         error_limit_static_global_var(erl, 10, 0);
-        error_limit(&erl, "heartbeat clock: woke up %llu microseconds later than expected (can be due to system load or the CLOCK_REALTIME set to the future).", now - next);
+        error_limit(&erl, "heartbeat clock: woke up %"PRIu64" microseconds later than expected (can be due to system load or the CLOCK_REALTIME set to the future).", now - next);
     }
 
     if(unlikely(!hb->realtime)) {
@@ -381,7 +381,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
             }
         }
         else {
-            netdata_log_error("Cannot nanosleep() for %llu microseconds.", usec);
+            netdata_log_error("Cannot nanosleep() for %"PRIu64" microseconds.", usec);
             break;
         }
     }

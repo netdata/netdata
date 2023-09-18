@@ -1328,7 +1328,7 @@ int main(int argc, char **argv) {
         if(unlikely(netdata_exit)) break;
 
         if(unlikely(debug && iteration))
-            fprintf(stderr, "perf.plugin: iteration %zu, dt %llu usec\n"
+            fprintf(stderr, "perf.plugin: iteration %zu, dt %"PRIu64" usec\n"
                     , iteration
                     , dt
             );
