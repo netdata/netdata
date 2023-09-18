@@ -2460,7 +2460,7 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
     for(i = 0; i < indent ;i++) buffer[i] = ' ';
     buffer[i] = '\0';
 
-    fprintf(stderr, "  %s %s%s (%d %s %llu"
+    fprintf(stderr, "  %s %s%s (%d %s %"PRIu64""
         , buffer
         , prefix
         , p->comm
@@ -3432,7 +3432,7 @@ static void calculate_netdata_statistics(void) {
 // update chart dimensions
 
 static inline void send_BEGIN(const char *type, const char *id, usec_t usec) {
-    fprintf(stdout, "BEGIN %s.%s %llu\n", type, id, usec);
+    fprintf(stdout, "BEGIN %s.%s %"PRIu64"\n", type, id, usec);
 }
 
 static inline void send_SET(const char *name, kernel_uint_t value) {
@@ -3518,11 +3518,11 @@ void send_resource_usage_to_netdata(usec_t dt) {
     }
 
     fprintf(stdout,
-        "BEGIN netdata.apps_cpu %llu\n"
-        "SET user = %llu\n"
-        "SET system = %llu\n"
+        "BEGIN netdata.apps_cpu %"PRIu64"\n"
+        "SET user = %"PRIu64"\n"
+        "SET system = %"PRIu64"\n"
         "END\n"
-        "BEGIN netdata.apps_sizes %llu\n"
+        "BEGIN netdata.apps_sizes %"PRIu64"\n"
         "SET calls = %zu\n"
         "SET files = %zu\n"
         "SET filenames = %zu\n"
@@ -3549,7 +3549,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         );
 
     fprintf(stdout,
-            "BEGIN netdata.apps_fix %llu\n"
+            "BEGIN netdata.apps_fix %"PRIu64"\n"
             "SET utime = %u\n"
             "SET stime = %u\n"
             "SET gtime = %u\n"
@@ -3566,7 +3566,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
 
     if(include_exited_childs)
         fprintf(stdout,
-            "BEGIN netdata.apps_children_fix %llu\n"
+            "BEGIN netdata.apps_children_fix %"PRIu64"\n"
             "SET cutime = %u\n"
             "SET cstime = %u\n"
             "SET cgtime = %u\n"

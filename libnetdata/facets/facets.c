@@ -1762,7 +1762,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
 
     buffer_json_member_add_array(wb, "data");
     {
-        usec_t last_usec = 0;
+        usec_t last_usec = 0; (void)last_usec;
 
         for(FACET_ROW *row = facets->base ; row ;row = row->next) {
 

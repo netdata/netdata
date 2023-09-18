@@ -2877,7 +2877,7 @@ static usec_t dictionary_unittest_run_and_measure_time(DICTIONARY *dict, char *m
         }
     }
 
-    fprintf(stderr, " %zu errors, %d (found %ld) items in dictionary, %d (found %ld) referenced, %d (found %ld) deleted, %llu usec \n",
+    fprintf(stderr, " %zu errors, %d (found %ld) items in dictionary, %d (found %ld) referenced, %d (found %ld) deleted, %"PRIu64" usec \n",
             errs, dict?dict->entries:0, found_ok, dict?dict->referenced_items:0, found_referenced, dict?dict->pending_deletion_items:0, found_deleted, dt);
     *errors += errs;
     return dt;
