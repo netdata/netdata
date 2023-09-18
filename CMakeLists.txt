@@ -824,6 +824,11 @@ add_library(libnetdata ${LIBNETDATA_FILES})
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR})
 
+# pthread
+target_link_libraries(libnetdata PUBLIC
+        "$<$<BOOL:${LINUX}>:pthread;rt>"
+)
+
 # ebpf
 if(ENABLE_PLUGIN_EBPF)
         target_link_libraries(libnetdata PUBLIC ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a)
