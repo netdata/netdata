@@ -895,11 +895,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
             ae->global_id = sqlite3_column_int64(res, 32);
 
         ae->chart_name = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 33);
-
-        if (sqlite3_column_type(res, 34) != SQLITE_NULL)
-            ae->summary = string_strdupz((char *) sqlite3_column_text(res, 34));
-        else
-            ae->summary = NULL;
+        ae->summary = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 34);
 
         char value_string[100 + 1];
         string_freez(ae->old_value_string);

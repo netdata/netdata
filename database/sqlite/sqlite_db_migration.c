@@ -321,9 +321,9 @@ static int do_migration_v10_v11(sqlite3 *database, const char *name)
     return 0;
 }
 
+#define MIGR_11_12_UPD_HEALTH_LOG_DETAIL "UPDATE health_log_detail SET summary = (select name from health_log where health_log_id = health_log_detail.health_log_id);"
 static int do_migration_v11_v12(sqlite3 *database, const char *name)
 {
-    char sql[2048];
     int rc = 0;
 
     netdata_log_info("Running \"%s\" database migration", name);
@@ -332,10 +332,8 @@ static int do_migration_v11_v12(sqlite3 *database, const char *name)
         table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
         rc = init_database_batch(database, &database_migrate_v11_v12[0]);
 
-    if (!rc) {
-        snprintfz(sql, 2047, "UPDATE health_log_detail SET summary = (select name from health_log where health_log_id = health_log_detail.health_log_id);");
-        sqlite3_exec_monitored(database, sql, 0, 0, NULL);
-    }
+    if (!rc)
+        sqlite3_exec_monitored(database, MIGR_11_12_UPD_HEALTH_LOG_DETAIL, 0, 0, NULL);
 
     return rc;
 }
