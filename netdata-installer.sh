@@ -297,8 +297,8 @@ while [ -n "${1}" ]; do
     "--auto-update-type") ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
-    "--enable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DEABLE_PLUGIN_FREEIPMI=On)}" | sed 's/$/ -DEABLE_PLUGIN_FREEIPMI=On/g')" ;;
-    "--disable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DEABLE_PLUGIN_FREEIPMI=Off)}" | sed 's/$/ -DEABLE_PLUGIN_FREEIPMI=Off/g')" ;;
+    "--enable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_FREEIPMI=On)}" | sed 's/$/ -DENABLE_PLUGIN_FREEIPMI=On/g')" ;;
+    "--disable-plugin-freeipmi") NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_FREEIPMI=Off)}" | sed 's/$/ -DENABLE_PLUGIN_FREEIPMI=Off/g')" ;;
     "--disable-https")
       NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_DBENGINE=Off)}" | sed 's/$/ -DENABLE_DBENGINE=Off/g')"
       NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_H2O=Off)}" | sed 's/$/ -DENABLE_H2O=Off/g')"
