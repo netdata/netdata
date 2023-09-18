@@ -57,9 +57,6 @@
 static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
-DICTIONARY *uids = NULL;
-DICTIONARY *gids = NULL;
-
 // ----------------------------------------------------------------------------
 
 static inline sd_journal *netdata_open_systemd_journal(void) {
@@ -130,7 +127,7 @@ static inline void netdata_systemd_journal_process_row(sd_journal *j, FACETS *fa
     }
 }
 
-static inline ND_SD_JOURNAL_STATUS check_stop(size_t row_counter, bool *cancelled, usec_t stop_monotonic_ut) {
+static inline ND_SD_JOURNAL_STATUS check_stop(size_t row_counter, const bool *cancelled, usec_t stop_monotonic_ut) {
     if((row_counter % 1000) == 0) {
         if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
             internal_error(true, "Function has been cancelled");
@@ -146,7 +143,11 @@ static inline ND_SD_JOURNAL_STATUS check_stop(size_t row_counter, bool *cancelle
     return ND_SD_JOURNAL_OK;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t if_modified_since, usec_t stop_monotonic_ut, usec_t *last_modified, bool *cancelled) {
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
+        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
+        usec_t after_ut, usec_t before_ut,
+        usec_t if_modified_since, usec_t stop_monotonic_ut, usec_t *last_modified,
+        bool *cancelled) {
     if(!netdata_systemd_journal_seek_to(j, before_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
@@ -202,7 +203,12 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(sd_journal *j, BUFFER *w
     return status;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t anchor, size_t entries, usec_t stop_monotonic_ut, bool *cancelled) {
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
+        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
+        usec_t after_ut, usec_t before_ut,
+        usec_t anchor, size_t entries, usec_t stop_monotonic_ut,
+        bool *cancelled) {
+
     if(!netdata_systemd_journal_seek_to(j, anchor))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
@@ -252,7 +258,12 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(sd_journal *j, B
     return status;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(sd_journal *j, BUFFER *wb, FACETS *facets, usec_t after_ut, usec_t before_ut, usec_t anchor, size_t entries, usec_t stop_monotonic_ut, bool *cancelled) {
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
+        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
+        usec_t after_ut, usec_t before_ut,
+        usec_t anchor, size_t entries, usec_t stop_monotonic_ut,
+        bool *cancelled) {
+
     if(!netdata_systemd_journal_seek_to(j, anchor))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
@@ -499,8 +510,8 @@ static FACET_ROW_SEVERITY syslog_priority_to_facet_severity(int priority) {
 }
 
 static char *uid_to_username(uid_t uid, char *buffer, size_t buffer_size) {
+    static __thread char tmp[1024 + 1];
     struct passwd pw, *result;
-    char tmp[1024 + 1];
 
     if (getpwuid_r(uid, &pw, tmp, 1024, &result) != 0 || result == NULL)
         return NULL;
@@ -510,8 +521,8 @@ static char *uid_to_username(uid_t uid, char *buffer, size_t buffer_size) {
 }
 
 static char *gid_to_groupname(gid_t gid, char* buffer, size_t buffer_size) {
+    static __thread char tmp[1024 + 1];
     struct group grp, *result;
-    char tmp[1024 + 1];
 
     if (getgrgid_r(gid, &grp, tmp, 1024, &result) != 0 || result == NULL)
         return NULL;
@@ -546,45 +557,105 @@ static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_un
     }
 }
 
-static void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, void *data) {
-    DICTIONARY *cache = data;
+// ----------------------------------------------------------------------------
+// UID and GID transformation
+
+#define UID_GID_HASHTABLE_SIZE 1000
+
+struct word_t2str_hashtable_entry {
+    struct word_t2str_hashtable_entry *next;
+    Word_t hash;
+    size_t len;
+    char str[];
+};
+
+struct word_t2str_hashtable {
+    SPINLOCK spinlock;
+    size_t size;
+    struct word_t2str_hashtable_entry *hashtable[UID_GID_HASHTABLE_SIZE];
+};
+
+struct word_t2str_hashtable uid_hashtable = {
+        .size = UID_GID_HASHTABLE_SIZE,
+};
+
+struct word_t2str_hashtable gid_hashtable = {
+        .size = UID_GID_HASHTABLE_SIZE,
+};
+
+struct word_t2str_hashtable_entry **word_t2str_hashtable_slot(struct word_t2str_hashtable *ht, Word_t hash) {
+    size_t slot = hash % ht->size;
+    struct word_t2str_hashtable_entry **e = &ht->hashtable[slot];
+
+    while(*e && (*e)->hash != hash)
+        e = &((*e)->next);
+
+    return e;
+}
+
+const char *uid_to_username_cached(uid_t uid, size_t *length) {
+    spinlock_lock(&uid_hashtable.spinlock);
+
+    struct word_t2str_hashtable_entry **e = word_t2str_hashtable_slot(&uid_hashtable, uid);
+    if(!(*e)) {
+        static __thread char buf[1024 + 1];
+        const char *name = uid_to_username(uid, buf, 1024);
+        size_t size = strlen(name) + 1;
+
+        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
+        (*e)->len = size - 1;
+        (*e)->hash = uid;
+        memcpy((*e)->str, name, size);
+    }
+
+    spinlock_unlock(&uid_hashtable.spinlock);
+
+    *length = (*e)->len;
+    return (*e)->str;
+}
+
+const char *gid_to_groupname_cached(gid_t gid, size_t *length) {
+    spinlock_lock(&gid_hashtable.spinlock);
+
+    struct word_t2str_hashtable_entry **e = word_t2str_hashtable_slot(&gid_hashtable, gid);
+    if(!(*e)) {
+        static __thread char buf[1024 + 1];
+        const char *name = gid_to_groupname(gid, buf, 1024);
+        size_t size = strlen(name) + 1;
+
+        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
+        (*e)->len = size - 1;
+        (*e)->hash = gid;
+        memcpy((*e)->str, name, size);
+    }
+
+    spinlock_unlock(&gid_hashtable.spinlock);
+
+    *length = (*e)->len;
+    return (*e)->str;
+}
+
+static void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
-        const char *sv = dictionary_get(cache, v);
-        if(!sv) {
-            char buf[1024 + 1];
-            int uid = str2i(buffer_tostring(wb));
-            const char *name = uid_to_username(uid, buf, 1024);
-            if (!name)
-                name = v;
-
-            sv = dictionary_set(cache, v, (void *)name, strlen(name) + 1);
-        }
-
-        buffer_flush(wb);
-        buffer_strcat(wb, sv);
+        uid_t uid = str2i(buffer_tostring(wb));
+        size_t len;
+        const char *name = uid_to_username_cached(uid, &len);
+        buffer_contents_replace(wb, name, len);
     }
 }
 
-static void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, void *data) {
-    DICTIONARY *cache = data;
+static void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
-        const char *sv = dictionary_get(cache, v);
-        if(!sv) {
-            char buf[1024 + 1];
-            int gid = str2i(buffer_tostring(wb));
-            const char *name = gid_to_groupname(gid, buf, 1024);
-            if (!name)
-                name = v;
-
-            sv = dictionary_set(cache, v, (void *)name, strlen(name) + 1);
-        }
-
-        buffer_flush(wb);
-        buffer_strcat(wb, sv);
+        gid_t gid = str2i(buffer_tostring(wb));
+        size_t len;
+        const char *name = gid_to_groupname_cached(gid, &len);
+        buffer_contents_replace(wb, name, len);
     }
 }
+
+// ----------------------------------------------------------------------------
 
 static void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
     FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
@@ -608,7 +679,7 @@ static void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
 
-static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
+static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row __maybe_unused, void *data __maybe_unused) {
     buffer_json_add_array_item_object(json_array);
     buffer_json_member_add_string(json_array, "value", buffer_tostring(rkv->wb));
     buffer_json_object_close(json_array);
@@ -663,10 +734,10 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_register_key_name(facets, "USER_UNIT", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name_transformation(facets, "_UID", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
-                                            netdata_systemd_journal_transform_uid, uids);
+                                            netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(facets, "_GID", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
-                                            netdata_systemd_journal_transform_gid, gids);
+                                            netdata_systemd_journal_transform_gid, NULL);
 
     bool info = false;
     bool data_only = false;
@@ -885,9 +956,6 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    uids = dictionary_create(0);
-    gids = dictionary_create(0);
-
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);
 
@@ -942,9 +1010,6 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         if(now - started_t > 86400)
             break;
     }
-
-    dictionary_destroy(uids);
-    dictionary_destroy(gids);
 
     exit(0);
 }
