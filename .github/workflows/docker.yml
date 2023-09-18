@@ -53,7 +53,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
       - name: Test Build
         id: build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           load: true
           push: false
@@ -111,7 +111,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
       - name: Build
         id: build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: ${{ matrix.platforms }}
           load: false
@@ -215,7 +215,7 @@ jobs:
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Docker Build
         id: build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: ${{ github.repository == 'netdata/netdata' }}
@@ -327,7 +327,7 @@ jobs:
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Docker Build
         id: build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: ${{ github.repository == 'netdata/netdata' }}
