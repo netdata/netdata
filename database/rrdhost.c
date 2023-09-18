@@ -335,7 +335,7 @@ int is_legacy = 1;
     netdata_mutex_init(&host->receiver_lock);
 
     if (likely(!archived)) {
-        rrdfunctions_init(host);
+        rrdfunctions_host_init(host);
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
@@ -665,7 +665,7 @@ static void rrdhost_update(RRDHOST *host
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
 
-        rrdfunctions_init(host);
+        rrdfunctions_host_init(host);
 
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
@@ -1070,9 +1070,9 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
-    rrd_collector_add_function(localhost, NULL, "streaming", 10,
-                               RRDFUNCTIONS_STREAMING_HELP, true,
-                               rrdhost_function_streaming, NULL);
+    rrd_function_add(localhost, NULL, "streaming", 10,
+                     RRDFUNCTIONS_STREAMING_HELP, true,
+                     rrdhost_function_streaming, NULL);
 #endif
 
     if (likely(system_info)) {
@@ -1160,9 +1160,11 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
 
     rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
+
 #ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_compressor_destroy(&host->sender->compressor);
 #endif
+
     replication_cleanup_sender(host->sender);
 
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
@@ -1266,7 +1268,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     freez(host->node_id);
 
     rrdfamily_index_destroy(host);
-    rrdfunctions_destroy(host);
+    rrdfunctions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
     if (host == localhost)
         rrdvariables_destroy(health_rrdvars);

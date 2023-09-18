@@ -940,6 +940,7 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
                        buffer_strlen(func_wb),
                        now_realtime_usec() - tmp->received_ut);
     }
+
     string_freez(tmp->transaction);
     buffer_free(func_wb);
     freez(tmp);
@@ -989,7 +990,9 @@ void execute_commands(struct sender_state *s) {
                 tmp->transaction = string_strdupz(transaction);
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
 
-                int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
+                int code = rrd_function_run(s->host, wb, timeout, function, false, transaction,
+                                            stream_execute_function_callback, tmp, NULL, NULL);
+
                 if(code != HTTP_RESP_OK) {
                     if (!buffer_strlen(wb))
                         rrd_call_function_error(wb, "Failed to route request to collector", code);
@@ -997,6 +1000,13 @@ void execute_commands(struct sender_state *s) {
                     stream_execute_function_callback(wb, code, tmp);
                 }
             }
+        }
+        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
+            worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
+
+            char *transaction = get_word(words, num_words, 1);
+            if(transaction && *transaction)
+                rrd_function_cancel(transaction);
         }
         else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_REPLAY_REQUEST);

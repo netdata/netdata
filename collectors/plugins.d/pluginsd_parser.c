@@ -733,14 +733,15 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
 struct inflight_function {
     int code;
     int timeout;
-    BUFFER *destination_wb;
     STRING *function;
-    void (*callback)(BUFFER *wb, int code, void *callback_data);
-    void *callback_data;
+    BUFFER *result_body_wb;
+    rrd_function_result_callback_t result_cb;
+    void *result_cb_data;
     usec_t timeout_ut;
     usec_t started_ut;
     usec_t sent_ut;
     const char *payload;
+    PARSER *parser;
 };
 
 static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void *func, void *parser_ptr) {
@@ -751,10 +752,12 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     // leave this code as default, so that when the dictionary is destroyed this will be sent back to the caller
     pf->code = HTTP_RESP_GATEWAY_TIMEOUT;
 
+    const char *transaction = dictionary_acquired_item_name(item);
+
     char buffer[2048 + 1];
     snprintfz(buffer, 2048, "%s %s %d \"%s\"\n",
                       pf->payload ? "FUNCTION_PAYLOAD" : "FUNCTION",
-                      dictionary_acquired_item_name(item),
+                      transaction,
                       pf->timeout,
                       string2str(pf->function));
 
@@ -765,7 +768,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
     if(ret < 0) {
         netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
-        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
+        rrd_call_function_error(pf->result_body_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
@@ -782,7 +785,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
     if(ret < 0) {
         netdata_log_error("FUNCTION_PAYLOAD '%s': failed to send function to plugin, error %zd", string2str(pf->function), ret);
-        rrd_call_function_error(pf->destination_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
+        rrd_call_function_error(pf->result_body_wb, "Failed to communicate with collector", HTTP_RESP_SERVICE_UNAVAILABLE);
     }
     else {
         internal_error(LOG_FUNCTIONS,
@@ -798,8 +801,8 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     struct inflight_function *pf = new_func;
 
     netdata_log_error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
-    pf->code = rrd_call_function_error(pf->destination_wb, "This request is already in progress", HTTP_RESP_BAD_REQUEST);
-    pf->callback(pf->destination_wb, pf->code, pf->callback_data);
+    pf->code = rrd_call_function_error(pf->result_body_wb, "This request is already in progress", HTTP_RESP_BAD_REQUEST);
+    pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
     string_freez(pf->function);
 
     return false;
@@ -811,9 +814,9 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     internal_error(LOG_FUNCTIONS,
                    "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %llu usec, response %llu usec)",
                    string2str(pf->function), dictionary_acquired_item_name(item),
-                   buffer_strlen(pf->destination_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
+                   buffer_strlen(pf->result_body_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
 
-    pf->callback(pf->destination_wb, pf->code, pf->callback_data);
+    pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
     string_freez(pf->function);
 }
 
@@ -833,8 +836,8 @@ static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
                            "FUNCTION '%s' removing expired transaction '%s', after %llu usec.",
                            string2str(pf->function), pf_dfe.name, now - pf->started_ut);
 
-            if(!buffer_strlen(pf->destination_wb) || pf->code == HTTP_RESP_OK)
-                pf->code = rrd_call_function_error(pf->destination_wb,
+            if(!buffer_strlen(pf->result_body_wb) || pf->code == HTTP_RESP_OK)
+                pf->code = rrd_call_function_error(pf->result_body_wb,
                                                    "Timeout waiting for collector response.",
                                                    HTTP_RESP_GATEWAY_TIMEOUT);
 
@@ -847,35 +850,73 @@ static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
     dfe_done(pf);
 }
 
+void pluginsd_function_cancel(void *data) {
+    struct inflight_function *look_for = data, *t;
+
+    bool sent = false;
+    dfe_start_read(look_for->parser->inflight.functions, t) {
+        if(look_for == t) {
+            const char *transaction = t_dfe.name;
+
+            internal_error(true, "PLUGINSD: sending function cancellation to plugin for transaction '%s'", transaction);
+
+            char buffer[2048 + 1];
+            snprintfz(buffer, 2048, "%s %s\n",
+                      PLUGINSD_KEYWORD_FUNCTION_CANCEL,
+                      transaction);
+
+            // send the command to the plugin
+            ssize_t ret = send_to_plugin(buffer, t->parser);
+            if(ret < 0)
+                sent = true;
+
+            break;
+        }
+    }
+    dfe_done(t);
+
+    if(sent <= 0)
+        netdata_log_error("PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
+}
+
 // this is the function that is called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
-static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeout, const char *function, void *collector_data, void (*callback)(BUFFER *wb, int code, void *callback_data), void *callback_data) {
-    PARSER  *parser = collector_data;
+static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, const char *function,
+                                        void *execute_cb_data,
+                                        rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                        rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
+                                        void *is_cancelled_cb_data __maybe_unused,
+                                        rrd_function_register_canceller_cb_t register_canceller_cb,
+                                        void *register_canceller_db_data) {
+    PARSER  *parser = execute_cb_data;
 
     usec_t now = now_realtime_usec();
 
     struct inflight_function tmp = {
         .started_ut = now,
         .timeout_ut = now + timeout * USEC_PER_SEC,
-        .destination_wb = destination_wb,
+        .result_body_wb = result_body_wb,
         .timeout = timeout,
         .function = string_strdupz(function),
-        .callback = callback,
-        .callback_data = callback_data,
-        .payload = NULL
+        .result_cb = result_cb,
+        .result_cb_data = result_cb_data,
+        .payload = NULL,
+        .parser = parser,
     };
 
     uuid_t uuid;
-    uuid_generate_time(uuid);
+    uuid_generate_random(uuid);
 
-    char key[UUID_STR_LEN];
-    uuid_unparse_lower(uuid, key);
+    char transaction[UUID_STR_LEN];
+    uuid_unparse_lower(uuid, transaction);
 
     dictionary_write_lock(parser->inflight.functions);
 
     // if there is any error, our dictionary callbacks will call the caller callback to notify
     // the caller about the error - no need for error handling here.
-    dictionary_set(parser->inflight.functions, key, &tmp, sizeof(struct inflight_function));
+    void *t = dictionary_set(parser->inflight.functions, transaction, &tmp, sizeof(struct inflight_function));
+    if(register_canceller_cb)
+        register_canceller_cb(register_canceller_db_data, pluginsd_function_cancel, t);
 
     if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
         parser->inflight.smaller_timeout = tmp.timeout_ut;
@@ -890,6 +931,8 @@ static int pluginsd_execute_function_callback(BUFFER *destination_wb, int timeou
 }
 
 static inline PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
+    // a plugin or a child is registering a function
+
     bool global = false;
     size_t i = 1;
     if(num_words >= 2 && strcmp(get_word(words, num_words, 1), "GLOBAL") == 0) {
@@ -926,7 +969,7 @@ static inline PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER
             timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
     }
 
-    rrd_collector_add_function(host, st, name, timeout, help, false, pluginsd_execute_function_callback, parser);
+    rrd_function_add(host, st, name, timeout, help, false, pluginsd_function_execute_cb, parser);
 
     parser->user.data_collections_count++;
 
@@ -973,18 +1016,18 @@ static inline PARSER_RC pluginsd_function_result_begin(char **words, size_t num_
     }
     else {
         if(format && *format)
-            pf->destination_wb->content_type = functions_format_to_content_type(format);
+            pf->result_body_wb->content_type = functions_format_to_content_type(format);
 
         pf->code = code;
 
-        pf->destination_wb->expires = expiration;
+        pf->result_body_wb->expires = expiration;
         if(expiration <= now_realtime_sec())
-            buffer_no_cacheable(pf->destination_wb);
+            buffer_no_cacheable(pf->result_body_wb);
         else
-            buffer_cacheable(pf->destination_wb);
+            buffer_cacheable(pf->result_body_wb);
     }
 
-    parser->defer.response = (pf) ? pf->destination_wb : NULL;
+    parser->defer.response = (pf) ? pf->result_body_wb : NULL;
     parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
     parser->defer.action = pluginsd_function_result_end;
     parser->defer.action_data = string_strdupz(key); // it is ok is key is NULL
@@ -1916,11 +1959,11 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
     struct inflight_function tmp = {
         .started_ut = now,
         .timeout_ut = now + VIRT_FNC_TIMEOUT + USEC_PER_SEC,
-        .destination_wb = wb,
+        .result_body_wb = wb,
         .timeout = VIRT_FNC_TIMEOUT,
         .function = string_strdupz(name),
-        .callback = virt_fnc_got_data_cb,
-        .callback_data = &cond,
+        .result_cb = virt_fnc_got_data_cb,
+        .result_cb_data = &cond,
         .payload = payload,
     };
 

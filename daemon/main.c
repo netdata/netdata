@@ -1904,6 +1904,8 @@ int main(int argc, char **argv) {
 
         replication_initialize();
 
+        rrd_functions_inflight_init();
+
         // --------------------------------------------------------------------
         // get the certificate and start security
 
