@@ -20,16 +20,6 @@ void buffer_reset(BUFFER *wb) {
     buffer_overflow_check(wb);
 }
 
-const char *buffer_tostring(BUFFER *wb)
-{
-    buffer_need_bytes(wb, 1);
-    wb->buffer[wb->len] = '\0';
-
-    buffer_overflow_check(wb);
-
-    return(wb->buffer);
-}
-
 void buffer_char_replace(BUFFER *wb, char from, char to) {
     char *s = wb->buffer, *end = &wb->buffer[wb->len];
 
