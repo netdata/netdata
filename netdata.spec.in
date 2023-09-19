@@ -179,7 +179,7 @@ BuildRequires: pkgconfig(libnetfilter_acct)
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
-%if 0%{?_have_freeipmi}
+%if %{_have_freeipmi}
 BuildRequires: pkgconfig(libipmimonitoring)
 %endif
 # end - freeipmi plugin dependencies
