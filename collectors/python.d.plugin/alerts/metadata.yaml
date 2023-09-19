@@ -21,9 +21,9 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector creates an 'Alerts' menu with one line plot of `alerts.status`.
+          This collector creates an 'Alerts' menu with three stacked plots of `alerts.counts`, `alerts.warning`, `alerts.critical`.
         method_description: |
-          Alarm status is read from the Netdata agent rest api [`/api/v1/alerts?all`](https://learn.netdata.cloud/api#/alerts/alerts1).
+          Alert status is read from the Netdata agent rest api [`/api/v1/alarms?all`](https://learn.netdata.cloud/api#/alerts/alerts1).
       supported_platforms:
         include: []
         exclude: []
@@ -33,7 +33,8 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            It discovers instances of Netdata running on localhost, and gathers metrics from `http://127.0.0.1:19999/api/v1/alerts?all`. `CLEAR` status is mapped to `0`, `WARNING` to `1` and `CRITICAL` to `2`. Also, by default all alerts produced will be monitored.
+            It discovers instances of Netdata running on localhost, and gathers metrics from `http://127.0.0.1:19999/api/v1/alarms?all`. 
+            By default all alerts produced will be monitored.
         limits:
           description: ""
         performance_impact:
@@ -63,28 +64,16 @@ modules:
           list:
             - name: url
               description: Netdata agent alerts endpoint to collect from. Can be local or remote so long as reachable by agent.
-              default_value: http://127.0.0.1:19999/api/v1/alerts?all
+              default_value: http://127.0.0.1:19999/api/v1/alarms?all
               required: true
-            - name: status_map
-              description: Mapping of alarm status to integer number that will be the metric value collected.
-              default_value: '{"CLEAR": 0, "WARNING": 1, "CRITICAL": 2}'
-              required: true
-            - name: collect_alarm_values
-              description: set to true to include a chart with calculated alarm values over time.
-              default_value: false
-              required: true
-            - name: alarm_status_chart_type
-              description: define the type of chart for plotting status over time e.g. 'line' or 'stacked'.
-              default_value: "line"
-              required: true
-            - name: alarm_contains_words
+            - name: alert_contains_words
               description: >
-                A "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only alerts with "cpu" or "load" in alarm name. Default includes all.
+                A "," separated list of words you want to filter alert names for. For example 'cpu,load' would filter for only alerts with "cpu" or "load" in alert name. Default includes all.
               default_value: ""
               required: true
-            - name: alarm_excludes_words
+            - name: alert_excludes_words
               description: >
-                A "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude all alerts with "cpu" or "load" in alarm name. Default excludes None.
+                A "," separated list of words you want to exclude based on alert name. For example 'cpu,load' would exclude all alerts with "cpu" or "load" in alert name. Default excludes None.
               default_value: ""
               required: true
             - name: update_every
@@ -118,7 +107,7 @@ modules:
               description: A basic example configuration.
               config: |
                 jobs:
-                  url: 'http://127.0.0.1:19999/api/v1/alerts?all'
+                  url: 'http://127.0.0.1:19999/api/v1/alarms?all'
             - name: Advanced
               folding:
                 enabled: true
@@ -128,24 +117,12 @@ modules:
               config: |
                 ML:
                   update_every: 5
-                  url: 'http://127.0.0.1:19999/api/v1/alerts?all'
-                  status_map:
-                    CLEAR: 0
-                    WARNING: 1
-                    CRITICAL: 2
-                  collect_alarm_values: true
-                  alarm_status_chart_type: 'stacked'
+                  url: 'http://127.0.0.1:19999/api/v1/alarms?all'
                   alarm_contains_words: 'ml_'
                 
                 Default:
                   update_every: 5
-                  url: 'http://127.0.0.1:19999/api/v1/alerts?all'
-                  status_map:
-                    CLEAR: 0
-                    WARNING: 1
-                    CRITICAL: 2
-                  collect_alarm_values: false
-                  alarm_status_chart_type: 'stacked'
+                  url: 'http://127.0.0.1:19999/api/v1/alarms?all'
                   alarm_excludes_words: 'ml_'
     troubleshooting:
       problems:
@@ -163,15 +140,21 @@ modules:
             These metrics refer to the entire monitored application.
           labels: []
           metrics:
-            - name: alerts.status
-              description: Alerts ({status mapping})
-              unit: "status"
-              chart_type: line
+            - name: alerts.counts
+              description: Alerts Counts
+              unit: "alerts"
+              chart_type: stacked
               dimensions:
-                - name: a dimension per alarm representing the latest status of the alarm.
-            - name: alerts.values
-              description: Alarm Values
-              unit: "value"
-              chart_type: line
+                - name: Dimensions for `clear`, `warning`, `critical` alert counts.
+            - name: alerts.warning
+              description: Warning Alerts
+              unit: "alerts"
+              chart_type: stacked
               dimensions:
-                - name: a dimension per alarm representing the latest collected value of the alarm.
+                - name: a dimension per alert in WARNING state.
+            - name: alerts.critical
+              description: Critical Alerts
+              unit: "alerts"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per alert in CRITICAL state.
