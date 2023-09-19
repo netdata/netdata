@@ -223,10 +223,6 @@ extern ebpf_process_stat_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
 extern ebpf_process_stat_t *process_stat_vector;
 
-extern ARAL *ebpf_aral_socket_pid;
-void ebpf_socket_aral_init();
-ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
-
 extern ARAL *ebpf_aral_cachestat_pid;
 void ebpf_cachestat_aral_init();
 netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void);
@@ -253,10 +249,6 @@ netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 
 // ARAL Section end
-
-// Threads integrated with apps
-extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
-// Threads integrated with apps
 
 #include "libnetdata/threads/threads.h"
 

@@ -906,7 +906,7 @@ static void ebpf_socket_exit(void *ptr)
         ebpf_socket_obsolete_global_charts(em);
 
 #ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_socket_pid)
+        if (aral_socket_table)
             ebpf_statistic_obsolete_aral_chart(em, socket_disable_priority);
 #endif
         pthread_mutex_unlock(&lock);
@@ -1797,7 +1797,6 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         }
 
         ebpf_hash_socket_accumulator(values, end);
-        ebpf_socket_fill_publish_apps(key.pid, values);
 
         // We update UDP to show info with charts, but we do not show them with functions
         /*
@@ -2038,33 +2037,6 @@ static void ebpf_socket_read_hash_global_tables(netdata_idx_t *stats, int maps_p
     socket_aggregated_data[NETDATA_IDX_TCP_CLEANUP_RBUF].bytes = res[NETDATA_KEY_BYTES_TCP_CLEANUP_RBUF];
     socket_aggregated_data[NETDATA_IDX_UDP_RECVBUF].bytes = res[NETDATA_KEY_BYTES_UDP_RECVMSG];
     socket_aggregated_data[NETDATA_IDX_UDP_SENDMSG].bytes = res[NETDATA_KEY_BYTES_UDP_SENDMSG];
-}
-
-/**
- * Fill publish apps when necessary.
- *
- * @param current_pid  the PID that I am updating
- * @param ns           the structure with data read from memory.
- */
-void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
-{
-    ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
-    if (!curr) {
-        curr = ebpf_socket_stat_get();
-        socket_bandwidth_curr[current_pid] = curr;
-    }
-
-    curr->bytes_sent += ns->tcp.tcp_bytes_sent;
-    curr->bytes_received += ns->tcp.tcp_bytes_received;
-    curr->call_tcp_sent += ns->tcp.call_tcp_sent;
-    curr->call_tcp_received += ns->tcp.call_tcp_received;
-    curr->retransmit += ns->tcp.retransmit;
-    curr->call_close += ns->tcp.close;
-    curr->call_tcp_v4_connection += ns->tcp.ipv4_connect;
-    curr->call_tcp_v6_connection += ns->tcp.ipv6_connect;
-
-    curr->call_udp_sent += ns->udp.call_udp_sent;
-    curr->call_udp_received += ns->udp.call_udp_received;
 }
 
 /**
@@ -2684,8 +2656,8 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_send_apps_data(em, apps_groups_root_target);
 
 #ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_socket_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_socket_pid, em);
+        if (aral_socket_table)
+            ebpf_send_data_aral_chart(aral_socket_table, em);
 #endif
 
         if (cgroups)
@@ -2724,9 +2696,6 @@ static void ebpf_socket_initialize_global_vectors()
     memset(socket_aggregated_data, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_syscall_stat_t));
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
-
-    ebpf_socket_aral_init();
-    socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
 
     aral_socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME,
                                                sizeof(netdata_socket_plus_t));
@@ -2949,8 +2918,8 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 
 #ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_socket_pid)
-        socket_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
+    if (aral_socket_tablen)
+        socket_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME, em);
 #endif
 
     pthread_mutex_unlock(&lock);

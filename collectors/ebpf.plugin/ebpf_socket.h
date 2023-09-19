@@ -153,7 +153,6 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "services.net_udp_send"
 
 // ARAL name
-#define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"
 #define NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME "ebpf_pid_socket"
 #define NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME "ebpf_socket_tbl"
 
