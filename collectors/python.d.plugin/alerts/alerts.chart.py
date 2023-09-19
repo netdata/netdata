@@ -9,17 +9,21 @@ from bases.FrameworkServices.UrlService import UrlService
 
 update_every = 10
 disabled_by_default = False
-autodetection_retry: 10
 
 
 def charts_template():
     order = [
+        'counts',
         'clear',
         'warning',
         'critical'
     ]
 
     charts = {
+        'counts': {
+            'options': [None, 'Alert Status', 'alerts', 'alerts', 'alerts.counts', 'stacked'],
+            'lines': [],
+        },
         'clear': {
             'options': [None, 'Clear Alerts', 'active', 'active', 'alerts.clear', 'stacked'],
             'lines': [],
@@ -46,7 +50,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order, self.definitions = charts_template()
         self.url = self.configuration.get('url', DEFAULT_URL)
-        self.collected_dims = {'clear': set(), 'warning': set(), 'critical': set()}
+        self.collected_dims = {'counts': {'clear','warning','critical'}, 'clear': set(), 'warning': set(), 'critical': set()}
         self.alert_contains_words = self.configuration.get('alert_contains_words', DEFAULT_ALARM_CONTAINS_WORDS)
         self.alert_contains_words_list = [alert_contains_word.lstrip(' ').rstrip(' ') for alert_contains_word in self.alert_contains_words.split(',')]
         self.alert_excludes_words = self.configuration.get('alert_excludes_words', DEFAULT_ALARM_EXCLUDES_WORDS)
@@ -66,11 +70,17 @@ class Service(UrlService):
             alerts = {alert_name: alerts[alert_name] for alert_name in alerts for alert_excludes_word in
                       self.alert_excludes_words_list if alert_excludes_word not in alert_name}
 
+        data = {
+            'clear': len([a for a in alerts if alerts[a]['status'] == 'CLEAR'])
+        }
         data_warning = {'{}_warning'.format(a): 1 for a in alerts if alerts[a]['status'] == 'WARNING'}
+        data['warning'] = len(data_warning)
         self.update_charts('warning', data_warning)
+        data.update(data_warning)
         data_critical = {'{}_critical'.format(a): 1 for a in alerts if alerts[a]['status'] == 'CRITICAL'}
+        data['critical'] = len(data_critical)
         self.update_charts('critical', data_critical)
-        data = {**data_warning, **data_critical}
+        data.update(data_critical)
 
         return data
 
