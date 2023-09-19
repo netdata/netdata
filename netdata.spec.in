@@ -142,10 +142,10 @@ Requires: %{name}-plugin-debugfs = %{version}
 Requires: %{name}-plugin-chartsd = %{version}
 Requires: %{name}-plugin-slabinfo = %{version}
 Requires: %{name}-plugin-perf = %{version}
-%if 0%{?_have_nfacct}
+%if %{_have_nfacct}
 Requires: %{name}-plugin-nfacct = %{version}
 %endif
-%if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+%if %{_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: %{name}-plugin-freeipmi = %{version}
 %endif
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
@@ -161,13 +161,13 @@ Recommends: %{name}-plugin-systemd-journal = %{version}
 # rather than the standard ones
 
 # epbf plugin dependencies
-%if 0%{?_have_ebpf}
+%if %{_have_ebpf}
 BuildRequires: pkgconfig(libelf)
 %endif
 # end ebpf plugin dependencies
 
 # nfacct plugin dependencies
-%if 0%{?_have_nfacct}
+%if %{_have_nfacct}
 BuildRequires: pkgconfig(libmnl)
 BuildRequires: pkgconfig(libnetfilter_acct)
 %endif
@@ -250,20 +250,20 @@ make download
 # Conf step
 %cmake \
 	-DCMAKE_INSTALL_PREFIX=/ \
-	%if 0%{!?_have_ebpf}
-	-DENABLE_PLUGIN_EBPF=Off \
-	%else
+	%if %{_have_ebpf}
 	-DENABLE_PLUGIN_EBPF=On \
-	%endif
-	%if 0%{!?_have_freeipmi}
-	-DENABLE_PLUGIN_FREEIPMI=Off \
 	%else
+	-DENABLE_PLUGIN_EBPF=Off \
+	%endif
+	%if %{_have_freeipmi}
 	-DENABLE_PLUGIN_FREEIPMI=On \
-	%endif
-	%if 0%{!?_have_nfacct}
-	-DENABLE_PLUGIN_NFACCT=Off \
 	%else
+	-DENABLE_PLUGIN_FREEIPMI=Off \
+	%endif
+	%if %{_have_nfacct}
 	-DENABLE_PLUGIN_NFACCT=On \
+	%else
+	-DENABLE_PLUGIN_NFACCT=Off \
 	%endif
 	%if 0%{?centos_ver:1}
 	%if %{centos_ver} < 8
@@ -549,12 +549,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/cloud.d
 
 # Free IPMI belongs to a different sub-package
-%if 0%{?_have_freeipmi}
+%if %{_have_freeipmi}
 %exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
 
 # NFACCT belongs to a different sub-package
-%if 0%{?_have_nfacct}
+%if %{_have_nfacct}
 %exclude %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
 %endif
 
@@ -566,7 +566,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libdir}/%{name}/conf.d/charts.d/
 
 # eBPF belongs to a different sub-package
-%if 0%{?_have_ebpf}
+%if %{_have_ebpf}
 %exclude %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
 %exclude %{_libdir}/%{name}/conf.d/ebpf.d.conf
 %exclude %{_libdir}/%{name}/conf.d/ebpf.d
@@ -639,7 +639,7 @@ fi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
 
-%if 0%{?_have_nfacct}
+%if %{_have_nfacct}
 %package plugin-nfacct
 Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
