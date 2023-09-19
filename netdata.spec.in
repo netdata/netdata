@@ -181,11 +181,7 @@ BuildRequires: pkgconfig(libipmimonitoring)
 
 # CUPS plugin dependencies
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
-%if 0%{?suse_version}
 BuildRequires: cups-devel
-%else
-BuildRequires: pkgconfig(cups)
-%endif
 %endif
 # end - cups plugin dependencies
 
@@ -608,7 +604,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %package plugin-cups
 Summary: The CUPS metrics collection plugin for the Netdata Agent
 Group: Applications/System
-Requires: cups >= 1.7
 Requires: %{name} = %{version}
 
 %description plugin-cups
