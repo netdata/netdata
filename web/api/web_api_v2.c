@@ -238,9 +238,9 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
             req.scope_nodes = value;
         else if(!strcmp(name, "nodes"))
             req.nodes = value;
-        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "scope_contexts"))
+        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_INSTANCES | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "scope_contexts"))
             req.scope_contexts = value;
-        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "contexts"))
+        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_INSTANCES | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "contexts"))
             req.contexts = value;
         else if((mode & CONTEXTS_V2_SEARCH) && !strcmp(name, "q"))
             req.q = value;
@@ -309,6 +309,10 @@ static int web_client_api_request_v2_q(RRDHOST *host __maybe_unused, struct web_
 
 static int web_client_api_request_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
+}
+
+static int web_client_api_request_v2_instances(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS | CONTEXTS_V2_INSTANCES);
 }
 
 static int web_client_api_request_v2_nodes(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -734,6 +738,7 @@ static struct web_api_command api_commands_v2[] = {
         {"weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_weights, 0},
 
         {"contexts",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_contexts, 0},
+        {"instances",           0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_instances, 0},
         {"nodes",               0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_nodes, 0},
         {"node_instances",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_node_instances, 0},
         {"versions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_versions, 0},

@@ -178,6 +178,13 @@ struct context_v2_entry {
     time_t last_time_s;
     RRD_FLAGS flags;
     FTS_MATCH match;
+
+    DICTIONARY *instances;
+};
+
+struct instance_v2_entry {
+    RRDCONTEXT_ACQUIRED *rca;
+    size_t ni;
 };
 
 struct alert_v2_entry {
@@ -521,6 +528,11 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
     return matches != 0;
 }
 
+static void instances_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct rrdcontext_to_json_v2_data *ctl = data; (void)ctl;
+    struct instance_v2_entry *z = value;
+    rrdcontext_release(z->rca);
+}
 
 static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
     struct rrdcontext_to_json_v2_data *ctl = data;
@@ -555,7 +567,28 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
                 .match = match,
         };
 
-        dictionary_set(ctl->contexts.dict, string2str(rc->id), &t, sizeof(struct context_v2_entry));
+        struct context_v2_entry *z = dictionary_set(ctl->contexts.dict, string2str(rc->id), &t, sizeof(struct context_v2_entry));
+
+        if(ctl->mode & CONTEXTS_V2_INSTANCES) {
+            if(!z->instances) {
+                z->instances = dictionary_create_advanced(
+                        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                        NULL, sizeof(struct instance_v2_entry));
+
+                dictionary_register_delete_callback(z->instances, instances_delete_callback, &ctl);
+            }
+
+            RRDCONTEXT_ACQUIRED *t_rca = rrdcontext_acquired_dup(rca);
+
+            char t_rca_str[24 + 1];
+            snprintfz(t_rca_str, 24, "%p", t_rca);
+
+            struct instance_v2_entry ti = {
+                    .rca = t_rca,
+                    .ni = ctl->nodes.ni,
+            };
+            dictionary_set(z->instances, t_rca_str, &ti, sizeof(struct instance_v2_entry));
+        }
     }
 
     return 1;
@@ -949,6 +982,9 @@ static void buffer_json_contexts_v2_mode_to_array(BUFFER *wb, const char *key, C
     if(mode & CONTEXTS_V2_CONTEXTS)
         buffer_json_add_array_item_string(wb, "contexts");
 
+    if(mode & CONTEXTS_V2_INSTANCES)
+        buffer_json_add_array_item_string(wb, "instances");
+
     if(mode & CONTEXTS_V2_SEARCH)
         buffer_json_add_array_item_string(wb, "search");
 
@@ -1097,7 +1133,8 @@ static void functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
     freez(t->node_ids);
 }
 
-static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
+    struct rrdcontext_to_json_v2_data *ctl = data; (void)ctl;
     struct context_v2_entry *o = old_value;
     struct context_v2_entry *n = new_value;
 
@@ -1150,9 +1187,11 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     return true;
 }
 
-static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct rrdcontext_to_json_v2_data *ctl = data; (void)ctl;
     struct context_v2_entry *z = value;
     string_freez(z->family);
+    dictionary_destroy(z->instances);
 }
 
 static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const char *context, time_t alarm_id, void *data) {
@@ -2079,6 +2118,30 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         buffer_json_member_add_boolean(wb, "live", collected);
                         if (mode & CONTEXTS_V2_SEARCH)
                             buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+
+                        if(mode & CONTEXTS_V2_INSTANCES && z->instances) {
+                            buffer_json_member_add_array(wb, "instances");
+                            {
+                                struct instance_v2_entry *ti;
+                                dfe_start_read(z->instances, ti) {
+                                    RRDCONTEXT *rc = rrdcontext_acquired_value(ti->rca);
+                                    RRDINSTANCE *ri;
+                                    dfe_start_read(rc->rrdinstances, ri) {
+                                        buffer_json_add_array_item_object(wb); // instance
+                                        {
+                                            buffer_json_member_add_string(wb, "id", string2str(ri->id));
+                                            if(ri->name && ri->name != ri->id)
+                                                buffer_json_member_add_string(wb, "nm", string2str(ri->name));
+                                            buffer_json_member_add_uint64(wb, "ni", ti->ni);
+                                        }
+                                        buffer_json_object_close(wb); // instance
+                                    }
+                                    dfe_done(ri);
+                                }
+                                dfe_done(ti);
+                            }
+                            buffer_json_array_close(wb); // instances
+                        }
                     }
                     buffer_json_object_close(wb);
                 }
