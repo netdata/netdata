@@ -356,6 +356,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         }
 
         buffer->len = 0;
+        buffer->buffer[0] = '\0';
     }
 
     result = parser->user.data_collections_count;
