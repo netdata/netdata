@@ -509,7 +509,11 @@ fi
 
 if ! command -v cmake >/dev/null 2>&1; then
     fatal "Could not find CMake, which is required to build Netdata." I0012
+else
+    cmake="$(command -v cmake)"
+    progress "Found CMake at ${cmake}. CMake version: $(${cmake} --version | head -n 1)"
 fi
+
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
     printf '%s' "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
@@ -629,7 +633,7 @@ build_jsonc() {
   fi
 
   cd "${1}" > /dev/null || exit 1
-  run eval "${env_cmd} cmake -DBUILD_SHARED_LIBS=OFF ."
+  run eval "${env_cmd} ${cmake} -DBUILD_SHARED_LIBS=OFF ."
   run eval "${env_cmd} make ${MAKEOPTS}"
   cd - > /dev/null || return 1
 }
@@ -648,13 +652,6 @@ bundle_jsonc() {
   # If --build-json-c flag or not json-c on system, then bundle our own json-c
   if [ -z "${NETDATA_BUILD_JSON_C}" ] && pkg-config json-c; then
     NETDATA_BUILD_JSON_C=0
-    return 0
-  fi
-
-  if [ -z "$(command -v cmake)" ]; then
-    run_failed "Could not find cmake, which is required to build JSON-C. The install process will continue, but Netdata Cloud support will be disabled."
-    NETDATA_BUILD_JSON_C=0
-    ENABLE_CLOUD=0
     return 0
   fi
 
@@ -720,12 +717,6 @@ copy_yaml() {
 bundle_yaml() {
   if pkg-config yaml-0.1; then
     BUNDLE_YAML=0
-    return 0
-  fi
-
-  if [ -z "$(command -v cmake)" ]; then
-    run_failed "Could not find cmake, which is required to build YAML. Critical error."
-    BUNDLE_YAML=1
     return 0
   fi
 
@@ -1085,7 +1076,7 @@ check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
 # End of feature autodetection code
 
 # shellcheck disable=SC2086
-if ! run cmake \
+if ! run ${cmake} \
          -S ./ \
          -B "${NETDATA_BUILD_DIR}" \
          -DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}" \
@@ -1107,7 +1098,7 @@ trap - EXIT
 progress "Compile netdata"
 
 # shellcheck disable=SC2086
-if ! run cmake --build "${NETDATA_BUILD_DIR}" -- ${MAKEOPTS} VERBOSE=1; then
+if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" -- ${MAKEOPTS} VERBOSE=1; then
   fatal "Failed to build Netdata." I000B
 fi
 
@@ -1119,7 +1110,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
-if ! run cmake --install "${NETDATA_BUILD_DIR}"; then
+if ! run ${cmake} --install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
 
