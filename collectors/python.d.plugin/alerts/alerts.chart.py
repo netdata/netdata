@@ -13,11 +13,16 @@ disabled_by_default = False
 
 def charts_template():
     order = [
+        'clear',
         'warning',
         'critical'
     ]
 
     charts = {
+        'clear': {
+            'options': [None, 'Clear Alerts', 'active', 'active', 'alerts.clear', 'stacked'],
+            'lines': [],
+        },
         'warning': {
             'options': [None, 'Warning Alerts', 'active', 'active', 'alerts.warning', 'stacked'],
             'lines': [],
@@ -40,7 +45,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order, self.definitions = charts_template()
         self.url = self.configuration.get('url', DEFAULT_URL)
-        self.collected_dims = {'warning': set(), 'critical': set()}
+        self.collected_dims = {'clear': set(), 'warning': set(), 'critical': set()}
         self.alert_contains_words = self.configuration.get('alert_contains_words', DEFAULT_ALARM_CONTAINS_WORDS)
         self.alert_contains_words_list = [alert_contains_word.lstrip(' ').rstrip(' ') for alert_contains_word in self.alert_contains_words.split(',')]
         self.alert_excludes_words = self.configuration.get('alert_excludes_words', DEFAULT_ALARM_EXCLUDES_WORDS)
@@ -60,8 +65,11 @@ class Service(UrlService):
             alerts = {alert_name: alerts[alert_name] for alert_name in alerts for alert_excludes_word in
                       self.alert_excludes_words_list if alert_excludes_word not in alert_name}
 
-        data = {a: 1 for a in alerts if alerts[a]['status'] == 'WARNING'}
-        self.update_charts('warning', data)
+        data = {a: 1 for a in alerts if alerts[a]['status'] == 'CLEAR'}
+        self.update_charts('clear', data)
+        data_warning = {a: 1 for a in alerts if alerts[a]['status'] == 'WARNING'}
+        self.update_charts('warning', data_warning)
+        data.update(data_warning)
         data_critical = {a: 1 for a in alerts if alerts[a]['status'] == 'CRITICAL'}
         self.update_charts('critical', data_critical)
         data.update(data_critical)
