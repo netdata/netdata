@@ -5,15 +5,15 @@ modules:
       module_name: changefinder
       monitored_instance:
         name: python.d changefinder
-        link: ''
+        link: ""
         categories:
           - data-collection.other
-        icon_filename: ''
+        icon_filename: ""
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ''
+        description: ""
       keywords:
         - change detection
         - anomaly detection
@@ -54,14 +54,14 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ''
+        description: ""
       default_behavior:
         auto_detection:
-          description: 'By default this collector will work over all `system.*` charts.'
+          description: "By default this collector will work over all `system.*` charts."
         limits:
-          description: ''
+          description: ""
         performance_impact:
-          description: ''
+          description: ""
     setup:
       prerequisites:
         list:
@@ -87,21 +87,21 @@ modules:
       configuration:
         file:
           name: python.d/changefinder.conf
-          description: ''
+          description: ""
         options:
           description: |
             There are 2 sections:
-            
+
             * Global variables
             * One or more JOBS that can define multiple different instances to monitor.
-            
+
             The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-            
+
             Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-            
+
             Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
           folding:
-            title: 'Config options'
+            title: "Config options"
             enabled: true
           list:
             - name: charts_regex
@@ -146,7 +146,7 @@ modules:
         examples:
           folding:
             enabled: true
-            title: 'Config'
+            title: "Config"
           list:
             - name: Default
               description: Default configuration.

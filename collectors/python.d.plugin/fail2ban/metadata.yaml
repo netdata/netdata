@@ -35,29 +35,29 @@ modules:
           The `fail2ban.log` file must be readable by the user `netdata`.
             - change the file ownership and access permissions.
             - update `/etc/logrotate.d/fail2ban`` to persist the changes after rotating the log file.
-          
+
           To change the file ownership and access permissions, execute the following:
-          
+
           ```shell
           sudo chown root:netdata /var/log/fail2ban.log
           sudo chmod 640 /var/log/fail2ban.log
           ```
-          
+
           To persist the changes after rotating the log file, add `create 640 root netdata` to the `/etc/logrotate.d/fail2ban`:
-          
+
           ```shell
           /var/log/fail2ban.log {
-          
+
               weekly
               rotate 4
               compress
-          
+
               delaycompress
               missingok
               postrotate
                   fail2ban-client flushlogs 1>/dev/null
               endscript
-          
+
               # If fail2ban runs as non-root it still needs to have write access
               # to logfiles.
               # create 640 fail2ban adm
@@ -83,14 +83,14 @@ modules:
         options:
           description: |
             There are 2 sections:
-            
+
             * Global variables
             * One or more JOBS that can define multiple different instances to monitor.
-            
+
             The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
-            
+
             Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
-            
+
             Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
           folding:
             title: Config options
