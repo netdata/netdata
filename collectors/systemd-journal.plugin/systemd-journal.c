@@ -514,9 +514,10 @@ static char *uid_to_username(uid_t uid, char *buffer, size_t buffer_size) {
     struct passwd pw, *result = NULL;
 
     if (getpwuid_r(uid, &pw, tmp, sizeof(tmp), &result) != 0 || !result || !pw.pw_name || !(*pw.pw_name))
-        return NULL;
+        snprintfz(buffer, buffer_size - 1, "%u", uid);
+    else
+        snprintfz(buffer, buffer_size - 1, "%u (%s)", uid, pw.pw_name);
 
-    snprintfz(buffer, buffer_size - 1, "%u (%s)", uid, pw.pw_name);
     return buffer;
 }
 
@@ -525,9 +526,10 @@ static char *gid_to_groupname(gid_t gid, char* buffer, size_t buffer_size) {
     struct group grp, *result = NULL;
 
     if (getgrgid_r(gid, &grp, tmp, sizeof(tmp), &result) != 0 || !result || !grp.gr_name || !(*grp.gr_name))
-        return NULL;
+        snprintfz(buffer, buffer_size - 1, "%u", gid);
+    else
+        snprintfz(buffer, buffer_size - 1, "%u (%s)", gid, grp.gr_name);
 
-    snprintfz(buffer, buffer_size - 1, "%u (%s)", gid, grp.gr_name);
     return buffer;
 }
 
@@ -560,7 +562,7 @@ static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_un
 // ----------------------------------------------------------------------------
 // UID and GID transformation
 
-#define UID_GID_HASHTABLE_SIZE 1000
+#define UID_GID_HASHTABLE_SIZE 10000
 
 struct word_t2str_hashtable_entry {
     struct word_t2str_hashtable_entry *next;
@@ -600,14 +602,12 @@ const char *uid_to_username_cached(uid_t uid, size_t *length) {
     if(!(*e)) {
         static __thread char buf[1024];
         const char *name = uid_to_username(uid, buf, sizeof(buf));
-        if(name) {
-            size_t size = strlen(name) + 1;
+        size_t size = strlen(name) + 1;
 
-            *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
-            (*e)->len = size - 1;
-            (*e)->hash = uid;
-            memcpy((*e)->str, name, size);
-        }
+        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
+        (*e)->len = size - 1;
+        (*e)->hash = uid;
+        memcpy((*e)->str, name, size);
     }
 
     spinlock_unlock(&uid_hashtable.spinlock);
@@ -623,14 +623,12 @@ const char *gid_to_groupname_cached(gid_t gid, size_t *length) {
     if(!(*e)) {
         static __thread char buf[1024];
         const char *name = gid_to_groupname(gid, buf, sizeof(buf));
-        if(name) {
-            size_t size = strlen(name) + 1;
+        size_t size = strlen(name) + 1;
 
-            *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
-            (*e)->len = size - 1;
-            (*e)->hash = gid;
-            memcpy((*e)->str, name, size);
-        }
+        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
+        (*e)->len = size - 1;
+        (*e)->hash = gid;
+        memcpy((*e)->str, name, size);
     }
 
     spinlock_unlock(&gid_hashtable.spinlock);
