@@ -2,8 +2,57 @@
 
 cmake_minimum_required(VERSION 3.1.0)
 
+#
+# version atrocities
+#
+
+find_package(Git)
+
+if(GIT_EXECUTABLE)
+        execute_process(COMMAND ${GIT_EXECUTABLE} describe
+                        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                        RESULT_VARIABLE GIT_DESCRIBE_RESULT
+                        OUTPUT_VARIABLE GIT_DESCRIBE_OUTPUT)
+        if(GIT_DESCRIBE_RESULT)
+                file(STRINGS packaging/version GIT_DESCRIBE_OUTPUT)
+                message(WARNING "using version from packaging/version: '${GIT_DESCRIBE_OUTPUT}'")
+        endif()
+else()
+        file(STRINGS packaging/version GIT_DESCRIBE_OUTPUT)
+        message(WARNING "using version from packaging/version: '${GIT_DESCRIBE_OUTPUT}'")
+endif()
+
+string(STRIP ${GIT_DESCRIBE_OUTPUT} GIT_DESCRIBE_OUTPUT)
+string(REGEX MATCH "v?([0-9]+)\\.([0-9]+)\\.([0-9]+)-([0-9]+)?-?([0-9a-zA-Z]+)?" MATCHES "${GIT_DESCRIBE_OUTPUT}")
+
+if(CMAKE_MATCH_COUNT EQUAL 3)
+        set(FIELD_MAJOR ${CMAKE_MATCH_1})
+        set(FIELD_MINOR ${CMAKE_MATCH_2})
+        set(FIELD_PATCH ${CMAKE_MATCH_3})
+        set(FIELD_TWEAK 0)
+        set(FIELD_DESCR "N/A")
+elseif(CMAKE_MATCH_COUNT EQUAL 4)
+        set(FIELD_MAJOR ${CMAKE_MATCH_1})
+        set(FIELD_MINOR ${CMAKE_MATCH_2})
+        set(FIELD_PATCH ${CMAKE_MATCH_3})
+        set(FIELD_TWEAK ${CMAKE_MATCH_4})
+        set(FIELD_DESCR "N/A")
+elseif(CMAKE_MATCH_COUNT EQUAL 5)
+        set(FIELD_MAJOR ${CMAKE_MATCH_1})
+        set(FIELD_MINOR ${CMAKE_MATCH_2})
+        set(FIELD_PATCH ${CMAKE_MATCH_3})
+        set(FIELD_TWEAK ${CMAKE_MATCH_4})
+        set(FIELD_DESCR ${CMAKE_MATCH_5})
+else()
+        message(FATAL_ERROR "Wrong version regex match count ${CMAKE_MATCH_COUNT} (should be in 3, 4 or 5)")
+endif()
+
+#
+# project
+#
+
 project(netdata
-        VERSION 1.41.0.300
+        VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK}
         DESCRIPTION "Netdata real-time monitoring"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
@@ -1362,6 +1411,7 @@ set(VARLIB_DIR "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
 
 set(CONFIGURE_COMMAND "dummy-configure-command")
 set(NETDATA_USER "netdata")
+set(VERSION "${GIT_DESCRIBE_OUTPUT}")
 
 configure_file(config.cmake.h.in config.h)
 

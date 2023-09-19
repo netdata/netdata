@@ -79,7 +79,7 @@
 #cmakedefine CONFIGURE_COMMAND "@CONFIGURE_COMMAND@"
 #cmakedefine NETDATA_USER "@NETDATA_USER@"
 
-#define VERSION "1.34.0"
+#cmakedefine VERSION "@GIT_DESCRIBE_OUTPUT@"
 
 #define ENABLE_JSONC 1
 
