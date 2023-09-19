@@ -421,7 +421,6 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   total_ram="$((total_ram * 1024))"
 
   if [ "${total_ram}" -le "$((base * mega))" ] && [ -z "${NETDATA_ENABLE_ML}" ]; then
-    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_ML=Off)}" | sed 's/$/ -DENABLE_ML=Off/g')"
     NETDATA_ENABLE_ML=0
   fi
 
@@ -432,6 +431,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
       proc_count="$((proc_count - 1))"
       target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
       MAKEOPTS="-j${proc_count}"
+      NINJAOPTS="-j${proc_count}"
     done
   else
     if [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ] && [ -z "${SKIP_RAM_CHECK}" ]; then
@@ -514,6 +514,20 @@ else
     progress "Found CMake at ${cmake}. CMake version: $(${cmake} --version | head -n 1)"
 fi
 
+if ! command -v "ninja" >/dev/null 2>&1; then
+    progress "Could not find Ninja, will use Make instead."
+else
+    ninja="$(command -v ninja)"
+    progress "Found Ninja at ${ninja}. Ninja version: $(${ninja} --version)"
+    progress "Will use Ninja for this build instead of Make."
+fi
+
+make="$(command -v make 2>/dev/null)"
+
+if [ -z "${make}" ] && [ -z "${ninja}" ]; then
+    fatal "Could not find a usable copy of Make, which is required to build Netdata." I0014
+fi
+
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
     printf '%s' "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
@@ -559,7 +573,7 @@ build_protobuf() {
     return 1
   fi
 
-  if ! run eval "${env_cmd} make ${MAKEOPTS}"; then
+  if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
     cd - > /dev/null || return 1
     return 1
   fi
@@ -583,6 +597,12 @@ bundle_protobuf() {
   if [ -n "${USE_SYSTEM_PROTOBUF}" ]; then
     echo "Skipping protobuf"
     warning "You have requested use of a system copy of protobuf. This should work, but it is not recommended as it's very likely to break if you upgrade the currently installed version of protobuf."
+    return 0
+  fi
+
+  if [ -z "${make}" ]; then
+    warning "No usable copy of Make found, which is required for bundling protobuf. Attempting to use a system copy fo protobuf instead."
+    USE_SYSTEM_PROTOBUF=1
     return 0
   fi
 
@@ -634,7 +654,7 @@ build_jsonc() {
 
   cd "${1}" > /dev/null || exit 1
   run eval "${env_cmd} ${cmake} -DBUILD_SHARED_LIBS=OFF ."
-  run eval "${env_cmd} make ${MAKEOPTS}"
+  run eval "${env_cmd} ${make} ${MAKEOPTS}"
   cd - > /dev/null || return 1
 }
 
@@ -653,6 +673,10 @@ bundle_jsonc() {
   if [ -z "${NETDATA_BUILD_JSON_C}" ] && pkg-config json-c; then
     NETDATA_BUILD_JSON_C=0
     return 0
+  fi
+
+  if [ -z "${make}" ]; then
+    fatal "No usable copy of Make found, which is required to bundle JSON-C. Either install development files for JSON-C, or install a working copy of Make." I0015
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling JSON-C."
@@ -701,7 +725,7 @@ build_yaml() {
 
   cd "${1}" > /dev/null || return 1
   run eval "${env_cmd} ./configure --disable-shared --disable-dependency-tracking --with-pic"
-  run eval "${env_cmd} make ${MAKEOPTS}"
+  run eval "${env_cmd} ${make} ${MAKEOPTS}"
   cd - > /dev/null || return 1
 }
 
@@ -718,6 +742,10 @@ bundle_yaml() {
   if pkg-config yaml-0.1; then
     BUNDLE_YAML=0
     return 0
+  fi
+
+  if [ -z "${make}" ]; then
+    fatal "Need to bundle libyaml but cannot find a copy of Make to build it with. Either install development files for libyaml, or install a usable copy fo Make." I0016
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling YAML."
@@ -801,7 +829,7 @@ build_libbpf() {
   cd "${1}/src" > /dev/null || return 1
   mkdir root build
   # shellcheck disable=SC2086
-  run env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make ${MAKEOPTS} install
+  run env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS= BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. ${make} ${MAKEOPTS} install
   cd - > /dev/null || return 1
 }
 
@@ -823,6 +851,13 @@ copy_libbpf() {
 
 bundle_libbpf() {
   if { [ -n "${NETDATA_DISABLE_EBPF}" ] && [ "${NETDATA_DISABLE_EBPF}" = 1 ]; } || [ "$(uname -s)" != Linux ]; then
+    ENABLE_EBPF=0
+    NETDATA_DISABLE_EBPF=1
+    return 0
+  fi
+
+  if [ -z "${make}" ]; then
+    warning "No usable copy of Make found, which is required to bundle libbpf. Disabling eBPF support."
     ENABLE_EBPF=0
     NETDATA_DISABLE_EBPF=1
     return 0
@@ -1079,6 +1114,7 @@ check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
 if ! run ${cmake} \
          -S ./ \
          -B "${NETDATA_BUILD_DIR}" \
+         ${ninja:+-G Ninja} \
          -DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}" \
          ${NETDATA_USER:+-DNETDATA_USER="${NETDATA_USER}"} \
          ${NETDATA_CMAKE_OPTIONS} \
@@ -1097,8 +1133,10 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
+CMAKE_BUILD_OPTS="-- ${MAKEOPTS} VERBOSE=1"
+[ -n "${ninja}" ] && CMAKE_BUILD_OPTS="-- ${NINJAOPTS} -v"
 # shellcheck disable=SC2086
-if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" -- ${MAKEOPTS} VERBOSE=1; then
+if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" ${CMAKE_BUILD_OPTS}; then
   fatal "Failed to build Netdata." I000B
 fi
 
