@@ -14,7 +14,6 @@ disabled_by_default = False
 def charts_template():
     order = [
         'counts',
-        'clear',
         'warning',
         'critical'
     ]
@@ -22,10 +21,6 @@ def charts_template():
     charts = {
         'counts': {
             'options': [None, 'Alert Status', 'alerts', 'alerts', 'alerts.counts', 'stacked'],
-            'lines': [],
-        },
-        'clear': {
-            'options': [None, 'Clear Alerts', 'active', 'active', 'alerts.clear', 'stacked'],
             'lines': [],
         },
         'warning': {
@@ -50,7 +45,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order, self.definitions = charts_template()
         self.url = self.configuration.get('url', DEFAULT_URL)
-        self.collected_dims = {'counts': {'clear','warning','critical'}, 'clear': set(), 'warning': set(), 'critical': set()}
+        self.collected_dims = {'counts': {'clear','warning','critical'}, 'warning': set(), 'critical': set()}
         self.alert_contains_words = self.configuration.get('alert_contains_words', DEFAULT_ALARM_CONTAINS_WORDS)
         self.alert_contains_words_list = [alert_contains_word.lstrip(' ').rstrip(' ') for alert_contains_word in self.alert_contains_words.split(',')]
         self.alert_excludes_words = self.configuration.get('alert_excludes_words', DEFAULT_ALARM_EXCLUDES_WORDS)
