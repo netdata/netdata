@@ -204,6 +204,8 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/eval/eval.h
                      libnetdata/facets/facets.c
                      libnetdata/facets/facets.h
+                     libnetdata/functions_evloop/functions_evloop.c
+                     libnetdata/functions_evloop/functions_evloop.h
                      libnetdata/gorilla/gorilla.cc
                      libnetdata/gorilla/gorilla.h
                      libnetdata/health/health.c
