@@ -59,7 +59,7 @@ modules:
           section_name: "[plugin:freeipmi]"
         options:
           description: |
-            The configuration is set using command line options. 
+            The configuration is set using command line options:
 
             ```
             # netdata.conf
