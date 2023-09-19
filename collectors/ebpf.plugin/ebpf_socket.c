@@ -1031,6 +1031,56 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
 }
 
 /**
+ * Sum PID values from kernel
+ *
+ * Update publish show data read from kernel.
+ *
+ * @param root
+ */
+void ebpf_socket_sum_pid_values_from_kernel(struct ebpf_target *root)
+{
+    ebpf_socket_publish_apps_t *socket = &root->socket;
+    struct ebpf_pid_on_target *w = root->root_pid;
+    if (!root->root_pid)
+        return;
+
+    memset(socket, 0, sizeof(*socket));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+    while (root) {
+        int32_t pid = w->pid;
+
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+        if (pid_ptr) {
+            rw_spinlock_read_lock(&pid_ptr->socket_stats.rw_spinlock);
+            if (pid_ptr->socket_stats.JudyLArray) {
+                Word_t local_timestamp = 0;
+                bool first_socket = true;
+                Pvoid_t *socket_value;
+                while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_timestamp, &first_socket))) {
+                    netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
+
+                    socket->bytes_sent += values->data.tcp.tcp_bytes_sent;
+                    socket->bytes_received += values->data.tcp.tcp_bytes_received;
+                    socket->call_tcp_sent += values->data.tcp.call_tcp_sent;
+                    socket->call_tcp_received += values->data.tcp.call_tcp_received;
+                    socket->retransmit += values->data.tcp.retransmit;
+                    socket->call_udp_sent += values->data.udp.udp_bytes_sent;
+                    socket->call_udp_received += values->data.udp.udp_bytes_received;
+                    socket->call_close += values->data.tcp.close;
+                    socket->call_tcp_v4_connection += values->data.tcp.ipv4_connect;
+                    socket->call_tcp_v6_connection += values->data.tcp.ipv6_connect;
+                }
+            }
+            rw_spinlock_read_unlock(&pid_ptr->socket_stats.rw_spinlock);
+        }
+
+        root = root->next;
+    }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
+
+/**
  * Send data to Netdata calling auxiliary functions.
  *
  * @param em   the structure with thread information

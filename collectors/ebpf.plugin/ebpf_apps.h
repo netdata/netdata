@@ -61,6 +61,7 @@ struct ebpf_target {
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
+    ebpf_socket_publish_apps_t socket;
 
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
