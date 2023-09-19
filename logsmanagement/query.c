@@ -84,9 +84,6 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     struct File_info *p_file_infos[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
 
     /* Check all required query parameters are present */
-    if(unlikely(!*p_query_params->filename && !*p_query_params->chart_name))
-        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR];
-
     if(unlikely(!p_query_params->req_from_ts || !p_query_params->req_to_ts))
         return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_INV_TS_ERR];
 
@@ -100,14 +97,15 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
 
     /* Find p_file_infos for this query according to chart_names or filenames 
      * if the former is not valid. Only one of the two will be used, 
-     * charts_names and filenames cannot be mixed. */
+     * charts_names and filenames cannot be mixed.
+     * If neither list is provided, search all available log sources. */
     if(p_query_params->chart_name[0]){
         int pfi_off = 0;
         for(int cn_off = 0; p_query_params->chart_name[cn_off]; cn_off++) {
-            for(int pfia_dat_off = 0; pfia_dat_off < p_file_infos_arr->count; pfia_dat_off++) {
-                if( !strcmp(p_file_infos_arr->data[pfia_dat_off]->chart_name, p_query_params->chart_name[cn_off]) && 
-                    p_file_infos_arr->data[pfia_dat_off]->db_mode != LOGS_MANAG_DB_MODE_NONE) {
-                    p_file_infos[pfi_off++] = p_file_infos_arr->data[pfia_dat_off];
+            for(int pfi_arr_off = 0; pfi_arr_off < p_file_infos_arr->count; pfi_arr_off++) {
+                if( !strcmp(p_file_infos_arr->data[pfi_arr_off]->chart_name, p_query_params->chart_name[cn_off]) && 
+                    p_file_infos_arr->data[pfi_arr_off]->db_mode != LOGS_MANAG_DB_MODE_NONE) {
+                    p_file_infos[pfi_off++] = p_file_infos_arr->data[pfi_arr_off];
                     break;
                 }
             }
@@ -116,24 +114,34 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     else if(p_query_params->filename[0]){
         int pfi_off = 0;
         for(int fn_off = 0; p_query_params->filename[fn_off]; fn_off++) {
-            for(int pfia_dat_off = 0; pfia_dat_off < p_file_infos_arr->count; pfia_dat_off++) {
-                if( !strcmp(p_file_infos_arr->data[pfia_dat_off]->filename, p_query_params->filename[fn_off]) && 
-                    p_file_infos_arr->data[pfia_dat_off]->db_mode != LOGS_MANAG_DB_MODE_NONE) {
-                    p_file_infos[pfi_off++] = p_file_infos_arr->data[pfia_dat_off];
+            for(int pfi_arr_off = 0; pfi_arr_off < p_file_infos_arr->count; pfi_arr_off++) {
+                if( !strcmp(p_file_infos_arr->data[pfi_arr_off]->filename, p_query_params->filename[fn_off]) && 
+                    p_file_infos_arr->data[pfi_arr_off]->db_mode != LOGS_MANAG_DB_MODE_NONE) {
+                    p_file_infos[pfi_off++] = p_file_infos_arr->data[pfi_arr_off];
                     break;
                 }
             }
         }
     }
-    else return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR];
+    else{
+        int pfi_off = 0;
+        for(int pfi_arr_off = 0; pfi_arr_off < p_file_infos_arr->count; pfi_arr_off++) {
+            if(p_file_infos_arr->data[pfi_arr_off]->db_mode != LOGS_MANAG_DB_MODE_NONE)
+                p_file_infos[pfi_off++] = p_file_infos_arr->data[pfi_arr_off];
+        }
+    }
 
-    if(unlikely(!p_file_infos[0])) return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR];
+    if(unlikely(!p_file_infos[0])) 
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR];
 
     
     if( p_query_params->sanitize_keyword && p_query_params->keyword && 
         *p_query_params->keyword && strcmp(p_query_params->keyword, " ")){
         p_query_params->keyword = sanitise_string(p_query_params->keyword); // freez(p_query_params->keyword) in this case
     }
+
+    if(p_query_params->stop_monotonic_ut == 0)
+        p_query_params->stop_monotonic_ut = now_monotonic_usec() + (LOGS_MANAG_QUERY_TIMEOUT_DEFAULT - 1) * USEC_PER_SEC;
 
     struct rusage ru_start, ru_end;
     getrusage(RUSAGE_THREAD, &ru_start);
@@ -145,28 +153,20 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_lock(p_file_infos[pfi_off]->db_mut);
 
-
     /* If results are requested in ascending timestamp order, search DB(s) first 
      * and then the circular buffers. Otherwise, search the circular buffers
      * first and the DB(s) second. In both cases, the quota must be respected. */
-    if(p_query_params->order_by_asc) 
+    if(p_query_params->order_by_asc)
         db_search(p_query_params, p_file_infos);
 
-    if (p_query_params->results_buff->len < p_query_params->quota) {
-        Circ_buff_t *circ_buffs[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
-        int pfi_off = -1;
-        while(p_file_infos[++pfi_off]){
-            circ_buffs[pfi_off] = p_file_infos[pfi_off]->circ_buff;
-            uv_rwlock_rdlock(&circ_buffs[pfi_off]->buff_realloc_rwlock);
-        }
-        circ_buff_search(circ_buffs, p_query_params);
-        for(pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
-            uv_rwlock_rdunlock(&circ_buffs[pfi_off]->buff_realloc_rwlock);
-        }
-    }
+    if( p_query_params->results_buff->len < p_query_params->quota && 
+        now_monotonic_usec() <= p_query_params->stop_monotonic_ut)
+            circ_buff_search(p_query_params, p_file_infos);
 
-    if(!p_query_params->order_by_asc && p_query_params->results_buff->len <  p_query_params->quota) 
-        db_search(p_query_params, p_file_infos);
+    if(!p_query_params->order_by_asc && 
+        p_query_params->results_buff->len < p_query_params->quota &&
+        now_monotonic_usec() <= p_query_params->stop_monotonic_ut) 
+            db_search(p_query_params, p_file_infos);
 
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
         uv_mutex_unlock(p_file_infos[pfi_off]->db_mut);
@@ -192,7 +192,8 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
         freez(p_query_params->keyword);
     }
 
-    if(!p_query_params->results_buff->len) return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
+    if(!p_query_params->results_buff->len) 
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
 
     return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_OK];
 }

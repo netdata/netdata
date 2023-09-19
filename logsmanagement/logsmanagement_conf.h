@@ -124,6 +124,7 @@ typedef enum {
 #define LOGS_MANAG_QUERY_QUOTA_MAX MAX_LOG_MSG_SIZE     /**< Max logs management query quota **/
 #define LOGS_MANAG_QUERY_IGNORE_CASE_DEFAULT 0          /**< Boolean to indicate whether to ignore case for keyword or not **/
 #define LOGS_MANAG_QUERY_SANITIZE_KEYWORD_DEFAULT 0     /**< Boolean to indicate whether to sanitize keyword or not **/
+#define LOGS_MANAG_QUERY_TIMEOUT_DEFAULT 30             /**< Default timeout of logs management queries (in secs) **/
 
 /* -------------------------------------------------------------------------- */
 

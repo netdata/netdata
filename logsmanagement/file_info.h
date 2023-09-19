@@ -35,10 +35,6 @@ static const char * const log_src_t_str[] = {LOG_SRCS};
 
 #include "rrd_api/rrd_api.h"
 
-// Forward declaration to break circular dependency
-struct Circ_buff;
-struct Circ_buff_item_ptrs;
-
 typedef enum log_src_state {
     LOG_SRC_UNINITIALIZED = 0,      /*!< config not initialized */
     LOG_SRC_READY,                  /*!< config initialized (monitoring may have started or not) */

@@ -1585,6 +1585,9 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         else if(!strcmp(name, LOGS_QRY_KW_QUOTA)) {
             req_quota = strtoll(value, NULL, 10);
         }
+        else if (!strcmp(name, "timeout")) {
+            query_params.stop_monotonic_ut = now_monotonic_usec() + (strtoull(value, NULL, 10) - 1) * USEC_PER_SEC;
+        }
         else if(!strcmp(name, LOGS_QRY_KW_FILENAME) && fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) {
             query_params.filename[fn_off++] = value;
         }
@@ -1788,8 +1791,8 @@ static struct web_api_command api_commands_v1[] = {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics,      0              },
 
 #if defined(ENABLE_LOGSMANAGEMENT)
-        { "logsmanagement_sources", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_logsmanagement_sources, 0 },
-        { "logsmanagement",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_logsmanagement,         0 },
+        { "logsmanagement_sources", 0, ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_logsmanagement_sources, 0 },
+        { "logsmanagement",         0, ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_logsmanagement,         0 },
 #endif
 
 #if defined(ENABLE_ML)

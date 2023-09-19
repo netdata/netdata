@@ -15,6 +15,9 @@
 #include "query.h"
 #include "file_info.h"
 
+// Forward declaration to break circular dependency
+struct File_info;
+
 typedef enum {
     CIRC_BUFF_ITEM_STATUS_UNPROCESSED = 0,
     CIRC_BUFF_ITEM_STATUS_PARSED = 1,
@@ -52,7 +55,7 @@ typedef struct Circ_buff {
     int compression_ratio;				        /**< text_size_total / text_compressed_size_total **/
 } Circ_buff_t;
 
-void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_query_params);
+void circ_buff_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]);
 size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space);
 int circ_buff_insert(Circ_buff_t *const buff);
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff);

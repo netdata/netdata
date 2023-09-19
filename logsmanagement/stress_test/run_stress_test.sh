@@ -79,11 +79,9 @@ then
 					--dont-wait \
 					--disable-lto \
 					--disable-telemetry \
-					--disable-cloud \
 					--disable-go \
 					--disable-ebpf \
 					--disable-ml \
-					--use-system-protobuf \
 					--enable-logsmanagement-tests \
 					--install-prefix $INSTALL_PATH
 	else

@@ -11,9 +11,14 @@
 #include "helper.h"
 #include "parser.h"
 
+struct qsort_item {
+    Circ_buff_item_t *cbi;
+    struct File_info *pfi;
+};
+
 static int qsort_timestamp (const void *item_a, const void *item_b) {
-   return ( (int64_t)(*(Circ_buff_item_t**)item_a)->timestamp - 
-            (int64_t)(*(Circ_buff_item_t**)item_b)->timestamp);
+   return ( (int64_t)((struct qsort_item*)item_a)->cbi->timestamp - 
+            (int64_t)((struct qsort_item*)item_b)->cbi->timestamp);
 }
 
 static int reverse_qsort_timestamp (const void * item_a, const void * item_b) {
@@ -29,27 +34,29 @@ static int reverse_qsort_timestamp (const void * item_a, const void * item_b) {
  * circ_buff_search() and circ_buff_read_done() are mutually exclusive due 
  * to uv_mutex_lock() and uv_mutex_unlock() in queries and when writing to DB.
  * 
- * @param buffs Buffers to be searched
  * @param p_query_params Query parameters to search according to.
+ * @param p_file_infos   File_info structs to be searched.
  */
-void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_query_params) {
+void circ_buff_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]) {
+    
+    for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
+        uv_rwlock_rdlock(&p_file_infos[pfi_off]->circ_buff->buff_realloc_rwlock);
 
-    BUFFER *const res_buff = p_query_params->results_buff;
+    int buffs_size = 0, 
+        buff_max_num_of_items = 0;
 
-    int buffs_size = 0, buff_max_num_of_items = 0;
-
-    if(unlikely(buffs[0] == NULL)) return; // No buffs to be searched
-    while(buffs[buffs_size]){
-        if(buffs[buffs_size]->num_of_items > buff_max_num_of_items) 
-            buff_max_num_of_items = buffs[buffs_size]->num_of_items;
+    while(p_file_infos[buffs_size]){
+        if(p_file_infos[buffs_size]->circ_buff->num_of_items > buff_max_num_of_items) 
+            buff_max_num_of_items = p_file_infos[buffs_size]->circ_buff->num_of_items;
         buffs_size++;
     }
 
-    Circ_buff_item_t *items[buffs_size * buff_max_num_of_items + 1]; // worst case allocation
+    struct qsort_item items[buffs_size * buff_max_num_of_items + 1]; // worst case allocation
+    
     int items_off = 0;
 
-    for(int buff_off = 0; buffs[buff_off]; buff_off++){
-        Circ_buff_t *buff = buffs[buff_off];
+    for(int buff_off = 0; p_file_infos[buff_off]; buff_off++){
+        Circ_buff_t *buff = p_file_infos[buff_off]->circ_buff;
         /* TODO: The following 3 operations need to be replaced with a struct
          * to gurantee atomicity. */
         int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
@@ -58,33 +65,46 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
 
         if ((head == tail) && !full) continue;  // Nothing to do if buff is empty
 
-        for (int i = tail; i != head; i = (i + 1) % buff->num_of_items)
-            items[items_off++] = &buff->items[i];
+        for (int i = tail; i != head; i = (i + 1) % buff->num_of_items){
+            items[items_off].cbi = &buff->items[i];
+            items[items_off++].pfi = p_file_infos[buff_off];
+        }
     }
 
-    items[items_off] = NULL;
+    items[items_off].cbi = NULL;
+    items[items_off].pfi = NULL;
 
-    if(unlikely(items[0] == NULL)) return; // No items to be searched
-    else qsort(items, items_off, sizeof(items[0]), 
-                p_query_params->order_by_asc ? qsort_timestamp : reverse_qsort_timestamp);
+    if(items[0].cbi) 
+        qsort(items, items_off, sizeof(items[0]), p_query_params->order_by_asc ? qsort_timestamp : reverse_qsort_timestamp);
+
+    
+    BUFFER *const res_buff = p_query_params->results_buff;
  
     logs_query_res_hdr_t res_hdr = { // result header
-        .matches = 0, 
-        .text_size = 0, 
-        .timestamp = p_query_params->act_to_ts
+        .timestamp = p_query_params->act_to_ts,
+        .text_size = 0,
+        .matches = 0,
+        .log_source = "",
+        .log_type = ""
     }; 
 
-    for (int i = 0; items[i]; i++) {
+    for (int i = 0; items[i].cbi; i++) {
 
-        /* If exceeding quota and new timestamp is different than previous, terminate query but
-        *  inform caller about act_to_ts to continue from (its next value) in next call. */
-        if(res_buff->len >= p_query_params->quota && items[i]->timestamp != res_hdr.timestamp){
+        /* If exceeding quota or timeout is reached and new timestamp is different than previous, 
+         * terminate query but inform caller about act_to_ts to continue from (its next value) in next call. */
+        if((res_buff->len >= p_query_params->quota || now_monotonic_usec() > p_query_params->stop_monotonic_ut) && 
+                items[i].cbi->timestamp != res_hdr.timestamp){
             p_query_params->act_to_ts = res_hdr.timestamp;
             break;
         }
 
-        res_hdr.timestamp = items[i]->timestamp;
-        res_hdr.text_size = items[i]->text_size;
+        res_hdr.timestamp = items[i].cbi->timestamp;
+        res_hdr.text_size = items[i].cbi->text_size;
+        snprintfz(res_hdr.log_source, sizeof(res_hdr.log_source), "%s", log_src_t_str[items[i].pfi->log_source]);
+        snprintfz(res_hdr.log_type, sizeof(res_hdr.log_type), "%s", log_src_type_t_str[items[i].pfi->log_type]);
+        snprintfz(res_hdr.basename, sizeof(res_hdr.basename), "%s", items[i].pfi->file_basename);
+        snprintfz(res_hdr.filename, sizeof(res_hdr.filename), "%s", items[i].pfi->filename);
+        snprintfz(res_hdr.chartname, sizeof(res_hdr.chartname), "%s", items[i].pfi->chart_name);
 
         if (p_query_params->order_by_asc ?
             ( res_hdr.timestamp >= p_query_params->req_from_ts  && res_hdr.timestamp <= p_query_params->req_to_ts  ) : 
@@ -95,14 +115,14 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
             buffer_increase(res_buff, sizeof(res_hdr) + res_hdr.text_size); 
 
             if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
-                /* NOTE: relying on items[i]->num_lines to get number of log lines
+                /* NOTE: relying on items[i]->cbi->num_lines to get number of log lines
                  * might not be 100% correct, since parsing must have taken place 
                  * already to return correct count. Maybe an issue under heavy load. */
-                res_hdr.matches = items[i]->num_lines;
-                memcpy(&res_buff->buffer[res_buff->len + sizeof(res_hdr)], items[i]->data, res_hdr.text_size);
+                res_hdr.matches = items[i].cbi->num_lines;
+                memcpy(&res_buff->buffer[res_buff->len + sizeof(res_hdr)], items[i].cbi->data, res_hdr.text_size);
             }
             else {
-                res_hdr.matches = search_keyword(   items[i]->data, res_hdr.text_size, 
+                res_hdr.matches = search_keyword(   items[i].cbi->data, res_hdr.text_size, 
                                                     &res_buff->buffer[res_buff->len + sizeof(res_hdr)], 
                                                     &res_hdr.text_size, p_query_params->keyword, NULL, 
                                                     p_query_params->ignore_case);
@@ -125,6 +145,9 @@ void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_q
             m_assert(TEST_MS_TIMESTAMP_VALID(res_hdr.timestamp), "res_hdr.timestamp is invalid");
         }
     }
+
+    for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
+        uv_rwlock_rdunlock(&p_file_infos[pfi_off]->circ_buff->buff_realloc_rwlock);
 }
 
 /**

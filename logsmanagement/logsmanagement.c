@@ -1301,7 +1301,7 @@ void *logsmanagement_main(void *ptr) {
 
     rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, 
                                 FUNCTION_LOGSMANAGEMENT_HELP_SHORT, true, 
-                                logsmanagement_function_execute_cb, NULL);
+                                logsmanagement_function_facets, NULL);
 
     collector_info("logsmanagement_main() setup completed successfully");
 

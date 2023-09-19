@@ -1186,6 +1186,12 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 goto next_item;
             }
 
+            #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
+            netdata_log_debug(D_LOGS_MANAG, "strptime() result: year:%d mon:%d day:%d hour:%d min:%d sec:%d", 
+                ltm.tm_year, ltm.tm_mon, ltm.tm_mday, 
+                ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
+            #endif
+
             /* Deal with 2nd part of datetime i.e. timezone */
 
             m_assert(*tz_str == ' ', "Invalid TIME timezone");
@@ -1215,9 +1221,17 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             netdata_log_debug(D_LOGS_MANAG, "Timezone: int:%ld, hrs:%ld, mins:%ld", tz, tz_h, tz_m);
             #endif
 
-            log_line_parsed->timestamp = mktime(&ltm) + tz_adj;
+            if(-1 == (log_line_parsed->timestamp = timegm(&ltm) + tz_adj)){
+                collector_error("TIME datetime parsing failed");
+                log_line_parsed->timestamp = 0;
+                log_line_parsed->parsing_errors++;
+            }
+
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
+            char tb[80];
+            strftime(tb, sizeof(tb), "%c", &ltm );
             netdata_log_debug(D_LOGS_MANAG, "Extracted TIME:%ld", log_line_parsed->timestamp);
+            netdata_log_debug(D_LOGS_MANAG, "Extracted TIME string:%s", tb);
             #endif
 
             offset = tz_str_end + 1; // WARNING! this modifies the offset but it is required in the TIME case.

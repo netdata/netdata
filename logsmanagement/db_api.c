@@ -1178,7 +1178,7 @@ return_error:
  * @details This function searches one or more databases for any results 
  * matching the query parameters. If any results are found, it will decompress 
  * the text of each returned row and add it to the results buffer, up to a 
- * maximum amount of p_query_params->quota bytes. 
+ * maximum amount of p_query_params->quota bytes (unless timed out). 
  * @todo Make decompress buffer static to reduce mallocs/frees.
  * @todo Limit number of results returned through SQLite Query to speed up search?
  */
@@ -1288,9 +1288,14 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
     
     BUFFER *const res_buff = p_query_params->results_buff;
     logs_query_res_hdr_t res_hdr = { // results header
-        .matches = 0,
+        .timestamp = p_query_params->act_to_ts,
         .text_size = 0,
-        .timestamp = p_query_params->act_to_ts
+        .matches = 0,
+        .log_source = "",
+        .log_type = "",
+        .basename = "",
+        .filename = "",
+        .chartname =""
     }; 
     size_t text_compressed_size_max = 0;
     
@@ -1305,13 +1310,20 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         unsigned long num_lines = (unsigned long) sqlite3_column_int64(stmt_get_log_msg_metadata, 5);
         int db_off = p_file_infos[1] ? sqlite3_column_int(stmt_get_log_msg_metadata, 6) : 0;
 
-        /* If exceeding quota and new timestamp is different than previous, terminate query */
-        if(res_buff->len >= p_query_params->quota && tmp_itm.timestamp != res_hdr.timestamp){
+        /* If exceeding quota or timeout is reached and new timestamp 
+         * is different than previous, terminate query. */
+        if((res_buff->len >= p_query_params->quota || now_monotonic_usec() > p_query_params->stop_monotonic_ut) && 
+                tmp_itm.timestamp != res_hdr.timestamp){
             p_query_params->act_to_ts = res_hdr.timestamp;
             break;
         }
 
         res_hdr.timestamp = tmp_itm.timestamp;
+        snprintfz(res_hdr.log_source, sizeof(res_hdr.log_source), "%s", log_src_t_str[p_file_infos[db_off]->log_source]);
+        snprintfz(res_hdr.log_type, sizeof(res_hdr.log_type), "%s", log_src_type_t_str[p_file_infos[db_off]->log_type]);
+        snprintfz(res_hdr.basename, sizeof(res_hdr.basename), "%s", p_file_infos[db_off]->file_basename);
+        snprintfz(res_hdr.filename, sizeof(res_hdr.filename), "%s", p_file_infos[db_off]->filename);
+        snprintfz(res_hdr.chartname, sizeof(res_hdr.chartname), "%s", p_file_infos[db_off]->chart_name);
 
         /* Retrieve compressed log messages from BLOB file */
         if(tmp_itm.text_compressed_size > text_compressed_size_max){

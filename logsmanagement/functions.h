@@ -16,4 +16,9 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                                         void (*callback)(BUFFER *wb, int code, void *callback_data), 
                                         void *callback_data);
 
+int logsmanagement_function_facets( BUFFER *wb, int timeout, 
+                                    const char *function, void *collector_data, 
+                                    void (*callback)(BUFFER *wb, int code, void *callback_data), 
+                                    void *callback_data);
+
 #endif // FUNCTIONS_H_

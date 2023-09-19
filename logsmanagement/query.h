@@ -14,8 +14,8 @@
 
 #define LOGS_QRY_VERSION "1"
 
-#define LOGS_QRY_KW_START_TIME  "from"
-#define LOGS_QRY_KW_END_TIME    "to"
+#define LOGS_QRY_KW_START_TIME  "after"
+#define LOGS_QRY_KW_END_TIME    "before"
 #define LOGS_QRY_KW_QUOTA       "quota"
 #define LOGS_QRY_KW_CHARTNAME   "chart_name"
 #define LOGS_QRY_KW_FILENAME    "filename"
@@ -68,6 +68,9 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb);
  * @param quota Request quota for results. When exceeded, query will 
  * return, even if there are more pending results.
  * 
+ * @param stop_monotonic_ut Monotonic time in usec after which the query
+ * will be timed out.
+ * 
  * @param chart_name Chart name of log source to be queried, as it appears 
  * on the netdata dashboard. If this is defined and not an empty string, the 
  * filename parameter is ignored.
@@ -107,6 +110,7 @@ typedef struct logs_query_params {
     msec_t act_to_ts;
     int order_by_asc;
     unsigned long quota;
+    usec_t stop_monotonic_ut;
     char *chart_name[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *filename[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *keyword;
@@ -120,6 +124,11 @@ typedef struct logs_query_res_hdr {
     msec_t timestamp;
     size_t text_size;
     int matches;
+    char log_source[20];
+    char log_type[20];
+    char basename[20];
+    char filename[50];
+    char chartname[20];
 } logs_query_res_hdr_t;
 
 /** 
