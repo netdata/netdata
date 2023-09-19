@@ -22,8 +22,8 @@ def charts_template():
         'counts': {
             'options': [None, 'Alert Status', 'alerts', 'counts', 'alerts.counts', 'stacked'],
             'lines': [
-                ['clear'], 
-                ['warning'], 
+                ['clear'],
+                ['warning'],
                 ['critical']
             ],
         },
@@ -49,11 +49,17 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order, self.definitions = charts_template()
         self.url = self.configuration.get('url', DEFAULT_URL)
-        self.collected_dims = {'counts': {'clear','warning','critical'}, 'warning': set(), 'critical': set()}
+        self.collected_dims = {'counts': {'clear', 'warning', 'critical'}, 'warning': set(), 'critical': set()}
         self.alert_contains_words = self.configuration.get('alert_contains_words', DEFAULT_ALARM_CONTAINS_WORDS)
-        self.alert_contains_words_list = [alert_contains_word.lstrip(' ').rstrip(' ') for alert_contains_word in self.alert_contains_words.split(',')]
+        self.alert_contains_words_list = [
+            alert_contains_word.lstrip(' ').rstrip(' ')
+            for alert_contains_word in self.alert_contains_words.split(',')
+        ]
         self.alert_excludes_words = self.configuration.get('alert_excludes_words', DEFAULT_ALARM_EXCLUDES_WORDS)
-        self.alert_excludes_words_list = [alert_excludes_word.lstrip(' ').rstrip(' ') for alert_excludes_word in self.alert_excludes_words.split(',')]
+        self.alert_excludes_words_list = [
+            alert_excludes_word.lstrip(' ').rstrip(' ')
+            for alert_excludes_word in self.alert_excludes_words.split(',')
+        ]
 
     def _get_data(self):
         raw_data = self._get_raw_data()
