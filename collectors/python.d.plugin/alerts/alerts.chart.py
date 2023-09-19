@@ -20,15 +20,19 @@ def charts_template():
 
     charts = {
         'counts': {
-            'options': [None, 'Alert Status', 'alerts', 'alerts', 'alerts.counts', 'stacked'],
-            'lines': [],
+            'options': [None, 'Alert Status', 'alerts', 'counts', 'alerts.counts', 'stacked'],
+            'lines': [
+                ['clear'], 
+                ['warning'], 
+                ['critical']
+            ],
         },
         'warning': {
-            'options': [None, 'Warning Alerts', 'active', 'active', 'alerts.warning', 'stacked'],
+            'options': [None, 'Warning Alerts', 'active', 'warning', 'alerts.warning', 'stacked'],
             'lines': [],
         },
         'critical': {
-            'options': [None, 'Critical Alerts', 'active', 'active', 'alerts.warning', 'stacked'],
+            'options': [None, 'Critical Alerts', 'active', 'critical', 'alerts.critical', 'stacked'],
             'lines': [],
         },
     }
