@@ -1333,8 +1333,7 @@ target_link_libraries(netdata PRIVATE
 set(NETDATACLI_FILES daemon/commands.h
                      daemon/pipename.c
                      daemon/pipename.h
-                     cli/cli.c
-                     cli/cli.h)
+                     cli/cli.c)
 
 add_executable(netdatacli ${NETDATACLI_FILES})
 target_link_libraries(netdatacli libnetdata)

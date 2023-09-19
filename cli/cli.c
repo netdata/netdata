@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "cli.h"
 #include "daemon/pipename.h"
+#include "daemon/common.h"
+#include "libnetdata/required_dummies.h"
 
 void error_int(int is_collector __maybe_unused, const char *prefix __maybe_unused, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     FILE *fp = stderr;
