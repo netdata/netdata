@@ -9,6 +9,7 @@ from bases.FrameworkServices.UrlService import UrlService
 
 update_every = 10
 disabled_by_default = False
+autodetection_retry: 10
 
 
 def charts_template():
@@ -35,7 +36,7 @@ def charts_template():
     return order, charts
 
 
-DEFAULT_URL = 'http://127.0.0.1:19999/api/v1/alerts?all'
+DEFAULT_URL = 'http://127.0.0.1:19999/api/v1/alarms?all'
 DEFAULT_ALARM_CONTAINS_WORDS = ''
 DEFAULT_ALARM_EXCLUDES_WORDS = ''
 
@@ -57,7 +58,7 @@ class Service(UrlService):
             return None
 
         raw_data = loads(raw_data)
-        alerts = raw_data.get('alerts', {})
+        alerts = raw_data.get('alarms', {})
         if self.alert_contains_words != '':
             alerts = {alert_name: alerts[alert_name] for alert_name in alerts for alert_contains_word in
                       self.alert_contains_words_list if alert_contains_word in alert_name}
@@ -65,14 +66,11 @@ class Service(UrlService):
             alerts = {alert_name: alerts[alert_name] for alert_name in alerts for alert_excludes_word in
                       self.alert_excludes_words_list if alert_excludes_word not in alert_name}
 
-        data = {a: 1 for a in alerts if alerts[a]['status'] == 'CLEAR'}
-        self.update_charts('clear', data)
-        data_warning = {a: 1 for a in alerts if alerts[a]['status'] == 'WARNING'}
+        data_warning = {'{}_warning'.format(a): 1 for a in alerts if alerts[a]['status'] == 'WARNING'}
         self.update_charts('warning', data_warning)
-        data.update(data_warning)
-        data_critical = {a: 1 for a in alerts if alerts[a]['status'] == 'CRITICAL'}
+        data_critical = {'{}_critical'.format(a): 1 for a in alerts if alerts[a]['status'] == 'CRITICAL'}
         self.update_charts('critical', data_critical)
-        data.update(data_critical)
+        data = {**data_warning, **data_critical}
 
         return data
 
