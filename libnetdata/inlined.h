@@ -394,10 +394,10 @@ static inline NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
     return str2ndd(src, endptr) * sign;
 }
 
-static inline char *strncpyz(char *dst, const char *src, size_t n) {
+static inline char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1) {
     char *p = dst;
 
-    while (*src && n--)
+    while (*src && dst_size_minus_1--)
         *dst++ = *src++;
 
     *dst = '\0';

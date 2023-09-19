@@ -370,7 +370,7 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
-    int ret = web_client_send(w);
+    ssize_t ret = web_client_send(w);
 
     if(unlikely(ret < 0)) {
         retval = -1;

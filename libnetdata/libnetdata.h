@@ -842,6 +842,7 @@ extern char *netdata_configured_host_prefix;
 #include "gorilla/gorilla.h"
 #include "facets/facets.h"
 #include "dyn_conf/dyn_conf.h"
+#include "functions_evloop/functions_evloop.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"

@@ -890,7 +890,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
                 erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
 
     if(erl->sleep_ut)
-        fprintf(fp, " (sleeping for %llu microseconds every time this happens)", erl->sleep_ut);
+        fprintf(fp, " (sleeping for %"PRIu64" microseconds every time this happens)", erl->sleep_ut);
 
     if(__errno) {
         char buf[1024];

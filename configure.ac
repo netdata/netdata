@@ -2023,6 +2023,7 @@ AC_CONFIG_FILES([
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
     libnetdata/facets/Makefile
+    libnetdata/functions_evloop/Makefile
     libnetdata/july/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile

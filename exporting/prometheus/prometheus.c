@@ -522,7 +522,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
         buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT, p->rd->collector.last_collected_value);
 
     if (p->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-        buffer_sprintf(wb, " %llu\n", timeval_msec(&p->rd->collector.last_collected_time));
+        buffer_sprintf(wb, " %"PRIu64"\n", timeval_msec(&p->rd->collector.last_collected_time));
     else
         buffer_sprintf(wb, "\n");
 }

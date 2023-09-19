@@ -1412,7 +1412,9 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    return rrd_call_function_and_wait(host, wb, timeout, function);
+    return rrd_function_run(host, wb, timeout, function, true, NULL,
+                            NULL, NULL,
+                            web_client_interrupt_callback, w);
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
