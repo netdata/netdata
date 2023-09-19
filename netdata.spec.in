@@ -88,43 +88,29 @@ BuildRequires: gcc
 BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
-BuildRequires: autoconf
-%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
-BuildRequires: autoconf-archive
-%if 0%{?rhel} <= 8 && 0%{?amzn} < 2023
-BuildRequires: autogen
-%endif
-%endif
-BuildRequires: automake
 BuildRequires: cmake
 BuildRequires: pkgconfig
 BuildRequires: curl
 BuildRequires: findutils
-BuildRequires: zlib-devel
-BuildRequires: libuuid-devel
-BuildRequires: libuv-devel >= 1
-BuildRequires: openssl-devel
+BuildRequires: pkgconfig(zlib)
+BuildRequires: pkgconfig(uuid)
+BuildRequires: pkgconfig(libuv)
+BuildRequires: pkgconfig(openssl)
+BuildRequires: pkgconfig(liblz4)
+BuildRequires: pkgconfig(yaml-0.1)
+BuildRequires: pkgconfig(json-c)
 %if 0%{?suse_version}
 BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
-BuildRequires: liblz4-devel
-BuildRequires: libjson-c-devel
-BuildRequires: libyaml-devel
 %else
 %if 0%{?fedora}
 BuildRequires: protobuf-devel
 BuildRequires: protobuf-c-devel
-BuildRequires: lz4-devel
-BuildRequires: json-c-devel
-BuildRequires: libyaml-devel
 %else
 %if 0%{?centos_ver} >= 8
 BuildRequires: protobuf-devel
 BuildRequires: protobuf-c-devel
 %endif
-BuildRequires: lz4-devel
-BuildRequires: json-c-devel
-BuildRequires: libyaml-devel
 %endif
 %endif
 
@@ -176,30 +162,30 @@ Recommends: %{name}-plugin-systemd-journal = %{version}
 
 # epbf plugin dependencies
 %if 0%{?_have_ebpf}
-%if 0%{?suse_version}
-BuildRequires: libelf-devel
-%else
-BuildRequires: elfutils-libelf-devel
-%endif
+BuildRequires: pkgconfig(libelf)
 %endif
 # end ebpf plugin dependencies
 
 # nfacct plugin dependencies
 %if 0%{?_have_nfacct}
-BuildRequires: libmnl-devel
-BuildRequires: libnetfilter_acct-devel
+BuildRequires: pkgconfig(libmnl)
+BuildRequires: pkgconfig(libnetfilter_acct)
 %endif
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
 %if 0%{?_have_freeipmi}
-BuildRequires: freeipmi-devel
+BuildRequires: pkgconfig(libipmimonitoring)
 %endif
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
-BuildRequires: cups-devel >= 1.7
+%if 0%{?suse_version}
+BuildRequires: cups-devel
+%else
+BuildRequires: pkgconfig(cups)
+%endif
 %endif
 # end - cups plugin dependencies
 
@@ -212,11 +198,11 @@ BuildRequires: golang
 # end - go.d.plugin plugin dependencies
 
 # systemd-journal dependencies
-BuildRequires: systemd-devel
+BuildRequires: pkgconfig(libsystemd)
 # end - systemd-journal dependencies
 
 # Prometheus remote write dependencies
-BuildRequires: snappy-devel
+BuildRequires: pkgconfig(snappy)
 # end - prometheus remote write dependencies
 
 # #####################################################################
@@ -266,34 +252,49 @@ make download
 
 %build
 # Conf step
-autoreconf -ivf
-%configure \
+%cmake \
+	-DCMAKE_INSTALL_PREFIX=/ \
 	%if 0%{!?_have_ebpf}
-	--disable-ebpf \
+	-DENABLE_PLUGIN_EBPF=Off \
+	%else
+	-DENABLE_PLUGIN_EBPF=On \
 	%endif
 	%if 0%{!?_have_freeipmi}
-	--disable-plugin-freeipmi \
+	-DENABLE_PLUGIN_FREEIPMI=Off \
+	%else
+	-DENABLE_PLUGIN_FREEIPMI=On \
 	%endif
 	%if 0%{!?_have_nfacct}
-	--disable-plugin-nfacct \
+	-DENABLE_PLUGIN_NFACCT=Off \
+	%else
+	-DENABLE_PLUGIN_NFACCT=On \
 	%endif
 	%if 0%{?centos_ver:1}
 	%if %{centos_ver} < 8
-	--with-bundled-protobuf \
+	-DENABLE_BUNDLED_PROTOBUF=On \
+	%else
+	-DENABLE_BUNDLED_PROTOBUF=Off \
 	%endif
+	%else
+	-DENABLE_BUNDLED_PROTOBUF=Off \
 	%endif
-	--prefix="%{_prefix}" \
-	--sysconfdir="%{_sysconfdir}" \
-	--localstatedir="%{_localstatedir}" \
-	--libexecdir="%{_libexecdir}" \
-	--libdir="%{_libdir}" \
-	--with-zlib \
-	--with-math \
-	--with-user=%{name} \
-	--disable-dependency-tracking
+	-DENABLE_ACLK=On \
+	-DENABLE_CLOUD=On \
+	-DENABLE_DBENGINE=On \
+	-DENABLE_H2O=On \
+	-DENABLE_ML=On \
+	-DENABLE_PLUGIN_APPS=On \
+	-DENABLE_PLUGIN_CGROUP_NETWORK=On \
+	-DENABLE_PLUGIN_DEBUGFS=On \
+	-DENABLE_PLUGIN_PERF=On \
+	-DENABLE_PLUGIN_SLABINFO=On \
+	-DENABLE_PLUGIN_XENSTAT=Off \
+	-DENABLE_EXPORTING_MONGODB=Off \
+	-DENABLE_BUNDLED_JSONC=Off \
+	-DENABLE_BUNDLED_YAML=Off
 
 # Build step
-%{__make} %{?_smp_mflags}
+%{cmake_build}
 
 # Build go.d.plugin
 %if 0%{?_golang_build}
@@ -307,7 +308,7 @@ TRAVIS_TAG="%{go_version}" %{__make} build
 # ###########################################################
 # Clear the directory, if already exists and install
 rm -rf "${RPM_BUILD_ROOT}"
-%{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
+%{cmake_install}
 
 install -m 644 -p "system/%{name}.conf" "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 
@@ -318,54 +319,7 @@ install -m 755 -p packaging/installer/%{name}-updater.sh "${RPM_BUILD_ROOT}%{_li
 # ###########################################################
 # logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
-install -m 644 -p "system/logrotate/%{name}" "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
-
-# ###########################################################
-# Install freeipmi
-%if 0%{?_have_freeipmi}
-install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
-%endif
-
-# ###########################################################
-# Install apps.plugin
-install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/apps.plugin"
-
-# ###########################################################
-# Install debugfs.plugin
-install -m 0750 -p debugfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/debugfs.plugin"
-
-# ###########################################################
-# Install systemd-journal.plugin
-install -m 4750 -p systemd-journal.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin"
-
-# ###########################################################
-# Install perf.plugin
-install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
-
-# ###########################################################
-# Install ebpf.plugin
-%if 0%{?_have_ebpf}
-install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
-%endif
-
-# ###########################################################
-# Install cups.plugin
-%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
-install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
-%endif
-
-# ###########################################################
-# Install slabinfo.plugin
-install -m 4750 -p slabinfo.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/slabinfo.plugin"
-
-# ###########################################################
-# Install cache and log directories
-install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/cache/%{name}"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/log/%{name}"
-
-# ###########################################################
-# Install registry directory
-install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
+install -m 644 -p "%{__cmake_builddir}/system/logrotate/%{name}" "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
 # ###########################################################
 # Install uninstaller script
@@ -377,9 +331,9 @@ install -m 750 -p packaging/installer/%{name}-uninstaller.sh \
 
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
 %if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-install -m 644 -p "system/systemd/%{name}.service" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}.service"
+install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}.service" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}.service"
 %else
-install -m 644 -p "system/systemd/%{name}.service.v235" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}.service"
+install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}.service.v235" "${RPM_BUILD_ROOT}%{_unitdir}/%{name}.service"
 %endif
 install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p "system/systemd/50-%{name}.preset" "${RPM_BUILD_ROOT}%{_presetdir}/50-%{name}.preset"
@@ -596,6 +550,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/cloud.d
 
 # Free IPMI belongs to a different sub-package
 %if 0%{?_have_freeipmi}
@@ -965,6 +920,8 @@ fi
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
 %changelog
+* Tue Sep 19 2023 Austin hemmelgarn <austin@netdata.cloud> 0.0.0-24
+- Switch to using cmake for builds.
 * Mon Aug 28 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-23
 - Build go.d.plugin natively for CentOS Stream distro
 * Mon Aug 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-22

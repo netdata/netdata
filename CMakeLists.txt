@@ -1376,9 +1376,12 @@ install(PROGRAMS collectors/cgroups.plugin/cgroup-name.sh
 
 install(DIRECTORY DESTINATION var/cache/netdata)
 install(DIRECTORY DESTINATION var/log/netdata)
+install(DIRECTORY DESTINATION var/lib/netdata/registry)
 install(DIRECTORY DESTINATION var/lib/netdata/cloud.d)
 install(DIRECTORY DESTINATION var/run)
 install(DIRECTORY DESTINATION etc/netdata)
+install(DIRECTORY DESTINATION etc/netdata/health.d)
+install(DIRECTORY DESTINATION etc/netdata/statsd.d)
 install(DIRECTORY DESTINATION usr/lib/netdata/conf.d)
 install(DIRECTORY DESTINATION usr/libexec/netdata/plugins.d)
 install(DIRECTORY DESTINATION usr/share/netdata/web)
