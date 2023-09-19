@@ -511,9 +511,9 @@ static FACET_ROW_SEVERITY syslog_priority_to_facet_severity(int priority) {
 
 static char *uid_to_username(uid_t uid, char *buffer, size_t buffer_size) {
     static __thread char tmp[1024 + 1];
-    struct passwd pw, *result;
+    struct passwd pw, *result = NULL;
 
-    if (getpwuid_r(uid, &pw, tmp, 1024, &result) != 0 || result == NULL)
+    if (getpwuid_r(uid, &pw, tmp, sizeof(tmp), &result) != 0 || !result || !pw.pw_name || !(*pw.pw_name))
         return NULL;
 
     snprintfz(buffer, buffer_size - 1, "%u (%s)", uid, pw.pw_name);
@@ -521,10 +521,10 @@ static char *uid_to_username(uid_t uid, char *buffer, size_t buffer_size) {
 }
 
 static char *gid_to_groupname(gid_t gid, char* buffer, size_t buffer_size) {
-    static __thread char tmp[1024 + 1];
-    struct group grp, *result;
+    static __thread char tmp[1024];
+    struct group grp, *result = NULL;
 
-    if (getgrgid_r(gid, &grp, tmp, 1024, &result) != 0 || result == NULL)
+    if (getgrgid_r(gid, &grp, tmp, sizeof(tmp), &result) != 0 || !result || !grp.gr_name || !(*grp.gr_name))
         return NULL;
 
     snprintfz(buffer, buffer_size - 1, "%u (%s)", gid, grp.gr_name);
@@ -598,14 +598,16 @@ const char *uid_to_username_cached(uid_t uid, size_t *length) {
 
     struct word_t2str_hashtable_entry **e = word_t2str_hashtable_slot(&uid_hashtable, uid);
     if(!(*e)) {
-        static __thread char buf[1024 + 1];
-        const char *name = uid_to_username(uid, buf, 1024);
-        size_t size = strlen(name) + 1;
+        static __thread char buf[1024];
+        const char *name = uid_to_username(uid, buf, sizeof(buf));
+        if(name) {
+            size_t size = strlen(name) + 1;
 
-        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
-        (*e)->len = size - 1;
-        (*e)->hash = uid;
-        memcpy((*e)->str, name, size);
+            *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
+            (*e)->len = size - 1;
+            (*e)->hash = uid;
+            memcpy((*e)->str, name, size);
+        }
     }
 
     spinlock_unlock(&uid_hashtable.spinlock);
@@ -619,14 +621,16 @@ const char *gid_to_groupname_cached(gid_t gid, size_t *length) {
 
     struct word_t2str_hashtable_entry **e = word_t2str_hashtable_slot(&gid_hashtable, gid);
     if(!(*e)) {
-        static __thread char buf[1024 + 1];
-        const char *name = gid_to_groupname(gid, buf, 1024);
-        size_t size = strlen(name) + 1;
+        static __thread char buf[1024];
+        const char *name = gid_to_groupname(gid, buf, sizeof(buf));
+        if(name) {
+            size_t size = strlen(name) + 1;
 
-        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
-        (*e)->len = size - 1;
-        (*e)->hash = gid;
-        memcpy((*e)->str, name, size);
+            *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
+            (*e)->len = size - 1;
+            (*e)->hash = gid;
+            memcpy((*e)->str, name, size);
+        }
     }
 
     spinlock_unlock(&gid_hashtable.spinlock);
