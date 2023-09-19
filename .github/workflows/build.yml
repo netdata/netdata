@@ -74,6 +74,7 @@ jobs:
               --sort=name --posix --auto-compress --exclude-vcs --exclude-vcs-ignores \
               --exclude=.github --exclude=.gitattributes \
               --transform "s/^\\.\\//netdata-$(git describe)\\//" --verbose .
+          cd artifacts/
           echo "distfile=$(find . -name 'netdata-*.tar.gz')" >> "${GITHUB_OUTPUT}"
       - name: Store
         id: store
