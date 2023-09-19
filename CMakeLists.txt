@@ -51,6 +51,7 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 #
 # detect OS
 #
+
 set(LINUX   False)
 set(FREEBSD False)
 set(MACOS   False)
@@ -65,6 +66,27 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
 else()
         set(LINUX True)
         add_definitions(-D_GNU_SOURCE)
+endif()
+
+#
+# Libm
+#
+
+# checks link with cmake required libs
+cmake_policy(SET CMP0075 NEW)
+
+include(CheckFunctionExists)
+
+check_function_exists(log10 HAVE_LOG10)
+if(NOT HAVE_LOG10)
+        unset(HAVE_LOG10 CACHE)
+        list(APPEND CMAKE_REQUIRED_LIBRARIES m)
+        check_function_exists(log10 HAVE_LOG10)
+        if(HAVE_LOG10)
+                set(LINK_LIBM True CACHE BOOL "" FORCE)
+        else()
+                message(FATAL_ERROR "Can not use log10 with/without libm.")
+        endif()
 endif()
 
 #
@@ -870,9 +892,18 @@ add_library(libnetdata ${LIBNETDATA_FILES})
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR})
 
-# pthread
+# pthread (FIXME: use find_package for this)
+
+# set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+# set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+# find_package(Threads REQUIRED)
+
+# add_executable(test test.cpp)
+# target_link_libraries(test Threads::Threads)
+
 target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${LINUX}>:pthread;rt>"
+        "$<$<BOOL:${LINK_LIBM}>:m>"
 )
 
 # ebpf
