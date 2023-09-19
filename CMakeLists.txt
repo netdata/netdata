@@ -831,7 +831,7 @@ set(MONGODB_EXPORTING_FILES exporting/mongodb/mongodb.c
 if(ENABLE_H2O)
         add_library(h2o ${LIBH2O_FILES})
 
-        target_include_directories(h2o AFTER PUBLIC
+        target_include_directories(h2o BEFORE PUBLIC
                                    "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/include"
                                    "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/cloexec"
                                    "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/brotli/enc"
@@ -928,7 +928,7 @@ if(ENABLE_BUNDLED_JSONC)
         set_property(TARGET jsonc PROPERTY
                      IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/externaldeps/jsonc/libjson-c.a")
 
-        target_include_directories(libnetdata AFTER PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/jsonc")
+        target_include_directories(libnetdata BEFORE PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/jsonc")
         target_link_libraries(libnetdata PUBLIC jsonc)
 else()
         pkg_check_modules(JSONC REQUIRED json-c)
@@ -946,7 +946,7 @@ if(ENABLE_BUNDLED_YAML)
         set_property(TARGET yaml PROPERTY
                      IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/externaldeps/libyaml/libyaml.a")
 
-        target_include_directories(libnetdata AFTER PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/libyaml")
+        target_include_directories(libnetdata BEFORE PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/libyaml")
         target_link_libraries(libnetdata PUBLIC yaml)
 else()
         pkg_check_modules(YAML REQUIRED yaml-0.1)
