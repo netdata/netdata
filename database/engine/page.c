@@ -185,6 +185,7 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
             // allocate new gorilla buffer
             gorilla_buffer_t *gbuf = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer);
             memset(gbuf, 0, GORILLA_BUFFER_SIZE);
+            global_statistics_gorilla_buffer_add_hot();
 
             *pg->gorilla.writer = gorilla_writer_init(gbuf, GORILLA_BUFFER_SLOTS);
             pg->gorilla.num_buffers = 1;
@@ -400,6 +401,10 @@ uint32_t pgd_disk_footprint(PGD *pg)
                                "Gorilla writer does not have any buffers");
 
                 size = pg->gorilla.num_buffers * GORILLA_BUFFER_SIZE;
+
+                if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) {
+                    global_statistics_gorilla_buffer_remove_hot(pg->gorilla.num_buffers);
+                }
             } else if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
                 size = pg->raw.size;
             } else {
@@ -518,6 +523,7 @@ void pgd_append_point(PGD *pg,
 
                 gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, GORILLA_BUFFER_SLOTS);
                 pg->gorilla.num_buffers += 1;
+                global_statistics_gorilla_buffer_add_hot();
 
                 ok = gorilla_writer_write(pg->gorilla.writer, t);
                 internal_fatal(ok == false, "Failed to writer value in newly allocated gorilla buffer.");
