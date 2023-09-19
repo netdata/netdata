@@ -17,35 +17,6 @@ arch_order:  # sort order for per-architecture jobs in CI
   - arm64
   - aarch64
 include:
-# This matrix element builds packages for EL, Alma & Rocky
-  - &rocky
-    distro: rockylinux
-    version: "9"
-    support_type: Core
-    notes: ''
-    jsonc_removal: |
-      dnf remove -y json-c-devel
-    eol_check: true
-    packages: &rocky_packages
-      type: rpm
-      repo_distro: el/9
-      alt_links:
-        - el/9Server
-        - el/9Client
-      arches:
-        - x86_64
-        - aarch64
-    test:
-      ebpf-core: true
-  - <<: *rocky
-    version: "8"
-    packages:
-      <<: *rocky_packages
-      repo_distro: el/8
-      alt_links:
-        - el/8Server
-        - el/8Client
-
   - &alpine
     distro: alpine
     version: edge
@@ -78,6 +49,16 @@ include:
     support_type: Intermediate
     notes: ''
     eol_check: true
+
+  - distro: archlinux
+    version: latest
+    support_type: Intermediate
+    notes: ''
+    eol_check: false
+    env_prep: |
+      pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
+    test:
+      ebpf-core: true
 
   - &amzn
     distro: amazonlinux
@@ -249,6 +230,34 @@ include:
       <<: *oracle_packages
       repo_distro: ol/9
 
+  - &rocky
+    distro: rockylinux
+    version: "9"
+    support_type: Core
+    notes: ''
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    eol_check: true
+    packages: &rocky_packages
+      type: rpm
+      repo_distro: el/9
+      alt_links:
+        - el/9Server
+        - el/9Client
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *rocky
+    version: "8"
+    packages:
+      <<: *rocky_packages
+      repo_distro: el/8
+      alt_links:
+        - el/8Server
+        - el/8Client
+
   - &ubuntu
     distro: ubuntu
     version: "22.04"
@@ -278,23 +287,7 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
-
 no_include: # Info for platforms not covered in CI
-  - distro: archlinux
-    version: latest
-    support_type: Intermediate
-    notes: ''
-    eol_check: false
-    env_prep: |
-      pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
-    test:
-      ebpf-core: true
-
-  - distro: clearlinux
-    version: latest
-    support_type: Community
-    notes: ''
-
   - distro: docker
     version: "19.03 or newer"
     support_type: Core
@@ -307,26 +300,10 @@ no_include: # Info for platforms not covered in CI
         - linux/arm64
         - linux/ppc64le
 
-  - &freebsd
-    distro: freebsd
-    version: 13-STABLE
-    support_type: Community
-    notes: ''
-
-  - distro: gentoo
+  - distro: clearlinux
     version: latest
     support_type: Community
     notes: ''
-
-  - &macos
-    distro: macos
-    version: '13'
-    support_type: Community
-    notes: ''
-  - <<: *macos
-    version: '12'
-  - <<: *macos
-    version: '11'
 
   - &rhel
     distro: rhel
@@ -344,3 +321,24 @@ no_include: # Info for platforms not covered in CI
     packages:
       arches:
         - x86_64
+
+  - &freebsd
+    distro: freebsd
+    version: 13-STABLE
+    support_type: Community
+    notes: ''
+
+  - &macos
+    distro: macos
+    version: '13'
+    support_type: Community
+    notes: ''
+  - <<: *macos
+    version: '12'
+  - <<: *macos
+    version: '11'
+
+  - distro: gentoo
+    version: latest
+    support_type: Community
+    notes: ''
