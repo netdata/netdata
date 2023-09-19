@@ -432,6 +432,7 @@ jobs:
           cp dist-tarball/* artifacts/download/latest || exit 1
           cd artifacts/download/latest || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
+          ls -lFh
           sha256sum -b ./* > "sha256sums.txt" || exit 1
           cat sha256sums.txt
       - name: Fetch test environment
