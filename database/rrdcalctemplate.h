@@ -36,7 +36,8 @@ struct rrdcalctemplate {
 
     STRING *source;                 // the source of this alarm
     STRING *units;                  // the units of the alarm
-    STRING *info;                   // a short description of the alarm
+    STRING *summary;                // a short summary of the alarm
+    STRING *info;                   // a description of the alarm
 
     int update_every;               // update frequency for the alarm
 
@@ -105,6 +106,7 @@ struct rrdcalctemplate {
 #define rrdcalctemplate_module_match(rt) string2str((rt)->module_match)
 #define rrdcalctemplate_charts_match(rt) string2str((rt)->charts_match)
 #define rrdcalctemplate_units(rt) string2str((rt)->units)
+#define rrdcalctemplate_summary(rt) string2str((rt)->summary)
 #define rrdcalctemplate_info(rt) string2str((rt)->info)
 #define rrdcalctemplate_source(rt) string2str((rt)->source)
 #define rrdcalctemplate_dimensions(rt) string2str((rt)->dimensions)
