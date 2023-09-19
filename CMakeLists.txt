@@ -61,6 +61,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
         set(FREEBSD True)
 else()
         set(LINUX True)
+        add_definitions(-D_GNU_SOURCE)
 endif()
 
 #
