@@ -81,7 +81,7 @@ modules:
 
               ```yaml
               [ plugin:python.d ]
-                # update every = 1  
+                # update every = 1
                 command options = -ppython3
               ```
       configuration:
@@ -110,7 +110,7 @@ modules:
               required: true
             - name: charts_to_exclude
               description: |
-                charts to exclude, useful if you would like to exclude some specific charts. 
+                charts to exclude, useful if you would like to exclude some specific charts.
                 note: should be a ',' separated string like 'chart.name,chart.name'.
               default_value: ""
               required: false
