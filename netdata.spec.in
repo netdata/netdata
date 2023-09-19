@@ -89,6 +89,11 @@ BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: cmake
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+BuildRequires: ninja-build
+%else
+BuildRequires: ninja
+%endif
 BuildRequires: pkgconfig
 BuildRequires: curl
 BuildRequires: findutils
@@ -248,7 +253,7 @@ make download
 
 %build
 # Conf step
-%cmake \
+%cmake -G Ninja \
 	-DCMAKE_INSTALL_PREFIX=/ \
 	%if %{_have_ebpf}
 	-DENABLE_PLUGIN_EBPF=On \
@@ -290,7 +295,7 @@ make download
 	-DENABLE_BUNDLED_YAML=Off
 
 # Build step
-%{cmake_build}
+%{cmake_build} -- -v
 
 # Build go.d.plugin
 %if 0%{?_golang_build}
