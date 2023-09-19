@@ -154,8 +154,8 @@ static inline int parser_action(PARSER *parser, char *input) {
     parser->line++;
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
-        char command[PLUGINSD_LINE_MAX + 1];
-        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, isspace_map_pluginsd);
+        char command[100 + 1];
+        bool has_keyword = find_first_keyword(input, command, 100, isspace_map_pluginsd);
 
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
             if(parser->defer.response) {
@@ -183,7 +183,7 @@ static inline int parser_action(PARSER *parser, char *input) {
         return 0;
     }
 
-    char *words[PLUGINSD_MAX_WORDS];
+    static __thread char *words[PLUGINSD_MAX_WORDS];
     size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
     const char *command = get_word(words, num_words, 0);
 
