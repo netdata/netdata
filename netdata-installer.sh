@@ -131,7 +131,6 @@ renice 19 $$ > /dev/null 2> /dev/null
 LDFLAGS="${LDFLAGS}"
 CFLAGS="${CFLAGS-"-O2 -pipe"}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
-CXXFLAGS="${CXXFLAGS:-${CFLAGS}}"
 # shellcheck disable=SC2269
 ACLK="${ACLK}"
 
