@@ -2,17 +2,22 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.4...HEAD)
 
 **Merged pull requests:**
 
+- fix compilation warnings [\#16001](https://github.com/netdata/netdata/pull/16001) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#15985](https://github.com/netdata/netdata/pull/15985) ([netdatabot](https://github.com/netdatabot))
+- Re-store rrdvars on late dimensions [\#15984](https://github.com/netdata/netdata/pull/15984) ([MrZammler](https://github.com/MrZammler))
 - Functions: allow collectors to be restarted [\#15983](https://github.com/netdata/netdata/pull/15983) ([ktsaou](https://github.com/ktsaou))
 - Metadata fixes for some collectors [\#15982](https://github.com/netdata/netdata/pull/15982) ([Ancairon](https://github.com/Ancairon))
 - update go.d.plugin to v0.55.0 [\#15981](https://github.com/netdata/netdata/pull/15981) ([ilyam8](https://github.com/ilyam8))
 - bump UI to v6.37.1 [\#15980](https://github.com/netdata/netdata/pull/15980) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin function is not thread safe [\#15978](https://github.com/netdata/netdata/pull/15978) ([ktsaou](https://github.com/ktsaou))
+- functions cancelling [\#15977](https://github.com/netdata/netdata/pull/15977) ([ktsaou](https://github.com/ktsaou))
 - Facets: fixes 5 [\#15976](https://github.com/netdata/netdata/pull/15976) ([ktsaou](https://github.com/ktsaou))
 - facets histogram: do not send db retention for facets [\#15974](https://github.com/netdata/netdata/pull/15974) ([ktsaou](https://github.com/ktsaou))
+- extend ml default training from ~24 to ~48 hours [\#15971](https://github.com/netdata/netdata/pull/15971) ([andrewm4894](https://github.com/andrewm4894))
 - facets histogram when empty [\#15970](https://github.com/netdata/netdata/pull/15970) ([ktsaou](https://github.com/ktsaou))
 - facets: do not shadow local variable [\#15968](https://github.com/netdata/netdata/pull/15968) ([ktsaou](https://github.com/ktsaou))
 - Skip trying to preserve file owners when bundling external code. [\#15966](https://github.com/netdata/netdata/pull/15966) ([Ferroin](https://github.com/Ferroin))
@@ -46,6 +51,7 @@
 - Update change-metrics-storage.md [\#15896](https://github.com/netdata/netdata/pull/15896) ([Ancairon](https://github.com/Ancairon))
 - make `anomaly_detection.type_anomaly_rate` stacked [\#15895](https://github.com/netdata/netdata/pull/15895) ([andrewm4894](https://github.com/andrewm4894))
 - Update pfsense.md [\#15894](https://github.com/netdata/netdata/pull/15894) ([Ancairon](https://github.com/Ancairon))
+- Initial tooling for Integrations Documentation [\#15893](https://github.com/netdata/netdata/pull/15893) ([Ancairon](https://github.com/Ancairon))
 - Reset the obsolete flag on service thread [\#15892](https://github.com/netdata/netdata/pull/15892) ([MrZammler](https://github.com/MrZammler))
 - Add better recovery for corrupted metadata [\#15891](https://github.com/netdata/netdata/pull/15891) ([stelfrag](https://github.com/stelfrag))
 - Add index to ACLK table to improve update statements [\#15890](https://github.com/netdata/netdata/pull/15890) ([stelfrag](https://github.com/stelfrag))
@@ -120,6 +126,10 @@
 - Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
 - Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 - Metadata cleanup improvements [\#15462](https://github.com/netdata/netdata/pull/15462) ([stelfrag](https://github.com/stelfrag))
+
+## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.3...v1.42.4)
 
 ## [v1.42.3](https://github.com/netdata/netdata/tree/v1.42.3) (2023-09-11)
 
@@ -383,7 +393,6 @@
 - readme: reorder cols in whats new and add links [\#15455](https://github.com/netdata/netdata/pull/15455) ([andrewm4894](https://github.com/andrewm4894))
 - Store and transmit chart\_name to cloud in alert events [\#15441](https://github.com/netdata/netdata/pull/15441) ([MrZammler](https://github.com/MrZammler))
 - Refactor RRD code. [\#15423](https://github.com/netdata/netdata/pull/15423) ([vkalintiris](https://github.com/vkalintiris))
-- Add initial tooling for generating integrations.js file. [\#15406](https://github.com/netdata/netdata/pull/15406) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
@@ -421,15 +430,6 @@
 - Update README.md [\#15414](https://github.com/netdata/netdata/pull/15414) ([ktsaou](https://github.com/ktsaou))
 - collector meta: restrict chart\_type to known values [\#15413](https://github.com/netdata/netdata/pull/15413) ([ilyam8](https://github.com/ilyam8))
 - Update README.md [\#15412](https://github.com/netdata/netdata/pull/15412) ([tkatsoulas](https://github.com/tkatsoulas))
-- add reference to cncf [\#15408](https://github.com/netdata/netdata/pull/15408) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Make skipped CI run even faster. [\#15407](https://github.com/netdata/netdata/pull/15407) ([Ferroin](https://github.com/Ferroin))
-- Pre release fixes [\#15405](https://github.com/netdata/netdata/pull/15405) ([ktsaou](https://github.com/ktsaou))
-- Hide eBPF functions [\#15404](https://github.com/netdata/netdata/pull/15404) ([thiagoftsm](https://github.com/thiagoftsm))
-- remove collector meta definitions [\#15403](https://github.com/netdata/netdata/pull/15403) ([ilyam8](https://github.com/ilyam8))
-- bump v2 dashboard to latest prod [\#15402](https://github.com/netdata/netdata/pull/15402) ([ilyam8](https://github.com/ilyam8))
-- Make yamls pass the schema, and use decided temporary naming scheme [\#15401](https://github.com/netdata/netdata/pull/15401) ([Ancairon](https://github.com/Ancairon))
-- collector meta schema: global config examples folding + per example [\#15398](https://github.com/netdata/netdata/pull/15398) ([ilyam8](https://github.com/ilyam8))
-- packaging: fix arch detection in update\_static [\#15396](https://github.com/netdata/netdata/pull/15396) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
