@@ -37,7 +37,7 @@ jobs:
         uses: tj-actions/changed-files@v39
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
-          files_yaml: |
+          files: |
             **.c
             **.cc
             **.h
