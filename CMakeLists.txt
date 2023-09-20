@@ -1284,12 +1284,12 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
             DESTINATION usr/libexec/netdata/plugins.d)
     install(PROGRAMS collectors/cgroups.plugin/cgroup-network-helper.sh
             COMPONENT cgroup_network_plugin
-            DESTINATION usr/lib/netdata/plugins.d)
+            DESTINATION usr/libexec/netdata/plugins.d)
 else()
         # FIXME: rpm builders need this either way.
         install(PROGRAMS collectors/cgroups.plugin/cgroup-network-helper.sh
             COMPONENT cgroup_network_plugin
-            DESTINATION usr/lib/netdata/plugins.d)
+            DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
