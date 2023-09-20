@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef NETDATA_HEALTH_LIB
 # define NETDATA_HEALTH_LIB 1
 

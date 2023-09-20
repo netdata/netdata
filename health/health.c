@@ -82,7 +82,8 @@ static bool prepare_command(BUFFER *wb,
                             const char *classification,
                             const char *edit_command,
                             const char *machine_guid,
-                            uuid_t *transition_id
+                            uuid_t *transition_id,
+                            const char *summary
 ) {
     char buf[8192];
     size_t n = 8192 - 1;
@@ -192,6 +193,10 @@ static bool prepare_command(BUFFER *wb,
     char tr_id[UUID_STR_LEN];
     uuid_unparse_lower(*transition_id, tr_id);
     if (!sanitize_command_argument_string(buf, tr_id, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, summary, n))
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
@@ -581,7 +586,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               ae->classification?ae_classification(ae):"Unknown",
                               edit_command,
                               host->machine_guid,
-                              &ae->transition_id);
+                              &ae->transition_id,
+                              host->health.use_summary_for_notifications && ae->summary?ae_summary(ae):ae_name(ae));
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {
@@ -835,6 +841,7 @@ static void initialize_health(RRDHOST *host)
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
+    host->health.use_summary_for_notifications = config_get_boolean(CONFIG_SECTION_HEALTH, "use summary for notifications", CONFIG_BOOLEAN_YES);
 
     sql_health_alarm_log_load(host);
 
@@ -1157,6 +1164,7 @@ void *health_main(void *ptr) {
                                                                     RRDCALC_STATUS_REMOVED,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     0,
                                                                     rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
@@ -1424,6 +1432,7 @@ void *health_main(void *ptr) {
                                                                     status,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     rc->delay_last,
                                                                     (
@@ -1511,6 +1520,7 @@ void *health_main(void *ptr) {
                                                                     rc->status,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     rc->delay_last,
                                                                     (

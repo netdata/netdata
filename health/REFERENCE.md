@@ -41,18 +41,22 @@ Each health configuration file contains one or more health _entities_, which alw
 For example, here is the first health entity in `health.d/cpu.conf`:
 
 ```yaml
-template: 10min_cpu_usage
-      on: system.cpu
-      os: linux
-   hosts: *
-  lookup: average -10m unaligned of user,system,softirq,irq,guest
-   units: %
-   every: 1m
-    warn: $this > (($status >= $WARNING)  ? (75) : (85))
-    crit: $this > (($status == $CRITICAL) ? (85) : (95))
-   delay: down 15m multiplier 1.5 max 1h
-    info: average cpu utilization for the last 10 minutes (excluding iowait, nice and steal)
-      to: sysadmin
+ template: 10min_cpu_usage
+       on: system.cpu
+    class: Utilization
+     type: System
+component: CPU
+       os: linux
+    hosts: *
+   lookup: average -10m unaligned of user,system,softirq,irq,guest
+    units: %
+    every: 1m
+     warn: $this > (($status >= $WARNING)  ? (75) : (85))
+     crit: $this > (($status == $CRITICAL) ? (85) : (95))
+    delay: down 15m multiplier 1.5 max 1h
+  summary: CPU utilization
+     info: Average cpu utilization for the last 10 minutes (excluding iowait, nice and steal)
+       to: sysadmin
 ```
 
 To tune this alert to trigger warning and critical alerts at a lower CPU utilization, change the `warn` and `crit` lines
@@ -243,7 +247,8 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`options`](#alert-line-options)                    | no              | Add an option to not clear alerts.                                                    |
 | [`host labels`](#alert-line-host-labels)            | no              | Restrict an alert or template to a list of matching labels present on a host.         |
 | [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a host.         |
-| [`info`](#alert-line-info)                          | no              | A brief description of the alert.                                                     |
+| [`summary`](#alert-line-summary)                    | no              | A brief description of the alert.                                                     |
+| [`info`](#alert-line-info)                          | no              | A longer text field that provides more information of this alert                      |
 
 The `alarm` or `template` line must be the first line of any entity.
 
@@ -729,13 +734,44 @@ is specified that does not exist in the chart, the chart won't be matched.
 
 See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
 
+#### Alert line `summary`
+
+The summary field contains a brief title of the alert. It is used as the subject for the notifications, and in
+dashboard list of alerts. An example for the `ram_available` alert is:
+
+```yaml
+summary: Available Ram
+```
+
+summary fields can contain special variables in their text that will be replaced during run-time to provide more specific
+alert information. Current variables supported are:
+
+| variable            | description                                                       |
+|---------------------|-------------------------------------------------------------------|
+| ${family}           | Will be replaced by the family instance for the alert (e.g. eth0) |
+| ${label:LABEL_NAME} | The variable will be replaced with the value of the chart label   |
+
+For example, a summry field like the following:
+
+```yaml
+summary: 1 minute received traffic overflow for ${label:device}
+```
+
+Will be rendered on the alert acting on interface `eth0` as:
+
+```yaml
+info: 1 minute received traffic overflow for ${label:device}
+```
+
+> Please note that variable names are case-sensitive.
+
 #### Alert line `info`
 
 The info field can contain a small piece of text describing the alert or template. This will be rendered in
 notifications and UI elements whenever the specific alert is in focus. An example for the `ram_available` alert is:
 
 ```yaml
-info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
+info: Percentage of estimated amount of RAM available for userspace processes, without causing swapping
 ```
 
 info fields can contain special variables in their text that will be replaced during run-time to provide more specific
@@ -744,7 +780,7 @@ alert information. Current variables supported are:
 | variable            | description                                                       |
 |---------------------|-------------------------------------------------------------------|
 | ${family}           | Will be replaced by the family instance for the alert (e.g. eth0) |
-| ${label:LABEL_NAME} | The variable will be replaced with the value of the label         |
+| ${label:LABEL_NAME} | The variable will be replaced with the value of the chart label   |
 
 For example, an info field like the following:
 

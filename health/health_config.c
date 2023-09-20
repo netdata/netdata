@@ -23,6 +23,7 @@
 #define HEALTH_EXEC_KEY "exec"
 #define HEALTH_RECIPIENT_KEY "to"
 #define HEALTH_UNITS_KEY "units"
+#define HEALTH_SUMMARY_KEY "summary"
 #define HEALTH_INFO_KEY "info"
 #define HEALTH_CLASS_KEY "class"
 #define HEALTH_COMPONENT_KEY "component"
@@ -488,6 +489,7 @@ static inline void alert_config_free(struct alert_config *cfg)
     string_freez(cfg->exec);
     string_freez(cfg->to);
     string_freez(cfg->units);
+    string_freez(cfg->summary);
     string_freez(cfg->info);
     string_freez(cfg->classification);
     string_freez(cfg->component);
@@ -528,6 +530,7 @@ static int health_readfile(const char *filename, void *data) {
             hash_every = 0,
             hash_lookup = 0,
             hash_units = 0,
+            hash_summary = 0,
             hash_info = 0,
             hash_class = 0,
             hash_component = 0,
@@ -560,6 +563,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_exec = simple_uhash(HEALTH_EXEC_KEY);
         hash_every = simple_uhash(HEALTH_EVERY_KEY);
         hash_units = simple_hash(HEALTH_UNITS_KEY);
+        hash_summary = simple_hash(HEALTH_SUMMARY_KEY);
         hash_info = simple_hash(HEALTH_INFO_KEY);
         hash_class = simple_uhash(HEALTH_CLASS_KEY);
         hash_component = simple_uhash(HEALTH_COMPONENT_KEY);
@@ -928,6 +932,21 @@ static int health_readfile(const char *filename, void *data) {
                 }
                 rc->units = string_strdupz(value);
             }
+            else if(hash == hash_summary && !strcasecmp(key, HEALTH_SUMMARY_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->summary = string_strdupz(value);
+                if(rc->summary) {
+                    if(strcmp(rrdcalc_summary(rc), value) != 0)
+                        netdata_log_error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                          line, filename, rrdcalc_name(rc), key, rrdcalc_summary(rc), value, value);
+
+                    string_freez(rc->summary);
+                    string_freez(rc->original_summary);
+                }
+                rc->summary = string_strdupz(value);
+                rc->original_summary = string_dup(rc->summary);
+            }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 strip_quotes(value);
 
@@ -1218,6 +1237,19 @@ static int health_readfile(const char *filename, void *data) {
                     string_freez(rt->units);
                 }
                 rt->units = string_strdupz(value);
+            }
+            else if(hash == hash_summary && !strcasecmp(key, HEALTH_SUMMARY_KEY)) {
+                strip_quotes(value);
+
+                alert_cfg->summary = string_strdupz(value);
+                if(rt->summary) {
+                    if(strcmp(rrdcalctemplate_summary(rt), value) != 0)
+                        netdata_log_error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                          line, filename, rrdcalctemplate_name(rt), key, rrdcalctemplate_summary(rt), value, value);
+
+                    string_freez(rt->summary);
+                }
+                rt->summary = string_strdupz(value);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 strip_quotes(value);

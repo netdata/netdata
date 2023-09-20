@@ -105,9 +105,8 @@ failed:
 #define SQL_INSERT_HEALTH_LOG_DETAIL                                                                                        \
     "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, "                                   \
     "updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, " \
-    "info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id) "         \
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,@global_id); "
-
+    "info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, summary) " \
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,@global_id,?); "
 static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -347,6 +346,12 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->summary, 23);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind summary parameter for SQL_INSERT_HEALTH_LOG_DETAIL");
+        goto failed;
+    }
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG_DETAIL, rc = %d", rrdhost_hostname(host), rc);
@@ -500,9 +505,9 @@ done:
 #define SQL_INJECT_REMOVED                                                                                                      \
     "insert into health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, "  \
     "duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, " \
-    "delay, new_value, old_value, last_repeat, transition_id, global_id) "                                                      \
+    "delay, new_value, old_value, last_repeat, transition_id, global_id, summary) "                                             \
     "select health_log_id, ?1, ?2, ?3, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, unixepoch(), info, exec_code, -2, " \
-    "new_status, delay, NULL, new_value, 0, ?5, now_usec(0) from health_log_detail where unique_id = ?6 and transition_id = ?7;"
+    "new_status, delay, NULL, new_value, 0, ?5, now_usec(0), summary from health_log_detail where unique_id = ?6 and transition_id = ?7;"
 
 #define SQL_INJECT_REMOVED_UPDATE_DETAIL "update health_log_detail set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3 and transition_id = ?4;"
 
@@ -742,7 +747,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
             "hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, " \
             "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, " \
             "hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, " \
-            "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id, hl.chart_name " \
+            "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id, hl.chart_name, hld.summary " \
             "FROM health_log hl, alert_hash ah, health_log_detail hld " \
             "WHERE hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
 
@@ -890,6 +895,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
             ae->global_id = sqlite3_column_int64(res, 32);
 
         ae->chart_name = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 33);
+        ae->summary = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 34);
 
         char value_string[100 + 1];
         string_freez(ae->old_value_string);
@@ -940,8 +946,8 @@ void sql_health_alarm_log_load(RRDHOST *host)
     "on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, " \
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
-    "p_db_lookup_before, p_update_every, source, chart_labels) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
-    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36);"
+    "p_db_lookup_before, p_update_every, source, chart_labels, summary) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
+    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37);"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {
@@ -1129,6 +1135,10 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->summary, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store alert config, rc = %d", rc);
@@ -1195,6 +1205,7 @@ int alert_hash_and_store_config(
     DIGEST_ALERT_CONFIG_VAL(cfg->repeat);
     DIGEST_ALERT_CONFIG_VAL(cfg->host_labels);
     DIGEST_ALERT_CONFIG_VAL(cfg->chart_labels);
+    DIGEST_ALERT_CONFIG_VAL(cfg->summary);
 
     EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
     EVP_MD_CTX_destroy(evpctx);
@@ -1275,8 +1286,8 @@ done:
      "hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, "                         \
      "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, "                     \
      "hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, "    \
-     "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id FROM health_log hl, "      \
-     "alert_hash ah, health_log_detail hld WHERE hl.config_hash_id = ah.hash_id and "                                  \
+     "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.summary "             \
+     "FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hl.config_hash_id = ah.hash_id and "              \
      "hl.health_log_id = hld.health_log_id and hl.host_id = @host_id "
 
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
@@ -1424,6 +1435,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             (long unsigned int)sqlite3_column_int64(res, 26),
             (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
 
+        health_string2json(wb, "\t\t", "summary", (char *) sqlite3_column_text(res, 32), ",\n");
         health_string2json(wb, "\t\t", "info", (char *) sqlite3_column_text(res, 19), ",\n");
 
         if(unlikely(sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {

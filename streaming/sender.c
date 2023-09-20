@@ -934,7 +934,7 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
         sender_commit(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
         sender_thread_buffer_free();
 
-        internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
+        internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %"PRIu64" usec).",
                        rrdhost_hostname(s->host), s->connected_to,
                        string2str(tmp->transaction),
                        buffer_strlen(func_wb),

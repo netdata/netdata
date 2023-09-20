@@ -88,6 +88,12 @@ const char *database_migrate_v10_v11[] = {
     NULL
 };
 
+const char *database_migrate_v11_v12[] = {
+    "ALTER TABLE health_log_detail ADD summary TEXT;",
+    "ALTER TABLE alert_hash ADD summary TEXT;",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
@@ -315,6 +321,23 @@ static int do_migration_v10_v11(sqlite3 *database, const char *name)
     return 0;
 }
 
+#define MIGR_11_12_UPD_HEALTH_LOG_DETAIL "UPDATE health_log_detail SET summary = (select name from health_log where health_log_id = health_log_detail.health_log_id);"
+static int do_migration_v11_v12(sqlite3 *database, const char *name)
+{
+    int rc = 0;
+
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (table_exists_in_database("health_log_detail") && !column_exists_in_table("health_log_detail", "summary") &&
+        table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
+        rc = init_database_batch(database, &database_migrate_v11_v12[0]);
+
+    if (!rc)
+        sqlite3_exec_monitored(database, MIGR_11_12_UPD_HEALTH_LOG_DETAIL, 0, 0, NULL);
+
+    return rc;
+}
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
@@ -369,6 +392,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v8 to v9",  .func = do_migration_v8_v9},
     {.name = "v9 to v10",  .func = do_migration_v9_v10},
     {.name = "v10 to v11",  .func = do_migration_v10_v11},
+    {.name = "v11 to v12",  .func = do_migration_v11_v12},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
