@@ -1119,11 +1119,8 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
         rw_spinlock_write_lock(&pid_ptr->cachestat_stats.rw_spinlock);
         if (pid_ptr->cachestat_stats.JudyLArray) {
             while ((cache_value = JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_cache, &first_cache))) {
-                (void)cache_value;
-                /*
-                netdata_socket_plus_t *socket_clean = *cache_value;
-                aral_freez(aral_socket_table, socket_clean);
-                 */
+                netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
+                ebpf_cachestat_release(values);
             }
             JudyLFreeArray(&pid_ptr->cachestat_stats.JudyLArray, PJE0);
             pid_ptr->cachestat_stats.JudyLArray = NULL;
