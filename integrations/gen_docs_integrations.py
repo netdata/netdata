@@ -16,16 +16,19 @@ def cleanup():
             for directory in dirs:
                 if directory == "integrations":
                     shutil.rmtree(os.path.join(subdir, directory))
+                    break
     else:
         for subdir, dirs, files in os.walk("collectors"):
             for directory in dirs:
                 if directory == "integrations":
                     shutil.rmtree(os.path.join(subdir, directory))
+                    break
 
         for subdir, dirs, files in os.walk("exporting"):
             for directory in dirs:
                 if directory == "integrations":
                     shutil.rmtree(os.path.join(subdir, directory))
+                    break
 
 def generate_category_from_name(category_fragment, category_array):
     """
