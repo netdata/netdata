@@ -28,6 +28,7 @@
 #cmakedefine MAJOR_IN_MKDEV
 #cmakedefine HAVE_CLOCK_GETTIME
 #cmakedefine HAVE_STRERROR_R
+#cmakedefine HAVE_SD_JOURNAL_OS_ROOT
 
 // checked source compilation
 #cmakedefine STRERROR_R_CHAR_P

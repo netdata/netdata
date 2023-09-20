@@ -160,6 +160,14 @@ check_include_file("stdint.h" HAVE_STDINT_H)
 check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
 
 #
+# check libraries we need
+#
+
+include(CheckLibraryExists)
+check_library_exists(systemd sd_journal_open "" HAVE_SYSTEMD_LIB)
+check_include_file("systemd/sd-journal.h" HAVE_SYSTEMD_SD_JOURNAL_H)
+
+#
 # check symbols
 #
 
@@ -173,7 +181,9 @@ check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
 #
 # check source compilation
 #
+
 include(CheckCSourceCompiles)
+
 check_c_source_compiles("
 #define _GNU_SOURCE
 #include <string.h>
@@ -181,6 +191,14 @@ int main() {
         char x = *strerror_r(0, &x, sizeof(x)); return 0;
 }
 " STRERROR_R_CHAR_P)
+
+check_c_source_compiles("
+#include <systemd/sd-journal.h>
+int main() {
+        int x = SD_JOURNAL_OS_ROOT;
+        return 0;
+}
+" HAVE_SD_JOURNAL_OS_ROOT)
 
 # openssl/crypto
 if(NOT MACOS)
@@ -1270,12 +1288,16 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
-    add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
-    target_link_libraries(systemd-journal.plugin libnetdata)
+        if (NOT HAVE_SYSTEMD_LIB OR NOT HAVE_SYSTEMD_SD_JOURNAL_H)
+                message(FATAL_ERROR "Can not build systemd-journal plugin because we can't find the library/headers.")
+        endif()
 
-    install(TARGETS systemd-journal.plugin
-            COMPONENT systemd_journal_plugin
-            DESTINATION usr/libexec/netdata/plugins.d)
+        add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
+        target_link_libraries(systemd-journal.plugin libnetdata -lsystemd)
+
+        install(TARGETS systemd-journal.plugin
+                COMPONENT systemd_journal_plugin
+                DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
