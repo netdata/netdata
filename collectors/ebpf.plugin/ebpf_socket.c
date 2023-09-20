@@ -1822,6 +1822,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key.pid, values->name);
         if (!pid_ptr) {
+            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_socket_loop;
         }
 
@@ -1850,6 +1851,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
                     // Socket was not updated since last read
                     JudyLDel(&pid_ptr->socket_stats.JudyLArray, values[0].first_timestamp, PJE0);
                     aral_freez(aral_socket_table, socket_ptr);
+                    bpf_map_delete_elem(fd, &key);
                 }
             } else // First time
                 socket_ptr->last_update = update_time;
