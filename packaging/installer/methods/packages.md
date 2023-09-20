@@ -27,12 +27,9 @@ and fail if it cannot do so.
 > In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
 > We still maintain the Package cloud repositories, but they are not guaranteed to work and may be removed 
 > without prior warning. 
-> You find the following `repoconfigs`:
 >
-> - `netdata-repo-1-2.noarch.rpm` : You will receive packages for the `stable` channel of the Agent from our Package Cloud 
-> - `netdata-repo-2-1.noarch.rpm` : You will receive packages for the `stable` channel of the Agent from our self-hosted repo (repo.netdata.cloud)
-> - `netdata-repo-edge-1-2.noarch.rpm` : You will receive packages for the `nightly` channel of the Agent from our Package Cloud 
-> - `netdata-repo-edge-2-1.noarch.rpm` : You will receive packages for the `nightly` channel of the Agent from our self-hosted repo (repo.netdata.cloud)
+> When selecting a repository configuration package, note that the version 2 packages provide configuration for
+> our self-hosted repositories, and then version 1 packages provide configuration for Package Cloud.
 
 
 ## Manual setup of RPM packages.
