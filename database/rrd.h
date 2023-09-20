@@ -1006,6 +1006,7 @@ struct alarm_entry {
 
     STRING *source;
     STRING *units;
+    STRING *summary;
     STRING *info;
 
     NETDATA_DOUBLE old_value;
@@ -1042,6 +1043,7 @@ struct alarm_entry {
 #define ae_recipient(ae) string2str((ae)->recipient)
 #define ae_source(ae) string2str((ae)->source)
 #define ae_units(ae) string2str((ae)->units)
+#define ae_summary(ae) string2str((ae)->summary)
 #define ae_info(ae) string2str((ae)->info)
 #define ae_old_value_string(ae) string2str((ae)->old_value_string)
 #define ae_new_value_string(ae) string2str((ae)->new_value_string)
@@ -1064,6 +1066,7 @@ typedef struct health {
     uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
     uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
     unsigned int health_enabled;                   // 1 when this host has health enabled
+    bool use_summary_for_notifications;            // whether or not to use the summary field as a subject for notifications
 } HEALTH;
 
 // ----------------------------------------------------------------------------

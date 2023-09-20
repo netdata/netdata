@@ -64,8 +64,10 @@ struct rrdcalc {
 
     STRING *source;                 // the source of this alarm
     STRING *units;                  // the units of the alarm
+    STRING *summary;                // a short alert summary
+    STRING *original_summary;       // the original summary field before any variable replacement
     STRING *original_info;          // the original info field before any variable replacement
-    STRING *info;                   // a short description of the alarm
+    STRING *info;                   // a description of the alarm
 
     int update_every;               // update frequency for the alarm
 
@@ -170,6 +172,8 @@ struct rrdcalc {
 #define rrdcalc_module_match(rc) string2str((rc)->module_match)
 #define rrdcalc_source(rc) string2str((rc)->source)
 #define rrdcalc_units(rc) string2str((rc)->units)
+#define rrdcalc_original_summary(rc) string2str((rc)->original_summary)
+#define rrdcalc_summary(rc) string2str((rc)->summary)
 #define rrdcalc_original_info(rc) string2str((rc)->original_info)
 #define rrdcalc_info(rc) string2str((rc)->info)
 #define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
@@ -206,6 +210,7 @@ struct alert_config {
     STRING *exec;
     STRING *to;
     STRING *units;
+    STRING *summary;
     STRING *info;
     STRING *classification;
     STRING *component;

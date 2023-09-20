@@ -60,6 +60,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"recipient\": \"%s\",\n"
                     "\t\t\t\"source\": \"%s\",\n"
                     "\t\t\t\"units\": \"%s\",\n"
+                    "\t\t\t\"summary\": \"%s\",\n"
                     "\t\t\t\"info\": \"%s\",\n"
                     "\t\t\t\"status\": \"%s\",\n"
                     "\t\t\t\"last_status_change\": %lu,\n"
@@ -93,6 +94,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->recipient?rrdcalc_recipient(rc):string2str(host->health.health_default_recipient)
                    , rrdcalc_source(rc)
                    , rrdcalc_units(rc)
+                   , rrdcalc_summary(rc)
                    , rrdcalc_info(rc)
                    , rrdcalc_status2string(rc->status)
                    , (unsigned long)rc->last_status_change

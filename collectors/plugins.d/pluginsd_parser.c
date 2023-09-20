@@ -772,7 +772,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
+                       "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %"PRIu64" usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
@@ -789,7 +789,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     }
     else {
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%zd bytes, in %llu usec)",
+                       "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%zd bytes, in %"PRIu64" usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_ut - pf->started_ut);
     }
@@ -812,7 +812,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     struct inflight_function *pf = func;
 
     internal_error(LOG_FUNCTIONS,
-                   "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %llu usec, response %llu usec)",
+                   "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %"PRIu64" usec, response %"PRIu64" usec)",
                    string2str(pf->function), dictionary_acquired_item_name(item),
                    buffer_strlen(pf->result_body_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
 
@@ -833,7 +833,7 @@ static void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
     dfe_start_write(parser->inflight.functions, pf) {
         if (pf->timeout_ut < now) {
             internal_error(true,
-                           "FUNCTION '%s' removing expired transaction '%s', after %llu usec.",
+                           "FUNCTION '%s' removing expired transaction '%s', after %"PRIu64" usec.",
                            string2str(pf->function), pf_dfe.name, now - pf->started_ut);
 
             if(!buffer_strlen(pf->result_body_wb) || pf->code == HTTP_RESP_OK)
