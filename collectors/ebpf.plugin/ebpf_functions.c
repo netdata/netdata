@@ -7,8 +7,6 @@
  *  EBPF FUNCTION COMMON
  *****************************************************************/
 
-RW_SPINLOCK rw_spinlock;        // protect the buffer
-
 /**
  * Function Start thread
  *
@@ -49,7 +47,6 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
  * @param thread_name name of the thread we are looking for.
  *
  * @return it returns a pointer for the module that has thread_name on success or NULL otherwise.
- */
 ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
@@ -60,6 +57,7 @@ ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
 
     return NULL;
 }
+ */
 
 /*****************************************************************
  *  EBPF HELP FUNCTIONS
@@ -71,7 +69,6 @@ ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
  * Shows help with all options accepted by thread function.
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
-*/
 static void ebpf_function_thread_manipulation_help(const char *transaction) {
     BUFFER *wb = buffer_create(0, NULL);
     buffer_sprintf(wb, "%s",
@@ -94,12 +91,11 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
             "Filters can be combined. Each filter can be given only one time.\n"
             );
 
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
-    pthread_mutex_unlock(&lock);
 
     buffer_free(wb);
 }
+*/
 
 /*****************************************************************
  *  EBPF ERROR FUNCTIONS
@@ -115,9 +111,7 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
  * @param msg          the error message
  */
 static void ebpf_function_error(const char *transaction, int code, const char *msg) {
-    pthread_mutex_lock(&lock);
     pluginsd_function_json_error_to_stdout(transaction, code, msg);
-    pthread_mutex_unlock(&lock);
 }
 
 /*****************************************************************
@@ -135,7 +129,6 @@ static void ebpf_function_error(const char *transaction, int code, const char *m
  * @param line_max     Number of arguments given
  * @param timeout      The function timeout
  * @param em           The structure with thread information
- */
 static void ebpf_function_thread_manipulation(const char *transaction,
                                               char *function __maybe_unused,
                                               char *line_buffer __maybe_unused,
@@ -370,12 +363,11 @@ static void ebpf_function_thread_manipulation(const char *transaction,
     buffer_json_finalize(wb);
 
     // Lock necessary to avoid race condition
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
-    pthread_mutex_unlock(&lock);
 
     buffer_free(wb);
 }
+ */
 
 /*****************************************************************
  *  EBPF SOCKET FUNCTION
@@ -389,7 +381,6 @@ static void ebpf_function_thread_manipulation(const char *transaction,
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
 static void ebpf_function_socket_help(const char *transaction) {
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
     fprintf(stdout, "%s",
             "ebpf.plugin / socket\n"
@@ -427,7 +418,6 @@ static void ebpf_function_socket_help(const char *transaction) {
     );
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
-    pthread_mutex_unlock(&lock);
 }
 
 /**
@@ -644,20 +634,16 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
  * @param function     function name and arguments given to thread.
- * @param line_buffer  buffer used to parse args
- * @param line_max     Number of arguments given
  * @param timeout      The function timeout
- * @param em           The structure with thread information
+ * @param cancelled    Variable used to store function status.
  */
 static void ebpf_function_socket_manipulation(const char *transaction,
                                               char *function __maybe_unused,
-                                              char *line_buffer __maybe_unused,
-                                              int line_max __maybe_unused,
                                               int timeout __maybe_unused,
-                                              ebpf_module_t *em)
+                                              bool *cancelled __maybe_unused)
 {
-    UNUSED(line_buffer);
     UNUSED(timeout);
+    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
 
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
@@ -1058,14 +1044,12 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     buffer_json_finalize(wb);
 
     // Lock necessary to avoid race condition
-    pthread_mutex_lock(&lock);
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
 
     fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
 
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
-    pthread_mutex_unlock(&lock);
 
     buffer_free(wb);
 }
@@ -1083,61 +1067,31 @@ static void ebpf_function_socket_manipulation(const char *transaction,
  */
 void *ebpf_function_thread(void *ptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    char buffer[PLUGINSD_LINE_MAX + 1];
+    (void)ptr;
 
-    rw_spinlock_init(&rw_spinlock);
-    char *s = NULL;
-    while(!ebpf_exit_plugin && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
-        char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
+    bool ebpf_function_plugin_exit = false;
+    struct functions_evloop_globals *wg = functions_evloop_init(1,
+                                                                "EBPF",
+                                                                &lock,
+                                                                &ebpf_function_plugin_exit);
 
-        const char *keyword = get_word(words, num_words, 0);
+    functions_evloop_add_function(wg,
+                                  "ebpf_socket",
+                                  ebpf_function_socket_manipulation,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
-        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while(!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                                  keyword,
-                                  transaction?transaction:"(unset)",
-                                  timeout_s?timeout_s:"(unset)",
-                                  function?function:"(unset)");
-            }
-            else {
-                int timeout = str2i(timeout_s);
-                rw_spinlock_write_lock(&rw_spinlock);
-                if (!strncmp(function, EBPF_FUNCTION_THREAD, sizeof(EBPF_FUNCTION_THREAD) - 1))
-                    ebpf_function_thread_manipulation(transaction,
-                                                      function,
-                                                      buffer,
-                                                      PLUGINSD_LINE_MAX + 1,
-                                                      timeout,
-                                                      em);
-                else if (!strncmp(function, EBPF_FUNCTION_SOCKET, sizeof(EBPF_FUNCTION_SOCKET) - 1))
-                    ebpf_function_socket_manipulation(transaction,
-                                                      function,
-                                                      buffer,
-                                                      PLUGINSD_LINE_MAX + 1,
-                                                      timeout,
-                                                      &ebpf_modules[EBPF_MODULE_SOCKET_IDX]);
-                else
-                    ebpf_function_error(transaction,
-                                        HTTP_RESP_NOT_FOUND,
-                                        "No function with this name found in ebpf.plugin.");
-
-                rw_spinlock_write_unlock(&rw_spinlock);
-            }
+        if (ebpf_function_plugin_exit) {
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            ebpf_stop_threads(0);
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            break;
         }
-        else
-            netdata_log_error("Received unknown command: %s", keyword ? keyword : "(unset)");
     }
 
-    if(!s || feof(stdin) || ferror(stdin)) {
-        ebpf_stop_threads(SIGQUIT);
-        netdata_log_error("Received error on stdin.");
-    }
     return NULL;
 }

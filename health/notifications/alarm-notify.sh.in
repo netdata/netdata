@@ -248,6 +248,7 @@ else
   edit_command_line="${28}"  # The command to edit the alarm, with the line number
   child_machine_guid="${29}" # the machine_guid of the child
   transition_id="${30}"      # the transition_id of the alert
+  summary="${31}"            # the summary text field of the alert
 fi
 
 # -----------------------------------------------------------------------------
@@ -2531,7 +2532,7 @@ status_message="status unknown"
 color="grey"
 
 # the alarm value
-alarm="${name//_/ } = ${value_string}"
+alarm="${summary//_/ } = ${value_string}"
 
 # the image of the alarm
 image="${images_base_url}/images/banner-icon-144x144.png"
@@ -2582,7 +2583,7 @@ CLEAR)
 esac
 
 # the html email subject
-html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${host}"
+html_email_subject="${status_email_subject}, ${summary} = ${value_string}, on ${host}"
 
 if [ "${status}" = "CLEAR" ]; then
   severity="Recovered from ${old_status}"
@@ -2593,8 +2594,8 @@ if [ "${status}" = "CLEAR" ]; then
 
   # don't show the value when the status is CLEAR
   # for certain alarms, this value might not have any meaning
-  alarm="${name//_/ } ${raised_for}"
-  html_email_subject="${status_email_subject}, ${name} ${raised_for}, on ${host}"
+  alarm="${summary//_/ } ${raised_for}"
+  html_email_subject="${status_email_subject}, ${summary} ${raised_for}, on ${host}"
 
 elif { [ "${old_status}" = "WARNING" ] && [ "${status}" = "CRITICAL" ]; }; then
   severity="Escalated to ${status}"
@@ -3184,7 +3185,7 @@ Content-Transfer-Encoding: 8bit
                       <tbody>
                       <tr>
                         <td align="left" style="font-size:0px;padding:10px 25px;padding-top:15px;word-break:break-word;">
-                          <div style="font-family:Open Sans, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#35414A;">${name}</div>
+                          <div style="font-family:Open Sans, sans-serif;font-size:20px;font-weight:700;line-height:1;text-align:left;color:#35414A;">${summary}</div>
                         </td>
                       </tr>
                       </tbody>
@@ -3342,14 +3343,14 @@ Content-Transfer-Encoding: 8bit
               <tbody>
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-bottom:6px;word-break:break-word;">
-                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Chart:
-                    <span style="font-weight:700; font-size:20px">${chart}</span></div>
+                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Alert:
+                    <span style="font-weight:700; font-size:20px">${name}</span></div>
                 </td>
               </tr>
               <tr>
                 <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;word-break:break-word;">
-                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Family:
-                    <span style="font-weight:700; font-size:20px">${family}</span></div>
+                  <div style="font-family:Open Sans, sans-serif;font-size:18px;line-height:1;text-align:left;color:#35414A;">Chart:
+                    <span style="font-weight:700; font-size:20px">${chart}</span></div>
                 </td>
               </tr>
               <tr>
@@ -3610,7 +3611,7 @@ Content-Transfer-Encoding: 8bit
                     <tbody>
                     <tr>
                       <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;padding-bottom:0;word-break:break-word;">
-                        <div style="font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;">© Netdata 2021 - The real-time performance and health monitoring</div>
+                        <div style="font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;">© Netdata $(date +'%Y') - The real-time performance and health monitoring</div>
                       </td>
                     </tr>
                     </tbody>

@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/common.h"
 #include "web/server/web_client.h"
+#include "database/rrdfunctions.h"
 #include "database/rrd.h"
 
 #define CONNECTED_TO_SIZE 100

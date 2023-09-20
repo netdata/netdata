@@ -2,7 +2,7 @@ plugin_name: freeipmi.plugin
 modules:
   - meta:
       plugin_name: freeipmi.plugin
-      module_name: sensors
+      module_name: freeipmi
       monitored_instance:
         name: Intelligent Platform Management Interface (IPMI)
         link: "https://en.wikipedia.org/wiki/Intelligent_Platform_Management_Interface"
@@ -42,36 +42,225 @@ modules:
     setup:
       prerequisites:
         list:
+          - title: Install freeipmi.plugin
+            description: |
+              When using our official DEB/RPM packages, the FreeIPMI plugin is included in a separate package named `netdata-plugin-freeipmi` which needs to be manually installed using your system package manager. It is not installed automatically due to the large number of dependencies it requires.
+
+              When using a static build of Netdata, the FreeIPMI plugin will be included and installed automatically, though you will still need to have FreeIPMI installed on your system to be able to use the plugin.
+
+              When using a local build of Netdata, you need to ensure that the FreeIPMI development packages (typically called `libipmimonitoring-dev`, `libipmimonitoring-devel`, or `freeipmi-devel`) are installed when building Netdata.
           - title: Preliminary actions
             description: |
-              If you have not previously used IPMI on your system, you will probably need to run the ipmimonitoring command as root to initialize IPMI settings so that the Netdata plugin works correctly. It should return information about available sensors on the system.
-
-              In some distributions libipmimonitoring.pc is located in a non-standard directory, which can cause building the plugin to fail when building Netdata from source. In that case you should find the file and linking it to the standard pkg-config directory. Usually, running sudo ln -s /usr/lib/$(uname -m)-linux-gnu/pkgconfig/libipmimonitoring.pc/libipmimonitoring.pc /usr/lib/pkgconfig/libipmimonitoring.pc resolves this issue.
-
-              If you installed `netdata` using a package manager, it is also necessary to install the package `netdata-plugin-freeimpi`.
+              If you have not previously used IPMI on your system, you will probably need to run the `ipmimonitoring` command as root
+              to initialize IPMI settings so that the Netdata plugin works correctly. It should return information about available sensors on the system.
       configuration:
         file:
           name: "netdata.conf"
-          section_name: '[plugin:freeipmi]'
-          description: "This is netdata main configuration file"
+          section_name: "[plugin:freeipmi]"
         options:
-          description: "This tool receives command line options that are visible when user run: `./usr/libexec/netdata/plugins.d/freeipmi.plugin --help`"
+          description: |
+            The configuration is set using command line options:
+
+            ```
+            # netdata.conf
+            [plugin:freeipmi]
+              command options = opt1 opt2 ... optN
+            ```
+
+            To display a help message listing the available command line options:
+
+            ```bash
+            ./usr/libexec/netdata/plugins.d/freeipmi.plugin --help
+            ```
           folding:
-            title: "Config options"
+            title: "Command options"
             enabled: true
           list:
-            - name: command options
-              description: Variable used to pass arguments for the plugin.
-              default_value: 1
+            - name: SECONDS
+              description: Data collection frequency.
+              default_value: ""
+              required: false
+            - name: debug
+              description: Enable verbose output.
+              default_value: disabled
+              required: false
+            - name: no-sel
+              description: Disable System Event Log (SEL) collection.
+              default_value: disabled
+              required: false
+            - name: reread-sdr-cache
+              description: Re-read SDR cache on every iteration.
+              default_value: disabled
+              required: false
+            - name: interpret-oem-data
+              description: Attempt to parse OEM data.
+              default_value: disabled
+              required: false
+            - name: assume-system-event-record
+              description: treat illegal SEL events records as normal.
+              default_value: disabled
+              required: false
+            - name: ignore-non-interpretable-sensors
+              description: Do not read sensors that cannot be interpreted.
+              default_value: disabled
+              required: false
+            - name: bridge-sensors
+              description: Bridge sensors not owned by the BMC.
+              default_value: disabled
+              required: false
+            - name: shared-sensors
+              description: Enable shared sensors if found.
+              default_value: disabled
+              required: false
+            - name: no-discrete-reading
+              description: Do not read sensors if their event/reading type code is invalid.
+              default_value: enabled
+              required: false
+            - name: ignore-scanning-disabled
+              description: Ignore the scanning bit and read sensors no matter what.
+              default_value: disabled
+              required: false
+            - name: assume-bmc-owner
+              description: Assume the BMC is the sensor owner no matter what (usually bridging is required too).
+              default_value: disabled
+              required: false
+            - name: hostname HOST
+              description: Remote IPMI hostname or IP address.
+              default_value: local
+              required: false
+            - name: username USER
+              description: Username that will be used when connecting to the remote host.
+              default_value: ""
+              required: false
+            - name: password PASS
+              description: Password that will be used when connecting to the remote host.
+              default_value: ""
+              required: false
+            - name: noauthcodecheck / no-auth-code-check
+              description: Don't check the authentication codes returned.
+              default_value: ""
+              required: false
+            - name: driver-type IPMIDRIVER
+              description: Specify the driver type to use instead of doing an auto selection. The currently available outofband drivers are LAN and LAN_2_0, which  perform  IPMI  1.5  and  IPMI  2.0 respectively. The currently available inband drivers are KCS, SSIF, OPENIPMI and SUNBMC.
+              default_value: ""
+              required: false
+            - name: sdr-cache-dir PATH
+              description: SDR cache files directory.
+              default_value: /tmp
+              required: false
+            - name: sensor-config-file FILE
+              description: Sensors configuration filename.
+              default_value: system default
+              required: false
+            - name: sel-config-file FILE
+              description: SEL configuration filename.
+              default_value: system default
+              required: false
+            - name: ignore N1,N2,N3,...
+              description: Sensor IDs to ignore.
+              default_value: ""
+              required: false
+            - name: ignore-status N1,N2,N3,...
+              description: Sensor IDs to ignore status (nominal/warning/critical).
+              default_value: ""
+              required: false
+            - name: -v
+              description: Print version and exit.
+              default_value: ""
+              required: false
+            - name: --help
+              description: Print usage message and exit.
+              default_value: ""
               required: false
         examples:
           folding:
             enabled: true
-            title: ""
-          list: []
+            title: "Config"
+          list:
+            - name: Decrease data collection frequency
+              description: Basic example decreasing data collection frequency. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
+              config: |
+                [plugin:freeipmi]
+                  update every = 10
+              folding:
+                enabled: false
+            - name: Disable SEL collection
+              description: Append to `command options =` the options you need.
+              config: |
+                [plugin:freeipmi]
+                  command options = no-sel
+            - name: Ignore specific sensors
+              description: |
+                Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`.
+
+                **However this file is not used by `libipmimonitoring`** (the library used by Netdata's `freeipmi.plugin`).
+
+                To find the IDs to ignore, run the command `ipmimonitoring`. The first column is the wanted ID:
+
+                ID  | Name             | Type                     | State    | Reading    | Units | Event
+                1   | Ambient Temp     | Temperature              | Nominal  | 26.00      | C     | 'OK'
+                2   | Altitude         | Other Units Based Sensor | Nominal  | 480.00     | ft    | 'OK'
+                3   | Avg Power        | Current                  | Nominal  | 100.00     | W     | 'OK'
+                4   | Planar 3.3V      | Voltage                  | Nominal  | 3.29       | V     | 'OK'
+                5   | Planar 5V        | Voltage                  | Nominal  | 4.90       | V     | 'OK'
+                6   | Planar 12V       | Voltage                  | Nominal  | 11.99      | V     | 'OK'
+                7   | Planar VBAT      | Voltage                  | Nominal  | 2.95       | V     | 'OK'
+                8   | Fan 1A Tach      | Fan                      | Nominal  | 3132.00    | RPM   | 'OK'
+                9   | Fan 1B Tach      | Fan                      | Nominal  | 2150.00    | RPM   | 'OK'
+                10  | Fan 2A Tach      | Fan                      | Nominal  | 2494.00    | RPM   | 'OK'
+                11  | Fan 2B Tach      | Fan                      | Nominal  | 1825.00    | RPM   | 'OK'
+                12  | Fan 3A Tach      | Fan                      | Nominal  | 3538.00    | RPM   | 'OK'
+                13  | Fan 3B Tach      | Fan                      | Nominal  | 2625.00    | RPM   | 'OK'
+                14  | Fan 1            | Entity Presence          | Nominal  | N/A        | N/A   | 'Entity Present'
+                15  | Fan 2            | Entity Presence          | Nominal  | N/A        | N/A   | 'Entity Present'
+                ...
+
+                `freeipmi.plugin` supports the option `ignore` that accepts a comma separated list of sensor IDs to ignore. To configure it set on `netdata.conf`:
+              config: |
+                [plugin:freeipmi]
+                      command options = ignore 1,2,3,4,...
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Debug Mode
+            description: |
+              You can run `freeipmi.plugin` with the debug option enabled, to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
+
+              - Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on your system, open `netdata.conf` and look for the `plugins` setting under `[directories]`.
+
+                ```bash
+                cd /usr/libexec/netdata/plugins.d/
+                ```
+
+              - Switch to the `netdata` user.
+
+                ```bash
+                sudo -u netdata -s
+                ```
+
+              - Run the `freeipmi.plugin` in debug mode:
+
+                ```bash
+                ./freeipmi.plugin 5 debug
+                ```
+          - name: kimpi0 CPU usage
+            description: |
+              There have been reports that kipmi is showing increased CPU when the IPMI is queried. To lower the CPU consumption of the system you can issue this command:
+
+              ```sh
+              echo 10 > /sys/module/ipmi_si/parameters/kipmid_max_busy_us
+              ```
+
+              You can also permanently set the above setting by creating the file `/etc/modprobe.d/ipmi.conf` with this content:
+
+              ```sh
+              # prevent kipmi from consuming 100% CPU
+              options ipmi_si kipmid_max_busy_us=10
+              ```
+
+              This instructs the kernel IPMI module to pause for a tick between checking IPMI. Querying IPMI will be a lot slower now (e.g. several seconds for IPMI to respond), but `kipmi` will not use any noticeable CPU.
+
+              You can also use a higher number (this is the number of microseconds to poll IPMI for a response, before waiting for a tick).
     alerts:
       - name: ipmi_sensor_state
         link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
@@ -81,9 +270,20 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ""
+      description: |
+        The plugin does a speed test when it starts, to find out the duration needed by the IPMI processor to respond. Depending on the speed of your IPMI processor, charts may need several seconds to show up on the dashboard.
       availability: []
       scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: ipmi.sel
+              description: IPMI Events
+              unit: "events"
+              chart_type: area
+              dimensions:
+                - name: events
         - name: sensor
           description: ""
           labels:
@@ -94,12 +294,6 @@ modules:
             - name: component
               description: One of 25 recognized components (Processor, Peripheral).
           metrics:
-            - name: ipmi.sel
-              description: IPMI Events
-              unit: "events"
-              chart_type: area
-              dimensions:
-                - name: events
             - name: ipmi.sensor_state
               description: IPMI Sensors State
               unit: "state"

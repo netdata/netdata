@@ -533,42 +533,42 @@ int string_unittest(size_t entries) {
             strings[i] = string_strdupz(names[i]);
         }
         end_ut = now_realtime_usec();
-        fprintf(stderr, "Created %zu strings in %llu usecs\n", entries, end_ut - start_ut);
+        fprintf(stderr, "Created %zu strings in %"PRIu64" usecs\n", entries, end_ut - start_ut);
 
         start_ut = now_realtime_usec();
         for(size_t i = 0; i < entries ;i++) {
             strings[i] = string_dup(strings[i]);
         }
         end_ut = now_realtime_usec();
-        fprintf(stderr, "Cloned %zu strings in %llu usecs\n", entries, end_ut - start_ut);
+        fprintf(stderr, "Cloned %zu strings in %"PRIu64" usecs\n", entries, end_ut - start_ut);
 
         start_ut = now_realtime_usec();
         for(size_t i = 0; i < entries ;i++) {
             strings[i] = string_strdupz(string2str(strings[i]));
         }
         end_ut = now_realtime_usec();
-        fprintf(stderr, "Found %zu existing strings in %llu usecs\n", entries, end_ut - start_ut);
+        fprintf(stderr, "Found %zu existing strings in %"PRIu64" usecs\n", entries, end_ut - start_ut);
 
         start_ut = now_realtime_usec();
         for(size_t i = 0; i < entries ;i++) {
             string_freez(strings[i]);
         }
         end_ut = now_realtime_usec();
-        fprintf(stderr, "Released %zu referenced strings in %llu usecs\n", entries, end_ut - start_ut);
+        fprintf(stderr, "Released %zu referenced strings in %"PRIu64" usecs\n", entries, end_ut - start_ut);
 
         start_ut = now_realtime_usec();
         for(size_t i = 0; i < entries ;i++) {
             string_freez(strings[i]);
         }
         end_ut = now_realtime_usec();
-        fprintf(stderr, "Released (again) %zu referenced strings in %llu usecs\n", entries, end_ut - start_ut);
+        fprintf(stderr, "Released (again) %zu referenced strings in %"PRIu64" usecs\n", entries, end_ut - start_ut);
 
         start_ut = now_realtime_usec();
         for(size_t i = 0; i < entries ;i++) {
             string_freez(strings[i]);
         }
         end_ut = now_realtime_usec();
-        fprintf(stderr, "Freed %zu strings in %llu usecs\n", entries, end_ut - start_ut);
+        fprintf(stderr, "Freed %zu strings in %"PRIu64" usecs\n", entries, end_ut - start_ut);
 
         freez(strings);
 

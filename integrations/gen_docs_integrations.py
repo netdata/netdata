@@ -111,11 +111,11 @@ endmeta-->
                     if not os.path.exists(f'{path}/integrations'):
                         os.mkdir(f'{path}/integrations')
 
-                    with open(f'{path}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md', 'w+') as txt:
+                    with open(f'{path}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md', 'w+') as txt:
                         # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
                         # afterwards the ingest will replace this metadata with meta_yaml
                         md = md.replace(
-                            "<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{meta_yaml.replace("/metadata.yaml", "")}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md\"')
+                            "<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{meta_yaml.replace("/metadata.yaml", "")}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md\"')
 
                         clean_and_write(md, txt)
                 except Exception as e:
@@ -124,7 +124,7 @@ endmeta-->
                 # If we only created one file inside a collector, add the entry to the symlink_dict, so we can make the link
                 if len(os.listdir(f'{path}/integrations')) == 1:
                     symlink_dict.update(
-                        {path: f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md'})
+                        {path: f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md'})
                 else:
                     try:
                         symlink_dict.pop(path)
@@ -175,11 +175,11 @@ endmeta-->
                     if not os.path.exists(f'{path}/integrations'):
                         os.mkdir(f'{path}/integrations')
 
-                    with open(f'{path}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md', 'w+') as txt:
+                    with open(f'{path}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md', 'w+') as txt:
                         # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
                         # afterwards the ingest will replace this metadata with meta_yaml
                         md = md.replace(
-                            "<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{meta_yaml.replace("/metadata.yaml", "")}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md\"')
+                            "<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{meta_yaml.replace("/metadata.yaml", "")}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md\"')
 
                         clean_and_write(md, txt)
                 except Exception as e:
@@ -188,7 +188,7 @@ endmeta-->
                 # If we only created one file inside a collector, add the entry to the symlink_dict, so we can make the link
                 if len(os.listdir(f'{path}/integrations')) == 1:
                     symlink_dict.update(
-                        {path: f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md'})
+                        {path: f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md'})
                 else:
                     try:
                         symlink_dict.pop(path)
@@ -235,12 +235,12 @@ endmeta-->
 
             if "cloud-notifications" in path:
                 # for cloud notifications we generate them near their metadata.yaml
-                name = integration['meta']['name'].lower().replace(" ", "_")
+                name = integration['meta']['name'].lower().replace(" ", "_").replace("(", "").replace(")", "")
                 if not os.path.exists(f'{path}/integrations'):
                     os.mkdir(f'{path}/integrations')
 
                 proper_edit_name = meta_yaml.replace(
-                    "metadata.yaml", f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-")}.md\"')
+                    "metadata.yaml", f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md\"')
 
                 md = md.replace("<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{proper_edit_name}')
 

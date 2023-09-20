@@ -234,12 +234,12 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
     strncpyz(threadname, name, NETDATA_THREAD_NAME_MAX);
 
 #if defined(__FreeBSD__)
-    pthread_set_name_np(ut, threadname);
+    pthread_set_name_np(ut ? ut : pthread_self(), threadname);
 #elif defined(__APPLE__)
     // Apple can only set its own name
     UNUSED(ut);
 #else
-    ret = pthread_setname_np(ut, threadname);
+    ret = pthread_setname_np(ut ? ut : pthread_self(), threadname);
 #endif
 
     thread_name_get(true);

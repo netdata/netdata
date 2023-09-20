@@ -249,6 +249,17 @@ static inline void buffer_strcat(BUFFER *wb, const char *txt) {
     buffer_overflow_check(wb);
 }
 
+static inline void buffer_contents_replace(BUFFER *wb, const char *txt, size_t len) {
+    wb->len = 0;
+    buffer_need_bytes(wb, len + 1);
+
+    memcpy(wb->buffer, txt, len);
+    wb->len = len;
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
 static inline void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt)) return;
 

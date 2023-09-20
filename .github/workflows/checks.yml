@@ -2,58 +2,77 @@
 name: Checks
 on:
   push:
-    paths:
-      - '**.c'
-      - '**.cc'
-      - '**.h'
-      - '**.hh'
-      - '**.in'
-      - '!netdata.spec.in'
-      - 'configure.ac'
-      - '**/Makefile*'
-      - 'Makefile*'
-      - '.gitignore'
-      - '.github/workflows/checks.yml'
-      - 'build/**'
-      - 'aclk/aclk-schemas/'
-      - 'ml/dlib/'
-      - 'mqtt_websockets'
-      - 'web/server/h2o/libh2o'
     branches:
       - master
-  pull_request:
-    paths: # This MUST be kept in-sync with the paths-ignore key for the checks-dummy.yml workflow.
-      - '**.c'
-      - '**.cc'
-      - '**.h'
-      - '**.hh'
-      - '**.in'
-      - '!netdata.spec.in'
-      - 'configure.ac'
-      - '**/Makefile*'
-      - 'Makefile*'
-      - '.gitignore'
-      - '.github/workflows/checks.yml'
-      - 'build/**'
-      - 'aclk/aclk-schemas/'
-      - 'ml/dlib/'
-      - 'mqtt_websockets'
-      - 'web/server/h2o/libh2o'
+  pull_request: null
 env:
   DISABLE_TELEMETRY: 1
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  libressl-checks:
-    name: LibreSSL
+  file-check: # Check what files changed if we’re being run in a PR or on a push.
+    name: Check Modified Files
     runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check-run.outputs.run }}
     steps:
       - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Check files
+        id: check-files
+        uses: tj-actions/changed-files@v39
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            **.c
+            **.cc
+            **.h
+            **.hh
+            **.in
+            configure.ac
+            **/Makefile*
+            Makefile*
+            .gitignore
+            .github/workflows/checks.yml
+            build/**
+            aclk/aclk-schemas/
+            ml/dlib/
+            mqtt_websockets
+            web/server/h2o/libh2o
+          files_ignore: |
+            netdata.spec.in
+            **.md
+      - name: Check Run
+        id: check-run
+        run: |
+          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+
+  libressl-checks:
+    name: LibreSSL
+    needs:
+      - file-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build
+        if: needs.file-check.outputs.run == 'true'
         run: >
           docker run -v "$PWD":/netdata -w /netdata alpine:latest /bin/sh -c
           'apk add bash;
@@ -63,30 +82,49 @@ jobs:
           autoreconf -ivf;
           ./configure --disable-dependency-tracking;
           make;'
+
   clang-checks:
     name: Clang
+    needs:
+      - file-check
     runs-on: ubuntu-latest
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Build
-        run: |
-          docker build -f .github/dockerfiles/Dockerfile.clang .
+        if: needs.file-check.outputs.run == 'true'
+        run: docker build -f .github/dockerfiles/Dockerfile.clang .
+
   gitignore-check:
     name: .gitignore
+    needs:
+      - file-check
     runs-on: ubuntu-latest
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Prepare environment
+        if: needs.file-check.outputs.run == 'true'
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata
+        if: needs.file-check.outputs.run == 'true'
         run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build
       - name: Check that repo is clean
+        if: needs.file-check.outputs.run == 'true'
         run: |
           git status --porcelain=v1 > /tmp/porcelain
           if [ -s /tmp/porcelain ]; then
