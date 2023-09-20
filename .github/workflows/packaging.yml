@@ -54,6 +54,7 @@ jobs:
             configure.ac
             **/Makefile*
             Makefile*
+            .github/data/distros.yml
             .github/workflows/packaging.yml
             .github/scripts/gen-matrix-packaging.py
             .github/scripts/pkg-test.sh

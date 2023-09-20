@@ -47,6 +47,7 @@ jobs:
             netdata-installer.sh
             **/Makefile*
             Makefile*
+            .github/data/distros.yml
             .github/workflows/build.yml
             .github/scripts/build-static.sh
             .github/scripts/get-static-cache-key.sh
