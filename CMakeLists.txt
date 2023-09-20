@@ -92,6 +92,7 @@ option(ENABLE_PLUGIN_CUPS "enable cups.plugin" True)
 option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" True)
 option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" True)
 option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
+option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" True)
 
 option(ENABLE_BUNDLED_JSONC "enable bundled json-c" False)
 option(ENABLE_BUNDLED_YAML "enable bundled yaml" False)
@@ -1266,6 +1267,15 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(PROGRAMS collectors/cgroups.plugin/cgroup-network-helper.sh
             COMPONENT cgroup_network_plugin
             DESTINATION usr/lib/netdata/conf.d)
+endif()
+
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+    add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
+    target_link_libraries(systemd-journal.plugin libnetdata)
+
+    install(TARGETS systemd-journal.plugin
+            COMPONENT systemd_journal_plugin
+            DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
