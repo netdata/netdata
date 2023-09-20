@@ -1253,12 +1253,12 @@ void *ebpf_function_thread(void *ptr)
                                                                 &ebpf_plugin_exit);
 
     functions_evloop_add_function(wg,
-                                  "ebpf_socket",
+                                  EBPF_FUNCTION_SOCKET,
                                   ebpf_function_socket_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
     functions_evloop_add_function(wg,
-                                  "ebpf_cachestat",
+                                  EBPF_FUNCTION_CACHESTAT,
                                   ebpf_function_cachestat_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
