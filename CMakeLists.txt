@@ -1581,6 +1581,35 @@ install(FILES collectors/charts.d.plugin/ap/ap.conf
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
 #
+# ebpf files
+#
+
+if(ENABLE_PLUGIN_EBPF)
+        install(FILES collectors/ebpf.plugin/ebpf.d.conf
+                DESTINATION usr/lib/netdata/conf.d)
+
+        install(FILES collectors/ebpf.plugin/ebpf.d/cachestat.conf
+                      collectors/ebpf.plugin/ebpf.d/dcstat.conf
+                      collectors/ebpf.plugin/ebpf.d/disk.conf
+                      collectors/ebpf.plugin/ebpf.d/ebpf_kernel_reject_list.txt
+                      collectors/ebpf.plugin/ebpf.d/fd.conf
+                      collectors/ebpf.plugin/ebpf.d/filesystem.conf
+                      collectors/ebpf.plugin/ebpf.d/functions.conf
+                      collectors/ebpf.plugin/ebpf.d/hardirq.conf
+                      collectors/ebpf.plugin/ebpf.d/mdflush.conf
+                      collectors/ebpf.plugin/ebpf.d/mount.conf
+                      collectors/ebpf.plugin/ebpf.d/network.conf
+                      collectors/ebpf.plugin/ebpf.d/oomkill.conf
+                      collectors/ebpf.plugin/ebpf.d/process.conf
+                      collectors/ebpf.plugin/ebpf.d/shm.conf
+                      collectors/ebpf.plugin/ebpf.d/softirq.conf
+                      collectors/ebpf.plugin/ebpf.d/swap.conf
+                      collectors/ebpf.plugin/ebpf.d/sync.conf
+                      collectors/ebpf.plugin/ebpf.d/vfs.conf
+                DESTINATION usr/lib/netdata/conf.d/ebpf.d)
+endif()
+
+#
 # dashboard
 #
 
