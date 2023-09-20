@@ -670,7 +670,7 @@ static void calculate_stats(netdata_publish_cachestat_t *publish) {
  * @param out the vector with read values.
  * @param maps_per_core do I need to read all cores?
  */
-static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_per_core)
+static void ebpf_cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_cachestat_pid_t *total = &out[0];
@@ -680,6 +680,10 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
         total->add_to_page_cache_lru += w->add_to_page_cache_lru;
         total->mark_buffer_dirty += w->mark_buffer_dirty;
         total->mark_page_accessed += w->mark_page_accessed;
+
+        if (!isascii(total->name[0]) && isascii(w->name[0])) {
+            strncpyz(total->name, w->name, TASK_COMM_LEN);
+        }
     }
 }
 
@@ -703,36 +707,15 @@ static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, n
 }
 
 /**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
- */
-static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *publish)
-{
-    netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
-    if (!curr) {
-        curr = ebpf_publish_cachestat_get();
-        cachestat_pid[current_pid] = curr;
-
-        cachestat_save_pid_values(curr, publish);
-        return;
-    }
-
-    cachestat_save_pid_values(curr, publish);
-}
-
-/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_read_cachestat_apps_table(int maps_per_core)
+static void ebpf_read_cachestat_apps_table(int maps_per_core, int update_every)
 {
+    netdata_thread_disable_cancelability();
     netdata_cachestat_pid_t *cv = cachestat_vector;
     uint32_t key = 0, next_key = 0;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
@@ -740,23 +723,57 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
     if (maps_per_core)
         length *= ebpf_nprocs;
 
+    time_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
-            goto end_cachstat_loop;
+            goto end_cachestat_loop;
         }
 
         if (key > (uint32_t)pid_max) {
-            goto end_cachstat_loop;
+            goto end_cachestat_loop;
         }
 
-        cachestat_apps_accumulator(cv, maps_per_core);
-        cachestat_fill_pid(key, cv);
+        ebpf_cachestat_apps_accumulator(cv, maps_per_core);
+        // Get PID structure
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, cv->name);
+        if (!pid_ptr) {
+            goto end_cachestat_loop;
+        }
+
+        // Get Cachestat structure
+        rw_spinlock_write_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+        netdata_publish_cachestat_t **cs_pptr = (netdata_publish_cachestat_t **)ebpf_judy_insert_unsafe(
+            &pid_ptr->cachestat_stats.JudyLArray, cv[0].ct);
+        netdata_publish_cachestat_t *cs_ptr = *cs_pptr;
+        if (likely(*cs_pptr == NULL)) {
+            *cs_pptr = ebpf_publish_cachestat_get();
+            cs_ptr = *cs_pptr;
+
+            cachestat_save_pid_values(cs_ptr, cv);
+            cs_ptr->current_timestamp = update_time;
+            goto end_cachestat_loop;
+        }
+
+        cachestat_save_pid_values(cs_ptr, cv);
+        if (cv[0].mark_page_accessed != cs_ptr->prev.mark_page_accessed)
+            cs_ptr->current_timestamp = update_time;
+        else if ((update_time - cs_ptr->current_timestamp) > update_every) {
+            JudyLDel(&pid_ptr->socket_stats.JudyLArray, cv[0].ct, PJE0);
+            ebpf_cachestat_release(cs_ptr);
+            bpf_map_delete_elem(fd, &key);
+        }
+
+        rw_spinlock_write_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // We are cleaning to avoid passing data read from one process to other.
-end_cachstat_loop:
+end_cachestat_loop:
         memset(cv, 0, length);
         key = next_key;
     }
+    netdata_thread_enable_cancelability();
 }
 
 /**
@@ -776,9 +793,9 @@ void *ebpf_read_cachestat_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     int maps_per_core = em->maps_per_core;
-    ebpf_read_cachestat_apps_table(maps_per_core);
-
     int update_every = em->update_every;
+    ebpf_read_cachestat_apps_table(maps_per_core, update_every);
+
     int counter = update_every - 1;
 
     uint32_t running_time = 0;
@@ -789,7 +806,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
-        ebpf_read_cachestat_apps_table(maps_per_core);
+        ebpf_read_cachestat_apps_table(maps_per_core, update_every);
 
         counter = 0;
     }
@@ -829,7 +846,7 @@ static void ebpf_update_cachestat_cgroup(int maps_per_core)
                     continue;
                 }
 
-                cachestat_apps_accumulator(cv, maps_per_core);
+                ebpf_cachestat_apps_accumulator(cv, maps_per_core);
 
                 memcpy(out, cv, sizeof(netdata_cachestat_pid_t));
             }
