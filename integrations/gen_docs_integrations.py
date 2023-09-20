@@ -1,10 +1,10 @@
 import json
-import os
 import shutil
+from pathlib import Path
 
 # Dictionary responsible for making the symbolic links at the end of the script's run.
 symlink_dict = {}
-am_i_inside_go = "go.d.plugin" in os.getcwd()
+am_i_inside_go = "go.d.plugin" in str(Path.cwd())
 
 
 def cleanup():
@@ -12,23 +12,18 @@ def cleanup():
     clean directories that are either data collection or exporting integrations
     """
     if am_i_inside_go:
-        for subdir, dirs, files in os.walk("modules"):
-            for directory in dirs:
-                if directory == "integrations":
-                    shutil.rmtree(os.path.join(subdir, directory))
-                    break
+        for element in Path("modules").glob('**/*/'):
+            if "integrations" in str(element):
+                shutil.rmtree(element)
     else:
-        for subdir, dirs, files in os.walk("collectors"):
-            for directory in dirs:
-                if directory == "integrations":
-                    shutil.rmtree(os.path.join(subdir, directory))
-                    break
+        for element in Path("collectors").glob('**/*/'):
+            if "integrations" in str(element):
+                shutil.rmtree(element)
 
-        for subdir, dirs, files in os.walk("exporting"):
-            for directory in dirs:
-                if directory == "integrations":
-                    shutil.rmtree(os.path.join(subdir, directory))
-                    break
+        for element in Path("exporting").glob('**/*/'):
+            if "integrations" in str(element):
+                shutil.rmtree(element)
+
 
 def generate_category_from_name(category_fragment, category_array):
     """
@@ -56,7 +51,7 @@ def generate_category_from_name(category_fragment, category_array):
         i += 1
 
 
-def clean_and_write(md, txt):
+def clean_and_write(md, path):
     """
     This function takes care of the special details element, and converts it to the equivalent that md expects.
     Then it writes the buffer on the file provided.
@@ -65,7 +60,7 @@ def clean_and_write(md, txt):
     md = md.replace("{% details summary=\"", "<details><summary>").replace(
         "\" %}", "</summary>\n").replace("{% /details %}", "</details>\n")
 
-    txt.write(md)
+    path.write_text(md)
 
 
 def add_custom_edit_url(markdown_string, meta_yaml_link, sidebar_label_string, mode='default'):
@@ -105,13 +100,17 @@ def read_integrations_js(path_to_file):
     """
     Open integrations/integrations.js and extract the dictionaries
     """
-    with open(path_to_file) as dataFile:
-        data = dataFile.read()
+
+    try:
+        data = Path(path_to_file).read_text()
 
         categories_str = data.split("export const categories = ")[1].split("export const integrations = ")[0]
         integrations_str = data.split("export const categories = ")[1].split("export const integrations = ")[1]
 
         return json.loads(categories_str), json.loads(integrations_str)
+
+    except FileNotFoundError as e:
+        print("Exception", e)
 
 
 def build_readme_from_integration(integration, mode=''):
@@ -243,22 +242,22 @@ def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
     """
     if mode == 'default':
         # Only if the path exists, this caters for running the same script on both the go and netdata repos.
-        if os.path.exists(path):
+        if Path(path).exists():
+            if not Path(f'{path}/integrations').exists():
+                Path(f'{path}/integrations').mkdir()
+
             try:
-                if not os.path.exists(f'{path}/integrations'):
-                    os.mkdir(f'{path}/integrations')
+                md = add_custom_edit_url(md, meta_yaml, sidebar_label)
+                clean_and_write(
+                    md,
+                    Path(f'{path}/integrations/{clean_string(sidebar_label)}.md')
+                    )
 
-                with open(f'{path}/integrations/{clean_string(sidebar_label)}.md', 'w+') as txt:
-                    # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
-                    # afterwards the ingest will replace this metadata with meta_yaml
-                    md = add_custom_edit_url(md, meta_yaml, sidebar_label)
-
-                    clean_and_write(md, txt)
-            except Exception as e:
-                print("Error in writing to file", e, integration['id'])
+            except FileNotFoundError as e:
+                print("Exception in writing to file", e)
 
             # If we only created one file inside the directory, add the entry to the symlink_dict, so we can make the symbolic link
-            if len(os.listdir(f'{path}/integrations')) == 1:
+            if len(list(Path(f'{path}/integrations').iterdir())) == 1:
                 symlink_dict.update(
                     {path: f'integrations/{clean_string(sidebar_label)}.md'})
             else:
@@ -273,8 +272,8 @@ def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
             # for cloud notifications we generate them near their metadata.yaml
             name = clean_string(integration['meta']['name'])
 
-            if not os.path.exists(f'{path}/integrations'):
-                os.mkdir(f'{path}/integrations')
+            if not Path(f'{path}/integrations').exists():
+                Path(f'{path}/integrations').mkdir()
 
             # proper_edit_name = meta_yaml.replace(
             #     "metadata.yaml", f'integrations/{clean_string(sidebar_label)}.md\"')
@@ -288,11 +287,15 @@ def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
             md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='agent-notifications')
 
             finalpath = f'{path}/README.md'
+        
         try:
-            with open(finalpath, 'w') as txt:
-                clean_and_write(md, txt)
-        except:
-            print('error in writing')
+            clean_and_write(
+                md,
+                Path(finalpath)
+                )
+
+        except FileNotFoundError as e:
+            print("Exception in writing to file", e)
 
 
 def make_symlinks(symlink_dict):
@@ -301,18 +304,17 @@ def make_symlinks(symlink_dict):
     """
     for element in symlink_dict:
         # Remove the README to prevent it being a normal file
-        os.remove(f'{element}/README.md')
+        Path.unlink(f'{element}/README.md')
         # and then make a symlink to the actual markdown
-        os.symlink(symlink_dict[element], f'{element}/README.md')
+        Path(f'{element}/README.md').symlink_to(symlink_dict[element])
 
-        with open(f'{element}/{symlink_dict[element]}', 'r') as txt:
-            md = txt.read()
+        filepath = Path(f'{element}/{symlink_dict[element]}')
+        md = filepath.read_text()
 
         # This preserves the custom_edit_url for most files as it was,
         # so the existing links don't break, this is vital for link replacement afterwards
-        with open(f'{element}/{symlink_dict[element]}', 'w+') as txt:
-            md = md.replace(f'{element}/{symlink_dict[element]}', f'{element}/README.md')
-            txt.write(md)
+        filepath.write_text(md.replace(
+            f'{element}/{symlink_dict[element]}', f'{element}/README.md'))
 
 
 cleanup()
