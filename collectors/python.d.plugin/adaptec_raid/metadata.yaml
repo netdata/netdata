@@ -112,7 +112,7 @@ modules:
                 enabled: false
               description: A basic example configuration per job
               config: |
-                ```yaml
+                ```
                 job_name:
                     name: my_job_name           
                     update_every: 1         # the JOB's data collection frequency

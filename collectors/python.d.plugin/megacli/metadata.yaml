@@ -116,7 +116,7 @@ modules:
                 enabled: false
               description: A basic example configuration per job
               config: |
-                ```yaml
+                ```
                 job_name:
                     name: myname
                     update_every: 1
