@@ -89,7 +89,7 @@ BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: cmake
-%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2 && 0%{!?suse_version:1}
 BuildRequires: ninja-build
 %else
 BuildRequires: ninja
