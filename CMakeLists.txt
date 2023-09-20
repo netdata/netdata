@@ -897,7 +897,7 @@ set(MONGODB_EXPORTING_FILES exporting/mongodb/mongodb.c
 #
 
 if(ENABLE_H2O)
-        add_library(h2o ${LIBH2O_FILES})
+        add_library(h2o STATIC ${LIBH2O_FILES})
 
         target_include_directories(h2o BEFORE PUBLIC
                                    "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/include"
@@ -929,7 +929,7 @@ endif()
 #
 # build libjudy
 #
-add_library(judy ${LIBJUDY_SOURCES})
+add_library(judy STATIC ${LIBJUDY_SOURCES})
 
 target_compile_options(judy PUBLIC
         -Wno-sign-compare
@@ -956,7 +956,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-add_library(libnetdata ${LIBNETDATA_FILES})
+add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR})
 
@@ -1072,7 +1072,7 @@ if(ENABLE_ACLK)
                                    ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include
                                    ${CMAKE_SOURCE_DIR}/mqtt_websockets/c_rhash/include)
 
-        add_library(mqttwebsockets ${MQTT_WEBSOCKETS_FILES})
+        add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
 
         target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
                                                      -DRBUF_CUSTOM_MALLOC
