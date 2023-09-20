@@ -353,7 +353,6 @@ jobs:
           tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
         id: upload
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.artifact_key }}-test-env
