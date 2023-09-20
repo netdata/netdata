@@ -2133,6 +2133,14 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                                             if(ri->name && ri->name != ri->id)
                                                 buffer_json_member_add_string(wb, "nm", string2str(ri->name));
                                             buffer_json_member_add_uint64(wb, "ni", ti->ni);
+
+                                            if(ri->rrdlabels) {
+                                                buffer_json_member_add_object(wb, "labels");
+                                                {
+                                                    rrdlabels_to_buffer_json_members(ri->rrdlabels, wb);
+                                                }
+                                                buffer_json_object_close(wb); // labels
+                                            }
                                         }
                                         buffer_json_object_close(wb); // instance
                                     }
