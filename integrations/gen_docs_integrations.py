@@ -254,7 +254,7 @@ def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
                     md = add_custom_edit_url(md, meta_yaml, sidebar_label)
 
                     clean_and_write(md, txt)
-            except Exception as e:
+            except OSError as e:
                 print("Error in writing to file", e, integration['id'])
 
             # If we only created one file inside the directory, add the entry to the symlink_dict, so we can make the symbolic link
