@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- fix crash on setting thread name [\#16016](https://github.com/netdata/netdata/pull/16016) ([ilyam8](https://github.com/ilyam8))
+- Systemd-Journal: fix crash when the uid or gid do not have names [\#16015](https://github.com/netdata/netdata/pull/16015) ([ktsaou](https://github.com/ktsaou))
+- Fix compilation warnings [\#16006](https://github.com/netdata/netdata/pull/16006) ([stelfrag](https://github.com/stelfrag))
+- Update CMakeLists.txt [\#16005](https://github.com/netdata/netdata/pull/16005) ([stelfrag](https://github.com/stelfrag))
+- eBPF socket: function with event loop [\#16004](https://github.com/netdata/netdata/pull/16004) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix compilation warnings [\#16001](https://github.com/netdata/netdata/pull/16001) ([ktsaou](https://github.com/ktsaou))
+- Update integrations/gen\_docs\_integrations.py [\#15997](https://github.com/netdata/netdata/pull/15997) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#15985](https://github.com/netdata/netdata/pull/15985) ([netdatabot](https://github.com/netdatabot))
 - Re-store rrdvars on late dimensions [\#15984](https://github.com/netdata/netdata/pull/15984) ([MrZammler](https://github.com/MrZammler))
 - Functions: allow collectors to be restarted [\#15983](https://github.com/netdata/netdata/pull/15983) ([ktsaou](https://github.com/ktsaou))
@@ -26,6 +32,7 @@
 - Clarifying the possible installation types [\#15958](https://github.com/netdata/netdata/pull/15958) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix journal direction parsing [\#15957](https://github.com/netdata/netdata/pull/15957) ([ktsaou](https://github.com/ktsaou))
 - facets and journal improvements [\#15956](https://github.com/netdata/netdata/pull/15956) ([ktsaou](https://github.com/ktsaou))
+- Preserve README info inside metadata.yaml for freeipmi.plugin [\#15955](https://github.com/netdata/netdata/pull/15955) ([Ancairon](https://github.com/Ancairon))
 - Fix CID 400366 [\#15953](https://github.com/netdata/netdata/pull/15953) ([stelfrag](https://github.com/stelfrag))
 - Update descriptions. [\#15952](https://github.com/netdata/netdata/pull/15952) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update slabinfo metadata [\#15951](https://github.com/netdata/netdata/pull/15951) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -56,6 +63,7 @@
 - Add better recovery for corrupted metadata [\#15891](https://github.com/netdata/netdata/pull/15891) ([stelfrag](https://github.com/stelfrag))
 - Add index to ACLK table to improve update statements [\#15890](https://github.com/netdata/netdata/pull/15890) ([stelfrag](https://github.com/stelfrag))
 - Limit atomic operations for statistics [\#15887](https://github.com/netdata/netdata/pull/15887) ([ktsaou](https://github.com/ktsaou))
+- Add a summary field to alerts [\#15886](https://github.com/netdata/netdata/pull/15886) ([MrZammler](https://github.com/MrZammler))
 - Properly document issues with installing on hosts without IPv4. [\#15882](https://github.com/netdata/netdata/pull/15882) ([Ferroin](https://github.com/Ferroin))
 - allow any field to be a facet [\#15880](https://github.com/netdata/netdata/pull/15880) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#15879](https://github.com/netdata/netdata/pull/15879) ([netdatabot](https://github.com/netdatabot))
@@ -423,13 +431,6 @@
 - Update README.md [\#15424](https://github.com/netdata/netdata/pull/15424) ([christophidesp](https://github.com/christophidesp))
 - Decode url before checking for question mark [\#15422](https://github.com/netdata/netdata/pull/15422) ([MrZammler](https://github.com/MrZammler))
 - use real-time clock for http response headers [\#15421](https://github.com/netdata/netdata/pull/15421) ([ktsaou](https://github.com/ktsaou))
-- Bugfix on alerts generation for yamls [\#15420](https://github.com/netdata/netdata/pull/15420) ([Ancairon](https://github.com/Ancairon))
-- Minor typo fix on consul.conf [\#15419](https://github.com/netdata/netdata/pull/15419) ([Ancairon](https://github.com/Ancairon))
-- monitor applications file descriptor limits [\#15417](https://github.com/netdata/netdata/pull/15417) ([ktsaou](https://github.com/ktsaou))
-- Update README.md [\#15416](https://github.com/netdata/netdata/pull/15416) ([ktsaou](https://github.com/ktsaou))
-- Update README.md [\#15414](https://github.com/netdata/netdata/pull/15414) ([ktsaou](https://github.com/ktsaou))
-- collector meta: restrict chart\_type to known values [\#15413](https://github.com/netdata/netdata/pull/15413) ([ilyam8](https://github.com/ilyam8))
-- Update README.md [\#15412](https://github.com/netdata/netdata/pull/15412) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 

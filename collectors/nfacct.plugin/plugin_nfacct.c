@@ -854,7 +854,7 @@ int main(int argc, char **argv) {
         if(unlikely(netdata_exit)) break;
 
         if(debug && iteration)
-            fprintf(stderr, "nfacct.plugin: iteration %zu, dt %llu usec\n"
+            fprintf(stderr, "nfacct.plugin: iteration %zu, dt %"PRIu64" usec\n"
                     , iteration
                     , dt
             );

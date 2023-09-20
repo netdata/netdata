@@ -20,6 +20,18 @@ When using the kickstart script, you can force usage of native DEB or RPM packag
 `--native-only` when invoking the script. This will cause it to only attempt to use native packages for the install,
 and fail if it cannot do so.
 
+
+
+> ### Note
+> 
+> In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
+> We still maintain the Package cloud repositories, but they are not guaranteed to work and may be removed 
+> without prior warning. 
+>
+> When selecting a repository configuration package, note that the version 2 packages provide configuration for
+> our self-hosted repositories, and then version 1 packages provide configuration for Package Cloud.
+
+
 ## Manual setup of RPM packages.
 
 Netdata’s official RPM repositories are hosted at https://repo.netdata.cloud/repos. We provide four groups of

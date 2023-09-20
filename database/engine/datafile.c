@@ -112,7 +112,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                          "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted shortly "
-                                         "(scanned open cache in %llu usecs)",
+                                         "(scanned open cache in %"PRIu64" usecs)",
                                    df->fileno, df->ctx->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
@@ -129,7 +129,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                          "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted now "
-                                         "(scanned open cache in %llu usecs)",
+                                         "(scanned open cache in %"PRIu64" usecs)",
                                    df->fileno, df->ctx->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
@@ -143,7 +143,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                 internal_error(true, "DBENGINE: datafile %u of tier %d "
                                      "has %u lockers (oc:%u, pd:%u), "
                                      "%zu clean and %zu hot open cache pages "
-                                     "(scanned open cache in %llu usecs)",
+                                     "(scanned open cache in %"PRIu64" usecs)",
                                df->fileno, df->ctx->config.tier,
                                df->users.lockers,
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
