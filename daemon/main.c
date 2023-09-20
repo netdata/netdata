@@ -449,6 +449,7 @@ void netdata_cleanup_and_exit(int ret) {
                     error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
                     error_limit(&erl, "waiting for %zu collectors to finish", running);
                     // sleep_usec(100 * USEC_PER_MS);
+                    cleanup_destroyed_dictionaries();
                 }
             }
 
