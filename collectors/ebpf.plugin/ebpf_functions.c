@@ -465,7 +465,7 @@ static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_valu
  * @param values      data read from hash table
  * @param name        the process name
  */
-static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values, char *name)
+static void ebpf_fill_socket_function_buffer(BUFFER *wb, netdata_socket_plus_t *values, char *name)
 {
     buffer_json_add_array_item_array(wb);
 
@@ -598,7 +598,7 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
         if (pid_ptr->socket_stats.JudyLArray) {
             while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_timestamp, &first_socket))) {
                 netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
-                ebpf_fill_function_buffer(buf, values, pid_ptr->name);
+                ebpf_fill_socket_function_buffer(buf, values, pid_ptr->name);
             }
             counter++;
         }
@@ -608,7 +608,7 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
     if (!counter) {
         netdata_socket_plus_t fake_values = { };
         ebpf_socket_fill_fake_socket(&fake_values);
-        ebpf_fill_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED);
+        ebpf_fill_socket_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED);
     }
 }
 
@@ -633,7 +633,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 
         ebpf_socket_fill_fake_socket(&fake_values);
 
-        ebpf_fill_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED);
+        ebpf_fill_socket_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED);
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         return;
     }
