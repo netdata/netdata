@@ -1130,6 +1130,44 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
 }
 
 /**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param pid         the process PID
+ * @param values      data read from hash table
+ * @param name        the process name
+ */
+static void ebpf_fill_cachestat_function_buffer(BUFFER *wb, uint32_t pid, netdata_publish_cachestat_t *values, char *name)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)pid);
+
+    // NAME
+    buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // Ratio
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->ratio);
+
+    // Dirty
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->dirty);
+
+    // Hit
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->hit);
+
+    // Miss
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->miss);
+
+    buffer_json_array_close(wb);
+}
+
+/**
  * Cachestat read judy
  *
  * Thread responsible to fill thread data.
@@ -1144,6 +1182,9 @@ void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
         !ebpf_judy_pid.index.JudyLArray) {
+        netdata_publish_cachestat_t fake_cachestat = { };
+
+        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED);
         return;
     }
 }
@@ -1230,6 +1271,208 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
     buffer_json_member_add_array(wb, "data");
     ebpf_cachestat_read_judy(wb, em);
     buffer_json_array_close(wb); // data
+
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int fields_id = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PID",
+            "Process ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Process Name",
+            "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Ratio",
+            "Access Ratio",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Dirty",
+            "Dirty pages",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Hit",
+            "Page Access",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Miss",
+            "Page outside memory",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // Cachestat Ratio
+        buffer_json_member_add_object(wb, "CachestatRatio");
+        {
+            buffer_json_member_add_string(wb, "name", "Hit Ratio");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "ratio");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Cachestat Dirty
+        buffer_json_member_add_object(wb, "CachestatDirties");
+        {
+            buffer_json_member_add_string(wb, "name", "Dirties");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "dirty");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Cachestat Hits
+        buffer_json_member_add_object(wb, "CachestatHits");
+        {
+            buffer_json_member_add_string(wb, "name", "Hits");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "hit");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Cachestat Hits
+        buffer_json_member_add_object(wb, "CachestatMisses");
+        {
+            buffer_json_member_add_string(wb, "name", "Miss");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "miss");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_string(wb, "default_sort_column", "PID");
+
+    // Do we use only on fields that can be groupped?
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process ID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Process Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
 }
 
 /*****************************************************************
