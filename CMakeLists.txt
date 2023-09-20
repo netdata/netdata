@@ -1454,7 +1454,7 @@ configure_file(config.cmake.h.in config.h)
 install(TARGETS netdata DESTINATION usr/sbin)
 
 install(PROGRAMS collectors/cgroups.plugin/cgroup-name.sh
-        DESTINATION usr/lib/netdata/conf.d)
+        DESTINATION usr/libexec/netdata/plugins.d)
 
 install(DIRECTORY DESTINATION var/cache/netdata)
 install(DIRECTORY DESTINATION var/log/netdata)
