@@ -218,6 +218,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
   --disable-plugin-xenstat   Explicitly disable the xenstat plugin.
+  --enable-plugin-systemd-journal Enable the the systemd journal plugin. Default: enable it when libsystemd is available.
+  --disable-plugin-systemd-journal Explicitly disable the systemd journal plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
   --disable-exporting-kinesis Explicitly disable AWS Kinesis exporting connector.
@@ -310,6 +312,8 @@ while [ -n "${1}" ]; do
     "--disable-plugin-nfacct") ENABLE_NFACCT=0 ;;
     "--enable-plugin-xenstat") ENABLE_XENSTAT=1 ;;
     "--disable-plugin-xenstat") ENABLE_XENSTAT=0 ;;
+    "--enable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=1 ;;
+    "--disable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
@@ -1075,6 +1079,20 @@ else
   NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=On"
 fi
 
+if [ -z "${ENABLE_SYSTEMD_PLUGIN}" ]; then
+    if check_for_module libsystemd; then
+        if check_for_module libelogind; then
+            ENABLE_SYSTEMD_JOURNAL=0
+        else
+            ENABLE_SYSTEMD_JOURNAL=1
+        fi
+    else
+        ENABLE_SYSTEMD_JOURNAL=0
+    fi
+fi
+
+enable_feature PLUGIN_SYSTEMD_JOURNAL "${ENABLE_SYSTEMD_JOURNAL}"
+
 [ -z "${NETDATA_ENABLE_ML}" ] && NETDATA_ENABLE_ML=1
 enable_feature ML "${NETDATA_ENABLE_ML}"
 
@@ -1102,6 +1120,7 @@ enable_feature H2O "${ENABLE_H2O}"
 enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
 
 enable_feature PLUGIN_APPS 1
+enable_feature PLUGIN_LOCAL_LISTENERS 1
 
 check_for_feature EXPORTING_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
 check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
