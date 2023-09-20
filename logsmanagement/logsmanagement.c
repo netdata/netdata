@@ -1299,7 +1299,7 @@ void *logsmanagement_main(void *ptr) {
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
 #endif  // LOGS_MANAGEMENT_STRESS_TEST
 
-    rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, 
+    rrd_function_add( localhost, NULL, "logsmanagement", LOGS_MANAG_QUERY_TIMEOUT_DEFAULT, 
                                 FUNCTION_LOGSMANAGEMENT_HELP_SHORT, true, 
                                 logsmanagement_function_facets, NULL);
 

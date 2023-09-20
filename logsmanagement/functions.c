@@ -361,14 +361,14 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     "|message"                                  \
     ""
 
-int logsmanagement_function_facets(BUFFER *wb, int timeout, 
-                                    const char *function, void *collector_data, 
-                                    void (*callback)(BUFFER *wb, int code, void *callback_data), 
-                                    void *callback_data){
+int logsmanagement_function_facets( BUFFER *wb, int timeout, const char *function, void *collector_data, 
+                                    rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                    rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                                    rrd_function_register_canceller_cb_t register_cancel_cb, void *register_cancel_db_data){
 
     UNUSED(collector_data);
-    UNUSED(callback);
-    UNUSED(callback_data);
+    UNUSED(result_cb);
+    UNUSED(result_cb_data);
 
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
@@ -637,7 +637,7 @@ int logsmanagement_function_facets(BUFFER *wb, int timeout,
     facets_set_items(facets, last);
     facets_set_anchor(facets, anchor, direction);
     facets_set_query(facets, query);
-    facets_set_histogram(facets, chart ? chart : "chartname", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+    facets_set_histogram_by_name(facets, chart ? chart : "chartname", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
     // For now, always perform descending timestamp query
     // TODO: FIXME
