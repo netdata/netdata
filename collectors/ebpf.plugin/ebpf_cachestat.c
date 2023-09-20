@@ -674,6 +674,7 @@ static void ebpf_cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int ma
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_cachestat_pid_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_cachestat_pid_t *w = &out[i];
         total->account_page_dirtied += w->account_page_dirtied;
@@ -684,7 +685,11 @@ static void ebpf_cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int ma
         if (!isascii(total->name[0]) && isascii(w->name[0])) {
             strncpyz(total->name, w->name, TASK_COMM_LEN);
         }
+
+        if (!ct && w->ct)
+            ct = w->ct;
     }
+    total->ct = ct;
 }
 
 /**
@@ -739,6 +744,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int update_every)
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, cv->name);
         if (!pid_ptr) {
+            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_cachestat_loop;
         }
 
@@ -753,16 +759,16 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int update_every)
 
             cachestat_save_pid_values(cs_ptr, cv);
             cs_ptr->current_timestamp = update_time;
-            goto end_cachestat_loop;
-        }
-
-        cachestat_save_pid_values(cs_ptr, cv);
-        if (cv[0].mark_page_accessed != cs_ptr->prev.mark_page_accessed)
-            cs_ptr->current_timestamp = update_time;
-        else if ((update_time - cs_ptr->current_timestamp) > update_every) {
-            JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
-            ebpf_cachestat_release(cs_ptr);
-            bpf_map_delete_elem(fd, &key);
+            cachestat_save_pid_values(cs_ptr, cv);
+        }  else {
+            if (cv[0].mark_page_accessed != cs_ptr->prev.mark_page_accessed) {
+                cs_ptr->current_timestamp = update_time;
+                cachestat_save_pid_values(cs_ptr, cv);
+            } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
+                JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
+                ebpf_cachestat_release(cs_ptr);
+                bpf_map_delete_elem(fd, &key);
+            }
         }
 
         rw_spinlock_write_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
@@ -1510,10 +1516,8 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  */
 static void ebpf_cachestat_allocate_global_vectors(int apps)
 {
-    if (apps) {
-        ebpf_cachestat_aral_init();
-        cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
-    }
+    ebpf_cachestat_aral_init();
+    cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
