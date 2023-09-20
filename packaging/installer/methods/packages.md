@@ -24,9 +24,9 @@ and fail if it cannot do so.
 
 > ### Note
 > 
-> Since July 2022, Netdata moved the shipping process of native packages from Package Cloud to it's private hosted 
-> repo. We still maintain the Package Cloud repo though. This is important to understand when you gonna try to manually config 
-> your repo to receive packages. Let's assume that you want to install repoconfig for your Fedora 3X distro. 
+> In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
+> We still maintain the Package cloud repositories, but they are not guaranteed to work and may be removed 
+> without prior warning. 
 > You find the following `repoconfigs`:
 >
 > - `netdata-repo-1-2.noarch.rpm` : You will receive packages for the `stable` channel of the Agent from our Package Cloud 
