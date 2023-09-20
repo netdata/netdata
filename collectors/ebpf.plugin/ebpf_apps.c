@@ -1214,12 +1214,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
  */
 void cleanup_variables_from_other_threads(uint32_t pid)
 {
-    // Clean cachestat structure
-    if (cachestat_pid) {
-        ebpf_cachestat_release(cachestat_pid[pid]);
-        cachestat_pid[pid] = NULL;
-    }
-
     // Clean directory cache structure
     if (dcstat_pid) {
         ebpf_dcstat_release(dcstat_pid[pid]);
