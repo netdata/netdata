@@ -60,7 +60,7 @@ jobs:
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.file-check.outputs.any-modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.file-check.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
