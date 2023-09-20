@@ -1544,6 +1544,43 @@ install(FILES health/notifications/health_alarm_notify.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #
+# charts.d files
+#
+
+configure_file(collectors/charts.d.plugin/charts.d.plugin.in collectors/charts.d.plugin/charts.d.plugin @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/collectors/charts.d.plugin/charts.d.plugin
+        DESTINATION usr/libexec/netdata/plugins.d)
+
+install(FILES collectors/charts.d.plugin/charts.d.dryrun-helper.sh
+              collectors/charts.d.plugin/loopsleepms.sh.inc
+        DESTINATION usr/libexec/netdata/plugins.d)
+
+install(FILES collectors/charts.d.plugin/charts.d.conf
+        DESTINATION usr/lib/netdata/conf.d/charts.d.conf)
+
+# scripts
+
+install(FILES collectors/charts.d.plugin/ap/ap.chart.sh
+              collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
+              collectors/charts.d.plugin/example/example.chart.sh
+              collectors/charts.d.plugin/libreswan/libreswan.chart.sh
+              collectors/charts.d.plugin/nut/nut.chart.sh
+              collectors/charts.d.plugin/opensips/opensips.chart.sh
+              collectors/charts.d.plugin/sensors/sensors.chart.sh
+        DESTINATION usr/libexec/netdata/charts.d)
+
+# confs
+
+install(FILES collectors/charts.d.plugin/ap/ap.conf
+              collectors/charts.d.plugin/apcupsd/apcupsd.conf
+              collectors/charts.d.plugin/example/example.conf
+              collectors/charts.d.plugin/libreswan/libreswan.conf
+              collectors/charts.d.plugin/nut/nut.conf
+              collectors/charts.d.plugin/opensips/opensips.conf
+              collectors/charts.d.plugin/sensors/sensors.conf
+        DESTINATION usr/lib/netdata/conf.d/charts.d)
+
+#
 # dashboard
 #
 
