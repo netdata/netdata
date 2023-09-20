@@ -947,7 +947,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
     "p_db_lookup_before, p_update_every, source, chart_labels, summary) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
-    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37);"
+    "?13,NULL,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37);"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {
@@ -1018,10 +1018,6 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
         goto bind_fail;
 
     rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->calc, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->families, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1182,7 +1178,6 @@ int alert_hash_and_store_config(
     DIGEST_ALERT_CONFIG_VAL(cfg->os);
     DIGEST_ALERT_CONFIG_VAL(cfg->host);
     DIGEST_ALERT_CONFIG_VAL(cfg->on);
-    DIGEST_ALERT_CONFIG_VAL(cfg->families);
     DIGEST_ALERT_CONFIG_VAL(cfg->plugin);
     DIGEST_ALERT_CONFIG_VAL(cfg->module);
     DIGEST_ALERT_CONFIG_VAL(cfg->charts);
