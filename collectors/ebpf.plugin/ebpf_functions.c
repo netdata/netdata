@@ -1130,6 +1130,25 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
 }
 
 /**
+ * Cachestat read judy
+ *
+ * Thread responsible to fill thread data.
+ *
+ * @param buf the buffer to store data;
+ * @param em  the module main structure.
+ *
+ * @return It always returns NULL.
+ */
+void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
+{
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+        !ebpf_judy_pid.index.JudyLArray) {
+        return;
+    }
+}
+
+/**
  * Function: Socket
  *
  * Show information for sockets stored in hash tables.
@@ -1196,6 +1215,21 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+
+    time_t expires = now_realtime_sec() + em->update_every;
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", em->update_every);
+    buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_CACHESTAT_FUNCTION_DESCRIPTION);
+
+    // Collect data
+    buffer_json_member_add_array(wb, "data");
+    ebpf_cachestat_read_judy(wb, em);
+    buffer_json_array_close(wb); // data
 }
 
 /*****************************************************************
@@ -1213,7 +1247,7 @@ void *ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
-    struct functions_evloop_globals *wg = functions_evloop_init(1,
+    struct functions_evloop_globals *wg = functions_evloop_init(2,
                                                                 "EBPF",
                                                                 &lock,
                                                                 &ebpf_plugin_exit);
@@ -1221,6 +1255,11 @@ void *ebpf_function_thread(void *ptr)
     functions_evloop_add_function(wg,
                                   "ebpf_socket",
                                   ebpf_function_socket_manipulation,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+
+    functions_evloop_add_function(wg,
+                                  "ebpf_cachestat",
+                                  ebpf_function_cachestat_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
     heartbeat_t hb;
