@@ -43,7 +43,6 @@ jobs:
             **.h
             **.hh
             **.in
-            !netdata.spec.in
             configure.ac
             netdata-installer.sh
             **/Makefile*
@@ -60,11 +59,13 @@ jobs:
             ml/dlib/
             mqtt_websockets
             web/server/h2o/libh2o
-            !**.md
+          files_ignore: |
+            netdata.spec.in
+            **.md
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any-changed }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-files.outputs.any-modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
@@ -242,28 +243,19 @@ jobs:
   matrix: # Generate the shared build matrix for our build tests.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
-    needs:
-      - file-check
     if: github.event_name != 'workflow_dispatch'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Prepare tools
         id: prepare
-        if: needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
-        if: needs.file-check.outputs.run == 'true'
         run: |
           matrix="$(.github/scripts/gen-matrix-build.py)"
           echo "Generated matrix: ${matrix}"
@@ -288,7 +280,6 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
 
   prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
@@ -297,7 +288,6 @@ jobs:
     if: github.event_name != 'workflow_dispatch'
     needs:
       - matrix
-      - file-check
     env:
       RETRY_DELAY: 300
     strategy:
@@ -306,22 +296,15 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Setup Buildx
         id: buildx
-        if: needs.file-check.outputs.run == 'true'
         uses: docker/setup-buildx-action@v3
       - name: Build test environment
         id: build1
         uses: docker/build-push-action@v5
-        if: needs.file-check.outputs.run == 'true'
         continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
         with:
           push: false
@@ -334,10 +317,10 @@ jobs:
           outputs: type=docker,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Retry delay
-        if: ${{ steps.build1.outcome == 'failure' && needs.file-check.outputs.run == 'true' }}
+        if: ${{ steps.build1.outcome == 'failure' }}
         run: sleep "${RETRY_DELAY}"
       - name: Build test environment (attempt 2)
-        if: ${{ steps.build1.outcome == 'failure' && needs.file-check.outputs.run == 'true' }}
+        if: ${{ steps.build1.outcome == 'failure' }}
         id: build2
         uses: docker/build-push-action@v5
         continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
@@ -352,10 +335,10 @@ jobs:
           outputs: type=docker,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Retry delay
-        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' && needs.file-check.outputs.run == 'true' }}
+        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
         run: sleep "${RETRY_DELAY}"
       - name: Build test environment (attempt 3)
-        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' && needs.file-check.outputs.run == 'true' }}
+        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
         id: build3
         uses: docker/build-push-action@v5
         with:
@@ -399,7 +382,6 @@ jobs:
             && startsWith(github.ref, 'refs/heads/master')
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
 
   source-build: # Test various source build arrangements.

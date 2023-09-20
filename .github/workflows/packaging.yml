@@ -66,11 +66,12 @@ jobs:
             ml/dlib/
             mqtt_websockets
             web/server/h2o/libh2o
-            !**.md
+          files_ignore: |
+            **.md
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.file-check.outputs.any-changed }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.file-check.outputs.any-modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
@@ -78,28 +79,19 @@ jobs:
 
   matrix:
     name: Prepare Build Matrix
-    needs:
-      - file-check
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Prepare tools
         id: prepare
-        if: needs.file-check.outputs.run == 'true'
         run: |
           sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
-        if: needs.file-check.outputs.run == 'true'
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ] && \
              [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}" = "true" ]; then
@@ -128,30 +120,21 @@ jobs:
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
             && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
 
   version-check:
     name: Version check
-    needs:
-      - file-check
     runs-on: ubuntu-latest
     outputs:
       repo: ${{ steps.check-version.outputs.repo }}
       version: ${{ steps.check-version.outputs.version }}
       retention: ${{ steps.check-version.outputs.retention }}
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
       - name: Check Version
         id: check-version
-        if: needs.file-check.outputs.run == 'true'
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             case "${{ github.event.inputs.type }}" in
@@ -193,7 +176,6 @@ jobs:
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
             && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
 
   build:

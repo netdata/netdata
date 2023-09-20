@@ -34,7 +34,6 @@ jobs:
             **.h
             **.hh
             **.in
-            !netdata.spec.in
             configure.ac
             **/Makefile*
             Makefile*
@@ -45,11 +44,13 @@ jobs:
             ml/dlib/
             mqtt_websockets
             web/server/h2o/libh2o
-            !**.md
+          files_ignore: |
+            netdata.spec.in
+            **.md
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any-changed }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-files.outputs.any-modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
