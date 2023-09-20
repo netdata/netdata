@@ -1542,6 +1542,24 @@ install(PROGRAMS health/notifications/alarm-email.sh
 install(FILES health/notifications/health_alarm_notify.conf
               health/notifications/health_email_recipients.conf
         DESTINATION usr/lib/netdata/conf.d)
+#
+# test/ files
+#
+
+configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
+configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
+configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
+configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
+configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
+configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
+
+install(FILES ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
+              ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
+              ${CMAKE_BINARY_DIR}/tests/urls/request.sh
+              ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
+              ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
+              ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
+        DESTINATION usr/libexec/netdata/plugins.d)
 
 #
 # charts.d files
