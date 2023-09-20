@@ -760,7 +760,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int update_every)
         if (cv[0].mark_page_accessed != cs_ptr->prev.mark_page_accessed)
             cs_ptr->current_timestamp = update_time;
         else if ((update_time - cs_ptr->current_timestamp) > update_every) {
-            JudyLDel(&pid_ptr->socket_stats.JudyLArray, cv[0].ct, PJE0);
+            JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
             ebpf_cachestat_release(cs_ptr);
             bpf_map_delete_elem(fd, &key);
         }
@@ -779,7 +779,7 @@ end_cachestat_loop:
 /**
  * Cachestat thread
  *
- * Thread used to generate socket charts.
+ * Thread used to generate cachestat charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *
@@ -818,39 +818,45 @@ void *ebpf_read_cachestat_thread(void *ptr)
  * Update cgroup
  *
  * Update cgroup data based in
- *
- * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_cachestat_cgroup(int maps_per_core)
+static void ebpf_update_cachestat_cgroup()
 {
-    netdata_cachestat_pid_t *cv = cachestat_vector;
-    int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_cachestat_pid_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
+        netdata_publish_cachestat_t *out = &ect->publish_cachestat;
+        memset(out, 0, sizeof(netdata_publish_cachestat_t));
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_cachestat_pid_t *out = &pids->cachestat;
-            if (likely(cachestat_pid) && cachestat_pid[pid]) {
-                netdata_publish_cachestat_t *in = cachestat_pid[pid];
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            if (pid_ptr) {
+                rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+                if (pid_ptr->cachestat_stats.JudyLArray) {
+                    Word_t local_timestamp = 0;
+                    bool first_cache = true;
+                    Pvoid_t *cache_value;
+                    while (
+                        (cache_value =
+                             JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
+                        netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
+                        out->prev.mark_page_accessed += values->prev.mark_page_accessed;
+                        out->prev.account_page_dirtied += values->prev.account_page_dirtied;
+                        out->prev.add_to_page_cache_lru += values->prev.add_to_page_cache_lru;
+                        out->prev.mark_buffer_dirty += values->prev.mark_buffer_dirty;
 
-                memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
-            } else {
-                memset(cv, 0, length);
-                if (bpf_map_lookup_elem(fd, &pid, cv)) {
-                    continue;
+                        out->current.mark_page_accessed += values->current.mark_page_accessed;
+                        out->current.account_page_dirtied += values->current.account_page_dirtied;
+                        out->current.add_to_page_cache_lru += values->current.add_to_page_cache_lru;
+                        out->current.mark_buffer_dirty += values->current.mark_buffer_dirty;
+                    }
                 }
-
-                ebpf_cachestat_apps_accumulator(cv, maps_per_core);
-
-                memcpy(out, cv, sizeof(netdata_cachestat_pid_t));
+                rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
             }
         }
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
@@ -1387,7 +1393,7 @@ static void cachestat_collector(ebpf_module_t *em)
         pthread_mutex_lock(&collect_data_mutex);
 
         if (cgroups)
-            ebpf_update_cachestat_cgroup(maps_per_core);
+            ebpf_update_cachestat_cgroup();
 
         pthread_mutex_lock(&lock);
 
