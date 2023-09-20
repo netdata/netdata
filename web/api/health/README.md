@@ -61,7 +61,7 @@ Specifically, the API allows you to:
 
 -   Disable health checks completely. Alert conditions will not be evaluated at all and no entries will be added to the alert log.
 -   Silence alert notifications. Alert conditions will be evaluated, the alerts will appear in the log and the Netdata UI will show the alerts as active, but no notifications will be sent.
--   Disable or Silence specific alerts that match selectors on alert/template name, chart, context, host and family.
+-   Disable or Silence specific alerts that match selectors on alert/template name, chart, context, and host.
 
 The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://NODE:19999/netdata.conf`:
 
@@ -138,7 +138,6 @@ The accepted keys for the `selection criteria` are the following:
 -   `chart`    : Chart ids/names, as shown on the dashboard. These will match the `on` entry of a configured `alarm`.
 -   `context`  : Chart context, as shown on the dashboard. These will match the `on` entry of a configured `template`.
 -   `hosts`    : The hostnames that will need to match.
--   `families` : The alert families.
 
 You can add any of the selection criteria you need on the request, to ensure that only the alerts you are interested in are matched and disabled/silenced. e.g. there is no reason to add `hosts: *`, if you want the criteria to be applied to alerts for all hosts.
 
@@ -152,12 +151,6 @@ Example 2: Silence all alerts and templates with name starting with `out_of` on 
 
 ```
 http://NODE:19999/api/v1/manage/health?cmd=SILENCE&alarm=out_of*&hosts=myhost
-```
-
-Example 2.2: Add one more selector, to also silence alerts for cpu1 and cpu2
-
-```
-http://NODE:19999/api/v1/manage/health?families=cpu1 cpu2
 ```
 
 ### List silencers
