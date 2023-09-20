@@ -1284,7 +1284,12 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
             DESTINATION usr/libexec/netdata/plugins.d)
     install(PROGRAMS collectors/cgroups.plugin/cgroup-network-helper.sh
             COMPONENT cgroup_network_plugin
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION usr/lib/netdata/plugins.d)
+else()
+        # FIXME: rpm builders need this either way.
+        install(PROGRAMS collectors/cgroups.plugin/cgroup-network-helper.sh
+            COMPONENT cgroup_network_plugin
+            DESTINATION usr/lib/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
@@ -1608,6 +1613,14 @@ install(FILES collectors/charts.d.plugin/charts.d.dryrun-helper.sh
 install(FILES collectors/charts.d.plugin/charts.d.conf
         DESTINATION usr/lib/netdata/conf.d)
 
+#
+# tc-qos-helper
+#
+
+configure_file(collectors/tc.plugin/tc-qos-helper.sh.in collectors/tc.plugin/tc-qos-helper.sh @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/collectors/tc.plugin/tc-qos-helper.sh
+        DESTINATION usr/libexec/netdata/plugins.d)
+
 # scripts
 
 install(FILES collectors/charts.d.plugin/ap/ap.chart.sh
@@ -1772,6 +1785,10 @@ install(FILES collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
               collectors/python.d.plugin/w1sensor/w1sensor.chart.py
               collectors/python.d.plugin/zscores/zscores.chart.py
         DESTINATION usr/libexec/netdata/python.d)
+
+# FIXME: don't install this unconditionally
+configure_file(collectors/ioping.plugin/ioping.plugin.in collectors/ioping.plugin/ioping.plugin @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/collectors/ioping.plugin/ioping.plugin DESTINATION usr/libexec/netdata/plugins.d)
 
 #
 # dashboard
