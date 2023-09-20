@@ -1010,23 +1010,42 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
  */
 void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
 {
-    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
-    memset(&publish->current, 0, sizeof(publish->current));
+    if (!root)
+        return;
 
-    netdata_cachestat_pid_t *dst = &publish->current;
+    memset(publish, 0, sizeof(netdata_publish_cachestat_t));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_cachestat_t *w = cachestat_pid[pid];
-        if (w) {
-            netdata_cachestat_pid_t *src = &w->current;
-            dst->account_page_dirtied += src->account_page_dirtied;
-            dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
-            dst->mark_buffer_dirty += src->mark_buffer_dirty;
-            dst->mark_page_accessed += src->mark_page_accessed;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+        if (pid_ptr) {
+            rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+            if (pid_ptr->cachestat_stats.JudyLArray) {
+                Word_t local_timestamp = 0;
+                bool first_cache = true;
+                Pvoid_t *cache_value;
+                while (
+                    (cache_value =
+                        JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
+                    netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
+                    publish->prev.mark_page_accessed += values->prev.mark_page_accessed;
+                    publish->prev.account_page_dirtied += values->prev.account_page_dirtied;
+                    publish->prev.add_to_page_cache_lru += values->prev.add_to_page_cache_lru;
+                    publish->prev.mark_buffer_dirty += values->prev.mark_buffer_dirty;
+
+                    publish->current.mark_page_accessed += values->current.mark_page_accessed;
+                    publish->current.account_page_dirtied += values->current.account_page_dirtied;
+                    publish->current.add_to_page_cache_lru += values->current.add_to_page_cache_lru;
+                    publish->current.mark_buffer_dirty += values->current.mark_buffer_dirty;
+                }
+            }
+            rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
         }
 
         root = root->next;
     }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /**
