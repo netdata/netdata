@@ -716,16 +716,13 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         *((RRDLABEL_SRC *)PValue) = new_ls;
 
         labels->version++;
-        size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
-        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
 
         if (old_key) {
-            mem_before_judyl = mem_after_judyl;
             (void)JudyLDel(&labels->JudyL, (Word_t) old_key, PJE0);
             delete_label((RRDLABEL *)old_key);
-            mem_after_judyl = JudyLMemUsed(labels->JudyL);
-            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_before_judyl - mem_after_judyl, 0);
         }
+        size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
+        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
     }
     else
         delete_label(label);
