@@ -1556,7 +1556,7 @@ install(FILES collectors/charts.d.plugin/charts.d.dryrun-helper.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES collectors/charts.d.plugin/charts.d.conf
-        DESTINATION usr/lib/netdata/conf.d/charts.d.conf)
+        DESTINATION usr/lib/netdata/conf.d)
 
 # scripts
 
@@ -1608,6 +1608,120 @@ if(ENABLE_PLUGIN_EBPF)
                       collectors/ebpf.plugin/ebpf.d/vfs.conf
                 DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 endif()
+
+#
+# python.d files
+#
+
+configure_file(collectors/python.d.plugin/python.d.plugin.in collectors/python.d.plugin/python.d.plugin @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/collectors/python.d.plugin/python.d.plugin
+        DESTINATION usr/libexec/netdata/plugins.d/python.d.plugin)
+
+install(DIRECTORY collectors/python.d.plugin/python_modules
+        DESTINATION usr/libexec/netdata/python.d)
+
+install(FILES collectors/python.d.plugin/python.d.conf
+        DESTINATION usr/lib/netdata/conf.d)
+
+# conf files
+
+install(FILES collectors/python.d.plugin/adaptec_raid/adaptec_raid.conf
+              collectors/python.d.plugin/alarms/alarms.conf
+              collectors/python.d.plugin/am2320/am2320.conf
+              collectors/python.d.plugin/anomalies/anomalies.conf
+              collectors/python.d.plugin/beanstalk/beanstalk.conf
+              collectors/python.d.plugin/bind_rndc/bind_rndc.conf
+              collectors/python.d.plugin/boinc/boinc.conf
+              collectors/python.d.plugin/ceph/ceph.conf
+              collectors/python.d.plugin/changefinder/changefinder.conf
+              collectors/python.d.plugin/dovecot/dovecot.conf
+              collectors/python.d.plugin/example/example.conf
+              collectors/python.d.plugin/exim/exim.conf
+              collectors/python.d.plugin/fail2ban/fail2ban.conf
+              collectors/python.d.plugin/gearman/gearman.conf
+              collectors/python.d.plugin/go_expvar/go_expvar.conf
+              collectors/python.d.plugin/haproxy/haproxy.conf
+              collectors/python.d.plugin/hddtemp/hddtemp.conf
+              collectors/python.d.plugin/hpssa/hpssa.conf
+              collectors/python.d.plugin/icecast/icecast.conf
+              collectors/python.d.plugin/ipfs/ipfs.conf
+              collectors/python.d.plugin/litespeed/litespeed.conf
+              collectors/python.d.plugin/megacli/megacli.conf
+              collectors/python.d.plugin/memcached/memcached.conf
+              collectors/python.d.plugin/monit/monit.conf
+              collectors/python.d.plugin/nsd/nsd.conf
+              collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
+              collectors/python.d.plugin/openldap/openldap.conf
+              collectors/python.d.plugin/oracledb/oracledb.conf
+              collectors/python.d.plugin/pandas/pandas.conf
+              collectors/python.d.plugin/postfix/postfix.conf
+              collectors/python.d.plugin/puppet/puppet.conf
+              collectors/python.d.plugin/rethinkdbs/rethinkdbs.conf
+              collectors/python.d.plugin/retroshare/retroshare.conf
+              collectors/python.d.plugin/riakkv/riakkv.conf
+              collectors/python.d.plugin/samba/samba.conf
+              collectors/python.d.plugin/sensors/sensors.conf
+              collectors/python.d.plugin/smartd_log/smartd_log.conf
+              collectors/python.d.plugin/spigotmc/spigotmc.conf
+              collectors/python.d.plugin/squid/squid.conf
+              collectors/python.d.plugin/tomcat/tomcat.conf
+              collectors/python.d.plugin/tor/tor.conf
+              collectors/python.d.plugin/traefik/traefik.conf
+              collectors/python.d.plugin/uwsgi/uwsgi.conf
+              collectors/python.d.plugin/varnish/varnish.conf
+              collectors/python.d.plugin/w1sensor/w1sensor.conf
+              collectors/python.d.plugin/zscores/zscores.conf
+        DESTINATION usr/lib/netdata/conf.d/python.d)
+
+# scripts
+
+install(FILES collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
+              collectors/python.d.plugin/alarms/alarms.chart.py
+              collectors/python.d.plugin/am2320/am2320.chart.py
+              collectors/python.d.plugin/anomalies/anomalies.chart.py
+              collectors/python.d.plugin/beanstalk/beanstalk.chart.py
+              collectors/python.d.plugin/bind_rndc/bind_rndc.chart.py
+              collectors/python.d.plugin/boinc/boinc.chart.py
+              collectors/python.d.plugin/ceph/ceph.chart.py
+              collectors/python.d.plugin/changefinder/changefinder.chart.py
+              collectors/python.d.plugin/dovecot/dovecot.chart.py
+              collectors/python.d.plugin/example/example.chart.py
+              collectors/python.d.plugin/exim/exim.conf
+              collectors/python.d.plugin/fail2ban/fail2ban.chart.py
+              collectors/python.d.plugin/gearman/gearman.chart.py
+              collectors/python.d.plugin/go_expvar/go_expvar.chart.py
+              collectors/python.d.plugin/haproxy/haproxy.chart.py
+              collectors/python.d.plugin/hddtemp/hddtemp.chart.py
+              collectors/python.d.plugin/hpssa/hpssa.chart.py
+              collectors/python.d.plugin/icecast/icecast.chart.py
+              collectors/python.d.plugin/ipfs/ipfs.chart.py
+              collectors/python.d.plugin/litespeed/litespeed.chart.py
+              collectors/python.d.plugin/megacli/megacli.chart.py
+              collectors/python.d.plugin/memcached/memcached.chart.py
+              collectors/python.d.plugin/monit/monit.chart.py
+              collectors/python.d.plugin/nsd/nsd.chart.py
+              collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py
+              collectors/python.d.plugin/openldap/openldap.chart.py
+              collectors/python.d.plugin/oracledb/oracledb.chart.py
+              collectors/python.d.plugin/pandas/pandas.chart.py
+              collectors/python.d.plugin/postfix/postfix.chart.py
+              collectors/python.d.plugin/puppet/puppet.chart.py
+              collectors/python.d.plugin/rethinkdbs/rethinkdbs.chart.py
+              collectors/python.d.plugin/retroshare/retroshare.chart.py
+              collectors/python.d.plugin/riakkv/riakkv.chart.py
+              collectors/python.d.plugin/samba/samba.chart.py
+              collectors/python.d.plugin/sensors/sensors.chart.py
+              collectors/python.d.plugin/smartd_log/smartd_log.chart.py
+              collectors/python.d.plugin/spigotmc/spigotmc.chart.py
+              collectors/python.d.plugin/squid/squid.chart.py
+              collectors/python.d.plugin/tomcat/tomcat.chart.py
+              collectors/python.d.plugin/tor/tor.chart.py
+              collectors/python.d.plugin/traefik/traefik.chart.py
+              collectors/python.d.plugin/uwsgi/uwsgi.chart.py
+              collectors/python.d.plugin/varnish/varnish.chart.py
+              collectors/python.d.plugin/w1sensor/w1sensor.chart.py
+              collectors/python.d.plugin/zscores/zscores.chart.py
+        DESTINATION usr/libexec/netdata/python.d)
 
 #
 # dashboard
