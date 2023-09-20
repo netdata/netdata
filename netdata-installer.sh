@@ -408,17 +408,16 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   NETDATA_DISABLE_TELEMETRY=1
 fi
 
+if [ -n "${MAKEOPTS}" ]; then
+  JOBS="$(echo "${MAKEOPTS}" | grep -oE '\-j *[[:digit:]]+' | tr -d '\-j ')"
+else
+  JOBS="$(find_processors)"
+fi
+
 if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   mega="$((1024 * 1024))"
   base=1024
   scale=256
-
-  # shellcheck disable=SC2086
-  if [ -n "${MAKEOPTS}" ]; then
-    proc_count="$(echo ${MAKEOPTS} | grep -oE '\-j *[[:digit:]]+' | tr -d '\-j ')"
-  else
-    proc_count="$(find_processors)"
-  fi
 
   target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
   total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
@@ -429,16 +428,15 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   fi
 
   if [ -z "${MAKEOPTS}" ]; then
-    MAKEOPTS="-j${proc_count}"
+    MAKEOPTS="-j${JOBS}"
 
-    while [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ]; do
-      proc_count="$((proc_count - 1))"
-      target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
-      MAKEOPTS="-j${proc_count}"
-      NINJAOPTS="-j${proc_count}"
+    while [ "${target_ram}" -gt "${total_ram}" ] && [ "${JOBS}" -gt 1 ]; do
+      JOBS="$((JOBS - 1))"
+      target_ram="$((base * mega + (scale * mega * (JOBS - 1))))"
+      MAKEOPTS="-j${JOBS}"
     done
   else
-    if [ "${target_ram}" -gt "${total_ram}" ] && [ "${proc_count}" -gt 1 ] && [ -z "${SKIP_RAM_CHECK}" ]; then
+    if [ "${target_ram}" -gt "${total_ram}" ] && [ "${JOBS}" -gt 1 ] && [ -z "${SKIP_RAM_CHECK}" ]; then
       target_ram="$(echo "${target_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
       total_ram="$(echo "${total_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
       run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
@@ -1152,10 +1150,8 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-CMAKE_BUILD_OPTS="-- ${MAKEOPTS} VERBOSE=1"
-[ -n "${ninja}" ] && CMAKE_BUILD_OPTS="-- ${NINJAOPTS} -v"
 # shellcheck disable=SC2086
-if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" ${CMAKE_BUILD_OPTS}; then
+if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" --verbose --jobs=${JOBS}; then
   fatal "Failed to build Netdata." I000B
 fi
 
