@@ -1168,6 +1168,45 @@ static void ebpf_fill_cachestat_function_buffer(BUFFER *wb, uint32_t pid, netdat
 }
 
 /**
+ * Fill function buffer unsafe
+ *
+ * Fill the function buffer with socket information. Before to call this function it is necessary to lock
+ * ebpf_judy_pid.index.rw_spinlock
+ *
+ * @param buf    buffer used to store data to be shown by function.
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static void ebpf_cachestat_fill_function_buffer_unsafe(BUFFER *buf)
+{
+    int counter = 0;
+
+    Pvoid_t *pid_value, *cache_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        bool first_cache = true;
+        Word_t local_timestamp = 0;
+        rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+        if (pid_ptr->cachestat_stats.JudyLArray) {
+            while ((cache_value = JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
+                netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
+                ebpf_fill_cachestat_function_buffer(buf, local_pid, values, pid_ptr->name);
+            }
+            counter++;
+        }
+        rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+    }
+
+    if (!counter) {
+        netdata_publish_cachestat_t fake_cachestat = { };
+
+        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED);
+    }
+}
+
+/**
  * Cachestat read judy
  *
  * Thread responsible to fill thread data.
@@ -1182,11 +1221,15 @@ void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
         !ebpf_judy_pid.index.JudyLArray) {
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         netdata_publish_cachestat_t fake_cachestat = { };
 
         ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED);
         return;
     }
+
+    ebpf_cachestat_fill_function_buffer_unsafe(buf);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /**
@@ -1256,7 +1299,6 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-
 
     time_t expires = now_realtime_sec() + em->update_every;
 
@@ -1473,6 +1515,19 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
         }
         buffer_json_object_close(wb);
     }
+
+    buffer_json_member_add_time_t(wb, "expires", expires);
+    buffer_json_finalize(wb);
+
+    // Lock necessary to avoid race condition
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+
+    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+
+    buffer_free(wb);
 }
 
 /*****************************************************************
