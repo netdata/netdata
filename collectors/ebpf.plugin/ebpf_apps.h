@@ -239,8 +239,8 @@ void ebpf_vfs_release(netdata_publish_vfs_t *stat);
 
 extern ARAL *ebpf_aral_fd_pid;
 void ebpf_fd_aral_init();
-netdata_fd_stat_t *ebpf_fd_stat_get(void);
-void ebpf_fd_release(netdata_fd_stat_t *stat);
+netdata_fd_stat_plus_t *ebpf_fd_stat_get(void);
+void ebpf_fd_release(netdata_fd_stat_plus_t *stat);
 
 extern ARAL *ebpf_aral_shm_pid;
 void ebpf_shm_aral_init();

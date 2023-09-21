@@ -49,6 +49,11 @@ typedef struct netdata_fd_stat {
     uint32_t close_err;
 } netdata_fd_stat_t;
 
+typedef struct netdata_fd_stat_plus {
+    uint64_t current_timestamp;
+    netdata_fd_stat_t data;
+} netdata_fd_stat_plus_t;
+
 enum fd_tables {
     NETDATA_FD_PID_STATS,
     NETDATA_FD_GLOBAL_STATS,
@@ -87,7 +92,7 @@ enum fd_close_syscall {
 
 void *ebpf_fd_thread(void *ptr);
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_fd_release(netdata_fd_stat_t *stat);
+void ebpf_fd_release(netdata_fd_stat_plus_t *stat);
 extern struct config fd_config;
 extern netdata_ebpf_targets_t fd_targets[];
 

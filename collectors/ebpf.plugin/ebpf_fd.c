@@ -670,25 +670,6 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out, int maps_per_core)
 }
 
 /**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
- */
-static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
-{
-    netdata_fd_stat_t *curr = fd_pid[current_pid];
-    if (!curr) {
-        curr = ebpf_fd_stat_get();
-        fd_pid[current_pid] = curr;
-    }
-
-    memcpy(curr, &publish[0], sizeof(netdata_fd_stat_t));
-}
-
-/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
@@ -697,31 +678,66 @@ static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
  */
 static void ebpf_read_fd_apps_table(int maps_per_core, int update_every)
 {
+    netdata_thread_disable_cancelability();
     netdata_fd_stat_t *fv = fd_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
+    uint32_t key = 0, next_key = 0;
     int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
     size_t length = sizeof(netdata_fd_stat_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-
+    time_t update_time = time(NULL);
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, fv)) {
-            pids = pids->next;
-            continue;
+            goto end_fd_loop;
+        }
+
+        if (key > (uint32_t)pid_max) {
+            goto end_fd_loop;
         }
 
         fd_apps_accumulator(fv, maps_per_core);
 
-        fd_fill_pid(key, fv);
+        // Get PID structure
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, fv->name);
+        if (!pid_ptr) {
+            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+            goto end_fd_loop;
+        }
+
+        // Get Cachestat structure
+        rw_spinlock_write_lock(&pid_ptr->fd_stats.rw_spinlock);
+        netdata_fd_stat_plus_t **fd_pptr = (netdata_fd_stat_plus_t **)ebpf_judy_insert_unsafe(
+            &pid_ptr->fd_stats.JudyLArray, fv[0].ct);
+        netdata_fd_stat_plus_t *fd_ptr = *fd_pptr;
+        if (likely(*fd_pptr == NULL)) {
+            *fd_pptr = ebpf_fd_stat_get();
+            fd_ptr = *fd_pptr;
+
+            fd_ptr->current_timestamp = update_time;
+            memcpy(&fd_ptr->data, &fv[0], sizeof(netdata_fd_stat_t));
+        }  else {
+            if (fv[0].open_call != fd_ptr->data.open_call && fv[0].close_call != fd_ptr->data.close_call) {
+                fd_ptr->current_timestamp = update_time;
+                memcpy(&fd_ptr->data, &fv[0], sizeof(netdata_fd_stat_t));
+            } else if ((update_time - fd_ptr->current_timestamp) > (uint64_t )update_every) {
+                JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, fv[0].ct, PJE0);
+                ebpf_fd_release(fd_ptr);
+                bpf_map_delete_elem(fd, &key);
+            }
+        }
+
+        rw_spinlock_write_unlock(&pid_ptr->fd_stats.rw_spinlock);
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // We are cleaning to avoid passing data read from one process to other.
+end_fd_loop:
         memset(fv, 0, length);
-
-        pids = pids->next;
+        key = next_key;
     }
+    netdata_thread_enable_cancelability();
 }
 
 /**
@@ -758,6 +774,8 @@ void *ebpf_read_fd_thread(void *ptr)
 
         counter = 0;
     }
+
+    return NULL;
 }
 
 /**
@@ -779,17 +797,17 @@ static void ebpf_update_fd_cgroup(int maps_per_core)
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_fd_stat_t *out = &pids->fd;
+            netdata_fd_stat_plus_t *out = &pids->fd;
             if (likely(fd_pid) && fd_pid[pid]) {
                 netdata_fd_stat_t *in = fd_pid[pid];
 
-                memcpy(out, in, sizeof(netdata_fd_stat_t));
+                memcpy(&out->data, in, sizeof(netdata_fd_stat_t));
             } else {
                 memset(fv, 0, length);
                 if (!bpf_map_lookup_elem(fd, &pid, fv)) {
                     fd_apps_accumulator(fv, maps_per_core);
 
-                    memcpy(out, fv, sizeof(netdata_fd_stat_t));
+                    memcpy(&out->data, fv, sizeof(netdata_fd_stat_t));
                 }
             }
         }
