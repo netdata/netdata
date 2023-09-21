@@ -46,7 +46,7 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_FUNCTION_SOCKET_INTERFACES "interfaces"
 
 // cachestat constants
-#define EBPF_PLUGIN_CACHESTAT_FUNCTION_DESCRIPTION "Detailed information about how processes are accessing the linux page cache"
+#define EBPF_PLUGIN_CACHESTAT_FUNCTION_DESCRIPTION "Detailed information about how processes are accessing the linux page cache during runtime."
 
 void *ebpf_function_thread(void *ptr);
 

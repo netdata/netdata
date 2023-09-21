@@ -1164,6 +1164,12 @@ static void ebpf_fill_cachestat_function_buffer(BUFFER *wb, uint32_t pid, netdat
     // Miss
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->miss);
 
+    // Total page access
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->current.mark_page_accessed);
+
+    // Pages modified since start
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->current.mark_buffer_dirty);
+
     buffer_json_array_close(wb);
 }
 
@@ -1375,7 +1381,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             wb,
             fields_id++,
             "Dirty",
-            "Dirty pages",
+            "Dirty pages since last reload.",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
             RRDF_FIELD_TRANSFORM_NUMBER,
@@ -1393,7 +1399,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             wb,
             fields_id++,
             "Hit",
-            "Page Access",
+            "Page Access since last reload.",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
             RRDF_FIELD_TRANSFORM_NUMBER,
@@ -1412,6 +1418,42 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             fields_id++,
             "Miss",
             "Page outside memory",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Page Access",
+            "Number of times pages was accessed since start.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Modified Page",
+            "Number of modified page since start.",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
             RRDF_FIELD_TRANSFORM_NUMBER,
