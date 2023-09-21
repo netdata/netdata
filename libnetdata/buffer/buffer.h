@@ -97,7 +97,6 @@ typedef struct web_buffer {
 #define buffer_no_cacheable(wb) do { (wb)->options |= WB_CONTENT_NO_CACHEABLE; if((wb)->options & WB_CONTENT_CACHEABLE)    (wb)->options &= ~WB_CONTENT_CACHEABLE;  (wb)->expires = 0; } while(0)
 
 #define buffer_strlen(wb) ((wb)->len)
-const char *buffer_tostring(BUFFER *wb);
 
 #define BUFFER_OVERFLOW_EOF "EOF"
 
@@ -157,6 +156,16 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
                             bool add_anonymous_object, BUFFER_JSON_OPTIONS options);
 
 void buffer_json_finalize(BUFFER *wb);
+
+static const char *buffer_tostring(BUFFER *wb)
+{
+    buffer_need_bytes(wb, 1);
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+
+    return(wb->buffer);
+}
 
 static inline void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
 #ifdef NETDATA_INTERNAL_CHECKS
