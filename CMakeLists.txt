@@ -1717,7 +1717,7 @@ endif()
 
 configure_file(collectors/python.d.plugin/python.d.plugin.in collectors/python.d.plugin/python.d.plugin @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/collectors/python.d.plugin/python.d.plugin
-        DESTINATION usr/libexec/netdata/plugins.d/python.d.plugin)
+        DESTINATION usr/libexec/netdata/plugins.d)
 
 install(DIRECTORY collectors/python.d.plugin/python_modules
         DESTINATION usr/libexec/netdata/python.d)
