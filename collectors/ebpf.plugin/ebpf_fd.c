@@ -12,6 +12,17 @@ static char *open_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"do_sys_openat2", "do_
 static netdata_syscall_stat_t fd_aggregated_data[NETDATA_FD_SYSCALL_END];
 static netdata_publish_syscall_t fd_publish_aggregated[NETDATA_FD_SYSCALL_END];
 
+struct netdata_static_thread ebpf_read_fd = {
+    .name = "EBPF_READ_FD",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 static ebpf_local_maps_t fd_maps[] = {{.name = "tbl_fd_pid", .internal_input = ND_EBPF_DEFAULT_PID_SIZE,
                                        .user_input = 0,
                                        .type = NETDATA_EBPF_MAP_RESIZABLE  | NETDATA_EBPF_MAP_PID,
@@ -538,6 +549,9 @@ static void ebpf_fd_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    if (ebpf_read_fd.thread)
+        netdata_thread_cancel(*ebpf_read_fd.thread);
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -681,7 +695,7 @@ static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void read_fd_apps_table(int maps_per_core)
+static void ebpf_read_fd_apps_table(int maps_per_core, int update_every)
 {
     netdata_fd_stat_t *fv = fd_vector;
     uint32_t key;
@@ -707,6 +721,42 @@ static void read_fd_apps_table(int maps_per_core)
         memset(fv, 0, length);
 
         pids = pids->next;
+    }
+}
+
+/**
+ * File descriptor thread
+ *
+ * Thread used to generate cachestat charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_fd_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+    ebpf_read_fd_apps_table(maps_per_core, update_every);
+
+    int counter = update_every - 1;
+
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    usec_t period = update_every * USEC_PER_SEC;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        ebpf_read_fd_apps_table(maps_per_core, update_every);
+
+        counter = 0;
     }
 }
 
@@ -1121,8 +1171,6 @@ static void fd_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_fd_read_global_tables(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
-        if (apps)
-            read_fd_apps_table(maps_per_core);
 
         if (cgroups)
             ebpf_update_fd_cgroup(maps_per_core);
@@ -1377,6 +1425,13 @@ void *ebpf_fd_thread(void *ptr)
 
     ebpf_global_labels(fd_aggregated_data, fd_publish_aggregated, fd_dimension_names, fd_id_names,
                        algorithms, NETDATA_FD_SYSCALL_END);
+
+    ebpf_read_fd.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_fd.thread,
+                          ebpf_read_fd.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_fd_thread,
+                          em);
 
     pthread_mutex_lock(&lock);
     ebpf_create_fd_global_charts(em);
