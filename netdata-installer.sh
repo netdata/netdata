@@ -320,13 +320,8 @@ while [ -n "${1}" ]; do
     "--disable-exporting-kinesis" | "--disable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
-    "--enable-exporting-prometheus-remote-write" | "--enable-backend-prometheus-remote-write")
-      # TODO: Needs CMake Support
-      ;;
-    "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write")
-      # TODO: Needs CMake Support
-      NETDATA_DISABLE_PROMETHEUS=1
-      ;;
+    "--enable-exporting-prometheus-remote-write" | "--enable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=1 ;;
+    "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=1 ;;
     "--enable-exporting-mongodb" | "--enable-backend-mongodb") EXPORTER_MONGODB=1 ;;
     "--disable-exporting-mongodb" | "--disable-backend-mongodb") EXPORTER_MONGODB=0 ;;
     "--enable-exporting-pubsub")
@@ -596,7 +591,7 @@ copy_protobuf() {
 }
 
 bundle_protobuf() {
-  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${NETDATA_DISABLE_PROMETHEUS}" ]; then
+  if [ -n "${NETDATA_DISABLE_CLOUD}" ] && [ -n "${EXPORTER_PROMETHEUS}" ] && [ "${EXPORTER_PROMETHEUS}" -eq 0 ]; then
     echo "Skipping protobuf"
     return 0
   fi
@@ -608,7 +603,7 @@ bundle_protobuf() {
   fi
 
   if [ -z "${make}" ]; then
-    warning "No usable copy of Make found, which is required for bundling protobuf. Attempting to use a system copy fo protobuf instead."
+    warning "No usable copy of Make found, which is required for bundling protobuf. Attempting to use a system copy of protobuf instead."
     USE_SYSTEM_PROTOBUF=1
     return 0
   fi
@@ -1127,7 +1122,8 @@ enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
 enable_feature PLUGIN_APPS 1
 enable_feature PLUGIN_LOCAL_LISTENERS 1
 
-check_for_feature EXPORTING_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
+check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
+check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
 check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
 check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT}" libnetfilter_acct libnml
 check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight

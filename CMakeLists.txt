@@ -77,7 +77,6 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 option(ENABLE_CLOUD "enable cloud" True)
 option(ENABLE_ACLK "enable aclk" True)
 option(ENABLE_ML "enable machine learning" True)
-option(ENABLE_EXPORTING_MONGODB "enable exporting mongodb" True)
 option(ENABLE_H2O "enable h2o" True)
 option(ENABLE_DBENGINE "enable dbengine" True)
 
@@ -95,6 +94,7 @@ option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
 option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" True)
 
 option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "enable prometheus remote write exporter" True)
+option(ENABLE_EXPORTER_MONGODB "enable mongodb exporter" True)
 
 option(ENABLE_BUNDLED_JSONC "enable bundled json-c" False)
 option(ENABLE_BUNDLED_YAML "enable bundled yaml" False)
@@ -1393,7 +1393,7 @@ endif()
 # exporters
 #
 
-if(ENABLE_EXPORTING_MONGODB)
+if(ENABLE_EXPORTER_MONGODB)
         pkg_check_modules(MONGOC REQUIRED libmongoc-1.0)
 endif()
 
