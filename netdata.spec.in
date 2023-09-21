@@ -301,7 +301,7 @@ make download
 	-DENABLE_BUNDLED_YAML=Off
 
 # Build step
-%{cmake_build} -- -v
+%{cmake_build}
 
 # Build go.d.plugin
 %if 0%{?_golang_build}
