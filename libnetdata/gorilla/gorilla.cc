@@ -190,20 +190,20 @@ gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw) {
     return curr_head;
 }
 
-uint32_t gorilla_writer_disk_size_in_bytes(const gorilla_writer_t *gw)
+uint32_t gorilla_writer_nbytes(const gorilla_writer_t *gw)
 {
-    uint32_t num_buffers = 0;
+    uint32_t nbits = 0;
 
-    gorilla_buffer_t *curr_gbuf = gw->head_buffer;
+    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
     do {
-        gorilla_buffer_t *next_gbuf = curr_gbuf->header.next;
+        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
 
-        num_buffers++;
+        nbits += __atomic_load_n(&curr_gbuf->header.nbits, __ATOMIC_SEQ_CST);
 
         curr_gbuf = next_gbuf;
     } while (curr_gbuf);
 
-    return num_buffers * GORILLA_BUFFER_SIZE;
+    return (nbits + (CHAR_BIT - 1)) / CHAR_BIT;
 }
 
 bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size) {

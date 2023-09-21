@@ -404,6 +404,8 @@ uint32_t pgd_disk_footprint(PGD *pg)
 
                 if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) {
                     global_statistics_gorilla_buffer_remove_hot(pg->gorilla.num_buffers);
+                    global_statistics_tier0_disk_compressed_bytes(gorilla_writer_nbytes(pg->gorilla.writer));
+                    global_statistics_tier0_disk_uncompressed_bytes(gorilla_writer_entries(pg->gorilla.writer) * sizeof(storage_number));
                 }
             } else if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
                 size = pg->raw.size;
@@ -549,7 +551,6 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
             pgdc->slots = pgdc->pgd->used;
             break;
         case PAGE_GORILLA_METRICS: {
-
             if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
                 pgdc->slots = pgdc->pgd->slots;
                 pgdc->gr = gorilla_reader_init((void *) pg->raw.data);

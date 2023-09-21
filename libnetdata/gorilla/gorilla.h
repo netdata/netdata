@@ -60,7 +60,7 @@ gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw);
 
 gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw);
 
-uint32_t gorilla_writer_disk_size_in_bytes(const gorilla_writer_t *gw);
+uint32_t gorilla_writer_nbytes(const gorilla_writer_t *gw);
 bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size);
 
 uint32_t gorilla_buffer_patch(gorilla_buffer_t *buf);
