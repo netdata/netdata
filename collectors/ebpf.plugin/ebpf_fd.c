@@ -782,23 +782,40 @@ void *ebpf_read_fd_thread(void *ptr)
  * Update cgroup
  *
  * Update cgroup data collected per PID.
- *
- * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_fd_cgroup(int maps_per_core)
+static void ebpf_update_fd_cgroup()
 {
-    ebpf_cgroup_target_t *ect ;
-    netdata_fd_stat_t *fv = fd_vector;
-    int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_fd_stat_t) * ebpf_nprocs;
-
+    ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
+        netdata_fd_stat_t *out = &ect->publish_systemd_fd;
+        memset(out, 0, sizeof(netdata_fd_stat_t));
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_fd_stat_plus_t *out = &pids->fd;
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            if (pid_ptr) {
+                rw_spinlock_read_lock(&pid_ptr->fd_stats.rw_spinlock);
+                if (pid_ptr->fd_stats.JudyLArray) {
+                    Word_t local_timestamp = 0;
+                    bool first_fd = true;
+                    Pvoid_t *fd_value;
+                    while (
+                        (fd_value =
+                             JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_timestamp, &first_fd))) {
+                        netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*fd_value;
+                        out->open_call += values->data.open_call;
+                        out->close_call += values->data.close_call;
+                        out->open_err += values->data.open_err;
+                        out->close_err += values->data.close_err;
+                    }
+                }
+                rw_spinlock_read_unlock(&pid_ptr->fd_stats.rw_spinlock);
+            }
         }
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
@@ -1179,7 +1196,7 @@ static void fd_collector(ebpf_module_t *em)
         pthread_mutex_lock(&collect_data_mutex);
 
         if (cgroups)
-            ebpf_update_fd_cgroup(maps_per_core);
+            ebpf_update_fd_cgroup();
 
         pthread_mutex_lock(&lock);
 
