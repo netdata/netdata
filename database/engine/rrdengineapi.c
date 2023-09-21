@@ -382,7 +382,15 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     }
 
-    handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
+    switch (ctx->config.page_type) {
+    case PAGE_GORILLA_METRICS:
+        handle->page_entries_max = 1024;
+        break;
+    default:
+        handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
+        break;
+    }
+
     handle->page_start_time_ut = point_in_time_ut;
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
