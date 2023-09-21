@@ -1703,6 +1703,223 @@ static void ebpf_function_fd_manipulation(const char *transaction,
     ebpf_fd_read_judy(wb, em);
     buffer_json_array_close(wb); // data
 
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int fields_id = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PID",
+            "Process ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Process Name",
+            "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Open",
+            "Calls to open file.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Close",
+            "Calls to close file",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Open Error",
+            "Errors when files were open.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Close Error",
+            "Errors when files were closed",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // File Descriptor
+        buffer_json_member_add_object(wb, "FileDescriptor");
+        {
+            buffer_json_member_add_string(wb, "name", "File Descriptor");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "open");
+                buffer_json_add_array_item_string(wb, "close");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // File Error
+        buffer_json_member_add_object(wb, "FileError");
+        {
+            buffer_json_member_add_string(wb, "name", "File Descriptor Error");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "open");
+                buffer_json_add_array_item_string(wb, "close");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Cachestat Hits
+        buffer_json_member_add_object(wb, "CachestatHits");
+        {
+            buffer_json_member_add_string(wb, "name", "Hits");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "hit");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Cachestat Hits
+        buffer_json_member_add_object(wb, "CachestatMisses");
+        {
+            buffer_json_member_add_string(wb, "name", "Miss");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "miss");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_string(wb, "default_sort_column", "PID");
+
+    // Do we use only on fields that can be groupped?
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process ID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Process Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_time_t(wb, "expires", expires);
+    buffer_json_finalize(wb);
+
+    // Lock necessary to avoid race condition
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+
+    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+
+    buffer_free(wb);
 }
 
 /*****************************************************************
