@@ -358,7 +358,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         buffer->len = 0;
         buffer->buffer[0] = '\0';
     }
-
+    buffer_free(buffer);
     result = parser->user.data_collections_count;
 
     // free parser with the pop function
