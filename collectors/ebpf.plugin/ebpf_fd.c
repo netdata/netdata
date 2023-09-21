@@ -770,7 +770,7 @@ void *ebpf_read_fd_thread(void *ptr)
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
-        ebpf_read_fd_apps_table(maps_per_core, update_every);
+        ebpf_read_fd_apps_table(maps_per_core, (uint64_t)update_every);
 
         counter = 0;
     }

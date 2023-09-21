@@ -739,7 +739,7 @@ static inline void ebpf_cachestat_update_individual_group(netdata_publish_caches
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_read_cachestat_apps_table(int maps_per_core, int update_every)
+static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_every)
 {
     netdata_thread_disable_cancelability();
     netdata_cachestat_pid_t *cv = cachestat_vector;
@@ -822,7 +822,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    ebpf_read_cachestat_apps_table(maps_per_core, update_every);
+    ebpf_read_cachestat_apps_table(maps_per_core, (uint64_t)update_every);
 
     int counter = update_every - 1;
 
@@ -834,7 +834,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
-        ebpf_read_cachestat_apps_table(maps_per_core, update_every);
+        ebpf_read_cachestat_apps_table(maps_per_core, (uint64_t)update_every);
 
         counter = 0;
     }
