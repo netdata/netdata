@@ -19,6 +19,24 @@ AutoReqProv: yes
 # hours to finish).
 %global _lto_cflags %nil
 
+# Use our custom CMake version from our package builders if we can’t find cmake.
+%if 0%{?centos_ver} == 7
+%global __cmake /cmake/bin/cmake
+%global __cmake_builddir .
+%global cmake %{__cmake}
+%global cmake_build %{__cmake} --build %{__cmake_builddir} --verbose --parallel $(nproc)
+%global cmake_install DESTDIR="%{buildroot}" %{__cmake} --install %{__cmake_builddir}
+%global _have_ml 0
+%endif
+%if 0%{?amazon_linux} == 2
+%global __cmake /cmake/bin/cmake
+%global __cmake_builddir .
+%global cmake %{__cmake}
+%global cmake_build %{__cmake} --build %{__cmake_builddir} --verbose --parallel $(nproc)
+%global cmake_install DESTDIR="%{buildroot}" %{__cmake} --install %{__cmake_builddir}
+%global _have_ml 0
+%endif
+
 # Disable go.d.plugin build on outdated golang distros
 %if 0%{?centos_ver:1}
 %if 0%{?centos_ver} >= 8 && 0%{!?almalinux_ver:1} && 0%{!?rocky_ver:1}
@@ -60,6 +78,13 @@ AutoReqProv: yes
 %global _have_freeipmi 1
 %endif
 
+# Disable CUPS on old RHEL systems.
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+%global _have_cups 1
+%else
+%global _have_cups 0
+%endif
+
 # Disable NFACCT for RHEL equivalents and Amazon Linux
 %if 0%{?centos_ver} || 0%{?amzn}
 %global _have_nfacct 0
@@ -72,6 +97,11 @@ AutoReqProv: yes
 %global _have_xenstat 1
 %else
 %global _have_xenstat 0
+%endif
+
+# If ML hasn’t been explicitly disabled or enabled yet, enable it now.
+%if 0%{!?_have_ml:1}
+%global _have_ml 1
 %endif
 
 Summary:	Real-time performance monitoring, done right!
@@ -100,7 +130,7 @@ BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: cmake
-%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2 && 0%{!?suse_version:1}
+%if 0%{!?suse_version:1}
 BuildRequires: ninja-build
 %else
 BuildRequires: ninja
@@ -168,7 +198,9 @@ Suggests: %{name}-plugin-xenstat = %{version}
 Suggests: %{name}-plugin-freeipmi = %{version}
 %endif
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+%if %{_have_cups}
 Suggests: %{name}-plugin-cups = %{version}
+%endif
 Recommends: %{name}-plugin-systemd-journal = %{version}
 %endif
 
@@ -199,7 +231,7 @@ BuildRequires: pkgconfig(libipmimonitoring)
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
-%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
+%if %{_have_cups}
 BuildRequires: cups-devel
 %endif
 # end - cups plugin dependencies
@@ -220,7 +252,11 @@ BuildRequires: pkgconfig(libsystemd)
 %if 0%{?suse_version}
 BuildRequires: snappy-devel
 %else
+%if 0%{?centos_ver} != 7
 BuildRequires: pkgconfig(snappy)
+%else
+BuildRequires: snappy-devel
+%endif
 %endif
 # end - prometheus remote write dependencies
 
@@ -280,6 +316,11 @@ make download
 # Conf step
 %cmake -G Ninja \
 	-DCMAKE_INSTALL_PREFIX=/ \
+	%if %{_have_cups}
+	-DENABLE_PLUGIN_CUPS=On \
+	%else
+	-DENABLE_PLUGIN_CUPS=Off \
+	%endif
 	%if %{_have_ebpf}
 	-DENABLE_PLUGIN_EBPF=On \
 	%else
@@ -309,11 +350,15 @@ make download
 	%else
 	-DENABLE_BUNDLED_PROTOBUF=Off \
 	%endif
+	%if %{_have_ml}
+	-DENABLE_ML=On \
+	%else
+	-DENABLE_ML=Off \
+	%endif
 	-DENABLE_ACLK=On \
 	-DENABLE_CLOUD=On \
 	-DENABLE_DBENGINE=On \
 	-DENABLE_H2O=On \
-	-DENABLE_ML=On \
 	-DENABLE_PLUGIN_APPS=On \
 	-DENABLE_PLUGIN_CGROUP_NETWORK=On \
 	-DENABLE_PLUGIN_DEBUGFS=On \
@@ -638,7 +683,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
 
 # CUPS belongs to a different sub package
-%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
+%if %{_have_cups}
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
 
 %package plugin-cups

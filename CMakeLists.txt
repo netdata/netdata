@@ -171,7 +171,7 @@ check_library_exists(systemd sd_journal_open "" HAVE_SYSTEMD_LIB)
 check_include_file("systemd/sd-journal.h" HAVE_SYSTEMD_SD_JOURNAL_H)
 
 check_library_exists(snappy snappy_compress "" HAVE_SNAPPY_LIB)
-check_include_file("snappy.h" HAVE_SNAPPY_H)
+#check_include_file("snappy.h" HAVE_SNAPPY_H)
 
 #
 # check symbols
@@ -1404,7 +1404,7 @@ endif()
 if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         pkg_check_modules(SNAPPY snappy)
         if (NOT SNAPPY_FOUND)
-                if(HAVE_SNAPPY_LIB AND HAVE_SNAPPY_H)
+                if(HAVE_SNAPPY_LIB)
                         set(SNAPPY_INCLUDE_DIRS "")
                         set(SNAPPY_CFLAGS_OTHER "")
                         set(SNAPPY_LIBRARIES "-lsnappy")
