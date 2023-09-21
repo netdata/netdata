@@ -205,7 +205,6 @@ extern ebpf_process_stat_t **global_process_stats;
 extern netdata_publish_dcstat_t **dcstat_pid;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
-extern netdata_fd_stat_t **fd_pid;
 extern netdata_publish_shm_t **shm_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,

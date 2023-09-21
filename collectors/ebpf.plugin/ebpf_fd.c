@@ -798,18 +798,6 @@ static void ebpf_update_fd_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_fd_stat_plus_t *out = &pids->fd;
-            if (likely(fd_pid) && fd_pid[pid]) {
-                netdata_fd_stat_t *in = fd_pid[pid];
-
-                memcpy(&out->data, in, sizeof(netdata_fd_stat_t));
-            } else {
-                memset(fv, 0, length);
-                if (!bpf_map_lookup_elem(fd, &pid, fv)) {
-                    fd_apps_accumulator(fv, maps_per_core);
-
-                    memcpy(&out->data, fv, sizeof(netdata_fd_stat_t));
-                }
-            }
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -832,7 +820,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 
     while (root) {
         int32_t pid = root->pid;
-        netdata_fd_stat_t *w = fd_pid[pid];
+        netdata_fd_stat_t *w = NULL;
         if (w) {
             open_call += w->open_call;
             close_call += w->close_call;
@@ -1369,7 +1357,6 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
 static void ebpf_fd_allocate_global_vectors()
 {
     ebpf_fd_aral_init();
-    fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
     fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
 
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));

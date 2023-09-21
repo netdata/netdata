@@ -20,7 +20,6 @@ netdata_publish_cachestat_t **cachestat_pid = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
 netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
-netdata_fd_stat_t **fd_pid = NULL;
 netdata_publish_shm_t **shm_pid = NULL;
 ebpf_process_stat_t **global_process_stats = NULL;
 
@@ -1213,12 +1212,6 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     if (vfs_pid) {
         ebpf_vfs_release(vfs_pid[pid]);
         vfs_pid[pid] = NULL;
-    }
-
-    // Clean fd structure
-    if (fd_pid) {
-        ebpf_fd_release(fd_pid[pid]);
-        fd_pid[pid] = NULL;
     }
 
     // Clean shm structure
