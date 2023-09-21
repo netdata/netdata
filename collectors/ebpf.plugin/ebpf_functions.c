@@ -1239,7 +1239,7 @@ void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
 }
 
 /**
- * Function: Socket
+ * Function: Cachestat
  *
  * Show information for sockets stored in hash tables.
  *
@@ -1571,6 +1571,141 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
 }
 
 /*****************************************************************
+ *  EBPF FD FUNCTION
+ *****************************************************************/
+
+/**
+ * Thread Help
+ *
+ * Shows help with all options accepted by thread function.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+*/
+static void ebpf_function_fd_help(const char *transaction) {
+    static char *fd_message = {
+        "ebpf.plugin / fd\n"
+        "\n"
+        "Function `fd` display file descriptor manipulation during ebpf.plugin runtime.\n"
+        "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+        "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+        "modified request.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   period:PERIOD\n"
+        "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
+    ebpf_function_help(transaction, fd_message);
+}
+
+/**
+ * FD read judy
+ *
+ * Thread responsible to fill thread data.
+ *
+ * @param buf the buffer to store data;
+ * @param em  the module main structure.
+ *
+ * @return It always returns NULL.
+ */
+void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em)
+{
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+        !ebpf_judy_pid.index.JudyLArray) {
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        netdata_publish_cachestat_t fake_cachestat = { };
+
+        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED);
+        return;
+    }
+
+    ebpf_cachestat_fill_function_buffer_unsafe(buf);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
+
+/**
+ * Function: FD
+ *
+ * Show information for sockets stored in hash tables.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+ * @param function     function name and arguments given to thread.
+ * @param timeout      The function timeout
+ * @param cancelled    Variable used to store function status.
+ */
+static void ebpf_function_fd_manipulation(const char *transaction,
+                                          char *function __maybe_unused,
+                                          int timeout __maybe_unused,
+                                          bool *cancelled __maybe_unused)
+{
+    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_FD_IDX];
+    char *words[PLUGINSD_MAX_WORDS] = {NULL};
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
+    int period = -1;
+
+    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+        const char *keyword = get_word(words, num_words, i);
+        if (!keyword)
+            break;
+
+        if (strncmp(keyword, EBPF_FUNCTION_OPTION_PERIOD, sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1];
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            period = str2i(name);
+            if (period > 0) {
+                em->lifetime = period;
+            } else
+                em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+
+#ifdef NETDATA_DEV_MODE
+            collector_info("Lifetime modified for %u", em->lifetime);
+#endif
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        } else if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
+            ebpf_function_fd_help(transaction);
+            return;
+        }
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        // Cleanup when we already had a thread running
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        //ebpf_cachestat_clean_judy_array_unsafe();
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+        if (ebpf_function_start_thread(em, period)) {
+            ebpf_function_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR, "Cannot start thread.");
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            return;
+        }
+    } else {
+        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
+            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+        }
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    time_t expires = now_realtime_sec() + em->update_every;
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", em->update_every);
+    buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_FD_FUNCTION_DESCRIPTION);
+
+    // Collect data
+    buffer_json_member_add_array(wb, "data");
+    ebpf_fd_read_judy(wb, em);
+    buffer_json_array_close(wb); // data
+
+}
+
+/*****************************************************************
  *  EBPF FUNCTION THREAD
  *****************************************************************/
 
@@ -1585,7 +1720,7 @@ void *ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
-    struct functions_evloop_globals *wg = functions_evloop_init(2,
+    struct functions_evloop_globals *wg = functions_evloop_init(3,
                                                                 "EBPF",
                                                                 &lock,
                                                                 &ebpf_plugin_exit);
@@ -1600,6 +1735,11 @@ void *ebpf_function_thread(void *ptr)
                                   ebpf_function_cachestat_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
+    functions_evloop_add_function(wg,
+                                  EBPF_FUNCTION_FD,
+                                  ebpf_function_fd_manipulation,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!ebpf_plugin_exit) {
@@ -1612,4 +1752,3 @@ void *ebpf_function_thread(void *ptr)
 
     return NULL;
 }
-

@@ -24,6 +24,7 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_FUNCTION_THREAD "ebpf_thread"
 #define EBPF_FUNCTION_SOCKET "ebpf_socket"
 #define EBPF_FUNCTION_CACHESTAT "ebpf_cachestat"
+#define EBPF_FUNCTION_FD "ebpf_fd"
 
 // thread constants
 #define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information about eBPF threads."
@@ -47,6 +48,9 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 
 // cachestat constants
 #define EBPF_PLUGIN_CACHESTAT_FUNCTION_DESCRIPTION "Detailed information about how processes are accessing the linux page cache during runtime."
+
+// fd constants
+#define EBPF_PLUGIN_FD_FUNCTION_DESCRIPTION "Detailed information about how processes are opening and closing files."
 
 void *ebpf_function_thread(void *ptr);
 

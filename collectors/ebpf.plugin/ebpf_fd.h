@@ -95,6 +95,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_fd_release(netdata_fd_stat_plus_t *stat);
 extern struct config fd_config;
 extern netdata_ebpf_targets_t fd_targets[];
+extern void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em);
 
 #endif /* NETDATA_EBPF_FD_H */
 
