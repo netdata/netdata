@@ -1299,16 +1299,12 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
- *
- * @param apps is apps enabled?
  */
-static void ebpf_fd_allocate_global_vectors(int apps)
+static void ebpf_fd_allocate_global_vectors()
 {
-    if (apps) {
-        ebpf_fd_aral_init();
-        fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
-        fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
-    }
+    ebpf_fd_aral_init();
+    fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
+    fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
 
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 }
@@ -1373,7 +1369,7 @@ void *ebpf_fd_thread(void *ptr)
         goto endfd;
     }
 
-    ebpf_fd_allocate_global_vectors(em->apps_charts);
+    ebpf_fd_allocate_global_vectors();
 
     int algorithms[NETDATA_FD_SYSCALL_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX
