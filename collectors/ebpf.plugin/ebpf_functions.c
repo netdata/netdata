@@ -1252,7 +1252,6 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
     int period = -1;
 
-    rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
@@ -1273,11 +1272,9 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         } else if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
             ebpf_function_cachestat_help(transaction);
-            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
         }
     }
-    rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
@@ -1369,7 +1366,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             NAN,
             RRDF_FIELD_SORT_ASCENDING,
             NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_SUMMARY_MEAN,
             RRDF_FIELD_FILTER_MULTISELECT,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
@@ -1387,7 +1384,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             NAN,
             RRDF_FIELD_SORT_ASCENDING,
             NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_SUMMARY_SUM,
             RRDF_FIELD_FILTER_MULTISELECT,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
@@ -1405,7 +1402,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             NAN,
             RRDF_FIELD_SORT_ASCENDING,
             NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_SUMMARY_SUM,
             RRDF_FIELD_FILTER_MULTISELECT,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
@@ -1423,7 +1420,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
             NAN,
             RRDF_FIELD_SORT_ASCENDING,
             NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_SUMMARY_SUM,
             RRDF_FIELD_FILTER_MULTISELECT,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
@@ -1515,6 +1512,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
         }
         buffer_json_object_close(wb);
     }
+    buffer_json_object_close(wb); // charts
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
