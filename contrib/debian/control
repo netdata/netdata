@@ -125,8 +125,7 @@ Description: Compiled eBPF legacy code for the Netdata eBPF plugin
 
 Package: netdata-plugin-pythond
 Architecture: all
-Depends: ${shlibs:Depends},
-         netdata (= ${source:Version})
+Depends: netdata (= ${source:Version})
 Pre-Depends: adduser
 Suggests: sudo
 Conflicts: netdata (<< ${source:Version})
@@ -197,3 +196,13 @@ Conflicts: netdata (<< ${source:Version})
 Description: The systemd-journal collector for the Netdata Agent
  This plugin allows the Netdata Agent to present logs from the systemd
  journal on Netdata Cloud or the local Agent dashboard.
+
+Package: netdata-plugin-xenstat
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends},
+         netdata (= ${source:Version})
+Pre-Depends: adduser
+Conflicts: netdata (<< ${source:Version})
+Description: The xenstat plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from the Xen
+ Hypervisor.

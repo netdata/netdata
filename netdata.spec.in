@@ -67,6 +67,13 @@ AutoReqProv: yes
 %global _have_nfacct 1
 %endif
 
+# Disable xenstat if we’re not on Fedora or openSUSE
+%if 0%{?suse_version} || 0%{?fedora}
+%global _have_xenstat 1
+%else
+%global _have_xenstat 0
+%endif
+
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	%{version}
@@ -154,6 +161,9 @@ Requires: %{name}-plugin-perf = %{version}
 %if %{_have_nfacct}
 Requires: %{name}-plugin-nfacct = %{version}
 %endif
+%if %{_have_xenstat}
+Suggests: %{name}-plugin-xenstat = %{version}
+%endif
 %if %{_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: %{name}-plugin-freeipmi = %{version}
 %endif
@@ -213,6 +223,13 @@ BuildRequires: snappy-devel
 BuildRequires: pkgconfig(snappy)
 %endif
 # end - prometheus remote write dependencies
+
+# Xenstat dependencies
+%if %{_have_xenstat}
+BuildRequires: pkgconfig(xenstat)
+BuildRequires: pkgconfig(xenlight)
+%endif
+# end - xenstat dependencies
 
 # #####################################################################
 # End of dependency management configuration
@@ -278,6 +295,11 @@ make download
 	%else
 	-DENABLE_PLUGIN_NFACCT=Off \
 	%endif
+	%if %{_have_xenstat}
+	-DENABLE_PLUGIN_XENSTAT=On \
+	%else
+	-DENABLE_PLUGIN_XENSTAT=Off \
+	%endif
 	%if 0%{?centos_ver:1}
 	%if %{centos_ver} < 8
 	-DENABLE_BUNDLED_PROTOBUF=On \
@@ -299,7 +321,6 @@ make download
 	-DENABLE_PLUGIN_PERF=On \
 	-DENABLE_PLUGIN_SLABINFO=On \
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
-	-DENABLE_PLUGIN_XENSTAT=Off \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 	-DENABLE_EXPORTER_MONGODB=Off \
 	-DENABLE_BUNDLED_JSONC=Off \
@@ -612,6 +633,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # systemd-journal belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+
+# xenstat belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -929,6 +953,28 @@ fi
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+
+%if %{_have_xenstat}
+%package plugin-xenstat
+Summary: The xenstat plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+
+%description plugin-xenstat
+ This plugin allows Netdata to collect metrics from the Xen Hypervisor.
+
+%pre plugin-xenstat
+
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%files plugin-xenstat
+%defattr(0750,root,netdata,0750)
+# SUID needed for data collection
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
+%endif
 
 %changelog
 * Tue Sep 19 2023 Austin hemmelgarn <austin@netdata.cloud> 0.0.0-24
