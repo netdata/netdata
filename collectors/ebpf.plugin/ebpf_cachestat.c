@@ -712,6 +712,27 @@ static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, n
 }
 
 /**
+ * Update individual group
+ *
+ * Update statistics for individual group after prev and current to be filled.
+ *
+ * @param w a pointer with values.
+ */
+static inline void ebpf_cachestat_update_individual_group(netdata_publish_cachestat_t *w)
+{
+    netdata_cachestat_pid_t *current = &w->current;
+    netdata_cachestat_pid_t *prev = &w->prev;
+
+    uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
+    uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+    w->dirty = (long long)mbd;
+    uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
+    uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+
+    cachestat_update_publish(w, mpa, mbd, apcl, apd);
+}
+
+/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
@@ -757,13 +778,14 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int update_every)
             *cs_pptr = ebpf_publish_cachestat_get();
             cs_ptr = *cs_pptr;
 
-            cachestat_save_pid_values(cs_ptr, cv);
             cs_ptr->current_timestamp = update_time;
             cachestat_save_pid_values(cs_ptr, cv);
+            ebpf_cachestat_update_individual_group(cs_ptr);
         }  else {
             if (cv[0].mark_page_accessed != cs_ptr->prev.mark_page_accessed) {
                 cs_ptr->current_timestamp = update_time;
                 cachestat_save_pid_values(cs_ptr, cv);
+                ebpf_cachestat_update_individual_group(cs_ptr);
             } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
                 JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
                 ebpf_cachestat_release(cs_ptr);
@@ -1511,10 +1533,8 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
- *
- * @param apps is apps enabled?
  */
-static void ebpf_cachestat_allocate_global_vectors(int apps)
+static void ebpf_cachestat_allocate_global_vectors()
 {
     ebpf_cachestat_aral_init();
     cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
@@ -1626,7 +1646,7 @@ void *ebpf_cachestat_thread(void *ptr)
         goto endcachestat;
     }
 
-    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
+    ebpf_cachestat_allocate_global_vectors();
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
