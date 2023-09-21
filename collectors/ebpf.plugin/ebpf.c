@@ -724,6 +724,9 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 
         pid_ptr->cachestat_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->cachestat_stats.rw_spinlock);
+
+        pid_ptr->fd_stats.JudyLArray = NULL;
+        rw_spinlock_init(&pid_ptr->fd_stats.rw_spinlock);
     } else {
         if (pid_ptr->name[0] == '\0' && name)
             strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
