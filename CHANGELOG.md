@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- add systemd-journal.plugin to apps\_groups.conf [\#16024](https://github.com/netdata/netdata/pull/16024) ([ilyam8](https://github.com/ilyam8))
+- Fix handling of CI skipping. [\#16022](https://github.com/netdata/netdata/pull/16022) ([Ferroin](https://github.com/Ferroin))
+- update bundled UI to v6.39.0 [\#16020](https://github.com/netdata/netdata/pull/16020) ([ilyam8](https://github.com/ilyam8))
 - fix crash on setting thread name [\#16016](https://github.com/netdata/netdata/pull/16016) ([ilyam8](https://github.com/ilyam8))
 - Systemd-Journal: fix crash when the uid or gid do not have names [\#16015](https://github.com/netdata/netdata/pull/16015) ([ktsaou](https://github.com/ktsaou))
+- some collector metadata improvements [\#16008](https://github.com/netdata/netdata/pull/16008) ([andrewm4894](https://github.com/andrewm4894))
 - Fix compilation warnings [\#16006](https://github.com/netdata/netdata/pull/16006) ([stelfrag](https://github.com/stelfrag))
 - Update CMakeLists.txt [\#16005](https://github.com/netdata/netdata/pull/16005) ([stelfrag](https://github.com/stelfrag))
 - eBPF socket: function with event loop [\#16004](https://github.com/netdata/netdata/pull/16004) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -29,6 +33,7 @@
 - Skip trying to preserve file owners when bundling external code. [\#15966](https://github.com/netdata/netdata/pull/15966) ([Ferroin](https://github.com/Ferroin))
 - fix using undefined var when loading job statuses in python.d [\#15965](https://github.com/netdata/netdata/pull/15965) ([ilyam8](https://github.com/ilyam8))
 - facets: data-only queries [\#15961](https://github.com/netdata/netdata/pull/15961) ([ktsaou](https://github.com/ktsaou))
+- Clarify shipping repos cases [\#15960](https://github.com/netdata/netdata/pull/15960) ([tkatsoulas](https://github.com/tkatsoulas))
 - Clarifying the possible installation types [\#15958](https://github.com/netdata/netdata/pull/15958) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix journal direction parsing [\#15957](https://github.com/netdata/netdata/pull/15957) ([ktsaou](https://github.com/ktsaou))
 - facets and journal improvements [\#15956](https://github.com/netdata/netdata/pull/15956) ([ktsaou](https://github.com/ktsaou))
@@ -40,6 +45,7 @@
 - streaming logs [\#15948](https://github.com/netdata/netdata/pull/15948) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#15946](https://github.com/netdata/netdata/pull/15946) ([netdatabot](https://github.com/netdatabot))
 - Integrations: Add a note to enable the collectors [\#15945](https://github.com/netdata/netdata/pull/15945) ([MrZammler](https://github.com/MrZammler))
+- Change the build image of EL packages from alma to rocky [\#15944](https://github.com/netdata/netdata/pull/15944) ([tkatsoulas](https://github.com/tkatsoulas))
 - Integrations: Add a note to install charts.d plugin [\#15943](https://github.com/netdata/netdata/pull/15943) ([MrZammler](https://github.com/MrZammler))
 - Add description about packages [\#15941](https://github.com/netdata/netdata/pull/15941) ([thiagoftsm](https://github.com/thiagoftsm))
 - facets optimizations [\#15940](https://github.com/netdata/netdata/pull/15940) ([ktsaou](https://github.com/ktsaou))
@@ -400,7 +406,6 @@
 - Add short descriptions to cgroups yaml [\#15457](https://github.com/netdata/netdata/pull/15457) ([Ancairon](https://github.com/Ancairon))
 - readme: reorder cols in whats new and add links [\#15455](https://github.com/netdata/netdata/pull/15455) ([andrewm4894](https://github.com/andrewm4894))
 - Store and transmit chart\_name to cloud in alert events [\#15441](https://github.com/netdata/netdata/pull/15441) ([MrZammler](https://github.com/MrZammler))
-- Refactor RRD code. [\#15423](https://github.com/netdata/netdata/pull/15423) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
@@ -426,11 +431,6 @@
 - Remove duplicate category from categories.yaml [\#15432](https://github.com/netdata/netdata/pull/15432) ([Ancairon](https://github.com/Ancairon))
 - readme: add link for netdata cloud and sign-in cta [\#15431](https://github.com/netdata/netdata/pull/15431) ([andrewm4894](https://github.com/andrewm4894))
 - add chart id and name to alert instances and transitions [\#15430](https://github.com/netdata/netdata/pull/15430) ([ktsaou](https://github.com/ktsaou))
-- update v2 dashboard [\#15427](https://github.com/netdata/netdata/pull/15427) ([ilyam8](https://github.com/ilyam8))
-- fix unlocked registry access and add hostname to search response [\#15426](https://github.com/netdata/netdata/pull/15426) ([ktsaou](https://github.com/ktsaou))
-- Update README.md [\#15424](https://github.com/netdata/netdata/pull/15424) ([christophidesp](https://github.com/christophidesp))
-- Decode url before checking for question mark [\#15422](https://github.com/netdata/netdata/pull/15422) ([MrZammler](https://github.com/MrZammler))
-- use real-time clock for http response headers [\#15421](https://github.com/netdata/netdata/pull/15421) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
