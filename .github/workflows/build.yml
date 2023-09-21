@@ -408,15 +408,6 @@ jobs:
         id: load
         if: needs.file-check.outputs.run == 'true'
         run: docker load --input image.tar
-<<<<<<< HEAD
-=======
-      - name: Regular build on ${{ matrix.distro }}
-        id: build-basic
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c 'autoreconf -ivf && ./configure --disable-dependency-tracking && make -j2'
->>>>>>> master
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         id: build-no-cloud
         if: needs.file-check.outputs.run == 'true'
