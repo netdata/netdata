@@ -94,6 +94,8 @@ option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" True)
 option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
 option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" True)
 
+option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "enable prometheus remote write exporter" True)
+
 option(ENABLE_BUNDLED_JSONC "enable bundled json-c" False)
 option(ENABLE_BUNDLED_YAML "enable bundled yaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
@@ -235,6 +237,20 @@ else()
         set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
         set(OPENSSL_CFLAGS_OTHER "")
         set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+endif()
+
+#
+# figure out if we need protoc/protobuf
+#
+
+if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
+        if(ENABLE_BUNDLED_PROTOBUF)
+                set(PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/protoc")
+                set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src")
+                set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/.libs/libprotobuf.a")
+        else()
+                find_package(Protobuf REQUIRED)
+        endif()
 endif()
 
 #
@@ -892,6 +908,11 @@ set(ACLK_FILES aclk/aclk_util.c
 set(MONGODB_EXPORTING_FILES exporting/mongodb/mongodb.c
                             exporting/mongodb/mongodb.h)
 
+set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES exporting/prometheus/remote_write/remote_write.c
+                                            exporting/prometheus/remote_write/remote_write.h
+                                            exporting/prometheus/remote_write/remote_write_request.cc
+                                            exporting/prometheus/remote_write/remote_write_request.h)
+
 #
 # build h2o
 #
@@ -929,6 +950,7 @@ endif()
 #
 # build libjudy
 #
+
 add_library(judy STATIC ${LIBJUDY_SOURCES})
 
 target_compile_options(judy PUBLIC
@@ -1061,8 +1083,44 @@ target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
 target_link_libraries(libnetdata PUBLIC "$<$<BOOL:${ENABLE_H2O}>:h2o>")
 
 #
-# build protos
+# helper function to build protos
 #
+
+function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
+        if(NOT ARGN)
+                message(SEND_ERROR "Error: PROTOBUF_ACLK_GENERATE_CPP() called without any proto files")
+                return()
+        endif()
+
+        set(${INC_DIR})
+        set(${OUT_DIR})
+        set(${SRCS})
+        set(${HDRS})
+
+        foreach(FIL ${ARGN})
+                get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+                get_filename_component(DIR ${ABS_FIL} DIRECTORY)
+                get_filename_component(FIL_WE ${FIL} NAME_WE)
+
+                set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
+                list(APPEND ${SRCS} ${GENERATED_PB_CC})
+
+                set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
+                list(APPEND ${HDRS} ${GENERATED_PB_H})
+
+                add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
+                                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ARGS -I=${INC_DIR} --cpp_out=${OUT_DIR} ${ABS_FIL}
+                                   DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+                                   COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+                                   VERBATIM)
+        endforeach()
+
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES COMPILE_OPTIONS -Wno-deprecated-declarations)
+
+        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+endfunction()
 
 if(ENABLE_ACLK)
         #
@@ -1086,48 +1144,11 @@ if(ENABLE_ACLK)
         #
         # proto definitions
         #
-        if(ENABLE_BUNDLED_PROTOBUF)
-                set(PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/protoc")
-                set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src")
-                set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/.libs/libprotobuf.a")
-        else()
-                find_package(Protobuf REQUIRED)
-        endif()
-
-        function(protobuf_aclk_generate_cpp SRCS HDRS)
-          if(NOT ARGN)
-            message(SEND_ERROR "Error: PROTOBUF_ACLK_GENERATE_CPP() called without any proto files")
-            return()
-          endif()
-
-          set(${SRCS})
-          set(${HDRS})
-          foreach(FIL ${ARGN})
-            get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
-            get_filename_component(DIR ${ABS_FIL} DIRECTORY)
-            get_filename_component(FIL_WE ${FIL} NAME_WE)
-
-            set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
-            list(APPEND ${SRCS} ${GENERATED_PB_CC})
-
-            set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
-            list(APPEND ${HDRS} ${GENERATED_PB_H})
-
-            add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
-                               COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ARGS -I=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas --cpp_out=${CMAKE_SOURCE_DIR}/aclk/aclk-schemas ${ABS_FIL}
-                               DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
-                               COMMENT "Running C++ protocol buffer compiler on ${FIL}"
-                               VERBATIM)
-          endforeach()
-
-          set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
-          set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES COMPILE_OPTIONS -Wno-deprecated-declarations)
-
-          set(${SRCS} ${${SRCS}} PARENT_SCOPE)
-          set(${HDRS} ${${HDRS}} PARENT_SCOPE)
-        endfunction()
-
-        protobuf_aclk_generate_cpp(ACLK_PROTO_BUILT_SRCS ACLK_PROTO_BUILT_HDRS ${ACLK_PROTO_DEFS})
+        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/aclk/aclk-schemas"
+                            "${CMAKE_SOURCE_DIR}/aclk/aclk-schemas"
+                            ACLK_PROTO_BUILT_SRCS
+                            ACLK_PROTO_BUILT_HDRS
+                            ${ACLK_PROTO_DEFS})
 
         list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                                ${ACLK_PROTO_BUILT_HDRS})
@@ -1369,28 +1390,44 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
 endif()
 
 #
-# build netdata (only Linux ATM)
-#
-
-#
 # exporters
 #
 
 if(ENABLE_EXPORTING_MONGODB)
-    pkg_check_modules(MONGOC REQUIRED libmongoc-1.0)
+        pkg_check_modules(MONGOC REQUIRED libmongoc-1.0)
 endif()
+
+if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
+        pkg_check_modules(SNAPPY REQUIRED snappy)
+
+        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
+                            "${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
+                            PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
+                            PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
+                            "exporting/prometheus/remote_write/remote_write.proto")
+
+        list(APPEND PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
+                    ${PROMETHEUS_REMOTE_WRITE_BUILT_SRCS}
+                    ${PROMETHEUS_REMOTE_WRITE_BUILT_HDRS})
+endif()
+
+#
+# build netdata (only Linux ATM)
+#
 
 add_executable(netdata
         ${NETDATA_FILES}
         "$<$<BOOL:${ENABLE_ACLK}>:${ACLK_FILES}>"
         "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
 )
 
 target_compile_definitions(netdata PRIVATE
         "$<$<BOOL:${ENABLE_ACLK}>:${PROTOBUF_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
         "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_CFLAGS_OTHER}>"
 )
 
 target_include_directories(netdata PRIVATE
@@ -1400,6 +1437,7 @@ target_include_directories(netdata PRIVATE
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include>"
         "$<$<BOOL:${ENABLE_ML}>:${CMAKE_SOURCE_DIR}/ml/dlib>"
         "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )
 
 target_link_libraries(netdata PRIVATE
@@ -1409,6 +1447,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_ACLK}>:mqttwebsockets>"
         "$<$<BOOL:${ENABLE_ACLK}>:${PROTOBUF_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_LIBRARIES}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
 )
 
