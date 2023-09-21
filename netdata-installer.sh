@@ -1136,7 +1136,7 @@ check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
 
 if [ -n "${NETDATA_PREPARE_ONLY}" ]; then
     progress "Exiting before building Netdata as requested."
-    printf "Would have used the following CMake command line for configuration: %s" "${cmake} ${NETDATA_CMAKE_OPTIONS}"
+    printf "Would have used the following CMake command line for configuration: %s\n" "${cmake} ${NETDATA_CMAKE_OPTIONS}"
     trap - EXIT
     exit 0
 fi
