@@ -676,7 +676,7 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out, int maps_per_core)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_read_fd_apps_table(int maps_per_core, int update_every)
+static void ebpf_read_fd_apps_table(int maps_per_core, uint64_t update_every)
 {
     netdata_thread_disable_cancelability();
     netdata_fd_stat_t *fv = fd_vector;
@@ -830,29 +830,38 @@ static void ebpf_update_fd_cgroup()
  */
 static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *root)
 {
-    uint32_t open_call = 0;
-    uint32_t close_call = 0;
-    uint32_t open_err = 0;
-    uint32_t close_err = 0;
+    if (!root)
+        return;
 
+
+    memset(fd, 0, sizeof(netdata_fd_stat_t));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
     while (root) {
         int32_t pid = root->pid;
-        netdata_fd_stat_t *w = NULL;
-        if (w) {
-            open_call += w->open_call;
-            close_call += w->close_call;
-            open_err += w->open_err;
-            close_err += w->close_err;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+        if (pid_ptr) {
+            rw_spinlock_read_lock(&pid_ptr->fd_stats.rw_spinlock);
+            if (pid_ptr->fd_stats.JudyLArray) {
+                Word_t local_timestamp = 0;
+                bool first_cache = true;
+                Pvoid_t *cache_value;
+                while (
+                    (cache_value =
+                         JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_timestamp, &first_cache))) {
+                    netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*cache_value;
+                    fd->open_call += values->data.open_call;
+                    fd->close_call += values->data.close_call;
+                    fd->open_err += values->data.open_err;
+                    fd->close_err += values->data.close_err;
+                }
+            }
+            rw_spinlock_read_unlock(&pid_ptr->fd_stats.rw_spinlock);
         }
 
         root = root->next;
     }
-
-    // These conditions were added, because we are using incremental algorithm
-    fd->open_call = (open_call >= fd->open_call) ? open_call : fd->open_call;
-    fd->close_call = (close_call >= fd->close_call) ? close_call : fd->close_call;
-    fd->open_err = (open_err >= fd->open_err) ? open_err : fd->open_err;
-    fd->close_err = (close_err >= fd->close_err) ? close_err : fd->close_err;
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 }
 
 /**
