@@ -242,7 +242,7 @@ void ebpf_fd_aral_init()
  *
  * @return it returns the address on success.
  */
-netdata_fd_stat_t *ebpf_fd_stat_get(void)
+netdata_fd_stat_plus_t *ebpf_fd_stat_get(void)
 {
     netdata_fd_stat_plus_t *target = aral_mallocz(ebpf_aral_fd_pid);
     memset(target, 0, sizeof(netdata_fd_stat_plus_t));

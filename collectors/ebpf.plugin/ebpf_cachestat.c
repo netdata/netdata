@@ -749,7 +749,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    time_t update_time = time(NULL);
+    uint64_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
             goto end_cachestat_loop;
