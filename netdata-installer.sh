@@ -1157,8 +1157,10 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
+BUILD_OPTS="VERBOSE=1"
+[ -n "${ninja}" ] && BUILD_OPTS="-v"
 # shellcheck disable=SC2086
-if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" --verbose --parallel ${JOBS}; then
+if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" --parallel ${JOBS} -- ${BUILD_OPTS}; then
   fatal "Failed to build Netdata." I000B
 fi
 
