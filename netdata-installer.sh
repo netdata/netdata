@@ -387,6 +387,11 @@ while [ -n "${1}" ]; do
       NETDATA_PREFIX="${2}"
       shift 1
       ;;
+    "--prepare-only")
+      NETDATA_DISABLE_TELEMETRY=1
+      NETDATA_PREPARE_ONLY=1
+      DONOTWAIT=1
+      ;;
     "--help" | "-h")
       usage
       exit 1
@@ -453,7 +458,7 @@ elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
   MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
 fi
 
-if [ "$(id -u)" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ] && [ -z "${NETDATA_PREPARE_ONLY}" ]; then
   if [ -z "${NETDATA_PREFIX}" ]; then
     netdata_banner
     banner_nonroot_install "${@}"
@@ -1069,6 +1074,8 @@ NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
+NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${ninja:+-G Ninja} -DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} "
+
 # Feature autodetection code starts here
 
 if [ "${USE_SYSTEM_PROTOBUF}" -eq 1 ]; then
@@ -1127,15 +1134,15 @@ check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
 
 # End of feature autodetection code
 
+if [ -n "${NETDATA_PREPARE_ONLY}" ]; then
+    progress "Exiting before building Netdata as requested."
+    printf "Would have used the following CMake command line for configuration: %s" "${cmake} ${NETDATA_CMAKE_OPTIONS}"
+    trap - EXIT
+    exit 0
+fi
+
 # shellcheck disable=SC2086
-if ! run ${cmake} \
-         -S ./ \
-         -B "${NETDATA_BUILD_DIR}" \
-         ${ninja:+-G Ninja} \
-         -DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}" \
-         ${NETDATA_USER:+-DNETDATA_USER="${NETDATA_USER}"} \
-         ${NETDATA_CMAKE_OPTIONS} \
-         ; then
+if ! run ${cmake} ${NETDATA_CMAKE_OPTIONS}; then
   fatal "Failed to configure Netdata sources." I000A
 fi
 
