@@ -166,8 +166,12 @@ check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
 #
 
 include(CheckLibraryExists)
+
 check_library_exists(systemd sd_journal_open "" HAVE_SYSTEMD_LIB)
 check_include_file("systemd/sd-journal.h" HAVE_SYSTEMD_SD_JOURNAL_H)
+
+check_library_exists(snappy snappy_compress "" HAVE_SNAPPY_LIB)
+check_include_file("snappy.h" HAVE_SNAPPY_H)
 
 #
 # check symbols
@@ -1398,7 +1402,16 @@ if(ENABLE_EXPORTER_MONGODB)
 endif()
 
 if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
-        pkg_check_modules(SNAPPY REQUIRED snappy)
+        pkg_check_modules(SNAPPY snappy)
+        if (NOT SNAPPY_FOUND)
+                if(HAVE_SNAPPY_LIB AND HAVE_SNAPPY_H)
+                        set(SNAPPY_INCLUDE_DIRS "")
+                        set(SNAPPY_CFLAGS_OTHER "")
+                        set(SNAPPY_LIBRARIES "-lsnappy")
+                else()
+                        message(FATAL_ERROR "Could not find snappy libraries with pkg-config or internal cmake checks.")
+                endif()
+        endif()
 
         protoc_generate_cpp("${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
                             "${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
