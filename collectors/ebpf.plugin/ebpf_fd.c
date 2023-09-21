@@ -911,24 +911,18 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
  */
 static void ebpf_fd_sum_cgroup_pids(netdata_fd_stat_t *fd, struct pid_on_target2 *pids)
 {
-    netdata_fd_stat_t accumulator;
-    memset(&accumulator, 0, sizeof(accumulator));
+    memset(fd, 0, sizeof(netdata_fd_stat_t));
 
     while (pids) {
         netdata_fd_stat_t *w = &pids->fd;
 
-        accumulator.open_err += w->open_err;
-        accumulator.open_call += w->open_call;
-        accumulator.close_call += w->close_call;
-        accumulator.close_err += w->close_err;
+        fd->open_err += w->open_err;
+        fd->open_call += w->open_call;
+        fd->close_call += w->close_call;
+        fd->close_err += w->close_err;
 
         pids = pids->next;
     }
-
-    fd->open_call = (accumulator.open_call >= fd->open_call) ? accumulator.open_call : fd->open_call;
-    fd->open_err = (accumulator.open_err >= fd->open_err) ? accumulator.open_err : fd->open_err;
-    fd->close_call = (accumulator.close_call >= fd->close_call) ? accumulator.close_call : fd->close_call;
-    fd->close_err = (accumulator.close_err >= fd->close_err) ? accumulator.close_err : fd->close_err;
 }
 
 /**
