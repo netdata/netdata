@@ -1151,7 +1151,7 @@ trap - EXIT
 progress "Compile netdata"
 
 # shellcheck disable=SC2086
-if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" --verbose --jobs=${JOBS}; then
+if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" --verbose --parallel ${JOBS}; then
   fatal "Failed to build Netdata." I000B
 fi
 
