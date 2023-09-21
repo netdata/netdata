@@ -203,7 +203,11 @@ BuildRequires: pkgconfig(libsystemd)
 # end - systemd-journal dependencies
 
 # Prometheus remote write dependencies
+%if 0%{?suse_version}
+BuildRequires: snappy-devel
+%else
 BuildRequires: pkgconfig(snappy)
+%endif
 # end - prometheus remote write dependencies
 
 # #####################################################################
