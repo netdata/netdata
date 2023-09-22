@@ -719,11 +719,11 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint64_t update_every)
             fd_ptr->current_timestamp = update_time;
             memcpy(&fd_ptr->data, &fv[0], sizeof(netdata_fd_stat_t));
         }  else {
-            if (fv[0].open_call != fd_ptr->data.open_call && fv[0].close_call != fd_ptr->data.close_call) {
+            if (fv[0].open_call != fd_ptr->data.open_call || fv[0].close_call != fd_ptr->data.close_call) {
                 fd_ptr->current_timestamp = update_time;
                 memcpy(&fd_ptr->data, &fv[0], sizeof(netdata_fd_stat_t));
             } else if ((update_time - fd_ptr->current_timestamp) > (uint64_t )update_every) {
-                JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, fv[0].ct, PJE0);
+                JudyLDel(&pid_ptr->fd_stats.JudyLArray, fv[0].ct, PJE0);
                 ebpf_fd_release(fd_ptr);
                 bpf_map_delete_elem(fd, &key);
             }
@@ -743,7 +743,7 @@ end_fd_loop:
 /**
  * File descriptor thread
  *
- * Thread used to generate cachestat charts.
+ * Thread used to generate fd charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *
