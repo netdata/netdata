@@ -158,6 +158,12 @@ typedef struct ebpf_process_stat {
     uint8_t removeme;
 } ebpf_process_stat_t;
 
+typedef struct ebpf_process_stat_plus {
+    uint64_t current_timestamp;
+
+    ebpf_process_stat_t data;
+} ebpf_process_stat_plus_t;
+
 /**
  * Internal function used to write debug messages.
  *
