@@ -1255,7 +1255,7 @@ static void change_syscalls()
  * Set local variables
  *
  */
-static void set_local_pointers()
+static void ebpf_process_set_local_pointers()
 {
     if (isrh >= NETDATA_MINIMUM_RH_VERSION && isrh < NETDATA_RH_8)
         change_syscalls();
@@ -1329,12 +1329,11 @@ void *ebpf_process_thread(void *ptr)
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    pthread_mutex_lock(&lock);
     ebpf_process_allocate_global_vectors(NETDATA_KEY_PUBLISH_PROCESS_END);
 
     ebpf_update_pid_table(&process_maps[0], em);
 
-    set_local_pointers();
+    ebpf_process_set_local_pointers();
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
         pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -1349,6 +1348,7 @@ void *ebpf_process_thread(void *ptr)
         process_aggregated_data, process_publish_aggregated, process_dimension_names, process_id_names,
         algorithms, NETDATA_KEY_PUBLISH_PROCESS_END);
 
+    pthread_mutex_lock(&lock);
     ebpf_create_global_charts(em);
 
     ebpf_update_stats(&plugin_statistics, em);
