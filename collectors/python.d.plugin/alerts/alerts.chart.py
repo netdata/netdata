@@ -20,7 +20,7 @@ def charts_template():
 
     charts = {
         'counts': {
-            'options': [None, 'Alert Status', 'alerts', 'counts', 'alerts.counts', 'stacked'],
+            'options': [None, 'Alert Status', 'alerts', 'counts', 'alerts.counts', 'line'],
             'lines': [
                 ['clear'],
                 ['warning'],
@@ -98,7 +98,7 @@ class Service(UrlService):
                 self.collected_dims[chart].add(dim)
                 self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
 
-        for dim in list(self.collected_dims[chart]):
-            if dim not in data:
-                self.collected_dims[chart].remove(dim)
-                self.charts[chart].del_dimension(dim, hide=False)
+        #for dim in list(self.collected_dims[chart]):
+        #    if dim not in data:
+        #        self.collected_dims[chart].remove(dim)
+        #        self.charts[chart].del_dimension(dim, hide=False)
