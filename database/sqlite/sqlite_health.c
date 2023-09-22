@@ -97,8 +97,8 @@ failed:
 */
 #define SQL_INSERT_HEALTH_LOG                                                                                          \
     "INSERT INTO health_log (host_id, alarm_id, "                                                                      \
-    "config_hash_id, name, chart, family, exec, recipient, units, chart_context, last_transition_id, chart_name) "     \
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "                                                                                \
+    "config_hash_id, name, chart, exec, recipient, units, chart_context, last_transition_id, chart_name) "     \
+    "VALUES (?,?,?,?,?,?,?,?,?,?,?) "                                                                                \
     "ON CONFLICT (host_id, alarm_id) DO UPDATE SET last_transition_id = excluded.last_transition_id, "                 \
     "chart_name = excluded.chart_name RETURNING health_log_id; "
 
@@ -154,43 +154,37 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
         goto failed;
     }
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->family, 6);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind family parameter for SQL_INSERT_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->exec, 7);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->exec, 6);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind exec parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->recipient, 8);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->recipient, 7);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind recipient parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->units, 9);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->units, 8);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter to store node instance information");
         goto failed;
     }
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_context, 10);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_context, 9);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_context parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = sqlite3_bind_blob(res, 11, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
+    rc = sqlite3_bind_blob(res, 10, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind transition_id parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
     }
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_name, 12);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_name, 11);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind chart_name parameter for SQL_INSERT_HEALTH_LOG");
         goto failed;
@@ -745,7 +739,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
 */
 #define SQL_LOAD_HEALTH_LOG "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, " \
             "hld.updates_id, hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, " \
-            "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, hl.units, " \
+            "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.exec, hl.recipient, ah.source, hl.units, " \
             "hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, " \
             "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id, hl.chart_name, hld.summary " \
             "FROM health_log hl, alert_hash ah, health_log_detail hld " \
@@ -808,7 +802,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
             continue;
         }
 
-        //need name, chart and family
+        //need name and chart
         if (sqlite3_column_type(res, 12) == SQLITE_NULL) {
             error_report("HEALTH [%s]: Got null name field. Ignoring it.", rrdhost_hostname(host));
             errored++;
@@ -821,14 +815,8 @@ void sql_health_alarm_log_load(RRDHOST *host)
             continue;
         }
 
-        if (sqlite3_column_type(res, 14) == SQLITE_NULL) {
-            error_report("HEALTH [%s]: Got null family field. Ignoring it.", rrdhost_hostname(host));
-            errored++;
-            continue;
-        }
-
         // Check if we got last_repeat field
-        time_t last_repeat = (time_t)sqlite3_column_int64(res, 26);
+        time_t last_repeat = (time_t)sqlite3_column_int64(res, 25);
 
         rc = dictionary_get(all_rrdcalcs, (char *) sqlite3_column_text(res, 13));
         if(unlikely(rc)) {
@@ -865,37 +853,36 @@ void sql_health_alarm_log_load(RRDHOST *host)
 
         ae->name   = string_strdupz((char *) sqlite3_column_text(res, 12));
         ae->chart  = string_strdupz((char *) sqlite3_column_text(res, 13));
-        ae->family = string_strdupz((char *) sqlite3_column_text(res, 14));
 
-        ae->exec = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 15);
-        ae->recipient = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 16);
-        ae->source = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 17);
-        ae->units = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 18);
-        ae->info = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 19);
+        ae->exec = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 14);
+        ae->recipient = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 15);
+        ae->source = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 16);
+        ae->units = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 17);
+        ae->info = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 18);
 
-        ae->exec_code   = (int) sqlite3_column_int(res, 20);
-        ae->new_status  = (RRDCALC_STATUS) sqlite3_column_int(res, 21);
-        ae->old_status  = (RRDCALC_STATUS)sqlite3_column_int(res, 22);
-        ae->delay       = (int) sqlite3_column_int(res, 23);
+        ae->exec_code   = (int) sqlite3_column_int(res, 19);
+        ae->new_status  = (RRDCALC_STATUS) sqlite3_column_int(res, 20);
+        ae->old_status  = (RRDCALC_STATUS)sqlite3_column_int(res, 21);
+        ae->delay       = (int) sqlite3_column_int(res, 22);
 
-        ae->new_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 24);
-        ae->old_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 25);
+        ae->new_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 23);
+        ae->old_value   = (NETDATA_DOUBLE) sqlite3_column_double(res, 24);
 
         ae->last_repeat = last_repeat;
 
-        ae->classification = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 27);
-        ae->component = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 28);
-        ae->type = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 29);
-        ae->chart_context = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 30);
+        ae->classification = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 26);
+        ae->component = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 27);
+        ae->type = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 28);
+        ae->chart_context = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 29);
+
+        if (sqlite3_column_type(res, 30) != SQLITE_NULL)
+            uuid_copy(ae->transition_id, *((uuid_t *)sqlite3_column_blob(res, 30)));
 
         if (sqlite3_column_type(res, 31) != SQLITE_NULL)
-            uuid_copy(ae->transition_id, *((uuid_t *)sqlite3_column_blob(res, 31)));
+            ae->global_id = sqlite3_column_int64(res, 31);
 
-        if (sqlite3_column_type(res, 32) != SQLITE_NULL)
-            ae->global_id = sqlite3_column_int64(res, 32);
-
-        ae->chart_name = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 33);
-        ae->summary = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 34);
+        ae->chart_name = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 32);
+        ae->summary = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 33);
 
         char value_string[100 + 1];
         string_freez(ae->old_value_string);
@@ -943,11 +930,11 @@ void sql_health_alarm_log_load(RRDHOST *host)
  * Store an alert config hash in the database
  */
 #define SQL_STORE_ALERT_CONFIG_HASH "insert or replace into alert_hash (hash_id, date_updated, alarm, template, " \
-    "on_key, class, component, type, os, hosts, lookup, every, units, calc, families, plugin, module, " \
+    "on_key, class, component, type, os, hosts, lookup, every, units, calc, plugin, module, " \
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
     "p_db_lookup_before, p_update_every, source, chart_labels, summary) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
-    "?13,NULL,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37);"
+    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36);"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {

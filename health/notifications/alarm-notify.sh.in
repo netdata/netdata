@@ -239,7 +239,7 @@ else
   when="${6}"                # the timestamp this event occurred
   name="${7}"                # the name of the alarm, as given in netdata health.d entries
   chart="${8}"               # the name of the chart (type.id)
-  family="${9}"              # the family of the chart
+  # family="${9}"              # the family of the chart
   status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
   old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
   value="${12}"              # the current value of the alarm

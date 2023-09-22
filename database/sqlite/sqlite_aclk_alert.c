@@ -806,7 +806,6 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     alarm_log->chart = strdupz(ae_chart_id(ae));
     alarm_log->name = strdupz(ae_name(ae));
-    alarm_log->family = strdupz(ae_family(ae));
 
     alarm_log->batch_id = 0;
     alarm_log->sequence_id = 0;

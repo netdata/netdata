@@ -61,7 +61,6 @@ static bool prepare_command(BUFFER *wb,
                             uint32_t when,
                             const char *alert_name,
                             const char *alert_chart_name,
-                            const char *alert_family,
                             const char *new_status,
                             const char *old_status,
                             NETDATA_DOUBLE new_value,
@@ -115,10 +114,6 @@ static bool prepare_command(BUFFER *wb,
     buffer_sprintf(wb, " '%s'", buf);
 
     if (!sanitize_command_argument_string(buf, alert_chart_name, n))
-        return false;
-    buffer_sprintf(wb, " '%s'", buf);
-
-    if (!sanitize_command_argument_string(buf, alert_family, n))
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
@@ -565,7 +560,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               (unsigned long)ae->when,
                               ae_name(ae),
                               ae->chart?ae_chart_id(ae):"NOCHART",
-                              ae->family?ae_family(ae):"NOFAMILY",
                               rrdcalc_status2string(ae->new_status),
                               rrdcalc_status2string(ae->old_status),
                               ae->new_value,
@@ -1149,7 +1143,6 @@ void *health_main(void *ptr) {
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
                                                                     rc->type,
@@ -1417,7 +1410,6 @@ void *health_main(void *ptr) {
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
                                                                     rc->type,
@@ -1505,7 +1497,6 @@ void *health_main(void *ptr) {
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
                                                                     rc->type,
