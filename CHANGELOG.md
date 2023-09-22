@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix package builds on Rocky Linux. [\#16026](https://github.com/netdata/netdata/pull/16026) ([Ferroin](https://github.com/Ferroin))
 - add systemd-journal.plugin to apps\_groups.conf [\#16024](https://github.com/netdata/netdata/pull/16024) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of CI skipping. [\#16022](https://github.com/netdata/netdata/pull/16022) ([Ferroin](https://github.com/Ferroin))
 - update bundled UI to v6.39.0 [\#16020](https://github.com/netdata/netdata/pull/16020) ([ilyam8](https://github.com/ilyam8))
 - fix crash on setting thread name [\#16016](https://github.com/netdata/netdata/pull/16016) ([ilyam8](https://github.com/ilyam8))
 - Systemd-Journal: fix crash when the uid or gid do not have names [\#16015](https://github.com/netdata/netdata/pull/16015) ([ktsaou](https://github.com/ktsaou))
+- remove the line length limit from pluginsd [\#16013](https://github.com/netdata/netdata/pull/16013) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16011](https://github.com/netdata/netdata/pull/16011) ([netdatabot](https://github.com/netdatabot))
 - some collector metadata improvements [\#16008](https://github.com/netdata/netdata/pull/16008) ([andrewm4894](https://github.com/andrewm4894))
 - Fix compilation warnings [\#16006](https://github.com/netdata/netdata/pull/16006) ([stelfrag](https://github.com/stelfrag))
 - Update CMakeLists.txt [\#16005](https://github.com/netdata/netdata/pull/16005) ([stelfrag](https://github.com/stelfrag))
@@ -429,8 +432,6 @@
 - Add catch-all category entry in categories.yaml [\#15434](https://github.com/netdata/netdata/pull/15434) ([Ancairon](https://github.com/Ancairon))
 - Update CODEOWNERS [\#15433](https://github.com/netdata/netdata/pull/15433) ([andrewm4894](https://github.com/andrewm4894))
 - Remove duplicate category from categories.yaml [\#15432](https://github.com/netdata/netdata/pull/15432) ([Ancairon](https://github.com/Ancairon))
-- readme: add link for netdata cloud and sign-in cta [\#15431](https://github.com/netdata/netdata/pull/15431) ([andrewm4894](https://github.com/andrewm4894))
-- add chart id and name to alert instances and transitions [\#15430](https://github.com/netdata/netdata/pull/15430) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 

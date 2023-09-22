@@ -357,7 +357,7 @@ struct buffered_reader {
     char read_buffer[PLUGINSD_LINE_MAX + 1];
 };
 
-char *buffered_reader_next_line(struct buffered_reader *reader, char *dst, size_t dst_size);
+bool buffered_reader_next_line(struct buffered_reader *reader, BUFFER *dst);
 static inline void buffered_reader_init(struct buffered_reader *reader) {
     reader->read_buffer[0] = '\0';
     reader->read_len = 0;

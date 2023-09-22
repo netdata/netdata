@@ -2352,15 +2352,22 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
     buffered_reader_init(&parser->reader);
-    char buffer[PLUGINSD_LINE_MAX + 2];
+    BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
     while(likely(service_running(SERVICE_COLLECTORS))) {
-        if (unlikely(!buffered_reader_next_line(&parser->reader, buffer, PLUGINSD_LINE_MAX + 2))) {
+        if (unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
             if(unlikely(!buffered_reader_read_timeout(&parser->reader, fileno((FILE *)parser->fp_input), 2 * 60 * MSEC_PER_SEC)))
                 break;
+
+            continue;
         }
-        else if(unlikely(parser_action(parser,  buffer)))
+
+        if(unlikely(parser_action(parser,  buffer->buffer)))
             break;
+
+        buffer->len = 0;
+        buffer->buffer[0] = '\0';
     }
+    buffer_free(buffer);
 
     cd->unsafe.enabled = parser->user.enabled;
     count = parser->user.data_collections_count;
