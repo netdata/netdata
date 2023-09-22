@@ -4137,7 +4137,7 @@ int main(int argc, char **argv)
         if (++update_apps_list == update_apps_every) {
             update_apps_list = 0;
             cleanup_exited_pids();
-            collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
+            ebpf_collect_data_for_all_processes();
 
             pthread_mutex_lock(&lock);
             ebpf_create_apps_charts(apps_groups_root_target);

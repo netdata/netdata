@@ -292,6 +292,28 @@ static void ebpf_read_process_hash_global_tables(netdata_idx_t *stats, int maps_
 }
 
 /**
+ * Process Accumulator
+ *
+ * Sum all values read from kernel and store in the first address.
+ *
+ * @param out the vector with read values.
+ * @param maps_per_core do I need to read all cores?
+ */
+void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
+{
+    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
+    ebpf_process_stat_t *total = &out[0];
+    for (i = 1; i < end; i++) {
+        ebpf_process_stat_t *w = &out[i];
+        total->exit_call += w->exit_call;
+        total->task_err += w->task_err;
+        total->create_thread += w->create_thread;
+        total->create_process += w->create_process;
+        total->release_call += w->release_call;
+    }
+}
+
+/**
  * Update cgroup
  *
  * Update cgroup data based in PID running.
@@ -332,6 +354,43 @@ static void ebpf_update_process_cgroup(int maps_per_core)
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
 
+
+/**
+ * Read APPS table
+ *
+ * Read the apps table and store data inside the structure.
+ *
+ * @param maps_per_core do I need to read all cores?
+ */
+static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_every)
+{
+    netdata_thread_disable_cancelability();
+    ebpf_process_stat_t *psv = process_stat_vector;
+    uint32_t key = 0, next_key = 0;
+    int fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
+    size_t length = sizeof(ebpf_process_stat_t);
+    if (maps_per_core)
+        length *= ebpf_nprocs;
+
+    uint64_t update_time = time(NULL);
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (bpf_map_lookup_elem(fd, &key, psv)) {
+            goto end_process_loop;
+        }
+
+        if (key > (uint32_t)pid_max) {
+            goto end_process_loop;
+        }
+
+        ebpf_process_apps_accumulator(psv, maps_per_core);
+
+        end_process_loop:
+        memset(psv, 0, length);
+    }
+
+    netdata_thread_enable_cancelability();
+}
+
 /**
  * Process thread
  *
@@ -350,7 +409,7 @@ void *ebpf_read_process_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-   //  ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
+    ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
 
     int counter = update_every - 1;
 
@@ -362,7 +421,7 @@ void *ebpf_read_process_thread(void *ptr)
         if (ebpf_exit_plugin || ++counter != update_every)
             continue;
 
-        // ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
+        ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
 
         counter = 0;
     }

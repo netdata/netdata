@@ -1315,38 +1315,14 @@ static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pi
     w->root_pid = pid_on_target;
 }
 
-/**
- * Process Accumulator
- *
- * Sum all values read from kernel and store in the first address.
- *
- * @param out the vector with read values.
- * @param maps_per_core do I need to read all cores?
- */
-void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
-{
-    int i, end = (maps_per_core) ? ebpf_nprocs : 1;
-    ebpf_process_stat_t *total = &out[0];
-    for (i = 1; i < end; i++) {
-        ebpf_process_stat_t *w = &out[i];
-        total->exit_call += w->exit_call;
-        total->task_err += w->task_err;
-        total->create_thread += w->create_thread;
-        total->create_process += w->create_process;
-        total->release_call += w->release_call;
-    }
-}
 
 /**
  * Collect data for all process
  *
  * Read data from hash table and store it in appropriate vectors.
  * It also creates the link between targets and PIDs.
- *
- * @param tbl_pid_stats_fd      The mapped file descriptor for the hash table.
- * @param maps_per_core         do I have hash maps per core?
  */
-void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
+void ebpf_collect_data_for_all_processes()
 {
     if (unlikely(!ebpf_all_pids))
         return;
@@ -1368,45 +1344,6 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
     }
 
     read_proc_filesystem();
-
-    uint32_t key;
-    pids = ebpf_root_of_pids; // global list of all processes running
-    // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-
-    if (tbl_pid_stats_fd != -1) {
-        size_t length =  sizeof(ebpf_process_stat_t);
-        if (maps_per_core)
-            length *= ebpf_nprocs;
-
-        while (pids) {
-            key = pids->pid;
-
-            ebpf_process_stat_t *w = global_process_stats[key];
-            if (!w) {
-                w = ebpf_process_stat_get();
-                global_process_stats[key] = w;
-            }
-
-            if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
-                // Clean Process structures
-                ebpf_process_stat_release(w);
-                global_process_stats[key] = NULL;
-
-                cleanup_variables_from_other_threads(key);
-
-                pids = pids->next;
-                continue;
-            }
-
-            ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
-
-            memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
-
-            memset(process_stat_vector, 0, length);
-
-            pids = pids->next;
-        }
-    }
 
     link_all_processes_to_their_parents();
 
