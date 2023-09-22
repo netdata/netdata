@@ -21,20 +21,26 @@
 #define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
 
 #define SQL_STORE_HOST_INFO                                                                                            \
-    "INSERT OR REPLACE INTO host "                                                                                     \
-    "(host_id, hostname, registry_hostname, update_every, os, timezone, tags, hops, memory_mode, "                     \
-    "abbrev_timezone, utc_offset, program_name, program_version,"                                                      \
-    "entries, health_enabled, last_connected) "                                                                        \
-    "VALUES (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, @memory_mode, "     \
-    "@abbrev_timezone, @utc_offset, @program_name, @program_version, "                                                 \
-    "@entries, @health_enabled, @last_connected);"
+    "INSERT OR REPLACE INTO host (host_id, hostname, registry_hostname, update_every, os, timezone, tags, "            \
+    "hops, memory_mode, "                     \
+    "abbrev_timezone, utc_offset, program_name, program_version, entries, health_enabled, last_connected) "         \
+    "VALUES (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, "                          \
+    "@hops, @memory_mode, @abbrev_timezone, @utc_offset, @program_name, @program_version, @entries, @health_enabled, @last_connected);"
 
-#define SQL_STORE_CHART "insert or replace into chart (chart_id, host_id, type, id, " \
-    "name, family, context, title, unit, plugin, module, priority, update_every , chart_type , memory_mode , " \
-    "history_entries) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16);"
+#define SQL_STORE_CHART                                                                                                \
+    "INSERT INTO chart (chart_id, host_id, type, id, name, family, context, title, unit, plugin, module, priority, "   \
+    "update_every , chart_type , memory_mode , history_entries) "                                                      \
+    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16) "                                                 \
+    "ON CONFLICT(chart_id) DO UPDATE SET type=excluded.type, id=excluded.id, name=excluded.name, "                     \
+    "family=excluded.family, context=excluded.context, title=excluded.title, unit=excluded.unit, "                     \
+    "plugin=excluded.plugin, module=excluded.module, priority=excluded.priority, update_every=excluded.update_every, " \
+    "chart_type=excluded.chart_type, memory_mode = excluded.memory_mode, history_entries = excluded.history_entries"
 
-#define SQL_STORE_DIMENSION "INSERT OR REPLACE INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm, options) " \
-        "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm, @options);"
+#define SQL_STORE_DIMENSION                                                                                            \
+    "INSERT INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm, options) "                    \
+    "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm, @options) "                            \
+    "ON CONFLICT(dim_id) DO UPDATE SET id=excluded.id, name=excluded.name, multiplier=excluded.multiplier, "           \
+    "divisor=excluded.divisor, algorithm=excluded.divisor, options=excluded.options"
 
 #define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
 #define SELECT_CHART_LIST "SELECT chart_id, rowid FROM chart WHERE rowid > @row_id"
