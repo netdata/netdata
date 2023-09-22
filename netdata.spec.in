@@ -286,6 +286,9 @@ autoreconf -ivf
 	--with-bundled-protobuf \
 	%endif
 	%endif
+	%if 0%{?oraclelinux}
+	--disable-exporting-mongodb \
+	%endif
 	--prefix="%{_prefix}" \
 	--sysconfdir="%{_sysconfdir}" \
 	--localstatedir="%{_localstatedir}" \
