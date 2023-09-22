@@ -69,6 +69,17 @@ struct config process_config = { .first_section = NULL,
 int process_disable_priority;
 #endif
 
+struct netdata_static_thread ebpf_read_process = {
+    .name = "EBPF_READ_PROCESS",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -320,6 +331,45 @@ static void ebpf_update_process_cgroup(int maps_per_core)
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
+
+/**
+ * Process thread
+ *
+ * Thread used to read process data.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_process_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+   //  ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
+
+    int counter = update_every - 1;
+
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    usec_t period = update_every * USEC_PER_SEC;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        // ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
+
+        counter = 0;
+    }
+
+    return NULL;
+}
+
 
 /*****************************************************************
  *
@@ -771,6 +821,9 @@ static void ebpf_process_disable_tracepoints()
 static void ebpf_process_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    if (ebpf_read_process.thread)
+        netdata_thread_cancel(*ebpf_read_process.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1360,6 +1413,13 @@ void *ebpf_process_thread(void *ptr)
 #endif
 
     pthread_mutex_unlock(&lock);
+
+    ebpf_read_process.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_process.thread,
+                          ebpf_read_process.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_process_thread,
+                          em);
 
     process_collector(em);
 
