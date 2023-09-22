@@ -597,7 +597,16 @@ update_available() {
       latest_major="$(echo "${latest_tag}" | cut -f 1 -d '.' | tr -d 'v')"
 
       if [ "${current_major}" -ne "${latest_major}" ]; then
-        if echo "${NETDATA_ACCEPT_MAJOR_VERSIONS}" | grep -F -q -w "${current_major}" ; then
+        update_safe=0
+
+        for v in ${NETDATA_ACCEPT_MAJOR_VERSIONS}; do
+          if [ "${current_major}" -eq "${v}" ]; then
+            update_safe=1
+            break
+          fi
+        done
+
+        if [ "${update_safe}" -eq 0 ]; then
           warn_major_update
         fi
       fi
@@ -897,7 +906,16 @@ update_binpkg() {
   latest_major="$(get_new_binpkg_major)"
 
   if [ -n "${latest_major}" ] && [ "${latest_major}" -ne "${current_major}" ]; then
-    if echo "${NETDATA_ACCEPT_MAJOR_VERSIONS}" | grep -F -q -w "${current_major}" ; then
+    update_safe=0
+
+    for v in ${NETDATA_ACCEPT_MAJOR_VERSIONS}; do
+      if [ "${current_major}" -eq "${v}" ]; then
+        update_safe=1
+        break
+      fi
+    done
+
+    if [ "${update_safe}" -eq 0 ]; then
       warn_major_update
     fi
   fi
