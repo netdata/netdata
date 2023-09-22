@@ -38,8 +38,10 @@ AutoReqProv: yes
 %endif
 
 # openSUSE requires us to explicity ask for ninja for builds.
+# We also need to specify the build directory since they do not.
 %if 0%{?suse_version}
 %global __builder ninja
+%global __cmake_builddir %{__builddir}
 %endif
 
 # Disable go.d.plugin build on outdated golang distros
