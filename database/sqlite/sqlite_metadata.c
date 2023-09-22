@@ -11,26 +11,26 @@
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
 
 #define STORE_HOST_LABEL                                                                                               \
-    "INSERT OR REPLACE INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
+    "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
 
 #define STORE_CHART_LABEL                                                                                              \
-    "INSERT OR REPLACE INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
+    "INSERT INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
 
 #define STORE_HOST_OR_CHART_LABEL_VALUE "(u2h('%s'), %d,'%s','%s', unixepoch())"
 
 #define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
 
-#define SQL_STORE_HOST_INFO                                                                                            \
-    "INSERT OR REPLACE INTO host (host_id, hostname, registry_hostname, update_every, os, timezone, tags, "            \
-    "hops, memory_mode, "                     \
-    "abbrev_timezone, utc_offset, program_name, program_version, entries, health_enabled, last_connected) "         \
-    "VALUES (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, "                          \
-    "@hops, @memory_mode, @abbrev_timezone, @utc_offset, @program_name, @program_version, @entries, @health_enabled, @last_connected);"
+#define SQL_STORE_HOST_INFO                                                                                              \
+    "INSERT OR REPLACE INTO host (host_id, hostname, registry_hostname, update_every, os, timezone, tags, hops, "        \
+    "memory_mode, abbrev_timezone, utc_offset, program_name, program_version, entries, health_enabled, last_connected) " \
+    "VALUES (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, "                     \
+    "@memory_mode, @abbrev_tz, @utc_offset, @prog_name, @prog_version, @entries, @health_enabled, @last_connected);"
 
 #define SQL_STORE_CHART                                                                                                \
     "INSERT INTO chart (chart_id, host_id, type, id, name, family, context, title, unit, plugin, module, priority, "   \
-    "update_every , chart_type , memory_mode , history_entries) "                                                      \
-    "values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16) "                                                 \
+    "update_every, chart_type, memory_mode, history_entries) "                                                         \
+    "values (@chart_id, @host_id, @type, @id, @name, @family, @context, @title, @unit, @plugin, @module, @priority, "  \
+    "@update_every, @chart_type, @memory_mode, @history_entries) "                                                     \
     "ON CONFLICT(chart_id) DO UPDATE SET type=excluded.type, id=excluded.id, name=excluded.name, "                     \
     "family=excluded.family, context=excluded.context, title=excluded.title, unit=excluded.unit, "                     \
     "plugin=excluded.plugin, module=excluded.module, priority=excluded.priority, update_every=excluded.update_every, " \
@@ -46,8 +46,9 @@
 #define SELECT_CHART_LIST "SELECT chart_id, rowid FROM chart WHERE rowid > @row_id"
 #define SELECT_CHART_LABEL_LIST "SELECT chart_id, rowid FROM chart_label WHERE rowid > @row_id"
 
-#define SQL_STORE_HOST_SYSTEM_INFO_VALUES "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES " \
-    "(@uuid, @name, @value, unixepoch())"
+#define SQL_STORE_HOST_SYSTEM_INFO_VALUES                                                                              \
+    "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES "                       \
+    "(@uuid, @name, @value, UNIXEPOCH())"
 
 #define MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID                                                                          \
     "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0);"
@@ -196,6 +197,7 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
     struct query_build tmp = {.sql = work_buffer, .count = 0};
     uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
     rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
+    buffer_strcat(work_buffer, " ON CONFLICT (chart_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
     int rc = db_execute(db_meta, buffer_tostring(work_buffer));
     if (likely(!rc)) {
         st->rrdlabels_last_saved_version = new_version;
@@ -1493,6 +1495,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                 struct query_build tmp = {.sql = work_buffer, .count = 0};
                 uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
                 rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
+                buffer_strcat(work_buffer, " ON CONFLICT (host_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
                 rc = db_execute(db_meta, buffer_tostring(work_buffer));
 
                 if (unlikely(rc)) {
