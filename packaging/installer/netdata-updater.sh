@@ -36,11 +36,12 @@ PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packag
 
 NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/releases}"
 NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
+NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS="1 2"
 
 # Following variables are intended to be overridden by the updater config file.
 NETDATA_UPDATER_JITTER=3600
 NETDATA_NO_SYSTEMD_JOURNAL=0
-NETDATA_MAJOR_VERSION_UPDATES=0
+NETDATA_ACCEPT_MAJOR_VERSIONS=''
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
@@ -188,18 +189,12 @@ confirm() {
 }
 
 warn_major_update() {
-  if ! is_integer "${NETDATA_MAJOR_VERSION_UPDATES}"; then
-    NETDATA_MAJOR_VERSION_UPDATES=1
-  fi
-
   nmv_suffix="New major versions generally involve breaking changes, and may not work in the same way as older versions."
 
-  if [ "${INTERACTIVE}" -eq 0 ] && [ "${NETDATA_MAJOR_VERSION_UPDATES}" -eq 0 ]; then
+  if [ "${INTERACTIVE}" -eq 0 ]; then
     warning "Would update to a new major version of Netdata. ${nmv_suffix}"
-    warning "To install the new major version anyway, either run the updater interactively, or set NETDATA_MAJOR_VERSION_UPDATES to a non-zero value in ${UPDATER_CONFIG_PATH}."
+    warning "To install the new major version anyway, either run the updater interactively, or include the new major version number in the NETDATA_ACCEPT_MAJOR_VERSIONS variable in ${UPDATER_CONFIG_PATH}."
     fatal "Aborting update to new major version to avoid breaking things." U001B
-  elif [ "${NETDATA_MAJOR_VERSION_UPDATES}" -ne 0 ]; then
-    warning "Updating to a new major version of Netdata at user request. This may break some functionality."
   else
     warning "This update will install a new major version of Netdata. ${nmv_suffix}"
     if confirm "Are you sure you want to update to a new major version of Netdata?"; then
@@ -602,7 +597,9 @@ update_available() {
       latest_major="$(echo "${latest_tag}" | cut -f 1 -d '.' | tr -d 'v')"
 
       if [ "${current_major}" -ne "${latest_major}" ]; then
-        warn_major_update
+        if echo "${NETDATA_ACCEPT_MAJOR_VERSIONS}" | grep -F -q -w "${current_major}" ; then
+          warn_major_update
+        fi
       fi
     fi
 
@@ -900,7 +897,9 @@ update_binpkg() {
   latest_major="$(get_new_binpkg_major)"
 
   if [ -n "${latest_major}" ] && [ "${latest_major}" -ne "${current_major}" ]; then
-    warn_major_version_update
+    if echo "${NETDATA_ACCEPT_MAJOR_VERSIONS}" | grep -F -q -w "${current_major}" ; then
+      warn_major_update
+    fi
   fi
 
   # shellcheck disable=SC2086
@@ -986,6 +985,8 @@ if [ -r "${UPDATER_CONFIG_PATH}" ]; then
   # shellcheck source=/dev/null
   . "${UPDATER_CONFIG_PATH}"
 fi
+
+[ -z "${NETDATA_ACCEPT_MAJOR_VERSIONS}" ] && NETDATA_ACCEPT_MAJOR_VERSIONS="${NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS}"
 
 while [ -n "${1}" ]; do
   case "${1}" in
