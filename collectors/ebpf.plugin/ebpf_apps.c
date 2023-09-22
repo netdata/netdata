@@ -21,7 +21,7 @@ netdata_publish_dcstat_t **dcstat_pid = NULL;
 netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_shm_t **shm_pid = NULL;
-ebpf_process_stat_t **global_process_stats = NULL;
+ebpf_process_stat_plus_t **global_process_stats = NULL;
 
 /**
  * eBPF ARAL Init
@@ -38,7 +38,7 @@ void ebpf_aral_init(void)
 
     ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf_pid_stat", sizeof(struct ebpf_pid_stat));
 
-    ebpf_aral_process_stat = ebpf_allocate_pid_aral(NETDATA_EBPF_PROC_ARAL_NAME, sizeof(ebpf_process_stat_t));
+    ebpf_aral_process_stat = ebpf_allocate_pid_aral(NETDATA_EBPF_PROC_ARAL_NAME, sizeof(ebpf_process_stat_plus_t));
 
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
@@ -85,7 +85,7 @@ void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
 ebpf_process_stat_t *ebpf_process_stat_get(void)
 {
     ebpf_process_stat_t *target = aral_mallocz(ebpf_aral_process_stat);
-    memset(target, 0, sizeof(ebpf_process_stat_t));
+    memset(target, 0, sizeof(ebpf_process_stat_plus_t));
     return target;
 }
 
@@ -94,7 +94,7 @@ ebpf_process_stat_t *ebpf_process_stat_get(void)
  *
  * @param stat Release a target after usage.
  */
-void ebpf_process_stat_release(ebpf_process_stat_t *stat)
+void ebpf_process_stat_release(ebpf_process_stat_plus_t *stat)
 {
     aral_freez(ebpf_aral_process_stat, stat);
 }
@@ -1235,12 +1235,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-
-            // Clean process structure
-            if (global_process_stats) {
-                ebpf_process_stat_release(global_process_stats[r]);
-                global_process_stats[r] = NULL;
-            }
 
             cleanup_variables_from_other_threads(r);
 

@@ -170,7 +170,7 @@ long long ebpf_process_sum_values_for_pids(struct ebpf_pid_on_target *root, size
     long long ret = 0;
     while (root) {
         int32_t pid = root->pid;
-        ebpf_process_stat_t *w = global_process_stats[pid];
+        ebpf_process_stat_plus_t *w = global_process_stats[pid];
         if (w) {
             uint32_t *value = (uint32_t *)((char *)w + offset);
             ret += *value;
@@ -193,7 +193,7 @@ void ebpf_process_remove_pids()
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     while (pids) {
         uint32_t pid = pids->pid;
-        ebpf_process_stat_t *w = global_process_stats[pid];
+        ebpf_process_stat_plus_t *w = global_process_stats[pid];
         if (w) {
             ebpf_process_stat_release(w);
             global_process_stats[pid] = NULL;
@@ -335,9 +335,9 @@ static void ebpf_update_process_cgroup(int maps_per_core)
             int pid = pids->pid;
             ebpf_process_stat_t *out = &pids->ps;
             if (global_process_stats[pid]) {
-                ebpf_process_stat_t *in = global_process_stats[pid];
+                ebpf_process_stat_plus_t *in = global_process_stats[pid];
 
-                memcpy(out, in, sizeof(ebpf_process_stat_t));
+                memcpy(out, &in->data, sizeof(ebpf_process_stat_t));
             } else {
                 if (bpf_map_lookup_elem(pid_fd, &pid, process_stat_vector)) {
                     memset(out, 0, sizeof(ebpf_process_stat_t));
@@ -1354,7 +1354,7 @@ static void ebpf_process_allocate_global_vectors(size_t length)
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     process_stat_vector = callocz(ebpf_nprocs, sizeof(ebpf_process_stat_t));
 
-    global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
+    global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_plus_t *));
 }
 
 static void change_syscalls()

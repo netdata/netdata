@@ -206,7 +206,7 @@ int get_pid_comm(pid_t pid, size_t n, char *dest);
 
 void ebpf_collect_data_for_all_processes();
 
-extern ebpf_process_stat_t **global_process_stats;
+extern ebpf_process_stat_plus_t **global_process_stats;
 extern netdata_publish_dcstat_t **dcstat_pid;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
@@ -223,7 +223,7 @@ extern netdata_publish_shm_t **shm_pid;
 extern void ebpf_aral_init(void);
 
 extern ebpf_process_stat_t *ebpf_process_stat_get(void);
-extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
+extern void ebpf_process_stat_release(ebpf_process_stat_plus_t *stat);
 extern ebpf_process_stat_t *process_stat_vector;
 
 extern ARAL *ebpf_aral_cachestat_pid;
