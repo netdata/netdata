@@ -1601,6 +1601,83 @@ static void ebpf_function_fd_help(const char *transaction) {
 }
 
 /**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param pid         the process PID
+ * @param values      data read from hash table
+ * @param name        the process name
+ */
+static void ebpf_fill_fd_function_buffer(BUFFER *wb, uint32_t pid, netdata_fd_stat_plus_t *values, char *name)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)pid);
+
+    // NAME
+    buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // Open
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.open_call);
+
+    // Open Error
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.open_err);
+
+    // Close
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.close_call);
+
+    // Close Error
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.close_err);
+
+    buffer_json_array_close(wb);
+}
+
+/**
+ * Fill function buffer unsafe
+ *
+ * Fill the function buffer with socket information. Before to call this function it is necessary to lock
+ * ebpf_judy_pid.index.rw_spinlock
+ *
+ * @param buf    buffer used to store data to be shown by function.
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static void ebpf_fd_fill_function_buffer_unsafe(BUFFER *buf)
+{
+    int counter = 0;
+
+    Pvoid_t *pid_value, *fd_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        bool first_fd = true;
+        Word_t local_timestamp = 0;
+        rw_spinlock_read_lock(&pid_ptr->fd_stats.rw_spinlock);
+        if (pid_ptr->fd_stats.JudyLArray) {
+            while ((fd_value = JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_timestamp, &first_fd))) {
+                netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*fd_value;
+                ebpf_fill_fd_function_buffer(buf, local_pid, values, pid_ptr->name);
+            }
+            counter++;
+        }
+        rw_spinlock_read_unlock(&pid_ptr->fd_stats.rw_spinlock);
+    }
+
+    if (!counter) {
+        netdata_fd_stat_plus_t fake_fd = { };
+
+        ebpf_fill_fd_function_buffer(buf, getpid(), &fake_fd, EBPF_NOT_IDENFIED);
+    }
+}
+
+/**
  * FD read judy
  *
  * Thread responsible to fill thread data.
@@ -1616,13 +1693,13 @@ void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em)
     if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
         !ebpf_judy_pid.index.JudyLArray) {
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
-        netdata_publish_cachestat_t fake_cachestat = { };
+        netdata_fd_stat_plus_t fake_fd = { };
 
-        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED);
+        ebpf_fill_fd_function_buffer(buf, getpid(), &fake_fd, EBPF_NOT_IDENFIED);
         return;
     }
 
-    ebpf_cachestat_fill_function_buffer_unsafe(buf);
+    ebpf_fd_fill_function_buffer_unsafe(buf);
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
 }
 
@@ -1766,8 +1843,8 @@ static void ebpf_function_fd_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Close",
-            "Calls to close file",
+            "Open Error",
+            "Errors when files were open.",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
             RRDF_FIELD_TRANSFORM_NUMBER,
@@ -1784,8 +1861,8 @@ static void ebpf_function_fd_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Open Error",
-            "Errors when files were open.",
+            "Close",
+            "Calls to close file",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
             RRDF_FIELD_TRANSFORM_NUMBER,
