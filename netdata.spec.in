@@ -110,6 +110,13 @@ AutoReqProv: yes
 %global _have_xenstat 0
 %endif
 
+# Skip MongoDB exporter on known problem platforms
+%if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn}
+%global _have_mongo_exporter 0
+%else
+%global _have_mongo_exporter 1
+%endif
+
 # If ML hasn’t been explicitly disabled or enabled yet, enable it now.
 %if 0%{!?_have_ml:1}
 %global _have_ml 1
@@ -278,6 +285,12 @@ BuildRequires: pkgconfig(xenlight)
 %endif
 # end - xenstat dependencies
 
+# MongoDB exporter dependencies
+%if %{_have_mongo_exporter}
+BuildRequires: pkgconfig(libmongoc-1.0)
+%endif
+# end - mongodb expoerter dependencies
+
 # #####################################################################
 # End of dependency management configuration
 # #####################################################################
@@ -366,6 +379,11 @@ make download
 	%else
 	-DENABLE_ML=Off \
 	%endif
+	%if %{_have_mongo_exporter}
+	-DENABLE_EXPORTER_MONGODB=On \
+	%else
+	-DENABLE_EXPORTER_MONGODB=Off \
+	%endif
 	-DENABLE_ACLK=On \
 	-DENABLE_CLOUD=On \
 	-DENABLE_DBENGINE=On \
@@ -378,7 +396,6 @@ make download
 	-DENABLE_PLUGIN_SLABINFO=On \
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
-	-DENABLE_EXPORTER_MONGODB=Off \
 	-DENABLE_BUNDLED_JSONC=Off \
 	-DENABLE_BUNDLED_YAML=Off
 
