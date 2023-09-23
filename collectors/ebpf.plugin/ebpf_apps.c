@@ -16,12 +16,10 @@ ARAL *ebpf_aral_shm_pid = NULL;
 
 // ----------------------------------------------------------------------------
 // Global vectors used with apps
-netdata_publish_cachestat_t **cachestat_pid = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
 netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_shm_t **shm_pid = NULL;
-ebpf_process_stat_plus_t **global_process_stats = NULL;
 
 /**
  * eBPF ARAL Init

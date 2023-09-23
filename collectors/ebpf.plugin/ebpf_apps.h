@@ -40,6 +40,46 @@
 #define EBPF_MAX_NAME 100
 
 // ----------------------------------------------------------------------------
+// target
+//
+// target is the structure that processes are aggregated to be reported
+// to netdata.
+//
+// - Each entry in /etc/apps_groups.conf creates a target.
+// - Each user and group used by a process in the system, creates a target.
+struct ebpf_pid_on_target {
+    int32_t pid;
+    struct ebpf_pid_on_target *next;
+};
+
+// ----------------------------------------------------------------------------
+// Structures used to read information from kernel ring
+typedef struct ebpf_process_stat {
+    uint64_t ct;
+    char name[TASK_COMM_LEN];
+
+    uint64_t pid_tgid; // This cannot be removed, because it is used inside kernel ring.
+    uint32_t pid;
+
+    //Counter
+    uint32_t exit_call;
+    uint32_t release_call;
+    uint32_t create_process;
+    uint32_t create_thread;
+
+    //Counter
+    uint32_t task_err;
+
+    uint8_t removeme;
+} ebpf_process_stat_t;
+
+typedef struct ebpf_process_stat_plus {
+    uint64_t current_timestamp;
+
+    ebpf_process_stat_t data;
+} ebpf_process_stat_plus_t;
+
+// ----------------------------------------------------------------------------
 // pid_stat
 //
 struct ebpf_target {
@@ -62,6 +102,7 @@ struct ebpf_target {
     netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
     ebpf_socket_publish_apps_t socket;
+    ebpf_process_stat_t process;
 
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
@@ -124,46 +165,6 @@ struct ebpf_pid_stat {
     struct ebpf_pid_stat *next;
 };
 
-// ----------------------------------------------------------------------------
-// target
-//
-// target is the structure that processes are aggregated to be reported
-// to netdata.
-//
-// - Each entry in /etc/apps_groups.conf creates a target.
-// - Each user and group used by a process in the system, creates a target.
-struct ebpf_pid_on_target {
-    int32_t pid;
-    struct ebpf_pid_on_target *next;
-};
-
-// ----------------------------------------------------------------------------
-// Structures used to read information from kernel ring
-typedef struct ebpf_process_stat {
-    uint64_t ct;
-    char name[TASK_COMM_LEN];
-
-    uint64_t pid_tgid; // This cannot be removed, because it is used inside kernel ring.
-    uint32_t pid;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-
-    uint8_t removeme;
-} ebpf_process_stat_t;
-
-typedef struct ebpf_process_stat_plus {
-    uint64_t current_timestamp;
-
-    ebpf_process_stat_t data;
-} ebpf_process_stat_plus_t;
-
 /**
  * Internal function used to write debug messages.
  *
@@ -206,7 +207,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest);
 
 void ebpf_collect_data_for_all_processes();
 
-extern ebpf_process_stat_plus_t **global_process_stats;
 extern netdata_publish_dcstat_t **dcstat_pid;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
