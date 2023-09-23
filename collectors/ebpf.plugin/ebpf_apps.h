@@ -73,8 +73,14 @@ typedef struct ebpf_process_stat {
     uint8_t removeme;
 } ebpf_process_stat_t;
 
+typedef enum ebpf_process_publish_status {
+    NETDATA_EBPF_PROCESS_NOT_PUBLISHED = (1<<0),
+    NETDATA_EBPF_PROCESS_PUBLISHED = (1<<1),
+} ebpf_process_publish_status_t;
+
 typedef struct ebpf_process_stat_plus {
     uint64_t current_timestamp;
+    ebpf_process_publish_status_t publish;
 
     ebpf_process_stat_t data;
 } ebpf_process_stat_plus_t;

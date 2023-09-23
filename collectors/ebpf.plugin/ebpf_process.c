@@ -194,6 +194,7 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
                         w->process.create_thread += values->data.create_thread;
                         w->process.create_process += values->data.create_process;
                         w->process.exit_call += values->data.exit_call;
+                        values->publish = NETDATA_EBPF_PROCESS_NOT_PUBLISHED;
                     }
                 }
                 rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
@@ -384,11 +385,17 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
         }  else {
             if (!psv[0].release_call) {
                 ps_ptr->current_timestamp = update_time;
+                ps_ptr->publish = NETDATA_EBPF_PROCESS_NOT_PUBLISHED;
                 memcpy(&ps_ptr->data, &psv[0], sizeof(ebpf_process_stat_plus_t));
-            } else if ((update_time - ps_ptr->current_timestamp) > update_every) {
-                JudyLDel(&pid_ptr->process_stats.JudyLArray, psv[0].ct, PJE0);
-                ebpf_process_stat_release(ps_ptr);
-                bpf_map_delete_elem(fd, &key);
+            } else {
+                if ((update_time - ps_ptr->current_timestamp) > update_every &&
+                     ps_ptr->publish & NETDATA_EBPF_PROCESS_PUBLISHED) {
+                    JudyLDel(&pid_ptr->process_stats.JudyLArray, psv[0].ct, PJE0);
+                    ebpf_process_stat_release(ps_ptr);
+                    bpf_map_delete_elem(fd, &key);
+                } else { // This else is here, to be sure that we still clean data independent of apps and functions
+                    ps_ptr->publish = NETDATA_EBPF_PROCESS_PUBLISHED;
+                }
             }
         }
 
@@ -1312,6 +1319,7 @@ static void process_collector(ebpf_module_t *em)
             if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
                 ebpf_process_sum_values_for_pids(apps_groups_root_target);
             }
+            pthread_mutex_unlock(&collect_data_mutex);
 
             pthread_mutex_lock(&lock);
 
@@ -1319,21 +1327,23 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_data(em);
             }
 
-            if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-                ebpf_process_send_apps_data(apps_groups_root_target, em);
-            }
-
 #ifdef NETDATA_DEV_MODE
             if (ebpf_aral_process_stat)
                 ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
 #endif
 
+            pthread_mutex_unlock(&collect_data_mutex);
+            if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+                ebpf_process_send_apps_data(apps_groups_root_target, em);
+            }
+
             if (cgroups && shm_ebpf_cgroup.header) {
                 ebpf_process_send_cgroup_data(em);
             }
 
-            pthread_mutex_unlock(&lock);
+            fflush(stdout);
             pthread_mutex_unlock(&collect_data_mutex);
+            pthread_mutex_unlock(&lock);
 
             pthread_mutex_lock(&ebpf_exit_cleanup);
             if (running_time && !em->running_time)
@@ -1344,8 +1354,6 @@ static void process_collector(ebpf_module_t *em)
             em->running_time = running_time;
             pthread_mutex_unlock(&ebpf_exit_cleanup);
         }
-
-        fflush(stdout);
     }
 }
 
