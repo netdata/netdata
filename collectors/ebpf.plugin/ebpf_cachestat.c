@@ -1081,6 +1081,23 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
  *
  * @param root the target list.
 */
+void ebpf_cache_update_apps_data(struct ebpf_target *root)
+{
+    struct ebpf_target *w;
+
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
+            ebpf_cachestat_update_individual_group(&w->cachestat);
+        }
+    }
+}
+
+/**
+ * Send data to Netdata calling auxiliary functions.
+ *
+ * @param root the target list.
+*/
 void ebpf_cache_send_apps_data(struct ebpf_target *root)
 {
     struct ebpf_target *w;
@@ -1437,28 +1454,34 @@ static void cachestat_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_cachestat_read_global_tables(stats, maps_per_core);
-        pthread_mutex_lock(&collect_data_mutex);
 
+        pthread_mutex_lock(&collect_data_mutex);
         if (cgroups)
             ebpf_update_cachestat_cgroup();
+
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_cache_update_apps_data(apps_groups_root_target);
+
+        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&lock);
 
         cachestat_send_global(&publish);
-
-        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_cache_send_apps_data(apps_groups_root_target);
 
 #ifdef NETDATA_DEV_MODE
         if (ebpf_aral_cachestat_pid)
             ebpf_send_data_aral_chart(ebpf_aral_cachestat_pid, em);
 #endif
 
+        pthread_mutex_lock(&collect_data_mutex);
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_cache_send_apps_data(apps_groups_root_target);
+
         if (cgroups)
             ebpf_cachestat_send_cgroup_data(update_every);
 
-        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
