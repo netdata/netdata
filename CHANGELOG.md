@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Disable mongodb exporter builds where broken. [\#16033](https://github.com/netdata/netdata/pull/16033) ([Ferroin](https://github.com/Ferroin))
 - Fix package builds on Rocky Linux. [\#16026](https://github.com/netdata/netdata/pull/16026) ([Ferroin](https://github.com/Ferroin))
 - add systemd-journal.plugin to apps\_groups.conf [\#16024](https://github.com/netdata/netdata/pull/16024) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of CI skipping. [\#16022](https://github.com/netdata/netdata/pull/16022) ([Ferroin](https://github.com/Ferroin))
@@ -430,8 +431,6 @@
 - apps.plugin fds limits improvements [\#15437](https://github.com/netdata/netdata/pull/15437) ([ktsaou](https://github.com/ktsaou))
 - disable apps\_group\_file\_descriptors\_utilization alarm [\#15435](https://github.com/netdata/netdata/pull/15435) ([ilyam8](https://github.com/ilyam8))
 - Add catch-all category entry in categories.yaml [\#15434](https://github.com/netdata/netdata/pull/15434) ([Ancairon](https://github.com/Ancairon))
-- Update CODEOWNERS [\#15433](https://github.com/netdata/netdata/pull/15433) ([andrewm4894](https://github.com/andrewm4894))
-- Remove duplicate category from categories.yaml [\#15432](https://github.com/netdata/netdata/pull/15432) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
