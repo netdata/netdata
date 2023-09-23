@@ -13,8 +13,6 @@ import sys
 
 from pathlib import Path
 
-os.chdir(Path(__file__).parent.absolute())
-
 BASEPATH = Path('v1')
 
 URLTEMPLATE = 'https://github.com/netdata/dashboard/releases/download/{0}/dashboard.tar.gz'
@@ -126,6 +124,9 @@ def list_changed_files():
         subprocess.check_call('echo "EOF" >> $GITHUB_ENV', shell=True)
 
 
-copy_dashboard(sys.argv[1])
-write_makefile()
-list_changed_files()
+if __name__ == "__main__":
+    os.chdir(Path(__file__).parent.absolute())
+
+    copy_dashboard(sys.argv[1])
+    write_makefile()
+    list_changed_files()
