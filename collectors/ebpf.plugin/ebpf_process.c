@@ -384,7 +384,41 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
 
         ebpf_process_apps_accumulator(psv, maps_per_core);
 
-        end_process_loop:
+        // Get PID structure
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, psv->name);
+        if (!pid_ptr) {
+            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+            goto end_process_loop;
+        }
+
+        // Get Process structure
+        rw_spinlock_write_lock(&pid_ptr->process_stats.rw_spinlock);
+        ebpf_process_stat_plus_t **ps_pptr = (ebpf_process_stat_plus_t **)ebpf_judy_insert_unsafe(
+            &pid_ptr->process_stats.JudyLArray, psv[0].ct);
+        ebpf_process_stat_plus_t *ps_ptr = *ps_pptr;
+        if (likely(*ps_pptr == NULL)) {
+            *ps_pptr = ebpf_process_stat_get();
+            ps_ptr = *ps_pptr;
+
+            ps_ptr->current_timestamp = update_time;
+            memcpy(&ps_ptr->data, &psv[0], sizeof(ebpf_process_stat_plus_t));
+        }  else {
+            if (!psv[0].release_call) {
+                ps_ptr->current_timestamp = update_time;
+                memcpy(&ps_ptr->data, &psv[0], sizeof(ebpf_process_stat_plus_t));
+            } else if ((update_time - ps_ptr->current_timestamp) > update_every) {
+                JudyLDel(&pid_ptr->process_stats.JudyLArray, psv[0].ct, PJE0);
+                ebpf_process_stat_release(ps_ptr);
+                bpf_map_delete_elem(fd, &key);
+            }
+        }
+
+        rw_spinlock_write_unlock(&pid_ptr->process_stats.rw_spinlock);
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+end_process_loop:
         memset(psv, 0, length);
     }
 

@@ -82,9 +82,9 @@ void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
  *
  * @return it returns the address on success.
  */
-ebpf_process_stat_t *ebpf_process_stat_get(void)
+ebpf_process_stat_plus_t *ebpf_process_stat_get(void)
 {
-    ebpf_process_stat_t *target = aral_mallocz(ebpf_aral_process_stat);
+    ebpf_process_stat_plus_t *target = aral_mallocz(ebpf_aral_process_stat);
     memset(target, 0, sizeof(ebpf_process_stat_plus_t));
     return target;
 }
