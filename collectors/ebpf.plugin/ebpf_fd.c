@@ -867,10 +867,9 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 /**
  * Send data to Netdata calling auxiliary functions.
  *
- * @param em   the structure with thread information
  * @param root the target list.
 */
-void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
+void ebpf_update_apps_data(struct ebpf_target *root)
 {
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
@@ -1196,13 +1195,16 @@ static void fd_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_fd_read_global_tables(stats, maps_per_core);
+
         pthread_mutex_lock(&collect_data_mutex);
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_update_apps_data(apps_groups_root_target);
 
         if (cgroups)
             ebpf_update_fd_cgroup();
+        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&lock);
-
 #ifdef NETDATA_DEV_MODE
         if (ebpf_aral_fd_pid)
             ebpf_send_data_aral_chart(ebpf_aral_fd_pid, em);
@@ -1210,14 +1212,16 @@ static void fd_collector(ebpf_module_t *em)
 
         ebpf_fd_send_data(em);
 
+        pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_fd_send_apps_data(em, apps_groups_root_target);
 
         if (cgroups)
             ebpf_fd_send_cgroup_data(em);
 
-        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+
+        pthread_mutex_unlock(&lock);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
