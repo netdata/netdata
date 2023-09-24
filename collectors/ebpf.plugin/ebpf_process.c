@@ -1299,60 +1299,60 @@ static void process_collector(ebpf_module_t *em)
     while (!ebpf_plugin_exit && running_time < lifetime) {
         usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
         (void)dt;
-        if (ebpf_plugin_exit)
-            break;
+        if (ebpf_plugin_exit || ++counter != update_every)
+            continue;
 
-        if (++counter == update_every) {
-            counter = 0;
+        counter = 0;
 
-            ebpf_read_process_hash_global_tables(stats, maps_per_core);
+        ebpf_read_process_hash_global_tables(stats, maps_per_core);
 
-            netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
-            pthread_mutex_lock(&collect_data_mutex);
+        netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
+        pthread_mutex_lock(&collect_data_mutex);
 
-            if (ebpf_all_pids_count > 0) {
-                if (cgroups && shm_ebpf_cgroup.header) {
-                    ebpf_update_process_cgroup(maps_per_core);
-                }
+        if (ebpf_all_pids_count > 0) {
+            if (cgroups && shm_ebpf_cgroup.header) {
+                ebpf_update_process_cgroup(maps_per_core);
             }
+        }
 
-            if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-                ebpf_process_sum_values_for_pids(apps_groups_root_target);
-            }
-            pthread_mutex_unlock(&collect_data_mutex);
+        if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_process_sum_values_for_pids(apps_groups_root_target);
+        }
+        pthread_mutex_unlock(&collect_data_mutex);
 
-            pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&lock);
 
-            if (publish_global) {
-                ebpf_process_send_data(em);
-            }
+        if (publish_global) {
+            ebpf_process_send_data(em);
+        }
 
 #ifdef NETDATA_DEV_MODE
-            if (ebpf_aral_process_stat)
-                ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
+        if (ebpf_aral_process_stat)
+            ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
 #endif
 
-            pthread_mutex_unlock(&collect_data_mutex);
-            if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-                ebpf_process_send_apps_data(apps_groups_root_target, em);
-            }
+        pthread_mutex_unlock(&collect_data_mutex);
+        if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_process_send_apps_data(apps_groups_root_target, em);
+        }
 
-            if (cgroups && shm_ebpf_cgroup.header) {
-                ebpf_process_send_cgroup_data(em);
-            }
+        if (cgroups && shm_ebpf_cgroup.header) {
+            ebpf_process_send_cgroup_data(em);
+        }
 
-            fflush(stdout);
-            pthread_mutex_unlock(&collect_data_mutex);
-            pthread_mutex_unlock(&lock);
+        fflush(stdout);
+        pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
 
-            pthread_mutex_lock(&ebpf_exit_cleanup);
-            if (running_time && !em->running_time)
-                running_time = update_every;
-            else
-                running_time += update_every;
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
 
-            em->running_time = running_time;
-            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        if () {
         }
     }
 }
