@@ -60,6 +60,7 @@ static bool plugin_should_exit = false;
 // ----------------------------------------------------------------------------
 
 typedef enum {
+    ND_SD_JOURNAL_NO_FILE_MATCHED,
     ND_SD_JOURNAL_FAILED_TO_OPEN,
     ND_SD_JOURNAL_FAILED_TO_SEEK,
     ND_SD_JOURNAL_TIMED_OUT,
@@ -82,6 +83,8 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
 
 #define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
 
+static usec_t max_journal_vs_realtime_delta_ut = 2 * USEC_PER_SEC; // assume always 2 seconds latency
+
 static inline void netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, usec_t *msg_ut) {
     const void *data;
     size_t length;
@@ -102,8 +105,17 @@ static inline void netdata_systemd_journal_process_row(sd_journal *j, FACETS *fa
 
         if(unlikely(key_length == sizeof(JD_SOURCE_REALTIME_TIMESTAMP) && strcmp(key_copy, JD_SOURCE_REALTIME_TIMESTAMP) == 0)) {
             usec_t ut = str2ull(value, NULL);
-            if(ut)
+            if(ut && ut < *msg_ut) {
+                usec_t delta = *msg_ut - ut;
                 *msg_ut = ut;
+
+                // update max_journal_vs_realtime_delta_ut if the delta increased
+                usec_t expected = max_journal_vs_realtime_delta_ut;
+                do {
+                    if(delta <= max_journal_vs_realtime_delta_ut)
+                        break;
+                } while(!__atomic_compare_exchange_n(&max_journal_vs_realtime_delta_ut, &expected, delta, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+            }
         }
 
         facets_add_key_value_length(facets, key_copy, key_length - 1, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
@@ -573,7 +585,7 @@ static void journal_files_registry_update() {
 // ----------------------------------------------------------------------------
 
 #define jf_is_mine(jf, source_type, after_ut, before_ut) \
-    ((jf)->source_type & (source_type) && (jf)->msg_last_ut >= (after_ut) && (jf)->msg_first_ut <= (before_ut))
+    (((source_type) == ~0 || ((jf)->source_type & (source_type)) == (source_type)) && (jf)->msg_last_ut >= (after_ut) && (jf)->msg_first_ut <= (before_ut))
 
 static int netdata_systemd_journal_query(
         BUFFER *wb, FACETS *facets, SD_JOURNAL_FILE_SOURCE_TYPE source_type,
@@ -584,9 +596,17 @@ static int netdata_systemd_journal_query(
         bool *cancelled) {
 
     usec_t last_modified = 0;
-    ND_SD_JOURNAL_STATUS status;
+    ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
 
     struct journal_file *jf;
+
+    if(anchor && direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
+        // the anchor has an actual realtime timestamp of a log entry
+        // but the seek we will do, uses the timestamp journald received the message
+        // so, when going forward (to the future), we have push the anchor
+        // back by: max_journal_vs_realtime_delta_ut
+        anchor -= __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+    }
 
     if(if_modified_since) {
         bool modified = false;
@@ -608,6 +628,8 @@ static int netdata_systemd_journal_query(
         }
     }
 
+    buffer_json_member_add_array(wb, "_journal_files");
+
     bool partial = false;
     dfe_start_reentrant(journal_files_registry, jf) {
         if(!jf_is_mine(jf, source_type, after_ut, before_ut))
@@ -625,15 +647,25 @@ static int netdata_systemd_journal_query(
         if(tmp_last_modified > last_modified)
             last_modified = tmp_last_modified;
 
+        buffer_json_add_array_item_object(wb); // journal file
+        buffer_json_member_add_string(wb, "filename", jf_dfe.name);
+        buffer_json_member_add_uint64(wb, "type", jf->source_type);
+        buffer_json_member_add_uint64(wb, "last_modified_ut", jf->file_last_modified_ut);
+        buffer_json_member_add_uint64(wb, "msg_first_ut", jf->msg_first_ut);
+        buffer_json_member_add_uint64(wb, "msg_last_ut", jf->msg_last_ut);
+        buffer_json_object_close(wb); // journal file
+
         bool stop = false;
         switch(tmp_status) {
             case ND_SD_JOURNAL_OK:
+            case ND_SD_JOURNAL_NO_FILE_MATCHED:
                 status = tmp_status;
                 break;
 
             case ND_SD_JOURNAL_FAILED_TO_OPEN:
             case ND_SD_JOURNAL_FAILED_TO_SEEK:
-                if(status == ND_SD_JOURNAL_FAILED_TO_OPEN)
+                partial = true;
+                if(status == ND_SD_JOURNAL_NO_FILE_MATCHED)
                     status = tmp_status;
                 break;
 
@@ -654,20 +686,27 @@ static int netdata_systemd_journal_query(
     }
     dfe_done(jf);
 
-    if(status != ND_SD_JOURNAL_OK && status != ND_SD_JOURNAL_TIMED_OUT) {
-        buffer_flush(wb);
+    buffer_json_array_close(wb); // _journal_files
 
-        switch (status) {
-            case ND_SD_JOURNAL_CANCELLED:
-                return HTTP_RESP_CLIENT_CLOSED_REQUEST;
+    switch (status) {
+        case ND_SD_JOURNAL_OK:
+        case ND_SD_JOURNAL_TIMED_OUT:
+        case ND_SD_JOURNAL_NO_FILE_MATCHED:
+            break;
 
-            case ND_SD_JOURNAL_NOT_MODIFIED:
-                return HTTP_RESP_NOT_MODIFIED;
+        case ND_SD_JOURNAL_CANCELLED:
+            buffer_flush(wb);
+            return HTTP_RESP_CLIENT_CLOSED_REQUEST;
 
-            default:
-            case ND_SD_JOURNAL_FAILED_TO_SEEK:
-                return HTTP_RESP_INTERNAL_SERVER_ERROR;
-        }
+        case ND_SD_JOURNAL_NOT_MODIFIED:
+            buffer_flush(wb);
+            return HTTP_RESP_NOT_MODIFIED;
+
+        default:
+        case ND_SD_JOURNAL_FAILED_TO_OPEN:
+        case ND_SD_JOURNAL_FAILED_TO_SEEK:
+            buffer_flush(wb);
+            return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
