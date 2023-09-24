@@ -87,6 +87,7 @@ static inline sd_journal *netdata_open_systemd_journal(void) {
 }
 
 typedef enum {
+    ND_SD_JOURNAL_FAILED_TO_OPEN,
     ND_SD_JOURNAL_FAILED_TO_SEEK,
     ND_SD_JOURNAL_TIMED_OUT,
     ND_SD_JOURNAL_OK,
@@ -335,17 +336,25 @@ bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_
     return first_msg_ut != last_modified;
 }
 
-static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
-                                         usec_t after_ut, usec_t before_ut,
-                                         usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
-                                         usec_t if_modified_since, bool data_only,
-                                         usec_t stop_monotonic_ut,
-                                         bool *cancelled) {
-    sd_journal *j = netdata_open_systemd_journal();
-    if(!j)
-        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
+        const char *filename,
+        BUFFER *wb, FACETS *facets,
+        usec_t after_ut, usec_t before_ut,
+        usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
+        usec_t if_modified_since, usec_t stop_monotonic_ut, bool data_only,
+        bool *cancelled, usec_t *last_modified) {
 
-    usec_t last_modified = 0;
+    internal_error(true, "processing file '%s'", filename);
+
+    sd_journal *j = NULL;
+    const char *files[2] = {
+            [0] = filename,
+            [1] = NULL,
+    };
+
+    sd_journal_open_files(&j, files, 0);
+    if(!j)
+        return ND_SD_JOURNAL_FAILED_TO_OPEN;
 
     ND_SD_JOURNAL_STATUS status;
 
@@ -362,10 +371,134 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets,
         // we have to do a full query
         status = netdata_systemd_journal_query_full(j, wb, facets,
                                                     after_ut, before_ut, if_modified_since,
-                                                    stop_monotonic_ut, &last_modified, cancelled);
+                                                    stop_monotonic_ut, last_modified, cancelled);
     }
 
     sd_journal_close(j);
+
+    return status;
+}
+
+#define VAR_LOG_JOURNAL_MAX_DEPTH 10
+
+static ND_SD_JOURNAL_STATUS traverse_var_log_journal(
+        const char *dirname, int depth,
+        BUFFER *wb, FACETS *facets,
+        usec_t after_ut, usec_t before_ut,
+        usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
+        usec_t if_modified_since, usec_t stop_monotonic_ut, bool data_only,
+        bool *cancelled, usec_t *last_modified) {
+
+    static const char *ext = ".journal";
+    static const size_t ext_len = sizeof(".journal") - 1;
+
+    if (depth > VAR_LOG_JOURNAL_MAX_DEPTH)
+        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+
+    DIR *dir;
+    struct dirent *entry;
+    struct stat info;
+    char absolute_path[FILENAME_MAX];
+    ND_SD_JOURNAL_STATUS ret_status = ND_SD_JOURNAL_FAILED_TO_OPEN;
+    usec_t ret_last_modified = *last_modified;
+
+    // Open the directory.
+    if ((dir = opendir(dirname)) == NULL) {
+        netdata_log_error("Cannot opendir() '%s'", dirname);
+        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+    }
+
+    // Read each entry in the directory.
+    bool stop = false;
+    while (!stop && (entry = readdir(dir)) != NULL) {
+        snprintfz(absolute_path, sizeof(absolute_path), "%s/%s", dirname, entry->d_name);
+        if (stat(absolute_path, &info) != 0) {
+            netdata_log_error("Failed to stat() '%s", absolute_path);
+            continue;
+        }
+
+        ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_FAILED_TO_OPEN;
+        usec_t tmp_last_modified = 0;
+
+        if (S_ISDIR(info.st_mode)) {
+            // If entry is a directory, call traverse recursively.
+            if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0)
+                status = traverse_var_log_journal(absolute_path, depth + 1,
+                                         wb, facets,
+                                         after_ut, before_ut, anchor, direction, entries,
+                                         if_modified_since, stop_monotonic_ut, data_only,
+                                         cancelled, &tmp_last_modified);
+
+        }
+        else if (S_ISREG(info.st_mode)) {
+            // If entry is a regular file, check if it ends with .journal.
+            char *filename = entry->d_name;
+            size_t len = strlen(filename);
+
+            if (len > ext_len && strcmp(filename + len - ext_len, ext) == 0) {
+                status = netdata_systemd_journal_query_one_file(
+                        absolute_path,
+                        wb, facets,
+                        after_ut, before_ut,
+                        anchor, direction, entries,
+                        if_modified_since, stop_monotonic_ut, data_only,
+                        cancelled, &tmp_last_modified);
+            }
+        }
+
+        if(tmp_last_modified > ret_last_modified)
+            ret_last_modified = tmp_last_modified;
+
+        switch(status) {
+            default:
+            case ND_SD_JOURNAL_OK:
+                ret_status = status;
+                break;
+
+            case ND_SD_JOURNAL_NOT_MODIFIED:
+            case ND_SD_JOURNAL_FAILED_TO_SEEK:
+            case ND_SD_JOURNAL_FAILED_TO_OPEN:
+                // continue to the next file
+                if(ret_status != ND_SD_JOURNAL_OK)
+                    ret_status = status;
+                break;
+
+            case ND_SD_JOURNAL_CANCELLED:
+            case ND_SD_JOURNAL_TIMED_OUT:
+                // we need to stop
+                stop = true;
+                ret_status = status;
+                break;
+        }
+    }
+
+    closedir(dir);
+
+    *last_modified = ret_last_modified;
+    return ret_status;
+}
+
+static int netdata_systemd_journal_query(
+        BUFFER *wb, FACETS *facets, const char *source,
+        usec_t after_ut, usec_t before_ut,
+        usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
+        usec_t if_modified_since, bool data_only,
+        usec_t stop_monotonic_ut,
+        bool *cancelled) {
+
+    char var_log_journal[PATH_MAX + 1] = "/var/log/journal";
+
+    if(*netdata_configured_host_prefix)
+        snprintfz(var_log_journal, PATH_MAX, "%s/var/log/journal", netdata_configured_host_prefix);
+
+    usec_t last_modified = 0;
+    ND_SD_JOURNAL_STATUS status = traverse_var_log_journal(
+            var_log_journal, 0,
+            wb, facets,
+            after_ut, before_ut,
+            anchor, direction, entries,
+            if_modified_since, stop_monotonic_ut, data_only,
+            cancelled, &last_modified);
 
     if(status != ND_SD_JOURNAL_OK && status != ND_SD_JOURNAL_TIMED_OUT) {
         buffer_flush(wb);
@@ -920,7 +1053,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
         facets_set_histogram_by_name(facets, "PRIORITY",
                                    after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
-    response = netdata_systemd_journal_query(wb, facets, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
+    response = netdata_systemd_journal_query(wb, facets, source,
+                                             after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                              anchor, direction, last,
                                              if_modified_since, data_only,
                                              now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC,
