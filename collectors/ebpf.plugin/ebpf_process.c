@@ -429,6 +429,7 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
 
 end_process_loop:
         memset(psv, 0, length);
+        key = next_key;
     }
 
     netdata_thread_enable_cancelability();
