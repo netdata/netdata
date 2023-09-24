@@ -240,6 +240,19 @@ if test "${enable_cloud}" = "no"; then
 fi
 
 # -----------------------------------------------------------------------------
+# Allows disabling v2 dashboard
+
+AC_ARG_ENABLE(
+    [cloud-ui],
+    [AS_HELP_STRING([--disable-cloud-ui],
+                    [Excludes cloud dashboard from installation])],
+    [ enable_cloud_ui="$enableval" ],
+    [ enable_cloud_ui="yes" ]
+)
+
+AM_CONDITIONAL([ENABLE_CLOUD_UI], [test "${enable_cloud_ui}" = "yes"])
+
+# -----------------------------------------------------------------------------
 # C++ version check
 
 # Check for C++17 support (optional)
