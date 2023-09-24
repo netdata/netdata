@@ -12,6 +12,75 @@
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
+// ----------------------------------------------------------------------------
+// fstat64 overloading to speed up libsystemd
+// https://github.com/systemd/systemd/pull/29261
+
+#include <dlfcn.h>
+#include <sys/stat.h>
+
+#define FSTAT_CACHE_MAX 1024
+struct fdstat64_cache_entry {
+    bool enabled;
+    bool updated;
+    int err_no;
+    struct stat64 stat;
+    int ret;
+    size_t cached_count;
+};
+struct fdstat64_cache_entry fstat64_cache[FSTAT_CACHE_MAX] = {0 };
+
+static void fstat_cache_enable(int fd) {
+    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
+        fstat64_cache[fd].enabled = true;
+        fstat64_cache[fd].updated = false;
+    }
+}
+
+static size_t fstat_cache_disable(int fd) {
+    size_t cached_count = 0;
+
+    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
+        fstat64_cache[fd].enabled = false;
+        fstat64_cache[fd].updated = false;
+        cached_count = fstat64_cache[fd].cached_count;
+    }
+
+    return cached_count;
+}
+
+static size_t fstat_calls = 0;
+static size_t fstat_cached_responses = 0;
+
+int fstat64(int fd, struct stat64 *buf) {
+    static int (*real_fstat)(int, struct stat64 *) = NULL;
+    if (!real_fstat)
+        real_fstat = dlsym(RTLD_NEXT, "fstat64");
+
+    fstat_calls++;
+
+    if(fd >= 0 && fd < FSTAT_CACHE_MAX && fstat64_cache[fd].enabled && fstat64_cache[fd].updated) {
+        fstat_cached_responses++;
+        errno = fstat64_cache[fd].err_no;
+        *buf = fstat64_cache[fd].stat;
+        fstat64_cache[fd].cached_count++;
+        return fstat64_cache[fd].ret;
+    }
+
+    int ret = real_fstat(fd, buf);
+
+    if(fd >= 0 && fd < FSTAT_CACHE_MAX && fstat64_cache[fd].enabled) {
+        fstat64_cache[fd].ret = ret;
+        fstat64_cache[fd].updated = true;
+        fstat64_cache[fd].err_no = errno;
+        fstat64_cache[fd].stat = *buf;
+    }
+
+    return ret;
+}
+
+// ----------------------------------------------------------------------------
+
 #define FACET_MAX_VALUE_LENGTH                  8192
 
 #define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
@@ -331,24 +400,30 @@ bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_
     return first_msg_ut != last_modified;
 }
 
+
+
 static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         const char *filename,
         BUFFER *wb, FACETS *facets,
         usec_t after_ut, usec_t before_ut,
         usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
         usec_t if_modified_since, usec_t stop_monotonic_ut, bool data_only,
-        bool *cancelled, usec_t *last_modified) {
+        bool *cancelled, usec_t *last_modified,
+        size_t *cached_count) {
 
     internal_error(true, "processing file '%s'", filename);
 
     sd_journal *j = NULL;
-    const char *files[2] = {
-            [0] = filename,
-            [1] = NULL,
-    };
 
-    if(sd_journal_open_files(&j, files, 0) < 0 || !j)
+    errno = 0;
+    int fd = open(filename, O_RDONLY);
+    fstat_cache_enable(fd);
+
+    if(sd_journal_open_files_fd(&j, &fd, 1, 0) < 0 || !j) {
+        *cached_count = fstat_cache_disable(fd);
+        close(fd);
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
+    }
 
     ND_SD_JOURNAL_STATUS status;
 
@@ -370,6 +445,8 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     }
 
     sd_journal_close(j);
+    *cached_count = fstat_cache_disable(fd);
+    close(fd);
 
     return status;
 }
@@ -585,7 +662,7 @@ static void journal_files_registry_update() {
 // ----------------------------------------------------------------------------
 
 #define jf_is_mine(jf, source_type, after_ut, before_ut) \
-    (((source_type) == ~0 || ((jf)->source_type & (source_type)) == (source_type)) && (jf)->msg_last_ut >= (after_ut) && (jf)->msg_first_ut <= (before_ut))
+    (((source_type) == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || ((jf)->source_type & (source_type)) == (source_type)) && (jf)->msg_last_ut >= (after_ut) && (jf)->msg_first_ut <= (before_ut))
 
 static int netdata_systemd_journal_query(
         BUFFER *wb, FACETS *facets, SD_JOURNAL_FILE_SOURCE_TYPE source_type,
@@ -635,6 +712,7 @@ static int netdata_systemd_journal_query(
         if(!jf_is_mine(jf, source_type, after_ut, before_ut))
             continue;
 
+        size_t cached_count = 0;
         usec_t tmp_last_modified = 0;
         ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file(
                 jf_dfe.name,
@@ -642,7 +720,8 @@ static int netdata_systemd_journal_query(
                 after_ut, before_ut,
                 anchor, direction, entries,
                 0, stop_monotonic_ut, data_only,
-                cancelled, &tmp_last_modified);
+                cancelled, &tmp_last_modified,
+                &cached_count);
 
         if(tmp_last_modified > last_modified)
             last_modified = tmp_last_modified;
@@ -653,6 +732,7 @@ static int netdata_systemd_journal_query(
         buffer_json_member_add_uint64(wb, "last_modified_ut", jf->file_last_modified_ut);
         buffer_json_member_add_uint64(wb, "msg_first_ut", jf->msg_first_ut);
         buffer_json_member_add_uint64(wb, "msg_last_ut", jf->msg_last_ut);
+        buffer_json_member_add_uint64(wb, "fstat_cached_count", cached_count);
         buffer_json_object_close(wb); // journal file
 
         bool stop = false;
