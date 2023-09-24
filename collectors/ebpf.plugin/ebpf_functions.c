@@ -1983,7 +1983,7 @@ static void ebpf_function_fd_manipulation(const char *transaction,
         }
         buffer_json_object_close(wb);
     }
-    buffer_json_object_close(wb); // charts
+    buffer_json_object_close(wb); // group by
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
@@ -2051,6 +2051,21 @@ static void ebpf_fill_process_function_buffer(BUFFER *wb, uint32_t pid, ebpf_pro
 
     // NAME
     buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // Create Task
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.create_process);
+
+    // Create Thread
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.create_thread);
+
+    // Exit
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.exit_call);
+
+    // Release task
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.release_call);
+
+    // Error
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.task_err);
 
     buffer_json_array_close(wb);
 }
@@ -2197,6 +2212,228 @@ static void ebpf_function_process_manipulation(const char *transaction,
     ebpf_process_read_judy(wb, em);
     buffer_json_array_close(wb); // data
 
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int fields_id = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PID",
+            "Process ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Process Name",
+            "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Create Task",
+            "Calls to create a new task (process/thread).",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Create Thread.",
+            "Calls to create a new thread.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Exit",
+            "Calls to exit function.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Release",
+            "Kernel release processes.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Error",
+            "Errors to create new task.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // Process and Thread
+        buffer_json_member_add_object(wb, "ProcessThreead");
+        {
+            buffer_json_member_add_string(wb, "name", "Process and Threads");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "process");
+                buffer_json_add_array_item_string(wb, "thread");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Exit
+        buffer_json_member_add_object(wb, "Exit");
+        {
+            buffer_json_member_add_string(wb, "name", "Exit");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "process");
+                buffer_json_add_array_item_string(wb, "task");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Process Status
+        buffer_json_member_add_object(wb, "ProcessStatus");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Status");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "process");
+                buffer_json_add_array_item_string(wb, "zombie");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Task Error
+        buffer_json_member_add_object(wb, "TaskError");
+        {
+            buffer_json_member_add_string(wb, "name", "Task error");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "process");
+                buffer_json_add_array_item_string(wb, "thread");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    // Do we use only on fields that can be groupped?
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process ID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Process Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group by
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
