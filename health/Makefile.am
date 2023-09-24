@@ -94,6 +94,7 @@ dist_healthconfig_DATA = \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
     health.d/unbound.conf \
+    health.d/upsd.conf \
     health.d/vcsa.conf \
     health.d/vernemq.conf \
     health.d/vsphere.conf \
