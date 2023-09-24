@@ -2030,6 +2030,97 @@ static void ebpf_function_process_help(const char *transaction) {
 }
 
 /**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param pid         the process PID
+ * @param values      data read from hash table
+ * @param name        the process name
+ */
+static void ebpf_fill_process_function_buffer(BUFFER *wb, uint32_t pid, ebpf_process_stat_plus_t *values, char *name)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)pid);
+
+    // NAME
+    buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    buffer_json_array_close(wb);
+}
+
+/**
+ * Fill function buffer unsafe
+ *
+ * Fill the function buffer with socket information. Before to call this function it is necessary to lock
+ * ebpf_judy_pid.index.rw_spinlock
+ *
+ * @param buf    buffer used to store data to be shown by function.
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static void ebpf_fill_process_function_buffer_unsafe(BUFFER *buf)
+{
+    int counter = 0;
+
+    Pvoid_t *pid_value, *process_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        bool first_process = true;
+        Word_t local_timestamp = 0;
+        rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
+        if (pid_ptr->process_stats.JudyLArray) {
+            while ((process_value = JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_timestamp, &first_process))) {
+                ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
+                ebpf_fill_process_function_buffer(buf, local_pid, values, pid_ptr->name);
+            }
+            counter++;
+        }
+        rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
+    }
+
+    if (!counter) {
+        ebpf_process_stat_plus_t fake_process = { };
+
+        ebpf_fill_process_function_buffer(buf, getpid(), &fake_process, EBPF_NOT_IDENFIED);
+    }
+}
+
+/**
+ * FD read judy
+ *
+ * Thread responsible to fill thread data.
+ *
+ * @param buf the buffer to store data;
+ * @param em  the module main structure.
+ *
+ * @return It always returns NULL.
+ */
+void ebpf_process_read_judy(BUFFER *buf, struct ebpf_module *em)
+{
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    if (!em->maps || (em->maps[NETDATA_PROCESS_PID_TABLE].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+        !ebpf_judy_pid.index.JudyLArray) {
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        ebpf_process_stat_plus_t fake_process = { };
+
+        ebpf_fill_process_function_buffer(buf, getpid(), &fake_process, EBPF_NOT_IDENFIED);
+        return;
+    }
+
+    ebpf_fill_process_function_buffer_unsafe(buf);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
+
+/**
  * Function: FD
  *
  * Show information for sockets stored in hash tables.
@@ -2077,7 +2168,7 @@ static void ebpf_function_process_manipulation(const char *transaction,
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-        //ebpf_cachestat_clean_judy_array_unsafe();
+        // ebpf_cachestat_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         if (ebpf_function_start_thread(em, period)) {
@@ -2103,7 +2194,7 @@ static void ebpf_function_process_manipulation(const char *transaction,
 
     // Collect data
     buffer_json_member_add_array(wb, "data");
-    //ebpf_cachestat_read_judy(wb, em);
+    ebpf_process_read_judy(wb, em);
     buffer_json_array_close(wb); // data
 
 
