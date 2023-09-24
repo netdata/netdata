@@ -59,33 +59,6 @@ static bool plugin_should_exit = false;
 
 // ----------------------------------------------------------------------------
 
-static inline sd_journal *netdata_open_systemd_journal(void) {
-    sd_journal *j = NULL;
-    int r;
-
-    if(*netdata_configured_host_prefix) {
-#ifdef HAVE_SD_JOURNAL_OS_ROOT
-        // Give our host prefix to systemd journal
-        r = sd_journal_open_directory(&j, netdata_configured_host_prefix, SD_JOURNAL_OS_ROOT);
-#else
-        char buf[FILENAME_MAX + 1];
-        snprintfz(buf, FILENAME_MAX, "%s/var/log/journal", netdata_configured_host_prefix);
-        r = sd_journal_open_directory(&j, buf, 0);
-#endif
-    }
-    else {
-        // Open the system journal for reading
-        r = sd_journal_open(&j, 0);
-    }
-
-    if (r < 0) {
-        netdata_log_error("SYSTEMD-JOURNAL: Failed to open SystemD Journal, with error %d", r);
-        return NULL;
-    }
-
-    return j;
-}
-
 typedef enum {
     ND_SD_JOURNAL_FAILED_TO_OPEN,
     ND_SD_JOURNAL_FAILED_TO_SEEK,
@@ -107,7 +80,9 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
     return true;
 }
 
-static inline void netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets) {
+#define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
+
+static inline void netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, usec_t *msg_ut) {
     const void *data;
     size_t length;
     SD_JOURNAL_FOREACH_DATA(j, data, length) {
@@ -124,6 +99,13 @@ static inline void netdata_systemd_journal_process_row(sd_journal *j, FACETS *fa
         key_copy[key_length - 1] = '\0';
 
         size_t value_length = length - key_length; // without '\0'
+
+        if(unlikely(key_length == sizeof(JD_SOURCE_REALTIME_TIMESTAMP) && strcmp(key_copy, JD_SOURCE_REALTIME_TIMESTAMP) == 0)) {
+            usec_t ut = str2ull(value, NULL);
+            if(ut)
+                *msg_ut = ut;
+        }
+
         facets_add_key_value_length(facets, key_copy, key_length - 1, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
     }
 }
@@ -180,8 +162,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
             first_msg_ut = msg_ut;
         }
 
-        if (msg_ut > before_ut)
+        if (msg_ut > before_ut) {
             continue;
+        }
 
         if (msg_ut < after_ut) {
             if(--excess_rows_allowed == 0)
@@ -190,7 +173,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
             continue;
         }
 
-        netdata_systemd_journal_process_row(j, facets);
+        netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
 
         status = check_stop(row_counter, cancelled, stop_monotonic_ut);
@@ -246,7 +229,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
         if(rows_added > entries && --excess_rows_allowed == 0)
             break;
 
-        netdata_systemd_journal_process_row(j, facets);
+        netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
         rows_added++;
 
@@ -301,7 +284,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
         if(rows_added > entries && --excess_rows_allowed == 0)
             break;
 
-        netdata_systemd_journal_process_row(j, facets);
+        netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
         rows_added++;
 
@@ -352,8 +335,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
             [1] = NULL,
     };
 
-    sd_journal_open_files(&j, files, 0);
-    if(!j)
+    if(sd_journal_open_files(&j, files, 0) < 0 || !j)
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
 
     ND_SD_JOURNAL_STATUS status;
@@ -369,9 +351,10 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     }
     else {
         // we have to do a full query
-        status = netdata_systemd_journal_query_full(j, wb, facets,
-                                                    after_ut, before_ut, if_modified_since,
-                                                    stop_monotonic_ut, last_modified, cancelled);
+        status = netdata_systemd_journal_query_full(
+                j, wb, facets,
+                after_ut, before_ut, if_modified_since,
+                stop_monotonic_ut, last_modified, cancelled);
     }
 
     sd_journal_close(j);
@@ -379,33 +362,161 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     return status;
 }
 
-#define VAR_LOG_JOURNAL_MAX_DEPTH 10
+// ----------------------------------------------------------------------------
+// journal files registry
 
-static ND_SD_JOURNAL_STATUS traverse_var_log_journal(
-        const char *dirname, int depth,
-        BUFFER *wb, FACETS *facets,
-        usec_t after_ut, usec_t before_ut,
-        usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
-        usec_t if_modified_since, usec_t stop_monotonic_ut, bool data_only,
-        bool *cancelled, usec_t *last_modified) {
+#define VAR_LOG_JOURNAL_MAX_DEPTH 10
+#define MAX_JOURNAL_DIRECTORIES 100
+
+typedef enum {
+    SDJF_LOCAL          = (1 << 0),
+    SDJF_REMOTE         = (1 << 1),
+    SDJF_SYSTEM         = (1 << 2),
+    SDJF_USER           = (1 << 3),
+    SDJF_OTHER          = (1 << 4),
+} SD_JOURNAL_FILE_SOURCE_TYPE;
+
+struct journal_file {
+    SD_JOURNAL_FILE_SOURCE_TYPE source_type;
+    usec_t file_last_modified_ut;
+    usec_t msg_first_ut;
+    usec_t msg_last_ut;
+    usec_t last_scan_ut;
+    bool logged_failure;
+};
+
+struct journal_directory {
+    char *path;
+    bool logged_failure;
+};
+
+static struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = { 0 };
+static DICTIONARY *journal_files_registry = NULL;
+
+static void journal_file_update_msg_ut(const char *filename, struct journal_file *jf) {
+    const char *files[2] = {
+            [0] = filename,
+            [1] = NULL,
+    };
+
+    sd_journal *j = NULL;
+    if(sd_journal_open_files(&j, files, 0) < 0 || !j) {
+        if(!jf->logged_failure) {
+            netdata_log_error("cannot open journal file '%s', using file timestamps to understand time-frame.", filename);
+            jf->logged_failure = true;
+        }
+
+        jf->msg_first_ut = 0;
+        jf->msg_last_ut = jf->file_last_modified_ut;
+        return;
+    }
+
+    usec_t first_ut = 0, last_ut = 0;
+
+    if(sd_journal_seek_head(j) < 0 || sd_journal_next(j) < 0 || sd_journal_get_realtime_usec(j, &first_ut) < 0 || !first_ut) {
+        internal_error(true, "cannot find the timestamp of the first message in '%s'", filename);
+        first_ut = 0;
+    }
+
+    if(sd_journal_seek_tail(j) < 0 || sd_journal_previous(j) < 0 || sd_journal_get_realtime_usec(j, &last_ut) < 0 || !last_ut) {
+        internal_error(true, "cannot find the timestamp of the last message in '%s'", filename);
+        last_ut = jf->file_last_modified_ut;
+    }
+
+    sd_journal_close(j);
+
+    if(first_ut > last_ut) {
+        internal_error(true, "timestamps are flipped in file '%s'", filename);
+        usec_t t = first_ut;
+        first_ut = last_ut;
+        last_ut = t;
+    }
+
+    jf->msg_first_ut = first_ut;
+    jf->msg_last_ut = last_ut;
+}
+
+static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
+    struct journal_file *jf = value;
+    const char *filename = dictionary_acquired_item_name(item);
+
+    const char *s = strrchr(filename, '/');
+    if(s) {
+        if(strstr(filename, "/remote/"))
+            jf->source_type = SDJF_REMOTE;
+        else
+            jf->source_type = SDJF_LOCAL;
+
+        if(strstr(s, "/system"))
+            jf->source_type |= SDJF_SYSTEM;
+        else if(strstr(s, "/user"))
+            jf->source_type |= SDJF_USER;
+        else
+            jf->source_type |= SDJF_OTHER;
+    }
+    else
+        jf->source_type = SDJF_LOCAL | SDJF_OTHER;
+
+    journal_file_update_msg_ut(filename, jf);
+
+    internal_error(true,
+                   "found journal file '%s', type %d, "
+                   "file modified: %"PRIu64", "
+                   "msg {first: %"PRIu64", last: %"PRIu64"}",
+                   filename, jf->source_type,
+                   jf->file_last_modified_ut,
+                   jf->msg_first_ut, jf->msg_last_ut);
+}
+
+static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data __maybe_unused) {
+    struct journal_file *jf = old_value;
+    struct journal_file *njf = new_value;
+
+    if(njf->last_scan_ut > jf->last_scan_ut)
+        jf->last_scan_ut = njf->last_scan_ut;
+
+    if(jf->file_last_modified_ut != njf->file_last_modified_ut) {
+        jf->file_last_modified_ut = njf->file_last_modified_ut;
+
+        const char *filename = dictionary_acquired_item_name(item);
+        journal_file_update_msg_ut(filename, jf);
+
+        internal_error(true,
+                       "updated journal file '%s', type %d, "
+                       "file modified: %"PRIu64", "
+                       "msg {first: %"PRIu64", last: %"PRIu64"}",
+                       filename, jf->source_type,
+                       jf->file_last_modified_ut,
+                       jf->msg_first_ut, jf->msg_last_ut);
+    }
+
+    return false;
+}
+
+static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
+    struct journal_file *jf = value; (void)jf;
+    const char *filename = dictionary_acquired_item_name(item); (void)filename;
+
+    internal_error(true, "removed journal file '%s'", filename);
+}
+
+void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut) {
 
     static const char *ext = ".journal";
     static const size_t ext_len = sizeof(".journal") - 1;
 
     if (depth > VAR_LOG_JOURNAL_MAX_DEPTH)
-        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+        return;
 
     DIR *dir;
     struct dirent *entry;
     struct stat info;
     char absolute_path[FILENAME_MAX];
-    ND_SD_JOURNAL_STATUS ret_status = ND_SD_JOURNAL_FAILED_TO_OPEN;
-    usec_t ret_last_modified = *last_modified;
 
     // Open the directory.
     if ((dir = opendir(dirname)) == NULL) {
         netdata_log_error("Cannot opendir() '%s'", dirname);
-        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+        return;
     }
 
     // Read each entry in the directory.
@@ -417,17 +528,10 @@ static ND_SD_JOURNAL_STATUS traverse_var_log_journal(
             continue;
         }
 
-        ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_FAILED_TO_OPEN;
-        usec_t tmp_last_modified = 0;
-
         if (S_ISDIR(info.st_mode)) {
             // If entry is a directory, call traverse recursively.
             if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0)
-                status = traverse_var_log_journal(absolute_path, depth + 1,
-                                         wb, facets,
-                                         after_ut, before_ut, anchor, direction, entries,
-                                         if_modified_since, stop_monotonic_ut, data_only,
-                                         cancelled, &tmp_last_modified);
+                journal_directory_scan(absolute_path, depth + 1, last_scan_ut);
 
         }
         else if (S_ISREG(info.st_mode)) {
@@ -436,69 +540,119 @@ static ND_SD_JOURNAL_STATUS traverse_var_log_journal(
             size_t len = strlen(filename);
 
             if (len > ext_len && strcmp(filename + len - ext_len, ext) == 0) {
-                status = netdata_systemd_journal_query_one_file(
-                        absolute_path,
-                        wb, facets,
-                        after_ut, before_ut,
-                        anchor, direction, entries,
-                        if_modified_since, stop_monotonic_ut, data_only,
-                        cancelled, &tmp_last_modified);
+                struct journal_file t = {
+                        .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
+                        .last_scan_ut = last_scan_ut,
+                };
+                dictionary_set(journal_files_registry, absolute_path, &t, sizeof(t));
             }
-        }
-
-        if(tmp_last_modified > ret_last_modified)
-            ret_last_modified = tmp_last_modified;
-
-        switch(status) {
-            default:
-            case ND_SD_JOURNAL_OK:
-                ret_status = status;
-                break;
-
-            case ND_SD_JOURNAL_NOT_MODIFIED:
-            case ND_SD_JOURNAL_FAILED_TO_SEEK:
-            case ND_SD_JOURNAL_FAILED_TO_OPEN:
-                // continue to the next file
-                if(ret_status != ND_SD_JOURNAL_OK)
-                    ret_status = status;
-                break;
-
-            case ND_SD_JOURNAL_CANCELLED:
-            case ND_SD_JOURNAL_TIMED_OUT:
-                // we need to stop
-                stop = true;
-                ret_status = status;
-                break;
         }
     }
 
     closedir(dir);
-
-    *last_modified = ret_last_modified;
-    return ret_status;
 }
 
+static void journal_files_registry_update() {
+    usec_t scan_ut = now_monotonic_usec();
+
+    for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES ;i++) {
+        if(!journal_directories[i].path)
+            break;
+
+        journal_directory_scan(journal_directories[i].path, 0, scan_ut);
+    }
+
+    struct journal_file *jf;
+    dfe_start_write(journal_files_registry, jf) {
+        if(jf->last_scan_ut < scan_ut)
+            dictionary_del(journal_files_registry, jf_dfe.name);
+    }
+    dfe_done(jf);
+}
+
+// ----------------------------------------------------------------------------
+
+#define jf_is_mine(jf, source_type, after_ut, before_ut) \
+    ((jf)->source_type & (source_type) && (jf)->msg_last_ut >= (after_ut) && (jf)->msg_first_ut <= (before_ut))
+
 static int netdata_systemd_journal_query(
-        BUFFER *wb, FACETS *facets, const char *source,
+        BUFFER *wb, FACETS *facets, SD_JOURNAL_FILE_SOURCE_TYPE source_type,
         usec_t after_ut, usec_t before_ut,
         usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
         usec_t if_modified_since, bool data_only,
         usec_t stop_monotonic_ut,
         bool *cancelled) {
 
-    char var_log_journal[PATH_MAX + 1] = "/var/log/journal";
-
-    if(*netdata_configured_host_prefix)
-        snprintfz(var_log_journal, PATH_MAX, "%s/var/log/journal", netdata_configured_host_prefix);
-
     usec_t last_modified = 0;
-    ND_SD_JOURNAL_STATUS status = traverse_var_log_journal(
-            var_log_journal, 0,
-            wb, facets,
-            after_ut, before_ut,
-            anchor, direction, entries,
-            if_modified_since, stop_monotonic_ut, data_only,
-            cancelled, &last_modified);
+    ND_SD_JOURNAL_STATUS status;
+
+    struct journal_file *jf;
+
+    if(if_modified_since) {
+        bool modified = false;
+
+        dfe_start_read(journal_files_registry, jf) {
+            if(!jf_is_mine(jf, source_type, after_ut, before_ut))
+                continue;
+
+            if(jf->msg_last_ut > if_modified_since) {
+                modified = true;
+                break;
+            }
+        }
+        dfe_done(jf);
+
+        if(!modified) {
+            buffer_flush(wb);
+            return HTTP_RESP_NOT_MODIFIED;
+        }
+    }
+
+    bool partial = false;
+    dfe_start_reentrant(journal_files_registry, jf) {
+        if(!jf_is_mine(jf, source_type, after_ut, before_ut))
+            continue;
+
+        usec_t tmp_last_modified = 0;
+        ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file(
+                jf_dfe.name,
+                wb, facets,
+                after_ut, before_ut,
+                anchor, direction, entries,
+                0, stop_monotonic_ut, data_only,
+                cancelled, &tmp_last_modified);
+
+        if(tmp_last_modified > last_modified)
+            last_modified = tmp_last_modified;
+
+        bool stop = false;
+        switch(tmp_status) {
+            case ND_SD_JOURNAL_OK:
+                status = tmp_status;
+                break;
+
+            case ND_SD_JOURNAL_FAILED_TO_OPEN:
+            case ND_SD_JOURNAL_FAILED_TO_SEEK:
+                if(status == ND_SD_JOURNAL_FAILED_TO_OPEN)
+                    status = tmp_status;
+                break;
+
+            case ND_SD_JOURNAL_CANCELLED:
+            case ND_SD_JOURNAL_TIMED_OUT:
+                partial = true;
+                stop = true;
+                status = tmp_status;
+                break;
+
+            case ND_SD_JOURNAL_NOT_MODIFIED:
+                internal_fatal(true, "this should never be returned here");
+                break;
+        }
+
+        if(stop)
+            break;
+    }
+    dfe_done(jf);
 
     if(status != ND_SD_JOURNAL_OK && status != ND_SD_JOURNAL_TIMED_OUT) {
         buffer_flush(wb);
@@ -517,7 +671,7 @@ static int netdata_systemd_journal_query(
     }
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
-    buffer_json_member_add_boolean(wb, "partial", status != ND_SD_JOURNAL_OK);
+    buffer_json_member_add_boolean(wb, "partial", partial);
     buffer_json_member_add_string(wb, "type", "table");
 
     if(!data_only) {
@@ -821,6 +975,8 @@ static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, 
 }
 
 static void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
+    journal_files_registry_update();
+
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
@@ -884,6 +1040,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     const char *query = NULL;
     const char *chart = NULL;
     const char *source = NULL;
+    SD_JOURNAL_FILE_SOURCE_TYPE source_type = ~0;
 
     buffer_json_member_add_object(wb, "request");
 
@@ -905,6 +1062,29 @@ static void function_systemd_journal(const char *transaction, char *function, in
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {
             source = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
+
+            source_type = ~0; // "all"
+
+            if(strcmp(source, "all") == 0)
+                source_type = ~0;
+            else if(strcmp(source, "local") == 0)
+                source_type = SDJF_LOCAL;
+            else if(strcmp(source, "remote") == 0)
+                source_type = SDJF_REMOTE;
+            else if(strcmp(source, "local-system-only") == 0)
+                source_type = SDJF_LOCAL | SDJF_SYSTEM;
+            else if(strcmp(source, "local-users-only") == 0)
+                source_type = SDJF_LOCAL | SDJF_USER;
+            else if(strcmp(source, "local-other-only") == 0)
+                source_type = SDJF_LOCAL | SDJF_OTHER;
+            else if(strcmp(source, "remote-system-only") == 0)
+                source_type = SDJF_REMOTE | SDJF_SYSTEM;
+            else if(strcmp(source, "remote-users-only") == 0)
+                source_type = SDJF_REMOTE | SDJF_USER;
+            else if(strcmp(source, "remote-other-only") == 0)
+                source_type = SDJF_REMOTE | SDJF_OTHER;
+            else
+                internal_error(true, "unknown source '%s'", source);
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_AFTER ":", sizeof(JOURNAL_PARAMETER_AFTER ":") - 1) == 0) {
             after_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_AFTER ":") - 1]);
@@ -1023,10 +1203,89 @@ static void function_systemd_journal(const char *transaction, char *function, in
                 {
                     buffer_json_add_array_item_object(wb);
                     {
-                        buffer_json_member_add_string(wb, "id", "default");
-                        buffer_json_member_add_string(wb, "name", "default");
+                        buffer_json_member_add_string(wb, "id", "all");
+                        buffer_json_member_add_string(wb, "name", "all");
                     }
                     buffer_json_object_close(wb); // options object
+
+                    SD_JOURNAL_FILE_SOURCE_TYPE available_types = 0;
+                    struct journal_file *jf;
+                    dfe_start_read(journal_files_registry, jf) {
+                        available_types |= jf->source_type;
+                    }
+                    dfe_done(jf);
+
+                    if((available_types & SDJF_LOCAL) == SDJF_LOCAL) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "local");
+                            buffer_json_member_add_string(wb, "name", "local");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
+
+                    if((available_types & (SDJF_LOCAL | SDJF_SYSTEM)) == (SDJF_LOCAL | SDJF_SYSTEM)) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "local-system-only");
+                            buffer_json_member_add_string(wb, "name", "local-system-only");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
+
+                    if((available_types & (SDJF_LOCAL | SDJF_USER)) == (SDJF_LOCAL | SDJF_USER)) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "local-users-only");
+                            buffer_json_member_add_string(wb, "name", "local-users-only");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
+
+                    if((available_types & (SDJF_LOCAL | SDJF_OTHER)) == (SDJF_LOCAL | SDJF_OTHER)) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "local-other-only");
+                            buffer_json_member_add_string(wb, "name", "local-other-only");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
+
+                    if((available_types & SDJF_REMOTE) == SDJF_REMOTE) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "local");
+                            buffer_json_member_add_string(wb, "name", "local");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
+
+                    if((available_types & (SDJF_REMOTE | SDJF_SYSTEM)) == (SDJF_REMOTE | SDJF_SYSTEM)) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "remote-system-only");
+                            buffer_json_member_add_string(wb, "name", "remote-system-only");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
+
+                    if((available_types & (SDJF_REMOTE | SDJF_USER)) == (SDJF_REMOTE | SDJF_USER)) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "remote-users-only");
+                            buffer_json_member_add_string(wb, "name", "remote-users-only");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
+
+                    if((available_types & (SDJF_REMOTE | SDJF_OTHER)) == (SDJF_REMOTE | SDJF_OTHER)) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", "remote-other-only");
+                            buffer_json_member_add_string(wb, "name", "remote-other-only");
+                        }
+                        buffer_json_object_close(wb); // options object
+                    }
                 }
                 buffer_json_array_close(wb); // options array
             }
@@ -1053,7 +1312,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
         facets_set_histogram_by_name(facets, "PRIORITY",
                                    after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
-    response = netdata_systemd_journal_query(wb, facets, source,
+    response = netdata_systemd_journal_query(wb, facets, source_type,
                                              after_s * USEC_PER_SEC, before_s * USEC_PER_SEC,
                                              anchor, direction, last,
                                              if_modified_since, data_only,
@@ -1094,6 +1353,39 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);
+
+    // ------------------------------------------------------------------------
+    // setup the journal directories
+
+    unsigned d = 0;
+
+    journal_directories[d++].path = strdupz("/var/log/journal");
+    journal_directories[d++].path = strdupz("/run/log/journal");
+
+    if(*netdata_configured_host_prefix) {
+        char path[PATH_MAX];
+        snprintfz(path, sizeof(path), "%s/var/log/journal", netdata_configured_host_prefix);
+        journal_directories[d++].path = strdupz(path);
+        snprintfz(path, sizeof(path), "%s/run/log/journal", netdata_configured_host_prefix);
+        journal_directories[d++].path = strdupz(path);
+    }
+
+    // terminate the list
+    journal_directories[d].path = NULL;
+
+    // ------------------------------------------------------------------------
+    // initialize the journal files registry
+
+    journal_files_registry = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(struct journal_file));
+
+    dictionary_register_insert_callback(journal_files_registry, files_registry_insert_cb, NULL);
+    dictionary_register_delete_callback(journal_files_registry, files_registry_delete_cb, NULL);
+    dictionary_register_conflict_callback(journal_files_registry, files_registry_conflict_cb, NULL);
+
+    journal_files_registry_update();
+
 
     // ------------------------------------------------------------------------
     // debug
