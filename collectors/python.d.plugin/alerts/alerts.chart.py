@@ -80,10 +80,16 @@ class Service(UrlService):
         }
         data_warning = {'{}_warning'.format(a): 1 for a in alerts if alerts[a]['status'] == 'WARNING'}
         data['warning'] = len(data_warning)
+        for dim in self.collected_dims['warning']:
+            if dim not in data_warning:
+                data_warning[dim] = 0
         self.update_charts('warning', data_warning)
         data.update(data_warning)
         data_critical = {'{}_critical'.format(a): 1 for a in alerts if alerts[a]['status'] == 'CRITICAL'}
         data['critical'] = len(data_critical)
+        for dim in self.collected_dims['critical']:
+            if dim not in data_critical:
+                data_critical[dim] = 0
         self.update_charts('critical', data_critical)
         data.update(data_critical)
 
@@ -97,8 +103,3 @@ class Service(UrlService):
             if dim not in self.collected_dims[chart]:
                 self.collected_dims[chart].add(dim)
                 self.charts[chart].add_dimension([dim, dim, algorithm, multiplier, divisor])
-
-        #for dim in list(self.collected_dims[chart]):
-        #    if dim not in data:
-        #        self.collected_dims[chart].remove(dim)
-        #        self.charts[chart].del_dimension(dim, hide=False)
