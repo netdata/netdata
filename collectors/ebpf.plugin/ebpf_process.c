@@ -194,7 +194,6 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
                         w->process.create_thread += values->data.create_thread;
                         w->process.create_process += values->data.create_process;
                         w->process.exit_call += values->data.exit_call;
-                        values->publish = NETDATA_EBPF_PROCESS_NOT_PUBLISHED;
                     }
                 }
                 rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
