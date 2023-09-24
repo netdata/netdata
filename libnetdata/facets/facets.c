@@ -479,7 +479,7 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
     k->hash = hash;
     k->facets = facets;
     k->options = options;
-    k->current_value.b = buffer_create(0, NULL);
+    k->current_value.b = buffer_create(sizeof(FACET_VALUE_UNSET), NULL);
     k->default_selected_for_values = true;
 
     if(!(k->options & FACET_KEY_OPTION_REORDER))
@@ -1264,9 +1264,12 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
     facets->operations.values.registered++;
     facets->operations.values.empty++;
 
-    buffer_contents_replace(k->current_value.b, FACET_VALUE_UNSET, sizeof(FACET_VALUE_UNSET) - 1);
+    // no need to copy the UNSET value
+    // empty values are exported as empty
+    k->current_value.b->len = 0;
+    // buffer_contents_replace(k->current_value.b, FACET_VALUE_UNSET, sizeof(FACET_VALUE_UNSET) - 1);
 
-    if(k->values.enabled)
+    if(unlikely(k->values.enabled))
         FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(k);
     else {
         k->key_found_in_row++;
