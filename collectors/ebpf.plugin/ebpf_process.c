@@ -316,18 +316,43 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
  * Update cgroup
  *
  * Update cgroup data based in PID running.
- *
- * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_process_cgroup(int maps_per_core)
+static void ebpf_update_process_cgroup()
 {
     ebpf_cgroup_target_t *ect ;
 
-    size_t length =  sizeof(ebpf_process_stat_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        struct pid_on_target2 *pids;
+        ebpf_process_stat_t *out = &ect->publish_systemd_ps;
+        memset(out, 0, sizeof(ebpf_process_stat_t));
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+        for (pids = ect->pids; pids; pids = pids->next) {
+            int pid = pids->pid;
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            if (pid_ptr) {
+                rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
+                if (pid_ptr->process_stats.JudyLArray) {
+                    Word_t local_timestamp = 0;
+                    bool first_process = true;
+                    Pvoid_t *process_value;
+                    while (
+                        (process_value =
+                             JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_timestamp, &first_process))) {
+                        ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
+
+                        out->exit_call += values->data.exit_call;
+                        out->create_process += values->data.create_process;
+                        out->create_thread += values->data.create_thread;
+                        out->task_err += values->data.task_err;
+                        out->release_call += values->data.release_call;
+                    }
+                }
+                rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
+            }
+        }
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
@@ -1309,10 +1334,8 @@ static void process_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
         pthread_mutex_lock(&collect_data_mutex);
 
-        if (ebpf_all_pids_count > 0) {
-            if (cgroups && shm_ebpf_cgroup.header) {
-                ebpf_update_process_cgroup(maps_per_core);
-            }
+        if (ebpf_all_pids_count > 0 && cgroups && shm_ebpf_cgroup.header) {
+            ebpf_update_process_cgroup();
         }
 
         if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
@@ -1352,8 +1375,6 @@ static void process_collector(ebpf_module_t *em)
 
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
-        if () {
-        }
     }
 }
 
