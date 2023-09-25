@@ -66,4 +66,6 @@ void aral_destroy_internal(ARAL *ar);
 
 #endif // NETDATA_TRACE_ALLOCATIONS
 
+int aral_benchmark(int argc, char *argv[]);
+
 #endif // ARAL_H

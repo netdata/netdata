@@ -1530,6 +1530,9 @@ int main(int argc, char **argv) {
                             unittest_running = true;
                             return aral_unittest(10000);
                         }
+                        else if(strcmp(optarg, "aralbench") == 0) {
+                            return aral_benchmark(argc, argv);
+                        }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;
                             return string_unittest(10000);
