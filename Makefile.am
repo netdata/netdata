@@ -977,7 +977,6 @@ MONGODB_EXPORTING_FILES = \
     $(NULL)
 
 DAEMON_FILES = \
-    libnetdata/aral/aral_bench.cc \
     daemon/buildinfo.c \
     daemon/buildinfo.h \
     daemon/common.c \
@@ -1230,7 +1229,6 @@ endif
 
 netdata_LDADD = \
     $(NETDATA_COMMON_LIBS) \
-    -lbenchmark
     $(NULL)
 
 if ENABLE_ACLK
