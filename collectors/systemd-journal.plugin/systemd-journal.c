@@ -1069,18 +1069,27 @@ static void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused
     FACET_ROW_KEY_VALUE *pid_rkv = dictionary_get(row->dict, "_PID");
     const char *pid = pid_rkv ? buffer_tostring(pid_rkv->wb) : FACET_VALUE_UNSET;
 
-    FACET_ROW_KEY_VALUE *syslog_identifier_rkv = dictionary_get(row->dict, "SYSLOG_IDENTIFIER");
-    const char *identifier = syslog_identifier_rkv ? buffer_tostring(syslog_identifier_rkv->wb) : FACET_VALUE_UNSET;
+    const char *identifier = NULL;
+    FACET_ROW_KEY_VALUE *container_name_rkv = dictionary_get(row->dict, "CONTAINER_NAME");
+    if(container_name_rkv && !container_name_rkv->empty)
+        identifier = buffer_tostring(container_name_rkv->wb);
 
-    if(strcmp(identifier, FACET_VALUE_UNSET) == 0) {
-        FACET_ROW_KEY_VALUE *comm_rkv = dictionary_get(row->dict, "_COMM");
-        identifier = comm_rkv ? buffer_tostring(comm_rkv->wb) : FACET_VALUE_UNSET;
+    if(!identifier) {
+        FACET_ROW_KEY_VALUE *syslog_identifier_rkv = dictionary_get(row->dict, "SYSLOG_IDENTIFIER");
+        if(syslog_identifier_rkv && !syslog_identifier_rkv->empty)
+            identifier = buffer_tostring(syslog_identifier_rkv->wb);
+
+        if(!identifier) {
+            FACET_ROW_KEY_VALUE *comm_rkv = dictionary_get(row->dict, "_COMM");
+            if(comm_rkv && !comm_rkv->empty)
+                identifier = buffer_tostring(comm_rkv->wb);
+        }
     }
 
     buffer_flush(rkv->wb);
 
-    if(strcmp(pid, FACET_VALUE_UNSET) == 0)
-        buffer_strcat(rkv->wb, identifier);
+    if(!identifier)
+        buffer_strcat(rkv->wb, FACET_VALUE_UNSET);
     else
         buffer_sprintf(rkv->wb, "%s[%s]", identifier, pid);
 
