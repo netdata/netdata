@@ -1782,17 +1782,20 @@ void ml_init()
     // create table
     if (db) {
         int target_version = perform_ml_database_migration(db, ML_METADATA_VERSION);
-        char buf[128];
-        snprintfz(buf, 127, "PRAGMA user_version=%d;", target_version);
-        (void) db_execute(db, buf);
-
-        char *err = NULL;
-        int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+        if (configure_sqlite_database(db, target_version)) {
+            error_report("Failed to setup ML database");
             sqlite3_close(db);
-            sqlite3_free(err);
             db = NULL;
+        }
+        else {
+            char *err = NULL;
+            int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
+            if (rc != SQLITE_OK) {
+                error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+                sqlite3_close(db);
+                sqlite3_free(err);
+                db = NULL;
+            }
         }
     }
 }

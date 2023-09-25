@@ -50,6 +50,7 @@ SQLITE_API int sqlite3_exec_monitored(
 int init_database_batch(sqlite3 *database, const char *batch[]);
 int sql_init_database(db_check_action_type_t rebuild, int memory);
 void sql_close_database(void);
+int configure_sqlite_database(sqlite3 *database, int target_version);
 
 // Helpers
 int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);
