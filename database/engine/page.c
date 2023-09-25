@@ -405,7 +405,6 @@ uint32_t pgd_disk_footprint(PGD *pg)
                 size = pg->gorilla.num_buffers * GORILLA_BUFFER_SIZE;
 
                 if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) {
-                    global_statistics_gorilla_buffer_remove_hot(pg->gorilla.num_buffers);
                     global_statistics_tier0_disk_compressed_bytes(gorilla_writer_nbytes(pg->gorilla.writer));
                     global_statistics_tier0_disk_uncompressed_bytes(gorilla_writer_entries(pg->gorilla.writer) * sizeof(storage_number));
                 }

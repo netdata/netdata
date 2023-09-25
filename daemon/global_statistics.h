@@ -46,7 +46,6 @@ void global_statistics_sqlite3_row_completed(void);
 void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array);
 
 void global_statistics_gorilla_buffer_add_hot();
-void global_statistics_gorilla_buffer_remove_hot(uint32_t);
 
 void global_statistics_tier0_disk_compressed_bytes(uint32_t size);
 void global_statistics_tier0_disk_uncompressed_bytes(uint32_t size);

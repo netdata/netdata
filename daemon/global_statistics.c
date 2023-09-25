@@ -121,10 +121,6 @@ void global_statistics_gorilla_buffer_add_hot() {
     __atomic_fetch_add(&global_statistics.tier0_hot_gorilla_buffers, 1, __ATOMIC_RELAXED);
 }
 
-void global_statistics_gorilla_buffer_remove_hot(uint32_t n) {
-    __atomic_fetch_sub(&global_statistics.tier0_hot_gorilla_buffers, n, __ATOMIC_RELAXED);
-}
-
 void global_statistics_tier0_disk_compressed_bytes(uint32_t size) {
     __atomic_fetch_add(&global_statistics.tier0_disk_compressed_bytes, size, __ATOMIC_RELAXED);
 }
