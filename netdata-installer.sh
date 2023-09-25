@@ -1137,6 +1137,11 @@ if [ -n "${NETDATA_PREPARE_ONLY}" ]; then
     exit 0
 fi
 
+# Let cmake know we don't want to link shared libs
+if [ "${IS_NETDATA_STATIC_BINARY}" = "yes" ]; then
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DBUILD_SHARED_LIBS=Off"
+fi
+
 # shellcheck disable=SC2086
 if ! run ${cmake} ${NETDATA_CMAKE_OPTIONS}; then
   fatal "Failed to configure Netdata sources." I000A
