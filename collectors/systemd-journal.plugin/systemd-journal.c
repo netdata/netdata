@@ -36,6 +36,7 @@ static void fstat_cache_enable(int fd) {
     if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
         fstat64_cache[fd].enabled = true;
         fstat64_cache[fd].updated = false;
+        fstat64_cache[fd].cached_count = 0;
     }
 }
 
@@ -46,6 +47,7 @@ static size_t fstat_cache_disable(int fd) {
         fstat64_cache[fd].enabled = false;
         fstat64_cache[fd].updated = false;
         cached_count = fstat64_cache[fd].cached_count;
+        fstat64_cache[fd].cached_count = 0;
     }
 
     return cached_count;
@@ -215,7 +217,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         usec_t after_ut, usec_t before_ut,
         usec_t if_modified_since, usec_t stop_monotonic_ut, usec_t *last_modified,
-        bool *cancelled) {
+        bool *cancelled, size_t *rows_read) {
     if(!netdata_systemd_journal_seek_to(j, before_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
@@ -260,6 +262,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 
         netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
+        (*rows_read)++;
 
         status = check_stop(row_counter, cancelled, stop_monotonic_ut);
     }
@@ -276,7 +279,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         usec_t after_ut, usec_t before_ut,
         usec_t anchor, size_t entries, usec_t stop_monotonic_ut,
-        bool *cancelled) {
+        bool *cancelled, size_t *rows_read) {
 
     if(!netdata_systemd_journal_seek_to(j, anchor))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -317,6 +320,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
         netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
         rows_added++;
+        (*rows_read)++;
 
         status = check_stop(row_counter, cancelled, stop_monotonic_ut);
     }
@@ -331,7 +335,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         usec_t after_ut, usec_t before_ut,
         usec_t anchor, size_t entries, usec_t stop_monotonic_ut,
-        bool *cancelled) {
+        bool *cancelled, size_t *rows_read) {
 
     if(!netdata_systemd_journal_seek_to(j, anchor))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -372,6 +376,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
         netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
         rows_added++;
+        (*rows_read)++;
 
         status = check_stop(row_counter, cancelled, stop_monotonic_ut);
     }
@@ -413,7 +418,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         usec_t anchor, FACETS_ANCHOR_DIRECTION direction, size_t entries,
         usec_t if_modified_since, usec_t stop_monotonic_ut, bool data_only,
         bool *cancelled, usec_t *last_modified,
-        size_t *cached_count) {
+        size_t *cached_count, size_t *rows_read) {
 
     internal_error(true, "processing file '%s'", filename);
 
@@ -447,16 +452,24 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 
         // we can do a data-only query
         if(direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = netdata_systemd_journal_query_data_forward(j, wb, facets, after_ut, before_ut, anchor, entries, stop_monotonic_ut, cancelled);
+            status = netdata_systemd_journal_query_data_forward(
+                    j, wb, facets,
+                    after_ut, before_ut,
+                    anchor, entries,
+                    stop_monotonic_ut, cancelled, rows_read);
         else
-            status = netdata_systemd_journal_query_data_backward(j, wb, facets, after_ut, before_ut, anchor, entries, stop_monotonic_ut, cancelled);
+            status = netdata_systemd_journal_query_data_backward(
+                    j, wb, facets,
+                    after_ut, before_ut,
+                    anchor, entries,
+                    stop_monotonic_ut, cancelled, rows_read);
     }
     else {
         // we have to do a full query
         status = netdata_systemd_journal_query_full(
                 j, wb, facets,
                 after_ut, before_ut, if_modified_since,
-                stop_monotonic_ut, last_modified, cancelled);
+                stop_monotonic_ut, last_modified, cancelled, rows_read);
     }
 
     sd_journal_close(j);
@@ -726,12 +739,15 @@ static int netdata_systemd_journal_query(
 
     buffer_json_member_add_array(wb, "_journal_files");
 
+    usec_t started_ut = 0;
+    usec_t ended_ut = now_monotonic_usec();
+
     bool partial = false;
     dfe_start_reentrant(journal_files_registry, jf) {
         if(!jf_is_mine(jf, source_type, after_ut, before_ut))
             continue;
 
-        size_t cached_count = 0;
+        size_t cached_count = 0, rows_read = 0;
         usec_t tmp_last_modified = 0;
         ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file(
                 jf_dfe.name,
@@ -740,18 +756,26 @@ static int netdata_systemd_journal_query(
                 anchor, direction, entries,
                 0, stop_monotonic_ut, data_only,
                 cancelled, &tmp_last_modified,
-                &cached_count);
+                &cached_count, &rows_read);
 
         if(tmp_last_modified > last_modified)
             last_modified = tmp_last_modified;
 
+        started_ut = ended_ut;
+        ended_ut = now_monotonic_usec();
+
         buffer_json_add_array_item_object(wb); // journal file
-        buffer_json_member_add_string(wb, "filename", jf_dfe.name);
-        buffer_json_member_add_uint64(wb, "type", jf->source_type);
-        buffer_json_member_add_uint64(wb, "last_modified_ut", jf->file_last_modified_ut);
-        buffer_json_member_add_uint64(wb, "msg_first_ut", jf->msg_first_ut);
-        buffer_json_member_add_uint64(wb, "msg_last_ut", jf->msg_last_ut);
-        buffer_json_member_add_uint64(wb, "fstat_cached_count", cached_count);
+        {
+            buffer_json_member_add_string(wb, "filename", jf_dfe.name);
+            buffer_json_member_add_uint64(wb, "type", jf->source_type);
+            buffer_json_member_add_uint64(wb, "last_modified_ut", jf->file_last_modified_ut);
+            buffer_json_member_add_uint64(wb, "msg_first_ut", jf->msg_first_ut);
+            buffer_json_member_add_uint64(wb, "msg_last_ut", jf->msg_last_ut);
+            buffer_json_member_add_uint64(wb, "fstat_cached_count", cached_count);
+            buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
+            buffer_json_member_add_uint64(wb, "rows_read", rows_read);
+            buffer_json_member_add_double(wb, "rows_per_second", (double)rows_read / ((double)(ended_ut - started_ut) / (double)USEC_PER_SEC));
+        }
         buffer_json_object_close(wb); // journal file
 
         bool stop = false;
