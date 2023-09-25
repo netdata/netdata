@@ -1154,16 +1154,12 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
- *
- * @param apps is apps enabled?
  */
-static void ebpf_shm_allocate_global_vectors(int apps)
+static void ebpf_shm_allocate_global_vectors()
 {
-    if (apps) {
-        ebpf_shm_aral_init();
-        shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
-        shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
-    }
+    ebpf_shm_aral_init();
+    shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
+    shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
 
     shm_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
@@ -1262,7 +1258,7 @@ void *ebpf_shm_thread(void *ptr)
         goto endshm;
     }
 
-    ebpf_shm_allocate_global_vectors(em->apps_charts);
+    ebpf_shm_allocate_global_vectors();
 
     int algorithms[NETDATA_SHM_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX,
