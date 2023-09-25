@@ -3,6 +3,7 @@
 
 #define HISTOGRAM_COLUMNS 100
 #define FACETS_KEYS_WITH_VALUES_MAX 200
+#define FACETS_KEYS_IN_ROW_MAX 500
 #define FACETS_KEYS_HASHTABLE_ENTRIES 1000
 #define FACETS_VALUES_HASHTABLE_ENTRIES 20
 
@@ -198,6 +199,11 @@ struct facets {
         size_t used;
         FACET_KEY *array[FACETS_KEYS_WITH_VALUES_MAX];
     } keys_with_values;
+
+    struct {
+        size_t used;
+        FACET_KEY *array[FACETS_KEYS_IN_ROW_MAX];
+    } keys_in_row;
 
     FACET_ROW *base;    // double linked list of the selected facets rows
 
@@ -1285,6 +1291,9 @@ void facets_data_only_mode(FACETS *facets) {
 // ----------------------------------------------------------------------------
 
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
+    if(likely(!k->current_value.updated && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+
     k->current_value.updated = true;
     k->current_value.empty = true;
 
@@ -1305,6 +1314,9 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
 }
 
 static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
+    if(likely(!k->current_value.updated && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+
     k->current_value.updated = true;
     k->current_value.empty = false;
 
@@ -1541,8 +1553,10 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
 }
 
 void facets_rows_begin(FACETS *facets) {
-    FACET_KEY *k;
-    foreach_key_in_facets(facets, k) {
+    size_t entries = facets->keys_in_row.used;
+
+    for(size_t p = 0; p < entries ;p++) {
+        FACET_KEY *k = facets->keys_in_row.array[p];
         k->key_found_in_row = 0;
         k->key_values_selected_in_row = 0;
         k->current_value.updated = false;
@@ -1550,10 +1564,10 @@ void facets_rows_begin(FACETS *facets) {
         k->current_value.hash = FACETS_HASH_ZERO;
         k->current_value.v = NULL;
     }
-    foreach_key_in_facets_done(k);
 
     facets->current_row.severity = FACET_ROW_SEVERITY_NORMAL;
     facets->current_row.keys_matched_by_query = 0;
+    facets->keys_in_row.used = 0;
 }
 
 void facets_row_finished(FACETS *facets, usec_t usec) {
