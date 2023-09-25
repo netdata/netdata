@@ -301,6 +301,7 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     ebpf_process_stat_t *total = &out[0];
+    uint32_t tgid = total->tgid;
     for (i = 1; i < end; i++) {
         ebpf_process_stat_t *w = &out[i];
         total->exit_call += w->exit_call;
@@ -308,7 +309,11 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
         total->create_thread += w->create_thread;
         total->create_process += w->create_process;
         total->release_call += w->release_call;
+
+        if (!tgid && w->tgid)
+            tgid = w->tgid;
     }
+    total->tgid = tgid;
 }
 
 /**
@@ -389,10 +394,17 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
         // Get PID structure
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, psv->name);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, psv[0].name);
         if (!pid_ptr) {
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_process_loop;
+        }
+        pid_ptr->tgid = psv[0].tgid;
+
+        if (key != pid_ptr->tgid) {
+            netdata_ebpf_judy_pid_stats_t *tgid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid_ptr->tgid, NULL);
+            if (tgid_ptr && tgid_ptr->name[0] && !pid_ptr->pname[0])
+                strncpyz(pid_ptr->pname, tgid_ptr->name, TASK_COMM_LEN);
         }
 
         // Get Process structure
@@ -411,6 +423,7 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
                 ps_ptr->current_timestamp = update_time;
                 ps_ptr->publish = NETDATA_EBPF_PROCESS_NOT_PUBLISHED;
                 memcpy(&ps_ptr->data, &psv[0], sizeof(ebpf_process_stat_t));
+                // We copy it again, because this can be created for another thread
             } else {
                 if ((update_time - ps_ptr->current_timestamp) > update_every &&
                      ps_ptr->publish & NETDATA_EBPF_PROCESS_PUBLISHED) {

@@ -111,6 +111,8 @@ typedef struct netdata_ebpf_judy_pid {
 
 typedef struct netdata_ebpf_judy_pid_stats {
     char name[TASK_COMM_LEN + 1];
+    char pname[TASK_COMM_LEN + 1];
+    uint32_t tgid;
 
     // Index for Socket timestamp
     struct {                            // support for multiple indexing engines
