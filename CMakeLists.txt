@@ -253,7 +253,11 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src")
                 set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/.libs/libprotobuf.a")
         else()
-                find_package(Protobuf REQUIRED)
+                if (NOT BUILD_SHARED_LIBS)
+                        set(Protobuf_USE_STATIC_LIBS On)
+                endif()
+
+                find_package(Protobuf)
         endif()
 endif()
 
