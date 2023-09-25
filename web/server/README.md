@@ -1,13 +1,3 @@
-<!--
-title: "Web server"
-description: "The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection."
-type: reference
-custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/README.md
-sidebar_label: "Web server"
-learn_status: "Published"
-learn_rel_path: "Configuration"
--->
-
 # Web server
 
 The Netdata web server is `static-threaded`, with a fixed, configurable number of threads. 
@@ -65,7 +55,7 @@ Scroll down to the `[web]` section to find the following settings.
 | `gzip compression level`                   | `3`                                                                                                                                                                                    | Valid settings are 1 (fastest) to 9 (best ratio).                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `web server threads`                       | ` `                                                                                                                                                                                    | How many processor threads the web server is allowed. The default is system-specific, the minimum of `6` or the number of CPU cores.                                                                                                                                                                                                                                                                                                                                                              |
 | `web server max sockets`                   | ` `                                                                                                                                                                                    | Available sockets. The default is system-specific, automatically adjusted to 50% of the max number of open files Netdata is allowed to use (via `/etc/security/limits.conf` or systemd), to allow enough file descriptors to be available for data collection.                                                                                                                                                                                                                                    |
-| `custom dashboard_info.js`                 | ` `                                                                                                                                                                                    | Specifies the location of a custom `dashboard.js` file. See [customizing the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md#customize-the-standard-dashboard) for details.                                                                                                                                                                                                                                                                                                                     |
+| `custom dashboard_info.js`                 | ` `                                                                                                                                                                                    | Specifies the location of a custom `dashboard.js` file.                                                                                                                                                                                                                                                                                                                     |
 
 ## Examples
 
