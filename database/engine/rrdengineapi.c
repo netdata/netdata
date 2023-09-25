@@ -382,15 +382,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     }
 
-    switch (ctx->config.page_type) {
-    case PAGE_GORILLA_METRICS:
-        handle->page_entries_max = 1024;
-        break;
-    default:
-        handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
-        break;
-    }
-
+    handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
     handle->page_start_time_ut = point_in_time_ut;
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
@@ -431,41 +423,40 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, siz
 
     PGD *d = NULL;
     
+    size_t max_size = tier_page_size[ctx->config.tier];
+    size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
+
+    size_t slots = aligned_allocation_entries(
+            max_slots,
+            indexing_partition((Word_t) handle->alignment, max_slots),
+            (time_t) (point_in_time_ut / USEC_PER_SEC)
+    );
+
+    if(slots < max_slots / 3)
+        slots = max_slots / 3;
+
+    if(slots < 3)
+        slots = 3;
+
+    size_t size = slots * CTX_POINT_SIZE_BYTES(ctx);
+
+    // internal_error(true, "PAGE ALLOC %zu bytes (%zu max)", size, max_size);
+
+    internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
+    internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
+
+    *data_size = size;
+
     switch (ctx->config.page_type) {
         case PAGE_METRICS:
-        case PAGE_TIER: {
-            size_t max_size = tier_page_size[ctx->config.tier];
-            size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
-
-            size_t slots = aligned_allocation_entries(
-                    max_slots,
-                    indexing_partition((Word_t) handle->alignment, max_slots),
-                    (time_t) (point_in_time_ut / USEC_PER_SEC)
-            );
-
-            if(slots < max_slots / 3)
-                slots = max_slots / 3;
-
-            if(slots < 3)
-                slots = 3;
-
-            size_t size = slots * CTX_POINT_SIZE_BYTES(ctx);
-
-            // internal_error(true, "PAGE ALLOC %zu bytes (%zu max)", size, max_size);
-
-            internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
-            internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
-
-            *data_size = size;
+        case PAGE_TIER:
             d = pgd_create(ctx->config.page_type, slots);
-
             break;
-        }
-        case PAGE_GORILLA_METRICS: {
-            *data_size = GORILLA_BUFFER_SLOTS * CTX_POINT_SIZE_BYTES(ctx);
+        case PAGE_GORILLA_METRICS:
+            // ignore slots, and use the fixed number of slots per gorilla buffer.
+            // gorilla will automatically add more buffers if needed.
             d = pgd_create(ctx->config.page_type, GORILLA_BUFFER_SLOTS);
             break;
-        }
         default:
             fatal("Unknown page type: %uc\n", ctx->config.page_type);
     }
