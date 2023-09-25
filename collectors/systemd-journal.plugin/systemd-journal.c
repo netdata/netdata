@@ -16,6 +16,8 @@
 // fstat64 overloading to speed up libsystemd
 // https://github.com/systemd/systemd/pull/29261
 
+#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
+
 #include <dlfcn.h>
 #include <sys/stat.h>
 
@@ -78,6 +80,8 @@ int fstat64(int fd, struct stat64 *buf) {
 
     return ret;
 }
+
+#endif // HAVE_SD_JOURNAL_OPEN_FILES_FD
 
 // ----------------------------------------------------------------------------
 
@@ -414,8 +418,9 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     internal_error(true, "processing file '%s'", filename);
 
     sd_journal *j = NULL;
-
     errno = 0;
+
+#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
     int fd = open(filename, O_RDONLY);
     fstat_cache_enable(fd);
 
@@ -424,6 +429,16 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         close(fd);
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
     }
+#else // !HAVE_SD_JOURNAL_OPEN_FILES_FD
+    const char *paths[2] = {
+            [0] = filename,
+            [1] = NULL,
+    };
+    if(sd_journal_open_files(&j, paths, 0) < 0 || !j) {
+        *cached_count = 0;
+        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+    }
+#endif // !HAVE_SD_JOURNAL_OPEN_FILES_FD
 
     ND_SD_JOURNAL_STATUS status;
 
@@ -445,8 +460,12 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     }
 
     sd_journal_close(j);
+#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
     *cached_count = fstat_cache_disable(fd);
     close(fd);
+#else
+    *cached_count = 0;
+#endif
 
     return status;
 }
