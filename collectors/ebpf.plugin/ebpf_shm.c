@@ -600,10 +600,10 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
             goto end_shm_loop;
         }
 
-        // Get Cachestat structure
-        rw_spinlock_write_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+        // Get SHM structure
+        rw_spinlock_write_lock(&pid_ptr->shm_stats.rw_spinlock);
         netdata_publish_shm_t **cs_pptr = (netdata_publish_shm_t **)ebpf_judy_insert_unsafe(
-            &pid_ptr->cachestat_stats.JudyLArray, cv[0].ct);
+            &pid_ptr->shm_stats.JudyLArray, cv[0].ct);
         netdata_publish_shm_t *cs_ptr = *cs_pptr;
         if (likely(*cs_pptr == NULL)) {
             *cs_pptr = ebpf_shm_stat_get();
@@ -611,7 +611,13 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
 
             cs_ptr->current_timestamp = update_time;
             memcpy(&cs_ptr->data, &cv[0], sizeof(netdata_publish_shm_kernel_t));
+        } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
+            JudyLDel(&pid_ptr->shm_stats.JudyLArray, cv[0].ct, PJE0);
+            ebpf_shm_release(cs_ptr);
+            bpf_map_delete_elem(fd, &key);
         }
+
+        rw_spinlock_write_unlock(&pid_ptr->shm_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // now that we've consumed the value, zero it out in the map.
