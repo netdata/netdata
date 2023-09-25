@@ -2038,8 +2038,13 @@ static void ebpf_function_process_help(const char *transaction) {
  * @param pid         the process PID
  * @param values      data read from hash table
  * @param name        the process name
+ * @param pname       parent name
  */
-static void ebpf_fill_process_function_buffer(BUFFER *wb, uint32_t pid, ebpf_process_stat_plus_t *values, char *name)
+static void ebpf_fill_process_function_buffer(BUFFER *wb,
+                                              uint32_t pid,
+                                              ebpf_process_stat_plus_t *values,
+                                              char *name,
+                                              char *pname)
 {
     buffer_json_add_array_item_array(wb);
 
@@ -2051,6 +2056,9 @@ static void ebpf_fill_process_function_buffer(BUFFER *wb, uint32_t pid, ebpf_pro
 
     // NAME
     buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // PNAME
+    buffer_json_add_array_item_string(wb, (pname[0] != '\0') ? name : EBPF_NOT_IDENFIED);
 
     // Create Task
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.create_process);
@@ -2095,7 +2103,7 @@ static void ebpf_fill_process_function_buffer_unsafe(BUFFER *buf)
         if (pid_ptr->process_stats.JudyLArray) {
             while ((process_value = JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_timestamp, &first_process))) {
                 ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
-                ebpf_fill_process_function_buffer(buf, local_pid, values, pid_ptr->name);
+                ebpf_fill_process_function_buffer(buf, local_pid, values, pid_ptr->name, pid_ptr->pname);
             }
             counter++;
         }
@@ -2105,7 +2113,7 @@ static void ebpf_fill_process_function_buffer_unsafe(BUFFER *buf)
     if (!counter) {
         ebpf_process_stat_plus_t fake_process = { };
 
-        ebpf_fill_process_function_buffer(buf, getpid(), &fake_process, EBPF_NOT_IDENFIED);
+        ebpf_fill_process_function_buffer(buf, getpid(), &fake_process, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
     }
 }
 
@@ -2127,7 +2135,7 @@ void ebpf_process_read_judy(BUFFER *buf, struct ebpf_module *em)
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_process_stat_plus_t fake_process = { };
 
-        ebpf_fill_process_function_buffer(buf, getpid(), &fake_process, EBPF_NOT_IDENFIED);
+        ebpf_fill_process_function_buffer(buf, getpid(), &fake_process, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
         return;
     }
 
@@ -2241,6 +2249,24 @@ static void ebpf_function_process_manipulation(const char *transaction,
             fields_id++,
             "Process Name",
             "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Parent Name",
+            "Parent Name",
             RRDF_FIELD_TYPE_STRING,
             RRDF_FIELD_VISUAL_VALUE,
             RRDF_FIELD_TRANSFORM_NONE,
@@ -2428,6 +2454,18 @@ static void ebpf_function_process_manipulation(const char *transaction,
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Parent Name
+        buffer_json_member_add_object(wb, "Parent Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Parent Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Parent Name");
             }
             buffer_json_array_close(wb);
         }

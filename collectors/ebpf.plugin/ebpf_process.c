@@ -405,6 +405,9 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
             netdata_ebpf_judy_pid_stats_t *tgid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid_ptr->tgid, NULL);
             if (tgid_ptr && tgid_ptr->name[0] && !pid_ptr->pname[0])
                 strncpyz(pid_ptr->pname, tgid_ptr->name, TASK_COMM_LEN);
+        } else {
+            if (!pid_ptr->pname[0])
+                strncpyz(pid_ptr->pname, psv[0].name, TASK_COMM_LEN);
         }
 
         // Get Process structure
