@@ -187,6 +187,8 @@ struct facets {
     DICTIONARY *accepted_params;
 
     struct {
+        size_t count;
+        size_t count_with_values;
         FACET_KEY *hashtable[FACETS_KEYS_HASHTABLE_ENTRIES];
         FACET_KEY *ll;
     } keys;
@@ -271,6 +273,9 @@ static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
 }
 
 static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
+    if(k->values.enabled)
+        k->facets->keys.count_with_values--;
+
     FACET_VALUE *v = k->values.ll;
     while(v) {
         FACET_VALUE *next = v->next;
@@ -403,11 +408,14 @@ static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
     if(facets_key_is_facet(facets, k)) {
         FACETS_VALUES_INDEX_CREATE(k);
         k->values.enabled = true;
+        k->facets->keys.count_with_values++;
     }
 }
 
 static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.ll = NULL;
+    facets->keys.count = 0;
+    facets->keys.count_with_values = 0;
 }
 
 static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
@@ -424,6 +432,8 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
     }
     memset(facets->keys.hashtable, 0, sizeof(facets->keys.hashtable));
     facets->keys.ll = NULL;
+    facets->keys.count = 0;
+    facets->keys.count_with_values = 0;
 }
 
 static inline FACET_KEY **facets_keys_hashtable_slot(FACETS *facets, FACETS_HASH hash) {
@@ -495,6 +505,7 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
     }
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->keys.ll, k, prev, next);
+    facets->keys.count++;
 
     return k;
 }
@@ -1530,63 +1541,79 @@ void facets_rows_begin(FACETS *facets) {
 }
 
 void facets_row_finished(FACETS *facets, usec_t usec) {
-    if(facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query)
-        goto cleanup;
+    if(facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) {
+        facets_rows_begin(facets);
+        return;
+    }
 
     facets->operations.rows.evaluated++;
 
     uint32_t total_keys = 0;
-    uint32_t selected_by = 0;
+    uint32_t selected_keys = 0;
+    uint32_t missed_keys = 0;
 
-    FACET_KEY *k;
+    FACET_KEY *key_pointers[facets->keys.count_with_values];
+    uint32_t key_pointers_pos = 0;
+
+    FACET_KEY *k, *histogram_key = NULL;
     foreach_key_in_facets(facets, k) {
+        if(!k->values.enabled)
+            continue;
+
         if(!k->key_found_in_row) {
             // put the FACET_VALUE_UNSET value into it
             facets_key_set_empty_value(facets, k);
         }
 
-        internal_fatal(!k->key_found_in_row, "all keys should be found in the row at this point");
         internal_fatal(k->key_found_in_row != 1, "all keys should be matched exactly once at this point");
         internal_fatal(k->key_values_selected_in_row > 1, "key values are selected in row more than once");
 
-        k->key_found_in_row = 1;
-
         total_keys++;
-        selected_by += (k->key_values_selected_in_row) ? 1 : 0;
+
+        if(key_pointers_pos < facets->keys.count_with_values)
+            key_pointers[key_pointers_pos++] = k;
+
+        if(k->key_values_selected_in_row)
+            selected_keys++;
+        else
+            missed_keys++;
+
+        if(facets->histogram.hash == k->hash)
+            histogram_key = k;
     }
     foreach_key_in_facets_done(k);
 
-    if(selected_by >= total_keys - 1) {
+    if(selected_keys >= total_keys - 1) {
         uint32_t found = 0;
 
-        foreach_key_in_facets(facets, k) {
-            uint32_t counted_by = selected_by;
+        for(uint32_t p = 0; p < key_pointers_pos ;p++) {
+            uint32_t counted_by = selected_keys;
+            k = key_pointers[p];
 
             if (counted_by != total_keys && !k->key_values_selected_in_row)
                 counted_by++;
 
-            if(counted_by == total_keys) {
-                if(k->values.enabled) {
-                    FACET_VALUE *v = FACET_VALUE_GET_CURRENT_VALUE(k);
-                    v->final_facet_value_counter++;
-
-                    if(selected_by == total_keys)
-                        facets_histogram_update_value(facets, k, v, usec);
-                }
+            if (counted_by == total_keys) {
+                FACET_VALUE *v = FACET_VALUE_GET_CURRENT_VALUE(k);
+                v->final_facet_value_counter++;
 
                 found++;
             }
         }
-        foreach_key_in_facets_done(k);
 
         internal_fatal(!found, "We should find at least one facet to count this row");
         (void)found;
     }
 
-    if(selected_by == total_keys)
-        facets_row_keep(facets, usec);
+    if(selected_keys == total_keys) {
+        // we need to keep this row
 
-cleanup:
+        if(histogram_key && histogram_key->values.enabled && histogram_key->current_value.v)
+            facets_histogram_update_value(facets, k, histogram_key->current_value.v, usec);
+
+        facets_row_keep(facets, usec);
+    }
+
     facets_rows_begin(facets);
 }
 
