@@ -1055,8 +1055,19 @@ target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
 
-# lz4
-pkg_check_modules(LIBLZ4 REQUIRED liblz4)
+# lz4 - try to find a version that is compatible with streaming compression
+# otherwise pick whichever one we can find to support dbengine but don't set
+# ENABLE_LZ4.
+pkg_check_modules(LIBLZ4 liblz4>=1.9.0)
+if(LIBLZ4_FOUND)
+        set(ENABLE_LZ4 On)
+else()
+        pkg_check_modules(LIBLZ4 REQUIRED liblz4)
+        target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
+        target_compile_definitions(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
+endif()
+
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
@@ -1488,7 +1499,6 @@ add_definitions(-DHAVE_CONFIG_H)
 
 set(STORAGE_WITH_MATH On)
 set(ENABLE_HTTPS On)
-set(ENABLE_LZ4 On)
 
 set(CACHE_DIR "${CMAKE_INSTALL_PREFIX}/var/cache/netdata")
 set(CONFIG_DIR "${CMAKE_INSTALL_PREFIX}/etc/netdata")
