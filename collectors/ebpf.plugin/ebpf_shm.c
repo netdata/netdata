@@ -54,6 +54,17 @@ netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TR
 int shm_disable_priority;
 #endif
 
+struct netdata_static_thread ebpf_read_shm = {
+    .name = "EBPF_READ_SHM",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 #ifdef LIBBPF_MAJOR_VERSION
 /*****************************************************************
  *
@@ -576,8 +587,9 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
+ * @param update_every  period of time
  */
-static void read_shm_apps_table(int maps_per_core)
+static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
 {
     netdata_publish_shm_t *cv = shm_vector;
     uint32_t key;
@@ -591,8 +603,7 @@ static void read_shm_apps_table(int maps_per_core)
         key = pids->pid;
 
         if (bpf_map_lookup_elem(fd, &key, cv)) {
-            pids = pids->next;
-            continue;
+            goto end_shm_loop;
         }
 
         shm_apps_accumulator(cv, maps_per_core);
@@ -600,9 +611,8 @@ static void read_shm_apps_table(int maps_per_core)
         shm_fill_pid(key, cv);
 
         // now that we've consumed the value, zero it out in the map.
+end_shm_loop:
         memset(cv, 0, length);
-        bpf_map_update_elem(fd, &key, cv, BPF_EXIST);
-
         pids = pids->next;
     }
 }
@@ -1001,6 +1011,44 @@ void ebpf_shm_send_cgroup_data(int update_every)
 }
 
 /**
+ * SHM thread
+ *
+ * Thread used to generate shm charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_shm_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+    ebpf_read_shm_apps_table(maps_per_core, (uint64_t)update_every);
+
+    int counter = update_every - 1;
+
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    usec_t period = update_every * USEC_PER_SEC;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        ebpf_read_shm_apps_table(maps_per_core, (uint64_t)update_every);
+
+        counter = 0;
+    }
+
+    return NULL;
+}
+
+/**
 * Main loop for this collector.
 */
 static void shm_collector(ebpf_module_t *em)
@@ -1025,7 +1073,6 @@ static void shm_collector(ebpf_module_t *em)
         ebpf_shm_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps) {
-            read_shm_apps_table(maps_per_core);
         }
 
         if (cgroups) {
@@ -1274,6 +1321,13 @@ void *ebpf_shm_thread(void *ptr)
         algorithms,
         NETDATA_SHM_END
     );
+
+    ebpf_read_shm.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_shm.thread,
+                          ebpf_read_shm.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_shm_thread,
+                          em);
 
     pthread_mutex_lock(&lock);
     ebpf_create_shm_charts(em->update_every);
