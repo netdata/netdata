@@ -24,6 +24,7 @@ typedef struct {
 typedef struct {
     size_t num_buffers;
     gorilla_writer_t *writer;
+    int aral_index;
 } page_gorilla_t;
 
 struct pgd {
@@ -53,8 +54,8 @@ struct pgd {
 struct {
     ARAL *aral_pgd;
     ARAL *aral_data[RRD_STORAGE_TIERS];
-    ARAL *aral_gorilla_buffer;
-    ARAL *aral_gorilla_writer;
+    ARAL *aral_gorilla_buffer[4];
+    ARAL *aral_gorilla_writer[4];
 } pgd_alloc_globals = {};
 
 static ARAL *pgd_aral_data_lookup(size_t size)
@@ -103,12 +104,12 @@ void pgd_init_arals(void)
     }
 
     // gorilla buffers aral
-    {
+    for (size_t i = 0; i != 4; i++) {
         char buf[20 + 1];
-        snprintfz(buf, 20, "gbuffer");
+        snprintfz(buf, 20, "gbuffer-%zu", i);
 
         // FIXME: add stats
-        pgd_alloc_globals.aral_gorilla_buffer = aral_create(
+        pgd_alloc_globals.aral_gorilla_buffer[i] = aral_create(
                 buf,
                 GORILLA_BUFFER_SIZE,
                 64,
@@ -118,12 +119,12 @@ void pgd_init_arals(void)
     }
 
     // gorilla writers aral
-    {
+    for (size_t i = 0; i != 4; i++) {
         char buf[20 + 1];
-        snprintfz(buf, 20, "gwriter");
+        snprintfz(buf, 20, "gwriter-%zu", i);
 
         // FIXME: add stats
-        pgd_alloc_globals.aral_gorilla_writer = aral_create(
+        pgd_alloc_globals.aral_gorilla_writer[i] = aral_create(
                 buf,
                 sizeof(gorilla_writer_t),
                 64,
@@ -182,10 +183,11 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
             pg->slots = 8 * GORILLA_BUFFER_SLOTS;
 
             // allocate new gorilla writer
-            pg->gorilla.writer = aral_mallocz(pgd_alloc_globals.aral_gorilla_writer);
+            pg->gorilla.aral_index = gettid() % 4;
+            pg->gorilla.writer = aral_mallocz(pgd_alloc_globals.aral_gorilla_writer[pg->gorilla.aral_index]);
 
             // allocate new gorilla buffer
-            gorilla_buffer_t *gbuf = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer);
+            gorilla_buffer_t *gbuf = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer[pg->gorilla.aral_index]);
             memset(gbuf, 0, GORILLA_BUFFER_SIZE);
             global_statistics_gorilla_buffer_add_hot();
 
@@ -285,14 +287,14 @@ void pgd_free(PGD *pg)
                     gorilla_buffer_t *gbuf = gorilla_writer_drop_head_buffer(pg->gorilla.writer);
                     if (!gbuf)
                         break;
-                    aral_freez(pgd_alloc_globals.aral_gorilla_buffer, gbuf);
+                    aral_freez(pgd_alloc_globals.aral_gorilla_buffer[pg->gorilla.aral_index], gbuf);
                     pg->gorilla.num_buffers -= 1;
                 }
 
                 internal_fatal(pg->gorilla.num_buffers != 0,
                                "Could not free all gorilla writer buffers");
 
-                aral_freez(pgd_alloc_globals.aral_gorilla_writer, pg->gorilla.writer);
+                aral_freez(pgd_alloc_globals.aral_gorilla_writer[pg->gorilla.aral_index], pg->gorilla.writer);
                 pg->gorilla.writer = NULL;
             } else {
                 fatal("pgd_free() called on gorilla page with unsupported state");
@@ -521,7 +523,7 @@ void pgd_append_point(PGD *pg,
 
             bool ok = gorilla_writer_write(pg->gorilla.writer, t);
             if (!ok) {
-                gorilla_buffer_t *new_buffer = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer);
+                gorilla_buffer_t *new_buffer = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer[pg->gorilla.aral_index]);
                 memset(new_buffer, 0, GORILLA_BUFFER_SIZE);
 
                 gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, GORILLA_BUFFER_SLOTS);
