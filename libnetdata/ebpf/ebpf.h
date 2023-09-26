@@ -318,7 +318,10 @@ typedef struct ebpf_module {
     struct {
         void *(*start_routine)(void *);                             // the thread function
         void (*apps_routine)(struct ebpf_module *em, void *ptr);    // the apps charts
-        void (*fnct_routine)(BUFFER *bf, struct ebpf_module *em);   // the function used for exteernal requests
+        void (*fnct_routine)(const char *transaction,
+            char *function __maybe_unused,
+            int timeout __maybe_unused,
+            bool *cancelled __maybe_unused);   // the function used for exteernal requests
         const char *fcnt_name;                                      // name given to cloud
         const char *fcnt_desc;                                      // description given about function
         const char *fcnt_thread_chart_name;

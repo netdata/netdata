@@ -339,9 +339,10 @@ void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_
 void ebpf_parse_service_name_section(struct config *cfg);
 void ebpf_parse_ips_unsafe(char *ptr);
 void ebpf_parse_ports(char *ptr);
-void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
-void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns);
-
+void ebpf_function_socket_manipulation(const char *transaction,
+                                       char *function __maybe_unused,
+                                       int timeout __maybe_unused,
+                                       bool *cancelled __maybe_unused);
 
 extern struct config socket_config;
 extern netdata_ebpf_targets_t socket_targets[];

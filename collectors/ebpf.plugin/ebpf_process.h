@@ -106,6 +106,9 @@ enum ebpf_process_tables {
 };
 
 extern struct config process_config;
-void ebpf_process_read_judy(BUFFER *buf, struct ebpf_module *em);
 
+void ebpf_function_process_manipulation(const char *transaction,
+                                        char *function __maybe_unused,
+                                        int timeout __maybe_unused,
+                                        bool *cancelled __maybe_unused);
 #endif /* NETDATA_EBPF_PROCESS_H */

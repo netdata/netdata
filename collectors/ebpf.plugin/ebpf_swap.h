@@ -48,7 +48,6 @@ enum swap_counters {
 
 void *ebpf_swap_thread(void *ptr);
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_shm_read_judy(BUFFER *buf, struct ebpf_module *em);
 
 extern struct config swap_config;
 extern netdata_ebpf_targets_t swap_targets[];

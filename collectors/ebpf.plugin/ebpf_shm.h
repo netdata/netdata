@@ -67,6 +67,10 @@ void *ebpf_shm_thread(void *ptr);
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 extern netdata_ebpf_targets_t shm_targets[];
+void ebpf_function_shm_manipulation(const char *transaction,
+                                    char *function __maybe_unused,
+                                    int timeout __maybe_unused,
+                                    bool *cancelled __maybe_unused);
 
 extern struct config shm_config;
 

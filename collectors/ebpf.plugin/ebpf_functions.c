@@ -1222,7 +1222,7 @@ static void ebpf_cachestat_fill_function_buffer_unsafe(BUFFER *buf)
  *
  * @return It always returns NULL.
  */
-void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
+static void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
 {
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
@@ -1248,10 +1248,10 @@ void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
  * @param timeout      The function timeout
  * @param cancelled    Variable used to store function status.
  */
-static void ebpf_function_cachestat_manipulation(const char *transaction,
-                                                char *function __maybe_unused,
-                                                int timeout __maybe_unused,
-                                                bool *cancelled __maybe_unused)
+void ebpf_function_cachestat_manipulation(const char *transaction,
+                                          char *function __maybe_unused,
+                                          int timeout __maybe_unused,
+                                          bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_CACHESTAT_IDX];
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
@@ -1687,7 +1687,7 @@ static void ebpf_fd_fill_function_buffer_unsafe(BUFFER *buf)
  *
  * @return It always returns NULL.
  */
-void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em)
+static void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em)
 {
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
@@ -1713,10 +1713,10 @@ void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em)
  * @param timeout      The function timeout
  * @param cancelled    Variable used to store function status.
  */
-static void ebpf_function_fd_manipulation(const char *transaction,
-                                          char *function __maybe_unused,
-                                          int timeout __maybe_unused,
-                                          bool *cancelled __maybe_unused)
+void ebpf_function_fd_manipulation(const char *transaction,
+                                   char *function __maybe_unused,
+                                   int timeout __maybe_unused,
+                                   bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_FD_IDX];
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
@@ -2127,7 +2127,7 @@ static void ebpf_fill_process_function_buffer_unsafe(BUFFER *buf)
  *
  * @return It always returns NULL.
  */
-void ebpf_process_read_judy(BUFFER *buf, struct ebpf_module *em)
+static void ebpf_process_read_judy(BUFFER *buf, struct ebpf_module *em)
 {
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_PROCESS_PID_TABLE].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
@@ -2153,10 +2153,10 @@ void ebpf_process_read_judy(BUFFER *buf, struct ebpf_module *em)
  * @param timeout      The function timeout
  * @param cancelled    Variable used to store function status.
  */
-static void ebpf_function_process_manipulation(const char *transaction,
-                                              char *function __maybe_unused,
-                                              int timeout __maybe_unused,
-                                              bool *cancelled __maybe_unused)
+void ebpf_function_process_manipulation(const char *transaction,
+                                        char *function __maybe_unused,
+                                        int timeout __maybe_unused,
+                                        bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_PROCESS_IDX];
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
@@ -2612,7 +2612,7 @@ static void ebpf_fill_shm_function_buffer_unsafe(BUFFER *buf)
  *
  * @return It always returns NULL.
  */
-void ebpf_shm_read_judy(BUFFER *buf, struct ebpf_module *em)
+static void ebpf_shm_read_judy(BUFFER *buf, struct ebpf_module *em)
 {
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     if (!em->maps || (em->maps[NETDATA_PID_SHM_TABLE].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
@@ -2638,10 +2638,10 @@ void ebpf_shm_read_judy(BUFFER *buf, struct ebpf_module *em)
  * @param timeout      The function timeout
  * @param cancelled    Variable used to store function status.
  */
-static void ebpf_function_shm_manipulation(const char *transaction,
-                                               char *function __maybe_unused,
-                                               int timeout __maybe_unused,
-                                               bool *cancelled __maybe_unused)
+void ebpf_function_shm_manipulation(const char *transaction,
+                                    char *function __maybe_unused,
+                                    int timeout __maybe_unused,
+                                    bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SHM_IDX];
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
