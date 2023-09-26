@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "facets.h"
 
-#define HISTOGRAM_COLUMNS 100
-#define FACETS_KEYS_WITH_VALUES_MAX 200
-#define FACETS_KEYS_IN_ROW_MAX 500
-#define FACETS_KEYS_HASHTABLE_ENTRIES 1000
-#define FACETS_VALUES_HASHTABLE_ENTRIES 20
+#define HISTOGRAM_COLUMNS 100               // the target number of points in a histogram
+#define FACETS_KEYS_WITH_VALUES_MAX 100     // the max number of keys that can be facets
+#define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
+
+#define FACETS_KEYS_HASHTABLE_ENTRIES 256
+#define FACETS_VALUES_HASHTABLE_ENTRIES 32
 
 // ----------------------------------------------------------------------------
 
@@ -196,11 +197,13 @@ struct facets {
     } keys;
 
     struct {
+        // this is like a stack, of the keys that are used as facets
         size_t used;
         FACET_KEY *array[FACETS_KEYS_WITH_VALUES_MAX];
     } keys_with_values;
 
     struct {
+        // this is like a stack, of the keys that need to clean up between each row
         size_t used;
         FACET_KEY *array[FACETS_KEYS_IN_ROW_MAX];
     } keys_in_row;
