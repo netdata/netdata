@@ -68,26 +68,21 @@ void destroy_alarm_log_entry(struct alarm_log_entry *entry)
 {
     //freez(entry->node_id);
     //freez(entry->claim_id);
-
     freez(entry->chart);
     freez(entry->name);
     freez(entry->family);
-
     freez(entry->config_hash);
-
     freez(entry->timezone);
-
     freez(entry->exec_path);
     freez(entry->conf_source);
     freez(entry->command);
-
     freez(entry->value_string);
     freez(entry->old_value_string);
-
     freez(entry->rendered_info);
     freez(entry->chart_context);
     freez(entry->transition_id);
     freez(entry->chart_name);
+    freez(entry->summary);
 }
 
 static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *proto)
@@ -136,6 +131,7 @@ static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *pr
     proto->set_event_id(data->event_id);
     proto->set_transition_id(data->transition_id);
     proto->set_chart_name(data->chart_name);
+    proto->set_summary(data->summary);
 }
 
 char *generate_alarm_log_entry(size_t *len, struct alarm_log_entry *data)
