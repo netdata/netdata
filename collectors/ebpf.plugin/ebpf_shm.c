@@ -538,7 +538,31 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
+        netdata_publish_shm_t *out = &ect->publish_shm;
+        memset(out, 0, sizeof(netdata_publish_shm_t));
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
+            int pid = pids->pid;
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            if (pid_ptr) {
+                rw_spinlock_read_lock(&pid_ptr->shm_stats.rw_spinlock);
+                if (pid_ptr->shm_stats.JudyLArray) {
+                    Word_t local_timestamp = 0;
+                    bool first_shm = true;
+                    Pvoid_t *shm_value;
+                    while (
+                        (shm_value = JudyLFirstThenNext(
+                            pid_ptr->shm_stats.JudyLArray, &local_timestamp, &first_shm))) {
+                        netdata_publish_shm_t *values = (netdata_publish_shm_t *)*shm_value;
+                        out->data.get += values->data.get;
+                        out->data.dt += values->data.dt;
+                        out->data.at += values->data.at;
+                        out->data.ctl += values->data.ctl;
+                    }
+                }
+                rw_spinlock_read_unlock(&pid_ptr->shm_stats.rw_spinlock);
+            }
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
