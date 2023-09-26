@@ -399,7 +399,7 @@ static void ebpf_function_thread_manipulation(const char *transaction,
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static void ebpf_function_socket_help(const char *transaction)
+static inline void ebpf_function_socket_help(const char *transaction)
 {
     static char *socket_message = {
         "ebpf.plugin / socket\n"
@@ -1081,7 +1081,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static void ebpf_function_cachestat_help(const char *transaction) {
+static inline void ebpf_function_cachestat_help(const char *transaction) {
     static char *cachestat_message = {
         "ebpf.plugin / cachestat\n"
         "\n"
@@ -1581,7 +1581,7 @@ static void ebpf_function_cachestat_manipulation(const char *transaction,
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static void ebpf_function_fd_help(const char *transaction) {
+static inline void ebpf_function_fd_help(const char *transaction) {
     static char *fd_message = {
         "ebpf.plugin / fd\n"
         "\n"
@@ -2010,7 +2010,7 @@ static void ebpf_function_fd_manipulation(const char *transaction,
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static void ebpf_function_process_help(const char *transaction) {
+static inline void ebpf_function_process_help(const char *transaction) {
     static char *fd_message = {
         "ebpf.plugin / process\n"
         "\n"
@@ -2517,6 +2517,116 @@ static inline void ebpf_function_shm_help(const char *transaction) {
     ebpf_function_help(transaction, fd_message);
 }
 
+/**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param pid         the process PID
+ * @param values      data read from hash table
+ * @param name        the process name
+ * @param pname       parent name
+ */
+static void ebpf_fill_shm_function_buffer(BUFFER *wb,
+                                              uint32_t pid,
+                                              netdata_publish_shm_kernel_t *values,
+                                              char *name,
+                                              char *pname)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)pid);
+
+    // NAME
+    buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // PNAME
+    buffer_json_add_array_item_string(wb, (pname[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // CTL
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->ctl);
+
+    // AT
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->at);
+
+    // GET
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->get);
+
+    // DT
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->dt);
+
+    buffer_json_array_close(wb);
+}
+
+/**
+ * Fill function buffer unsafe
+ *
+ * Fill the function buffer with socket information. Before to call this function it is necessary to lock
+ * ebpf_judy_pid.index.rw_spinlock
+ *
+ * @param buf    buffer used to store data to be shown by function.
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static void ebpf_fill_shm_function_buffer_unsafe(BUFFER *buf)
+{
+    int counter = 0;
+
+    Pvoid_t *pid_value, *shm_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        bool first_shm = true;
+        Word_t local_timestamp = 0;
+        rw_spinlock_read_lock(&pid_ptr->shm_stats.rw_spinlock);
+        if (pid_ptr->shm_stats.JudyLArray) {
+            while ((shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_timestamp, &first_shm))) {
+                netdata_publish_shm_t *values = (netdata_publish_shm_t *)*shm_value;
+                ebpf_fill_shm_function_buffer(buf, local_pid, &values->data, pid_ptr->name, pid_ptr->pname);
+            }
+            counter++;
+        }
+        rw_spinlock_read_unlock(&pid_ptr->shm_stats.rw_spinlock);
+    }
+
+    if (!counter) {
+        netdata_publish_shm_t fake_shm = { };
+
+        ebpf_fill_shm_function_buffer(buf, getpid(), &fake_shm.data, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
+    }
+}
+
+/**
+ * SHM read judy
+ *
+ * Thread responsible to fill thread data.
+ *
+ * @param buf the buffer to store data;
+ * @param em  the module main structure.
+ *
+ * @return It always returns NULL.
+ */
+void ebpf_shm_read_judy(BUFFER *buf, struct ebpf_module *em)
+{
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    if (!em->maps || (em->maps[NETDATA_PID_SHM_TABLE].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+        !ebpf_judy_pid.index.JudyLArray) {
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        netdata_publish_shm_t fake_shm = { };
+
+        ebpf_fill_shm_function_buffer(buf, getpid(), &fake_shm.data, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
+        return;
+    }
+
+    ebpf_fill_shm_function_buffer_unsafe(buf);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
 
 /**
  * Function: SHM
@@ -2580,6 +2690,187 @@ static void ebpf_function_shm_manipulation(const char *transaction,
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    time_t expires = now_realtime_sec() + em->update_every;
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", em->update_every);
+    buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_SHM_FUNCTION_DESCRIPTION);
+
+    // Collect data
+    buffer_json_member_add_array(wb, "data");
+    ebpf_shm_read_judy(wb, em);
+    buffer_json_array_close(wb); // data
+
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int fields_id = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PID",
+            "Process ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Process Name",
+            "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Parent Name",
+            "Parent Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "CTL",
+            "Calls to syscall shmctl.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "AT",
+            "Calls to syscall shmat.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "GET",
+            "Calls to syscall shmget",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "DT",
+            "Calls to syscall shmdt",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // Process and Thread
+        buffer_json_member_add_object(wb, "SharedMemoryCalls");
+        {
+            buffer_json_member_add_string(wb, "name", "Shared Memory Calls");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "get");
+                buffer_json_add_array_item_string(wb, "dt");
+                buffer_json_add_array_item_string(wb, "at");
+                buffer_json_add_array_item_string(wb, "ctl");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_time_t(wb, "expires", expires);
+    buffer_json_finalize(wb);
+
+    // Lock necessary to avoid race condition
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+
+    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+
+    buffer_free(wb);
 }
 
 /*****************************************************************
