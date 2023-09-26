@@ -220,6 +220,11 @@ struct facets {
     } current_row;
 
     struct {
+        usec_t after_ut;
+        usec_t before_ut;
+    } timeframe;
+
+    struct {
         FACET_KEY *key;
         FACETS_HASH hash;
         char *chart;
@@ -269,6 +274,20 @@ struct facets {
         } fts;
     } operations;
 };
+
+usec_t facets_row_oldest_ut(FACETS *facets) {
+    if(facets->base)
+        return facets->base->prev->usec;
+
+    return 0;
+}
+
+usec_t facets_row_newest_ut(FACETS *facets) {
+    if(facets->base)
+        return facets->base->usec;
+
+    return 0;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -559,7 +578,7 @@ static inline usec_t facets_histogram_slot_baseline_ut(FACETS *facets, usec_t ut
     return ut - delta_ut;
 }
 
-void facets_set_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut) {
+void facets_set_timeframe_and_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut) {
     if(after_ut > before_ut) {
         usec_t t = after_ut;
         after_ut = before_ut;
@@ -578,10 +597,16 @@ void facets_set_histogram_by_id(FACETS *facets, const char *key_id, usec_t after
         facets->histogram.hash = FACETS_HASH_ZERO;
     }
 
+    facets->timeframe.after_ut = after_ut;
+    facets->timeframe.before_ut = before_ut;
+
     facets->histogram.slot_width_ut = calculate_histogram_bar_width(after_ut, before_ut);
     facets->histogram.after_ut = facets_histogram_slot_baseline_ut(facets, after_ut);
     facets->histogram.before_ut = facets_histogram_slot_baseline_ut(facets, before_ut) + facets->histogram.slot_width_ut;
     facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width_ut + 1;
+
+    internal_fatal(after_ut > facets->histogram.after_ut, "after_ut is not less or equal to wanted after_ut");
+    internal_fatal(before_ut < facets->histogram.before_ut, "before_ut is not more or equal to wanted before_ut");
 
     if(facets->histogram.slots > 1000) {
         facets->histogram.slots = 1000 + 1;
@@ -589,11 +614,11 @@ void facets_set_histogram_by_id(FACETS *facets, const char *key_id, usec_t after
     }
 }
 
-void facets_set_histogram_by_name(FACETS *facets, const char *key_name, usec_t after_ut, usec_t before_ut) {
+void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_name, usec_t after_ut, usec_t before_ut) {
     char hash_str[FACET_STRING_HASH_SIZE];
     FACETS_HASH hash = FACETS_HASH_FUNCTION(key_name, strlen(key_name));
     facets_hash_to_str(hash, hash_str);
-    facets_set_histogram_by_id(facets, hash_str, after_ut, before_ut);
+    facets_set_timeframe_and_histogram_by_id(facets, hash_str, after_ut, before_ut);
 }
 
 static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
@@ -1574,12 +1599,14 @@ void facets_rows_begin(FACETS *facets) {
 }
 
 void facets_row_finished(FACETS *facets, usec_t usec) {
-    if(facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) {
+    facets->operations.rows.evaluated++;
+
+    if((facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) ||
+            (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
+            (facets->timeframe.after_ut && usec < facets->timeframe.after_ut)) {
         facets_rows_begin(facets);
         return;
     }
-
-    facets->operations.rows.evaluated++;
 
     size_t entries = facets->keys_with_values.used;
     size_t total_keys = 0;

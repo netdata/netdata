@@ -260,7 +260,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         FUNCTION_QUERY_STATUS *fqs) {
 
-    if(!netdata_systemd_journal_seek_to(j, fqs->before_ut))
+    usec_t anchor_delta = __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+
+    if(!netdata_systemd_journal_seek_to(j, fqs->before_ut + anchor_delta * 2))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
@@ -304,6 +306,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
         facets_row_finished(facets, msg_ut);
 
         row_counter++;
+        if(row_counter % 100 == 0 && msg_ut < (fqs->after_ut - anchor_delta))
+            break;
+
         if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
             FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
             last_row_counter = row_counter;
@@ -330,16 +335,14 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
 
-    if(!netdata_systemd_journal_seek_to(j, fqs->anchor))
+    usec_t anchor_delta = __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+
+    if(!netdata_systemd_journal_seek_to(j, fqs->anchor - anchor_delta)) // not need for *2
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
     size_t row_counter = 0, last_row_counter = 0;
     size_t bytes = 0, last_bytes = 0;
-
-    // the entries are not guaranteed to be sorted, so we process up to 100 entries beyond
-    // the end of the query to find possibly useful logs for our time-frame
-    size_t excess_rows_allowed = SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED;
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
@@ -352,23 +355,16 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
             continue;
         }
 
-        if (msg_ut > fqs->before_ut || msg_ut <= fqs->anchor)
-            continue;
-
-        if (msg_ut < fqs->after_ut) {
-            if(--excess_rows_allowed == 0)
-                break;
-
-            continue;
-        }
-
-        if(row_counter > fqs->entries && --excess_rows_allowed == 0)
-            break;
-
         bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
 
         row_counter++;
+        if(row_counter % 100 == 0) {
+            usec_t newest = facets_row_newest_ut(facets);
+            if(newest && msg_ut > (newest + anchor_delta))
+                break;
+        }
+
         if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
             FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
             last_row_counter = row_counter;
@@ -392,16 +388,14 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
 
-    if(!netdata_systemd_journal_seek_to(j, fqs->anchor))
+    usec_t anchor_delta = __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+
+    if(!netdata_systemd_journal_seek_to(j, fqs->anchor + anchor_delta * 2))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
     size_t row_counter = 0, last_row_counter = 0;
     size_t bytes = 0, last_bytes = 0;
-
-    // the entries are not guaranteed to be sorted, so we process up to 100 entries beyond
-    // the end of the query to find possibly useful logs for our time-frame
-    size_t excess_rows_allowed = SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED;
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
@@ -415,23 +409,16 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
             continue;
         }
 
-        if (msg_ut > fqs->before_ut || msg_ut >= fqs->anchor)
-            continue;
-
-        if (msg_ut < fqs->after_ut) {
-            if(--excess_rows_allowed == 0)
-                break;
-
-            continue;
-        }
-
-        if(row_counter > fqs->entries && --excess_rows_allowed == 0)
-            break;
-
         bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
         facets_row_finished(facets, msg_ut);
 
         row_counter++;
+        if(row_counter % 100 == 0) {
+            usec_t oldest = facets_row_oldest_ut(facets);
+            if(oldest && msg_ut < (oldest - anchor_delta))
+                break;
+        }
+
         if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
             FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
             last_row_counter = row_counter;
@@ -754,14 +741,6 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             buffer_flush(wb);
             return HTTP_RESP_NOT_MODIFIED;
         }
-    }
-
-    if(fqs->anchor && fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
-        // the anchor has an actual realtime timestamp of a log entry
-        // but the seek we will do, uses the timestamp journald received the message
-        // so, when going forward (to the future), we have push the anchor
-        // back by: max_journal_vs_realtime_delta_ut
-        fqs->anchor -= __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
     }
 
     // We will not do an if_modified_since query
@@ -1611,11 +1590,9 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_set_query(facets, query);
 
     if(chart && *chart)
-        facets_set_histogram_by_id(facets, chart,
-                                   after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+        facets_set_timeframe_and_histogram_by_id(facets, chart, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
     else
-        facets_set_histogram_by_name(facets, "PRIORITY",
-                                   after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
+        facets_set_timeframe_and_histogram_by_name(facets, "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
     fqs->source_type = source_type;
     fqs->after_ut = after_s * USEC_PER_SEC;

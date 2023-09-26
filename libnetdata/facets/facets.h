@@ -75,8 +75,8 @@ void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION direction);
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);
 void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options);
-void facets_set_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut);
-void facets_set_histogram_by_name(FACETS *facets, const char *key_name, usec_t after_ut, usec_t before_ut);
+void facets_set_timeframe_and_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut);
+void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_name, usec_t after_ut, usec_t before_ut);
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value);
 void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len, const char *value, size_t value_len);
@@ -85,5 +85,8 @@ void facets_report(FACETS *facets, BUFFER *wb);
 void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys);
 void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity);
 void facets_data_only_mode(FACETS *facets);
+
+usec_t facets_row_oldest_ut(FACETS *facets);
+usec_t facets_row_newest_ut(FACETS *facets);
 
 #endif
