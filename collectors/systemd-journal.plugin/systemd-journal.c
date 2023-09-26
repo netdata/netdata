@@ -846,7 +846,7 @@ static bool jf_is_mine(struct journal_file *jf, const char *filename, FUNCTION_Q
             (jf->msg_last_ut >= fqs->after_ut && jf->msg_first_ut <= fqs->before_ut)
     );
 
-    internal_error(!ret, "Not selecting file '%s', wanted source type %s found %d, wanted source '%s' found '%s', duration [%"PRIu64" - %"PRIu64"] found [%"PRIu64" - %"PRIu64"]",
+    internal_error(!ret, "Not selecting file '%s', wanted source type %d found %d, wanted source '%s' found '%s', duration [%"PRIu64" - %"PRIu64"] found [%"PRIu64" - %"PRIu64"]",
                    filename, fqs->source_type, jf->source_type,
                    string2str(fqs->source), string2str(jf->source),
                    fqs->after_ut, fqs->before_ut,
