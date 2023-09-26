@@ -67,7 +67,7 @@ void facets_destroy(FACETS *facets);
 void facets_accepted_param(FACETS *facets, const char *param);
 
 void facets_rows_begin(FACETS *facets);
-void facets_row_finished(FACETS *facets, usec_t usec);
+bool facets_row_finished(FACETS *facets, usec_t usec);
 
 FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options);
 void facets_set_query(FACETS *facets, const char *query);

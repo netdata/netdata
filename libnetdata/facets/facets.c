@@ -1598,14 +1598,14 @@ void facets_rows_begin(FACETS *facets) {
     facets->keys_in_row.used = 0;
 }
 
-void facets_row_finished(FACETS *facets, usec_t usec) {
+bool facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.rows.evaluated++;
 
     if((facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) ||
             (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
             (facets->timeframe.after_ut && usec < facets->timeframe.after_ut)) {
         facets_rows_begin(facets);
-        return;
+        return false;
     }
 
     size_t entries = facets->keys_with_values.used;
@@ -1662,6 +1662,8 @@ void facets_row_finished(FACETS *facets, usec_t usec) {
     }
 
     facets_rows_begin(facets);
+
+    return selected_keys == total_keys;
 }
 
 // ----------------------------------------------------------------------------

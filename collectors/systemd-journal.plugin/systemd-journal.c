@@ -204,6 +204,7 @@ typedef struct function_query_status {
     size_t cached_count;
 
     // progress statistics
+    size_t rows_useful;
     size_t rows_read;
     size_t bytes_read;
     size_t files_matched;
@@ -332,7 +333,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
         }
 
         bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
-        facets_row_finished(facets, msg_ut);
+        if(facets_row_finished(facets, msg_ut))
+            fqs->rows_useful++;
 
         row_counter++;
         if(row_counter % 100 == 0 && msg_ut < (fqs->after_ut - anchor_delta))
@@ -385,7 +387,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
         }
 
         bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
-        facets_row_finished(facets, msg_ut);
+        if(facets_row_finished(facets, msg_ut))
+            fqs->rows_useful++;
 
         row_counter++;
         if(row_counter % 100 == 0) {
@@ -439,7 +442,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
         }
 
         bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
-        facets_row_finished(facets, msg_ut);
+        if(facets_row_finished(facets, msg_ut))
+            fqs->rows_useful++;
 
         row_counter++;
         if(row_counter % 100 == 0) {
@@ -911,9 +915,13 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         fqs->file_working++;
         fqs->cached_count = 0;
 
-        size_t cached_count = 0, rows_read = fqs->rows_read, bytes_read = fqs->bytes_read;
+        size_t cached_count = 0;
+        size_t rows_useful = fqs->rows_useful;
+        size_t rows_read = fqs->rows_read;
+        size_t bytes_read = fqs->bytes_read;
         ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file( jf_dfe.name, wb, facets, fqs);
 
+        rows_useful = fqs->rows_useful - rows_useful;
         rows_read = fqs->rows_read - rows_read;
         bytes_read = fqs->bytes_read - bytes_read;
 
@@ -932,6 +940,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             buffer_json_member_add_uint64(wb, "fstat_cached_count", cached_count);
             buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
             buffer_json_member_add_uint64(wb, "rows_read", rows_read);
+            buffer_json_member_add_uint64(wb, "rows_useful", rows_useful);
             buffer_json_member_add_double(wb, "rows_per_second", (double)rows_read / (double)duration_ut * (double)USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
             buffer_json_member_add_double(wb, "bytes_per_second", (double)bytes_read / (double)duration_ut * (double)USEC_PER_SEC);
