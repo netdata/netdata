@@ -1704,6 +1704,35 @@ static void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em)
 }
 
 /**
+ * Clean Judy array unsafe
+ *
+ * Clean all Judy Array allocated to show table when a function is called.
+ * Before to call this function it is necessary to lock `ebpf_judy_pid.index.rw_spinlock`.
+ **/
+static void ebpf_fd_clean_judy_array_unsafe()
+{
+    if (!ebpf_judy_pid.index.JudyLArray)
+        return;
+
+    Pvoid_t *pid_value, *fd_value;
+    Word_t local_pid = 0, local_fd = 0;
+    bool first_pid = true, first_fd = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        rw_spinlock_write_lock(&pid_ptr->fd_stats.rw_spinlock);
+        if (pid_ptr->fd_stats.JudyLArray) {
+            while ((fd_value = JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_fd, &first_fd))) {
+                netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*fd_value;
+                ebpf_fd_release(values);
+            }
+            JudyLFreeArray(&pid_ptr->fd_stats.JudyLArray, PJE0);
+            pid_ptr->fd_stats.JudyLArray = NULL;
+        }
+        rw_spinlock_write_unlock(&pid_ptr->fd_stats.rw_spinlock);
+    }
+}
+
+/**
  * Function: FD
  *
  * Show information for sockets stored in hash tables.
@@ -1751,7 +1780,7 @@ void ebpf_function_fd_manipulation(const char *transaction,
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-        //ebpf_cachestat_clean_judy_array_unsafe();
+        ebpf_fd_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         if (ebpf_function_start_thread(em, period)) {
@@ -2144,7 +2173,36 @@ static void ebpf_process_read_judy(BUFFER *buf, struct ebpf_module *em)
 }
 
 /**
- * Function: FD
+ * Clean Judy array unsafe
+ *
+ * Clean all Judy Array allocated to show table when a function is called.
+ * Before to call this function it is necessary to lock `ebpf_judy_pid.index.rw_spinlock`.
+ **/
+static void ebpf_process_clean_judy_array_unsafe()
+{
+    if (!ebpf_judy_pid.index.JudyLArray)
+        return;
+
+    Pvoid_t *pid_value, *process_value;
+    Word_t local_pid = 0, local_process = 0;
+    bool first_pid = true, first_process = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        rw_spinlock_write_lock(&pid_ptr->process_stats.rw_spinlock);
+        if (pid_ptr->process_stats.JudyLArray) {
+            while ((process_value = JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_process, &first_process))) {
+                ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
+                ebpf_process_stat_release(values);
+            }
+            JudyLFreeArray(&pid_ptr->process_stats.JudyLArray, PJE0);
+            pid_ptr->process_stats.JudyLArray = NULL;
+        }
+        rw_spinlock_write_unlock(&pid_ptr->process_stats.rw_spinlock);
+    }
+}
+
+/**
+ * Function: Process
  *
  * Show information for sockets stored in hash tables.
  *
@@ -2191,7 +2249,7 @@ void ebpf_function_process_manipulation(const char *transaction,
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-        // ebpf_cachestat_clean_judy_array_unsafe();
+        ebpf_process_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         if (ebpf_function_start_thread(em, period)) {
@@ -2629,6 +2687,35 @@ static void ebpf_shm_read_judy(BUFFER *buf, struct ebpf_module *em)
 }
 
 /**
+ * Clean Judy array unsafe
+ *
+ * Clean all Judy Array allocated to show table when a function is called.
+ * Before to call this function it is necessary to lock `ebpf_judy_pid.index.rw_spinlock`.
+ **/
+static void ebpf_shm_clean_judy_array_unsafe()
+{
+    if (!ebpf_judy_pid.index.JudyLArray)
+        return;
+
+    Pvoid_t *pid_value, *shm_value;
+    Word_t local_pid = 0, local_shm = 0;
+    bool first_pid = true, first_shm = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        rw_spinlock_write_lock(&pid_ptr->shm_stats.rw_spinlock);
+        if (pid_ptr->shm_stats.JudyLArray) {
+            while ((shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_shm, &first_shm))) {
+                netdata_publish_shm_t *values = (netdata_publish_shm_t *)*shm_value;
+                ebpf_shm_release(values);
+            }
+            JudyLFreeArray(&pid_ptr->shm_stats.JudyLArray, PJE0);
+            pid_ptr->shm_stats.JudyLArray = NULL;
+        }
+        rw_spinlock_write_unlock(&pid_ptr->shm_stats.rw_spinlock);
+    }
+}
+
+/**
  * Function: SHM
  *
  * Show information for sockets stored in hash tables.
@@ -2676,7 +2763,7 @@ void ebpf_function_shm_manipulation(const char *transaction,
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
-        // ebpf_cachestat_clean_judy_array_unsafe();
+        ebpf_shm_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         if (ebpf_function_start_thread(em, period)) {
