@@ -336,6 +336,7 @@ int is_legacy = 1;
 
     if (likely(!archived)) {
         rrdfunctions_host_init(host);
+        host->last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
@@ -661,6 +662,8 @@ static void rrdhost_update(RRDHOST *host
 
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
+
+    host->last_connected = now_realtime_sec();
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);

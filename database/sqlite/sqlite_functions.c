@@ -4,7 +4,7 @@
 #include "sqlite3recover.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 13
+#define DB_METADATA_VERSION 14
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -14,7 +14,7 @@ const char *database_config[] = {
     "memory_mode INT DEFAULT 0, abbrev_timezone TEXT DEFAULT '', utc_offset INT NOT NULL DEFAULT 0,"
     "program_name TEXT NOT NULL DEFAULT 'unknown', program_version TEXT NOT NULL DEFAULT 'unknown', "
     "entries INT NOT NULL DEFAULT 0,"
-    "health_enabled INT NOT NULL DEFAULT 0);",
+    "health_enabled INT NOT NULL DEFAULT 0, last_connected INT NOT NULL DEFAULT 0);",
 
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "

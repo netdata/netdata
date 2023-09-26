@@ -104,6 +104,11 @@ const char *database_migrate_v12_v13_hash[] = {
     NULL
 };
 
+const char *database_migrate_v13_v14[] = {
+    "ALTER TABLE host ADD last_connected INT NOT NULL DEFAULT 0;",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
@@ -365,6 +370,17 @@ static int do_migration_v12_v13(sqlite3 *database, const char *name)
     return rc;
 }
 
+static int do_migration_v13_v14(sqlite3 *database, const char *name)
+{
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (!column_exists_in_table("host", "last_connected"))
+        return init_database_batch(database, &database_migrate_v13_v14[0]);
+
+    return 0;
+}
+
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
@@ -421,6 +437,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v10 to v11",  .func = do_migration_v10_v11},
     {.name = "v11 to v12",  .func = do_migration_v11_v12},
     {.name = "v12 to v13",  .func = do_migration_v12_v13},
+    {.name = "v13 to v14",  .func = do_migration_v13_v14},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
