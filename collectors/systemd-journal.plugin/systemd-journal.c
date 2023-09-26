@@ -625,6 +625,7 @@ static STRING *strdupz_source(const char *s, const char *e, size_t max_len, cons
     if(len >= max_len)
         len = max_len - 1;
     memcpy(dst, s, len);
+    dst[len] = '\0';
     buf[max_len - 1] = '\0';
 
     for(size_t i = 0; buf[i] ;i++)
@@ -685,7 +686,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                    "found journal file '%s', type %d, source '%s', "
                    "file modified: %"PRIu64", "
                    "msg {first: %"PRIu64", last: %"PRIu64"}",
-                   filename, jf->source_type, js->source ? string2str(jf->source) : "<unset>",
+                   filename, jf->source_type, jf->source ? string2str(jf->source) : "<unset>",
                    jf->file_last_modified_ut,
                    jf->msg_first_ut, jf->msg_last_ut);
 }
