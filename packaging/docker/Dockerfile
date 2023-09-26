@@ -3,7 +3,7 @@
 
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/builder:latest as builder
+FROM netdata/builder:v1 as builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
@@ -59,7 +59,7 @@ RUN mkdir -p /app/usr/sbin/ \
 #####################################################################
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/base:latest as base
+FROM netdata/base:v1 as base
 
 LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
 LABEL org.opencontainers.image.url="https://netdata.cloud"
