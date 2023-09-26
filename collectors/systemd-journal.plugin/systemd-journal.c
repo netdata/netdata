@@ -115,20 +115,46 @@ int fstat64(int fd, struct stat64 *buf) {
 #define JOURNAL_PARAMETER_PROGRESS              "progress"
 
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
-#define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       NULL
+
+#define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       \
+    "MESSAGE_ID"                                \
+    "|CODE_LINE"                                \
+    "|SYSLOG_RAW"                               \
+    "|MESSAGE"                                  \
+    "|DOCUMENTATION"                            \
+    "|TID"                                      \
+    "|CPU_USAGE_NSEC"                           \
+    "|SYSLOG_PID"                               \
+    "|*TIMESTAMP*"                              \
+    "|*_ID"                                     \
+    "|*_PID"                                    \
+    "|*_TID"                                    \
+    ""
+
 #define SYSTEMD_KEYS_INCLUDED_IN_FACETS         \
     "_TRANSPORT"                                \
     "|SYSLOG_IDENTIFIER"                        \
     "|SYSLOG_FACILITY"                          \
     "|PRIORITY"                                 \
+    "|_SYSTEMD_OWNER_UID"                       \
     "|_UID"                                     \
     "|_GID"                                     \
     "|_SYSTEMD_UNIT"                            \
+    "|_SYSTEMD_USER_UNIT"                       \
     "|_SYSTEMD_SLICE"                           \
+    "|_SYSTEMD_USER_SLICE"                      \
     "|_COMM"                                    \
     "|UNIT"                                     \
+    "|USER_UNIT"                                \
     "|CONTAINER_NAME"                           \
     "|IMAGE_NAME"                               \
+    "|ERRNO"                                    \
+    "|_NAMESPACE"                               \
+    "|COREDUMP_COMM"                            \
+    "|COREDUMP_UNIT"                            \
+    "|COREDUMP_USER_UNIT"                       \
+    "|_HOSTNAME"                                \
+    "|UNIT_RESULT"                              \
     ""
 
 static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -151,7 +177,8 @@ typedef enum {
     SDJF_REMOTE         = (1 << 1),
     SDJF_SYSTEM         = (1 << 2),
     SDJF_USER           = (1 << 3),
-    SDJF_OTHER          = (1 << 4),
+    SDJF_NAMESPACE      = (1 << 4),
+    SDJF_OTHER          = (1 << 5),
 } SD_JOURNAL_FILE_SOURCE_TYPE;
 
 typedef struct function_query_status {
@@ -162,6 +189,7 @@ typedef struct function_query_status {
 
     // request
     SD_JOURNAL_FILE_SOURCE_TYPE source_type;
+    STRING *source;
     usec_t after_ut;
     usec_t before_ut;
     usec_t anchor;
@@ -521,6 +549,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 #define MAX_JOURNAL_DIRECTORIES 100
 
 struct journal_file {
+    STRING *source;
     SD_JOURNAL_FILE_SOURCE_TYPE source_type;
     usec_t file_last_modified_ut;
     usec_t msg_first_ut;
@@ -580,21 +609,70 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
     jf->msg_last_ut = last_ut;
 }
 
+static STRING *strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
+    char buf[max_len];
+    size_t len;
+    char *dst = buf;
+
+    if(prefix) {
+        len = strlen(prefix);
+        memcpy(buf, prefix, len);
+        dst = &buf[len];
+        max_len -= len;
+    }
+
+    len = e - s;
+    if(len >= max_len)
+        len = max_len - 1;
+    memcpy(dst, s, len);
+    buf[max_len - 1] = '\0';
+
+    for(size_t i = 0; buf[i] ;i++)
+        if(!isalnum(buf[i]) && buf[i] != '-')
+            buf[i] = '_';
+
+    return string_strdupz(buf);
+}
+
 static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
     struct journal_file *jf = value;
     const char *filename = dictionary_acquired_item_name(item);
 
+    // based on the filename
+    // decide the source to show to the user
     const char *s = strrchr(filename, '/');
     if(s) {
         if(strstr(filename, "/remote/"))
             jf->source_type = SDJF_REMOTE;
-        else
-            jf->source_type = SDJF_LOCAL;
+        else {
+            const char *t = s - 1;
+            while(t >= filename && *t != '.' && *t != '/')
+                t--;
+
+            if(t >= filename && *t == '.') {
+                jf->source_type = SDJF_NAMESPACE;
+                jf->source = strdupz_source(t + 1, s, FILENAME_MAX, "namespace-");
+            }
+            else
+                jf->source_type = SDJF_LOCAL;
+        }
 
         if(strstr(s, "/system"))
             jf->source_type |= SDJF_SYSTEM;
         else if(strstr(s, "/user"))
             jf->source_type |= SDJF_USER;
+        else if(strstr(s, "/remote")) {
+            jf->source_type |= SDJF_REMOTE;
+
+            s++; // move to the next char of '/';
+
+            char *e = strchr(s, '@');
+            if(!e)
+                e = strstr(s, ".journal");
+
+            if(e)
+                jf->source = strdupz_source(s, e, FILENAME_MAX, NULL);
+        }
         else
             jf->source_type |= SDJF_OTHER;
     }
@@ -604,10 +682,10 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
     journal_file_update_msg_ut(filename, jf);
 
     internal_error(true,
-                   "found journal file '%s', type %d, "
+                   "found journal file '%s', type %d, source '%s', "
                    "file modified: %"PRIu64", "
                    "msg {first: %"PRIu64", last: %"PRIu64"}",
-                   filename, jf->source_type,
+                   filename, jf->source_type, js->source ? jf->source : "<unset>",
                    jf->file_last_modified_ut,
                    jf->msg_first_ut, jf->msg_last_ut);
 }
@@ -637,10 +715,47 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
     return false;
 }
 
+static void available_journal_file_sources_to_json_array(BUFFER *wb) {
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_NAME_LINK_DONT_CLONE);
+
+    dictionary_set(dict, "all", NULL, 0);
+
+    struct journal_file *jf;
+    dfe_start_read(journal_files_registry, jf) {
+        if((jf->source_type & (SDJF_LOCAL)) == (SDJF_LOCAL))
+            dictionary_set(dict, "local", NULL, 0);
+        if((jf->source_type & (SDJF_LOCAL | SDJF_SYSTEM)) == (SDJF_LOCAL | SDJF_SYSTEM))
+            dictionary_set(dict, "local-system-only", NULL, 0);
+        if((jf->source_type & (SDJF_LOCAL | SDJF_USER)) == (SDJF_LOCAL | SDJF_USER))
+            dictionary_set(dict, "local-users-only", NULL, 0);
+        if((jf->source_type & (SDJF_LOCAL | SDJF_NAMESPACE)) == (SDJF_LOCAL | SDJF_NAMESPACE))
+            dictionary_set(dict, "local-namespaces-only", NULL, 0);
+        if((jf->source_type & (SDJF_REMOTE)) == (SDJF_REMOTE))
+            dictionary_set(dict, "remotes-only", NULL, 0);
+        if(jf->source)
+            dictionary_set(dict, string2str(jf->source), NULL, 0);
+    }
+    dfe_done(jf);
+
+    void *t;
+    dfe_start_read(dict, t) {
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", t_dfe.name);
+            buffer_json_member_add_string(wb, "name", t_dfe.name);
+        }
+        buffer_json_object_close(wb); // options object
+    }
+    dfe_done(t);
+
+    dictionary_destroy(dict);
+}
+
 static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
     struct journal_file *jf = value; (void)jf;
     const char *filename = dictionary_acquired_item_name(item); (void)filename;
 
+    freez(jf->source);
     internal_error(true, "removed journal file '%s'", filename);
 }
 
@@ -715,8 +830,12 @@ static void journal_files_registry_update() {
 
 // ----------------------------------------------------------------------------
 
-#define jf_is_mine(jf, src_type, after_ut, before_ut) \
-    (((src_type) == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || ((jf)->source_type & (src_type)) == (src_type)) && (jf)->msg_last_ut >= (after_ut) && (jf)->msg_first_ut <= (before_ut))
+#define jf_is_mine(jf, fqs) \
+(                       \
+    ((fqs)->source_type == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || ((jf)->source_type & (fqs)->source_type) == (fqs)->source_type) && \
+    (!(fqs)->source || (fqs)->source == (jf)->source) &&                                    \
+    ((jf)->msg_last_ut >= (fqs)->after_ut && (jf)->msg_first_ut <= (fqs)->before_ut)        \
+)
 
 static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
@@ -727,7 +846,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         bool modified = false;
 
         dfe_start_read(journal_files_registry, jf) {
-            if(!jf_is_mine(jf, fqs->source_type, fqs->after_ut, fqs->before_ut))
+            if(!jf_is_mine(jf, fqs))
                 continue;
 
             if(jf->msg_last_ut > fqs->if_modified_since) {
@@ -750,7 +869,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     // count the files
     fqs->files_matched = fqs->file_working = 0;
     dfe_start_read(journal_files_registry, jf) {
-        if(!jf_is_mine(jf, fqs->source_type, fqs->after_ut, fqs->before_ut))
+        if(!jf_is_mine(jf, fqs))
             continue;
 
         fqs->files_matched++;
@@ -764,7 +883,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     bool partial = false;
     dfe_start_reentrant(journal_files_registry, jf) {
-        if(!jf_is_mine(jf, fqs->source_type, fqs->after_ut, fqs->before_ut))
+        if(!jf_is_mine(jf, fqs))
             continue;
 
         fqs->file_working++;
@@ -783,7 +902,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         buffer_json_add_array_item_object(wb); // journal file
         {
             buffer_json_member_add_string(wb, "filename", jf_dfe.name);
-            buffer_json_member_add_uint64(wb, "type", jf->source_type);
+            buffer_json_member_add_uint64(wb, "source_type", jf->source_type);
+            buffer_json_member_add_string(wb, "source", string2str(jf->source));
             buffer_json_member_add_uint64(wb, "last_modified_ut", jf->file_last_modified_ut);
             buffer_json_member_add_uint64(wb, "msg_first_ut", jf->msg_first_ut);
             buffer_json_member_add_uint64(wb, "msg_last_ut", jf->msg_last_ut);
@@ -916,6 +1036,142 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
     buffer_free(wb);
 }
 
+const char *errno_map[] = {
+        [1] = "EPERM",          // "Operation not permitted",
+        [2] = "ENOENT",         // "No such file or directory",
+        [3] = "ESRCH",          // "No such process",
+        [4] = "EINTR",          // "Interrupted system call",
+        [5] = "EIO",            // "Input/output error",
+        [6] = "ENXIO",          // "No such device or address",
+        [7] = "E2BIG",          // "Argument list too long",
+        [8] = "ENOEXEC",        // "Exec format error",
+        [9] = "EBADF",          // "Bad file descriptor",
+        [10] = "ECHILD",        // "No child processes",
+        [11] = "EAGAIN",        // "Resource temporarily unavailable",
+        [12] = "ENOMEM",        // "Cannot allocate memory",
+        [13] = "EACCES",        // "Permission denied",
+        [14] = "EFAULT",        // "Bad address",
+        [15] = "ENOTBLK",       // "Block device required",
+        [16] = "EBUSY",         // "Device or resource busy",
+        [17] = "EEXIST",        // "File exists",
+        [18] = "EXDEV",         // "Invalid cross-device link",
+        [19] = "ENODEV",        // "No such device",
+        [20] = "ENOTDIR",       // "Not a directory",
+        [21] = "EISDIR",        // "Is a directory",
+        [22] = "EINVAL",        // "Invalid argument",
+        [23] = "ENFILE",        // "Too many open files in system",
+        [24] = "EMFILE",        // "Too many open files",
+        [25] = "ENOTTY",        // "Inappropriate ioctl for device",
+        [26] = "ETXTBSY",       // "Text file busy",
+        [27] = "EFBIG",         // "File too large",
+        [28] = "ENOSPC",        // "No space left on device",
+        [29] = "ESPIPE",        // "Illegal seek",
+        [30] = "EROFS",         // "Read-only file system",
+        [31] = "EMLINK",        // "Too many links",
+        [32] = "EPIPE",         // "Broken pipe",
+        [33] = "EDOM",          // "Numerical argument out of domain",
+        [34] = "ERANGE",        // "Numerical result out of range",
+        [35] = "EDEADLK",       // "Resource deadlock avoided",
+        [36] = "ENAMETOOLONG",  // "File name too long",
+        [37] = "ENOLCK",        // "No locks available",
+        [38] = "ENOSYS",        // "Function not implemented",
+        [39] = "ENOTEMPTY",     // "Directory not empty",
+        [40] = "ELOOP",         // "Too many levels of symbolic links",
+        [11] = "EWOULDBLOCK",   // "Resource temporarily unavailable",
+        [42] = "ENOMSG",        // "No message of desired type",
+        [43] = "EIDRM",         // "Identifier removed",
+        [44] = "ECHRNG",        // "Channel number out of range",
+        [45] = "EL2NSYNC",      // "Level 2 not synchronized",
+        [46] = "EL3HLT",        // "Level 3 halted",
+        [47] = "EL3RST",        // "Level 3 reset",
+        [48] = "ELNRNG",        // "Link number out of range",
+        [49] = "EUNATCH",       // "Protocol driver not attached",
+        [50] = "ENOCSI",        // "No CSI structure available",
+        [51] = "EL2HLT",        // "Level 2 halted",
+        [52] = "EBADE",         // "Invalid exchange",
+        [53] = "EBADR",         // "Invalid request descriptor",
+        [54] = "EXFULL",        // "Exchange full",
+        [55] = "ENOANO",        // "No anode",
+        [56] = "EBADRQC",       // "Invalid request code",
+        [57] = "EBADSLT",       // "Invalid slot",
+        [35] = "EDEADLOCK",     // "Resource deadlock avoided",
+        [59] = "EBFONT",        // "Bad font file format",
+        [60] = "ENOSTR",        // "Device not a stream",
+        [61] = "ENODATA",       // "No data available",
+        [62] = "ETIME",         // "Timer expired",
+        [63] = "ENOSR",         // "Out of streams resources",
+        [64] = "ENONET",        // "Machine is not on the network",
+        [65] = "ENOPKG",        // "Package not installed",
+        [66] = "EREMOTE",       // "Object is remote",
+        [67] = "ENOLINK",       // "Link has been severed",
+        [68] = "EADV",          // "Advertise error",
+        [69] = "ESRMNT",        // "Srmount error",
+        [70] = "ECOMM",         // "Communication error on send",
+        [71] = "EPROTO",        // "Protocol error",
+        [72] = "EMULTIHOP",     // "Multihop attempted",
+        [73] = "EDOTDOT",       // "RFS specific error",
+        [74] = "EBADMSG",       // "Bad message",
+        [75] = "EOVERFLOW",     // "Value too large for defined data type",
+        [76] = "ENOTUNIQ",      // "Name not unique on network",
+        [77] = "EBADFD",        // "File descriptor in bad state",
+        [78] = "EREMCHG",       // "Remote address changed",
+        [79] = "ELIBACC",       // "Can not access a needed shared library",
+        [80] = "ELIBBAD",       // "Accessing a corrupted shared library",
+        [81] = "ELIBSCN",       // ".lib section in a.out corrupted",
+        [82] = "ELIBMAX",       // "Attempting to link in too many shared libraries",
+        [83] = "ELIBEXEC",      // "Cannot exec a shared library directly",
+        [84] = "EILSEQ",        // "Invalid or incomplete multibyte or wide character",
+        [85] = "ERESTART",      // "Interrupted system call should be restarted",
+        [86] = "ESTRPIPE",      // "Streams pipe error",
+        [87] = "EUSERS",        // "Too many users",
+        [88] = "ENOTSOCK",      // "Socket operation on non-socket",
+        [89] = "EDESTADDRREQ",  // "Destination address required",
+        [90] = "EMSGSIZE",      // "Message too long",
+        [91] = "EPROTOTYPE",    // "Protocol wrong type for socket",
+        [92] = "ENOPROTOOPT",   // "Protocol not available",
+        [93] = "EPROTONOSUPPORT",   // "Protocol not supported",
+        [94] = "ESOCKTNOSUPPORT",   // "Socket type not supported",
+        [95] = "ENOTSUP",       // "Operation not supported",
+        [96] = "EPFNOSUPPORT",  // "Protocol family not supported",
+        [97] = "EAFNOSUPPORT",  // "Address family not supported by protocol",
+        [98] = "EADDRINUSE",    // "Address already in use",
+        [99] = "EADDRNOTAVAIL", // "Cannot assign requested address",
+        [100] = "ENETDOWN",     // "Network is down",
+        [101] = "ENETUNREACH",  // "Network is unreachable",
+        [102] = "ENETRESET",    // "Network dropped connection on reset",
+        [103] = "ECONNABORTED", // "Software caused connection abort",
+        [104] = "ECONNRESET",   // "Connection reset by peer",
+        [105] = "ENOBUFS",      // "No buffer space available",
+        [106] = "EISCONN",      // "Transport endpoint is already connected",
+        [107] = "ENOTCONN",     // "Transport endpoint is not connected",
+        [108] = "ESHUTDOWN",    // "Cannot send after transport endpoint shutdown",
+        [109] = "ETOOMANYREFS", // "Too many references: cannot splice",
+        [110] = "ETIMEDOUT",    // "Connection timed out",
+        [111] = "ECONNREFUSED", // "Connection refused",
+        [112] = "EHOSTDOWN",    // "Host is down",
+        [113] = "EHOSTUNREACH", // "No route to host",
+        [114] = "EALREADY",     // "Operation already in progress",
+        [115] = "EINPROGRESS",  // "Operation now in progress",
+        [116] = "ESTALE",       // "Stale file handle",
+        [117] = "EUCLEAN",      // "Structure needs cleaning",
+        [118] = "ENOTNAM",      // "Not a XENIX named type file",
+        [119] = "ENAVAIL",      // "No XENIX semaphores available",
+        [120] = "EISNAM",       // "Is a named type file",
+        [121] = "EREMOTEIO",    // "Remote I/O error",
+        [122] = "EDQUOT",       // "Disk quota exceeded",
+        [123] = "ENOMEDIUM",    // "No medium found",
+        [124] = "EMEDIUMTYPE",  // "Wrong medium type",
+        [125] = "ECANCELED",    // "Operation canceled",
+        [126] = "ENOKEY",       // "Required key not available",
+        [127] = "EKEYEXPIRED",  // "Key has expired",
+        [128] = "EKEYREVOKED",  // "Key has been revoked",
+        [129] = "EKEYREJECTED", // "Key was rejected by service",
+        [130] = "EOWNERDEAD",   // "Owner died",
+        [131] = "ENOTRECOVERABLE",  // "State not recoverable",
+        [132] = "ERFKILL",      // "Operation not possible due to RF-kill",
+        [133] = "EHWPOISON",    // "Memory page has hardware error",
+};
+
 static const char *syslog_facility_to_name(int facility) {
     switch (facility) {
         case LOG_FAC(LOG_KERN): return "kern";
@@ -1023,6 +1279,20 @@ static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_un
         }
 
         facets_set_current_row_severity(facets, syslog_priority_to_facet_severity(priority));
+    }
+}
+
+static void netdata_systemd_journal_transform_errno(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        unsigned err_no = str2u(buffer_tostring(wb));
+        if(err_no > 0 && err_no < sizeof(errno_map) / sizeof(*errno_map)) {
+            const char *name = errno_map[err_no];
+            if(name) {
+                buffer_flush(wb);
+                buffer_strcat(wb, name);
+            }
+        }
     }
 }
 
@@ -1274,20 +1544,37 @@ static void function_systemd_journal(const char *transaction, char *function, in
 //                             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
 //                             netdata_systemd_journal_rich_message, NULL);
 
-    facets_register_key_name_transformation(facets, "PRIORITY", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+    facets_register_key_name_transformation(facets, "PRIORITY",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
                                             netdata_systemd_journal_transform_priority, NULL);
 
-    facets_register_key_name_transformation(facets, "SYSLOG_FACILITY", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+    facets_register_key_name_transformation(facets, "SYSLOG_FACILITY",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
                                             netdata_systemd_journal_transform_syslog_facility, NULL);
 
-    facets_register_key_name(facets, "SYSLOG_IDENTIFIER", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
-    facets_register_key_name(facets, "UNIT", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
-    facets_register_key_name(facets, "USER_UNIT", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
+    facets_register_key_name_transformation(facets, "ERRNO",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            netdata_systemd_journal_transform_errno, NULL);
 
-    facets_register_key_name_transformation(facets, "_UID", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+    facets_register_key_name(facets, "SYSLOG_IDENTIFIER",
+                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(facets, "UNIT",
+                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(facets, "USER_UNIT",
+                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name_transformation(facets, "_SYSTEMD_OWNER_UID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
                                             netdata_systemd_journal_transform_uid, NULL);
 
-    facets_register_key_name_transformation(facets, "_GID", FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+    facets_register_key_name_transformation(facets, "_UID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            netdata_systemd_journal_transform_uid, NULL);
+
+    facets_register_key_name_transformation(facets, "_GID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
                                             netdata_systemd_journal_transform_gid, NULL);
 
     bool info = false, data_only = false, progress = false;
@@ -1336,22 +1623,44 @@ static void function_systemd_journal(const char *transaction, char *function, in
 
             if(strcmp(source, "all") == 0)
                 source_type = ~0;
-            else if(strcmp(source, "local") == 0)
+            else if(strcmp(source, "local") == 0) {
                 source_type = SDJF_LOCAL;
-            else if(strcmp(source, "remote") == 0)
+                source = NULL;
+            }
+            else if(strcmp(source, "remote") == 0) {
                 source_type = SDJF_REMOTE;
-            else if(strcmp(source, "local-system-only") == 0)
+                source = NULL;
+            }
+            else if(strcmp(source, "local-system-only") == 0) {
                 source_type = SDJF_LOCAL | SDJF_SYSTEM;
-            else if(strcmp(source, "local-users-only") == 0)
+                source = NULL;
+            }
+            else if(strcmp(source, "local-users-only") == 0) {
                 source_type = SDJF_LOCAL | SDJF_USER;
-            else if(strcmp(source, "local-other-only") == 0)
+                source = NULL;
+            }
+            else if(strcmp(source, "local-other-only") == 0) {
                 source_type = SDJF_LOCAL | SDJF_OTHER;
-            else if(strcmp(source, "remote-system-only") == 0)
+                source = NULL;
+            }
+            else if(strcmp(source, "remote-system-only") == 0) {
                 source_type = SDJF_REMOTE | SDJF_SYSTEM;
-            else if(strcmp(source, "remote-users-only") == 0)
+                source = NULL;
+            }
+            else if(strcmp(source, "remote-users-only") == 0) {
                 source_type = SDJF_REMOTE | SDJF_USER;
-            else if(strcmp(source, "remote-other-only") == 0)
+                source = NULL;
+            }
+            else if(strcmp(source, "remote-other-only") == 0) {
                 source_type = SDJF_REMOTE | SDJF_OTHER;
+                source = NULL;
+            }
+            else if(strncmp(source, "remote-", 7) == 0) {
+                source_type = SDJF_REMOTE;
+            }
+            else if(strncmp(source, "namespace-", 10) == 0) {
+                source_type = SDJF_NAMESPACE;
+            }
             else
                 internal_error(true, "unknown source '%s'", source);
         }
@@ -1485,91 +1794,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
                 buffer_json_member_add_string(wb, "type", "select");
                 buffer_json_member_add_array(wb, "options");
                 {
-                    buffer_json_add_array_item_object(wb);
-                    {
-                        buffer_json_member_add_string(wb, "id", "all");
-                        buffer_json_member_add_string(wb, "name", "all");
-                    }
-                    buffer_json_object_close(wb); // options object
-
-                    SD_JOURNAL_FILE_SOURCE_TYPE available_types = 0;
-                    struct journal_file *jf;
-                    dfe_start_read(journal_files_registry, jf) {
-                        available_types |= jf->source_type;
-                    }
-                    dfe_done(jf);
-
-                    if((available_types & SDJF_LOCAL) == SDJF_LOCAL) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "local");
-                            buffer_json_member_add_string(wb, "name", "local");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
-
-                    if((available_types & (SDJF_LOCAL | SDJF_SYSTEM)) == (SDJF_LOCAL | SDJF_SYSTEM)) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "local-system-only");
-                            buffer_json_member_add_string(wb, "name", "local-system-only");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
-
-                    if((available_types & (SDJF_LOCAL | SDJF_USER)) == (SDJF_LOCAL | SDJF_USER)) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "local-users-only");
-                            buffer_json_member_add_string(wb, "name", "local-users-only");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
-
-                    if((available_types & (SDJF_LOCAL | SDJF_OTHER)) == (SDJF_LOCAL | SDJF_OTHER)) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "local-other-only");
-                            buffer_json_member_add_string(wb, "name", "local-other-only");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
-
-                    if((available_types & SDJF_REMOTE) == SDJF_REMOTE) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "local");
-                            buffer_json_member_add_string(wb, "name", "local");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
-
-                    if((available_types & (SDJF_REMOTE | SDJF_SYSTEM)) == (SDJF_REMOTE | SDJF_SYSTEM)) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "remote-system-only");
-                            buffer_json_member_add_string(wb, "name", "remote-system-only");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
-
-                    if((available_types & (SDJF_REMOTE | SDJF_USER)) == (SDJF_REMOTE | SDJF_USER)) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "remote-users-only");
-                            buffer_json_member_add_string(wb, "name", "remote-users-only");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
-
-                    if((available_types & (SDJF_REMOTE | SDJF_OTHER)) == (SDJF_REMOTE | SDJF_OTHER)) {
-                        buffer_json_add_array_item_object(wb);
-                        {
-                            buffer_json_member_add_string(wb, "id", "remote-other-only");
-                            buffer_json_member_add_string(wb, "name", "remote-other-only");
-                        }
-                        buffer_json_object_close(wb); // options object
-                    }
+                    available_journal_file_sources_to_json_array(wb);
                 }
                 buffer_json_array_close(wb); // options array
             }
