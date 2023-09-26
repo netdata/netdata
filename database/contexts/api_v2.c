@@ -1009,8 +1009,8 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             STORAGE_ENGINE *eng = localhost->db[tier].eng;
             if (!eng) continue;
 
-            size_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
-            size_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
+            uint64_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
+            uint64_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
             time_t first_time_s = storage_engine_global_first_time_s(eng->backend, localhost->db[tier].instance);
             size_t currently_collected_metrics = storage_engine_collected_metrics(eng->backend, localhost->db[tier].instance);
 

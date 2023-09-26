@@ -27,8 +27,8 @@ modules:
           It uses the arcconf command line utility (from adaptec) to monitor your raid controller.
           
           Executed commands:
-            - sudo -n arcconf GETCONFIG 1 LD
-            - sudo -n arcconf GETCONFIG 1 PD
+            - `sudo -n arcconf GETCONFIG 1 LD`
+            - `sudo -n arcconf GETCONFIG 1 PD`
       supported_platforms:
         include: []
         exclude: []

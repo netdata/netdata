@@ -180,7 +180,7 @@ navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostnam
 
    Netdata comes with hundreds of pre-configured alerts, that automatically check your metrics, immediately after they start getting collected.
 
-   Netdata can dispatch alert notifications to multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `StackPulse`, `Syslog`, `Telegram`, `Twilio`.
+   Netdata can dispatch alert notifications to multiple third party systems, including: `email`, `Alerta`, `AWS SNS`, `Discord`, `Dynatrace`, `flock`, `gotify`, `IRC`, `Matrix`, `MessageBird`, `Microsoft Teams`, `ntfy`, `OPSgenie`, `PagerDuty`, `Prowl`, `PushBullet`, `PushOver`, `RocketChat`, `Slack`, `SMS tools`, `Syslog`, `Telegram`, `Twilio`.
 
    By default, Netdata will send e-mail notifications, if there is a configured MTA on the system. 
 
