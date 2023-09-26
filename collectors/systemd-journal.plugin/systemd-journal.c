@@ -838,12 +838,19 @@ static void journal_files_registry_update() {
 //    ((jf)->msg_last_ut >= (fqs)->after_ut && (jf)->msg_first_ut <= (fqs)->before_ut)        \
 //)
 
-static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
-    return (
+static bool jf_is_mine(struct journal_file *jf, const char *filename, FUNCTION_QUERY_STATUS *fqs) {
+
+    bool ret = (
             (fqs->source_type == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || (jf->source_type & fqs->source_type) == fqs->source_type) &&
             (!fqs->source || fqs->source == jf->source) &&
             (jf->msg_last_ut >= fqs->after_ut && jf->msg_first_ut <= fqs->before_ut)
     );
+
+    internal_error(!ret, "Not selecting file '%s', wanted source type %s found %d, wanted source '%s' found '%s', duration [%"PRIu64" - %"PRIu64"] found [%"PRIu64" - %"PRIu64"]",
+                   filename, fqs->source_type, jf->source_type,
+                   string2str(fqs->source), string2str(jf->source),
+                   fqs->after_ut, fqs->before_ut,
+                   jf->msg_first_ut, jf->msg_last_ut);
 }
 
 static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
@@ -855,7 +862,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         bool modified = false;
 
         dfe_start_read(journal_files_registry, jf) {
-            if(!jf_is_mine(jf, fqs))
+            if(!jf_is_mine(jf, jf_dfe.name, fqs))
                 continue;
 
             if(jf->msg_last_ut > fqs->if_modified_since) {
@@ -878,7 +885,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     // count the files
     fqs->files_matched = fqs->file_working = 0;
     dfe_start_read(journal_files_registry, jf) {
-        if(!jf_is_mine(jf, fqs))
+        if(!jf_is_mine(jf, jf_dfe.name, fqs))
             continue;
 
         fqs->files_matched++;
@@ -892,7 +899,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     bool partial = false;
     dfe_start_reentrant(journal_files_registry, jf) {
-        if(!jf_is_mine(jf, fqs))
+        if(!jf_is_mine(jf, jf_dfe.name, fqs))
             continue;
 
         fqs->file_working++;
