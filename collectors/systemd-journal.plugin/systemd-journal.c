@@ -756,7 +756,7 @@ static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, v
     struct journal_file *jf = value; (void)jf;
     const char *filename = dictionary_acquired_item_name(item); (void)filename;
 
-    freez(jf->source);
+    string_freez(jf->source);
     internal_error(true, "removed journal file '%s'", filename);
 }
 
