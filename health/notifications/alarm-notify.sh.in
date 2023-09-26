@@ -34,9 +34,7 @@
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
 #  - RocketChat notifications by @Hermsi1337 #3777
-#  - Google Hangouts Chat notifications by @EnzoAkira and @hendrikhofstadt
 #  - Dynatrace Event by @illumine
-#  - Stackpulse Event by @thiagoftsm
 #  - Opsgenie by @thiaoftsm #9858
 #  - Gotify by @coffeegrind123
 #  - ntfy.sh by @Dim-P
@@ -174,7 +172,6 @@ irc
 awssns
 rocketchat
 sms
-hangouts
 dynatrace
 matrix
 ntfy
@@ -390,10 +387,6 @@ IRC_REALNAME=
 IRC_NETWORK=
 IRC_PORT=6667
 
-# hangouts configs
-declare -A HANGOUTS_WEBHOOK_URI
-declare -A HANGOUTS_WEBHOOK_THREAD
-
 # dynatrace configs
 DYNATRACE_SPACE=
 DYNATRACE_SERVER=
@@ -402,9 +395,6 @@ DYNATRACE_TAG_VALUE=
 DYNATRACE_ANNOTATION_TYPE=
 DYNATRACE_EVENT=
 SEND_DYNATRACE=
-
-# stackpulse configs
-STACKPULSE_WEBHOOK=
 
 # gotify configs
 GOTIFY_APP_URL=
@@ -635,9 +625,6 @@ filter_recipient_by_criticality() {
 # check irc
 [ -z "${IRC_NETWORK}" ] && SEND_IRC="NO"
 
-# check hangouts
-[ ${#HANGOUTS_WEBHOOK_URI[@]} -eq 0 ] && SEND_HANGOUTS="NO"
-
 # check fleep
 #shellcheck disable=SC2153
 { [ -z "${FLEEP_SERVER}" ] || [ -z "${FLEEP_SENDER}" ]; } && SEND_FLEEP="NO"
@@ -660,9 +647,6 @@ filter_recipient_by_criticality() {
 
 # check ntfy
 [ -z "${DEFAULT_RECIPIENT_NTFY}" ] && SEND_NTFY="NO"
-
-# check stackpulse
-[ -z "${STACKPULSE_WEBHOOK}" ] && SEND_STACKPULSE="NO"
 
 # check msteams
 [ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAMS="NO"
@@ -692,12 +676,10 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
   [ "${SEND_KAFKA}" = "YES" ] ||
   [ "${SEND_FLEEP}" = "YES" ] ||
   [ "${SEND_PROWL}" = "YES" ] ||
-  [ "${SEND_HANGOUTS}" = "YES" ] ||
   [ "${SEND_MATRIX}" = "YES" ] ||
   [ "${SEND_CUSTOM}" = "YES" ] ||
   [ "${SEND_MSTEAMS}" = "YES" ] ||
   [ "${SEND_DYNATRACE}" = "YES" ] ||
-  [ "${SEND_STACKPULSE}" = "YES" ] ||
   [ "${SEND_OPSGENIE}" = "YES" ] ||
   [ "${SEND_GOTIFY}" = "YES" ] ||
   [ "${SEND_NTFY}" = "YES" ]; then
@@ -724,11 +706,9 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
     SEND_KAFKA="NO"
     SEND_FLEEP="NO"
     SEND_PROWL="NO"
-    SEND_HANGOUTS="NO"
     SEND_MATRIX="NO"
     SEND_CUSTOM="NO"
     SEND_DYNATRACE="NO"
-    SEND_STACKPULSE="NO"
     SEND_OPSGENIE="NO"
     SEND_GOTIFY="NO"
     SEND_NTFY="NO"
@@ -873,13 +853,11 @@ for method in "${SEND_EMAIL}" \
   "${SEND_MATRIX}" \
   "${SEND_CUSTOM}" \
   "${SEND_IRC}" \
-  "${SEND_HANGOUTS}" \
   "${SEND_AWSSNS}" \
   "${SEND_SYSLOG}" \
   "${SEND_SMS}" \
   "${SEND_MSTEAMS}" \
   "${SEND_DYNATRACE}" \
-  "${SEND_STACKPULSE}" \
   "${SEND_OPSGENIE}" \
   "${SEND_GOTIFY}" \
   "${SEND_NTFY}" ; do
@@ -2122,117 +2100,6 @@ send_sms() {
   return 1
 }
 
-# -----------------------------------------------------------------------------
-# hangouts sender
-
-send_hangouts() {
-  local rooms="${1}" httpcode sent=0 room color payload webhook thread
-
-  [ "${SEND_HANGOUTS}" != "YES" ] && return 1
-
-  case "${status}" in
-  WARNING) color="#ffa700" ;;
-  CRITICAL) color="#d62d20" ;;
-  CLEAR) color="#008744" ;;
-  *) color="#777777" ;;
-  esac
-
-  for room in ${rooms}; do
-    if [ -z "${HANGOUTS_WEBHOOK_URI[$room]}" ] ; then
-      info "Can't send Hangouts notification for: ${host} ${chart}.${name} to room ${room}. HANGOUTS_WEBHOOK_URI[$room] not defined"
-    else
-      if [ -n "${HANGOUTS_WEBHOOK_THREAD[$room]}" ]; then
-        thread="\"name\" : \"${HANGOUTS_WEBHOOK_THREAD[$room]}\""
-      fi
-      webhook="${HANGOUTS_WEBHOOK_URI[$room]}"
-      payload="$(
-        cat <<EOF
-        {
-          "cards": [
-            {
-              "header": {
-                "title": "Netdata on ${host}",
-                "imageUrl": "${images_base_url}/images/banner-icon-144x144.png",
-                "imageStyle": "IMAGE"
-              },
-              "sections": [
-                {
-                  "header": "<b>${host}</b>",
-                  "widgets": [
-                    {
-                      "keyValue": {
-                        "topLabel": "Status Message",
-                        "content": "<b>${status_message}</b>",
-                        "contentMultiline": "true",
-                        "iconUrl": "${image}",
-                        "onClick": {
-                          "openLink": {
-                            "url": "${goto_url}"
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "keyValue": {
-                        "topLabel": "${chart} | ${family}",
-                        "content": "<font color=${color}>${alarm}</font>",
-                        "contentMultiline": "true"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "widgets": [
-                    {
-                      "textParagraph": {
-                      "text": "<font color=\"#0057e7\">@ ${date}\n<b>${info}</b></font>"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "widgets": [
-                    {
-                      "buttons": [
-                        {
-                          "textButton": {
-                            "text": "Go to ${host}",
-                            "onClick": {
-                              "openLink": {
-                                "url": "${goto_url}"
-                              }
-                            }
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ],
-          "thread": {
-            $thread
-          }
-        }
-EOF
-        )"
-
-      httpcode=$(docurl -H "Content-Type: application/json" -X POST -d "${payload}" "${webhook}")
-
-      if [ "${httpcode}" = "200" ]; then
-        info "sent hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
-        sent=$((sent + 1))
-      else
-        error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP response status code ${httpcode}."
-      fi
-    fi
-  done
-
-  [ ${sent} -gt 0 ] && return 0
-
-  return 1
-}
 
 # -----------------------------------------------------------------------------
 # Dynatrace sender
@@ -2283,51 +2150,6 @@ EOF
   fi
 }
 
-
-# -----------------------------------------------------------------------------
-# Stackpulse sender
-
-send_stackpulse() {
-  local payload httpcode oldv currv
-  [ "${SEND_STACKPULSE}" != "YES" ] && return 1
-
-  # We are sending null when values are nan to avoid errors while JSON message is parsed
-  [ "${old_value}" != "nan" ] && oldv="${old_value}" ||  oldv="null"
-  [ "${value}" != "nan" ] && currv="${value}" || currv="null"
-
-  payload=$(cat <<EOF
-  {
-    "Node" : "${host}",
-    "Chart" : "${chart}",
-    "OldValue" : ${oldv},
-    "Value" : ${currv},
-    "Units" : "${units}",
-    "OldStatus" : "${old_status}",
-    "Status" : "${status}",
-    "Alarm" : "${name}",
-    "Date": ${when},
-    "Duration": ${duration},
-    "NonClearDuration": ${non_clear_duration},
-    "Description" : "${status_message}, ${info}",
-    "CalcExpression" : "${calc_expression}",
-    "CalcParamValues" : "${calc_param_values}",
-    "TotalWarnings" : "${total_warnings}",
-    "TotalCritical" : "${total_critical}",
-    "ID" : ${alarm_id}
-  }
-EOF
-)
-
-  httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" ${STACKPULSE_WEBHOOK})
-  if [ "${httpcode}" = "200" ]; then
-    info "sent stackpulse notification for: ${host} ${chart}.${name} is ${status}"
-  else
-    error "failed to send stackpulse notification for: ${host} ${chart}.${name} is ${status}, with HTTP response status code ${httpcode}."
-    return 1
-  fi
-
-  return 0
-}
 # -----------------------------------------------------------------------------
 # Opsgenie sender
 
@@ -2630,15 +2452,6 @@ raised_for_html=
 
 send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
-
-# -----------------------------------------------------------------------------
-# send the hangouts notification
-
-# hangouts aggregates posts from the same room
-# so we use "${host} ${status}" as the room, to make them diff
-
-send_hangouts "${to_hangouts}"
-SENT_HANGOUTS=$?
 
 # -----------------------------------------------------------------------------
 # send the Microsoft Teams notification
@@ -3666,11 +3479,6 @@ send_dynatrace "${host}" "${chart}" "${name}"  "${status}"
 SENT_DYNATRACE=$?
 
 # -----------------------------------------------------------------------------
-# send the EVENT to Stackpulse
-send_stackpulse
-SENT_STACKPULSE=$?
-
-# -----------------------------------------------------------------------------
 # send messages to Opsgenie
 send_opsgenie
 SENT_OPSGENIE=$?
@@ -3691,7 +3499,6 @@ for state in "${SENT_EMAIL}" \
   "${SENT_PUSHOVER}" \
   "${SENT_TELEGRAM}" \
   "${SENT_SLACK}" \
-  "${SENT_HANGOUTS}" \
   "${SENT_ROCKETCHAT}" \
   "${SENT_ALERTA}" \
   "${SENT_FLOCK}" \
@@ -3713,7 +3520,6 @@ for state in "${SENT_EMAIL}" \
   "${SENT_SMS}" \
   "${SENT_MSTEAMS}" \
   "${SENT_DYNATRACE}" \
-  "${SENT_STACKPULSE}" \
   "${SENT_OPSGENIE}" \
   "${SENT_GOTIFY}" \
   "${SENT_NTFY}"; do
