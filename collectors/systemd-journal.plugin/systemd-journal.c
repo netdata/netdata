@@ -628,7 +628,7 @@ static STRING *strdupz_source(const char *s, const char *e, size_t max_len, cons
     buf[max_len - 1] = '\0';
 
     for(size_t i = 0; buf[i] ;i++)
-        if(!isalnum(buf[i]) && buf[i] != '-')
+        if(!isalnum(buf[i]) && buf[i] != '-' && buf[i] != '.')
             buf[i] = '_';
 
     return string_strdupz(buf);
@@ -685,7 +685,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                    "found journal file '%s', type %d, source '%s', "
                    "file modified: %"PRIu64", "
                    "msg {first: %"PRIu64", last: %"PRIu64"}",
-                   filename, jf->source_type, js->source ? jf->source : "<unset>",
+                   filename, jf->source_type, js->source ? string2str(jf->source) : "<unset>",
                    jf->file_last_modified_ut,
                    jf->msg_first_ut, jf->msg_last_ut);
 }
@@ -830,12 +830,20 @@ static void journal_files_registry_update() {
 
 // ----------------------------------------------------------------------------
 
-#define jf_is_mine(jf, fqs) \
-(                       \
-    ((fqs)->source_type == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || ((jf)->source_type & (fqs)->source_type) == (fqs)->source_type) && \
-    (!(fqs)->source || (fqs)->source == (jf)->source) &&                                    \
-    ((jf)->msg_last_ut >= (fqs)->after_ut && (jf)->msg_first_ut <= (fqs)->before_ut)        \
-)
+//#define jf_is_mine(jf, fqs) \
+//(                       \
+//    ((fqs)->source_type == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || ((jf)->source_type & (fqs)->source_type) == (fqs)->source_type) && \
+//    (!(fqs)->source || (fqs)->source == (jf)->source) &&                                    \
+//    ((jf)->msg_last_ut >= (fqs)->after_ut && (jf)->msg_first_ut <= (fqs)->before_ut)        \
+//)
+
+static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
+    return (
+            (fqs->source_type == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || (jf->source_type & fqs->source_type) == fqs->source_type) &&
+            (!fqs->source || fqs->source == jf->source) &&
+            (jf->msg_last_ut >= fqs->after_ut && jf->msg_first_ut <= fqs->before_ut)
+    );
+}
 
 static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
