@@ -542,22 +542,51 @@ static void ebpf_swap_read_global_table(netdata_idx_t *stats, int maps_per_core)
  */
 static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_target *root)
 {
-    uint64_t local_read = 0;
-    uint64_t local_write = 0;
+    if (!root)
+        return;
 
+    memset(swap, 0, sizeof(netdata_publish_swap_t));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_swap_t *w = swap_pid[pid];
-        if (w) {
-            local_write += w->data.write;
-            local_read += w->data.read;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+        if (pid_ptr) {
+            rw_spinlock_read_lock(&pid_ptr->swap_stats.rw_spinlock);
+            if (pid_ptr->swap_stats.JudyLArray) {
+                Word_t local_timestamp = 0;
+                bool first_swap = true;
+                Pvoid_t *swap_value;
+                while (
+                    (swap_value =
+                         JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_timestamp, &first_swap))) {
+                    netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
+                    swap->data.read += values->data.read;
+                    swap->data.write += values->data.write;
+                }
+            }
+            rw_spinlock_read_unlock(&pid_ptr->swap_stats.rw_spinlock);
         }
+
         root = root->next;
     }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
 
-    // These conditions were added, because we are using incremental algorithm
-    swap->data.write = (local_write >= swap->data.write) ? local_write : swap->data.write;
-    swap->data.read = (local_read >= swap->data.read) ? local_read : swap->data.read;
+/**
+ * Send data to Netdata calling auxiliary functions.
+ *
+ * @param root the target list.
+*/
+void ebpf_swap_update_apps_data(struct ebpf_target *root)
+{
+    struct ebpf_target *w;
+
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            ebpf_swap_sum_pids(&w->swap, w->root_pid);
+        }
+    }
 }
 
 /**
@@ -776,9 +805,9 @@ void ebpf_swap_send_cgroup_data(int update_every)
 }
 
 /**
- * Cachestat thread
+ * SWAP thread
  *
- * Thread used to generate cachestat charts.
+ * Thread used to generate swap charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *
@@ -836,15 +865,21 @@ static void swap_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_swap_read_global_table(stats, maps_per_core);
+
         pthread_mutex_lock(&collect_data_mutex);
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_swap_update_apps_data(apps_groups_root_target);
 
         if (cgroup)
             ebpf_update_swap_cgroup(maps_per_core);
+
+        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&lock);
 
         swap_send_global();
 
+        pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_swap_send_apps_data(apps_groups_root_target);
 
