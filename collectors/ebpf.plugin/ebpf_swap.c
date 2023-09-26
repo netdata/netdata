@@ -970,8 +970,6 @@ static void ebpf_swap_allocate_global_vectors()
 
     swap_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    swap_pid = callocz((size_t)pid_max, sizeof(netdata_publish_swap_t *));
-
     memset(swap_hash_values, 0, sizeof(swap_hash_values));
 
     ebpf_swap_aral_init();

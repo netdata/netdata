@@ -214,7 +214,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest);
 void ebpf_collect_data_for_all_processes();
 
 extern netdata_publish_dcstat_t **dcstat_pid;
-extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,

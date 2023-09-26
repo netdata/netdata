@@ -18,7 +18,6 @@ ARAL *ebpf_aral_swap_pid = NULL;
 // ----------------------------------------------------------------------------
 // Global vectors used with apps
 netdata_publish_dcstat_t **dcstat_pid = NULL;
-netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
 
 /**
@@ -1238,12 +1237,6 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     if (dcstat_pid) {
         ebpf_dcstat_release(dcstat_pid[pid]);
         dcstat_pid[pid] = NULL;
-    }
-
-    // Clean swap structure
-    if (swap_pid) {
-        freez(swap_pid[pid]);
-        swap_pid[pid] = NULL;
     }
 
     // Clean vfs structure
