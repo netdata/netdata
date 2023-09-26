@@ -24,12 +24,22 @@
 #define NETDATA_SYSTEMD_SWAP_READ_CONTEXT "services.swap_read"
 #define NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT "services.swap_write"
 
-typedef struct netdata_publish_swap {
+// ARAL Name
+#define NETDATA_EBPF_SWAP_ARAL_NAME "ebpf_swap"
+
+
+typedef struct netdata_publish_swap_kernel {
     uint64_t ct;
     char name[TASK_COMM_LEN];
 
     uint64_t read;
     uint64_t write;
+} netdata_publish_swap_kernel_t;
+
+typedef struct netdata_publish_swap {
+    uint64_t current_timestamp;
+
+    netdata_publish_swap_kernel_t data;
 } netdata_publish_swap_t;
 
 enum swap_tables {

@@ -256,6 +256,11 @@ void ebpf_shm_aral_init();
 netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
 
+extern ARAL *ebpf_aral_swap_pid;
+void ebpf_swap_release(netdata_publish_swap_t *stat);
+netdata_publish_swap_t *ebpf_publish_swap_get(void);
+void ebpf_swap_aral_init();
+
 // ARAL Section end
 
 #include "libnetdata/threads/threads.h"
