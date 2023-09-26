@@ -11,6 +11,7 @@ declare -a package_tree=(
   cmake
   curl
   elfutils-libelf-devel
+  findutils
   gcc
   gcc-c++
   git
