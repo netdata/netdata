@@ -19,7 +19,6 @@ ARAL *ebpf_aral_shm_pid = NULL;
 netdata_publish_dcstat_t **dcstat_pid = NULL;
 netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
-netdata_publish_shm_t **shm_pid = NULL;
 
 /**
  * eBPF ARAL Init
@@ -1210,12 +1209,6 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     if (vfs_pid) {
         ebpf_vfs_release(vfs_pid[pid]);
         vfs_pid[pid] = NULL;
-    }
-
-    // Clean shm structure
-    if (shm_pid) {
-        ebpf_shm_release(shm_pid[pid]);
-        shm_pid[pid] = NULL;
     }
 }
 

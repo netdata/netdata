@@ -216,7 +216,6 @@ void ebpf_collect_data_for_all_processes();
 extern netdata_publish_dcstat_t **dcstat_pid;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
-extern netdata_publish_shm_t **shm_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/libnetdata/aral).

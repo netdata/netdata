@@ -540,23 +540,6 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
-            int pid = pids->pid;
-            netdata_publish_shm_t *out = &pids->shm;
-            if (likely(shm_pid) && shm_pid[pid]) {
-                netdata_publish_shm_t *in = shm_pid[pid];
-
-                memcpy(out, in, sizeof(netdata_publish_shm_t));
-            } else {
-                if (!bpf_map_lookup_elem(fd, &pid, cv)) {
-                    shm_apps_accumulator(cv, maps_per_core);
-
-                    memcpy(out, cv, sizeof(netdata_publish_shm_t));
-
-                    // now that we've consumed the value, zero it out in the map.
-                    memset(cv, 0, length);
-                    bpf_map_update_elem(fd, &pid, cv, BPF_EXIST);
-                }
-            }
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -685,6 +668,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, struct ebpf_pid
 {
     while (root) {
         int32_t pid = root->pid;
+        /*
         netdata_publish_shm_kernel_t *w = shm_pid[pid];
         if (w) {
             shm->get += w->get;
@@ -698,6 +682,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, struct ebpf_pid
             w->dt = 0;
             w->ctl = 0;
         }
+         */
         root = root->next;
     }
 }
@@ -1216,7 +1201,6 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
 static void ebpf_shm_allocate_global_vectors()
 {
     ebpf_shm_aral_init();
-    shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
     shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_kernel_t));
 
     shm_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
