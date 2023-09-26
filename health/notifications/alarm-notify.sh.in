@@ -239,31 +239,30 @@ else
   when="${6}"                # the timestamp this event occurred
   name="${7}"                # the name of the alarm, as given in netdata health.d entries
   chart="${8}"               # the name of the chart (type.id)
-  # family="${9}"              # the family of the chart
-  status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-  old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-  value="${12}"              # the current value of the alarm
-  old_value="${13}"          # the previous value of the alarm
-  src="${14}"                # the line number and file the alarm has been configured
-  duration="${15}"           # the duration in seconds of the previous alarm state
-  non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
-  units="${17}"              # the units of the value
-  info="${18}"               # a short description of the alarm
-  value_string="${19}"       # friendly value (with units)
+  status="${9}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+  old_status="${10}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+  value="${11}"              # the current value of the alarm
+  old_value="${12}"          # the previous value of the alarm
+  src="${13}"                # the line number and file the alarm has been configured
+  duration="${14}"           # the duration in seconds of the previous alarm state
+  non_clear_duration="${15}" # the total duration in seconds this is/was non-clear
+  units="${16}"              # the units of the value
+  info="${17}"               # a short description of the alarm
+  value_string="${18}"       # friendly value (with units)
   # shellcheck disable=SC2034
   # variable is unused, but https://github.com/netdata/netdata/pull/5164#discussion_r255572947
-  old_value_string="${20}"   # friendly old value (with units), previously named "old_value_string"
-  calc_expression="${21}"    # contains the expression that was evaluated to trigger the alarm
-  calc_param_values="${22}"  # the values of the parameters in the expression, at the time of the evaluation
-  total_warnings="${23}"     # Total number of alarms in WARNING state
-  total_critical="${24}"     # Total number of alarms in CRITICAL state
-  total_warn_alarms="${25}"  # List of alarms in warning state
-  total_crit_alarms="${26}"  # List of alarms in critical state
-  classification="${27}"     # The class field from .conf files
-  edit_command_line="${28}"  # The command to edit the alarm, with the line number
-  child_machine_guid="${29}" # the machine_guid of the child
-  transition_id="${30}"      # the transition_id of the alert
-  summary="${31}"            # the summary text field of the alert
+  old_value_string="${19}"   # friendly old value (with units), previously named "old_value_string"
+  calc_expression="${20}"    # contains the expression that was evaluated to trigger the alarm
+  calc_param_values="${21}"  # the values of the parameters in the expression, at the time of the evaluation
+  total_warnings="${22}"     # Total number of alarms in WARNING state
+  total_critical="${23}"     # Total number of alarms in CRITICAL state
+  total_warn_alarms="${24}"  # List of alarms in warning state
+  total_crit_alarms="${25}"  # List of alarms in critical state
+  classification="${26}"     # The class field from .conf files
+  edit_command_line="${27}"  # The command to edit the alarm, with the line number
+  child_machine_guid="${28}" # the machine_guid of the child
+  transition_id="${29}"      # the transition_id of the alert
+  summary="${30}"            # the summary text field of the alert
 fi
 
 # -----------------------------------------------------------------------------
@@ -1133,7 +1132,7 @@ send_kafka() {
   local httpcode sent=0
   if [ "${SEND_KAFKA}" = "YES" ]; then
     httpcode=$(docurl -X POST \
-      --data "{host_ip:\"${KAFKA_SENDER_IP}\",when:${when},name:\"${name}\",chart:\"${chart}\",family:\"${family}\",status:\"${status}\",old_status:\"${old_status}\",value:${value},old_value:${old_value},duration:${duration},non_clear_duration:${non_clear_duration},units:\"${units}\",info:\"${info}\"}" \
+      --data "{host_ip:\"${KAFKA_SENDER_IP}\",when:${when},name:\"${name}\",chart:\"${chart}\",status:\"${status}\",old_status:\"${old_status}\",value:${value},old_value:${old_value},duration:${duration},non_clear_duration:${non_clear_duration},units:\"${units}\",info:\"${info}\"}" \
       "${KAFKA_URL}")
 
     if [ "${httpcode}" = "204" ]; then
@@ -1168,7 +1167,7 @@ send_pd() {
       current_time=$(date -r ${when} +'%Y-%m-%dT%H:%M:%S.000')
     fi
     for PD_SERVICE_KEY in ${recipients}; do
-      d="${status} ${name} = ${value_string} - ${host}, ${family}"
+      d="${status} ${name} = ${value_string} - ${host}"
       if [ ${USE_PD_VERSION} = "2" ]; then
         payload="$(
           cat <<EOF
@@ -1178,7 +1177,6 @@ send_pd() {
                   "source" : "${args_host}",
                   "severity" : "${severity}",
                   "timestamp" : "${current_time}",
-                  "group" : "${family}",
                   "class" : "${chart}",
                   "custom_details": {
                     "value_w_units": "${value_string}",
@@ -1223,7 +1221,6 @@ EOF
                 "alarm_id" : "${alarm_id}",
                 "name" : "${name}",
                 "chart" : "${chart}",
-                "family" : "${family}",
                 "status" : "${status}",
                 "old_status" : "${old_status}",
                 "value" : "${value}",
@@ -1471,7 +1468,7 @@ send_msteams() {
             "@type": "MessageCard",
             "themeColor": "${color}",
             "title": "$icon Alert ${status} from netdata for ${host}",
-            "text": "${host} ${status_message}, ${chart} (_${family}_), *${alarm}*",
+            "text": "${host} ${status_message}, ${chart}, *${alarm}*",
             "potentialAction": [
             {
                 "@type": "OpenUri",
@@ -1536,7 +1533,7 @@ send_slack() {
             $ch
             "username": "netdata on ${host}",
             "icon_url": "${images_base_url}/images/banner-icon-144x144.png",
-            "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
+            "text": "${host} ${status_message}, \`${chart}\`, *${alarm}*",
             "attachments": [
                 {
                     "fallback": "${alarm} - ${chart} (${family}) - ${info}",
@@ -1548,11 +1545,6 @@ send_slack() {
                         {
                             "title": "${chart}",
                             "value": "chart",
-                            "short": true
-                        },
-                        {
-                            "title": "${family}",
-                            "value": "family",
                             "short": true
                         }
                     ],
@@ -1601,7 +1593,7 @@ send_rocketchat() {
             "channel": "#${channel}",
             "alias": "netdata on ${host}",
             "avatar": "${images_base_url}/images/banner-icon-144x144.png",
-            "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
+            "text": "${host} ${status_message}, \`${chart}\`, *${alarm}*",
             "attachments": [
                 {
                     "color": "${color}",
@@ -1613,11 +1605,6 @@ send_rocketchat() {
                             "title": "${chart}",
                             "short": true,
                             "value": "chart"
-                        },
-                        {
-                            "title": "${family}",
-                            "short": true,
-                            "value": "family"
                         }
                     ],
                     "thumb_url": "${image}",
