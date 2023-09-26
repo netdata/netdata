@@ -722,12 +722,26 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
 }
 
 #define SDJF_SOURCE_ALL_NAME "all"
-#define SDJF_SOURCE_LOCAL_NAME "local"
-#define SDJF_SOURCE_LOCAL_SYSTEM_NAME "local-system"
-#define SDJF_SOURCE_LOCAL_USERS_NAME "local-users"
-#define SDJF_SOURCE_LOCAL_OTHER_NAME "local-other"
-#define SDJF_SOURCE_NAMESPACES_NAME "namespaces"
-#define SDJF_SOURCE_REMOTES_NAME "remotes"
+#define SDJF_SOURCE_LOCAL_NAME "all-local"
+#define SDJF_SOURCE_LOCAL_SYSTEM_NAME "local-system-only"
+#define SDJF_SOURCE_LOCAL_USERS_NAME "all-local-users"
+#define SDJF_SOURCE_LOCAL_OTHER_NAME "uncategorized"
+#define SDJF_SOURCE_NAMESPACES_NAME "all-namespaces"
+#define SDJF_SOURCE_REMOTES_NAME "all-remotes"
+
+static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry __maybe_unused, void *data) {
+    BUFFER *wb = data;
+    const char *name = dictionary_acquired_item_name(item);
+
+    buffer_json_add_array_item_object(wb);
+    {
+        buffer_json_member_add_string(wb, "id", name);
+        buffer_json_member_add_string(wb, "name", name);
+    }
+    buffer_json_object_close(wb); // options object
+
+    return 1;
+}
 
 static void available_journal_file_sources_to_json_array(BUFFER *wb) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_NAME_LINK_DONT_CLONE);
@@ -753,16 +767,7 @@ static void available_journal_file_sources_to_json_array(BUFFER *wb) {
     }
     dfe_done(jf);
 
-    void *t;
-    dfe_start_read(dict, t) {
-        buffer_json_add_array_item_object(wb);
-        {
-            buffer_json_member_add_string(wb, "id", t_dfe.name);
-            buffer_json_member_add_string(wb, "name", t_dfe.name);
-        }
-        buffer_json_object_close(wb); // options object
-    }
-    dfe_done(t);
+    dictionary_sorted_walkthrough_read(dict, journal_file_to_json_array_cb, wb);
 
     dictionary_destroy(dict);
 }
