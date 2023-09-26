@@ -1567,6 +1567,9 @@ static void function_systemd_journal(const char *transaction, char *function, in
 
     // register the fields in the order you want them on the dashboard
 
+    facets_register_key_name(facets, "_HOSTNAME",
+                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
+
     facets_register_dynamic_key_name(facets, "ND_JOURNAL_PROCESS",
                                      FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
                                      netdata_systemd_journal_dynamic_row_id, NULL);
