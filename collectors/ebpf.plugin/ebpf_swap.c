@@ -52,6 +52,17 @@ netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+struct netdata_static_thread ebpf_read_swap = {
+    .name = "EBPF_READ_SWAP",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable probe
@@ -458,7 +469,7 @@ static void ebpf_update_swap_cgroup(int maps_per_core)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void read_swap_apps_table(int maps_per_core)
+static void read_swap_apps_table(int maps_per_core, uint64_t update_every)
 {
     netdata_publish_swap_t *cv = swap_vector;
     uint32_t key;
@@ -769,6 +780,44 @@ void ebpf_swap_send_cgroup_data(int update_every)
 }
 
 /**
+ * Cachestat thread
+ *
+ * Thread used to generate cachestat charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_swap_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+    read_swap_apps_table(maps_per_core, (uint64_t)update_every);
+
+    int counter = update_every - 1;
+
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    usec_t period = update_every * USEC_PER_SEC;
+    while (!ebpf_exit_plugin && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        read_swap_apps_table(maps_per_core, (uint64_t)update_every);
+
+        counter = 0;
+    }
+
+    return NULL;
+}
+
+/**
 * Main loop for this collector.
 */
 static void swap_collector(ebpf_module_t *em)
@@ -792,8 +841,6 @@ static void swap_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_swap_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
-        if (apps)
-            read_swap_apps_table(maps_per_core);
 
         if (cgroup)
             ebpf_update_swap_cgroup(maps_per_core);
@@ -992,6 +1039,13 @@ void *ebpf_swap_thread(void *ptr)
     int algorithms[NETDATA_SWAP_END] = { NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
     ebpf_global_labels(swap_aggregated_data, swap_publish_aggregated, swap_dimension_name, swap_dimension_name,
                        algorithms, NETDATA_SWAP_END);
+
+    ebpf_read_swap.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_swap.thread,
+                          ebpf_read_swap.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_swap_thread,
+                          em);
 
     pthread_mutex_lock(&lock);
     ebpf_create_swap_charts(em->update_every);
