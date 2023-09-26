@@ -173,6 +173,7 @@ typedef enum {
 } ND_SD_JOURNAL_STATUS;
 
 typedef enum {
+    SDJF_ALL            = 0,
     SDJF_LOCAL          = (1 << 0),
     SDJF_REMOTE         = (1 << 1),
     SDJF_SYSTEM         = (1 << 2),
@@ -716,23 +717,33 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
     return false;
 }
 
+#define SDJF_SOURCE_ALL_NAME "all"
+#define SDJF_SOURCE_LOCAL_NAME "local"
+#define SDJF_SOURCE_LOCAL_SYSTEM_NAME "local-system"
+#define SDJF_SOURCE_LOCAL_USERS_NAME "local-users"
+#define SDJF_SOURCE_LOCAL_OTHER_NAME "local-other"
+#define SDJF_SOURCE_NAMESPACES_NAME "namespaces"
+#define SDJF_SOURCE_REMOTES_NAME "remotes"
+
 static void available_journal_file_sources_to_json_array(BUFFER *wb) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_NAME_LINK_DONT_CLONE);
 
-    dictionary_set(dict, "all", NULL, 0);
+    dictionary_set(dict, SDJF_SOURCE_ALL_NAME, NULL, 0);
 
     struct journal_file *jf;
     dfe_start_read(journal_files_registry, jf) {
         if((jf->source_type & (SDJF_LOCAL)) == (SDJF_LOCAL))
-            dictionary_set(dict, "local", NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_NAME, NULL, 0);
         if((jf->source_type & (SDJF_LOCAL | SDJF_SYSTEM)) == (SDJF_LOCAL | SDJF_SYSTEM))
-            dictionary_set(dict, "local-system-only", NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_SYSTEM_NAME, NULL, 0);
         if((jf->source_type & (SDJF_LOCAL | SDJF_USER)) == (SDJF_LOCAL | SDJF_USER))
-            dictionary_set(dict, "local-users-only", NULL, 0);
-        if((jf->source_type & (SDJF_LOCAL | SDJF_NAMESPACE)) == (SDJF_LOCAL | SDJF_NAMESPACE))
-            dictionary_set(dict, "local-namespaces-only", NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_USERS_NAME, NULL, 0);
+        if((jf->source_type & (SDJF_LOCAL | SDJF_OTHER)) == (SDJF_LOCAL | SDJF_OTHER))
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_OTHER_NAME, NULL, 0);
+        if((jf->source_type & (SDJF_NAMESPACE)) == (SDJF_NAMESPACE))
+            dictionary_set(dict, SDJF_SOURCE_NAMESPACES_NAME, NULL, 0);
         if((jf->source_type & (SDJF_REMOTE)) == (SDJF_REMOTE))
-            dictionary_set(dict, "remotes-only", NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_REMOTES_NAME, NULL, 0);
         if(jf->source)
             dictionary_set(dict, string2str(jf->source), NULL, 0);
     }
@@ -831,17 +842,10 @@ static void journal_files_registry_update() {
 
 // ----------------------------------------------------------------------------
 
-//#define jf_is_mine(jf, fqs) \
-//(                       \
-//    ((fqs)->source_type == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || ((jf)->source_type & (fqs)->source_type) == (fqs)->source_type) && \
-//    (!(fqs)->source || (fqs)->source == (jf)->source) &&                                    \
-//    ((jf)->msg_last_ut >= (fqs)->after_ut && (jf)->msg_first_ut <= (fqs)->before_ut)        \
-//)
-
 static bool jf_is_mine(struct journal_file *jf, const char *filename, FUNCTION_QUERY_STATUS *fqs) {
 
     bool ret = (
-            (fqs->source_type == (SD_JOURNAL_FILE_SOURCE_TYPE)(~0) || (jf->source_type & fqs->source_type) == fqs->source_type) &&
+            (fqs->source_type == SDJF_ALL || (jf->source_type & fqs->source_type) == fqs->source_type) &&
             (!fqs->source || fqs->source == jf->source) &&
             (jf->msg_last_ut >= fqs->after_ut && jf->msg_first_ut <= fqs->before_ut)
     );
@@ -1603,7 +1607,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     const char *chart = NULL;
     const char *source = NULL;
     const char *progress_id = NULL;
-    SD_JOURNAL_FILE_SOURCE_TYPE source_type = ~0;
+    SD_JOURNAL_FILE_SOURCE_TYPE source_type = SDJF_ALL;
 
     buffer_json_member_add_object(wb, "request");
 
@@ -1635,50 +1639,38 @@ static void function_systemd_journal(const char *transaction, char *function, in
         else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {
             source = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
 
-            source_type = ~0; // "all"
-
-            if(strcmp(source, "all") == 0)
-                source_type = ~0;
-            else if(strcmp(source, "local") == 0) {
+            if(strcmp(source, SDJF_SOURCE_ALL_NAME) == 0) {
+                source_type = SDJF_ALL;
+                source = NULL;
+            }
+            else if(strcmp(source, SDJF_SOURCE_LOCAL_NAME) == 0) {
                 source_type = SDJF_LOCAL;
                 source = NULL;
             }
-            else if(strcmp(source, "remote") == 0) {
+            else if(strcmp(source, SDJF_SOURCE_REMOTES_NAME) == 0) {
                 source_type = SDJF_REMOTE;
                 source = NULL;
             }
-            else if(strcmp(source, "local-system-only") == 0) {
+            else if(strcmp(source, SDJF_SOURCE_NAMESPACES_NAME) == 0) {
+                source_type = SDJF_NAMESPACE;
+                source = NULL;
+            }
+            else if(strcmp(source, SDJF_SOURCE_LOCAL_SYSTEM_NAME) == 0) {
                 source_type = SDJF_LOCAL | SDJF_SYSTEM;
                 source = NULL;
             }
-            else if(strcmp(source, "local-users-only") == 0) {
+            else if(strcmp(source, SDJF_SOURCE_LOCAL_USERS_NAME) == 0) {
                 source_type = SDJF_LOCAL | SDJF_USER;
                 source = NULL;
             }
-            else if(strcmp(source, "local-other-only") == 0) {
+            else if(strcmp(source, SDJF_SOURCE_LOCAL_OTHER_NAME) == 0) {
                 source_type = SDJF_LOCAL | SDJF_OTHER;
                 source = NULL;
             }
-            else if(strcmp(source, "remote-system-only") == 0) {
-                source_type = SDJF_REMOTE | SDJF_SYSTEM;
-                source = NULL;
+            else {
+                source_type = SDJF_ALL;
+                // else, match the source, whatever it is
             }
-            else if(strcmp(source, "remote-users-only") == 0) {
-                source_type = SDJF_REMOTE | SDJF_USER;
-                source = NULL;
-            }
-            else if(strcmp(source, "remote-other-only") == 0) {
-                source_type = SDJF_REMOTE | SDJF_OTHER;
-                source = NULL;
-            }
-            else if(strncmp(source, "remote-", 7) == 0) {
-                source_type = SDJF_REMOTE;
-            }
-            else if(strncmp(source, "namespace-", 10) == 0) {
-                source_type = SDJF_NAMESPACE;
-            }
-            else
-                internal_error(true, "unknown source '%s'", source);
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_AFTER ":", sizeof(JOURNAL_PARAMETER_AFTER ":") - 1) == 0) {
             after_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_AFTER ":") - 1]);
