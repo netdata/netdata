@@ -173,6 +173,7 @@ On the **parent** node, use OpenSSL to create the key and certificate, then use 
 by the `netdata` user.
 
 ```bash
+mkdir -p /etc/netdata/ssl
 sudo openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout /etc/netdata/ssl/key.pem -out /etc/netdata/ssl/cert.pem
 sudo chown netdata:netdata /etc/netdata/ssl/cert.pem /etc/netdata/ssl/key.pem
 ```
