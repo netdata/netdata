@@ -1000,7 +1000,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 # target_link_libraries(test Threads::Threads)
 
 target_link_libraries(libnetdata PUBLIC
-        "$<$<BOOL:${LINUX}>:pthread;rt>"
+        "$<$<OR:$<BOOL:${LINUX}>,$<BOOL:${FREEBSD}>>:pthread;rt>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
 )
 
