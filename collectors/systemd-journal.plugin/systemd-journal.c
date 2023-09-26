@@ -722,12 +722,12 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
 }
 
 #define SDJF_SOURCE_ALL_NAME "all"
-#define SDJF_SOURCE_LOCAL_NAME "all-local"
-#define SDJF_SOURCE_LOCAL_SYSTEM_NAME "local-system-only"
-#define SDJF_SOURCE_LOCAL_USERS_NAME "all-local-users"
-#define SDJF_SOURCE_LOCAL_OTHER_NAME "uncategorized"
-#define SDJF_SOURCE_NAMESPACES_NAME "all-namespaces"
-#define SDJF_SOURCE_REMOTES_NAME "all-remotes"
+#define SDJF_SOURCE_LOCAL_NAME "all-local-logs"
+#define SDJF_SOURCE_LOCAL_SYSTEM_NAME "all-local-system-logs"
+#define SDJF_SOURCE_LOCAL_USERS_NAME "all-local-user-logs"
+#define SDJF_SOURCE_LOCAL_OTHER_NAME "all-uncategorized"
+#define SDJF_SOURCE_NAMESPACES_NAME "all-local-namespaces"
+#define SDJF_SOURCE_REMOTES_NAME "all-remote-systems"
 
 static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry __maybe_unused, void *data) {
     BUFFER *wb = data;
