@@ -1208,7 +1208,7 @@ void *health_main(void *ptr) {
 
                     int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
                                                   rc->after, rc->before, rc->group, NULL,
-                                                  0, rc->options,
+                                                  0, rc->options | RRDR_OPTION_SELECTED_TIER,
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL, NULL,
                                                   &value_is_null, NULL, 0, 0,
