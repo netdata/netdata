@@ -605,8 +605,8 @@ void facets_set_timeframe_and_histogram_by_id(FACETS *facets, const char *key_id
     facets->histogram.before_ut = facets_histogram_slot_baseline_ut(facets, before_ut) + facets->histogram.slot_width_ut;
     facets->histogram.slots = (facets->histogram.before_ut - facets->histogram.after_ut) / facets->histogram.slot_width_ut + 1;
 
-    internal_fatal(after_ut > facets->histogram.after_ut, "after_ut is not less or equal to wanted after_ut");
-    internal_fatal(before_ut < facets->histogram.before_ut, "before_ut is not more or equal to wanted before_ut");
+    internal_fatal(after_ut < facets->histogram.after_ut, "histogram after_ut is not less or equal to wanted after_ut");
+    internal_fatal(before_ut > facets->histogram.before_ut, "histogram before_ut is not more or equal to wanted before_ut");
 
     if(facets->histogram.slots > 1000) {
         facets->histogram.slots = 1000 + 1;
