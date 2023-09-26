@@ -527,7 +527,6 @@ static void shm_apps_accumulator(netdata_publish_shm_kernel_t *out, int maps_per
 static void ebpf_update_shm_cgroup(int maps_per_core)
 {
     netdata_publish_shm_kernel_t *cv = shm_vector;
-    int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_shm_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
@@ -585,18 +584,18 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
 
         // Get SHM structure
         rw_spinlock_write_lock(&pid_ptr->shm_stats.rw_spinlock);
-        netdata_publish_shm_t **cs_pptr = (netdata_publish_shm_t **)ebpf_judy_insert_unsafe(
+        netdata_publish_shm_t **shm_pptr = (netdata_publish_shm_t **)ebpf_judy_insert_unsafe(
             &pid_ptr->shm_stats.JudyLArray, cv[0].ct);
-        netdata_publish_shm_t *cs_ptr = *cs_pptr;
-        if (likely(*cs_pptr == NULL)) {
-            *cs_pptr = ebpf_shm_stat_get();
-            cs_ptr = *cs_pptr;
+        netdata_publish_shm_t *shm_ptr = *shm_pptr;
+        if (likely(*shm_pptr == NULL)) {
+            *shm_pptr = ebpf_shm_stat_get();
+            shm_ptr = *shm_pptr;
 
-            cs_ptr->current_timestamp = update_time;
-            memcpy(&cs_ptr->data, &cv[0], sizeof(netdata_publish_shm_kernel_t));
-        } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
+            shm_ptr->current_timestamp = update_time;
+            memcpy(&shm_ptr->data, &cv[0], sizeof(netdata_publish_shm_kernel_t));
+        } else if ((update_time - shm_ptr->current_timestamp) > update_every) {
             JudyLDel(&pid_ptr->shm_stats.JudyLArray, cv[0].ct, PJE0);
-            ebpf_shm_release(cs_ptr);
+            ebpf_shm_release(shm_ptr);
             bpf_map_delete_elem(fd, &key);
         }
 
@@ -666,24 +665,50 @@ static void ebpf_shm_read_global_table(netdata_idx_t *stats, int maps_per_core)
  */
 static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, struct ebpf_pid_on_target *root)
 {
+    if (!root)
+        return;
+
+    memset(shm, 0, sizeof(netdata_publish_shm_kernel_t));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
     while (root) {
         int32_t pid = root->pid;
-        /*
-        netdata_publish_shm_kernel_t *w = shm_pid[pid];
-        if (w) {
-            shm->get += w->get;
-            shm->at += w->at;
-            shm->dt += w->dt;
-            shm->ctl += w->ctl;
-
-            // reset for next collection.
-            w->get = 0;
-            w->at = 0;
-            w->dt = 0;
-            w->ctl = 0;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+        if (pid_ptr) {
+            rw_spinlock_read_lock(&pid_ptr->shm_stats.rw_spinlock);
+            if (pid_ptr->shm_stats.JudyLArray) {
+                Word_t local_timestamp = 0;
+                bool first_shm = true;
+                Pvoid_t *shm_value;
+                while (
+                    (shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_timestamp, &first_shm))) {
+                    netdata_publish_shm_t *values = (netdata_publish_shm_t *)*shm_value;
+                    shm->at += values->data.at;
+                    shm->ctl += values->data.ctl;
+                    shm->dt += values->data.dt;
+                    shm->get += values->data.get;
+                }
+            }
+            rw_spinlock_read_unlock(&pid_ptr->shm_stats.rw_spinlock);
         }
-         */
+
         root = root->next;
+    }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
+
+/**
+ * Send data to Netdata calling auxiliary functions.
+ *
+ * @param root the target list.
+*/
+void ebpf_shm_update_apps_data(struct ebpf_target *root)
+{
+    struct ebpf_target *w;
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed && w->processes)) {
+            ebpf_shm_sum_pids(&w->shm.data, w->root_pid);
+        }
     }
 }
 
@@ -1069,31 +1094,34 @@ static void shm_collector(ebpf_module_t *em)
         ebpf_shm_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps) {
+            ebpf_shm_update_apps_data(apps_groups_root_target);
         }
 
         if (cgroups) {
             ebpf_update_shm_cgroup(maps_per_core);
         }
+        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&lock);
 
         shm_send_global();
-
-        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_shm_send_apps_data(apps_groups_root_target);
-        }
 
 #ifdef NETDATA_DEV_MODE
         if (ebpf_aral_shm_pid)
             ebpf_send_data_aral_chart(ebpf_aral_shm_pid, em);
 #endif
 
+        pthread_mutex_lock(&collect_data_mutex);
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            ebpf_shm_send_apps_data(apps_groups_root_target);
+        }
+
         if (cgroups) {
             ebpf_shm_send_cgroup_data(update_every);
         }
 
-        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
