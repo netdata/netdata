@@ -1110,6 +1110,7 @@ enable_feature PLUGIN_DEBUGFS "${IS_LINUX}"
 enable_feature PLUGIN_PERF "${IS_LINUX}"
 enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
 enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
+enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
 
 enable_feature ACLK "${ENABLE_CLOUD}"
 enable_feature CLOUD "${ENABLE_CLOUD}"
@@ -1120,7 +1121,6 @@ enable_feature H2O "${ENABLE_H2O}"
 enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
 
 enable_feature PLUGIN_APPS 1
-enable_feature PLUGIN_LOCAL_LISTENERS 1
 
 check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
 check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
