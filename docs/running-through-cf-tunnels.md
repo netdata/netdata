@@ -1,11 +1,5 @@
 # Running a Local Dashboard through Cloudflare Tunnels
 
-> ### Note
->
-> You can find the origin of this page in [this discussion](https://discord.com/channels/847502280503590932/1154164395799216189/1154556625944854618) in our Discord server.
->
-> We thought it was going to be helpful to all users, so we included it in our docs.
-
 ## Summary of tasks
 
 - Make a `netdata-web` HTTP tunnel on the parent node, so the web interface can be viewed publicly
@@ -110,4 +104,10 @@ You can edit the configuration file using the `edit-config` script from the Netd
 
 [Restart the Agents](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md), and you are done!
 
-You should now be able to have a Local Dashboard that gets its metrics from Child instnaces, running through Cloudflare tunnels.
+You should now be able to have a Local Dashboard that gets its metrics from Child instances, running through Cloudflare tunnels.
+
+> ### Note
+>
+> You can find the origin of this page in [this discussion](https://discord.com/channels/847502280503590932/1154164395799216189/1154556625944854618) in our Discord server.
+>
+> We thought it was going to be helpful to all users, so we included it in our docs.
