@@ -1835,6 +1835,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     else
         facets_set_timeframe_and_histogram_by_name(facets, "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
 
+    fqs->source = string_strdupz(source);
     fqs->source_type = source_type;
     fqs->after_ut = after_s * USEC_PER_SEC;
     fqs->before_ut = before_s * USEC_PER_SEC;
@@ -1845,6 +1846,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
     fqs->data_only = data_only;
     fqs->last_modified = 0;
     response = netdata_systemd_journal_query(wb, facets, fqs);
+    string_freez(fqs->source);
+    fqs->source = NULL;
 
     if(response != HTTP_RESP_OK) {
         netdata_mutex_lock(&stdout_mutex);
