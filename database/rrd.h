@@ -454,8 +454,8 @@ static inline void storage_engine_store_metric(
                                        count, anomaly_count, flags);
 }
 
-size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
-static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
+static inline uint64_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_disk_space_max(db_instance);
@@ -464,7 +464,7 @@ static inline size_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backen
     return 0;
 }
 
-size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
+uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
 static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))

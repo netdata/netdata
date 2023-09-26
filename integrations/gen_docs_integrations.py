@@ -1,8 +1,28 @@
 import json
-import os
+import shutil
+from pathlib import Path
 
 # Dictionary responsible for making the symbolic links at the end of the script's run.
 symlink_dict = {}
+am_i_inside_go = "go.d.plugin" in str(Path.cwd())
+
+
+def cleanup():
+    """
+    clean directories that are either data collection or exporting integrations
+    """
+    if am_i_inside_go:
+        for element in Path("modules").glob('**/*/'):
+            if "integrations" in str(element):
+                shutil.rmtree(element)
+    else:
+        for element in Path("collectors").glob('**/*/'):
+            if "integrations" in str(element):
+                shutil.rmtree(element)
+
+        for element in Path("exporting").glob('**/*/'):
+            if "integrations" in str(element):
+                shutil.rmtree(element)
 
 
 def generate_category_from_name(category_fragment, category_array):
@@ -31,7 +51,7 @@ def generate_category_from_name(category_fragment, category_array):
         i += 1
 
 
-def clean_and_write(md, txt):
+def clean_and_write(md, path):
     """
     This function takes care of the special details element, and converts it to the equivalent that md expects.
     Then it writes the buffer on the file provided.
@@ -39,27 +59,63 @@ def clean_and_write(md, txt):
     # clean first, replace
     md = md.replace("{% details summary=\"", "<details><summary>").replace(
         "\" %}", "</summary>\n").replace("{% /details %}", "</details>\n")
-    # print(md)
-    # exit()
 
-    txt.write(md)
+    path.write_text(md)
 
 
-# Open integrations/integrations.js and extract the dictionaries
-with open('integrations/integrations.js') as dataFile:
-    data = dataFile.read()
+def add_custom_edit_url(markdown_string, meta_yaml_link, sidebar_label_string, mode='default'):
+    """
+    Takes a markdown string and adds a "custom_edit_url" metadata to the metadata field
+    """
 
-    categories_str = data.split("export const categories = ")[1].split("export const integrations = ")[0]
-    integrations_str = data.split("export const categories = ")[1].split("export const integrations = ")[1]
+    output = ""
 
-    categories = json.loads(categories_str)
-    integrations = json.loads(integrations_str)
+    if mode == 'default':
+        path_to_md_file = f'{meta_yaml_link.replace("/metadata.yaml", "")}/integrations/{clean_string(sidebar_label_string)}'
 
-i = 0
-# Iterate through every integration
-for integration in integrations:
-    i += 1
-    if integration['integration_type'] == "collector":
+    elif mode == 'cloud-notifications':
+        path_to_md_file = meta_yaml_link.replace("metadata.yaml", f'integrations/{clean_string(sidebar_label_string)}')
+
+    elif mode == 'agent-notifications':
+        path_to_md_file = meta_yaml_link.replace("metadata.yaml", "README")
+
+    output = markdown_string.replace(
+        "<!--startmeta",
+        f'<!--startmeta\ncustom_edit_url: \"{path_to_md_file}.md\"')
+
+    return output
+
+
+def clean_string(string):
+    """
+    simple function to get rid of caps, spaces, slashes and parentheses from a given string
+
+    The string represents an integration name, as it would be displayed in the final text
+    """
+
+    return string.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+
+
+def read_integrations_js(path_to_file):
+    """
+    Open integrations/integrations.js and extract the dictionaries
+    """
+
+    try:
+        data = Path(path_to_file).read_text()
+
+        categories_str = data.split("export const categories = ")[1].split("export const integrations = ")[0]
+        integrations_str = data.split("export const categories = ")[1].split("export const integrations = ")[1]
+
+        return json.loads(categories_str), json.loads(integrations_str)
+
+    except FileNotFoundError as e:
+        print("Exception", e)
+
+
+def build_readme_from_integration(integration, mode=''):
+    # COLLECTORS
+    if mode == 'collector':
 
         try:
             # initiate the variables for the collector
@@ -99,44 +155,11 @@ endmeta-->
                 md += f"""
 {integration['troubleshooting']}
 """
-
-            path = meta_yaml.replace("https://github.com/netdata/", "") \
-                .split("/", 1)[1] \
-                .replace("edit/master/", "") \
-                .replace("/metadata.yaml", "")
-
-            # Only if the path exists, this caters for running the same script on both the go and netdata repos.
-            if os.path.exists(path):
-                try:
-                    if not os.path.exists(f'{path}/integrations'):
-                        os.mkdir(f'{path}/integrations')
-
-                    with open(f'{path}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md', 'w+') as txt:
-                        # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
-                        # afterwards the ingest will replace this metadata with meta_yaml
-                        md = md.replace(
-                            "<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{meta_yaml.replace("/metadata.yaml", "")}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md\"')
-
-                        clean_and_write(md, txt)
-                except Exception as e:
-                    print("Error in writing to the collector file", e, integration['id'])
-
-                # If we only created one file inside a collector, add the entry to the symlink_dict, so we can make the link
-                if len(os.listdir(f'{path}/integrations')) == 1:
-                    symlink_dict.update(
-                        {path: f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md'})
-                else:
-                    try:
-                        symlink_dict.pop(path)
-                    except KeyError:
-                        # We don't need to print something here.
-                        pass
-
         except Exception as e:
             print("Exception in collector md construction", e, integration['id'])
 
-    # kind of specific if clause, so we can avoid running excessive code in the go repo
-    elif integration['integration_type'] == "exporter" and "go.d.plugin" not in os.getcwd():
+    # EXPORTERS
+    elif mode == 'exporter':
         try:
             # initiate the variables for the exporter
             meta_yaml = integration['edit_link'].replace("blob", "edit")
@@ -164,42 +187,11 @@ endmeta-->
                 md += f"""
 {integration['troubleshooting']}
 """
-
-            path = meta_yaml.replace("https://github.com/netdata/", "") \
-                .split("/", 1)[1] \
-                .replace("edit/master/", "") \
-                .replace("/metadata.yaml", "")
-
-            if os.path.exists(path):
-                try:
-                    if not os.path.exists(f'{path}/integrations'):
-                        os.mkdir(f'{path}/integrations')
-
-                    with open(f'{path}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md', 'w+') as txt:
-                        # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
-                        # afterwards the ingest will replace this metadata with meta_yaml
-                        md = md.replace(
-                            "<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{meta_yaml.replace("/metadata.yaml", "")}/integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md\"')
-
-                        clean_and_write(md, txt)
-                except Exception as e:
-                    print("Error in writing to the file", e, integration['id'])
-
-                # If we only created one file inside a collector, add the entry to the symlink_dict, so we can make the link
-                if len(os.listdir(f'{path}/integrations')) == 1:
-                    symlink_dict.update(
-                        {path: f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md'})
-                else:
-                    try:
-                        symlink_dict.pop(path)
-                    except KeyError:
-                        # We don't need to print something here.
-                        pass
         except Exception as e:
             print("Exception in exporter md construction", e, integration['id'])
 
-    # kind of specific if clause, so we can avoid running excessive code in the go repo
-    elif integration['integration_type'] == "notification" and "go.d.plugin" not in os.getcwd():
+    # NOTIFICATIONS
+    elif mode == 'notification':
         try:
             # initiate the variables for the notification method
             meta_yaml = integration['edit_link'].replace("blob", "edit")
@@ -228,49 +220,132 @@ endmeta-->
 {integration['troubleshooting']}
 """
 
-            path = meta_yaml.replace("https://github.com/netdata/", "") \
-                .split("/", 1)[1] \
-                .replace("edit/master/", "") \
-                .replace("/metadata.yaml", "")
-
-            if "cloud-notifications" in path:
-                # for cloud notifications we generate them near their metadata.yaml
-                name = integration['meta']['name'].lower().replace(" ", "_").replace("(", "").replace(")", "")
-                if not os.path.exists(f'{path}/integrations'):
-                    os.mkdir(f'{path}/integrations')
-
-                proper_edit_name = meta_yaml.replace(
-                    "metadata.yaml", f'integrations/{sidebar_label.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")}.md\"')
-
-                md = md.replace("<!--startmeta", f'<!--startmeta\ncustom_edit_url: \"{proper_edit_name}')
-
-                finalpath = f'{path}/integrations/{name}.md'
-            else:
-                # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
-                # afterwards the ingest will replace this metadata with meta_yaml
-                md = md.replace("<!--startmeta",
-                                f'<!--startmeta\ncustom_edit_url: \"{meta_yaml.replace("metadata.yaml", "README.md")}')
-                finalpath = f'{path}/README.md'
-            try:
-                with open(finalpath, 'w') as txt:
-                    clean_and_write(md, txt)
-            except Exception as e:
-                print("Exception in notification md construction", e, integration['id'])
-
         except Exception as e:
-            print("Exception in for loop", e, "\n", integration)
+            print("Exception in notification md construction", e, integration['id'])
 
-for element in symlink_dict:
-    # Remove the README to prevent it being a normal file
-    os.remove(f'{element}/README.md')
-    # and then make a symlink to the actual markdown
-    os.symlink(symlink_dict[element], f'{element}/README.md')
+    return meta_yaml, sidebar_label, learn_rel_path, md
 
-    with open(f'{element}/{symlink_dict[element]}', 'r') as txt:
-        md = txt.read()
 
-    # This preserves the custom_edit_url for most files as it was,
-    # so the existing links don't break, this is vital for link replacement afterwards
-    with open(f'{element}/{symlink_dict[element]}', 'w+') as txt:
-        md = md.replace(f'{element}/{symlink_dict[element]}', f'{element}/README.md')
-        txt.write(md)
+def build_path(meta_yaml_link):
+    """
+    funtion that takes a metadata yaml file link, and makes it into a path that gets used to write to a file.
+    """
+    return meta_yaml_link.replace("https://github.com/netdata/", "") \
+        .split("/", 1)[1] \
+        .replace("edit/master/", "") \
+        .replace("/metadata.yaml", "")
+
+
+def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
+    """
+    takes the arguments needed to write the integration markdown to the proper file.
+    """
+    if mode == 'default':
+        # Only if the path exists, this caters for running the same script on both the go and netdata repos.
+        if Path(path).exists():
+            if not Path(f'{path}/integrations').exists():
+                Path(f'{path}/integrations').mkdir()
+
+            try:
+                md = add_custom_edit_url(md, meta_yaml, sidebar_label)
+                clean_and_write(
+                    md,
+                    Path(f'{path}/integrations/{clean_string(sidebar_label)}.md')
+                    )
+
+            except FileNotFoundError as e:
+                print("Exception in writing to file", e)
+
+            # If we only created one file inside the directory, add the entry to the symlink_dict, so we can make the symbolic link
+            if len(list(Path(f'{path}/integrations').iterdir())) == 1:
+                symlink_dict.update(
+                    {path: f'integrations/{clean_string(sidebar_label)}.md'})
+            else:
+                try:
+                    symlink_dict.pop(path)
+                except KeyError:
+                    # We don't need to print something here.
+                    pass
+    elif mode == 'notification':
+
+        if "cloud-notifications" in path:
+            # for cloud notifications we generate them near their metadata.yaml
+            name = clean_string(integration['meta']['name'])
+
+            if not Path(f'{path}/integrations').exists():
+                Path(f'{path}/integrations').mkdir()
+
+            # proper_edit_name = meta_yaml.replace(
+            #     "metadata.yaml", f'integrations/{clean_string(sidebar_label)}.md\"')
+
+            md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='cloud-notifications')
+
+            finalpath = f'{path}/integrations/{name}.md'
+        else:
+            # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
+            # afterwards the ingest will replace this metadata with meta_yaml
+            md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='agent-notifications')
+
+            finalpath = f'{path}/README.md'
+        
+        try:
+            clean_and_write(
+                md,
+                Path(finalpath)
+                )
+
+        except FileNotFoundError as e:
+            print("Exception in writing to file", e)
+
+
+def make_symlinks(symlink_dict):
+    """
+    takes a dictionary with directories that have a 1:1 relationship between their README and the integration (only one) inside the "integrations" folder.
+    """
+    for element in symlink_dict:
+        # Remove the README to prevent it being a normal file
+        Path.unlink(f'{element}/README.md')
+        # and then make a symlink to the actual markdown
+        Path(f'{element}/README.md').symlink_to(symlink_dict[element])
+
+        filepath = Path(f'{element}/{symlink_dict[element]}')
+        md = filepath.read_text()
+
+        # This preserves the custom_edit_url for most files as it was,
+        # so the existing links don't break, this is vital for link replacement afterwards
+        filepath.write_text(md.replace(
+            f'{element}/{symlink_dict[element]}', f'{element}/README.md'))
+
+
+cleanup()
+
+categories, integrations = read_integrations_js('integrations/integrations.js')
+
+
+# Iterate through every integration
+for integration in integrations:
+
+    if integration['integration_type'] == "collector":
+
+        meta_yaml, sidebar_label, learn_rel_path, md = build_readme_from_integration(integration, mode='collector')
+        path = build_path(meta_yaml)
+        write_to_file(path, md, meta_yaml, sidebar_label)
+
+    elif not am_i_inside_go:
+        # kind of specific if clause, so we can avoid running excessive code in the go repo
+        if integration['integration_type'] == "exporter":
+
+            meta_yaml, sidebar_label, learn_rel_path, md = build_readme_from_integration(integration, mode='exporter')
+            path = build_path(meta_yaml)
+            write_to_file(path, md, meta_yaml, sidebar_label)
+
+        # kind of specific if clause, so we can avoid running excessive code in the go repo
+        elif integration['integration_type'] == "notification":
+
+            meta_yaml, sidebar_label, learn_rel_path, md = build_readme_from_integration(
+                integration, mode='notification')
+            path = build_path(meta_yaml)
+            write_to_file(path, md, meta_yaml, sidebar_label, mode='notification')
+
+
+make_symlinks(symlink_dict)

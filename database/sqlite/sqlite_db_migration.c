@@ -94,6 +94,16 @@ const char *database_migrate_v11_v12[] = {
     NULL
 };
 
+const char *database_migrate_v12_v13_detail[] = {
+    "ALTER TABLE health_log_detail ADD summary TEXT;",
+    NULL
+};
+
+const char *database_migrate_v12_v13_hash[] = {
+    "ALTER TABLE alert_hash ADD summary TEXT;",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
     UNUSED(name);
@@ -250,7 +260,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
               "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, " \
               "flags int, exec_run_timestamp int, delay_up_to_timestamp int, " \
               "info text, exec_code int, new_status real, old_status real, delay int, " \
-              "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, host_id blob);");
+              "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text, host_id blob);");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);");
@@ -338,6 +348,23 @@ static int do_migration_v11_v12(sqlite3 *database, const char *name)
     return rc;
 }
 
+static int do_migration_v12_v13(sqlite3 *database, const char *name)
+{
+    int rc = 0;
+
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (table_exists_in_database("health_log_detail") && !column_exists_in_table("health_log_detail", "summary")) {
+        rc = init_database_batch(database, &database_migrate_v12_v13_detail[0]);
+        sqlite3_exec_monitored(database, MIGR_11_12_UPD_HEALTH_LOG_DETAIL, 0, 0, NULL);
+    }
+
+    if (table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
+        rc = init_database_batch(database, &database_migrate_v12_v13_hash[0]);
+
+    return rc;
+}
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
@@ -393,6 +420,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v9 to v10",  .func = do_migration_v9_v10},
     {.name = "v10 to v11",  .func = do_migration_v10_v11},
     {.name = "v11 to v12",  .func = do_migration_v11_v12},
+    {.name = "v12 to v13",  .func = do_migration_v12_v13},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };

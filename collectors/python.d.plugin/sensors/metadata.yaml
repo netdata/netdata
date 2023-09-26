@@ -117,7 +117,16 @@ modules:
                   - humidity
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: lm-sensors doesn't work on your device
+            description: |
+              When `lm-sensors` doesn't work on your device (e.g. for RPi temperatures),
+              use [the legacy bash collector](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/sensors/README.md)
+          - name: ACPI ring buffer errors are printed
+            description: |
+              There have been reports from users that on certain servers, ACPI ring buffer errors are printed by the kernel (`dmesg`)
+              when ACPI sensors are being accessed. We are tracking such cases in issue [#827](https://github.com/netdata/netdata/issues/827).
+              Please join this discussion for help.
     alerts: []
     metrics:
       folding:

@@ -60,34 +60,6 @@ include:
     test:
       ebpf-core: true
 
-  - &alma
-    distro: almalinux
-    version: "9"
-    support_type: Core
-    notes: ''
-    jsonc_removal: |
-      dnf remove -y json-c-devel
-    eol_check: true
-    packages: &alma_packages
-      type: rpm
-      repo_distro: el/9
-      alt_links:
-        - el/9Server
-        - el/9Client
-      arches:
-        - x86_64
-        - aarch64
-    test:
-      ebpf-core: true
-  - <<: *alma
-    version: "8"
-    packages:
-      <<: *alma_packages
-      repo_distro: el/8
-      alt_links:
-        - el/8Server
-        - el/8Client
-
   - &amzn
     distro: amazonlinux
     version: "2"
@@ -257,6 +229,34 @@ include:
     packages:
       <<: *oracle_packages
       repo_distro: ol/9
+
+  - &rocky
+    distro: rockylinux
+    version: "9"
+    support_type: Core
+    notes: ''
+    jsonc_removal: |
+      dnf remove -y json-c-devel
+    eol_check: true
+    packages: &rocky_packages
+      type: rpm
+      repo_distro: el/9
+      alt_links:
+        - el/9Server
+        - el/9Client
+      arches:
+        - x86_64
+        - aarch64
+    test:
+      ebpf-core: true
+  - <<: *rocky
+    version: "8"
+    packages:
+      <<: *rocky_packages
+      repo_distro: el/8
+      alt_links:
+        - el/8Server
+        - el/8Client
 
   - &ubuntu
     distro: ubuntu

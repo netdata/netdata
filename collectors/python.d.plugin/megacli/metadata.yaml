@@ -27,8 +27,8 @@ modules:
           
           Executed commands:
           
-          sudo -n megacli -LDPDInfo -aAll
-          sudo -n megacli -AdpBbuCmd -a0
+            -  `sudo -n megacli -LDPDInfo -aAll`
+            -  `sudo -n megacli -AdpBbuCmd -a0`
       supported_platforms:
         include: []
         exclude: []
