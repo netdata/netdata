@@ -57,7 +57,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Dynatrace](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/dynatrace.md)
 
-- [Go applications (EXPVAR)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/go_expvar/integrations/go_applications_(expvar).md)
+- [Go applications (EXPVAR)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/go_expvar/integrations/go_applications_expvar.md)
 
 - [Google Pagespeed](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/google_pagespeed.md)
 
@@ -119,7 +119,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Go-ethereum](https://github.com/netdata/go.d.plugin/blob/master/modules/geth/integrations/go-ethereum.md)
 
-- [Helium miner (validator)](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/helium_miner_(validator).md)
+- [Helium miner (validator)](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/helium_miner_validator.md)
 
 - [IOTA full node](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/iota_full_node.md)
 
@@ -329,7 +329,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Dnsmasq](https://github.com/netdata/go.d.plugin/blob/master/modules/dnsmasq/integrations/dnsmasq.md)
 
-- [ISC Bind (RNDC)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/bind_rndc/integrations/isc_bind_(rndc).md)
+- [ISC Bind (RNDC)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/bind_rndc/integrations/isc_bind_rndc.md)
 
 - [ISC DHCP](https://github.com/netdata/go.d.plugin/blob/master/modules/isc_dhcpd/integrations/isc_dhcp.md)
 
@@ -507,17 +507,17 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [HP iLO](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/hp_ilo.md)
 
-- [IBM CryptoExpress (CEX) cards](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/ibm_cryptoexpress_(cex)_cards.md)
+- [IBM CryptoExpress (CEX) cards](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/ibm_cryptoexpress_cex_cards.md)
 
 - [IBM Z Hardware Management Console](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/ibm_z_hardware_management_console.md)
 
-- [IPMI (By SoundCloud)](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/ipmi_(by_soundcloud).md)
+- [IPMI (By SoundCloud)](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/ipmi_by_soundcloud.md)
 
-- [Intelligent Platform Management Interface (IPMI)](https://github.com/netdata/netdata/blob/master/collectors/freeipmi.plugin/integrations/intelligent_platform_management_interface_(ipmi).md)
+- [Intelligent Platform Management Interface (IPMI)](https://github.com/netdata/netdata/blob/master/collectors/freeipmi.plugin/integrations/intelligent_platform_management_interface_ipmi.md)
 
-- [Linux Sensors (lm-sensors)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors/integrations/linux_sensors_(lm-sensors).md)
+- [Linux Sensors (lm-sensors)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors/integrations/linux_sensors_lm-sensors.md)
 
-- [Linux Sensors (sysfs)](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/sensors/integrations/linux_sensors_(sysfs).md)
+- [Linux Sensors (sysfs)](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/sensors/integrations/linux_sensors_sysfs.md)
 
 - [NVML](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/nvml.md)
 
@@ -699,7 +699,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Memory Usage](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/integrations/memory_usage.md)
 
-- [Memory modules (DIMMs)](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/integrations/memory_modules_(dimms).md)
+- [Memory modules (DIMMs)](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/integrations/memory_modules_dimms.md)
 
 - [Non-Uniform Memory Access](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/integrations/non-uniform_memory_access.md)
 
@@ -889,7 +889,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [SmartRG 808AC Cable Modem](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/smartrg_808ac_cable_modem.md)
 
-- [Starlink (SpaceX)](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/starlink_(spacex).md)
+- [Starlink (SpaceX)](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/starlink_spacex.md)
 
 - [Traceroute](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/traceroute.md)
 
@@ -1027,7 +1027,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [HP Smart Storage Arrays](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/hpssa/integrations/hp_smart_storage_arrays.md)
 
-- [Hadoop Distributed File System (HDFS)](https://github.com/netdata/go.d.plugin/blob/master/modules/hdfs/integrations/hadoop_distributed_file_system_(hdfs).md)
+- [Hadoop Distributed File System (HDFS)](https://github.com/netdata/go.d.plugin/blob/master/modules/hdfs/integrations/hadoop_distributed_file_system_hdfs.md)
 
 - [IBM Spectrum Virtualize](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/ibm_spectrum_virtualize.md)
 
@@ -1121,7 +1121,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Eaton UPS](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/eaton_ups.md)
 
-- [Network UPS Tools (NUT)](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/nut/integrations/network_ups_tools_(nut).md)
+- [Network UPS Tools (NUT)](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/nut/integrations/network_ups_tools_nut.md)
 
 - [Network UPS Tools](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/network_ups_tools.md)
 

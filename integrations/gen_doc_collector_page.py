@@ -55,7 +55,7 @@ for category_id, integrations in sorted(cat_dict.items()):
     for integration in integrations:
         name = integration['meta']['monitored_instance']['name']
         link = integration['edit_link'].replace("metadata.yaml", "") + \
-            "integrations/" + name.lower().replace(" ", "_").replace("/", "-")+".md"
+            "integrations/" + name.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")+".md"
         names.append(f"[{name}]({link})")
     for integration_name in sorted(names):
         md += "- " + integration_name + "\n\n"
