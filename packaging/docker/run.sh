@@ -48,8 +48,8 @@ fi
 
 if mountpoint -q /etc/netdata; then
   echo "Copying stock configuration to /etc/netdata"
-  cp -an /etc/netdata.stock/* /etc/netdata
-  cp -an /etc/netdata.stock/.[^.]* /etc/netdata
+  cp -an /etc/netdata.stock/* /etc/netdata || true
+  cp -an /etc/netdata.stock/.[^.]* /etc/netdata || true
 fi
 
 if [ -w "/etc/netdata" ]; then
