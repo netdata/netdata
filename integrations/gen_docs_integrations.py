@@ -304,7 +304,7 @@ def make_symlinks(symlink_dict):
     """
     for element in symlink_dict:
         # Remove the README to prevent it being a normal file
-        Path.unlink(f'{element}/README.md')
+        Path(f'{element}/README.md').unlink()
         # and then make a symlink to the actual markdown
         Path(f'{element}/README.md').symlink_to(symlink_dict[element])
 
