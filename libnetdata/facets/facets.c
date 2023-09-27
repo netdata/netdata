@@ -2,7 +2,7 @@
 #include "facets.h"
 
 #define HISTOGRAM_COLUMNS 150               // the target number of points in a histogram
-#define FACETS_KEYS_WITH_VALUES_MAX 100     // the max number of keys that can be facets
+#define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
 #define FACETS_KEYS_HASHTABLE_ENTRIES 256
@@ -161,6 +161,7 @@ struct facet_key {
     } dynamic;
 
     struct {
+        bool view_only;
         facets_key_transformer_t cb;
         void *data;
     } transform;
@@ -652,6 +653,8 @@ static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
 }
 
 static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
+    BUFFER *tb = NULL;
+
     buffer_json_member_add_array(wb, key);
     {
         if(first_key)
@@ -663,12 +666,24 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
                 if (unlikely(!v->histogram))
                     continue;
 
-                buffer_json_add_array_item_string(wb, v->name);
+                if(!v->empty && k->transform.cb && k->transform.view_only) {
+                    if(!tb)
+                        tb = buffer_create(0, NULL);
+
+                    buffer_flush(tb);
+                    buffer_strcat(tb, v->name);
+                    k->transform.cb(facets, tb, k->transform.data);
+                    buffer_json_add_array_item_string(wb, buffer_tostring(tb));
+                }
+                else
+                    buffer_json_add_array_item_string(wb, v->name);
             }
             foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
+
+    buffer_free(tb);
 }
 
 static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
@@ -1255,6 +1270,7 @@ inline FACET_KEY *facets_register_key_name_transformation(FACETS *facets, const 
     FACET_KEY *k = facets_register_key_name(facets, key, options);
     k->transform.cb = cb;
     k->transform.data = data;
+    k->transform.view_only = (options & FACET_KEY_OPTION_TRANSFORM_VIEW) ? true : false;
     return k;
 }
 
@@ -1350,7 +1366,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 
     facets->operations.values.registered++;
 
-    if(k->transform.cb) {
+    if(k->transform.cb && !k->transform.view_only) {
         facets->operations.values.transformed++;
         k->transform.cb(facets, k->current_value.b, k->transform.data);
     }
@@ -1714,6 +1730,33 @@ void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool w
     buffer_json_array_close(wb); // accepted_params
 }
 
+int facets_reorder_compar(const void *a, const void *b) {
+    const FACET_KEY *ak = *((const FACET_KEY **)a);
+    const FACET_KEY *bk = *((const FACET_KEY **)b);
+
+    const char *an = ak->name;
+    const char *bn = bk->name;
+
+    if(!an) an = "zzzzzzzz";
+    if(!bn) bn = "zzzzzzzz";
+
+    while(*an == '_') an++;
+    while(*bn == '_') bn++;
+
+    return strcmp(an, bn);
+}
+
+void facets_sort_and_reorder_keys(FACETS *facets) {
+    size_t entries = facets->keys_with_values.used;
+    FACET_KEY *keys[entries];
+    memcpy(keys, facets->keys_with_values.array, sizeof(FACET_KEY *) * entries);
+
+    qsort(keys, entries, sizeof(FACET_KEY *), facets_reorder_compar);
+
+    for(size_t i = 0; i < entries ;i++)
+        keys[i]->order = i + 1;
+}
+
 void facets_report(FACETS *facets, BUFFER *wb) {
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
         buffer_json_member_add_boolean(wb, "show_ids", false);   // do not show the column ids to the user
@@ -1734,6 +1777,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     if(!(facets->options & FACETS_OPTION_DISABLE_ALL_FACETS)) {
         buffer_json_member_add_array(wb, "facets");
         {
+            BUFFER *tb = NULL;
             FACET_KEY *k;
             foreach_key_in_facets(facets, k) {
                 if(!k->values.enabled)
@@ -1755,7 +1799,19 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                             buffer_json_add_array_item_object(wb);
                             {
                                 buffer_json_member_add_string(wb, "id", hash_to_static_string(v->hash));
-                                buffer_json_member_add_string(wb, "name", v->name);
+
+                                if(!v->empty && k->transform.cb && k->transform.view_only) {
+                                    if(!tb)
+                                        tb = buffer_create(0, NULL);
+
+                                    buffer_flush(tb);
+                                    buffer_strcat(tb, v->name);
+                                    k->transform.cb(facets, tb, k->transform.data);
+                                    buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
+                                }
+                                else
+                                    buffer_json_member_add_string(wb, "name", v->name);
+
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                             }
                             buffer_json_object_close(wb);
@@ -1767,6 +1823,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                 buffer_json_object_close(wb); // key
             }
             foreach_key_in_facets_done(k);
+            buffer_free(tb);
         }
         buffer_json_array_close(wb); // facets
     }
@@ -1873,6 +1930,14 @@ void facets_report(FACETS *facets, BUFFER *wb) {
 
                     k->dynamic.cb(facets, wb, rkv, row, k->dynamic.data);
                     facets->operations.values.dynamic++;
+                }
+                else if(unlikely(k->transform.cb && k->transform.view_only)) {
+                    if(!rkv || rkv->empty)
+                        buffer_json_add_array_item_string(wb, FACET_VALUE_UNSET);
+                    else {
+                        k->transform.cb(facets, rkv->wb, k->transform.data);
+                        buffer_json_add_array_item_string(wb, buffer_tostring(rkv->wb));
+                    }
                 }
                 else {
                     if(!rkv || rkv->empty)

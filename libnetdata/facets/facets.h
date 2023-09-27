@@ -22,6 +22,7 @@ typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_MAIN_TEXT      = (1 << 6), // full width and wrap
     FACET_KEY_OPTION_RICH_TEXT      = (1 << 7),
     FACET_KEY_OPTION_REORDER        = (1 << 8), // give the key a new order id on first encounter
+    FACET_KEY_OPTION_TRANSFORM_VIEW = (1 << 9), // when registering the transformation, do it only at the view, not on all data
 } FACET_KEY_OPTIONS;
 
 typedef enum __attribute__((packed)) {
@@ -86,6 +87,7 @@ void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool w
 void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity);
 void facets_data_only_mode(FACETS *facets);
 
+void facets_sort_and_reorder_keys(FACETS *facets);
 usec_t facets_row_oldest_ut(FACETS *facets);
 usec_t facets_row_newest_ut(FACETS *facets);
 

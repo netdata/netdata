@@ -1016,6 +1016,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         buffer_json_member_add_uint64(wb, "last_modified", fqs->last_modified);
     }
 
+    facets_sort_and_reorder_keys(facets);
     facets_report(facets, wb);
 
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + (fqs->data_only ? 3600 : 0));
@@ -1584,15 +1585,15 @@ static void function_systemd_journal(const char *transaction, char *function, in
 //                             netdata_systemd_journal_rich_message, NULL);
 
     facets_register_key_name_transformation(facets, "PRIORITY",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_priority, NULL);
 
     facets_register_key_name_transformation(facets, "SYSLOG_FACILITY",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_syslog_facility, NULL);
 
     facets_register_key_name_transformation(facets, "ERRNO",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_errno, NULL);
 
     facets_register_key_name(facets, "SYSLOG_IDENTIFIER",
@@ -1605,15 +1606,15 @@ static void function_systemd_journal(const char *transaction, char *function, in
                              FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name_transformation(facets, "_SYSTEMD_OWNER_UID",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(facets, "_UID",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_uid, NULL);
 
     facets_register_key_name_transformation(facets, "_GID",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_gid, NULL);
 
     bool info = false, data_only = false, progress = false;
