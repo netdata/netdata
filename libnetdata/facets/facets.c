@@ -109,6 +109,7 @@ typedef struct facet_value {
 
     uint32_t rows_matching_facet_value;
     uint32_t final_facet_value_counter;
+    uint32_t order;
 
     uint32_t *histogram;
     uint32_t min, max, sum;
@@ -134,9 +135,11 @@ struct facet_key {
     // members about the current row
     uint32_t key_found_in_row;
     uint32_t key_values_selected_in_row;
+    uint32_t order;
 
     struct {
         bool enabled;
+        uint32_t used;
         FACET_VALUE *hashtable[FACETS_VALUES_HASHTABLE_ENTRIES];
         FACET_VALUE *ll;
     } values;
@@ -152,8 +155,6 @@ struct facet_key {
     struct {
         FACET_VALUE *v;
     } empty_value;
-
-    uint32_t order;
 
     struct {
         facet_dynamic_row_t cb;
@@ -305,6 +306,7 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k);
 
 static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
     k->values.ll = NULL;
+    k->values.used = 0;
 }
 
 static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
@@ -317,6 +319,7 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
         v = next;
     }
     k->values.ll = NULL;
+    k->values.used = 0;
     memset(k->values.hashtable, 0, sizeof(k->values.hashtable));
     k->values.enabled = false;
 }
@@ -370,6 +373,7 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     memcpy(v, tv, sizeof(*v));
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(k->values.ll, v, prev, next);
+    k->values.used++;
 
     if(!v->selected)
         v->selected = k->default_selected_for_values;
@@ -1353,8 +1357,8 @@ void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION di
     facets->anchor.direction = direction;
 }
 
-void facets_dont_show_empty_value_facets(FACETS *facets) {
-    facets->options |= FACETS_OPTION_NO_EMPTY_VALUE_FACETS;
+void facets_enable_slice_mode(FACETS *facets) {
+    facets->options |= FACETS_OPTION_NO_EMPTY_VALUE_FACETS | FACETS_OPTION_SORT_FACETS_ALPHABETICALLY;
 }
 
 inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options) {
@@ -1804,7 +1808,7 @@ void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool w
     buffer_json_array_close(wb); // accepted_params
 }
 
-int facets_reorder_compar(const void *a, const void *b) {
+static int facets_keys_reorder_compar(const void *a, const void *b) {
     const FACET_KEY *ak = *((const FACET_KEY **)a);
     const FACET_KEY *bk = *((const FACET_KEY **)b);
 
@@ -1817,18 +1821,116 @@ int facets_reorder_compar(const void *a, const void *b) {
     while(*an == '_') an++;
     while(*bn == '_') bn++;
 
-    return strcmp(an, bn);
+    return strcasecmp(an, bn);
 }
 
 void facets_sort_and_reorder_keys(FACETS *facets) {
     size_t entries = facets->keys_with_values.used;
+    if(!entries)
+        return;
+
     FACET_KEY *keys[entries];
     memcpy(keys, facets->keys_with_values.array, sizeof(FACET_KEY *) * entries);
 
-    qsort(keys, entries, sizeof(FACET_KEY *), facets_reorder_compar);
+    qsort(keys, entries, sizeof(FACET_KEY *), facets_keys_reorder_compar);
 
     for(size_t i = 0; i < entries ;i++)
         keys[i]->order = i + 1;
+}
+
+static int facets_key_values_reorder_by_name_compar(const void *a, const void *b) {
+    const FACET_VALUE *av = *((const FACET_VALUE **)a);
+    const FACET_VALUE *bv = *((const FACET_VALUE **)b);
+
+    const char *an = av->name;
+    const char *bn = bv->name;
+
+    if(!an) an = "zzzzzzzz";
+    if(!bn) bn = "zzzzzzzz";
+
+    int ret = strcasecmp(an, bn);
+    return ret;
+}
+
+static int facets_key_values_reorder_by_count_compar(const void *a, const void *b) {
+    const FACET_VALUE *av = *((const FACET_VALUE **)a);
+    const FACET_VALUE *bv = *((const FACET_VALUE **)b);
+
+    if(av->final_facet_value_counter < bv->final_facet_value_counter)
+        return 1;
+
+    if(av->final_facet_value_counter > bv->final_facet_value_counter)
+        return -1;
+
+    return facets_key_values_reorder_by_name_compar(a, b);
+}
+
+static int facets_key_values_reorder_by_name_numeric_compar(const void *a, const void *b) {
+    const FACET_VALUE *av = *((const FACET_VALUE **)a);
+    const FACET_VALUE *bv = *((const FACET_VALUE **)b);
+
+    const char *an = av->name;
+    const char *bn = bv->name;
+
+    if(!an) an = "0";
+    if(!bn) bn = "0";
+
+    if(strcmp(an, FACET_VALUE_UNSET) == 0) an = "0";
+    if(strcmp(bn, FACET_VALUE_UNSET) == 0) bn = "0";
+
+    int64_t ad = str2ll(an, NULL);
+    int64_t bd = str2ll(bn, NULL);
+
+    if(ad < bd)
+        return 1;
+
+    if(ad > bd)
+        return -1;
+
+    return facets_key_values_reorder_by_name_compar(a, b);
+}
+
+static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
+    if(!k->values.enabled || !k->values.ll || !k->values.used)
+        return 0;
+
+    bool all_values_numeric = true;
+    size_t entries = k->values.used;
+    FACET_VALUE *values[entries], *v;
+    uint32_t used = 0;
+    foreach_value_in_key(k, v) {
+        if((k->facets->options & FACETS_OPTION_NO_EMPTY_VALUE_FACETS) && v->empty)
+            continue;
+
+        values[used] = v;
+
+        if(all_values_numeric && !v->empty && v->name) {
+            const char *s = v->name;
+            while(isdigit(*s)) s++;
+            if(*s != '\0')
+                all_values_numeric = false;
+        }
+
+        if(++used >= entries)
+            break;
+    }
+
+    if(!used)
+        return 0;
+
+    if(k->facets->options & FACETS_OPTION_SORT_FACETS_ALPHABETICALLY) {
+        if(all_values_numeric)
+            qsort(values, used, sizeof(FACET_VALUE *), facets_key_values_reorder_by_name_numeric_compar);
+        else
+            qsort(values, used, sizeof(FACET_VALUE *), facets_key_values_reorder_by_name_compar);
+    }
+    else
+        qsort(values, used, sizeof(FACET_VALUE *), facets_key_values_reorder_by_count_compar);
+
+    for(size_t i = 0; i < used; i++)
+        values[i]->order = i + 1;
+
+    return used;
 }
 
 void facets_report(FACETS *facets, BUFFER *wb) {
@@ -1857,15 +1959,18 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                 if(!k->values.enabled)
                     continue;
 
+                if(!facets_sort_and_reorder_values(k))
+                    // no values for this key
+                    continue;
+
                 buffer_json_add_array_item_object(wb); // key
                 {
                     buffer_json_member_add_string(wb, "id", hash_to_static_string(k->hash));
                     buffer_json_member_add_string(wb, "name", k->name);
 
-                    if(!k->order)
-                        k->order = facets->order++;
-
+                    if(!k->order) k->order = facets->order++;
                     buffer_json_member_add_uint64(wb, "order", k->order);
+
                     buffer_json_member_add_array(wb, "options");
                     {
                         FACET_VALUE *v;
@@ -1890,6 +1995,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                                     buffer_json_member_add_string(wb, "name", v->name);
 
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
+                                buffer_json_member_add_uint64(wb, "order", v->order);
                             }
                             buffer_json_object_close(wb);
                         }

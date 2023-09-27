@@ -1969,7 +1969,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     fqs->slice = slice;
     if(slice)
-        facets_dont_show_empty_value_facets(facets);
+        facets_enable_slice_mode(facets);
 #else
     fqs->slice = false;
 #endif

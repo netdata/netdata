@@ -55,12 +55,13 @@ FACET_KEY *facets_register_dynamic_key_name(FACETS *facets, const char *key, FAC
 FACET_KEY *facets_register_key_name_transformation(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facets_key_transformer_t cb, void *data);
 
 typedef enum __attribute__((packed)) {
-    FACETS_OPTION_ALL_FACETS_VISIBLE    = (1 << 0), // all facets, should be visible by default in the table
-    FACETS_OPTION_ALL_KEYS_FTS          = (1 << 1), // all keys are searchable by full text search
-    FACETS_OPTION_DISABLE_ALL_FACETS    = (1 << 2),
-    FACETS_OPTION_DISABLE_HISTOGRAM     = (1 << 3),
-    FACETS_OPTION_DATA_ONLY             = (1 << 4),
-    FACETS_OPTION_NO_EMPTY_VALUE_FACETS = (1 << 5),
+    FACETS_OPTION_ALL_FACETS_VISIBLE            = (1 << 0), // all facets, should be visible by default in the table
+    FACETS_OPTION_ALL_KEYS_FTS                  = (1 << 1), // all keys are searchable by full text search
+    FACETS_OPTION_DISABLE_ALL_FACETS            = (1 << 2),
+    FACETS_OPTION_DISABLE_HISTOGRAM             = (1 << 3),
+    FACETS_OPTION_DATA_ONLY                     = (1 << 4),
+    FACETS_OPTION_NO_EMPTY_VALUE_FACETS         = (1 << 5),
+    FACETS_OPTION_SORT_FACETS_ALPHABETICALLY    = (1 << 6),
 } FACETS_OPTIONS;
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);
@@ -75,7 +76,7 @@ FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_O
 void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION direction);
-void facets_dont_show_empty_value_facets(FACETS *facets);
+void facets_enable_slice_mode(FACETS *facets);
 
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);
 void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options);
