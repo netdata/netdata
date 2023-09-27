@@ -409,17 +409,37 @@ static void swap_apps_accumulator(netdata_publish_swap_kernel_t *out, int maps_p
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_swap_cgroup(int maps_per_core)
+static void ebpf_update_swap_cgroup()
 {
     ebpf_cgroup_target_t *ect ;
-    size_t length = sizeof(netdata_publish_swap_kernel_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
+        netdata_publish_swap_t *out = &ect->publish_swap;
+        memset(out, 0, sizeof(netdata_publish_swap_t));
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
+            int pid = pids->pid;
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            if (pid_ptr) {
+                rw_spinlock_read_lock(&pid_ptr->swap_stats.rw_spinlock);
+                if (pid_ptr->swap_stats.JudyLArray) {
+                    Word_t local_timestamp = 0;
+                    bool first_swap = true;
+                    Pvoid_t *swap_value;
+                    while (
+                        (swap_value =
+                             JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_timestamp, &first_swap))) {
+                        netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
+                        out->data.read += values->data.read;
+                        out->data.write += values->data.write;
+                    }
+                }
+                rw_spinlock_read_unlock(&pid_ptr->swap_stats.rw_spinlock);
+            }
         }
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
@@ -650,7 +670,7 @@ static void ebpf_send_systemd_swap_charts()
     ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_READ_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.data.read);
+            write_chart_dimension(ect->name, (long long) ect->publish_swap.data.read);
         }
     }
     ebpf_write_end_chart();
@@ -658,7 +678,7 @@ static void ebpf_send_systemd_swap_charts()
     ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.data.write);
+            write_chart_dimension(ect->name, (long long) ect->publish_swap.data.write);
         }
     }
     ebpf_write_end_chart();
@@ -769,7 +789,7 @@ void ebpf_swap_send_cgroup_data(int update_every)
     pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        ebpf_swap_sum_cgroup_pids(&ect->publish_systemd_swap, ect->pids);
+        ebpf_swap_sum_cgroup_pids(&ect->publish_swap, ect->pids);
     }
 
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
@@ -793,7 +813,7 @@ void ebpf_swap_send_cgroup_data(int update_every)
 
         if (ect->flags & NETDATA_EBPF_CGROUP_HAS_SWAP_CHART) {
             if (ect->updated) {
-                ebpf_send_specific_swap_data(ect->name, &ect->publish_systemd_swap.data);
+                ebpf_send_specific_swap_data(ect->name, &ect->publish_swap.data);
             } else {
                 ebpf_obsolete_specific_swap_charts(ect->name, update_every);
                 ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
@@ -871,7 +891,7 @@ static void swap_collector(ebpf_module_t *em)
             ebpf_swap_update_apps_data(apps_groups_root_target);
 
         if (cgroup)
-            ebpf_update_swap_cgroup(maps_per_core);
+            ebpf_update_swap_cgroup();
 
         pthread_mutex_unlock(&collect_data_mutex);
 
