@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- update bundled ui version to v6.41.1 [\#16054](https://github.com/netdata/netdata/pull/16054) ([ilyam8](https://github.com/ilyam8))
+- Fix missing find command when installing/updating on Rocky Linux systems. [\#16052](https://github.com/netdata/netdata/pull/16052) ([Ferroin](https://github.com/Ferroin))
 - Fix summary field in table [\#16050](https://github.com/netdata/netdata/pull/16050) ([MrZammler](https://github.com/MrZammler))
+- Switch to uint64\_t to avoid overflow in 32bit systems [\#16048](https://github.com/netdata/netdata/pull/16048) ([stelfrag](https://github.com/stelfrag))
 - Doc about running a local dashboard through Cloudflare \(community\) [\#16043](https://github.com/netdata/netdata/pull/16043) ([Ancairon](https://github.com/Ancairon))
 - Remove discontinued Hangouts and StackPulse notification methods [\#16041](https://github.com/netdata/netdata/pull/16041) ([Ancairon](https://github.com/Ancairon))
 - Disable mongodb exporter builds where broken. [\#16033](https://github.com/netdata/netdata/pull/16033) ([Ferroin](https://github.com/Ferroin))
@@ -35,6 +38,7 @@
 - Metadata fixes for some collectors [\#15982](https://github.com/netdata/netdata/pull/15982) ([Ancairon](https://github.com/Ancairon))
 - update go.d.plugin to v0.55.0 [\#15981](https://github.com/netdata/netdata/pull/15981) ([ilyam8](https://github.com/ilyam8))
 - bump UI to v6.37.1 [\#15980](https://github.com/netdata/netdata/pull/15980) ([ilyam8](https://github.com/ilyam8))
+- Maintain node's last connected timestamp in the db [\#15979](https://github.com/netdata/netdata/pull/15979) ([stelfrag](https://github.com/stelfrag))
 - apps.plugin function is not thread safe [\#15978](https://github.com/netdata/netdata/pull/15978) ([ktsaou](https://github.com/ktsaou))
 - functions cancelling [\#15977](https://github.com/netdata/netdata/pull/15977) ([ktsaou](https://github.com/ktsaou))
 - Facets: fixes 5 [\#15976](https://github.com/netdata/netdata/pull/15976) ([ktsaou](https://github.com/ktsaou))
@@ -430,8 +434,6 @@
 - Add cgroups yaml [\#15450](https://github.com/netdata/netdata/pull/15450) ([Ancairon](https://github.com/Ancairon))
 - Fix multiline [\#15449](https://github.com/netdata/netdata/pull/15449) ([Ancairon](https://github.com/Ancairon))
 - bump v2 dashboard to v6.21.3 [\#15448](https://github.com/netdata/netdata/pull/15448) ([ilyam8](https://github.com/ilyam8))
-- fix alerts transitions search when something specific is asked for [\#15447](https://github.com/netdata/netdata/pull/15447) ([ktsaou](https://github.com/ktsaou))
-- collector meta: remove meta.alternative\_monitored\_instances [\#15445](https://github.com/netdata/netdata/pull/15445) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
