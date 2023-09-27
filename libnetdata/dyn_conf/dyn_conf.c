@@ -682,7 +682,7 @@ static void handle_plugin_root(struct uni_http_response *resp, int method, struc
 
 void handle_module_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, const char *module, void *post_payload, size_t post_payload_size)
 {
-    if (strncmp(module, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
+    if (strncmp(module, DYN_CONF_SCHEMA, sizeof(DYN_CONF_SCHEMA)) == 0) {
         dyncfg_config_t cfg = plugin->get_config_schema_cb(plugin->cb_usr_ctx, plugin->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
@@ -691,7 +691,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->content_length = cfg.data_size;
         return;
     }
-    if (strncmp(module, DYN_CONF_MODULE_LIST, strlen(DYN_CONF_MODULE_LIST)) == 0) {
+    if (strncmp(module, DYN_CONF_MODULE_LIST, sizeof(DYN_CONF_MODULE_LIST)) == 0) {
         if (method != HTTP_METHOD_GET) {
             resp->content = "method not allowed (only GET)";
             resp->content_length = strlen(resp->content);
@@ -847,7 +847,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
 
 void handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size)
 {
-    if (strncmp(job_id, DYN_CONF_SCHEMA, strlen(DYN_CONF_SCHEMA)) == 0) {
+    if (strncmp(job_id, DYN_CONF_SCHEMA, sizeof(DYN_CONF_SCHEMA)) == 0) {
         dyncfg_config_t cfg = mod->get_config_schema_cb(mod->config_cb_usr_ctx, mod->plugin->name, mod->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
@@ -856,7 +856,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
         resp->content_length = cfg.data_size;
         return;
     }
-    if (strncmp(job_id, DYN_CONF_JOB_SCHEMA, strlen(DYN_CONF_JOB_SCHEMA)) == 0) {
+    if (strncmp(job_id, DYN_CONF_JOB_SCHEMA, sizeof(DYN_CONF_JOB_SCHEMA)) == 0) {
         dyncfg_config_t cfg = mod->get_job_config_schema_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
@@ -865,7 +865,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
         resp->content_length = cfg.data_size;
         return;
     }
-    if (strncmp(job_id, DYN_CONF_JOB_LIST, strlen(DYN_CONF_JOB_LIST)) == 0) {
+    if (strncmp(job_id, DYN_CONF_JOB_LIST, sizeof(DYN_CONF_JOB_LIST)) == 0) {
         if (mod->type != MOD_TYPE_ARRAY) {
             resp->content = "module type is not job_array (can't get the list of jobs)";
             resp->content_length = strlen(resp->content);
