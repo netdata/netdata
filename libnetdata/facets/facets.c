@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "facets.h"
 
-#define HISTOGRAM_COLUMNS 100               // the target number of points in a histogram
+#define HISTOGRAM_COLUMNS 150               // the target number of points in a histogram
 #define FACETS_KEYS_WITH_VALUES_MAX 100     // the max number of keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
