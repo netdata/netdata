@@ -27,6 +27,7 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_FUNCTION_FD "ebpf_fd"
 #define EBPF_FUNCTION_PROCESS "ebpf_process"
 #define EBPF_FUNCTION_SHM "ebpf_shm"
+#define EBPF_FUNCTION_SWAP "ebpf_swap"
 
 // thread constants
 #define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information about eBPF threads."
@@ -59,6 +60,9 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 
 // SHM constants
 #define EBPF_PLUGIN_SHM_FUNCTION_DESCRIPTION "Detailed information about how share memory calls."
+
+// SWAP constants
+#define EBPF_PLUGIN_SWAP_FUNCTION_DESCRIPTION "Detailed information about swap memory access."
 
 void *ebpf_function_thread(void *ptr);
 

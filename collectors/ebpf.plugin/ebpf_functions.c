@@ -2040,7 +2040,7 @@ void ebpf_function_fd_manipulation(const char *transaction,
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
 static inline void ebpf_function_process_help(const char *transaction) {
-    static char *fd_message = {
+    static char *process_message = {
         "ebpf.plugin / process\n"
         "\n"
         "Function `fd` display file descriptor manipulation during ebpf.plugin runtime.\n"
@@ -2055,7 +2055,7 @@ static inline void ebpf_function_process_help(const char *transaction) {
         "      specified plugin will use the default 300 seconds\n"
         "\n"
         "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
-    ebpf_function_help(transaction, fd_message);
+    ebpf_function_help(transaction, process_message);
 }
 
 /**
@@ -2557,7 +2557,7 @@ void ebpf_function_process_manipulation(const char *transaction,
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
 static inline void ebpf_function_shm_help(const char *transaction) {
-    static char *fd_message = {
+    static char *shm_message = {
         "ebpf.plugin / shm\n"
         "\n"
         "Function `shm` displays calls for system calls that controls shared memories.\n"
@@ -2572,7 +2572,7 @@ static inline void ebpf_function_shm_help(const char *transaction) {
         "      specified plugin will use the default 300 seconds\n"
         "\n"
         "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
-    ebpf_function_help(transaction, fd_message);
+    ebpf_function_help(transaction, shm_message);
 }
 
 /**
@@ -2960,6 +2960,153 @@ void ebpf_function_shm_manipulation(const char *transaction,
     buffer_free(wb);
 }
 
+
+/*****************************************************************
+ *  EBPF SWAP FUNCTION
+ *****************************************************************/
+
+/**
+ * Thread Help
+ *
+ * Shows help with all options accepted by thread function.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+*/
+static inline void ebpf_function_swap_help(const char *transaction) {
+    static char *swap_message = {
+        "ebpf.plugin / swap\n"
+        "\n"
+        "Function `swap` displays access to swap memory.\n"
+        "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+        "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+        "modified request.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   period:PERIOD\n"
+        "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
+    ebpf_function_help(transaction, swap_message);
+}
+
+/**
+ * Clean Judy array unsafe
+ *
+ * Clean all Judy Array allocated to show table when a function is called.
+ * Before to call this function it is necessary to lock `ebpf_judy_pid.index.rw_spinlock`.
+ **/
+static void ebpf_swap_clean_judy_array_unsafe()
+{
+    if (!ebpf_judy_pid.index.JudyLArray)
+        return;
+
+    Pvoid_t *pid_value, *swap_value;
+    Word_t local_pid = 0, local_swap = 0;
+    bool first_pid = true, first_swap = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        rw_spinlock_write_lock(&pid_ptr->swap_stats.rw_spinlock);
+        if (pid_ptr->swap_stats.JudyLArray) {
+            while ((swap_value = JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_swap, &first_swap))) {
+                netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
+                ebpf_swap_release(values);
+            }
+            JudyLFreeArray(&pid_ptr->swap_stats.JudyLArray, PJE0);
+            pid_ptr->swap_stats.JudyLArray = NULL;
+        }
+        rw_spinlock_write_unlock(&pid_ptr->swap_stats.rw_spinlock);
+    }
+}
+
+/**
+ * Function: SWAP
+ *
+ * Show information for sockets stored in hash tables.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+ * @param function     function name and arguments given to thread.
+ * @param timeout      The function timeout
+ * @param cancelled    Variable used to store function status.
+ */
+void ebpf_function_swap_manipulation(const char *transaction,
+                                     char *function __maybe_unused,
+                                     int timeout __maybe_unused,
+                                     bool *cancelled __maybe_unused)
+{
+    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SWAP_IDX];
+    char *words[PLUGINSD_MAX_WORDS] = {NULL};
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
+    int period = -1;
+
+    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+        const char *keyword = get_word(words, num_words, i);
+        if (!keyword)
+            break;
+
+        if (strncmp(keyword, EBPF_FUNCTION_OPTION_PERIOD, sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1];
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            period = str2i(name);
+            if (period > 0) {
+                em->lifetime = period;
+            } else
+                em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+
+#ifdef NETDATA_DEV_MODE
+            collector_info("Lifetime modified for %u", em->lifetime);
+#endif
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        } else if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
+            ebpf_function_swap_help(transaction);
+            return;
+        }
+    }
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        // Cleanup when we already had a thread running
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        ebpf_swap_clean_judy_array_unsafe();
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+        if (ebpf_function_start_thread(em, period)) {
+            ebpf_function_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR, "Cannot start thread.");
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            return;
+        }
+    } else {
+        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
+            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+        }
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    time_t expires = now_realtime_sec() + em->update_every;
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", em->update_every);
+    buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_SWAP_FUNCTION_DESCRIPTION);
+
+
+    buffer_json_member_add_time_t(wb, "expires", expires);
+    buffer_json_finalize(wb);
+
+    // Lock necessary to avoid race condition
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+
+    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+
+    buffer_free(wb);
+}
+
 /*****************************************************************
  *  EBPF FUNCTION THREAD
  *****************************************************************/
@@ -2975,7 +3122,7 @@ void *ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
-    struct functions_evloop_globals *wg = functions_evloop_init(5,
+    struct functions_evloop_globals *wg = functions_evloop_init(6,
                                                                 "EBPF",
                                                                 &lock,
                                                                 &ebpf_plugin_exit);
@@ -3003,6 +3150,11 @@ void *ebpf_function_thread(void *ptr)
     functions_evloop_add_function(wg,
                                   EBPF_FUNCTION_SHM,
                                   ebpf_function_shm_manipulation,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+
+    functions_evloop_add_function(wg,
+                                  EBPF_FUNCTION_SWAP,
+                                  ebpf_function_swap_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
     heartbeat_t hb;
