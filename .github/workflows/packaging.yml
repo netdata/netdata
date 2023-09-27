@@ -228,14 +228,14 @@ jobs:
           timeout_seconds: 900
           command: |
             docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}
-            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
       - name: Build Packages
         id: build
         if: needs.file-check.outputs.run == 'true'
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
-                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
+                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
       - name: Save Packages
         id: artifacts
         if: needs.file-check.outputs.run == 'true'
