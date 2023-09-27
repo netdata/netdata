@@ -510,6 +510,7 @@ bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_
     return first_msg_ut != last_modified;
 }
 
+#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
 static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
     const char *field = NULL;
     const void *data = NULL;
@@ -565,6 +566,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
 
     return filters_added ? true : false;
 }
+#endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
 static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         const char *filename, BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
@@ -607,6 +609,8 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         bool matches_filters = true;
 
         // we have to do a full query
+
+#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
         if(fqs->slice) {
             usec_t started = now_monotonic_usec();
 
@@ -615,6 +619,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 
             fqs->filtering_setup_ut += (ended - started);
         }
+#endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
         if(matches_filters)
             status = netdata_systemd_journal_query_full(j, wb, facets, fqs);
@@ -1653,7 +1658,10 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_accepted_param(facets, JOURNAL_PARAMETER_DATA_ONLY);
     facets_accepted_param(facets, JOURNAL_PARAMETER_ID);
     facets_accepted_param(facets, JOURNAL_PARAMETER_PROGRESS);
+
+#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     facets_accepted_param(facets, JOURNAL_PARAMETER_SLICE);
+#endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
     // register the fields in the order you want them on the dashboard
 
@@ -1956,11 +1964,15 @@ static void function_systemd_journal(const char *transaction, char *function, in
     fqs->if_modified_since = if_modified_since;
     fqs->data_only = data_only;
     fqs->last_modified = 0;
-    fqs->slice = slice;
     fqs->filters = filters;
 
+#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
+    fqs->slice = slice;
     if(slice)
         facets_dont_show_empty_value_facets(facets);
+#else
+    fqs->slice = false;
+#endif
 
     response = netdata_systemd_journal_query(wb, facets, fqs);
 
