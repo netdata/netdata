@@ -634,32 +634,6 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
 }
 
 /**
- * Sum PIDs
- *
- * Sum values for all targets.
- *
- * @param swap
- * @param root
- */
-static void ebpf_swap_sum_cgroup_pids(netdata_publish_swap_t *swap, struct pid_on_target2 *pids)
-{
-    uint64_t local_read = 0;
-    uint64_t local_write = 0;
-
-    while (pids) {
-        netdata_publish_swap_t *w = &pids->swap;
-        local_write += w->data.write;
-        local_read += w->data.read;
-
-        pids = pids->next;
-    }
-
-    // These conditions were added, because we are using incremental algorithm
-    swap->data.write = (local_write >= swap->data.write) ? local_write : swap->data.write;
-    swap->data.read = (local_read >= swap->data.read) ? local_read : swap->data.read;
-}
-
-/**
  * Send Systemd charts
  *
  * Send collected data to Netdata.
@@ -788,10 +762,6 @@ void ebpf_swap_send_cgroup_data(int update_every)
 
     pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        ebpf_swap_sum_cgroup_pids(&ect->publish_swap, ect->pids);
-    }
-
     int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
 
     if (has_systemd) {
