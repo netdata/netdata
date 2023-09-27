@@ -96,7 +96,7 @@ int fstat64(int fd, struct stat64 *buf) {
 #define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (3 * 3600)
 #define SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY 200
 #define SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED     50
-#define SYSTEMD_JOURNAL_WORKER_THREADS          2
+#define SYSTEMD_JOURNAL_WORKER_THREADS          5
 
 #define JOURNAL_PARAMETER_HELP                  "help"
 #define JOURNAL_PARAMETER_AFTER                 "after"
@@ -521,10 +521,10 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
 
     SD_JOURNAL_FOREACH_FIELD(j, field) {
         if(facets_key_name_is_facet(facets, field)) {
-            bool added_this_key = false;
-            size_t added_values = 0;
-
             if(sd_journal_query_unique(j, field) >= 0) {
+                bool added_this_key = false;
+                size_t added_values = 0;
+
                 SD_JOURNAL_FOREACH_UNIQUE(j, data, data_length) {
                     const char *key, *value;
                     size_t key_length, value_length;
@@ -1759,7 +1759,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
         else if(strncmp(keyword, JOURNAL_PARAMETER_ID ":", sizeof(JOURNAL_PARAMETER_ID ":") - 1) == 0) {
             char *id = &keyword[sizeof(JOURNAL_PARAMETER_ID ":") - 1];
 
-            if(id && *id)
+            if(*id)
                 progress_id = id;
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {

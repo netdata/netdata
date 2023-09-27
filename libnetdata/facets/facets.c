@@ -192,7 +192,6 @@ struct facets {
 
     struct {
         size_t count;
-        size_t count_with_values;
         FACET_KEY *hashtable[FACETS_KEYS_HASHTABLE_ENTRIES];
         FACET_KEY *ll;
     } keys;
