@@ -113,6 +113,7 @@ int fstat64(int fd, struct stat64 *buf) {
 #define JOURNAL_PARAMETER_INFO                  "info"
 #define JOURNAL_PARAMETER_ID                    "id"
 #define JOURNAL_PARAMETER_PROGRESS              "progress"
+#define JOURNAL_PARAMETER_SLICE                 "slice"
 
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 
@@ -198,12 +199,15 @@ typedef struct function_query_status {
     size_t entries;
     usec_t if_modified_since;
     bool data_only;
+    bool slice;
+    size_t filters;
     usec_t last_modified;
 
     // per file progress info
     size_t cached_count;
 
     // progress statistics
+    usec_t filtering_setup_ut;
     size_t rows_useful;
     size_t rows_read;
     size_t bytes_read;
@@ -227,26 +231,38 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
 
 static usec_t max_journal_vs_realtime_delta_ut = 2 * USEC_PER_SEC; // assume always 2 seconds latency
 
+static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
+    const char *k = data;
+    const char *equal = strchr(k, '=');
+    if(unlikely(!equal))
+        return false;
+
+    size_t kl = equal - k;
+
+    const char *v = ++equal;
+    size_t vl = data_length - kl - 1;
+
+    *key = k;
+    *key_length = kl;
+    *value = v;
+    *value_length = vl;
+
+    return true;
+}
+
 static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, usec_t *msg_ut) {
     const void *data;
     size_t length, bytes = 0;
 
     SD_JOURNAL_FOREACH_DATA(j, data, length) {
-        const char *key = data;
-        const char *equal = strchr(key, '=');
-        if(unlikely(!equal))
+        const char *key, *value;
+        size_t key_length, value_length;
+
+        if(!parse_journal_field(data, length, &key, &key_length, &value, &value_length))
             continue;
 
-        const char *value = ++equal;
-        size_t key_length = value - key; // including '\0'
-
-        char key_copy[key_length];
-        memcpy(key_copy, key, key_length - 1);
-        key_copy[key_length - 1] = '\0';
-
-        size_t value_length = length - key_length; // without '\0'
-
-        if(unlikely(key_length == sizeof(JD_SOURCE_REALTIME_TIMESTAMP) && strcmp(key_copy, JD_SOURCE_REALTIME_TIMESTAMP) == 0)) {
+        if(unlikely(key_length == sizeof(JD_SOURCE_REALTIME_TIMESTAMP) - 1 &&
+            memcmp(key, JD_SOURCE_REALTIME_TIMESTAMP, sizeof(JD_SOURCE_REALTIME_TIMESTAMP) - 1) == 0)) {
             usec_t ut = str2ull(value, NULL);
             if(ut && ut < *msg_ut) {
                 usec_t delta = *msg_ut - ut;
@@ -261,8 +277,8 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
             }
         }
 
-        bytes += key_length + value_length;
-        facets_add_key_value_length(facets, key_copy, key_length - 1, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
+        bytes += length;
+        facets_add_key_value_length(facets, key, key_length, value, value_length <= FACET_MAX_VALUE_LENGTH ? value_length : FACET_MAX_VALUE_LENGTH);
     }
 
     return bytes;
@@ -494,10 +510,64 @@ bool netdata_systemd_journal_check_if_modified_since(sd_journal *j, usec_t seek_
     return first_msg_ut != last_modified;
 }
 
+static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
+    const char *field = NULL;
+    const void *data = NULL;
+    size_t data_length;
+    size_t added_keys = 0;
+    size_t failures = 0;
+    size_t filters_added = 0;
+
+    SD_JOURNAL_FOREACH_FIELD(j, field) {
+        if(facets_key_name_is_facet(facets, field)) {
+            bool added_this_key = false;
+            size_t added_values = 0;
+
+            if(sd_journal_query_unique(j, field) >= 0) {
+                SD_JOURNAL_FOREACH_UNIQUE(j, data, data_length) {
+                    const char *key, *value;
+                    size_t key_length, value_length;
+
+                    if(!parse_journal_field(data, data_length, &key, &key_length, &value, &value_length))
+                        continue;
+
+                    facets_add_possible_value_name_to_key(facets, key, key_length, value, value_length);
+
+                    if(!facets_key_name_value_length_is_selected(facets, key, key_length, value, value_length))
+                        continue;
+
+                    if(added_keys && !added_this_key) {
+                        if(sd_journal_add_conjunction(j) < 0)
+                            failures++;
+
+                        added_this_key = true;
+                        added_keys++;
+                    }
+                    else if(added_values)
+                        if(sd_journal_add_disjunction(j) < 0)
+                            failures++;
+
+                    if(sd_journal_add_match(j, data, data_length) < 0)
+                        failures++;
+
+                    added_values++;
+                    filters_added++;
+                }
+            }
+        }
+    }
+
+    if(failures) {
+        netdata_log_error("failed to setup journal filter, will run the full query");
+        sd_journal_flush_matches(j);
+        return true;
+    }
+
+    return filters_added ? true : false;
+}
+
 static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         const char *filename, BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
-
-    internal_error(true, "processing file '%s'", filename);
 
     sd_journal *j = NULL;
     errno = 0;
@@ -534,11 +604,26 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
             status = netdata_systemd_journal_query_data_backward(j, wb, facets, fqs);
     }
     else {
+        bool matches_filters = true;
+
         // we have to do a full query
-        status = netdata_systemd_journal_query_full(j, wb, facets, fqs);
+        if(fqs->slice) {
+            usec_t started = now_monotonic_usec();
+
+            matches_filters = netdata_systemd_filtering_by_journal(j, facets, fqs) || !fqs->filters;
+            usec_t ended = now_monotonic_usec();
+
+            fqs->filtering_setup_ut += (ended - started);
+        }
+
+        if(matches_filters)
+            status = netdata_systemd_journal_query_full(j, wb, facets, fqs);
+        else
+            status = ND_SD_JOURNAL_NO_FILE_MATCHED;
     }
 
     sd_journal_close(j);
+
 #ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
     fqs->cached_count += fstat_cache_disable(fd);
     close(fd);
@@ -924,11 +1009,13 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         size_t rows_useful = fqs->rows_useful;
         size_t rows_read = fqs->rows_read;
         size_t bytes_read = fqs->bytes_read;
+        size_t filtering_setup_ut = fqs->filtering_setup_ut;
         ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file( jf_dfe.name, wb, facets, fqs);
 
         rows_useful = fqs->rows_useful - rows_useful;
         rows_read = fqs->rows_read - rows_read;
         bytes_read = fqs->bytes_read - bytes_read;
+        filtering_setup_ut = fqs->filtering_setup_ut - filtering_setup_ut;
 
         started_ut = ended_ut;
         ended_ut = now_monotonic_usec();
@@ -949,6 +1036,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             buffer_json_member_add_double(wb, "rows_per_second", (double)rows_read / (double)duration_ut * (double)USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
             buffer_json_member_add_double(wb, "bytes_per_second", (double)bytes_read / (double)duration_ut * (double)USEC_PER_SEC);
+            buffer_json_member_add_uint64(wb, "filtering_setup_ut", filtering_setup_ut);
         }
         buffer_json_object_close(wb); // journal file
 
@@ -956,7 +1044,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         switch(tmp_status) {
             case ND_SD_JOURNAL_OK:
             case ND_SD_JOURNAL_NO_FILE_MATCHED:
-                status = tmp_status;
+                status = (status == ND_SD_JOURNAL_OK) ? ND_SD_JOURNAL_OK : tmp_status;
                 break;
 
             case ND_SD_JOURNAL_FAILED_TO_OPEN:
@@ -1114,7 +1202,7 @@ const char *errno_map[] = {
         [38] = "ENOSYS",        // "Function not implemented",
         [39] = "ENOTEMPTY",     // "Directory not empty",
         [40] = "ELOOP",         // "Too many levels of symbolic links",
-        [11] = "EWOULDBLOCK",   // "Resource temporarily unavailable",
+        // [11] = "EWOULDBLOCK",   // "Resource temporarily unavailable",
         [42] = "ENOMSG",        // "No message of desired type",
         [43] = "EIDRM",         // "Identifier removed",
         [44] = "ECHRNG",        // "Channel number out of range",
@@ -1131,7 +1219,7 @@ const char *errno_map[] = {
         [55] = "ENOANO",        // "No anode",
         [56] = "EBADRQC",       // "Invalid request code",
         [57] = "EBADSLT",       // "Invalid slot",
-        [35] = "EDEADLOCK",     // "Resource deadlock avoided",
+        // [35] = "EDEADLOCK",     // "Resource deadlock avoided",
         [59] = "EBFONT",        // "Bad font file format",
         [60] = "ENOSTR",        // "Device not a stream",
         [61] = "ENODATA",       // "No data available",
@@ -1565,6 +1653,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_accepted_param(facets, JOURNAL_PARAMETER_DATA_ONLY);
     facets_accepted_param(facets, JOURNAL_PARAMETER_ID);
     facets_accepted_param(facets, JOURNAL_PARAMETER_PROGRESS);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_SLICE);
 
     // register the fields in the order you want them on the dashboard
 
@@ -1617,7 +1706,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_gid, NULL);
 
-    bool info = false, data_only = false, progress = false;
+    bool info = false, data_only = false, progress = false, slice = true;
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
     usec_t if_modified_since = 0;
@@ -1628,6 +1717,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     const char *source = NULL;
     const char *progress_id = NULL;
     SD_JOURNAL_FILE_SOURCE_TYPE source_type = SDJF_ALL;
+    size_t filters = 0;
 
     buffer_json_member_add_object(wb, "request");
 
@@ -1646,6 +1736,14 @@ static void function_systemd_journal(const char *transaction, char *function, in
         }
         else if(strcmp(keyword, JOURNAL_PARAMETER_DATA_ONLY) == 0) {
             data_only = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_SLICE ":", sizeof(JOURNAL_PARAMETER_SLICE ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_SLICE ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                slice = false;
+            else
+                slice = true;
         }
         else if(strcmp(keyword, JOURNAL_PARAMETER_PROGRESS) == 0) {
             progress = true;
@@ -1749,6 +1847,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
 
                     facets_register_facet_id_filter(facets, keyword, value, FACET_KEY_OPTION_FACET|FACET_KEY_OPTION_FTS|FACET_KEY_OPTION_REORDER);
                     buffer_json_add_array_item_string(wb, value);
+                    filters++;
 
                     value = sep;
                 }
@@ -1857,7 +1956,14 @@ static void function_systemd_journal(const char *transaction, char *function, in
     fqs->if_modified_since = if_modified_since;
     fqs->data_only = data_only;
     fqs->last_modified = 0;
+    fqs->slice = slice;
+    fqs->filters = filters;
+
+    if(slice)
+        facets_dont_show_empty_value_facets(facets);
+
     response = netdata_systemd_journal_query(wb, facets, fqs);
+
     string_freez(fqs->source);
     fqs->source = NULL;
 

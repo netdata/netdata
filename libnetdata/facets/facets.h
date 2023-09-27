@@ -60,6 +60,7 @@ typedef enum __attribute__((packed)) {
     FACETS_OPTION_DISABLE_ALL_FACETS    = (1 << 2),
     FACETS_OPTION_DISABLE_HISTOGRAM     = (1 << 3),
     FACETS_OPTION_DATA_ONLY             = (1 << 4),
+    FACETS_OPTION_NO_EMPTY_VALUE_FACETS = (1 << 5),
 } FACETS_OPTIONS;
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);
@@ -74,6 +75,8 @@ FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_O
 void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION direction);
+void facets_dont_show_empty_value_facets(FACETS *facets);
+
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);
 void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options);
 void facets_set_timeframe_and_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut);
@@ -86,6 +89,11 @@ void facets_report(FACETS *facets, BUFFER *wb);
 void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys);
 void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity);
 void facets_data_only_mode(FACETS *facets);
+
+bool facets_key_name_is_filter(FACETS *facets, const char *key);
+bool facets_key_name_is_facet(FACETS *facets, const char *key);
+bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length);
+void facets_add_possible_value_name_to_key(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length);
 
 void facets_sort_and_reorder_keys(FACETS *facets);
 usec_t facets_row_oldest_ut(FACETS *facets);
