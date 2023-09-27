@@ -365,7 +365,7 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int ) host->last_connected);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) host->last_connected);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
