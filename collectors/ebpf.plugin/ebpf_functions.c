@@ -2946,6 +2946,47 @@ void ebpf_function_shm_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // charts
 
+    // Do we use only on fields that can be groupped?
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process ID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Process Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Parent Name
+        buffer_json_member_add_object(wb, "Parent Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Parent Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Parent Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group by
+
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
@@ -3021,6 +3062,111 @@ static void ebpf_swap_clean_judy_array_unsafe()
 }
 
 /**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param pid         the process PID
+ * @param values      data read from hash table
+ * @param name        the process name
+ * @param pname       parent name
+ */
+static void ebpf_fill_swap_function_buffer(BUFFER *wb,
+                                          uint32_t pid,
+                                          netdata_publish_swap_kernel_t *values,
+                                          char *name,
+                                          char *pname)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)pid);
+
+    // NAME
+    buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // PNAME
+    buffer_json_add_array_item_string(wb, (pname[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // Read
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->read);
+
+    // Write
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->write);
+
+    buffer_json_array_close(wb);
+}
+
+/**
+ * Fill function buffer unsafe
+ *
+ * Fill the function buffer with socket information. Before to call this function it is necessary to lock
+ * ebpf_judy_pid.index.rw_spinlock
+ *
+ * @param buf    buffer used to store data to be shown by function.
+ *
+ * @return it returns 0 on success and -1 otherwise.
+ */
+static void ebpf_fill_swap_function_buffer_unsafe(BUFFER *buf)
+{
+    int counter = 0;
+
+    Pvoid_t *pid_value, *swap_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        bool first_swap = true;
+        Word_t local_timestamp = 0;
+        rw_spinlock_read_lock(&pid_ptr->swap_stats.rw_spinlock);
+        if (pid_ptr->swap_stats.JudyLArray) {
+            while ((swap_value = JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_timestamp, &first_swap))) {
+                netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
+                ebpf_fill_swap_function_buffer(buf, local_pid, &values->data, pid_ptr->name, pid_ptr->pname);
+            }
+            counter++;
+        }
+        rw_spinlock_read_unlock(&pid_ptr->swap_stats.rw_spinlock);
+    }
+
+    if (!counter) {
+        netdata_publish_swap_t fake_swap = { };
+
+        ebpf_fill_swap_function_buffer(buf, getpid(), &fake_swap.data, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
+    }
+}
+
+/**
+ * SWAP read judy
+ *
+ * Thread responsible to fill thread data.
+ *
+ * @param buf the buffer to store data;
+ * @param em  the module main structure.
+ *
+ * @return It always returns NULL.
+ */
+static void ebpf_swap_read_judy(BUFFER *buf, struct ebpf_module *em)
+{
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    if (!em->maps || (em->maps[NETDATA_PID_SWAP_TABLE].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+        !ebpf_judy_pid.index.JudyLArray) {
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        netdata_publish_swap_t fake_swap = { };
+
+        ebpf_fill_swap_function_buffer(buf, getpid(), &fake_swap.data, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
+        return;
+    }
+
+    ebpf_fill_swap_function_buffer_unsafe(buf);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
+
+/**
  * Function: SWAP
  *
  * Show information for sockets stored in hash tables.
@@ -3092,6 +3238,185 @@ void ebpf_function_swap_manipulation(const char *transaction,
     buffer_json_member_add_time_t(wb, "update_every", em->update_every);
     buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_SWAP_FUNCTION_DESCRIPTION);
 
+    // Collect data
+    buffer_json_member_add_array(wb, "data");
+    ebpf_swap_read_judy(wb, em);
+    buffer_json_array_close(wb); // data
+
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int fields_id = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PID",
+            "Process ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Process Name",
+            "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Parent Name",
+            "Parent Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Read",
+            "Events reading data on swap.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Write",
+            "Events writing to swap.",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Write",
+            "Events writing data on swap",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // Process and Thread
+        buffer_json_member_add_object(wb, "SWAPCalls");
+        {
+            buffer_json_member_add_string(wb, "name", "SWAP calls");
+            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "read");
+                buffer_json_add_array_item_string(wb, "write");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    // Do we use only on fields that can be groupped?
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process ID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Process Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Parent Name
+        buffer_json_member_add_object(wb, "Parent Name");
+        {
+            buffer_json_member_add_string(wb, "name", "Parent Name");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Parent Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group by
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
