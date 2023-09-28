@@ -662,6 +662,7 @@ struct journal_directory {
 
 static struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = { 0 };
 static DICTIONARY *journal_files_registry = NULL;
+static DICTIONARY *used_hashes_registry = NULL;
 
 static usec_t systemd_journal_session = 0;
 
@@ -1229,7 +1230,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     }
 
     facets_sort_and_reorder_keys(facets);
-    facets_report(facets, wb);
+    facets_report(facets, wb, used_hashes_registry);
 
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + (fqs->data_only ? 3600 : 0));
     buffer_json_finalize(wb);
@@ -2165,6 +2166,12 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     function_query_status_dict = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(FUNCTION_QUERY_STATUS));
+
+    // ------------------------------------------------------------------------
+    // initialize the used hashes files registry
+
+    used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
 
     // ------------------------------------------------------------------------
     // initialize the journal files registry

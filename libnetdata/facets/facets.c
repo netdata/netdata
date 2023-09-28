@@ -1820,11 +1820,11 @@ static int facets_keys_reorder_compar(const void *a, const void *b) {
     const char *an = ak->name;
     const char *bn = bk->name;
 
-    if(!an) an = "zzzzzzzz";
-    if(!bn) bn = "zzzzzzzz";
+    if(!an) an = "0";
+    if(!bn) bn = "0";
 
-    while(*an == '_') an++;
-    while(*bn == '_') bn++;
+    while(*an && ispunct(*an)) an++;
+    while(*bn && ispunct(*bn)) bn++;
 
     return strcasecmp(an, bn);
 }
@@ -1850,8 +1850,8 @@ static int facets_key_values_reorder_by_name_compar(const void *a, const void *b
     const char *an = av->name;
     const char *bn = bv->name;
 
-    if(!an) an = "zzzzzzzz";
-    if(!bn) bn = "zzzzzzzz";
+    if(!an) an = "0";
+    if(!bn) bn = "0";
 
     while(*an && ispunct(*an)) an++;
     while(*bn && ispunct(*bn)) bn++;
@@ -1962,7 +1962,56 @@ void facets_table_config(BUFFER *wb) {
     buffer_json_object_close(wb); // pagination
 }
 
-void facets_report(FACETS *facets, BUFFER *wb) {
+static const char *facets_json_key_name_string(FACET_KEY *k, DICTIONARY *used_hashes_registry) {
+    if(k->name) {
+        if(used_hashes_registry && !k->default_selected_for_values) {
+            char hash_str[FACET_STRING_HASH_SIZE];
+            facets_hash_to_str(k->hash, hash_str);
+            dictionary_set(used_hashes_registry, hash_str, (void *)k->name, strlen(k->name) + 1);
+        }
+
+        return k->name;
+    }
+
+    // key has no name
+    const char *name = "[UNAVAILABLE_FIELD]";
+
+    if(used_hashes_registry) {
+        char hash_str[FACET_STRING_HASH_SIZE];
+        facets_hash_to_str(k->hash, hash_str);
+        const char *s = dictionary_get(used_hashes_registry, hash_str);
+        if(s) name = s;
+    }
+
+    return name;
+}
+
+static const char *facets_json_key_value_string(FACET_KEY *k, FACET_VALUE *v, DICTIONARY *used_hashes_registry) {
+    if(v->name) {
+        if(used_hashes_registry && !k->default_selected_for_values && v->selected) {
+            char hash_str[FACET_STRING_HASH_SIZE];
+            facets_hash_to_str(v->hash, hash_str);
+            dictionary_set(used_hashes_registry, hash_str, (void *)v->name, strlen(v->name) + 1);
+        }
+
+        return v->name;
+    }
+
+    // key has no name
+    const char *name = "[unavailable field]";
+
+    if(used_hashes_registry) {
+        char hash_str[FACET_STRING_HASH_SIZE];
+        facets_hash_to_str(v->hash, hash_str);
+        const char *s = dictionary_get(used_hashes_registry, hash_str);
+        if(s) name = s;
+    }
+
+    return name;
+}
+
+
+void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry) {
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
         facets_table_config(wb);
         facets_accepted_parameters_to_json_array(facets, wb, true);
@@ -1985,7 +2034,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                 buffer_json_add_array_item_object(wb); // key
                 {
                     buffer_json_member_add_string(wb, "id", hash_to_static_string(k->hash));
-                    buffer_json_member_add_string(wb, "name", k->name);
+                    buffer_json_member_add_string(wb, "name", facets_json_key_name_string(k, used_hashes_registry));
 
                     if(!k->order) k->order = facets->order++;
                     buffer_json_member_add_uint64(wb, "order", k->order);
@@ -2011,7 +2060,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                                     buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
                                 }
                                 else
-                                    buffer_json_member_add_string(wb, "name", v->name);
+                                    buffer_json_member_add_string(wb, "name", facets_json_key_value_string(k, v, used_hashes_registry));
 
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                                 buffer_json_member_add_uint64(wb, "order", v->order);

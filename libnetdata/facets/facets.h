@@ -86,7 +86,7 @@ void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_
 void facets_add_key_value(FACETS *facets, const char *key, const char *value);
 void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len, const char *value, size_t value_len);
 
-void facets_report(FACETS *facets, BUFFER *wb);
+void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry);
 void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys);
 void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity);
 void facets_data_only_mode(FACETS *facets);
