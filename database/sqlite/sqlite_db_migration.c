@@ -129,7 +129,6 @@ const char *database_migrate_v13_v14[] = {
 
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "hops"))
@@ -139,7 +138,6 @@ static int do_migration_v1_v2(sqlite3 *database, const char *name)
 
 static int do_migration_v2_v3(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "memory_mode"))
@@ -149,7 +147,6 @@ static int do_migration_v2_v3(sqlite3 *database, const char *name)
 
 static int do_migration_v3_v4(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
 
     char sql[256];
@@ -181,7 +178,6 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
 
 static int do_migration_v4_v5(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     return init_database_batch(database, &database_migrate_v4_v5[0]);
@@ -189,7 +185,6 @@ static int do_migration_v4_v5(sqlite3 *database, const char *name)
 
 static int do_migration_v5_v6(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     return init_database_batch(database, &database_migrate_v5_v6[0]);
@@ -197,7 +192,6 @@ static int do_migration_v5_v6(sqlite3 *database, const char *name)
 
 static int do_migration_v6_v7(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     char sql[256];
@@ -231,7 +225,6 @@ static int do_migration_v6_v7(sqlite3 *database, const char *name)
 
 static int do_migration_v7_v8(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
 
     char sql[256];
@@ -410,7 +403,6 @@ const char *database_ml_migrate_v1_v2[] = {
 
 static int do_ml_migration_v1_v2(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (get_auto_vaccum(database) != 2)
@@ -421,7 +413,6 @@ static int do_ml_migration_v1_v2(sqlite3 *database, const char *name)
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
     return 0;
 }
