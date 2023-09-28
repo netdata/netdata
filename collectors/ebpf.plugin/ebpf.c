@@ -2799,11 +2799,13 @@ static void ebpf_update_table_size()
 static void ebpf_update_lifetime()
 {
     int i;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     uint32_t value = (uint32_t) appconfig_get_number(&collector_config, EBPF_GLOBAL_SECTION,
                                                      EBPF_CFG_LIFETIME, EBPF_DEFAULT_LIFETIME);
     for (i = 0; ebpf_modules[i].info.thread_name; i++) {
         ebpf_modules[i].lifetime = value;
     }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /**
