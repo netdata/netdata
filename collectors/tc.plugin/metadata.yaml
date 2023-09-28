@@ -36,7 +36,12 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title : command
+            description: |
+              It is necessary to have command `tc` installed on host, and it is suggested to install [FireQOS](http://firehol.org/tutorial/fireqos-new-user/).
+              After to install them, create the file `/etc/netdata/tc-qos-helper.conf` with content:
+              tc_show="class"
       configuration:
         file:
           name: "netdata.conf"
@@ -58,10 +63,11 @@ modules:
             title: "Config"
           list:
             - name: Basic
-              description: A basic example configuration.
+              description: A basic example configuration using classes defined in `/etc/iproute2/tc_cls`, for more details, take a look in netdata official [documentation](https://github.com/netdata/netdata/blob/master/collectors/tc.plugin/README.md#qos-configuration-with-tc).
               config: |
                 [plugin:tc]
                   script to run to get tc values = /usr/libexec/netdata/plugins.d/tc-qos-helper.sh
+                  enable show all classes and qdiscs for all interfaces = yes
     troubleshooting:
       problems:
         list: []
