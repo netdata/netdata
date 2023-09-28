@@ -944,7 +944,7 @@ static bool journal_file_merge_sizes(const DICTIONARY_ITEM *item __maybe_unused,
 }
 
 static void available_journal_file_sources_to_json_array(BUFFER *wb) {
-    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_NAME_LINK_DONT_CLONE);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_NAME_LINK_DONT_CLONE|DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_conflict_callback(dict, journal_file_merge_sizes, NULL);
 
     struct journal_file_source t = { 0 };

@@ -1856,6 +1856,9 @@ static int facets_key_values_reorder_by_name_compar(const void *a, const void *b
     if(!an) an = "zzzzzzzz";
     if(!bn) bn = "zzzzzzzz";
 
+    while(*an && ispunct(*an)) an++;
+    while(*bn && ispunct(*bn)) bn++;
+
     int ret = strcasecmp(an, bn);
     return ret;
 }
@@ -1890,10 +1893,10 @@ static int facets_key_values_reorder_by_name_numeric_compar(const void *a, const
     int64_t bd = str2ll(bn, NULL);
 
     if(ad < bd)
-        return 1;
+        return -1;
 
     if(ad > bd)
-        return -1;
+        return 1;
 
     return facets_key_values_reorder_by_name_compar(a, b);
 }
