@@ -4121,6 +4121,7 @@ int main(int argc, char **argv)
                           NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
 
     int i;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
 
@@ -4136,6 +4137,7 @@ int main(int argc, char **argv)
             em->lifetime = EBPF_DEFAULT_LIFETIME;
         }
     }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     usec_t step = USEC_PER_SEC;
     heartbeat_t hb;
