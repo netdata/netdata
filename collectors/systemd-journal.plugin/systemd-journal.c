@@ -88,6 +88,7 @@ int fstat64(int fd, struct stat64 *buf) {
 // ----------------------------------------------------------------------------
 
 #define FACET_MAX_VALUE_LENGTH                  8192
+#define SYSTEMD_JOURNAL_MAX_SOURCE_LEN          64
 
 #define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
 #define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
@@ -747,7 +748,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 
             if(t >= filename && *t == '.') {
                 jf->source_type = SDJF_NAMESPACE;
-                jf->source = string_strdupz_source(t + 1, s, FILENAME_MAX, "namespace-");
+                jf->source = string_strdupz_source(t + 1, s, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
             }
             else
                 jf->source_type = SDJF_LOCAL;
@@ -776,16 +777,16 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                     char ip[e - s + 1];
                     memcpy(ip, s, e - s);
                     ip[e - s] = '\0';
-                    char buf[NI_MAXHOST];
-                    if(ip_to_hostname(ip, buf, NI_MAXHOST))
-                        jf->source = string_strdupz_source(buf, &buf[strlen(buf)], NI_MAXHOST + 7, "remote-");
+                    char buf[SYSTEMD_JOURNAL_MAX_SOURCE_LEN];
+                    if(ip_to_hostname(ip, buf, sizeof(buf)))
+                        jf->source = string_strdupz_source(buf, &buf[strlen(buf)], SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                     else {
-                        netdata_log_error("Cannot find the hostname for IP '%s'", ip);
-                        jf->source = string_strdupz_source(s, e, FILENAME_MAX, "remote-");
+                        internal_error(true, "Cannot find the hostname for IP '%s'", ip);
+                        jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
                     }
                 }
                 else
-                    jf->source = string_strdupz_source(s, e, FILENAME_MAX, "remote-");
+                    jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
             }
             else
                 jf->source_type |= SDJF_OTHER;
