@@ -9,6 +9,8 @@
 #include "ad_charts.h"
 #include "database/sqlite/sqlite3.h"
 
+#define ML_METADATA_VERSION 2
+
 #define WORKER_TRAIN_QUEUE_POP         0
 #define WORKER_TRAIN_ACQUIRE_DIMENSION 1
 #define WORKER_TRAIN_QUERY             2
@@ -1625,6 +1627,8 @@ static void ml_flush_pending_models(ml_training_thread_t *training_thread) {
         training_thread->num_models_to_prune += training_thread->pending_model_info.size();        
     }
 
+    vacuum_database(db, "ML", 0, 0);
+
     training_thread->pending_model_info.clear();
 }
 
@@ -1777,13 +1781,21 @@ void ml_init()
 
     // create table
     if (db) {
-        char *err = NULL;
-        int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+        int target_version = perform_ml_database_migration(db, ML_METADATA_VERSION);
+        if (configure_sqlite_database(db, target_version)) {
+            error_report("Failed to setup ML database");
             sqlite3_close(db);
-            sqlite3_free(err);
             db = NULL;
+        }
+        else {
+            char *err = NULL;
+            int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
+            if (rc != SQLITE_OK) {
+                error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
+                sqlite3_close(db);
+                sqlite3_free(err);
+                db = NULL;
+            }
         }
     }
 }

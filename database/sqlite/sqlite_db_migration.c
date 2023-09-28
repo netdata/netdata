@@ -11,6 +11,24 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     return 0;
 }
 
+static int get_auto_vaccum(sqlite3 *database)
+{
+    char *err_msg = NULL;
+    char sql[128];
+
+    int exists = 0;
+
+    snprintf(sql, 127, "PRAGMA auto_vacuum");
+
+    int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &exists, &err_msg);
+    if (rc != SQLITE_OK) {
+        netdata_log_info("Error checking database auto vacuum setting; %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    return exists;
+}
+
 int table_exists_in_database(const char *table)
 {
     char *err_msg = NULL;
@@ -111,7 +129,6 @@ const char *database_migrate_v13_v14[] = {
 
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "hops"))
@@ -121,7 +138,6 @@ static int do_migration_v1_v2(sqlite3 *database, const char *name)
 
 static int do_migration_v2_v3(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "memory_mode"))
@@ -131,7 +147,6 @@ static int do_migration_v2_v3(sqlite3 *database, const char *name)
 
 static int do_migration_v3_v4(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
 
     char sql[256];
@@ -163,7 +178,6 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
 
 static int do_migration_v4_v5(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     return init_database_batch(database, &database_migrate_v4_v5[0]);
@@ -171,7 +185,6 @@ static int do_migration_v4_v5(sqlite3 *database, const char *name)
 
 static int do_migration_v5_v6(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     return init_database_batch(database, &database_migrate_v5_v6[0]);
@@ -179,7 +192,6 @@ static int do_migration_v5_v6(sqlite3 *database, const char *name)
 
 static int do_migration_v6_v7(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     char sql[256];
@@ -213,7 +225,6 @@ static int do_migration_v6_v7(sqlite3 *database, const char *name)
 
 static int do_migration_v7_v8(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
 
     char sql[256];
@@ -381,10 +392,27 @@ static int do_migration_v13_v14(sqlite3 *database, const char *name)
 }
 
 
+// Actions for ML migration
+const char *database_ml_migrate_v1_v2[] = {
+    "PRAGMA journal_mode=delete",
+    "PRAGMA journal_mode=WAL",
+    "PRAGMA auto_vacuum=2",
+    "VACUUM",
+    NULL
+};
+
+static int do_ml_migration_v1_v2(sqlite3 *database, const char *name)
+{
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (get_auto_vaccum(database) != 2)
+        return init_database_batch(database, &database_ml_migrate_v1_v2[0]);
+    return 0;
+}
+
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
     return 0;
 }
@@ -448,6 +476,12 @@ DATABASE_FUNC_MIGRATION_LIST context_migration_action[] = {
     {.name = NULL, .func = NULL}
 };
 
+DATABASE_FUNC_MIGRATION_LIST ml_migration_action[] = {
+    {.name = "v0 to v1",  .func = do_migration_noop},
+    {.name = "v1 to v2",  .func = do_ml_migration_v1_v2},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
 
 int perform_database_migration(sqlite3 *database, int target_version)
 {
@@ -457,4 +491,9 @@ int perform_database_migration(sqlite3 *database, int target_version)
 int perform_context_database_migration(sqlite3 *database, int target_version)
 {
     return migrate_database(database, target_version, "context", context_migration_action);
+}
+
+int perform_ml_database_migration(sqlite3 *database, int target_version)
+{
+    return migrate_database(database, target_version, "ml", ml_migration_action);
 }
