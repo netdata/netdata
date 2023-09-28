@@ -1115,10 +1115,11 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
 
     Pvoid_t *pid_value, *cache_value;
     Word_t local_pid = 0, local_cache = 0;
-    bool first_pid = true, first_cache = true;
+    bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
         rw_spinlock_write_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+        bool first_cache = true;
         if (pid_ptr->cachestat_stats.JudyLArray) {
             while ((cache_value = JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_cache, &first_cache))) {
                 netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
@@ -1284,12 +1285,15 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
         }
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_cachestat_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (period < 0)
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
 
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
@@ -1299,8 +1303,11 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
             return;
         }
     } else {
-        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING && period < 0) {
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+        } else {
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
