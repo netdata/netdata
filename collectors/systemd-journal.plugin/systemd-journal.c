@@ -877,8 +877,9 @@ static void human_readable_size_ib(uint64_t size, char *dst, size_t dst_len) {
 #define print_duration(dst, dst_len, pos, remaining, duration, one, many, printed) do { \
     if((remaining) > (duration)) {                                                      \
         uint64_t _count = (remaining) / (duration);                                     \
-        (pos) += snprintfz(&(dst)[pos], (dst_len) - (pos), "%s%"PRIu64" %s", (printed) ? "," : "", _count, _count > 1 ? (many) : (one));  \
-        (remaining) -= _count * (duration);                                             \
+        uint64_t _rem = (remaining) - (_count * (duration));                            \
+        (pos) += snprintfz(&(dst)[pos], (dst_len) - (pos), "%s%s%"PRIu64" %s", (printed) ? ", " : "", _rem ? "" : "and ", _count, _count > 1 ? (many) : (one));  \
+        (remaining) = _rem;                                                             \
         (printed) = true;                                                               \
     } \
 } while(0)
