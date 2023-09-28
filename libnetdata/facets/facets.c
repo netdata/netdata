@@ -1933,20 +1933,23 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     return used;
 }
 
+void facets_table_config(BUFFER *wb) {
+    buffer_json_member_add_boolean(wb, "show_ids", false);   // do not show the column ids to the user
+    buffer_json_member_add_boolean(wb, "has_history", true); // enable date-time picker with after-before
+
+    buffer_json_member_add_object(wb, "pagination");
+    {
+        buffer_json_member_add_boolean(wb, "enabled", true);
+        buffer_json_member_add_string(wb, "key", "anchor");
+        buffer_json_member_add_string(wb, "column", "timestamp");
+        buffer_json_member_add_string(wb, "units", "timestamp_usec");
+    }
+    buffer_json_object_close(wb); // pagination
+}
+
 void facets_report(FACETS *facets, BUFFER *wb) {
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
-        buffer_json_member_add_boolean(wb, "show_ids", false);   // do not show the column ids to the user
-        buffer_json_member_add_boolean(wb, "has_history", true); // enable date-time picker with after-before
-
-        buffer_json_member_add_object(wb, "pagination");
-        {
-            buffer_json_member_add_boolean(wb, "enabled", true);
-            buffer_json_member_add_string(wb, "key", "anchor");
-            buffer_json_member_add_string(wb, "column", "timestamp");
-            buffer_json_member_add_string(wb, "units", "timestamp_usec");
-        }
-        buffer_json_object_close(wb); // pagination
-
+        facets_table_config(wb);
         facets_accepted_parameters_to_json_array(facets, wb, true);
     }
 

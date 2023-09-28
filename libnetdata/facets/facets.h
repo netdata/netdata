@@ -100,4 +100,6 @@ void facets_sort_and_reorder_keys(FACETS *facets);
 usec_t facets_row_oldest_ut(FACETS *facets);
 usec_t facets_row_newest_ut(FACETS *facets);
 
+void facets_table_config(BUFFER *wb);
+
 #endif

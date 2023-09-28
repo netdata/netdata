@@ -662,6 +662,17 @@ struct journal_directory {
 static struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = { 0 };
 static DICTIONARY *journal_files_registry = NULL;
 
+static usec_t systemd_journal_session = 0;
+
+static void buffer_json_journal_versions(BUFFER *wb) {
+    buffer_json_member_add_object(wb, "versions");
+    {
+        buffer_json_member_add_uint64(wb, "sources",
+                                      systemd_journal_session + dictionary_version(journal_files_registry));
+    }
+    buffer_json_object_close(wb);
+}
+
 static void journal_file_update_msg_ut(const char *filename, struct journal_file *jf) {
     const char *files[2] = {
             [0] = filename,
@@ -1937,6 +1948,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
     buffer_json_member_add_time_t(wb, "timeout", timeout);
     buffer_json_object_close(wb); // request
 
+    buffer_json_journal_versions(wb);
+
     int response;
 
     if(info) {
@@ -1958,6 +1971,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
             buffer_json_object_close(wb); // required params object
         }
         buffer_json_array_close(wb); // required_params array
+
+        facets_table_config(wb);
 
         buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
         buffer_json_member_add_string(wb, "type", "table");
@@ -2069,6 +2084,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ------------------------------------------------------------------------
     // initialize the journal files registry
+
+    systemd_journal_session = (now_realtime_usec() / USEC_PER_SEC) * USEC_PER_SEC;
 
     journal_files_registry = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
