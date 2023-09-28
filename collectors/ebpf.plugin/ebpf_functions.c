@@ -52,6 +52,8 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
     st->thread = mallocz(sizeof(netdata_thread_t));
     em->enabled = NETDATA_THREAD_EBPF_FUNCTION_RUNNING;
     em->lifetime = period;
+    em->apps_level = NETDATA_APPS_LEVEL_ALL;
+    em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_log_info("Starting thread %s with lifetime = %d", em->info.thread_name, period);
@@ -2185,10 +2187,11 @@ static void ebpf_process_clean_judy_array_unsafe()
 
     Pvoid_t *pid_value, *process_value;
     Word_t local_pid = 0, local_process = 0;
-    bool first_pid = true, first_process = true;
+    bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
         rw_spinlock_write_lock(&pid_ptr->process_stats.rw_spinlock);
+        bool first_process = true;
         if (pid_ptr->process_stats.JudyLArray) {
             while ((process_value = JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_process, &first_process))) {
                 ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
@@ -2245,12 +2248,16 @@ void ebpf_function_process_manipulation(const char *transaction,
         }
     }
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
+    // Thread is not running
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_process_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (period < 0)
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
 
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR, "Cannot start thread.");
@@ -2258,8 +2265,11 @@ void ebpf_function_process_manipulation(const char *transaction,
             return;
         }
     } else {
-        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING && period < 0) {
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+        } else {
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);

@@ -775,7 +775,7 @@ static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
             int j = 0;
             while (maps[j].name) {
                 ebpf_local_maps_t *w = &maps[j];
-                if (w->map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED && !strcmp(map_name, w->name))
+                if (!strcmp(map_name, w->name))
                     w->map_fd = fd;
 
                 j++;
@@ -799,7 +799,7 @@ void ebpf_update_controller(int fd, ebpf_module_t *em)
         em->apps_level, 0, 0, 0, 0
     };
     uint32_t key;
-    uint32_t end = NETDATA_CONTROLLER_PID_TABLE_ADD;
+    uint32_t end = NETDATA_CONTROLLER_END;
 
     for (key = NETDATA_CONTROLLER_APPS_ENABLED; key < end; key++) {
         int ret = bpf_map_update_elem(fd, &key, &values[key], BPF_ANY);
@@ -828,7 +828,8 @@ static void ebpf_update_legacy_controller(ebpf_module_t *em, struct bpf_object *
         size_t i = 0;
         while (maps[i].name) {
             ebpf_local_maps_t *w = &maps[i];
-            if (w->map_fd != ND_EBPF_MAP_FD_NOT_INITIALIZED && (w->type & NETDATA_EBPF_MAP_CONTROLLER)) {
+            if (w->map_fd != ND_EBPF_MAP_FD_NOT_INITIALIZED &&
+               (w->type & (NETDATA_EBPF_MAP_CONTROLLER|NETDATA_EBPF_MAP_CONTROLLER_UPDATED))) {
                 w->type &= ~NETDATA_EBPF_MAP_CONTROLLER;
                 w->type |= NETDATA_EBPF_MAP_CONTROLLER_UPDATED;
 

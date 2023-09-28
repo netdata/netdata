@@ -981,6 +981,7 @@ static void ebpf_process_exit(void *ptr)
     ebpf_update_disabled_plugin_stats(em);
     process_pid_fd = -1;
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
     ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
