@@ -761,12 +761,15 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_socket_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (period < 0)
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
 
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
@@ -776,8 +779,11 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             return;
         }
     } else {
-        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING && period < 0) {
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+        } else {
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
