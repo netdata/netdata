@@ -1476,7 +1476,8 @@ static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item __ma
     FACET_ROW *row = data; (void)row;
 
     rkv->wb = buffer_create(0, NULL);
-    buffer_strcat(rkv->wb, rkv->tmp);
+    if(!rkv->empty)
+        buffer_strcat(rkv->wb, rkv->tmp);
 }
 
 static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -1484,8 +1485,14 @@ static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __
     FACET_ROW_KEY_VALUE *n_rkv = new_value;
     FACET_ROW *row = data; (void)row;
 
+    rkv->empty = n_rkv->empty;
+
     buffer_flush(rkv->wb);
-    buffer_strcat(rkv->wb, n_rkv->tmp);
+    if(!rkv->empty)
+        buffer_strcat(rkv->wb, n_rkv->tmp);
+
+    if(!rkv->empty && !rkv->wb->buffer[0])
+        internal_error(true, "hello");
 
     return false;
 }
@@ -1527,9 +1534,9 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
     FACET_KEY *k;
     foreach_key_in_facets(facets, k) {
         FACET_ROW_KEY_VALUE t = {
-                .tmp = (k->current_value.updated) ? buffer_tostring(k->current_value.b) : FACET_VALUE_UNSET,
+                .tmp = (k->current_value.updated && !k->current_value.empty) ? buffer_tostring(k->current_value.b) : NULL,
                 .wb = NULL,
-                .empty = k->current_value.empty,
+                .empty = !k->current_value.updated || k->current_value.empty,
         };
         dictionary_set(row->dict, k->name, &t, sizeof(t));
     }
@@ -1687,6 +1694,7 @@ void facets_rows_begin(FACETS *facets) {
     foreach_key_in_facets(facets, k) {
         facets_reset_key(k);
     }
+    foreach_key_in_facets_done(k);
 
     facets->keys_in_row.used = 0;
     facets_reset_keys_with_value_and_row(facets);
@@ -1933,6 +1941,13 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     return used;
 }
 
+const char *facets_json_unset_value(FACETS *facets) {
+    if(facets->options & FACETS_OPTION_NO_EMPTY_VALUE_FACETS)
+        return NULL;
+    else
+        return FACET_VALUE_UNSET;
+}
+
 void facets_table_config(BUFFER *wb) {
     buffer_json_member_add_boolean(wb, "show_ids", false);   // do not show the column ids to the user
     buffer_json_member_add_boolean(wb, "has_history", true); // enable date-time picker with after-before
@@ -1951,6 +1966,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
         facets_table_config(wb);
         facets_accepted_parameters_to_json_array(facets, wb, true);
+        buffer_json_member_add_string(wb, "unset_value", facets_json_unset_value(facets));
     }
 
     if(!(facets->options & FACETS_OPTION_DISABLE_ALL_FACETS)) {
@@ -2074,8 +2090,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                                 RRDF_FIELD_SUMMARY_COUNT,
                                 (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE
                                                                             : RRDF_FIELD_FILTER_FACET,
-                                options,
-                                FACET_VALUE_UNSET);
+                                options, facets_json_unset_value(facets));
                     }
             foreach_key_in_facets_done(k);
         }
@@ -2119,7 +2134,7 @@ void facets_report(FACETS *facets, BUFFER *wb) {
                 }
                 else {
                     if(!rkv || rkv->empty) {
-                        buffer_json_add_array_item_string(wb, FACET_VALUE_UNSET);
+                        buffer_json_add_array_item_string(wb, facets_json_unset_value(facets));
                     }
                     else if(unlikely(k->transform.cb && k->transform.view_only)) {
                         k->transform.cb(facets, rkv->wb, k->transform.data);
