@@ -1491,9 +1491,6 @@ static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __
     if(!rkv->empty)
         buffer_strcat(rkv->wb, n_rkv->tmp);
 
-    if(!rkv->empty && !rkv->wb->buffer[0])
-        internal_error(true, "hello");
-
     return false;
 }
 
