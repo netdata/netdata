@@ -1460,10 +1460,16 @@ static const char *syslog_priority_to_name(int priority) {
     }
 }
 
-static FACET_ROW_SEVERITY syslog_priority_to_facet_severity(int priority) {
+static FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets __maybe_unused, FACET_ROW *row, void *data __maybe_unused) {
     // same to
     // https://github.com/systemd/systemd/blob/aab9e4b2b86905a15944a1ac81e471b5b7075932/src/basic/terminal-util.c#L1501
     // function get_log_colors()
+
+    FACET_ROW_KEY_VALUE *priority_rkv = dictionary_get(row->dict, "PRIORITY");
+    if(!priority_rkv || priority_rkv->empty)
+        return FACET_ROW_SEVERITY_NORMAL;
+
+    int priority = str2i(buffer_tostring(priority_rkv->wb));
 
     if(priority <= LOG_ERR)
         return FACET_ROW_SEVERITY_CRITICAL;
@@ -1525,8 +1531,6 @@ static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_un
             buffer_flush(wb);
             buffer_strcat(wb, name);
         }
-
-        facets_set_current_row_severity(facets, syslog_priority_to_facet_severity(priority));
     }
 }
 
@@ -1782,6 +1786,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
     // register the fields in the order you want them on the dashboard
+
+    facets_register_row_severity(facets, syslog_priority_to_facet_severity, NULL);
 
     facets_register_key_name(facets, "_HOSTNAME",
                              FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
@@ -2195,6 +2201,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         bool cancelled = false;
         char buf[] = "systemd-journal after:-2592000 before:0 last:500";
+        // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, 600, &cancelled);
         exit(1);

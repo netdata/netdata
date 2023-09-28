@@ -237,6 +237,11 @@ struct facets {
     } histogram;
 
     struct {
+        facet_row_severity_t cb;
+        void *data;
+    } severity;
+
+    struct {
         FACET_ROW *last_added;
 
         size_t first;
@@ -1392,6 +1397,11 @@ void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity
     facets->current_row.severity = severity;
 }
 
+void facets_register_row_severity(FACETS *facets, facet_row_severity_t cb, void *data) {
+    facets->severity.cb = cb;
+    facets->severity.data = data;
+}
+
 void facets_data_only_mode(FACETS *facets) {
     facets->options |= FACETS_OPTION_DISABLE_ALL_FACETS | FACETS_OPTION_DISABLE_HISTOGRAM | FACETS_OPTION_DATA_ONLY;
 }
@@ -2010,7 +2020,6 @@ static const char *facets_json_key_value_string(FACET_KEY *k, FACET_VALUE *v, DI
     return name;
 }
 
-
 void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry) {
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
         facets_table_config(wb);
@@ -2166,6 +2175,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             buffer_json_add_array_item_uint64(wb, row->usec);
             buffer_json_add_array_item_object(wb);
             {
+                if(facets->severity.cb)
+                    row->severity = facets->severity.cb(facets, row, facets->severity.data);
+
                 buffer_json_member_add_string(wb, "severity", facets_severity_to_string(row->severity));
             }
             buffer_json_object_close(wb);
