@@ -355,6 +355,7 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->status = rc->status;
     t->flags = rc->run_flags;
     t->info = rc->info;
+    t->summary = rc->summary;
     t->value = rc->value;
     t->last_updated = rc->last_updated;
     t->last_status_change = rc->last_status_change;
