@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- update go.d version to v0.56.0 [\#16061](https://github.com/netdata/netdata/pull/16061) ([ilyam8](https://github.com/ilyam8))
+- Bugfix on integrations/gen\_docs\_integrations.py [\#16059](https://github.com/netdata/netdata/pull/16059) ([Ancairon](https://github.com/Ancairon))
+- Fix coverity 402975 [\#16058](https://github.com/netdata/netdata/pull/16058) ([stelfrag](https://github.com/stelfrag))
 - update bundled ui version to v6.41.1 [\#16054](https://github.com/netdata/netdata/pull/16054) ([ilyam8](https://github.com/ilyam8))
+- Update to use versioned base images for CI. [\#16053](https://github.com/netdata/netdata/pull/16053) ([Ferroin](https://github.com/Ferroin))
 - Fix missing find command when installing/updating on Rocky Linux systems. [\#16052](https://github.com/netdata/netdata/pull/16052) ([Ferroin](https://github.com/Ferroin))
 - Fix summary field in table [\#16050](https://github.com/netdata/netdata/pull/16050) ([MrZammler](https://github.com/MrZammler))
 - Switch to uint64\_t to avoid overflow in 32bit systems [\#16048](https://github.com/netdata/netdata/pull/16048) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#16044](https://github.com/netdata/netdata/pull/16044) ([netdatabot](https://github.com/netdatabot))
 - Doc about running a local dashboard through Cloudflare \(community\) [\#16043](https://github.com/netdata/netdata/pull/16043) ([Ancairon](https://github.com/Ancairon))
 - Remove discontinued Hangouts and StackPulse notification methods [\#16041](https://github.com/netdata/netdata/pull/16041) ([Ancairon](https://github.com/Ancairon))
+- health: add upsd alerts [\#16036](https://github.com/netdata/netdata/pull/16036) ([ilyam8](https://github.com/ilyam8))
 - Disable mongodb exporter builds where broken. [\#16033](https://github.com/netdata/netdata/pull/16033) ([Ferroin](https://github.com/Ferroin))
 - Run health queries from tier 0 [\#16032](https://github.com/netdata/netdata/pull/16032) ([MrZammler](https://github.com/MrZammler))
 - use `status` as units for `anomaly_detection.detector_events` [\#16028](https://github.com/netdata/netdata/pull/16028) ([andrewm4894](https://github.com/andrewm4894))
@@ -425,15 +431,6 @@
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.40.1...v1.41.0)
-
-**Merged pull requests:**
-
-- Include license for web v2 [\#15453](https://github.com/netdata/netdata/pull/15453) ([tkatsoulas](https://github.com/tkatsoulas))
-- Updates to metadata.yaml [\#15452](https://github.com/netdata/netdata/pull/15452) ([shyamvalsan](https://github.com/shyamvalsan))
-- Add apps yaml [\#15451](https://github.com/netdata/netdata/pull/15451) ([Ancairon](https://github.com/Ancairon))
-- Add cgroups yaml [\#15450](https://github.com/netdata/netdata/pull/15450) ([Ancairon](https://github.com/Ancairon))
-- Fix multiline [\#15449](https://github.com/netdata/netdata/pull/15449) ([Ancairon](https://github.com/Ancairon))
-- bump v2 dashboard to v6.21.3 [\#15448](https://github.com/netdata/netdata/pull/15448) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
