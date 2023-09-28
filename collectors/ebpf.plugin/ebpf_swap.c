@@ -876,8 +876,8 @@ static void swap_collector(ebpf_module_t *em)
         if (cgroup)
             ebpf_swap_send_cgroup_data(update_every);
 
-        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
