@@ -6,7 +6,20 @@
 
 **Merged pull requests:**
 
+- update go.d version to v0.56.0 [\#16061](https://github.com/netdata/netdata/pull/16061) ([ilyam8](https://github.com/ilyam8))
+- Bugfix on integrations/gen\_docs\_integrations.py [\#16059](https://github.com/netdata/netdata/pull/16059) ([Ancairon](https://github.com/Ancairon))
+- Fix coverity 402975 [\#16058](https://github.com/netdata/netdata/pull/16058) ([stelfrag](https://github.com/stelfrag))
+- update bundled ui version to v6.41.1 [\#16054](https://github.com/netdata/netdata/pull/16054) ([ilyam8](https://github.com/ilyam8))
+- Update to use versioned base images for CI. [\#16053](https://github.com/netdata/netdata/pull/16053) ([Ferroin](https://github.com/Ferroin))
+- Fix missing find command when installing/updating on Rocky Linux systems. [\#16052](https://github.com/netdata/netdata/pull/16052) ([Ferroin](https://github.com/Ferroin))
+- Fix summary field in table [\#16050](https://github.com/netdata/netdata/pull/16050) ([MrZammler](https://github.com/MrZammler))
+- Switch to uint64\_t to avoid overflow in 32bit systems [\#16048](https://github.com/netdata/netdata/pull/16048) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#16044](https://github.com/netdata/netdata/pull/16044) ([netdatabot](https://github.com/netdatabot))
+- Doc about running a local dashboard through Cloudflare \(community\) [\#16043](https://github.com/netdata/netdata/pull/16043) ([Ancairon](https://github.com/Ancairon))
+- Remove discontinued Hangouts and StackPulse notification methods [\#16041](https://github.com/netdata/netdata/pull/16041) ([Ancairon](https://github.com/Ancairon))
+- health: add upsd alerts [\#16036](https://github.com/netdata/netdata/pull/16036) ([ilyam8](https://github.com/ilyam8))
 - Disable mongodb exporter builds where broken. [\#16033](https://github.com/netdata/netdata/pull/16033) ([Ferroin](https://github.com/Ferroin))
+- Run health queries from tier 0 [\#16032](https://github.com/netdata/netdata/pull/16032) ([MrZammler](https://github.com/MrZammler))
 - use `status` as units for `anomaly_detection.detector_events` [\#16028](https://github.com/netdata/netdata/pull/16028) ([andrewm4894](https://github.com/andrewm4894))
 - add description for Homebrew on Apple Silicon Mac\(netdata/learn/\#1789\) [\#16027](https://github.com/netdata/netdata/pull/16027) ([theggs](https://github.com/theggs))
 - Fix package builds on Rocky Linux. [\#16026](https://github.com/netdata/netdata/pull/16026) ([Ferroin](https://github.com/Ferroin))
@@ -18,6 +31,7 @@
 - Systemd-Journal: fix crash when the uid or gid do not have names [\#16015](https://github.com/netdata/netdata/pull/16015) ([ktsaou](https://github.com/ktsaou))
 - remove the line length limit from pluginsd [\#16013](https://github.com/netdata/netdata/pull/16013) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16011](https://github.com/netdata/netdata/pull/16011) ([netdatabot](https://github.com/netdatabot))
+- Simplify the script for generating documentation from integrations [\#16009](https://github.com/netdata/netdata/pull/16009) ([Ancairon](https://github.com/Ancairon))
 - some collector metadata improvements [\#16008](https://github.com/netdata/netdata/pull/16008) ([andrewm4894](https://github.com/andrewm4894))
 - Fix compilation warnings [\#16006](https://github.com/netdata/netdata/pull/16006) ([stelfrag](https://github.com/stelfrag))
 - Update CMakeLists.txt [\#16005](https://github.com/netdata/netdata/pull/16005) ([stelfrag](https://github.com/stelfrag))
@@ -30,6 +44,7 @@
 - Metadata fixes for some collectors [\#15982](https://github.com/netdata/netdata/pull/15982) ([Ancairon](https://github.com/Ancairon))
 - update go.d.plugin to v0.55.0 [\#15981](https://github.com/netdata/netdata/pull/15981) ([ilyam8](https://github.com/ilyam8))
 - bump UI to v6.37.1 [\#15980](https://github.com/netdata/netdata/pull/15980) ([ilyam8](https://github.com/ilyam8))
+- Maintain node's last connected timestamp in the db [\#15979](https://github.com/netdata/netdata/pull/15979) ([stelfrag](https://github.com/stelfrag))
 - apps.plugin function is not thread safe [\#15978](https://github.com/netdata/netdata/pull/15978) ([ktsaou](https://github.com/ktsaou))
 - functions cancelling [\#15977](https://github.com/netdata/netdata/pull/15977) ([ktsaou](https://github.com/ktsaou))
 - Facets: fixes 5 [\#15976](https://github.com/netdata/netdata/pull/15976) ([ktsaou](https://github.com/ktsaou))
@@ -412,24 +427,10 @@
 - Freeipmi yaml updates [\#15458](https://github.com/netdata/netdata/pull/15458) ([Ancairon](https://github.com/Ancairon))
 - Add short descriptions to cgroups yaml [\#15457](https://github.com/netdata/netdata/pull/15457) ([Ancairon](https://github.com/Ancairon))
 - readme: reorder cols in whats new and add links [\#15455](https://github.com/netdata/netdata/pull/15455) ([andrewm4894](https://github.com/andrewm4894))
-- Store and transmit chart\_name to cloud in alert events [\#15441](https://github.com/netdata/netdata/pull/15441) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.40.1...v1.41.0)
-
-**Merged pull requests:**
-
-- Include license for web v2 [\#15453](https://github.com/netdata/netdata/pull/15453) ([tkatsoulas](https://github.com/tkatsoulas))
-- Updates to metadata.yaml [\#15452](https://github.com/netdata/netdata/pull/15452) ([shyamvalsan](https://github.com/shyamvalsan))
-- Add apps yaml [\#15451](https://github.com/netdata/netdata/pull/15451) ([Ancairon](https://github.com/Ancairon))
-- Add cgroups yaml [\#15450](https://github.com/netdata/netdata/pull/15450) ([Ancairon](https://github.com/Ancairon))
-- Fix multiline [\#15449](https://github.com/netdata/netdata/pull/15449) ([Ancairon](https://github.com/Ancairon))
-- bump v2 dashboard to v6.21.3 [\#15448](https://github.com/netdata/netdata/pull/15448) ([ilyam8](https://github.com/ilyam8))
-- fix alerts transitions search when something specific is asked for [\#15447](https://github.com/netdata/netdata/pull/15447) ([ktsaou](https://github.com/ktsaou))
-- collector meta: remove meta.alternative\_monitored\_instances [\#15445](https://github.com/netdata/netdata/pull/15445) ([ilyam8](https://github.com/ilyam8))
-- added missing fields to alerts instances [\#15442](https://github.com/netdata/netdata/pull/15442) ([ktsaou](https://github.com/ktsaou))
-- removed dup categories [\#15440](https://github.com/netdata/netdata/pull/15440) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.40.1](https://github.com/netdata/netdata/tree/v1.40.1) (2023-06-27)
 
