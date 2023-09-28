@@ -852,6 +852,8 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
         return NULL;
     }
 
+    __atomic_fetch_add(&ctx->atomic.num_flushed_pages, count, __ATOMIC_RELAXED);
+
     xt_io_descr = extent_io_descriptor_get();
     xt_io_descr->ctx = ctx;
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);

@@ -3,6 +3,10 @@
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "libnetdata/libnetdata.h"
 #include "event_loop.h"
 
@@ -134,5 +138,9 @@ size_t cloud_connection_id(void);
 const char *cloud_offline_reason(void);
 const char *cloud_base_url(void);
 CLOUD_STATUS buffer_json_cloud_status(BUFFER *wb, time_t now_s);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* NETDATA_COMMON_H */

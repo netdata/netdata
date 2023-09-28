@@ -753,6 +753,8 @@ set(RRD_PLUGIN_FILES
         database/rrdsetvar.h
         database/rrdvar.c
         database/rrdvar.h
+        database/storage_engine_benchmarks.cc
+        database/storage_engine_benchmarks.h
         database/storage_engine.c
         database/storage_engine.h
         database/ram/rrddim_mem.c

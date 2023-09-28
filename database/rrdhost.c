@@ -843,7 +843,7 @@ void *dbengine_tier_init(void *ptr) {
 }
 #endif
 
-void dbengine_init(char *hostname) {
+void dbengine_init(char *hostname, const char *cache_dir) {
 #ifdef ENABLE_DBENGINE
     use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
 
@@ -878,9 +878,9 @@ void dbengine_init(char *hostname) {
     int divisor = 1;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(tier == 0)
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", cache_dir);
         else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", cache_dir, tier);
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
@@ -1016,7 +1016,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
             netdata_log_info("DBENGINE: Initializing ...");
-            dbengine_init(hostname);
+            dbengine_init(hostname, netdata_configured_cache_dir);
         }
         else {
             netdata_log_info("DBENGINE: Not initializing ...");

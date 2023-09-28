@@ -1688,6 +1688,7 @@ static inline double rrddim_get_last_stored_value(RRDDIM *rd_dim, double *max_va
 
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
+extern void dbengine_init(char *hostname, const char *cache_dir);
 #endif
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_context.h"

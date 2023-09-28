@@ -3,6 +3,7 @@
 #include "common.h"
 #include "buildinfo.h"
 #include "static_threads.h"
+#include "database/storage_engine_benchmarks.h"
 
 #if defined(ENV32BIT)
 #warning COMPILING 32BIT NETDATA
@@ -1454,6 +1455,38 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
+#endif
+
+#if defined(ENABLE_DBENGINE)
+                        if (strcmp(optarg, "se-benchmarks") == 0)
+                        {
+                            unittest_running = true;
+
+                            {
+                                libuv_worker_threads = (int)get_netdata_cpus() * 6;
+
+                                if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
+                                    libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+
+                                if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
+                                    libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
+
+
+                                libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+                                if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
+                                    libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+                                    config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+                                }
+                            }
+
+                            post_conf_load(&user);
+                            get_netdata_configured_variables();
+                            default_health_enabled = 0;
+                            storage_tiers = 1;
+                            registry_init();
+
+                            return storage_engine_benchmarks(argc, argv);
+                        }
 #endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {

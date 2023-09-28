@@ -497,6 +497,8 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.h \
     database/storage_engine.c \
     database/storage_engine.h \
+    database/storage_engine_benchmarks.cc \
+    database/storage_engine_benchmarks.h \
     database/ram/rrddim_mem.c \
     database/ram/rrddim_mem.h \
     database/sqlite/sqlite_functions.c \
