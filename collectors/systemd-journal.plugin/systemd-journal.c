@@ -762,14 +762,14 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
         else if(strncmp(s, "/remote-", 8) == 0) {
             jf->source_type |= SDJF_REMOTE;
 
-            s++; // move to the next char of '/';
+            s = &s[8]; // skip "/remote-"
 
             char *e = strchr(s, '@');
             if(!e)
                 e = strstr(s, ".journal");
 
             if(e) {
-                const char *d = &s[7]; // skip "remote-"
+                const char *d = s;
                 for(; d < e && (isdigit(*d) || *d == '.' || *d == ':') ; d++) ;
                 if(d == e) {
                     // a valid IP address
@@ -777,11 +777,15 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
                     memcpy(ip, s, e - s);
                     ip[e - s] = '\0';
                     char buf[NI_MAXHOST];
-                    ip_to_hostname(ip, buf, NI_MAXHOST);
-                    jf->source = string_strdupz_source(buf, &buf[strlen(buf)], NI_MAXHOST + 7, "remote-");
+                    if(ip_to_hostname(ip, buf, NI_MAXHOST))
+                        jf->source = string_strdupz_source(buf, &buf[strlen(buf)], NI_MAXHOST + 7, "remote-");
+                    else {
+                        netdata_log_error("Cannot find the hostname for IP '%s'", ip);
+                        jf->source = string_strdupz_source(s, e, FILENAME_MAX, "remote-");
+                    }
                 }
                 else
-                    jf->source = string_strdupz_source(s, e, FILENAME_MAX, NULL);
+                    jf->source = string_strdupz_source(s, e, FILENAME_MAX, "remote-");
             }
             else
                 jf->source_type |= SDJF_OTHER;

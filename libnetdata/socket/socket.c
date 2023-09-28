@@ -39,10 +39,8 @@ bool ip_to_hostname(const char *ip, char *dst, size_t dst_len) {
 
     // Perform the reverse lookup
     int res = getnameinfo(sa_ptr, sa_len, dst, dst_len, NULL, 0, NI_NAMEREQD);
-    if(res != 0) {
-        netdata_log_error("Cannot find the hostname of IP '%s'", ip);
+    if(res != 0)
         return false;
-    }
 
     return true;
 }
