@@ -651,6 +651,7 @@ struct journal_file {
     usec_t msg_first_ut;
     usec_t msg_last_ut;
     usec_t last_scan_ut;
+    size_t size;
     bool logged_failure;
 };
 
@@ -826,19 +827,20 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
     if(njf->last_scan_ut > jf->last_scan_ut)
         jf->last_scan_ut = njf->last_scan_ut;
 
-    if(jf->file_last_modified_ut != njf->file_last_modified_ut) {
+    if(njf->file_last_modified_ut > jf->file_last_modified_ut) {
         jf->file_last_modified_ut = njf->file_last_modified_ut;
+        jf->size = njf->size;
 
         const char *filename = dictionary_acquired_item_name(item);
         journal_file_update_msg_ut(filename, jf);
 
         internal_error(true,
-                       "updated journal file '%s', type %d, "
-                       "file modified: %"PRIu64", "
-                       "msg {first: %"PRIu64", last: %"PRIu64"}",
-                       filename, jf->source_type,
-                       jf->file_last_modified_ut,
-                       jf->msg_first_ut, jf->msg_last_ut);
+                "updated journal file '%s', type %d, "
+                "file modified: %"PRIu64", "
+                                        "msg {first: %"PRIu64", last: %"PRIu64"}",
+                filename, jf->source_type,
+                jf->file_last_modified_ut,
+                jf->msg_first_ut, jf->msg_last_ut);
     }
 
     return false;
@@ -852,41 +854,123 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
 #define SDJF_SOURCE_NAMESPACES_NAME "all-local-namespaces"
 #define SDJF_SOURCE_REMOTES_NAME "all-remote-systems"
 
-static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry __maybe_unused, void *data) {
+struct journal_file_source {
+    usec_t first_ut;
+    usec_t last_ut;
+    size_t count;
+    uint64_t size;
+};
+
+static void human_readable_size_ib(uint64_t size, char *dst, size_t dst_len) {
+    if(size > 1024ULL * 1024 * 1024 * 1024)
+        snprintfz(dst, dst_len, "%0.2f TiB", (double)size / 1024.0 / 1024.0 / 1024.0 / 1024.0);
+    else if(size > 1024ULL * 1024 * 1024)
+        snprintfz(dst, dst_len, "%0.2f GiB", (double)size / 1024.0 / 1024.0 / 1024.0);
+    else if(size > 1024ULL * 1024)
+        snprintfz(dst, dst_len, "%0.2f MiB", (double)size / 1024.0 / 1024.0);
+    else if(size > 1024ULL)
+        snprintfz(dst, dst_len, "%0.2f KiB", (double)size / 1024.0);
+    else
+        snprintfz(dst, dst_len, "%"PRIu64" B", size);
+}
+
+#define print_duration(dst, dst_len, pos, remaining, duration, one, many, printed) do { \
+    if((remaining) > (duration)) {                                                      \
+        uint64_t _count = (remaining) / (duration);                                     \
+        (pos) += snprintfz(&(dst)[pos], (dst_len) - (pos), "%s%"PRIu64" %s", (printed) ? "," : "", _count, _count > 1 ? (one) : (many));  \
+        (remaining) -= _count * (duration);                                             \
+        (printed) = true;                                                               \
+    } \
+} while(0)
+
+static void human_readable_duration_s(time_t duration_s, char *dst, size_t dst_len) {
+    if(duration_s < 0)
+        duration_s = -duration_s;
+
+    size_t pos = 0;
+    dst[0] = 0 ;
+
+    bool printed = false;
+    print_duration(dst, dst_len, pos, duration_s, 86400 * 365, "year", "years", printed);
+    print_duration(dst, dst_len, pos, duration_s, 86400 * 30, "month", "months", printed);
+    print_duration(dst, dst_len, pos, duration_s, 86400 * 1, "day", "days", printed);
+    print_duration(dst, dst_len, pos, duration_s, 3600 * 1, "hour", "hours", printed);
+    print_duration(dst, dst_len, pos, duration_s, 60 * 1, "min", "mins", printed);
+    print_duration(dst, dst_len, pos, duration_s, 1, "sec", "secs", printed);
+}
+
+static int journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry, void *data) {
+    struct journal_file_source *jfs = entry;
     BUFFER *wb = data;
+
     const char *name = dictionary_acquired_item_name(item);
 
     buffer_json_add_array_item_object(wb);
     {
+        char size_for_humans[100];
+        human_readable_size_ib(jfs->size, size_for_humans, sizeof(size_for_humans));
+
+        char duration_for_humans[1024];
+        human_readable_duration_s((time_t)((jfs->last_ut - jfs->first_ut) / USEC_PER_SEC),
+                                  duration_for_humans, sizeof(duration_for_humans));
+
+        char info[1024];
+        snprintfz(info, sizeof(info), "%zu files, with a total size of %s, covering %s",
+                  jfs->count, size_for_humans, duration_for_humans);
+
         buffer_json_member_add_string(wb, "id", name);
         buffer_json_member_add_string(wb, "name", name);
+        buffer_json_member_add_string(wb, "pill", size_for_humans);
+        buffer_json_member_add_string(wb, "info", info);
     }
     buffer_json_object_close(wb); // options object
 
     return 1;
 }
 
+static bool journal_file_merge_sizes(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value , void *data __maybe_unused) {
+    struct journal_file_source *jfs = old_value, *njfs = new_value;
+    jfs->count += njfs->count;
+    jfs->size += njfs->size;
+
+    if(njfs->first_ut && njfs->first_ut < jfs->first_ut)
+        jfs->first_ut = njfs->first_ut;
+
+    if(njfs->last_ut && njfs->last_ut > jfs->last_ut)
+        jfs->last_ut = njfs->last_ut;
+
+    return false;
+}
+
 static void available_journal_file_sources_to_json_array(BUFFER *wb) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_NAME_LINK_DONT_CLONE);
+    dictionary_register_conflict_callback(dict, journal_file_merge_sizes, NULL);
 
-    dictionary_set(dict, SDJF_SOURCE_ALL_NAME, NULL, 0);
+    struct journal_file_source t = { 0 };
 
     struct journal_file *jf;
     dfe_start_read(journal_files_registry, jf) {
+        t.first_ut = jf->msg_first_ut;
+        t.last_ut = jf->msg_last_ut;
+        t.count = 1;
+        t.size = jf->size;
+
+        dictionary_set(dict, SDJF_SOURCE_ALL_NAME, &t, sizeof(t));
+
         if((jf->source_type & (SDJF_LOCAL)) == (SDJF_LOCAL))
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_NAME, NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_NAME, &t, sizeof(t));
         if((jf->source_type & (SDJF_LOCAL | SDJF_SYSTEM)) == (SDJF_LOCAL | SDJF_SYSTEM))
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_SYSTEM_NAME, NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_SYSTEM_NAME, &t, sizeof(t));
         if((jf->source_type & (SDJF_LOCAL | SDJF_USER)) == (SDJF_LOCAL | SDJF_USER))
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_USERS_NAME, NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_USERS_NAME, &t, sizeof(t));
         if((jf->source_type & (SDJF_LOCAL | SDJF_OTHER)) == (SDJF_LOCAL | SDJF_OTHER))
-            dictionary_set(dict, SDJF_SOURCE_LOCAL_OTHER_NAME, NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_LOCAL_OTHER_NAME, &t, sizeof(t));
         if((jf->source_type & (SDJF_NAMESPACE)) == (SDJF_NAMESPACE))
-            dictionary_set(dict, SDJF_SOURCE_NAMESPACES_NAME, NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_NAMESPACES_NAME, &t, sizeof(t));
         if((jf->source_type & (SDJF_REMOTE)) == (SDJF_REMOTE))
-            dictionary_set(dict, SDJF_SOURCE_REMOTES_NAME, NULL, 0);
+            dictionary_set(dict, SDJF_SOURCE_REMOTES_NAME, &t, sizeof(t));
         if(jf->source)
-            dictionary_set(dict, string2str(jf->source), NULL, 0);
+            dictionary_set(dict, string2str(jf->source), &t, sizeof(t));
     }
     dfe_done(jf);
 
@@ -945,6 +1029,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
                 struct journal_file t = {
                         .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
                         .last_scan_ut = last_scan_ut,
+                        .size = info.st_size,
                 };
                 dictionary_set(journal_files_registry, absolute_path, &t, sizeof(t));
             }
