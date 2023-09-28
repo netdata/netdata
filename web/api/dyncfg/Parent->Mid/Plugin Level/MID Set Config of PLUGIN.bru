@@ -1,0 +1,14 @@
+meta {
+  name: MID Set Config of PLUGIN
+  type: http
+  seq: 3
+}
+
+put {
+  url: http://{{PARENT_URL}}:{{PARENT_PORT}}/host/{{MIDDLE_HOST_UID}}/api/v2/config/{{PLUGIN_NAME}}
+  body: text
+}
+
+body:text {
+  test new configuration
+}

@@ -1,0 +1,10 @@
+meta {
+  name: MID Get Config of PLUGIN
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://{{PARENT_URL}}:{{PARENT_PORT}}/host/{{MIDDLE_HOST_UID}}/api/v2/config/{{PLUGIN_NAME}}
+  body: none
+}

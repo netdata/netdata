@@ -1,0 +1,10 @@
+meta {
+  name: Job Statuses
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://{{MIDDLE_URL}}:{{MIDDLE_PORT}}/api/v2/job_statuses
+  body: none
+}

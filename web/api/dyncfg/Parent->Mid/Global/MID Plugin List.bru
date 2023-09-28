@@ -1,0 +1,10 @@
+meta {
+  name: MID Plugin List
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://{{PARENT_URL}}:{{PARENT_PORT}}/host/{{MIDDLE_HOST_UID}}/api/v2/config
+  body: none
+}

@@ -1,0 +1,14 @@
+meta {
+  name: Job Statuses Grouped
+  type: http
+  seq: 3
+}
+
+get {
+  url: http://{{MIDDLE_URL}}:{{MIDDLE_PORT}}/api/v2/job_statuses?grouped
+  body: none
+}
+
+query {
+  grouped: 
+}

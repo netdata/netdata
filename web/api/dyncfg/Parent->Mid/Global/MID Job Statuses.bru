@@ -1,0 +1,10 @@
+meta {
+  name: MID Job Statuses
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://{{PARENT_URL}}:{{PARENT_PORT}}/host/{{MIDDLE_HOST_UID}}/api/v2/job_statuses
+  body: none
+}

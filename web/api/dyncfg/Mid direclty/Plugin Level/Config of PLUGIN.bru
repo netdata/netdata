@@ -1,0 +1,10 @@
+meta {
+  name: Config of PLUGIN
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://{{MIDDLE_URL}}:{{MIDDLE_PORT}}/api/v2/config/{{PLUGIN_NAME}}
+  body: none
+}
