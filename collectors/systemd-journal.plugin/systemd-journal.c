@@ -704,7 +704,7 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
     jf->msg_last_ut = last_ut;
 }
 
-static STRING *strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
+static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
     char buf[max_len];
     size_t len;
     char *dst = buf;
@@ -724,7 +724,7 @@ static STRING *strdupz_source(const char *s, const char *e, size_t max_len, cons
     buf[max_len - 1] = '\0';
 
     for(size_t i = 0; buf[i] ;i++)
-        if(!isalnum(buf[i]) && buf[i] != '-' && buf[i] != '.')
+        if(!isalnum(buf[i]) && buf[i] != '-' && buf[i] != '.' && buf[i] != ':')
             buf[i] = '_';
 
     return string_strdupz(buf);
@@ -747,17 +747,19 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 
             if(t >= filename && *t == '.') {
                 jf->source_type = SDJF_NAMESPACE;
-                jf->source = strdupz_source(t + 1, s, FILENAME_MAX, "namespace-");
+                jf->source = string_strdupz_source(t + 1, s, FILENAME_MAX, "namespace-");
             }
             else
                 jf->source_type = SDJF_LOCAL;
         }
 
-        if(strstr(s, "/system"))
+        if(strncmp(s, "/system", 7) == 0)
             jf->source_type |= SDJF_SYSTEM;
-        else if(strstr(s, "/user"))
+
+        else if(strncmp(s, "/user", 5) == 0)
             jf->source_type |= SDJF_USER;
-        else if(strstr(s, "/remote")) {
+
+        else if(strncmp(s, "/remote-", 8) == 0) {
             jf->source_type |= SDJF_REMOTE;
 
             s++; // move to the next char of '/';
@@ -766,8 +768,23 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
             if(!e)
                 e = strstr(s, ".journal");
 
-            if(e)
-                jf->source = strdupz_source(s, e, FILENAME_MAX, NULL);
+            if(e) {
+                const char *d = &s[7]; // skip "remote-"
+                for(; d < e && (isdigit(*d) || *d == '.' || *d == ':') ; d++) ;
+                if(d == e) {
+                    // a valid IP address
+                    char ip[e - s + 1];
+                    memcpy(ip, s, e - s);
+                    ip[e - s] = '\0';
+                    char buf[NI_MAXHOST];
+                    ip_to_hostname(ip, buf, NI_MAXHOST);
+                    jf->source = string_strdupz_source(buf, &buf[strlen(buf)], NI_MAXHOST + 7, "remote-");
+                }
+                else
+                    jf->source = string_strdupz_source(s, e, FILENAME_MAX, NULL);
+            }
+            else
+                jf->source_type |= SDJF_OTHER;
         }
         else
             jf->source_type |= SDJF_OTHER;
