@@ -301,8 +301,8 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
 
                 if(delta > expected)
                     netdata_log_error("increased max_journal_vs_realtime_delta_ut from %"PRIu64" to %"PRIu64", "
-                                      "journal %"PRIu64", actual %"PRIu64""
-                                      , expected, delta, origin_journal_ut, *msg_ut);
+                                      "journal %"PRIu64", actual %"PRIu64" (delta %"PRIu64")"
+                                      , expected, delta, origin_journal_ut, *msg_ut, *msg_ut - origin_journal_ut);
             }
         }
 
