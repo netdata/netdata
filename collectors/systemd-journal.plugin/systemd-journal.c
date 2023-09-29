@@ -838,13 +838,13 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
         const char *filename = dictionary_acquired_item_name(item);
         journal_file_update_msg_ut(filename, jf);
 
-        internal_error(true,
-                "updated journal file '%s', type %d, "
-                "file modified: %"PRIu64", "
-                                        "msg {first: %"PRIu64", last: %"PRIu64"}",
-                filename, jf->source_type,
-                jf->file_last_modified_ut,
-                jf->msg_first_ut, jf->msg_last_ut);
+//        internal_error(true,
+//                "updated journal file '%s', type %d, "
+//                "file modified: %"PRIu64", "
+//                                        "msg {first: %"PRIu64", last: %"PRIu64"}",
+//                filename, jf->source_type,
+//                jf->file_last_modified_ut,
+//                jf->msg_first_ut, jf->msg_last_ut);
     }
 
     return false;
