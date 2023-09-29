@@ -295,6 +295,10 @@ usec_t facets_row_newest_ut(FACETS *facets) {
     return 0;
 }
 
+uint32_t facets_rows(FACETS *facets) {
+    return facets->items_to_return;
+}
+
 // ----------------------------------------------------------------------------
 
 static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
@@ -2080,72 +2084,70 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         buffer_json_array_close(wb); // facets
     }
 
-    if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
-        buffer_json_member_add_object(wb, "columns");
-        {
-            size_t field_id = 0;
-            buffer_rrdf_table_add_field(
-                    wb, field_id++,
-                    "timestamp", "Timestamp",
-                    RRDF_FIELD_TYPE_TIMESTAMP,
-                    RRDF_FIELD_VISUAL_VALUE,
-                    RRDF_FIELD_TRANSFORM_DATETIME_USEC, 0, NULL, NAN,
-                    RRDF_FIELD_SORT_DESCENDING,
-                    NULL,
-                    RRDF_FIELD_SUMMARY_COUNT,
-                    RRDF_FIELD_FILTER_RANGE,
-                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
-                    NULL);
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+        buffer_rrdf_table_add_field(
+                wb, field_id++,
+                "timestamp", "Timestamp",
+                RRDF_FIELD_TYPE_TIMESTAMP,
+                RRDF_FIELD_VISUAL_VALUE,
+                RRDF_FIELD_TRANSFORM_DATETIME_USEC, 0, NULL, NAN,
+                RRDF_FIELD_SORT_DESCENDING,
+                NULL,
+                RRDF_FIELD_SUMMARY_COUNT,
+                RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
 
-            buffer_rrdf_table_add_field(
-                    wb, field_id++,
-                    "rowOptions", "rowOptions",
-                    RRDF_FIELD_TYPE_NONE,
-                    RRDR_FIELD_VISUAL_ROW_OPTIONS,
-                    RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                    RRDF_FIELD_SORT_FIXED,
-                    NULL,
-                    RRDF_FIELD_SUMMARY_COUNT,
-                    RRDF_FIELD_FILTER_NONE,
-                    RRDR_FIELD_OPTS_DUMMY,
-                    NULL);
+        buffer_rrdf_table_add_field(
+                wb, field_id++,
+                "rowOptions", "rowOptions",
+                RRDF_FIELD_TYPE_NONE,
+                RRDR_FIELD_VISUAL_ROW_OPTIONS,
+                RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                RRDF_FIELD_SORT_FIXED,
+                NULL,
+                RRDF_FIELD_SUMMARY_COUNT,
+                RRDF_FIELD_FILTER_NONE,
+                RRDR_FIELD_OPTS_DUMMY,
+                NULL);
 
-            FACET_KEY *k;
-            foreach_key_in_facets(facets, k) {
-                        RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_NONE;
-                        bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
+        FACET_KEY *k;
+        foreach_key_in_facets(facets, k) {
+                    RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_NONE;
+                    bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
 
-                        if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values.enabled))
-                            visible = true;
+                    if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values.enabled))
+                        visible = true;
 
-                        if (!visible)
-                            visible = simple_pattern_matches(facets->visible_keys, k->name);
+                    if (!visible)
+                        visible = simple_pattern_matches(facets->visible_keys, k->name);
 
-                        if (visible)
-                            options |= RRDF_FIELD_OPTS_VISIBLE;
+                    if (visible)
+                        options |= RRDF_FIELD_OPTS_VISIBLE;
 
-                        if (k->options & FACET_KEY_OPTION_MAIN_TEXT)
-                            options |= RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_WRAP;
+                    if (k->options & FACET_KEY_OPTION_MAIN_TEXT)
+                        options |= RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_WRAP;
 
-                        const char *hash_str = hash_to_static_string(k->hash);
+                    const char *hash_str = hash_to_static_string(k->hash);
 
-                        buffer_rrdf_table_add_field(
-                                wb, field_id++,
-                                hash_str, k->name ? k->name : hash_str,
-                                RRDF_FIELD_TYPE_STRING,
-                                (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE,
-                                RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                RRDF_FIELD_SORT_ASCENDING,
-                                NULL,
-                                RRDF_FIELD_SUMMARY_COUNT,
-                                (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE
-                                                                            : RRDF_FIELD_FILTER_FACET,
-                                options, FACET_VALUE_UNSET);
-                    }
-            foreach_key_in_facets_done(k);
-        }
-        buffer_json_object_close(wb); // columns
+                    buffer_rrdf_table_add_field(
+                            wb, field_id++,
+                            hash_str, k->name ? k->name : hash_str,
+                            RRDF_FIELD_TYPE_STRING,
+                            (k->options & FACET_KEY_OPTION_RICH_TEXT) ? RRDF_FIELD_VISUAL_RICH : RRDF_FIELD_VISUAL_VALUE,
+                            RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                            RRDF_FIELD_SORT_ASCENDING,
+                            NULL,
+                            RRDF_FIELD_SUMMARY_COUNT,
+                            (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE
+                                                                        : RRDF_FIELD_FILTER_FACET,
+                            options, FACET_VALUE_UNSET);
+                }
+        foreach_key_in_facets_done(k);
     }
+    buffer_json_object_close(wb); // columns
 
     buffer_json_member_add_array(wb, "data");
     {

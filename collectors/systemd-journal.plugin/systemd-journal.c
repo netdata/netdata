@@ -337,7 +337,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    if(!netdata_systemd_journal_seek_to(j, fqs->before_ut + anchor_delta * 2))
+    usec_t start_ut = fqs->before_ut + anchor_delta;
+    usec_t stop_ut = fqs->after_ut;
+
+    if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
@@ -345,46 +348,34 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
     size_t row_counter = 0, last_row_counter = 0;
     size_t bytes = 0, last_bytes = 0;
 
-    // the entries are not guaranteed to be sorted, so we process up to 100 entries beyond
-    // the end of the query to find possibly useful logs for our time-frame
-    size_t excess_rows_allowed = SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED;
-
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
     facets_rows_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
-        usec_t msg_ut;
-        if(sd_journal_get_realtime_usec(j, &msg_ut) < 0) {
+        usec_t msg_ut = 0;
+        if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
             errors_no_timestamp++;
             continue;
         }
 
         if(unlikely(!first_msg_ut)) {
-            if(msg_ut == fqs->if_modified_since) {
+            if(msg_ut == fqs->if_modified_since)
                 return ND_SD_JOURNAL_NOT_MODIFIED;
-            }
 
             first_msg_ut = msg_ut;
         }
 
-        if (msg_ut > fqs->before_ut)
+        if (unlikely(msg_ut > start_ut))
             continue;
 
-        if (msg_ut < fqs->after_ut) {
-            if(--excess_rows_allowed == 0)
-                break;
-
-            continue;
-        }
+        if (unlikely(msg_ut < stop_ut))
+            break;
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
             fqs->rows_useful++;
 
         row_counter++;
-        if(row_counter % 100 == 0 && msg_ut < (fqs->after_ut - anchor_delta))
-            break;
-
         if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
             FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
             last_row_counter = row_counter;
@@ -414,7 +405,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    if(!netdata_systemd_journal_seek_to(j, fqs->anchor - anchor_delta)) // not need for *2
+    usec_t start_ut = fqs->anchor;
+    usec_t stop_ut = fqs->before_ut + anchor_delta;
+
+    if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
@@ -425,19 +419,24 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 
     facets_rows_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_next(j) > 0) {
-
-        usec_t msg_ut;
-        if(sd_journal_get_realtime_usec(j, &msg_ut) < 0) {
+        usec_t msg_ut = 0;
+        if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
             errors_no_timestamp++;
             continue;
         }
+
+        if (unlikely(msg_ut < start_ut))
+            continue;
+
+        if (unlikely(msg_ut > stop_ut))
+            break;
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
             fqs->rows_useful++;
 
         row_counter++;
-        if(row_counter % 100 == 0) {
+        if(row_counter % 100 == 0 && facets_rows(facets) >= fqs->entries) {
             usec_t newest = facets_row_newest_ut(facets);
             if(newest && msg_ut > (newest + anchor_delta))
                 break;
@@ -469,7 +468,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    if(!netdata_systemd_journal_seek_to(j, fqs->anchor + anchor_delta * 2))
+    usec_t start_ut = fqs->anchor + anchor_delta;
+    usec_t stop_ut = fqs->after_ut;
+
+    if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
@@ -480,20 +482,24 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
 
     facets_rows_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
-        row_counter++;
-
-        usec_t msg_ut;
-        if(sd_journal_get_realtime_usec(j, &msg_ut) < 0) {
+        usec_t msg_ut = 0;
+        if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
             errors_no_timestamp++;
             continue;
         }
+
+        if (unlikely(msg_ut > start_ut))
+            continue;
+
+        if (unlikely(msg_ut < stop_ut))
+            break;
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
             fqs->rows_useful++;
 
         row_counter++;
-        if(row_counter % 100 == 0) {
+        if(row_counter % 100 == 0 && facets_rows(facets) >= fqs->entries) {
             usec_t oldest = facets_row_oldest_ut(facets);
             if(oldest && msg_ut < (oldest - anchor_delta))
                 break;
