@@ -2164,7 +2164,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     fqs->last_modified = 0;
     fqs->filters = filters;
 
-    if(fqs->anchor < fqs->after_ut) {
+    if(fqs->anchor && fqs->anchor < fqs->after_ut) {
         netdata_log_error("Received anchor %"PRIu64" is too small for query time-frame [%"PRIu64" - %"PRIu64"]",
                 fqs->anchor, fqs->after_ut, fqs->before_ut);
         fqs->anchor = 0;
