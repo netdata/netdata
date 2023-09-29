@@ -29,6 +29,21 @@ static int get_auto_vaccum(sqlite3 *database)
     return exists;
 }
 
+int db_table_count(sqlite3 *database)
+{
+    char *err_msg = NULL;
+    char sql[128];
+
+    int count = 0;
+    snprintf(sql, 127, "select count(1) from sqlite_schema where type = 'table'");
+    int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &count, &err_msg);
+    if (rc != SQLITE_OK) {
+        netdata_log_info("Error checking database table count; %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+    return count;
+}
+
 int table_exists_in_database(sqlite3 *database, const char *table)
 {
     char *err_msg = NULL;
@@ -470,7 +485,7 @@ int perform_database_migration(sqlite3 *database, int target_version)
 {
     int user_version = get_database_user_version(database);
 
-    if (!user_version && !table_exists_in_database(database, "host"))
+    if (!user_version && !db_table_count(database))
         return target_version;
 
     return migrate_database(database, target_version, "metadata", migration_action);
