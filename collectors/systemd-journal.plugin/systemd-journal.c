@@ -2135,15 +2135,6 @@ static void function_systemd_journal(const char *transaction, char *function, in
         goto output;
     }
 
-    facets_set_items(facets, last);
-    facets_set_anchor(facets, anchor, direction);
-    facets_set_query(facets, query);
-
-    if(chart && *chart)
-        facets_set_timeframe_and_histogram_by_id(facets, chart, after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
-    else
-        facets_set_timeframe_and_histogram_by_name(facets, "PRIORITY", after_s * USEC_PER_SEC, before_s * USEC_PER_SEC);
-
     fqs->source = string_strdupz(source);
     fqs->source_type = source_type;
     fqs->after_ut = after_s * USEC_PER_SEC;
@@ -2156,6 +2147,21 @@ static void function_systemd_journal(const char *transaction, char *function, in
     fqs->last_modified = 0;
     fqs->filters = filters;
 
+    if(fqs->anchor < fqs->after_ut) {
+        netdata_log_error("Received anchor %"PRIu64" is too small for query time-frame [%"PRIu64" - %"PRIu64"]",
+                fqs->anchor, fqs->after_ut, fqs->before_ut);
+        fqs->anchor = 0;
+    }
+    else if(fqs->anchor > fqs->before_ut) {
+        netdata_log_error("Received anchor %"PRIu64" is too big for query time-frame [%"PRIu64" - %"PRIu64"]",
+                fqs->anchor, fqs->after_ut, fqs->before_ut);
+        fqs->anchor = 0;
+    }
+
+    facets_set_items(facets, fqs->entries);
+    facets_set_anchor(facets, fqs->anchor, fqs->direction);
+    facets_set_query(facets, query);
+
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     fqs->slice = slice;
     if(slice)
@@ -2163,6 +2169,11 @@ static void function_systemd_journal(const char *transaction, char *function, in
 #else
     fqs->slice = false;
 #endif
+
+    if(chart && *chart)
+        facets_set_timeframe_and_histogram_by_id(facets, chart, fqs->after_ut, fqs->before_ut);
+    else
+        facets_set_timeframe_and_histogram_by_name(facets, "PRIORITY", fqs->after_ut, fqs->before_ut);
 
     response = netdata_systemd_journal_query(wb, facets, fqs);
 
