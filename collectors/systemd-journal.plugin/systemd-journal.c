@@ -247,7 +247,8 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
 
 #define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
 
-#define DEFAULT_MAX_JOURNAL_VS_REALTIME_DELTA_UT (2 * USEC_PER_SEC) // assume always 2 seconds latency
+#define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (2 * USEC_PER_SEC) // assume always 2 seconds latency
+#define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2 minutes delta
 
 static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
     const char *k = data;
@@ -279,12 +280,17 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
         if(!parse_journal_field(data, length, &key, &key_length, &value, &value_length))
             continue;
 
+        usec_t origin_journal_ut = *msg_ut;
+
         if(unlikely(key_length == sizeof(JD_SOURCE_REALTIME_TIMESTAMP) - 1 &&
             memcmp(key, JD_SOURCE_REALTIME_TIMESTAMP, sizeof(JD_SOURCE_REALTIME_TIMESTAMP) - 1) == 0)) {
             usec_t ut = str2ull(value, NULL);
             if(ut && ut < *msg_ut) {
                 usec_t delta = *msg_ut - ut;
                 *msg_ut = ut;
+
+                if(delta > JOURNAL_VS_REALTIME_DELTA_MAX_UT)
+                    delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
 
                 // update max_journal_vs_realtime_delta_ut if the delta increased
                 usec_t expected = jf->max_journal_vs_realtime_delta_ut;
@@ -294,7 +300,9 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
                 } while(!__atomic_compare_exchange_n(&jf->max_journal_vs_realtime_delta_ut, &expected, delta, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
                 if(delta > expected)
-                    netdata_log_error("increased max_journal_vs_realtime_delta_ut from %"PRIu64" to %"PRIu64"", expected, delta);
+                    netdata_log_error("increased max_journal_vs_realtime_delta_ut from %"PRIu64" to %"PRIu64", "
+                                      "journal %"PRIu64", actual %"PRIu64""
+                                      , expected, delta, origin_journal_ut, *msg_ut);
             }
         }
 
@@ -1044,7 +1052,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
                         .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
                         .last_scan_ut = last_scan_ut,
                         .size = info.st_size,
-                        .max_journal_vs_realtime_delta_ut = DEFAULT_MAX_JOURNAL_VS_REALTIME_DELTA_UT,
+                        .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
                 };
                 dictionary_set(journal_files_registry, absolute_path, &t, sizeof(t));
             }
