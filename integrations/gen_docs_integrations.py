@@ -223,7 +223,12 @@ endmeta-->
         except Exception as e:
             print("Exception in notification md construction", e, integration['id'])
 
-    return meta_yaml, sidebar_label, learn_rel_path, md
+    if "community" in integration['meta'].keys():
+        community = "<img src=\"https://img.shields.io/badge/maintained%20by-Community-blue\" />"
+    else:
+        community = "<img src=\"https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44\" />"
+
+    return meta_yaml, sidebar_label, learn_rel_path, md, community
 
 
 def build_path(meta_yaml_link):
@@ -236,10 +241,15 @@ def build_path(meta_yaml_link):
         .replace("/metadata.yaml", "")
 
 
-def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
+def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default'):
     """
     takes the arguments needed to write the integration markdown to the proper file.
     """
+
+    upper, lower = md.split("##", 1)
+
+    md = upper + community + f"\n\n##{lower}"
+
     if mode == 'default':
         # Only if the path exists, this caters for running the same script on both the go and netdata repos.
         if Path(path).exists():
@@ -251,7 +261,7 @@ def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
                 clean_and_write(
                     md,
                     Path(f'{path}/integrations/{clean_string(sidebar_label)}.md')
-                    )
+                )
 
             except FileNotFoundError as e:
                 print("Exception in writing to file", e)
@@ -287,12 +297,12 @@ def write_to_file(path, md, meta_yaml, sidebar_label, mode='default'):
             md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='agent-notifications')
 
             finalpath = f'{path}/README.md'
-        
+
         try:
             clean_and_write(
                 md,
                 Path(finalpath)
-                )
+            )
 
         except FileNotFoundError as e:
             print("Exception in writing to file", e)
@@ -327,25 +337,27 @@ for integration in integrations:
 
     if integration['integration_type'] == "collector":
 
-        meta_yaml, sidebar_label, learn_rel_path, md = build_readme_from_integration(integration, mode='collector')
+        meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
+            integration, mode='collector')
         path = build_path(meta_yaml)
-        write_to_file(path, md, meta_yaml, sidebar_label)
+        write_to_file(path, md, meta_yaml, sidebar_label, community)
 
     elif not am_i_inside_go:
         # kind of specific if clause, so we can avoid running excessive code in the go repo
         if integration['integration_type'] == "exporter":
 
-            meta_yaml, sidebar_label, learn_rel_path, md = build_readme_from_integration(integration, mode='exporter')
+            meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
+                integration, mode='exporter')
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label)
+            write_to_file(path, md, meta_yaml, sidebar_label, community)
 
         # kind of specific if clause, so we can avoid running excessive code in the go repo
         elif integration['integration_type'] == "notification":
 
-            meta_yaml, sidebar_label, learn_rel_path, md = build_readme_from_integration(
+            meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
                 integration, mode='notification')
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, mode='notification')
+            write_to_file(path, md, meta_yaml, sidebar_label, community,  mode='notification')
 
 
 make_symlinks(symlink_dict)
