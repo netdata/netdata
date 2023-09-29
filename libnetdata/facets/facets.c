@@ -1951,13 +1951,6 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     return used;
 }
 
-const char *facets_json_unset_value(FACETS *facets) {
-    if(facets->options & FACETS_OPTION_NO_EMPTY_VALUE_FACETS)
-        return NULL;
-    else
-        return FACET_VALUE_UNSET;
-}
-
 void facets_table_config(BUFFER *wb) {
     buffer_json_member_add_boolean(wb, "show_ids", false);   // do not show the column ids to the user
     buffer_json_member_add_boolean(wb, "has_history", true); // enable date-time picker with after-before
@@ -2024,7 +2017,6 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
         facets_table_config(wb);
         facets_accepted_parameters_to_json_array(facets, wb, true);
-        buffer_json_member_add_string(wb, "unset_value", facets_json_unset_value(facets));
     }
 
     if(!(facets->options & FACETS_OPTION_DISABLE_ALL_FACETS)) {
@@ -2148,7 +2140,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                                 RRDF_FIELD_SUMMARY_COUNT,
                                 (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE
                                                                             : RRDF_FIELD_FILTER_FACET,
-                                options, facets_json_unset_value(facets));
+                                options, FACET_VALUE_UNSET);
                     }
             foreach_key_in_facets_done(k);
         }
@@ -2195,7 +2187,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 }
                 else {
                     if(!rkv || rkv->empty) {
-                        buffer_json_add_array_item_string(wb, facets_json_unset_value(facets));
+                        buffer_json_add_array_item_string(wb, NULL);
                     }
                     else if(unlikely(k->transform.cb && k->transform.view_only)) {
                         k->transform.cb(facets, rkv->wb, k->transform.data);
