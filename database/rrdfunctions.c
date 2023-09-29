@@ -951,12 +951,14 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
         return rrd_call_function_async_and_dont_wait(r);
 }
 
+
+void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, const char *payload, rrd_function_result_callback_t callback, void *callback_data);
 // ----------------------------------------------------------------------------
 
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data) {
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
@@ -966,6 +968,12 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
     // find the function
 
     size_t sanitized_cmd_length = sanitize_function_text(sanitized_cmd, cmd, PLUGINSD_LINE_MAX);
+
+    if (is_dyncfg_function(sanitized_cmd, DYNCFG_FUNCTION_TYPE_ALL)) {
+        call_virtual_function_async(result_wb, host, sanitized_cmd, payload, result_cb, result_cb_data);
+        return HTTP_RESP_OK;
+    }
+
     code = rrd_call_function_find(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
     if(code != HTTP_RESP_OK)
         return code;
