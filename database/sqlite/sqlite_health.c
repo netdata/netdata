@@ -1175,6 +1175,11 @@ int alert_hash_and_store_config(
     unsigned char hash_value[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
     evpctx = EVP_MD_CTX_create();
+    // add check against NULL
+    if(!evpctx)
+    {
+        return -1;
+    }
     EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
 
     DIGEST_ALERT_CONFIG_VAL(cfg->alarm);
