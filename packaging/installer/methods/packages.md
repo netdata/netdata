@@ -113,6 +113,9 @@ Local mirrors of our official repositories can be created in one of two ways:
 We do not provide official support for mirroring our repositories,
 but we do have some tips for anyone looking to do so:
 
+- Our `robots.txt` file explicitly disallows indexing, so if you’re using a regular website mirroring tool,
+  you wil need to tell it to ignore `robots.txt` (for example, if using GNU wget, add `-e robots=off` to the
+  options you pass) to ensure that it actually retrieves everything.
 - Excluding special cases of caching proxies (such as apt-cacher-ng), our repository configuration packages _DO NOT_
   work with custom local mirrors. Thus, you will need to manually configure your systems to use your local mirror.
 - Packages are published as they are built, with 64-bit x86 packages being built first, followed by 32-bit x86,
