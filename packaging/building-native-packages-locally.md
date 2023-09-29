@@ -26,7 +26,7 @@ podman run -it --rm -e VERSION=0.1 -v $PWD:/netdata netdata/package-builders:<ta
 
 The `<tag>` should be the lowercase distribution name with no spaces, followed by the
 release of that distribution. For example, `centos7` to build on CentOS 7, or `ubuntu20.04`
-to build on Ubuntu 20.04. Note that we use Alma Linux for builds on CentOS/RHEL 8 or newer. See
+to build on Ubuntu 20.04. Note that we use Rocky Linux for builds on CentOS/RHEL 8 or newer. See
 [netdata/package-builders](https://hub.docker.com/r/netdata/package-builders/tags) for all available tags.
 
 The value passed in the `VERSION` environment variable can be any version number accepted by the type of package

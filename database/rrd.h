@@ -1178,6 +1178,7 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
 
+    time_t last_connected;                          // last time child connected (stored in db)
     time_t child_connect_time;                      // the time the last sender was connected
     time_t child_last_chart_command;                // the time of the last CHART streaming command
     time_t child_disconnected_time;                 // the time the last sender was disconnected
