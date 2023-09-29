@@ -96,6 +96,9 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
             STREAM_HAS_COMPRESSION |
+#ifdef NETDATA_TEST_DYNCFG
+            STREAM_CAP_DYNCFG |
+#endif
             (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
             (ml_capability ? STREAM_CAP_DATA_WITH_ML : 0) |
             0;
@@ -465,6 +468,47 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
 }
 
+// TODO enable this macro before release
+#define bail_if_no_cap(cap) \
+    if(unlikely(!stream_has_capability(host->sender, cap))) { \
+        netdata_log_error("STREAM %s [send]: cannot send job status update - parent does not support it.", rrdhost_hostname(host)); \
+        return; \
+    }
+
+#define dyncfg_check_can_push(host) \
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host))) \
+        return; \
+    bail_if_no_cap(STREAM_CAP_DYNCFG)
+
+// assumes job is locked and acquired!!!
+void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, const char *module_name, struct job *job) {
+    dyncfg_check_can_push(host);
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPORT_JOB_STATUS " %s %s %s %s %d\n", plugin_name, module_name, job->name, job_status2str(job->status), job->state);
+    if (job->reason)
+        buffer_sprintf(wb, " \"%s\"", job->reason);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+
+    job->dirty = 0;
+}
+
+void rrdpush_send_job_deleted(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name) {
+    dyncfg_check_can_push(host);
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_DELETE_JOB " %s %s %s\n", plugin_name, module_name, job_name);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
 RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
 
@@ -553,6 +597,78 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     BUFFER *wb = sender_start(host->sender);
 
     rrd_functions_expose_global_rrdpush(host, wb);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
+void rrdpush_send_dyncfg(RRDHOST *host) {
+    dyncfg_check_can_push(host);
+
+    BUFFER *wb = sender_start(host->sender);
+
+    DICTIONARY *plugins_dict = host->configurable_plugins;
+    
+    struct configurable_plugin *plug;
+    dfe_start_read(plugins_dict, plug) {
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_ENABLE " %s\n", plug->name);
+        struct module *mod;
+        dfe_start_read(plug->modules, mod) {
+            buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE " %s %s %s\n", plug->name, mod->name, module_type2str(mod->type));
+            struct job *job;
+            dfe_start_read(mod->jobs, job) {
+                pthread_mutex_lock(&job->lock);
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB " %s %s %s %s %"PRIu32"\n", plug->name, mod->name, job->name, job_type2str(job->type), job->flags);
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPORT_JOB_STATUS " %s %s %s %s %d", plug->name, mod->name, job->name, job_status2str(job->status), job->state);
+                if (job->reason)
+                    buffer_sprintf(wb, " \"%s\"", job->reason);
+                buffer_sprintf(wb, "\n");
+                job->dirty = 0;
+                pthread_mutex_unlock(&job->lock);
+            } dfe_done(job);
+        } dfe_done(mod);
+    }
+    dfe_done(plug);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
+void rrdpush_send_dyncfg_enable(RRDHOST *host, const char *plugin_name)
+{
+    dyncfg_check_can_push(host);
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_ENABLE " %s\n", plugin_name);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
+void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, const char *module_name, enum module_type type)
+{
+    dyncfg_check_can_push(host);
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE " %s %s %s\n", plugin_name, module_name, module_type2str(type));
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
+void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name, enum job_type type, uint32_t flags)
+{
+    dyncfg_check_can_push(host);
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB " %s %s %s %s %"PRIu32"\n", plugin_name, module_name, job_name, job_type2str(type), flags);
 
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
@@ -1288,6 +1404,7 @@ static struct {
     { STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     { STREAM_CAP_IEEE754, "IEEE754" },
     { STREAM_CAP_DATA_WITH_ML, "ML" },
+    { STREAM_CAP_DYNCFG, "DYN_CFG" },
     { 0 , NULL },
 };
 

@@ -1254,6 +1254,8 @@ struct rrdhost {
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;
 
+    DICTIONARY *configurable_plugins;               // configurable plugins for this host
+
     struct rrdhost *next;
     struct rrdhost *prev;
 };
