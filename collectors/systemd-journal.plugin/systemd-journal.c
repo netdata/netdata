@@ -116,6 +116,9 @@ int fstat64(int fd, struct stat64 *buf) {
 #define JOURNAL_PARAMETER_PROGRESS              "progress"
 #define JOURNAL_PARAMETER_SLICE                 "slice"
 
+#define JOURNAL_DEFAULT_SLICE_MODE              true
+#define JOURNAL_DEFAULT_DIRECTION               FACETS_ANCHOR_DIRECTION_BACKWARD
+
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       \
@@ -1245,38 +1248,95 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             "\n"
             "%s\n"
             "\n"
-            "The following filters are supported:\n"
+            "The following parameters are supported:\n"
             "\n"
-            "   help\n"
+            "   "JOURNAL_PARAMETER_HELP"\n"
             "      Shows this help message.\n"
             "\n"
-            "   before:TIMESTAMP\n"
+            "   "JOURNAL_PARAMETER_ID":STRING\n"
+            "      Caller supplied unique ID of the request.\n"
+            "      This can be used later to request a progress report of the query.\n"
+            "      Optional, but if omitted no `"JOURNAL_PARAMETER_PROGRESS"` can be requested.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_INFO"\n"
+            "      Request initial configuration information about the plugin.\n"
+            "      The key entity returned is the required_params array, which includes\n"
+            "      all the available systemd journal sources.\n"
+            "      When `"JOURNAL_PARAMETER_INFO"` is requested, all other parameters are ignored.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_PROGRESS"\n"
+            "      Request a progress report (the `id` of a running query is required).\n"
+            "      When `"JOURNAL_PARAMETER_PROGRESS"` is requested, only parameter `"JOURNAL_PARAMETER_ID"` is used.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_DATA_ONLY"\n"
+            "      Quickly respond with data requested, without generating a\n"
+            "      histogram and facets counters.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_SLICE":true or "JOURNAL_PARAMETER_SLICE":false\n"
+            "      When it is turned on, the plugin is executing filtering via libsystemd,\n"
+            "      utilizing all the available indexes of the journal files.\n"
+            "      When it is off, only the time constraint is handled by libsystemd and\n"
+            "      all filtering is done by the plugin.\n"
+            "      The default is: %s\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_SOURCE":SOURCE\n"
+            "      Query only the specified journal sources.\n"
+            "      Do an `"JOURNAL_PARAMETER_INFO"` query to find the sources.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_BEFORE":TIMESTAMP_IN_SECONDS\n"
             "      Absolute or relative (to now) timestamp in seconds, to start the query.\n"
             "      The query is always executed from the most recent to the oldest log entry.\n"
             "      If not given the default is: now.\n"
             "\n"
-            "   after:TIMESTAMP\n"
+            "   "JOURNAL_PARAMETER_AFTER":TIMESTAMP_IN_SECONDS\n"
             "      Absolute or relative (to `before`) timestamp in seconds, to end the query.\n"
             "      If not given, the default is %d.\n"
             "\n"
-            "   last:ITEMS\n"
+            "   "JOURNAL_PARAMETER_LAST":ITEMS\n"
             "      The number of items to return.\n"
             "      The default is %d.\n"
             "\n"
-            "   anchor:NUMBER\n"
-            "      The `timestamp` of the item last received, to return log entries after that.\n"
-            "      If not given, the query will return the top `ITEMS` from the most recent.\n"
+            "   "JOURNAL_PARAMETER_ANCHOR":TIMESTAMP_IN_MICROSECONDS\n"
+            "      Return items relative to this timestamp.\n"
+            "      The exact items to be returned depend on the query `"JOURNAL_PARAMETER_DIRECTION"`.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_DIRECTION":forward or "JOURNAL_PARAMETER_DIRECTION":backward\n"
+            "      When set to `backward` (default) the items returned are the newest before the\n"
+            "      `"JOURNAL_PARAMETER_ANCHOR"`, (or `"JOURNAL_PARAMETER_BEFORE"` if `"JOURNAL_PARAMETER_ANCHOR"` is not set)\n"
+            "      When set to `forward` the items returned are the oldest after the\n"
+            "      `"JOURNAL_PARAMETER_ANCHOR"`, (or `"JOURNAL_PARAMETER_AFTER"` if `"JOURNAL_PARAMETER_ANCHOR"` is not set)\n"
+            "      The default is: %s\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_QUERY":SIMPLE_PATTERN\n"
+            "      Do a full text search to find the log entries matching the pattern given.\n"
+            "      The plugin is searching for matches on all fields of the database.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_IF_MODIFIED_SINCE":TIMESTAMP_IN_MICROSECONDS\n"
+            "      Each successful response, includes a `last_modified` field.\n"
+            "      By providing the timestamp to the `"JOURNAL_PARAMETER_IF_MODIFIED_SINCE"` parameter,\n"
+            "      the plugin will return 200 with a successful response, or 304 if the source has not\n"
+            "      been modified since that timestamp.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_HISTOGRAM":facet_id\n"
+            "      Use the given `facet_id` for the histogram.\n"
+            "      This parameter is ignored in `"JOURNAL_PARAMETER_DATA_ONLY"` mode.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_FACETS":facet_id1,facet_id2,facet_id3,...\n"
+            "      Add the given facets to the list of fields for which analysis is required.\n"
+            "      The plugin will offer both a histogram and facet value counters for its values.\n"
+            "      This parameter is ignored in `"JOURNAL_PARAMETER_DATA_ONLY"` mode.\n"
             "\n"
             "   facet_id:value_id1,value_id2,value_id3,...\n"
             "      Apply filters to the query, based on the facet IDs returned.\n"
             "      Each `facet_id` can be given once, but multiple `facet_ids` can be given.\n"
             "\n"
-            "Filters can be combined. Each filter can be given only one time.\n"
             , program_name
             , SYSTEMD_JOURNAL_FUNCTION_NAME
             , SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION
+            , JOURNAL_DEFAULT_SLICE_MODE ? "true" : "false" // slice
             , -SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION
             , SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY
+            , JOURNAL_DEFAULT_DIRECTION == FACETS_ANCHOR_DIRECTION_BACKWARD ? "backward" : "forward"
     );
 
     netdata_mutex_lock(&stdout_mutex);
@@ -1838,12 +1898,12 @@ static void function_systemd_journal(const char *transaction, char *function, in
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_gid, NULL);
 
-    bool info = false, data_only = false, progress = false, slice = true;
+    bool info = false, data_only = false, progress = false, slice = JOURNAL_DEFAULT_SLICE_MODE;
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
     usec_t if_modified_since = 0;
     size_t last = 0;
-    FACETS_ANCHOR_DIRECTION direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
+    FACETS_ANCHOR_DIRECTION direction = JOURNAL_DEFAULT_DIRECTION;
     const char *query = NULL;
     const char *chart = NULL;
     const char *source = NULL;
