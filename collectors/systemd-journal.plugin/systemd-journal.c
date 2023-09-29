@@ -221,6 +221,18 @@ typedef struct function_query_status {
     size_t file_working;
 } FUNCTION_QUERY_STATUS;
 
+struct journal_file {
+    STRING *source;
+    SD_JOURNAL_FILE_SOURCE_TYPE source_type;
+    usec_t file_last_modified_ut;
+    usec_t msg_first_ut;
+    usec_t msg_last_ut;
+    usec_t last_scan_ut;
+    size_t size;
+    bool logged_failure;
+    usec_t max_journal_vs_realtime_delta_ut;
+};
+
 static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timestamp) {
     if(sd_journal_seek_realtime_usec(j, timestamp) < 0) {
         netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to %" PRIu64, timestamp);
@@ -235,7 +247,7 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
 
 #define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
 
-static usec_t max_journal_vs_realtime_delta_ut = 2 * USEC_PER_SEC; // assume always 2 seconds latency
+#define DEFAULT_MAX_JOURNAL_VS_REALTIME_DELTA_UT (2 * USEC_PER_SEC) // assume always 2 seconds latency
 
 static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
     const char *k = data;
@@ -256,7 +268,7 @@ static inline bool parse_journal_field(const char *data, size_t data_length, con
     return true;
 }
 
-static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, usec_t *msg_ut) {
+static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, struct journal_file *jf, usec_t *msg_ut) {
     const void *data;
     size_t length, bytes = 0;
 
@@ -275,11 +287,14 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
                 *msg_ut = ut;
 
                 // update max_journal_vs_realtime_delta_ut if the delta increased
-                usec_t expected = max_journal_vs_realtime_delta_ut;
+                usec_t expected = jf->max_journal_vs_realtime_delta_ut;
                 do {
-                    if(delta <= max_journal_vs_realtime_delta_ut)
+                    if(delta <= expected)
                         break;
-                } while(!__atomic_compare_exchange_n(&max_journal_vs_realtime_delta_ut, &expected, delta, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+                } while(!__atomic_compare_exchange_n(&jf->max_journal_vs_realtime_delta_ut, &expected, delta, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+
+                if(delta > expected)
+                    netdata_log_error("increased max_journal_vs_realtime_delta_ut from %"PRIu64" to %"PRIu64"", expected, delta);
             }
         }
 
@@ -310,9 +325,9 @@ static inline ND_SD_JOURNAL_STATUS check_stop(const bool *cancelled, const usec_
 
 ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        FUNCTION_QUERY_STATUS *fqs) {
+        struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
-    usec_t anchor_delta = __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+    usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
     if(!netdata_systemd_journal_seek_to(j, fqs->before_ut + anchor_delta * 2))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -354,7 +369,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
             continue;
         }
 
-        bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
+        bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
             fqs->rows_useful++;
 
@@ -386,9 +401,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 }
 
 ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
-        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
+        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
+        struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
-    usec_t anchor_delta = __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+    usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
     if(!netdata_systemd_journal_seek_to(j, fqs->anchor - anchor_delta)) // not need for *2
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -408,7 +424,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
             continue;
         }
 
-        bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
+        bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
             fqs->rows_useful++;
 
@@ -440,9 +456,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 }
 
 ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
-        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
+        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
+        struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
-    usec_t anchor_delta = __atomic_load_n(&max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+    usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
     if(!netdata_systemd_journal_seek_to(j, fqs->anchor + anchor_delta * 2))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -463,7 +480,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
             continue;
         }
 
-        bytes += netdata_systemd_journal_process_row(j, facets, &msg_ut);
+        bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
             fqs->rows_useful++;
 
@@ -575,7 +592,8 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
 static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
-        const char *filename, BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
+        const char *filename, BUFFER *wb, FACETS *facets,
+        struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
     sd_journal *j = NULL;
     errno = 0;
@@ -607,9 +625,9 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 
         // we can do a data-only query
         if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = netdata_systemd_journal_query_data_forward(j, wb, facets, fqs);
+            status = netdata_systemd_journal_query_data_forward(j, wb, facets, jf, fqs);
         else
-            status = netdata_systemd_journal_query_data_backward(j, wb, facets, fqs);
+            status = netdata_systemd_journal_query_data_backward(j, wb, facets, jf, fqs);
     }
     else {
         bool matches_filters = true;
@@ -628,7 +646,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
         if(matches_filters)
-            status = netdata_systemd_journal_query_full(j, wb, facets, fqs);
+            status = netdata_systemd_journal_query_full(j, wb, facets, jf, fqs);
         else
             status = ND_SD_JOURNAL_NO_FILE_MATCHED;
     }
@@ -648,17 +666,6 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 
 #define VAR_LOG_JOURNAL_MAX_DEPTH 10
 #define MAX_JOURNAL_DIRECTORIES 100
-
-struct journal_file {
-    STRING *source;
-    SD_JOURNAL_FILE_SOURCE_TYPE source_type;
-    usec_t file_last_modified_ut;
-    usec_t msg_first_ut;
-    usec_t msg_last_ut;
-    usec_t last_scan_ut;
-    size_t size;
-    bool logged_failure;
-};
 
 struct journal_directory {
     char *path;
@@ -1037,6 +1044,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
                         .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
                         .last_scan_ut = last_scan_ut,
                         .size = info.st_size,
+                        .max_journal_vs_realtime_delta_ut = DEFAULT_MAX_JOURNAL_VS_REALTIME_DELTA_UT,
                 };
                 dictionary_set(journal_files_registry, absolute_path, &t, sizeof(t));
             }
@@ -1140,7 +1148,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         size_t rows_read = fqs->rows_read;
         size_t bytes_read = fqs->bytes_read;
         size_t filtering_setup_ut = fqs->filtering_setup_ut;
-        ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file( jf_dfe.name, wb, facets, fqs);
+        ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file( jf_dfe.name, wb, facets, jf, fqs);
 
         rows_useful = fqs->rows_useful - rows_useful;
         rows_read = fqs->rows_read - rows_read;
@@ -1167,6 +1175,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
             buffer_json_member_add_double(wb, "bytes_per_second", (double)bytes_read / (double)duration_ut * (double)USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "filtering_setup_ut", filtering_setup_ut);
+            buffer_json_member_add_uint64(wb, "journal_vs_realtime_delta_ut", jf->max_journal_vs_realtime_delta_ut);
         }
         buffer_json_object_close(wb); // journal file
 
