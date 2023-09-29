@@ -53,49 +53,67 @@ static time_t bearer_get_token(uuid_t *uuid) {
 }
 
 #define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
+#define HTTP_REQUEST_X_NETDATA_AUTH_BEARER "\r\nX-Netdata-Auth: Bearer "
 
-bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
+BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
     const char *req = buffer_tostring(w->response.data);
     size_t req_len = buffer_strlen(w->response.data);
-    const char *bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
+    const char *bearer = NULL;
+    const char *bearer_end = NULL;
 
-    if(!bearer)
-        return false;
+    bearer = strcasestr(req, HTTP_REQUEST_X_NETDATA_AUTH_BEARER);
+    if(bearer)
+        bearer_end = bearer + sizeof(HTTP_REQUEST_X_NETDATA_AUTH_BEARER) - 1;
+    else {
+        bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
+        if(bearer)
+            bearer_end = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
+    }
 
-    const char *token_start = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
+    if(!bearer || !bearer_end)
+        return BEARER_STATUS_NO_BEARER_IN_HEADERS;
+
+    const char *token_start = bearer_end;
 
     while(isspace(*token_start))
         token_start++;
 
     const char *token_end = token_start + UUID_STR_LEN - 1 + 2;
     if (token_end > req + req_len)
-        return false;
+        return BEARER_STATUS_BEARER_DOES_NOT_FIT;
 
     strncpyz(dst, token_start, dst_len - 1);
     uuid_t uuid;
     if (uuid_parse(dst, uuid) != 0)
-        return false;
+        return BEARER_STATUS_NOT_PARSABLE;
 
-    return true;
+    return BEARER_STATUS_EXTRACTED_FROM_HEADER;
 }
 
-bool api_check_bearer_token(struct web_client *w) {
+BEARER_STATUS api_check_bearer_token(struct web_client *w) {
     if(!netdata_authorized_bearers)
-        return false;
+        return BEARER_STATUS_NO_BEARERS_DICTIONARY;
 
     char token[UUID_STR_LEN];
-    if(!extract_bearer_token_from_request(w, token, sizeof(token)))
-        return false;
+    BEARER_STATUS t = extract_bearer_token_from_request(w, token, sizeof(token));
+    if(t != BEARER_STATUS_EXTRACTED_FROM_HEADER)
+        return t;
 
     struct bearer_token *z = dictionary_get(netdata_authorized_bearers, token);
-    return z && z->expires_s > now_monotonic_sec();
+    if(!z)
+        return BEARER_STATUS_NOT_FOUND_IN_DICTIONARY;
+
+    if(z->expires_s < now_monotonic_sec())
+        return BEARER_STATUS_EXPIRED;
+
+    return BEARER_STATUS_AVAILABLE_AND_VALIDATED;
 }
 
 static bool verify_agent_uuids(const char *machine_guid, const char *node_id, const char *claim_id) {
     if(!machine_guid || !node_id || !claim_id)
         return false;
 
-    if(strcmp(machine_guid, rrdb.localhost->machine_guid) != 0)
+    if(strcmp(machine_guid, localhost->machine_guid) != 0)
         return false;
 
     char *agent_claim_id = get_agent_claimid();
@@ -103,11 +121,11 @@ static bool verify_agent_uuids(const char *machine_guid, const char *node_id, co
     bool not_verified = (!agent_claim_id || strcmp(claim_id, agent_claim_id) != 0);
     freez(agent_claim_id);
 
-    if (not_verified || !rrdb.localhost->node_id)
+    if(not_verified || !localhost->node_id)
         return false;
 
     char buf[UUID_STR_LEN];
-    uuid_unparse_lower(*rrdb.localhost->node_id, buf);
+    uuid_unparse_lower(*localhost->node_id, buf);
 
     if(strcmp(node_id, buf) != 0)
         return false;
@@ -153,7 +171,7 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
     buffer_json_finalize(wb);
 
@@ -192,8 +210,8 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
-    buffer_json_member_add_string(wb, "mg", rrdb.localhost->machine_guid);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
     buffer_json_member_add_uuid(wb, "token", &uuid);
     buffer_json_member_add_time_t(wb, "expiration", expires_s);
@@ -521,7 +539,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
     if(tier_str && *tier_str) {
         tier = str2ul(tier_str);
-        if(tier < rrdb.storage_tiers)
+        if(tier < storage_tiers)
             options |= RRDR_OPTION_SELECTED_TIER;
         else
             tier = 0;
@@ -644,31 +662,100 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
     return webrtc_new_connection(w->post_payload, w->response.data);
 }
 
+#define CONFIG_API_V2_URL "/api/v2/config"
+static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query __maybe_unused) {
+
+    char *url = strdupz(buffer_tostring(w->url_as_received));
+    char *url_full = url;
+
+    buffer_flush(w->response.data);
+    if (strncmp(url, CONFIG_API_V2_URL, strlen(CONFIG_API_V2_URL)) != 0) {
+        buffer_sprintf(w->response.data, "Invalid URL");
+        freez(url_full);
+        return HTTP_RESP_BAD_REQUEST;
+    }
+    url += strlen(CONFIG_API_V2_URL);
+
+    char *save_ptr = NULL;
+    char *plugin = strtok_r(url, "/", &save_ptr);
+    char *module = strtok_r(NULL, "/", &save_ptr);
+    char *job_id = strtok_r(NULL, "/", &save_ptr);
+    char *extra = strtok_r(NULL, "/", &save_ptr);
+
+    if (extra != NULL) {
+        buffer_sprintf(w->response.data, "Invalid URL");
+        freez(url_full);
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    int http_method;
+    switch (w->mode)
+    {
+        case WEB_CLIENT_MODE_GET:
+            http_method = HTTP_METHOD_GET;
+            break;
+        case WEB_CLIENT_MODE_POST:
+            http_method = HTTP_METHOD_POST;
+            break;
+        case WEB_CLIENT_MODE_PUT:
+            http_method = HTTP_METHOD_PUT;
+            break;
+        case WEB_CLIENT_MODE_DELETE:
+            http_method = HTTP_METHOD_DELETE;
+            break;
+        default:
+            buffer_sprintf(w->response.data, "Invalid HTTP method");
+            freez(url_full);
+            return HTTP_RESP_BAD_REQUEST;
+    }
+
+    struct uni_http_response resp = dyn_conf_process_http_request(http_method, plugin, module, job_id, w->post_payload, w->post_payload_size);
+    if (resp.content[resp.content_length - 1] != '\0') {
+        char *con = mallocz(resp.content_length + 1);
+        memcpy(con, resp.content, resp.content_length);
+        con[resp.content_length] = '\0';
+        if (resp.content_free)
+            resp.content_free(resp.content);
+        resp.content = con;
+        resp.content_free = freez_dyncfg;
+    }
+    buffer_strcat(w->response.data, resp.content);
+    if (resp.content_free)
+        resp.content_free(resp.content);
+    w->response.data->content_type = resp.content_type;
+    freez(url_full);
+    return resp.status;
+}
+
 static struct web_api_command api_commands_v2[] = {
-        {"info",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_info},
+        {"info",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_info, 0},
 
-        {"data",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_data},
-        {"weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_weights},
+        {"data",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_data, 0},
+        {"weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_weights, 0},
 
-        {"contexts",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_contexts},
-        {"nodes",               0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_nodes},
-        {"node_instances",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_node_instances},
-        {"versions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_versions},
-        {"functions",           0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS,     web_client_api_request_v2_functions},
-        {"q",                   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_q},
-        {"alerts",              0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alerts},
+        {"contexts",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_contexts, 0},
+        {"nodes",               0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_nodes, 0},
+        {"node_instances",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_node_instances, 0},
+        {"versions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_versions, 0},
+        {"functions",           0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS,     web_client_api_request_v2_functions, 0},
+        {"q",                   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_q, 0},
+        {"alerts",              0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alerts, 0},
 
-        {"alert_transitions",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_transitions},
-        {"alert_config",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_config},
+        {"alert_transitions",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_transitions, 0},
+        {"alert_config",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_config, 0},
 
-        {"claim",               0, WEB_CLIENT_ACL_NOCHECK,                                                     web_client_api_request_v2_claim},
+        {"claim",               0, WEB_CLIENT_ACL_NOCHECK,                                                     web_client_api_request_v2_claim, 0},
 
-        {"rtc_offer",           0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS,                                  web_client_api_request_v2_webrtc},
-        {"bearer_protection",   0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection},
-        {"bearer_get_token",    0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token},
+        {"rtc_offer",           0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS,                                  web_client_api_request_v2_webrtc, 0},
+        {"bearer_protection",   0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection, 0},
+        {"bearer_get_token",    0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token, 0},
+
+        {"config", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_config, 1},
+
+        { "ilove.svg",       0, WEB_CLIENT_ACL_NOCHECK, web_client_api_request_v2_ilove, 0 },
 
         // terminator
-        {NULL,                  0, WEB_CLIENT_ACL_NONE,                 NULL},
+        {NULL,                  0, WEB_CLIENT_ACL_NONE,                 NULL, 0},
 };
 
 inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {

@@ -10,7 +10,7 @@ Learn how to send alerts to your Gotify instance using Netdata's Agent alert not
 
 This is what you will get:
 
-<img src="https://user-images.githubusercontent.com/103264516/162509205-1e88e5d9-96b6-4f7f-9426-182776158128.png" alt="Example alarm notifications in Gotify" width="70%"></img>
+<img src="https://user-images.githubusercontent.com/103264516/162509205-1e88e5d9-96b6-4f7f-9426-182776158128.png" alt="Example alert notifications in Gotify" width="70%"></img>
 
 ## Prerequisites
 

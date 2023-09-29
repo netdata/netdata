@@ -82,7 +82,8 @@ static bool prepare_command(BUFFER *wb,
                             const char *classification,
                             const char *edit_command,
                             const char *machine_guid,
-                            uuid_t *transition_id
+                            uuid_t *transition_id,
+                            const char *summary
 ) {
     char buf[8192];
     size_t n = 8192 - 1;
@@ -195,6 +196,10 @@ static bool prepare_command(BUFFER *wb,
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
+    if (!sanitize_command_argument_string(buf, summary, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
     return true;
 }
 
@@ -254,7 +259,7 @@ static inline void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
  *
  * @return a pointer to the user config directory
  */
-static const char *health_user_config_dir(void) {
+inline char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, "health config", buffer);
@@ -267,7 +272,7 @@ static const char *health_user_config_dir(void) {
  *
  * @return a pointer to the stock config directory.
  */
-static const char *health_stock_config_dir(void) {
+inline char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, "stock health config", buffer);
@@ -344,8 +349,8 @@ static void health_reload_host(RRDHOST *host) {
 
     netdata_log_health("[%s]: Reloading health.", rrdhost_hostname(host));
 
-    const char *user_path = health_user_config_dir();
-    const char *stock_path = health_stock_config_dir();
+    char *user_path = health_user_config_dir();
+    char *stock_path = health_stock_config_dir();
 
     // free all running alarms
     rrdcalc_delete_all(host);
@@ -376,9 +381,6 @@ static void health_reload_host(RRDHOST *host) {
 
     // link the loaded alarms to their charts
     rrdset_foreach_write(st, host) {
-        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-            continue;
-
         rrdcalc_link_matching_alerts_to_rrdset(st);
         rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
@@ -403,7 +405,7 @@ void health_reload(void) {
     sql_refresh_hashes();
 
     RRDHOST *host;
-    dfe_start_reentrant(rrdb.rrdhost_root_index, host){
+    dfe_start_reentrant(rrdhost_root_index, host){
         health_reload_host(host);
     }
     dfe_done(host);
@@ -584,7 +586,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               ae->classification?ae_classification(ae):"Unknown",
                               edit_command,
                               host->machine_guid,
-                              &ae->transition_id);
+                              &ae->transition_id,
+                              host->health.use_summary_for_notifications && ae->summary?ae_summary(ae):ae_name(ae));
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {
@@ -724,11 +727,6 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_ARCHIVED))) {
-        netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as archived", rrdcalc_chart_name(rc), rrdcalc_name(rc));
-        return 0;
-    }
-
     if(unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
         netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
@@ -843,9 +841,7 @@ static void initialize_health(RRDHOST *host)
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
-
-    //if (!is_chart_name_populated(&host->host_uuid))
-    //    chart_name_populate(&host->host_uuid);
+    host->health.use_summary_for_notifications = config_get_boolean(CONFIG_SECTION_HEALTH, "use summary for notifications", CONFIG_BOOLEAN_YES);
 
     sql_health_alarm_log_load(host);
 
@@ -857,9 +853,6 @@ static void initialize_health(RRDHOST *host)
     // link the loaded alarms to their charts
     RRDSET *st;
     rrdset_foreach_reentrant(st, host) {
-        if (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))
-            continue;
-
         rrdcalc_link_matching_alerts_to_rrdset(st);
         rrdcalctemplate_link_matching_templates_to_rrdset(st);
     }
@@ -1004,7 +997,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
             }
             foreach_rrdcalctemplate_done(rt);
 
-            if (health_variable_check(health_rrdvars, st, rd))
+            if (health_variable_check(health_rrdvars, st, rd) || rrdset_flag_check(st, RRDSET_FLAG_HAS_RRDCALC_LINKED))
                 rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
@@ -1080,7 +1073,7 @@ void *health_main(void *ptr) {
         }
 
         worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
-        dfe_start_reentrant(rrdb.rrdhost_root_index, host) {
+        dfe_start_reentrant(rrdhost_root_index, host) {
 
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
@@ -1114,7 +1107,7 @@ void *health_main(void *ptr) {
             }
 
             // wait until cleanup of obsolete charts on children is complete
-            if (host != rrdb.localhost) {
+            if (host != localhost) {
                 if (unlikely(host->trigger_chart_obsoletion_check == 1)) {
                     netdata_log_health("[%s]: Waiting for chart obsoletion check.", rrdhost_hostname(host));
                     continue;
@@ -1171,6 +1164,7 @@ void *health_main(void *ptr) {
                                                                     RRDCALC_STATUS_REMOVED,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     0,
                                                                     rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
@@ -1187,7 +1181,7 @@ void *health_main(void *ptr) {
 
 #ifdef ENABLE_ACLK
                             if (netdata_cloud_enabled)
-                                sql_queue_alarm_to_aclk(host, ae, 1);
+                                sql_queue_alarm_to_aclk(host, ae, true);
 #endif
                         }
                     }
@@ -1214,7 +1208,7 @@ void *health_main(void *ptr) {
 
                     int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
                                                   rc->after, rc->before, rc->group, NULL,
-                                                  0, rc->options,
+                                                  0, rc->options | RRDR_OPTION_SELECTED_TIER,
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL, NULL,
                                                   &value_is_null, NULL, 0, 0,
@@ -1438,6 +1432,7 @@ void *health_main(void *ptr) {
                                                                     status,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     rc->delay_last,
                                                                     (
@@ -1525,6 +1520,7 @@ void *health_main(void *ptr) {
                                                                     rc->status,
                                                                     rc->source,
                                                                     rc->units,
+                                                                    rc->summary,
                                                                     rc->info,
                                                                     rc->delay_last,
                                                                     (
@@ -1611,7 +1607,7 @@ void *health_main(void *ptr) {
 }
 
 void health_add_host_labels(void) {
-    DICTIONARY *labels = rrdb.localhost->rrdlabels;
+    RRDLABELS *labels = localhost->rrdlabels;
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
     // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.

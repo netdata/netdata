@@ -40,7 +40,7 @@ const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
 bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
-DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
+RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
 RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria);
@@ -578,7 +578,7 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
     return rrdmetric_acquired_name(qd->rma);
 }
 
-STORAGE_ENGINE_ID query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
+struct storage_engine *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
 STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version);

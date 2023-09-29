@@ -58,7 +58,7 @@ static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PER
 static inline void registry_json_header(RRDHOST *host, struct web_client *w, const char *action, const char *status) {
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_string(w->response.data, "action", action);
     buffer_json_member_add_string(w->response.data, "status", status);
     buffer_json_member_add_string(w->response.data, "hostname", rrdhost_registry_hostname(host));
@@ -171,10 +171,10 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 
     buffer_json_member_add_object(w->response.data, "agent");
     {
-        buffer_json_member_add_string(w->response.data, "machine_guid", rrdb.localhost->machine_guid);
+        buffer_json_member_add_string(w->response.data, "machine_guid", localhost->machine_guid);
 
-        if(rrdb.localhost->node_id)
-            buffer_json_member_add_uuid(w->response.data, "node_id", rrdb.localhost->node_id);
+        if(localhost->node_id)
+            buffer_json_member_add_uuid(w->response.data, "node_id", localhost->node_id);
 
         char *claim_id = get_agent_claimid();
         if (claim_id) {
@@ -192,10 +192,11 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", netdata_anonymous_statistics_enabled);
+    buffer_json_member_add_boolean(w->response.data, "X-Netdata-Auth", true);
 
     buffer_json_member_add_array(w->response.data, "nodes");
     RRDHOST *h;
-    dfe_start_read(rrdb.rrdhost_root_index, h) {
+    dfe_start_read(rrdhost_root_index, h) {
         buffer_json_add_array_item_object(w->response.data);
         buffer_json_member_add_string(w->response.data, "machine_guid", h->machine_guid);
 
@@ -456,7 +457,7 @@ void registry_statistics(void) {
                 , "registry"
                 , "stats"
                 , 131000
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
         );
 
@@ -480,7 +481,7 @@ void registry_statistics(void) {
                 , "registry"
                 , "stats"
                 , 131100
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
         );
 
@@ -510,7 +511,7 @@ void registry_statistics(void) {
                 , "registry"
                 , "stats"
                 , 131300
-                , rrdb.localhost->update_every
+                , localhost->rrd_update_every
                 , RRDSET_TYPE_STACKED
         );
 

@@ -58,6 +58,4 @@ void service_exits(void);
 bool service_running(SERVICE_TYPE service);
 struct service_thread *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused);
 
-void localhost_load_labels(void);
-
 #endif /* NETDATA_MAIN_H */

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define NETDATA_RRD_INTERNALS
 
 #include "rrdengine.h"
 #include "pdc.h"
@@ -156,15 +157,11 @@ enum LIBUV_WORKERS_STATUS {
 
 static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
     size_t dispatched = __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED);
-    int reserved_libuv_worker_threads = 3;
 
-    internal_fatal(rrdb.libuv_worker_threads <= reserved_libuv_worker_threads,
-                   "libuv worker threads below minimum required");
-
-    if(dispatched >= (size_t)(rrdb.libuv_worker_threads))
+    if(dispatched >= (size_t)(libuv_worker_threads))
         return LIBUV_WORKERS_CRITICAL;
 
-    else if(dispatched >= (size_t)(rrdb.libuv_worker_threads - reserved_libuv_worker_threads))
+    else if(dispatched >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
         return LIBUV_WORKERS_STRESSED;
 
     return LIBUV_WORKERS_RELAXED;
@@ -357,7 +354,7 @@ static void wal_cleanup1(void) {
     if(!spinlock_trylock(&wal_globals.protected.spinlock))
         return;
 
-    if (wal_globals.protected.available_items && wal_globals.protected.available > rrdb.storage_tiers) {
+    if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
         wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
@@ -585,25 +582,25 @@ struct {
 } dbengine_page_alloc_globals = {};
 
 static inline ARAL *page_size_lookup(size_t size) {
-    for (size_t tier = 0; tier < rrdb.storage_tiers ;tier++)
-        if(size == rrdb.tier_page_size[tier])
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
+        if(size == tier_page_size[tier])
             return dbengine_page_alloc_globals.aral[tier];
 
     return NULL;
 }
 
 static void dbengine_page_alloc_init(void) {
-    for (size_t i = rrdb.storage_tiers; i > 0 ;i--) {
-        size_t tier = rrdb.storage_tiers - i;
+    for(size_t i = storage_tiers; i > 0 ;i--) {
+        size_t tier = storage_tiers - i;
 
         char buf[20 + 1];
         snprintfz(buf, 20, "tier%zu-pages", tier);
 
         dbengine_page_alloc_globals.aral[tier] = aral_create(
                 buf,
-                rrdb.tier_page_size[tier],
+                tier_page_size[tier],
                 64,
-                512 * rrdb.tier_page_size[tier],
+                512 * tier_page_size[tier],
                 pgc_aral_statistics(),
                 NULL, NULL, false, false);
     }
@@ -1787,7 +1784,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_FLUSH_INIT: {
-                    if(rrdeng_main.flushes_running < (size_t)(rrdb.libuv_worker_threads / 4)) {
+                    if(rrdeng_main.flushes_running < (size_t)(libuv_worker_threads / 4)) {
                         rrdeng_main.flushes_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }

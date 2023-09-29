@@ -8,6 +8,7 @@
 #include "../../aclk/schema-wrappers/context.h"
 #include "../../aclk/aclk_contexts_api.h"
 #include "../../aclk/aclk.h"
+#include "../storage_engine.h"
 
 #define MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST         5000
 #define FULL_RETENTION_SCAN_DELAY_AFTER_DB_ROTATION_SECS    120
@@ -57,6 +58,8 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 20), // this context belongs to a host that just disconnected
     RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 21), // this context is not used anymore
     RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 22), // this context changed because of a db rotation
+
+    RRD_FLAG_MERGED_COLLECTED_RI_TO_RC             = (1 << 29),
 
     // action to perform on an object
     RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION        = (1 << 30), // this object has to update its retention from the db
@@ -227,7 +230,7 @@ typedef struct rrdinstance {
     time_t update_every_s;              // data collection frequency
     RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL
 
-    DICTIONARY *rrdlabels;              // linked to RRDSET->chart_labels or own version
+    RRDLABELS *rrdlabels;              // linked to RRDSET->chart_labels or own version
 
     struct rrdcontext *rc;
     DICTIONARY *rrdmetrics;
@@ -379,5 +382,7 @@ uint64_t rrdcontext_version_hash_with_callback(
         void *bundle);
 
 void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused, void *bundle __maybe_unused);
+
+void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri);
 
 #endif //NETDATA_RRDCONTEXT_INTERNAL_H

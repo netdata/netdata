@@ -242,7 +242,9 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
 
+#ifdef ENABLE_HTTPS
 cleanup:
+#endif
     worker_is_idle();
     return w;
 }
@@ -368,7 +370,7 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
-    int ret = web_client_send(w);
+    ssize_t ret = web_client_send(w);
 
     if(unlikely(ret < 0)) {
         retval = -1;
@@ -438,7 +440,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , NULL
                         , web_client_first_request_timeout
                         , web_client_timeout
-                        , rrdb.default_update_every * 1000 // timer_milliseconds
+                        , default_rrd_update_every * 1000 // timer_milliseconds
                         , ptr // timer_data
                         , worker_private->max_sockets
             );
@@ -499,12 +501,12 @@ void *socket_listen_main_static_threaded(void *ptr) {
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
 
+#ifdef ENABLE_HTTPS
     netdata_ssl_validate_certificate = !config_get_boolean(CONFIG_SECTION_WEB, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
         netdata_log_info("SSL: web server will skip SSL certificates verification.");
 
-#ifdef ENABLE_HTTPS
     netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
 #endif
 

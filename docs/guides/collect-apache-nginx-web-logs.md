@@ -94,13 +94,13 @@ We do have [extensive
 documentation](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#custom-log-format) on how
 to build custom parsing for Nginx and Apache logs.
 
-## Tweak web log collector alarms
+## Tweak web log collector alerts
 
-Over time, we've created some default alarms for web log monitoring. These alarms are designed to work only when your
+Over time, we've created some default alerts for web log monitoring. These alerts are designed to work only when your
 web server is receiving more than 120 requests per minute. Otherwise, there's simply not enough data to make conclusions
 about what is "too few" or "too many."
 
--   [web log alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/web_log.conf).
+-   [web log alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/web_log.conf).
 
 You can also edit this file directly with `edit-config`:
 
@@ -108,5 +108,5 @@ You can also edit this file directly with `edit-config`:
 ./edit-config health.d/weblog.conf
 ```
 
-For more information about editing the defaults or writing new alarm entities, see our 
+For more information about editing the defaults or writing new alert entities, see our 
 [health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md).

@@ -51,10 +51,10 @@ learn more about [how data collectors work](https://github.com/netdata/netdata/b
 collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md)
 or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
-#### Alarms & notifications
+#### Alerts & notifications
 
-Netdata comes with hundreds of preconfigured alarms, designed by our monitoring gurus in parallel with our open-source
-community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
+Netdata comes with hundreds of preconfigured alerts, designed by our monitoring gurus in parallel with our open-source
+community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) or
 [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
 #### Make your deployment production ready
@@ -88,7 +88,7 @@ To install, copy the script, paste it into your node's terminal, and hit `Enter`
 > If you plan to also claim the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space, and `YOUR_ROOM_ID` with the ID of the room you are claiming to.
 > You can leave the room id blank to have your node claimed to the default "All nodes" room.
 
-Jump down to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps monitoring and
+Jump up to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps in monitoring and
 troubleshooting with Netdata.
 
 ## Other installation methods
@@ -202,6 +202,27 @@ _actively_ contributing to Netdata's future.
 
 We are tracking a few issues related to installation and packaging.
 
+#### Installs on hosts without IPv4 connectivity
+
+Our regular installation process requires access to a number of GitHub services that do not have IPv6 connectivity. As
+such, using the kickstart install script on such hosts generally does not work, and will typically fail with an
+error from cURL or wget about connection timeouts. You can check if your system is affected by this by attempting
+to connect to (or ping) `https://api.github.com/`. Failing to connect indicates that you are affected by this issue.
+
+There are three potential workarounds for this:
+
+1. You can configure your system with a proper IPv6 transition mechanism, such as NAT64. GitHub’s anachronisms
+   affect many projects other than just Netdata, and there are unfortunately a number of other services out there
+   that do not provide IPv6 connectivity, so taking this route is likely to save you time in the future as well.
+2. If you are using a system that we publish native packages for (see our [platform support
+   policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md) for more details),
+   you can manually set up our native package repositories as outlined in our [native package install
+   documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md). Our official
+   package repositories do provide service over IPv6, so they work without issue on hosts without IPv4 connectivity.
+3. If neither of the above options work for you, you can still install using our [offline installation
+   instructions](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md), though
+   do note that the offline install source must be prepared from a system with IPv4 connectivity.
+
 #### Older distributions (Ubuntu 14.04, Debian 8, CentOS 6) and OpenSSL
 
 If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
@@ -221,7 +242,7 @@ PowerTools, to gather hard dependencies. See the [CentOS 6](https://github.com/n
 
 #### Access to file is not permitted
 
-If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web//index.html` when you try to
+If you see an error similar to `Access to file is not permitted: /usr/share/netdata/web/index.html` when you try to
 visit the Agent dashboard at `http://NODE:19999`, you need to update Netdata's permissions to match those of your
 system.
 
@@ -238,7 +259,7 @@ These files need to have the same user and group used to install your netdata. S
 `netdata` and group `netdata`, in this scenario you will need to run the following command to fix the error:
 
 ```bash
-# chown -R netdata.netdata /usr/share/netdata/web
+# chown -R netdata:netdata /usr/share/netdata/web
 ```
 
 #### Multiple versions of OpenSSL

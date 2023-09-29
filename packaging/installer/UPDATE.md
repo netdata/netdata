@@ -31,6 +31,22 @@ Starting with netdata v1.33.0, you can use Netdata itself to determine the insta
 netdata -W buildinfo | grep -E 'Installation Type|Install type:'
 ```
 
+The following table contains all possible installation types:
+
+| Installation-type  | Description                                                                                                                                                 |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| binpkg-rpm         | RPM-based native packages shipped from Netdata's repos.                                                                                                     |
+| binpkg-deb         | DEB-based native packages shipped from Netdata's repos.                                                                                                     |
+| kickstart-build    | Build from source with the kickstart script's `--build-only` option.                                                                                        |
+| kickstart-static   | Installed the static builds, shipped from netdata via the kickstart script's (option: `--static-only`).                                                     |
+| manual-static-ARCH | Manually installed static Agent binaries by downloading archives from GitHub and installing them manually. Offline installations are part of this category. |
+| legacy-build       | Used for pre-existing kickstart.sh or netdata-installer.sh installations. This exist because we cannot determine how the install originally happened.       |
+| legacy-static      | Same as legacy-build, but for static installs.                                                                                                              |
+| oci                | Installed using official Docker images from Netdata, though not necessarily running on Docker                                                               |
+| custom             | Anything not covered by the other identifiers, including manual builds, manually running netdata-installer.sh, and third-party packages (community).        |
+| Unknown            | Same as custom.                                                                                                                                             |
+
+
 If you are using an older version of Netdata, or the above command produces no output, you can run our one-line
 installation script in dry-run mode to attempt to determine what method to use to update by running the following
 command:
@@ -70,6 +86,12 @@ the above command will report that it found an existing install, and then issue 
 find the updater script.
 
 On such installs, you can update Netdata using your distribution package manager.
+
+### Updates on hosts without IPv4 connectivity
+
+The update process outlined above suffers from the same issues that installing on hosts without IPv4
+connectivity does, and requires similar workarounds. For more details check [the explanation in our install
+documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#installs-on-hosts-without-ipv4-connectivity).
 
 ### If the kickstart script does not work
 
@@ -182,3 +204,6 @@ The following configuration options are currently supported:
   as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to
   the Cloud at the same time. The default value is 3600, which corresponds to one hour. Most users should not ever
   need to change this.
+- `NETDATA_NO_SYSTEMD_JOURNAL`: If set to a value other than 0, skip attempting to install the
+  `netdata-plugin-systemd-journal` package on supported systems on update. This optional package will be installed
+  by default on supported systems by the updater if this option is not set. Only affects systems using native packages.

@@ -1252,8 +1252,8 @@ static void populate_system_info(void) {
     struct rrdhost_system_info *system_info;
     bool free_system_info = false;
 
-    if(rrdb.localhost && rrdb.localhost->system_info) {
-        system_info = rrdb.localhost->system_info;
+    if(localhost && localhost->system_info) {
+        system_info = localhost->system_info;
     }
     else {
         system_info = callocz(1, sizeof(struct rrdhost_system_info));
@@ -1469,7 +1469,7 @@ void print_build_info_json(void) {
     populate_directories();
 
     BUFFER *b = buffer_create(0, NULL);
-    buffer_json_initialize(b, "\"", "\"", 0, true, false);
+    buffer_json_initialize(b, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     build_info_to_json_object(b);
 

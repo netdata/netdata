@@ -1146,7 +1146,7 @@ int netdata_ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_conf
         successful++;
 
         if(unlikely(state->debug))
-            fprintf(stderr, "%s: %s data collection speed was %llu usec\n",
+            fprintf(stderr, "%s: %s data collection speed was %"PRIu64" usec\n",
                     program_name, netdata_collect_type_to_string(type), end - start);
 
         // add it to our total
@@ -1307,7 +1307,7 @@ static size_t send_ipmi_sensor_metrics_to_netdata(struct netdata_ipmi_state *sta
                 if(likely(sn->do_metric)) {
                     if(unlikely(!is_sensor_updated(sn->last_collected_metric_ut, state->updates.now_ut, state->sensors.freq_ut))) {
                         if(unlikely(state->debug))
-                            fprintf(stderr, "%s: %s() sensor '%s' metric is not UPDATED (last updated %llu, now %llu, freq %llu\n",
+                            fprintf(stderr, "%s: %s() sensor '%s' metric is not UPDATED (last updated %"PRIu64", now %"PRIu64", freq %"PRIu64"\n",
                                     program_name, __FUNCTION__, sn->sensor_name, sn->last_collected_metric_ut, state->updates.now_ut, state->sensors.freq_ut);
                     }
                     else {
@@ -1360,7 +1360,7 @@ static size_t send_ipmi_sensor_metrics_to_netdata(struct netdata_ipmi_state *sta
                 if(likely(sn->do_state)) {
                     if(unlikely(!is_sensor_updated(sn->last_collected_state_ut, state->updates.now_ut, state->sensors.freq_ut))) {
                         if (unlikely(state->debug))
-                            fprintf(stderr, "%s: %s() sensor '%s' state is not UPDATED (last updated %llu, now %llu, freq %llu\n",
+                            fprintf(stderr, "%s: %s() sensor '%s' state is not UPDATED (last updated %"PRIu64", now %"PRIu64", freq %"PRIu64"\n",
                                     program_name, __FUNCTION__, sn->sensor_name, sn->last_collected_state_ut, state->updates.now_ut, state->sensors.freq_ut);
                     }
                     else {
@@ -1449,6 +1449,9 @@ int main (int argc, char **argv) {
     // set errors flood protection to 100 logs per hour
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
+
+    // initialize the threads
+    netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
 
     // ------------------------------------------------------------------------
     // parse command line parameters
@@ -1867,7 +1870,7 @@ int main (int argc, char **argv) {
             send_ipmi_sel_metrics_to_netdata(&state);
 
         if(unlikely(debug))
-            fprintf(stderr, "%s: iteration %zu, dt %llu usec, sensors ever collected %zu, sensors last collected %zu \n"
+            fprintf(stderr, "%s: iteration %zu, dt %"PRIu64" usec, sensors ever collected %zu, sensors last collected %zu \n"
                     , program_name
                     , iteration
                     , dt
@@ -1892,7 +1895,7 @@ int main (int argc, char **argv) {
 
         // restart check (14400 seconds)
         if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
-            collector_error("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
+            collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
             fflush(stdout);
             exit(0);

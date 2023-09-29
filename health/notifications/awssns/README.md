@@ -63,14 +63,14 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
    | `${alarm}`                  | Like "name = value units"                                                        |
    | `${status_message}`         | Like "needs attention", "recovered", "is critical"                               |
    | `${severity}`               | Like "Escalated to CRITICAL", "Recovered from WARNING"                           |
-   | `${raised_for}`             | Like "(alarm was raised for 10 minutes)"                                         |
+   | `${raised_for}`             | Like "(alert was raised for 10 minutes)"                                         |
    | `${host}`                   | The host generated this event                                                    |
    | `${url_host}`               | Same as ${host} but URL encoded                                                  |
    | `${unique_id}`              | The unique id of this event                                                      |
-   | `${alarm_id}`               | The unique id of the alarm that generated this event                             |
-   | `${event_id}`               | The incremental id of the event, for this alarm id                               |
+   | `${alarm_id}`               | The unique id of the alert that generated this event                             |
+   | `${event_id}`               | The incremental id of the event, for this alert id                               |
    | `${when}`                   | The timestamp this event occurred                                                |
-   | `${name}`                   | The name of the alarm, as given in netdata health.d entries                      |
+   | `${name}`                   | The name of the alert, as given in netdata health.d entries                      |
    | `${url_name}`               | Same as ${name} but URL encoded                                                  |
    | `${chart}`                  | The name of the chart (type.id)                                                  |
    | `${url_chart}`              | Same as ${chart} but URL encoded                                                 |
@@ -78,27 +78,27 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
    | `${url_family}`             | Same as ${family} but URL encoded                                                |
    | `${status}`                 | The current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
    | `${old_status}`             | The previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
-   | `${value}`                  | The current value of the alarm                                                   |
-   | `${old_value}`              | The previous value of the alarm                                                  |
-   | `${src}`                    | The line number and file the alarm has been configured                           |
-   | `${duration}`               | The duration in seconds of the previous alarm state                              |
+   | `${value}`                  | The current value of the alert                                                   |
+   | `${old_value}`              | The previous value of the alert                                                  |
+   | `${src}`                    | The line number and file the alert has been configured                           |
+   | `${duration}`               | The duration in seconds of the previous alert state                              |
    | `${duration_txt}`           | Same as ${duration} for humans                                                   |
    | `${non_clear_duration}`     | The total duration in seconds this is/was non-clear                              |
    | `${non_clear_duration_txt}` | Same as ${non_clear_duration} for humans                                         |
    | `${units}`                  | The units of the value                                                           |
-   | `${info}`                   | A short description of the alarm                                                 |
+   | `${info}`                   | A short description of the alert                                                 |
    | `${value_string}`           | Friendly value (with units)                                                      |
    | `${old_value_string}`       | Friendly old value (with units)                                                  |
-   | `${image}`                  | The URL of an image to represent the status of the alarm                         |
-   | `${color}`                  | A color in  AABBCC format for the alarm                                          |
+   | `${image}`                  | The URL of an image to represent the status of the alert                         |
+   | `${color}`                  | A color in  AABBCC format for the alert                                          |
    | `${goto_url}`               | The URL the user can click to see the netdata dashboard                          |
-   | `${calc_expression}`        | The expression evaluated to provide the value for the alarm                      |
+   | `${calc_expression}`        | The expression evaluated to provide the value for the alert                      |
    | `${calc_param_values}`      | The value of the variables in the evaluated expression                           |
-   | `${total_warnings}`         | The total number of alarms in WARNING state on the host                          |
-   | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
+   | `${total_warnings}`         | The total number of alerts in WARNING state on the host                          |
+   | `${total_critical}`         | The total number of alerts in CRITICAL state on the host                         |
 
 3. Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic.  
-   All roles will default to this variable if left unconfigured.
+   All roles will default to this variable if it is not configured.
 
 You can then have different recipient Topics per **role**, by editing `DEFAULT_RECIPIENT_AWSSNS` with the Topic ARN you want, in the following entries at the bottom of the same file:
 

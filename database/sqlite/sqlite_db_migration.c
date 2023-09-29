@@ -11,6 +11,24 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     return 0;
 }
 
+static int get_auto_vaccum(sqlite3 *database)
+{
+    char *err_msg = NULL;
+    char sql[128];
+
+    int exists = 0;
+
+    snprintf(sql, 127, "PRAGMA auto_vacuum");
+
+    int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &exists, &err_msg);
+    if (rc != SQLITE_OK) {
+        netdata_log_info("Error checking database auto vacuum setting; %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    return exists;
+}
+
 int table_exists_in_database(const char *table)
 {
     char *err_msg = NULL;
@@ -88,29 +106,47 @@ const char *database_migrate_v10_v11[] = {
     NULL
 };
 
+const char *database_migrate_v11_v12[] = {
+    "ALTER TABLE health_log_detail ADD summary TEXT;",
+    "ALTER TABLE alert_hash ADD summary TEXT;",
+    NULL
+};
+
+const char *database_migrate_v12_v13_detail[] = {
+    "ALTER TABLE health_log_detail ADD summary TEXT;",
+    NULL
+};
+
+const char *database_migrate_v12_v13_hash[] = {
+    "ALTER TABLE alert_hash ADD summary TEXT;",
+    NULL
+};
+
+const char *database_migrate_v13_v14[] = {
+    "ALTER TABLE host ADD last_connected INT NOT NULL DEFAULT 0;",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "hops"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v1_v2[0]);
+        return init_database_batch(database, &database_migrate_v1_v2[0]);
     return 0;
 }
 
 static int do_migration_v2_v3(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("host") && !column_exists_in_table("host", "memory_mode"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v2_v3[0]);
+        return init_database_batch(database, &database_migrate_v2_v3[0]);
     return 0;
 }
 
 static int do_migration_v3_v4(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
 
     char sql[256];
@@ -142,23 +178,20 @@ static int do_migration_v3_v4(sqlite3 *database, const char *name)
 
 static int do_migration_v4_v5(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
-    return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v4_v5[0]);
+    return init_database_batch(database, &database_migrate_v4_v5[0]);
 }
 
 static int do_migration_v5_v6(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
-    return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v5_v6[0]);
+    return init_database_batch(database, &database_migrate_v5_v6[0]);
 }
 
 static int do_migration_v6_v7(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running \"%s\" database migration", name);
 
     char sql[256];
@@ -192,7 +225,6 @@ static int do_migration_v6_v7(sqlite3 *database, const char *name)
 
 static int do_migration_v7_v8(sqlite3 *database, const char *name)
 {
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
 
     char sql[256];
@@ -244,7 +276,7 @@ static int do_migration_v8_v9(sqlite3 *database, const char *name)
               "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, " \
               "flags int, exec_run_timestamp int, delay_up_to_timestamp int, " \
               "info text, exec_code int, new_status real, old_status real, delay int, " \
-              "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, host_id blob);");
+              "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text, host_id blob);");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id);");
@@ -301,7 +333,7 @@ static int do_migration_v9_v10(sqlite3 *database, const char *name)
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "chart_labels"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v9_v10[0]);
+        return init_database_batch(database, &database_migrate_v9_v10[0]);
     return 0;
 }
 
@@ -310,15 +342,77 @@ static int do_migration_v10_v11(sqlite3 *database, const char *name)
     netdata_log_info("Running \"%s\" database migration", name);
 
     if (table_exists_in_database("health_log") && !column_exists_in_table("health_log", "chart_name"))
-        return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v10_v11[0]);
+        return init_database_batch(database, &database_migrate_v10_v11[0]);
 
+    return 0;
+}
+
+#define MIGR_11_12_UPD_HEALTH_LOG_DETAIL "UPDATE health_log_detail SET summary = (select name from health_log where health_log_id = health_log_detail.health_log_id);"
+static int do_migration_v11_v12(sqlite3 *database, const char *name)
+{
+    int rc = 0;
+
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (table_exists_in_database("health_log_detail") && !column_exists_in_table("health_log_detail", "summary") &&
+        table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
+        rc = init_database_batch(database, &database_migrate_v11_v12[0]);
+
+    if (!rc)
+        sqlite3_exec_monitored(database, MIGR_11_12_UPD_HEALTH_LOG_DETAIL, 0, 0, NULL);
+
+    return rc;
+}
+
+static int do_migration_v12_v13(sqlite3 *database, const char *name)
+{
+    int rc = 0;
+
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (table_exists_in_database("health_log_detail") && !column_exists_in_table("health_log_detail", "summary")) {
+        rc = init_database_batch(database, &database_migrate_v12_v13_detail[0]);
+        sqlite3_exec_monitored(database, MIGR_11_12_UPD_HEALTH_LOG_DETAIL, 0, 0, NULL);
+    }
+
+    if (table_exists_in_database("alert_hash") && !column_exists_in_table("alert_hash", "summary"))
+        rc = init_database_batch(database, &database_migrate_v12_v13_hash[0]);
+
+    return rc;
+}
+
+static int do_migration_v13_v14(sqlite3 *database, const char *name)
+{
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (!column_exists_in_table("host", "last_connected"))
+        return init_database_batch(database, &database_migrate_v13_v14[0]);
+
+    return 0;
+}
+
+
+// Actions for ML migration
+const char *database_ml_migrate_v1_v2[] = {
+    "PRAGMA journal_mode=delete",
+    "PRAGMA journal_mode=WAL",
+    "PRAGMA auto_vacuum=2",
+    "VACUUM",
+    NULL
+};
+
+static int do_ml_migration_v1_v2(sqlite3 *database, const char *name)
+{
+    netdata_log_info("Running \"%s\" database migration", name);
+
+    if (get_auto_vaccum(database) != 2)
+        return init_database_batch(database, &database_ml_migrate_v1_v2[0]);
     return 0;
 }
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
     UNUSED(database);
-    UNUSED(name);
     netdata_log_info("Running database migration %s", name);
     return 0;
 }
@@ -369,6 +463,9 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v8 to v9",  .func = do_migration_v8_v9},
     {.name = "v9 to v10",  .func = do_migration_v9_v10},
     {.name = "v10 to v11",  .func = do_migration_v10_v11},
+    {.name = "v11 to v12",  .func = do_migration_v11_v12},
+    {.name = "v12 to v13",  .func = do_migration_v12_v13},
+    {.name = "v13 to v14",  .func = do_migration_v13_v14},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
@@ -379,6 +476,12 @@ DATABASE_FUNC_MIGRATION_LIST context_migration_action[] = {
     {.name = NULL, .func = NULL}
 };
 
+DATABASE_FUNC_MIGRATION_LIST ml_migration_action[] = {
+    {.name = "v0 to v1",  .func = do_migration_noop},
+    {.name = "v1 to v2",  .func = do_ml_migration_v1_v2},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
 
 int perform_database_migration(sqlite3 *database, int target_version)
 {
@@ -388,4 +491,9 @@ int perform_database_migration(sqlite3 *database, int target_version)
 int perform_context_database_migration(sqlite3 *database, int target_version)
 {
     return migrate_database(database, target_version, "context", context_migration_action);
+}
+
+int perform_ml_database_migration(sqlite3 *database, int target_version)
+{
+    return migrate_database(database, target_version, "ml", ml_migration_action);
 }

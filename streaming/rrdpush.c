@@ -96,7 +96,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
             STREAM_HAS_COMPRESSION |
-            (rrdb.ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
+            (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
             (ml_capability ? STREAM_CAP_DATA_WITH_ML : 0) |
             0;
 }
@@ -140,7 +140,7 @@ int rrdpush_init() {
     default_rrdpush_seconds_to_replicate = config_get_number(CONFIG_SECTION_DB, "seconds to replicate", default_rrdpush_seconds_to_replicate);
     default_rrdpush_replication_step = config_get_number(CONFIG_SECTION_DB, "seconds per replication step", default_rrdpush_replication_step);
 
-    rrdb.rrdhost_free_orphan_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdb.rrdhost_free_orphan_time_s);
+    rrdhost_free_orphan_time_s    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time_s);
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
     default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
@@ -489,6 +489,12 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
 
+    if(unlikely(host_flags & RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
+        BUFFER *wb = sender_start(host->sender);
+        rrd_functions_expose_global_rrdpush(host, wb);
+        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    }
+
     RRDSET_FLAGS rrdset_flags = __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST);
     bool exposed_upstream = (rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED);
     bool replication_in_progress = !(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
@@ -588,7 +594,7 @@ int connect_to_one_of_destinations(
         if(d->postpone_reconnection_until > now)
             continue;
 
-        netdata_log_info(
+        internal_error(true,
             "STREAM %s: connecting to '%s' (default port: %d)...",
             rrdhost_hostname(host),
             string2str(d->destination),
@@ -801,7 +807,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
 #endif
 
-    rpt->config.update_every = rrdb.default_update_every;
+    rpt->config.update_every = default_rrd_update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
 
@@ -1057,7 +1063,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
     }
 
-    if (strcmp(rpt->machine_guid, rrdb.localhost->machine_guid) == 0) {
+    if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
 
         rrdpush_receiver_takeover_web_connection(w, rpt);
 
@@ -1166,6 +1172,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             // another receiver is already connected
             // try again later
 
+#ifdef NETDATA_INTERNAL_CHECKS
             char msg[200 + 1];
             snprintfz(msg, 200,
                       "multiple connections for same host, "
@@ -1176,6 +1183,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                     rpt,
                     msg,
                     "ALREADY CONNECTED");
+#endif
 
             // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
             buffer_flush(w->response.data);

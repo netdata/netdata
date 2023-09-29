@@ -182,7 +182,7 @@ class HPSSA(object):
                 break
             elif array_regex.match(line):
                 self.parse_array(adapter)
-            elif line == 'Unassigned' or line == 'HBA Drives':
+            elif line in ('Unassigned', 'unassigned') or line == 'HBA Drives':
                 self.parse_physical_drives(adapter)
             elif ignored_sections_regex.match(line):
                 self.parse_ignored_section()

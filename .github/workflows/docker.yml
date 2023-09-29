@@ -4,29 +4,7 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    paths: # This MUST be kept in-sync with the paths-ignore key for the docker-dummy.yml workflow.
-      - '**.c'
-      - '**.cc'
-      - '**.h'
-      - '**.hh'
-      - '**.in'
-      - '!netdata.spec.in'
-      - '.dockerignore'
-      - 'configure.ac'
-      - 'netdata-installer.sh'
-      - '**/Makefile*'
-      - 'Makefile*'
-      - '.github/workflows/docker.yml'
-      - '.github/scripts/docker-test.sh'
-      - 'build/**'
-      - 'packaging/docker/**'
-      - 'packaging/installer/**'
-      - 'aclk/aclk-schemas/'
-      - 'ml/dlib/'
-      - 'mqtt_websockets'
-      - 'web/server/h2o/libh2o'
-      - '!**.md'
+  pull_request: null
   workflow_dispatch:
     inputs:
       version:
@@ -39,27 +17,86 @@ concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
-  docker-test:
-    name: Docker Runtime Test
+  file-check: # Check what files changed if we’re being run in a PR or on a push.
+    name: Check Modified Files
     runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check-run.outputs.run }}
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Check files
+        id: file-check
+        uses: tj-actions/changed-files@v39
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            **.c
+            **.cc
+            **.h
+            **.hh
+            **.in
+            .dockerignore
+            configure.ac
+            netdata-installer.sh
+            **/Makefile*
+            Makefile*
+            .github/workflows/docker.yml
+            .github/scripts/docker-test.sh
+            build/**
+            packaging/docker/**
+            packaging/installer/**
+            aclk/aclk-schemas/
+            ml/dlib/
+            mqtt_websockets
+            web/server/h2o/libh2o
+          files_ignore: |
+            netdata.spec.in
+            **.md
+      - name: Check Run
+        id: check-run
+        run: |
+          if [ "${{ steps.file-check.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+
+  docker-test:
+    name: Docker Runtime Test
+    needs:
+      - file-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v2
+        if: needs.file-check.outputs.run == 'true'
+        uses: docker/setup-buildx-action@v3
       - name: Test Build
         id: build
-        uses: docker/build-push-action@v4
+        if: needs.file-check.outputs.run == 'true'
+        uses: docker/build-push-action@v5
         with:
           load: true
           push: false
           tags: netdata/netdata:test
       - name: Test Image
         id: test
+        if: needs.file-check.outputs.run == 'true'
         run: .github/scripts/docker-test.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -82,12 +119,15 @@ jobs:
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   docker-ci:
     if: github.event_name != 'workflow_dispatch'
     name: Docker Alt Arch Builds
-    needs: docker-test
+    needs:
+      - docker-test
+      - file-check
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -97,21 +137,28 @@ jobs:
           - linux/arm64
           - linux/ppc64le
     steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Setup QEMU
         id: qemu
-        if: matrix.platforms != 'linux/i386'
-        uses: docker/setup-qemu-action@v2
+        if: matrix.platforms != 'linux/i386' && needs.file-check.outputs.run == 'true'
+        uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        if: needs.file-check.outputs.run == 'true'
+        uses: docker/setup-buildx-action@v3
       - name: Build
         id: build
-        uses: docker/build-push-action@v4
+        if: needs.file-check.outputs.run == 'true'
+        uses: docker/build-push-action@v5
         with:
           platforms: ${{ matrix.platforms }}
           load: false
@@ -138,6 +185,7 @@ jobs:
             && github.event_name != 'pull_request'
             && startsWith(github.ref, 'refs/heads/master')
             && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
           }}
 
   normalize-tag: # Fix the release tag if needed
@@ -166,7 +214,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Determine which tags to use
@@ -186,21 +234,21 @@ jobs:
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Docker Hub Login
         id: docker-hub-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: GitHub Container Registry Login
         id: ghcr-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -208,14 +256,14 @@ jobs:
       - name: Quay.io Login
         id: quay-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Docker Build
         id: build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: ${{ github.repository == 'netdata/netdata' }}
@@ -278,7 +326,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Determine which tags to use
@@ -298,21 +346,21 @@ jobs:
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Docker Hub Login
         id: docker-hub-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: GitHub Container Registry Login
         id: ghcr-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -320,14 +368,14 @@ jobs:
       - name: Quay.io Login
         id: quay-login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Docker Build
         id: build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: ${{ github.repository == 'netdata/netdata' }}

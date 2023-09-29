@@ -849,7 +849,7 @@ static void test_create_main_rusage_chart(void **state)
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
     expect_value(rrdset_create_custom, priority, 130600);
-    expect_value(rrdset_create_custom, update_every, localhost->update_every);
+    expect_value(rrdset_create_custom, update_every, localhost->rrd_update_every);
     expect_value(rrdset_create_custom, chart_type, RRDSET_TYPE_STACKED);
     will_return(rrdset_create_custom, st_rusage);
 
@@ -1078,7 +1078,7 @@ static void test_can_send_rrdset(void **state)
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 0);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
-    st->storage_engine_id = STORAGE_ENGINE_NONE;
+    st->rrd_memory_mode = RRD_MEMORY_MODE_NONE;
     prometheus_exporter_instance->config.options |= EXPORTING_SOURCE_DATA_AVERAGE;
     assert_int_equal(can_send_rrdset(prometheus_exporter_instance, st, NULL), 0);
 }

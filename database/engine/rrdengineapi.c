@@ -13,19 +13,39 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
+struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
+
+#if defined(ENV32BIT)
+size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
+#else
+size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
+#endif
 
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
 #endif
+size_t page_type_size[256] = {sizeof(storage_number), sizeof(storage_number_tier1_t)};
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
-    rrdb.multidb_ctx[0] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier0;
-    rrdb.multidb_ctx[1] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier1;
-    rrdb.multidb_ctx[2] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier2;
-    rrdb.multidb_ctx[3] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier3;
-    rrdb.multidb_ctx[4] = (STORAGE_INSTANCE *) &multidb_ctx_storage_tier4;
+    multidb_ctx[0] = &multidb_ctx_storage_tier0;
+    multidb_ctx[1] = &multidb_ctx_storage_tier1;
+    multidb_ctx[2] = &multidb_ctx_storage_tier2;
+    multidb_ctx[3] = &multidb_ctx_storage_tier3;
+    multidb_ctx[4] = &multidb_ctx_storage_tier4;
 }
+
+int db_engine_journal_check = 0;
+int default_rrdeng_disk_quota_mb = 256;
+int default_multidb_disk_quota_mb = 256;
+
+#if defined(ENV32BIT)
+int default_rrdeng_page_cache_mb = 16;
+int default_rrdeng_extent_cache_mb = 0;
+#else
+int default_rrdeng_page_cache_mb = 32;
+int default_rrdeng_extent_cache_mb = 0;
+#endif
 
 // ----------------------------------------------------------------------------
 // metrics groups
@@ -65,7 +85,7 @@ void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance __maybe_unused, 
 // metric handle for legacy dbs
 
 /* This UUID is not unique across hosts */
-static void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
+void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
 {
     EVP_MD_CTX *evpctx;
     unsigned char hash_value[EVP_MAX_MD_SIZE];
@@ -235,6 +255,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     struct rrdeng_collect_handle *handle;
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
+    handle->common.backend = STORAGE_ENGINE_BACKEND_DBENGINE;
     handle->metric = metric;
     handle->page = NULL;
     handle->data = NULL;
@@ -423,7 +444,7 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    size_t max_size = rrdb.tier_page_size[ctx->config.tier];
+    size_t max_size = tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
 
     size_t slots = aligned_allocation_entries(
@@ -443,7 +464,7 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     // internal_error(true, "PAGE ALLOC %zu bytes (%zu max)", size, max_size);
 
     internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
-    internal_fatal(size > rrdb.tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
+    internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
 
     *data_size = size;
     void *d = dbengine_page_alloc(size);
@@ -513,7 +534,8 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     timing_step(TIMING_STEP_DBENGINE_MRG_UPDATE);
 }
 
-static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, usec_t point_in_time_ut, const char *msg) {
+static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __maybe_unused, usec_t point_in_time_ut __maybe_unused, const char *msg __maybe_unused) {
+#ifdef NETDATA_INTERNAL_CHECKS
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     char uuid[UUID_STR_LEN + 1];
     uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
@@ -541,6 +563,9 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, us
     );
 
     buffer_free(wb);
+#else
+    ;
+#endif
 }
 
 void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
@@ -746,14 +771,15 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
 
         handle->dt_s = db_update_every_s;
         if (!handle->dt_s) {
-            handle->dt_s = rrdb.default_update_every;
-            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, rrdb.default_update_every);
+            handle->dt_s = default_rrd_update_every;
+            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, default_rrd_update_every);
         }
 
         rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
         rrddim_handle->start_time_s = handle->start_time_s;
         rrddim_handle->end_time_s = handle->end_time_s;
         rrddim_handle->priority = priority;
+        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
 
         pg_cache_preload(handle);
 
@@ -769,6 +795,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
         rrddim_handle->start_time_s = handle->start_time_s;
         rrddim_handle->end_time_s = 0;
         rrddim_handle->priority = priority;
+        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
     }
 }
 
@@ -785,12 +812,14 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     if (unlikely(handle->now_s > rrddim_handle->end_time_s))
         return false;
 
-    size_t entries;
+    size_t entries = 0;
     handle->page = pg_cache_lookup_next(ctx, handle->pdc, handle->now_s, handle->dt_s, &entries);
-    if (unlikely(!handle->page))
-        return false;
 
-    internal_fatal(pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE, "Empty page returned");
+    internal_fatal(handle->page && (pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE || !entries),
+                   "A page was returned, but it is empty - pg_cache_lookup_next() should be handling this case");
+
+    if (unlikely(!handle->page || pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE || !entries))
+        return false;
 
     time_t page_start_time_s = pgc_page_start_time_s(handle->page);
     time_t page_end_time_s = pgc_page_end_time_s(handle->page);
@@ -979,19 +1008,24 @@ bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_
     return true;
 }
 
-size_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance) {
+uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     return ctx->config.max_disk_space;
 }
 
-size_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
+uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
 }
 
 time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
-    return __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+
+    time_t t = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+    if(t == LONG_MAX || t < 0)
+        t = 0;
+
+    return t;
 }
 
 size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {
@@ -1005,10 +1039,8 @@ size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {
  * You must not change the indices of the statistics or user code will break.
  * You must not exceed RRDENG_NR_STATS or it will crash.
  */
-void rrdeng_get_37_statistics(STORAGE_INSTANCE *db_instance, unsigned long long *array)
+void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) db_instance;
-
     if (ctx == NULL)
         return;
 
@@ -1061,12 +1093,12 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t) get_netdata_cpus() / rrdb.storage_tiers;
+    ssize_t cpus = (ssize_t)get_netdata_cpus() / (ssize_t)storage_tiers;
     if(cpus > (ssize_t)datafiles)
         cpus = (ssize_t)datafiles;
 
-    if(cpus > (ssize_t) rrdb.libuv_worker_threads)
-        cpus = (ssize_t) rrdb.libuv_worker_threads;
+    if(cpus > (ssize_t)libuv_worker_threads)
+        cpus = (ssize_t)libuv_worker_threads;
 
     if(cpus >= (ssize_t)get_netdata_cpus() / 2)
         cpus = (ssize_t)(get_netdata_cpus() / 2 - 1);
@@ -1105,9 +1137,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
     }
 }
 
-void rrdeng_readiness_wait(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) db_instance;
-
+void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     for (size_t i = 0; i < ctx->loading.populate_mrg.size; i++) {
         completion_wait_for(&ctx->loading.populate_mrg.array[i]);
         completion_destroy(&ctx->loading.populate_mrg.array[i]);
@@ -1125,17 +1155,14 @@ bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance) {
     return ctx->config.legacy;
 }
 
-void rrdeng_exit_mode(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) db_instance;
+void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
     __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
 }
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(STORAGE_INSTANCE **db_instance_ptr, const char *dbfiles_path,
+int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
                 unsigned disk_space_mb, size_t tier) {
-    struct rrdengine_instance **ctxp = (struct rrdengine_instance **) db_instance_ptr;
-
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
 
@@ -1155,7 +1182,7 @@ int rrdeng_init(STORAGE_INSTANCE **db_instance_ptr, const char *dbfiles_path,
     }
 
     if(NULL == ctxp) {
-        ctx = (struct rrdengine_instance *) rrdb.multidb_ctx[tier];
+        ctx = multidb_ctx[tier];
         memset(ctx, 0, sizeof(*ctx));
         ctx->config.legacy = false;
     }
@@ -1195,18 +1222,15 @@ int rrdeng_init(STORAGE_INSTANCE **db_instance_ptr, const char *dbfiles_path,
     return UV_EIO;
 }
 
-size_t rrdeng_collectors_running(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) db_instance;
+size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
 
 /*
  * Returns 0 on success, 1 on error
  */
-int rrdeng_exit(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) db_instance;
-
-    if (ctx == NULL)
+int rrdeng_exit(struct rrdengine_instance *ctx) {
+    if (NULL == ctx)
         return 1;
 
     // FIXME - ktsaou - properly cleanup ctx
@@ -1216,7 +1240,7 @@ int rrdeng_exit(STORAGE_INSTANCE *db_instance) {
     // 4. then wait for completion
 
     bool logged = false;
-    while (__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !rrdb.unittest_running) {
+    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
         if(!logged) {
             netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
             logged = true;
@@ -1243,9 +1267,7 @@ int rrdeng_exit(STORAGE_INSTANCE *db_instance) {
     return 0;
 }
 
-void rrdeng_prepare_exit(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) db_instance;
-
+void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
     if (NULL == ctx)
         return;
 
@@ -1295,7 +1317,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             if(likely(points > 1))
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
-                update_every_s = (time_t) (rrdb.default_update_every * get_tier_grouping(datafile->ctx->config.tier));
+                update_every_s = (time_t) (default_rrd_update_every * get_tier_grouping(datafile->ctx->config.tier));
                 stats->single_point_pages++;
             }
 
@@ -1324,7 +1346,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
     journalfile_v2_data_release(datafile->journalfile);
 }
 
-static RRDENG_SIZE_STATS rrdeng_size_statistics_internal(struct rrdengine_instance *ctx) {
+RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     RRDENG_SIZE_STATS stats = { 0 };
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
@@ -1370,80 +1392,16 @@ static RRDENG_SIZE_STATS rrdeng_size_statistics_internal(struct rrdengine_instan
 //    stats.sizeof_metric = 0;
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
-    stats.sizeof_point_data = rrdb.page_type_size[ctx->config.page_type];
-    stats.sizeof_page_data = rrdb.tier_page_size[ctx->config.tier];
+    stats.sizeof_point_data = page_type_size[ctx->config.page_type];
+    stats.sizeof_page_data = tier_page_size[ctx->config.tier];
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t) rrdb.default_update_every * get_tier_grouping(ctx->config.tier);
+    stats.default_granularity_secs = (size_t)default_rrd_update_every * get_tier_grouping(ctx->config.tier);
 
     return stats;
-}
-
-void rrdeng_size_statistics(STORAGE_INSTANCE *db_instance, BUFFER *wb) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) db_instance;
-    RRDENG_SIZE_STATS stats = rrdeng_size_statistics_internal(ctx);
-
-    buffer_sprintf(wb,
-                   "\n\t\t\"default_granularity_secs\":%zu"
-                   ",\n\t\t\"sizeof_datafile\":%zu"
-                   ",\n\t\t\"sizeof_page_in_cache\":%zu"
-                   ",\n\t\t\"sizeof_point_data\":%zu"
-                   ",\n\t\t\"sizeof_page_data\":%zu"
-                   ",\n\t\t\"pages_per_extent\":%zu"
-                   ",\n\t\t\"datafiles\":%zu"
-                   ",\n\t\t\"extents\":%zu"
-                   ",\n\t\t\"extents_pages\":%zu"
-                   ",\n\t\t\"points\":%zu"
-                   ",\n\t\t\"metrics\":%zu"
-                   ",\n\t\t\"metrics_pages\":%zu"
-                   ",\n\t\t\"extents_compressed_bytes\":%zu"
-                   ",\n\t\t\"pages_uncompressed_bytes\":%zu"
-                   ",\n\t\t\"pages_duration_secs\":%lld"
-                   ",\n\t\t\"single_point_pages\":%zu"
-                   ",\n\t\t\"first_t\":%ld"
-                   ",\n\t\t\"last_t\":%ld"
-                   ",\n\t\t\"database_retention_secs\":%lld"
-                   ",\n\t\t\"average_compression_savings\":%0.2f"
-                   ",\n\t\t\"average_point_duration_secs\":%0.2f"
-                   ",\n\t\t\"average_metric_retention_secs\":%0.2f"
-                   ",\n\t\t\"ephemeral_metrics_per_day_percent\":%0.2f"
-                   ",\n\t\t\"average_page_size_bytes\":%0.2f"
-                   ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
-                   ",\n\t\t\"currently_collected_metrics\":%zu"
-                   ",\n\t\t\"disk_space\":%zu"
-                   ",\n\t\t\"max_disk_space\":%zu"
-                   , stats.default_granularity_secs
-                   , stats.sizeof_datafile
-                   , stats.sizeof_page_in_cache
-                   , stats.sizeof_point_data
-                   , stats.sizeof_page_data
-                   , stats.pages_per_extent
-                   , stats.datafiles
-                   , stats.extents
-                   , stats.extents_pages
-                   , stats.points
-                   , stats.metrics
-                   , stats.metrics_pages
-                   , stats.extents_compressed_bytes
-                   , stats.pages_uncompressed_bytes
-                   , (long long)stats.pages_duration_secs
-                   , stats.single_point_pages
-                   , stats.first_time_s
-                   , stats.last_time_s
-                   , (long long)stats.database_retention_secs
-                   , stats.average_compression_savings
-                   , stats.average_point_duration_secs
-                   , stats.average_metric_retention_secs
-                   , stats.ephemeral_metrics_per_day_percent
-                   , stats.average_page_size_bytes
-                   , stats.estimated_concurrently_collected_metrics
-                   , stats.currently_collected_metrics
-                   , stats.disk_space
-                   , stats.max_disk_space
-                   );
 }
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void) {

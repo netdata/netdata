@@ -209,7 +209,7 @@ static inline uint64_t str2uint64_hex(const char *src, char **endptr) {
     const unsigned char *s = (const unsigned char *)src;
     unsigned char c;
 
-    while ((c = hex_value_from_ascii[*s]) != 255) {
+    while ((c = hex_value_from_ascii[toupper(*s)]) != 255) {
         num = (num << 4) | c;
         s++;
     }
@@ -394,10 +394,10 @@ static inline NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
     return str2ndd(src, endptr) * sign;
 }
 
-static inline char *strncpyz(char *dst, const char *src, size_t n) {
+static inline char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1) {
     char *p = dst;
 
-    while (*src && n--)
+    while (*src && dst_size_minus_1--)
         *dst++ = *src++;
 
     *dst = '\0';
@@ -508,6 +508,27 @@ static inline int read_single_signed_number_file(const char *filename, long long
     buffer[30] = '\0';
     *result = atoll(buffer);
     return 0;
+}
+
+static inline int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
+    char buffer[30 + 1];
+
+    int ret = read_file(filename, buffer, 30);
+    if(unlikely(ret)) {
+        *result = 0;
+        return ret;
+    }
+
+    buffer[30] = '\0';
+
+    if(likely(buffer[0])){
+        *result = str2ull_encoded(buffer);
+        return 0;
+    }
+    else {
+        *result = 0;
+        return -1;
+    }
 }
 
 static inline int uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {

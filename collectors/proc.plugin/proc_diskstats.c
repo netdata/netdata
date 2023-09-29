@@ -17,6 +17,11 @@
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc, after being looked up)
     char *device;           // the device of the disk (before being looked up)
+    char *disk_by_id;
+    char *model;
+    char *serial;
+//    bool rotational;
+//    bool removable;
     uint32_t hash;
     unsigned long major;
     unsigned long minor;
@@ -172,6 +177,8 @@ static char *path_to_sys_block_device = NULL;
 static char *path_to_sys_block_device_bcache = NULL;
 static char *path_to_sys_devices_virtual_block_device = NULL;
 static char *path_to_device_mapper = NULL;
+static char *path_to_dev_disk = NULL;
+static char *path_to_sys_block = NULL;
 static char *path_to_device_label = NULL;
 static char *path_to_device_id = NULL;
 static char *path_to_veritas_volume_groups = NULL;
@@ -469,6 +476,109 @@ static inline char *get_disk_name(unsigned long major, unsigned long minor, char
     return strdup(result);
 }
 
+static inline bool ends_with(const char *str, const char *suffix) {
+    if (!str || !suffix)
+        return false;
+
+    size_t len_str = strlen(str);
+    size_t len_suffix = strlen(suffix);
+    if (len_suffix > len_str)
+        return false;
+
+    return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
+}
+
+static inline char *get_disk_by_id(char *device) {
+    char pathname[256 + 1];
+    snprintfz(pathname, 256, "%s/by-id", path_to_dev_disk);
+
+    struct dirent *entry;
+    DIR *dp = opendir(pathname);
+    if (dp == NULL) {
+        internal_error(true, "Cannot open '%s'", pathname);
+        return NULL;
+    }
+
+    while ((entry = readdir(dp))) {
+        // We ignore the '.' and '..' entries
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        if(strncmp(entry->d_name, "md-uuid-", 8) == 0 ||
+                strncmp(entry->d_name, "dm-uuid-", 8) == 0 ||
+                strncmp(entry->d_name, "nvme-eui.", 9) == 0 ||
+                strncmp(entry->d_name, "wwn-", 4) == 0 ||
+                strncmp(entry->d_name, "lvm-pv-uuid-", 12) == 0)
+            continue;
+
+        char link_target[256 + 1];
+        char full_path[256 + 1];
+        snprintfz(full_path, 256, "%s/%s", pathname, entry->d_name);
+
+        ssize_t len = readlink(full_path, link_target, 256);
+        if (len == -1)
+            continue;
+
+        link_target[len] = '\0';
+
+        if (ends_with(link_target, device)) {
+            char *s = strdupz(entry->d_name);
+            closedir(dp);
+            return s;
+        }
+    }
+
+    closedir(dp);
+    return NULL;
+}
+
+static inline char *get_disk_model(char *device) {
+    char path[256 + 1];
+    char buffer[256 + 1];
+
+    snprintfz(path, 256, "%s/%s/device/model", path_to_sys_block, device);
+    if(read_file(path, buffer, 256) != 0) {
+        snprintfz(path, 256, "%s/%s/device/name", path_to_sys_block, device);
+        if(read_file(path, buffer, 256) != 0)
+            return NULL;
+    }
+
+    return strdupz(buffer);
+}
+
+static inline char *get_disk_serial(char *device) {
+    char path[256 + 1];
+    char buffer[256 + 1];
+
+    snprintfz(path, 256, "%s/%s/device/serial", path_to_sys_block, device);
+    if(read_file(path, buffer, 256) != 0)
+        return NULL;
+
+    return strdupz(buffer);
+}
+
+//static inline bool get_disk_rotational(char *device) {
+//    char path[256 + 1];
+//    char buffer[256 + 1];
+//
+//    snprintfz(path, 256, "%s/%s/queue/rotational", path_to_sys_block, device);
+//    if(read_file(path, buffer, 256) != 0)
+//        return false;
+//
+//    return buffer[0] == '1';
+//}
+//
+//static inline bool get_disk_removable(char *device) {
+//    char path[256 + 1];
+//    char buffer[256 + 1];
+//
+//    snprintfz(path, 256, "%s/%s/removable", path_to_sys_block, device);
+//    if(read_file(path, buffer, 256) != 0)
+//        return false;
+//
+//    return buffer[0] == '1';
+//}
+
 static void get_disk_config(struct disk *d) {
     int def_enable = global_enable_new_disks_detected_at_runtime;
 
@@ -594,6 +704,11 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     d->disk = get_disk_name(major, minor, disk);
     d->device = strdupz(disk);
+    d->disk_by_id = get_disk_by_id(disk);
+    d->model = get_disk_model(disk);
+    d->serial = get_disk_serial(disk);
+//    d->rotational = get_disk_rotational(disk);
+//    d->removable = get_disk_removable(disk);
     d->hash = simple_hash(d->device);
     d->major = major;
     d->minor = minor;
@@ -854,6 +969,11 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 static void add_labels_to_disk(struct disk *d, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device", d->disk, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "mount_point", d->mount_point, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "id", d->disk_by_id, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "model", d->model, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "serial", d->serial, RRDLABEL_SRC_AUTO);
+//    rrdlabels_add(st->rrdlabels, "rotational", d->rotational ? "true" : "false", RRDLABEL_SRC_AUTO);
+//    rrdlabels_add(st->rrdlabels, "removable", d->removable ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     switch (d->type) {
         default:
@@ -921,6 +1041,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
         path_to_device_mapper = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to device mapper", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s/dev/disk", netdata_configured_host_prefix);
+        path_to_dev_disk = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s/sys/block", netdata_configured_host_prefix);
+        path_to_sys_block = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /sys/block", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/disk/by-label", netdata_configured_host_prefix);
         path_to_device_label = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk/by-label", buffer);
@@ -2026,6 +2152,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             freez(t->disk);
             freez(t->device);
+            freez(t->disk_by_id);
+            freez(t->model);
+            freez(t->serial);
             freez(t->mount_point);
             freez(t->chart_id);
             freez(t);

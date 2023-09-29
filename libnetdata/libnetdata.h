@@ -248,7 +248,6 @@ size_t judy_aral_structures(void);
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
-#define CLAMP(value, min, max) MIN(MAX((value), (min)), (max))
 
 #define GUID_LEN 36
 
@@ -579,7 +578,7 @@ void recursive_config_double_dir_load(
         , void *data
         , size_t depth
 );
-char *read_by_filename(char *filename, long *file_size);
+char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
 /* fix for alpine linux */
@@ -799,6 +798,10 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
+
+#define XXH_INLINE_ALL
+#include "xxhash.h"
+
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
 #include "os.h"
@@ -837,9 +840,14 @@ extern char *netdata_configured_host_prefix;
 #include "yaml.h"
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"
+#include "facets/facets.h"
+#include "dyn_conf/dyn_conf.h"
+#include "functions_evloop/functions_evloop.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
+
+#define RRD_STORAGE_TIERS 5
 
 static inline size_t struct_natural_alignment(size_t size) __attribute__((const));
 
@@ -977,6 +985,14 @@ typedef enum {
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
 int hash256_string(const unsigned char *string, size_t size, char *hash);
+
+extern bool unittest_running;
+#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
+
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running);
+
+int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size);
+
 # ifdef __cplusplus
 }
 # endif

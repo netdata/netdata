@@ -178,6 +178,9 @@ int do_proc_pressure(int update_every, usec_t dt) {
         procfile *ff = resource_info[i].pf;
         int do_some = resources[i].some.enabled, do_full = resources[i].full.enabled;
 
+        if (!resources[i].some.available && !resources[i].full.available)
+            continue;
+
         if (unlikely(!ff)) {
             char filename[FILENAME_MAX + 1];
             char config_key[CONFIG_MAX_NAME + 1];
@@ -200,12 +203,19 @@ int do_proc_pressure(int update_every, usec_t dt) {
             do_full = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, do_full);
             resources[i].full.enabled = do_full;
 
-            if(!do_full && !do_some)
+            if (!do_full && !do_some) {
+                resources[i].some.available = false;
+                resources[i].full.available = false;
                 continue;
+            }
 
-            ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
+            ff = procfile_open(filename, " =", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
             if (unlikely(!ff)) {
-                collector_error("Cannot read pressure information from %s.", filename);
+                // PSI IRQ was added recently (https://github.com/torvalds/linux/commit/52b1364ba0b105122d6de0e719b36db705011ac1) 
+                if (strcmp(resource_info[i].name, "irq") != 0)
+                    collector_error("Cannot read pressure information from %s.", filename);
+                resources[i].some.available = false;
+                resources[i].full.available = false;
                 continue;
             }
         }

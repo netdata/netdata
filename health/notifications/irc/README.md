@@ -49,13 +49,13 @@ Edit `health_alarm_notify.conf`, changes to this file do not require restarting 
 
 2. Set `SEND_IRC` to `YES`
 3. Set `DEFAULT_RECIPIENT_IRC` to one or more channels to post the messages to.  
-   You can define multiple channels like this: `#alarms #systems`.  
-   All roles will default to this variable if left unconfigured.
+   You can define multiple channels like this: `#alerts #systems`.  
+   All roles will default to this variable if it is not configured.
 4. Set `IRC_NETWORK` to the IRC network which your preferred channels belong to.
 5. Set `IRC_PORT` to the IRC port to which a connection will occur.
 6. Set `IRC_NICKNAME` to the IRC nickname which is required to send the notification.  
    It must not be an already registered name as the connection's `MODE` is defined as a `guest`.
-7. Set `IRC_REALNAME` to the IRC realname which is required in order to make he connection.
+7. Set `IRC_REALNAME` to the IRC realname which is required in order to make the connection.
 
 You can then have different channels per **role**, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want, in the following entries at the bottom of the same file:
 
@@ -77,9 +77,9 @@ An example of a working configuration would be:
 # irc notification options
 #
 SEND_IRC="YES"
-DEFAULT_RECIPIENT_IRC="#system-alarms"
+DEFAULT_RECIPIENT_IRC="#system-alerts"
 IRC_NETWORK="irc.freenode.net"
-IRC_NICKNAME="netdata-alarm-user"
+IRC_NICKNAME="netdata-alert-user"
 IRC_REALNAME="netdata-user"
 ```
 

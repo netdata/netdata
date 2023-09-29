@@ -261,7 +261,7 @@ You can also enable the following eBPF programs:
 -   `swap` : This eBPF program creates charts that show information about swap access.
 -   `mdflush`: This eBPF program creates charts that show information about
 -   `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
--   `network viewer`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
+-   `socket`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
     bandwidth consumed by each.
     multi-device software flushes.
 -   `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
@@ -302,12 +302,13 @@ are divided in the following sections:
 
 #### `[network connections]`
 
-You can configure the information shown on `outbound` and `inbound` charts with the settings in this section.
+You can configure the information shown with function `ebpf_socket` using the settings in this section.
 
 ```conf
 [network connections]
-    maximum dimensions = 500
+    enabled = yes
     resolve hostname ips = no
+    resolve service names = yes
     ports = 1-1024 !145 !domain
     hostnames = !example.com
     ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
@@ -318,24 +319,23 @@ write `ports = 19999`, Netdata will collect only connections for itself. The `ho
 [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
 specific values or asterisk alone to define all values.
 
-In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain)
-and 145.
+In the above example, Netdata will collect metrics for all ports between `1` and `1024`, with the exception of `53` (domain)
+and `145`.
 
 The following options are available:
 
+-   `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
+-   `resolve hostname ips`: Enable resolving IPs to hostnames. It is disabled by default because it can be too slow.
+-   `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
+    all names are read from /etc/services.
 -   `ports`: Define the destination ports for Netdata to monitor.
 -   `hostnames`: The list of hostnames that can be resolved to an IP address.
 -   `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values. By default, only data for private IP addresses is collected, but this can
-    be changed with the `ips` setting.
+    range of IPs, or use CIDR values.
 
-By default, Netdata displays up to 500 dimensions on network connection charts. If there are more possible dimensions,
-they will be bundled into the `other` dimension. You can increase the number of shown dimensions by changing
-the `maximum dimensions` setting.
-
-The dimensions for the traffic charts are created using the destination IPs of the sockets by default. This can be
-changed setting `resolve hostname ips = yes` and restarting Netdata, after this Netdata will create dimensions using
-the `hostnames` every time that is possible to resolve IPs to their hostnames.
+By default the traffic table is created using the destination IPs and ports of the sockets. This can be
+changed, so that Netdata uses service names (if possible), by specifying `resolve service name = yes` in the configuration
+section.
 
 #### `[service name]`
 
@@ -990,13 +990,15 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
 
-## Function
+## Functions
+
+### ebpf_thread
 
 The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
 `ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
 can run the plugin with all threads disabled and enable them only when you want to take a look in specific areas.
 
-### List threads
+#### List threads
 
 To list all threads status you can query directly the endpoint function:
 
@@ -1006,7 +1008,7 @@ It is also possible to query a specific thread adding keyword `thread` and threa
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20thread:mount`
 
-### Enable thread
+#### Enable thread
 
 It is possible to enable a specific thread using the keyword `enable`:
 
@@ -1019,14 +1021,14 @@ after the thread name:
 
 in this example thread `mount` will run during 600 seconds (10 minutes).
 
-### Disable thread
+#### Disable thread
 
 It is also possible to stop any thread running using the keyword `disable`. For example, to disable `cachestat` you can
 request:
 
 `http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
 
-### Debugging threads
+#### Debugging threads
 
 You can verify the impact of threads on the host by running the
 [ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
@@ -1036,3 +1038,34 @@ You can check the results of having threads running on your environment in the N
 dashboard
 
 <img src="https://github.com/netdata/netdata/assets/49162938/91823573-114c-4c16-b634-cc46f7bb1bcf" alt="Threads running." />
+
+### ebpf_socket
+
+The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
+`ebpf_socket` that shows the current status of open sockets on host.
+
+#### Families
+
+The plugin shows by default sockets for IPV4 and IPV6, but it is possible to select a specific family by passing the
+family as an argument:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20family:IPV4`
+
+#### Resolve
+
+The plugin resolves ports to service names by default. You can show the port number by disabling the name resolution:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20resolve:NO`
+
+#### CIDR
+
+The plugin shows connections for all possible destination IPs by default. You can limit the range by specifying the CIDR:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20cidr:192.168.1.0/24`
+
+#### PORT
+
+The plugin shows connections for all possible ports by default. You can limit the range by specifying a port or range
+of ports:
+
+`http://localhost:19999/api/v1/function?function=ebpf_socket%20port:1-1024`

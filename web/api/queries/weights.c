@@ -149,7 +149,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
 
         buffer_json_member_add_array(wb, "db_points_per_tier");
         {
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 buffer_json_add_array_item_uint64(wb, stats->db_points_per_tier[tier]);
         }
         buffer_json_array_close(wb);
@@ -169,7 +169,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 size_t examined_dimensions, usec_t duration,
                                                 WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -221,7 +221,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats) {
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     results_header_to_json(results, wb, after, before, baseline_after, baseline_before,
                            points, method, group, options, shifts, examined_dimensions, duration, stats);
@@ -461,7 +461,7 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
 
         buffer_json_member_add_array(wb, "db_points_per_tier");
         {
-            for (size_t tier = 0; tier < rrdb.storage_tiers; tier++)
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 buffer_json_add_array_item_uint64(wb, stats->db_points_per_tier[tier]);
         }
         buffer_json_array_close(wb);
@@ -739,7 +739,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
         size_t examined_dimensions, struct query_weights_data *qwd,
         WEIGHTS_STATS *stats,
         struct query_versions *versions) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_uint64(wb, "api", 2);
 
     results_header_to_json_v2(results, wb, qwd, after, before, baseline_after, baseline_before,
@@ -958,7 +958,7 @@ static size_t registered_results_to_json_multinode_group_by(
         size_t examined_dimensions, struct query_weights_data *qwd,
         WEIGHTS_STATS *stats,
         struct query_versions *versions) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true, options & RRDR_OPTION_MINIFY);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_uint64(wb, "api", 2);
 
     results_header_to_json_v2(results, wb, qwd, after, before, baseline_after, baseline_before,
@@ -1288,7 +1288,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     stats->db_queries++;
     stats->result_points += r->stats.result_points_generated;
     stats->db_points += r->stats.db_points_read;
-    for(size_t tr = 0; tr < rrdb.storage_tiers ; tr++)
+    for(size_t tr = 0; tr < storage_tiers ; tr++)
         stats->db_points_per_tier[tr] += r->internal.qt->db.tiers[tr].points;
 
     if(r->d != 1 || r->internal.qt->query.used != 1) {
@@ -1395,7 +1395,7 @@ static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, si
     stats->db_queries += queries;
     stats->result_points += qv->result_points;
     stats->db_points += qv->points_read;
-    for(size_t tier = 0; tier < rrdb.storage_tiers ; tier++)
+    for(size_t tier = 0; tier < storage_tiers ; tier++)
         stats->db_points_per_tier[tier] += qv->storage_points_per_tier[tier];
 }
 
@@ -1806,7 +1806,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             }
     };
 
-    if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL))
+    if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL, false))
         buffer_no_cacheable(wb);
     else
         buffer_cacheable(wb);
@@ -1823,7 +1823,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         if(qwr->baseline_before <= API_RELATIVE_TIME_MAX)
             qwr->baseline_before += qwr->after;
 
-        rrdr_relative_window_to_absolute(&qwr->baseline_after, &qwr->baseline_before, NULL);
+        rrdr_relative_window_to_absolute(&qwr->baseline_after, &qwr->baseline_before, NULL, false);
 
         if (qwr->baseline_before <= qwr->baseline_after) {
             resp = HTTP_RESP_BAD_REQUEST;
@@ -1913,7 +1913,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
     if(qwd.interrupted) {
         error = "interrupted";
-        resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+        resp = HTTP_RESP_CLIENT_CLOSED_REQUEST;
         goto cleanup;
     }
 

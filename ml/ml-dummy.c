@@ -110,13 +110,11 @@ void ml_update_global_statistics_charts(uint64_t models_consulted) {
 }
 
 bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
-    UNUSED(rh);
     memset(mlm, 0, sizeof(*mlm));
     return false;
 }
 
 bool ml_host_running(RRDHOST *rh) {
-    UNUSED(rh);
     return false;
 }
 

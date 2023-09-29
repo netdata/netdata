@@ -10,31 +10,32 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 declare -a package_tree=(
-  gcc
-  gcc-c++
-  make
   autoconf
   autoconf-archive
   autogen
   automake
-  libatomic1
-  libtool
-  pkg-config
   cmake
-  zlib-devel
-  libuuid-devel
-  libmnl-devel
-  libjson-c-devel
-  libyaml-devel
-  libuv-devel
-  liblz4-devel
-  libopenssl-devel
-  libelf-devel
-  git
-  tar
   curl
+  gcc
+  gcc-c++
+  git
   gzip
+  libatomic1
+  libelf-devel
+  libjson-c-devel
+  liblz4-devel
+  libmnl-devel
+  libopenssl-devel
+  libtool
+  libuuid-devel
+  libuv-devel
+  libyaml-devel
+  make
+  pkg-config
   python3
+  systemd-devel
+  tar
+  zlib-devel
 )
 
 usage() {

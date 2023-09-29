@@ -494,8 +494,8 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find_by_id(host, chart);
-    if(!st) st = rrdset_find_by_name(host, chart);
+    RRDSET *st = rrdset_find(host, chart);
+    if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -644,7 +644,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_APPLICATION_JSON;
-    charts2json(host, w->response.data, 0, 0);
+    charts2json(host, w->response.data, 0);
     return HTTP_RESP_OK;
 }
 
@@ -762,7 +762,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
         }
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
-            if(tier < rrdb.storage_tiers)
+            if(tier < storage_tiers)
                 options |= RRDR_OPTION_SELECTED_TIER;
             else
                 tier = 0;
@@ -788,8 +788,8 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
 
     if(chart && !context) {
         // check if this is a specific chart
-        st = rrdset_find_by_id(host, chart);
-        if (!st) st = rrdset_find_by_name(host, chart);
+        st = rrdset_find(host, chart);
+        if (!st) st = rrdset_find_byname(host, chart);
     }
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
@@ -941,7 +941,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie)
         strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
-    else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
+    else if(extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)) != BEARER_STATUS_EXTRACTED_FROM_HEADER)
         person_guid[0] = '\0';
 
     char action = '\0';
@@ -1121,8 +1121,8 @@ static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *
     buffer_json_add_array_item_object(wb);
 
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-    buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == rrdb.localhost) ? 0 : 1);
-    buffer_json_member_add_boolean(wb, "reachable", (host == rrdb.localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
+    buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
 
     buffer_json_member_add_string(wb, "guid", host->machine_guid);
     buffer_json_member_add_uuid(wb, "node_id", host->node_id);
@@ -1145,12 +1145,12 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
     buffer_json_member_add_array(wb, "mirrored_hosts_status");
     rrdhost_foreach_read(host) {
-        if ((host == rrdb.localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+        if ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
             web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
         }
     }
     rrdhost_foreach_read(host) {
-        if ((host != rrdb.localhost && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
+        if ((host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) {
             web_client_api_request_v1_info_mirrored_hosts_status(wb, host);
         }
     }
@@ -1199,7 +1199,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
 
 extern int aclk_connected;
 inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
     buffer_json_member_add_string(wb, "uid", host->machine_guid);
@@ -1262,10 +1262,10 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "aclk-available", false);
 #endif
 
-    buffer_json_member_add_string(wb, "memory-mode", storage_engine_name(host->storage_engine_id));
+    buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
 #ifdef ENABLE_DBENGINE
-    buffer_json_member_add_uint64(wb, "multidb-disk-quota", rrdb.default_multidb_disk_quota_mb);
-    buffer_json_member_add_uint64(wb, "page-cache-size", rrdb.default_rrdeng_page_cache_mb);
+    buffer_json_member_add_uint64(wb, "multidb-disk-quota", default_multidb_disk_quota_mb);
+    buffer_json_member_add_uint64(wb, "page-cache-size", default_rrdeng_page_cache_mb);
 #endif // ENABLE_DBENGINE
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
@@ -1313,13 +1313,13 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
     (void) url;
 
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     ml_host_get_detection_info(host, wb);
     buffer_json_finalize(wb);
 
@@ -1332,7 +1332,7 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
     (void) url;
 
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1346,7 +1346,7 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -1360,7 +1360,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(url);
     UNUSED(host);
-    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -1386,7 +1386,7 @@ int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char 
 
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     int timeout = 0;
     const char *function = NULL;
@@ -1412,19 +1412,21 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    return rrd_call_function_and_wait(host, wb, timeout, function);
+    return rrd_function_run(host, wb, timeout, function, true, NULL,
+                            NULL, NULL,
+                            web_client_interrupt_callback, w);
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     host_functions2json(host, wb);
     buffer_json_finalize(wb);
 
@@ -1436,14 +1438,76 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     return HTTP_RESP_NOT_FOUND;
 }
 #else
+static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
+    RRDENG_SIZE_STATS stats = rrdeng_size_statistics(multidb_ctx[tier]);
+
+    buffer_sprintf(wb,
+                   "\n\t\t\"default_granularity_secs\":%zu"
+                   ",\n\t\t\"sizeof_datafile\":%zu"
+                   ",\n\t\t\"sizeof_page_in_cache\":%zu"
+                   ",\n\t\t\"sizeof_point_data\":%zu"
+                   ",\n\t\t\"sizeof_page_data\":%zu"
+                   ",\n\t\t\"pages_per_extent\":%zu"
+                   ",\n\t\t\"datafiles\":%zu"
+                   ",\n\t\t\"extents\":%zu"
+                   ",\n\t\t\"extents_pages\":%zu"
+                   ",\n\t\t\"points\":%zu"
+                   ",\n\t\t\"metrics\":%zu"
+                   ",\n\t\t\"metrics_pages\":%zu"
+                   ",\n\t\t\"extents_compressed_bytes\":%zu"
+                   ",\n\t\t\"pages_uncompressed_bytes\":%zu"
+                   ",\n\t\t\"pages_duration_secs\":%lld"
+                   ",\n\t\t\"single_point_pages\":%zu"
+                   ",\n\t\t\"first_t\":%ld"
+                   ",\n\t\t\"last_t\":%ld"
+                   ",\n\t\t\"database_retention_secs\":%lld"
+                   ",\n\t\t\"average_compression_savings\":%0.2f"
+                   ",\n\t\t\"average_point_duration_secs\":%0.2f"
+                   ",\n\t\t\"average_metric_retention_secs\":%0.2f"
+                   ",\n\t\t\"ephemeral_metrics_per_day_percent\":%0.2f"
+                   ",\n\t\t\"average_page_size_bytes\":%0.2f"
+                   ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
+                   ",\n\t\t\"currently_collected_metrics\":%zu"
+                   ",\n\t\t\"disk_space\":%zu"
+                   ",\n\t\t\"max_disk_space\":%zu"
+                   , stats.default_granularity_secs
+                   , stats.sizeof_datafile
+                   , stats.sizeof_page_in_cache
+                   , stats.sizeof_point_data
+                   , stats.sizeof_page_data
+                   , stats.pages_per_extent
+                   , stats.datafiles
+                   , stats.extents
+                   , stats.extents_pages
+                   , stats.points
+                   , stats.metrics
+                   , stats.metrics_pages
+                   , stats.extents_compressed_bytes
+                   , stats.pages_uncompressed_bytes
+                   , (long long)stats.pages_duration_secs
+                   , stats.single_point_pages
+                   , stats.first_time_s
+                   , stats.last_time_s
+                   , (long long)stats.database_retention_secs
+                   , stats.average_compression_savings
+                   , stats.average_point_duration_secs
+                   , stats.average_metric_retention_secs
+                   , stats.ephemeral_metrics_per_day_percent
+                   , stats.average_page_size_bytes
+                   , stats.estimated_concurrently_collected_metrics
+                   , stats.currently_collected_metrics
+                   , stats.disk_space
+                   , stats.max_disk_space
+                   );
+}
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
     if (!netdata_ready)
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
 
-    if(!rrdb.dbengine_enabled) {
+    if(!dbengine_enabled) {
         buffer_strcat(wb, "dbengine is not enabled");
         return HTTP_RESP_NOT_FOUND;
     }
@@ -1451,9 +1515,9 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     buffer_strcat(wb, "{");
-    for(size_t tier = 0; tier < rrdb.storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
         buffer_sprintf(wb, "%s\n\t\"tier%zu\": {", tier?",":"", tier);
-        rrdeng_size_statistics(rrdb.multidb_ctx[tier], wb);
+        web_client_api_v1_dbengine_stats_for_tier(wb, tier);
         buffer_strcat(wb, "\n\t}");
     }
     buffer_strcat(wb, "\n}");
@@ -1462,44 +1526,63 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #endif
 
+#define HLT_MGM "manage/health"
+int web_client_api_request_v1_mgmt(RRDHOST *host, struct web_client *w, char *url) {
+    const char *haystack = buffer_tostring(w->url_path_decoded);
+    char *needle;
+
+    buffer_flush(w->response.data);
+
+    if ((needle = strstr(haystack, HLT_MGM)) == NULL) {
+        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        return HTTP_RESP_NOT_FOUND;
+    }
+    needle += strlen(HLT_MGM);
+    if (*needle != '\0') {
+        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        return HTTP_RESP_NOT_FOUND;
+    }
+    return web_client_api_request_v1_mgmt_health(host, w, url);
+}
+
 static struct web_api_command api_commands_v1[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info                       },
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data                       },
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_chart                      },
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_charts                     },
-        { "context",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_context                    },
-        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts                   },
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info,     0                     },
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data,     0                     },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_chart,    0                     },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_charts,   0                     },
+        { "context",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_context,  0                     },
+        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts, 0                     },
 
         // registry checks the ACL by itself, so we allow everything
-        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,               web_client_api_request_v1_registry                   },
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,               web_client_api_request_v1_registry, 0                     },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge, 0 },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms                     },
-        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values             },
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log                 },
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables           },
-        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count               },
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics                },
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms,          0              },
+        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values,   0              },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log,       0              },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables, 0              },
+        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count,     0              },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics,      0              },
 
 #if defined(ENABLE_ML)
-        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info            },
+        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info, 0                      },
         // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        {"manage/health",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_mgmt_health },
-        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state            },
-        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations   },
-        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights               },
+        {"manage",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_mgmt, 1 },
+        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state, 0            },
+        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations, 0   },
+        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights, 0               },
 
-        {"function",             0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function },
-        {"functions",            0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions },
+        {"function",             0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
+        {"functions",            0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
 
-        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats },
+        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
 
         // terminator
-        { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL },
+        { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL, 0 },
 };
 
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {

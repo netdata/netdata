@@ -112,7 +112,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                          "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted shortly "
-                                         "(scanned open cache in %llu usecs)",
+                                         "(scanned open cache in %"PRIu64" usecs)",
                                    df->fileno, df->ctx->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
@@ -129,7 +129,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                          "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted now "
-                                         "(scanned open cache in %llu usecs)",
+                                         "(scanned open cache in %"PRIu64" usecs)",
                                    df->fileno, df->ctx->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
@@ -143,7 +143,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                 internal_error(true, "DBENGINE: datafile %u of tier %d "
                                      "has %u lockers (oc:%u, pd:%u), "
                                      "%zu clean and %zu hot open cache pages "
-                                     "(scanned open cache in %llu usecs)",
+                                     "(scanned open cache in %"PRIu64" usecs)",
                                df->fileno, df->ctx->config.tier,
                                df->users.lockers,
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
@@ -250,7 +250,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, rrdb.use_direct_io);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -333,7 +333,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_RDWR, &file, rrdb.use_direct_io);
+    fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;

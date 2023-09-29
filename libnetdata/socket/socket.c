@@ -810,7 +810,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             errno = 0;
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 if(errno == EALREADY || errno == EINPROGRESS) {
-                    netdata_log_info("Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
+                    internal_error(true, "Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
 
                     // Convert 'struct timeval' to milliseconds for poll():
                     int timeout_milliseconds = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
@@ -835,6 +835,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                     }
                     else if (ret == 0) {
                         // poll() timed out, the connection is not established within the specified timeout.
+                        errno = 0;
                         netdata_log_error("Timed out while connecting to '%s', port '%s'.", hostBfr, servBfr);
                         close(fd);
                         fd = -1;

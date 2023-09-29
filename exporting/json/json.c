@@ -186,7 +186,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         "\"timestamp\":%llu}",
 
         instance->config.prefix,
-        (host == rrdb.localhost) ? instance->config.hostname : rrdhost_hostname(host),
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         tags_pre,
         tags,
         tags_post,
@@ -270,7 +270,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"timestamp\": %llu}",
 
         instance->config.prefix,
-        (host == rrdb.localhost) ? instance->config.hostname : rrdhost_hostname(host),
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         tags_pre,
         tags,
         tags_post,

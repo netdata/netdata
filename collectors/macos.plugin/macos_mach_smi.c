@@ -99,7 +99,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             do_ram = 0;
             collector_error("DISABLED: system.ram");
             do_swapio = 0;
-            collector_error("DISABLED: system.swapio");
+            collector_error("DISABLED: mem.swapio");
             do_pgfaults = 0;
             collector_error("DISABLED: mem.pgfaults");
         } else {
@@ -148,10 +148,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
             if (likely(do_swapio)) {
-                st = rrdset_find_active_localhost("system.swapio");
+                st = rrdset_find_active_localhost("mem.swapio");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
-                            "system"
+                            "mem"
                             , "swapio"
                             , NULL
                             , "swap"

@@ -195,8 +195,8 @@ extern "C" void *profile_main(void *ptr) {
     netdata_thread_cleanup_push(profile_main_cleanup, ptr);
 
     int UpdateEvery = (int) config_get_number(CONFIG_SECTION_PROFILE, "update every", 1);
-    if (UpdateEvery < rrdb.localhost->update_every)
-        UpdateEvery = rrdb.localhost->update_every;
+    if (UpdateEvery < localhost->rrd_update_every)
+        UpdateEvery = localhost->rrd_update_every;
 
     // pick low-default values, in case this plugin is ever enabled accidentaly.
     size_t NumThreads = config_get_number(CONFIG_SECTION_PROFILE, "number of threads", 2);

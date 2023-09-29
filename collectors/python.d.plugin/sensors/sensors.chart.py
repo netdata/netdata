@@ -66,7 +66,7 @@ CHARTS = {
 
 LIMITS = {
     'temperature': [-127, 1000],
-    'voltage': [-127, 127],
+    'voltage': [-400, 400],
     'current': [-127, 127],
     'fan': [0, 65535]
 }

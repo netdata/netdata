@@ -265,22 +265,22 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
 
                 char buffer[1024 + 1];
 
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_dev_type", buffer, 1024))
+                if (read_edac_mc_rank_file(m->name, d->name, "dimm_dev_type", buffer, 1024))
                     rrdlabels_add(d->st->rrdlabels, "dimm_dev_type", buffer, RRDLABEL_SRC_AUTO);
 
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_edac_mode", buffer, 1024))
+                if (read_edac_mc_rank_file(m->name, d->name, "dimm_edac_mode", buffer, 1024))
                     rrdlabels_add(d->st->rrdlabels, "dimm_edac_mode", buffer, RRDLABEL_SRC_AUTO);
 
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_label", buffer, 1024))
+                if (read_edac_mc_rank_file(m->name, d->name, "dimm_label", buffer, 1024))
                     rrdlabels_add(d->st->rrdlabels, "dimm_label", buffer, RRDLABEL_SRC_AUTO);
 
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_location", buffer, 1024))
+                if (read_edac_mc_rank_file(m->name, d->name, "dimm_location", buffer, 1024))
                     rrdlabels_add(d->st->rrdlabels, "dimm_location", buffer, RRDLABEL_SRC_AUTO);
 
-                if(read_edac_mc_rank_file(m->name, d->name, "dimm_mem_type", buffer, 1024))
+                if (read_edac_mc_rank_file(m->name, d->name, "dimm_mem_type", buffer, 1024))
                     rrdlabels_add(d->st->rrdlabels, "dimm_mem_type", buffer, RRDLABEL_SRC_AUTO);
 
-                if(read_edac_mc_rank_file(m->name, d->name, "size", buffer, 1024))
+                if (read_edac_mc_rank_file(m->name, d->name, "size", buffer, 1024))
                     rrdlabels_add(d->st->rrdlabels, "size", buffer, RRDLABEL_SRC_AUTO);
 
                 d->ce.rd = rrddim_add(d->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

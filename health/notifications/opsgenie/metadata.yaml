@@ -1,0 +1,60 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-opsgenie'
+  meta:
+    name: 'OpsGenie'
+    link: 'https://www.atlassian.com/software/opsgenie'
+    categories:
+      - notify.agent
+    icon_filename: 'opsgenie.png'
+  keywords:
+    - OpsGenie
+  overview:
+    notification_description: |
+      Opsgenie is an alerting and incident response tool. It is designed to group and filter alarms, build custom routing rules for on-call teams, and correlate deployments and commits to incidents.
+      You can send notifications to Opsgenie using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+    notification_limitations: ''
+  setup:
+    prerequisites:
+      list:
+        - title: ''
+          description: |
+            - An Opsgenie integration. You can create an [integration](https://docs.opsgenie.com/docs/api-integration) in the [Opsgenie](https://www.atlassian.com/software/opsgenie) dashboard.
+            - Access to the terminal where Netdata Agent is running
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_OPSGENIE'
+            default_value: 'YES'
+            description: "Set `SEND_OPSGENIE` to YES"
+            required: true
+          - name: 'OPSGENIE_API_KEY'
+            default_value: ''
+            description: "Set `OPSGENIE_API_KEY` to your API key."
+            required: true
+          - name: 'OPSGENIE_API_URL'
+            default_value: 'https://api.opsgenie.com'
+            description: "Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`."
+            required: false
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              SEND_OPSGENIE="YES"
+              OPSGENIE_API_KEY="11111111-2222-3333-4444-555555555555"
+              OPSGENIE_API_URL=""
+  troubleshooting:
+    problems:
+      list: []

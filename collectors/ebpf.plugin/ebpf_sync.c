@@ -383,7 +383,7 @@ static void ebpf_sync_exit(void *ptr)
  */
 static int ebpf_sync_load_legacy(ebpf_sync_syscalls_t *w, ebpf_module_t *em)
 {
-    em->thread_name = w->syscall;
+    em->info.thread_name = w->syscall;
     if (!w->probe_links) {
         w->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
         if (!w->probe_links) {
@@ -413,7 +413,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 #endif
 
     int i;
-    const char *saved_name = em->thread_name;
+    const char *saved_name = em->info.thread_name;
     int errors = 0;
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
@@ -424,7 +424,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                 if (ebpf_sync_load_legacy(w, em))
                     errors++;
 
-                em->thread_name = saved_name;
+                em->info.thread_name = saved_name;
             }
 #ifdef LIBBPF_MAJOR_VERSION
             else {
@@ -446,12 +446,12 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                     w->enabled = false;
                 }
 
-                em->thread_name = saved_name;
+                em->info.thread_name = saved_name;
             }
 #endif
         }
     }
-    em->thread_name = saved_name;
+    em->info.thread_name = saved_name;
 
     memset(sync_counter_aggregated_data, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_syscall_stat_t));
     memset(sync_counter_publish_aggregated, 0 , NETDATA_SYNC_IDX_END * sizeof(netdata_publish_syscall_t));

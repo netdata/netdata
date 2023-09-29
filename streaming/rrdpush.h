@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/common.h"
 #include "web/server/web_client.h"
+#include "database/rrdfunctions.h"
 #include "database/rrd.h"
 
 #define CONNECTED_TO_SIZE 100
@@ -356,7 +357,7 @@ struct buffered_reader {
     char read_buffer[PLUGINSD_LINE_MAX + 1];
 };
 
-char *buffered_reader_next_line(struct buffered_reader *reader, char *dst, size_t dst_size);
+bool buffered_reader_next_line(struct buffered_reader *reader, BUFFER *dst);
 static inline void buffered_reader_init(struct buffered_reader *reader) {
     reader->read_buffer[0] = '\0';
     reader->read_len = 0;
@@ -395,7 +396,7 @@ struct receiver_state {
     } exit;
 
     struct {
-        STORAGE_ENGINE_ID storage_engine_id;
+        RRD_MEMORY_MODE mode;
         int history;
         int update_every;
         int health_enabled; // CONFIG_BOOLEAN_YES, CONFIG_BOOLEAN_NO, CONFIG_BOOLEAN_AUTO
@@ -696,7 +697,7 @@ typedef struct rrdhost_status {
     struct {
         RRDHOST_DB_STATUS status;
         RRDHOST_DB_LIVENESS liveness;
-        STORAGE_ENGINE_ID storage_engine_id;
+        RRD_MEMORY_MODE mode;
         time_t first_time_s;
         time_t last_time_s;
         size_t metrics;

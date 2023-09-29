@@ -38,7 +38,7 @@ static inline int uuid_parse_fix(char *in, uuid_t uuid)
 
 static inline int claimed()
 {
-    return rrdb.localhost->aclk_state.claimed_id != NULL;
+    return localhost->aclk_state.claimed_id != NULL;
 }
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
@@ -46,6 +46,9 @@ static inline int claimed()
         "unique(alert_unique_id));"
 
 #define INDEX_ACLK_ALERT "CREATE INDEX IF NOT EXISTS aclk_alert_index_%s ON aclk_alert_%s (alert_unique_id);"
+#define INDEX_ACLK_ALERT1 "CREATE INDEX IF NOT EXISTS aclk_alert_index1_%s ON aclk_alert_%s (filtered_alert_unique_id);"
+#define INDEX_ACLK_ALERT2 "CREATE INDEX IF NOT EXISTS aclk_alert_index2_%s ON aclk_alert_%s (date_submitted);"
+
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
 

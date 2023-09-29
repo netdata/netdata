@@ -13,9 +13,12 @@
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
 
 #define APPS_PLUGIN_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" 10 \"%s\"\n", APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\"\n", PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
     } while(0)
 
+#define APPS_PLUGIN_GLOBAL_FUNCTIONS() do { \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"processes\" %d \"%s\"\n", PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
+    } while(0)
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -1454,17 +1457,17 @@ cleanup:
             netdata_log_info(
                     "FDS_LIMITS: PID %d (%s) is using "
                     "%0.2f %% of its fds limits, "
-                    "open fds = %llu ("
-                    "files = %llu, "
-                    "pipes = %llu, "
-                    "sockets = %llu, "
-                    "inotifies = %llu, "
-                    "eventfds = %llu, "
-                    "timerfds = %llu, "
-                    "signalfds = %llu, "
-                    "eventpolls = %llu "
-                    "other = %llu "
-                    "), open fds limit = %llu, "
+                    "open fds = %"PRIu64 "("
+                    "files = %"PRIu64 ", "
+                    "pipes = %"PRIu64 ", "
+                    "sockets = %"PRIu64", "
+                    "inotifies = %"PRIu64", "
+                    "eventfds = %"PRIu64", "
+                    "timerfds = %"PRIu64", "
+                    "signalfds = %"PRIu64", "
+                    "eventpolls = %"PRIu64" "
+                    "other = %"PRIu64" "
+                    "), open fds limit = %"PRIu64", "
                     "%s, "
                     "original line [%s]",
                     p->pid, p->comm, p->openfds_limits_percent, all_fds,
@@ -2457,7 +2460,7 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
     for(i = 0; i < indent ;i++) buffer[i] = ' ';
     buffer[i] = '\0';
 
-    fprintf(stderr, "  %s %s%s (%d %s %llu"
+    fprintf(stderr, "  %s %s%s (%d %s %"PRIu64""
         , buffer
         , prefix
         , p->comm
@@ -3429,7 +3432,7 @@ static void calculate_netdata_statistics(void) {
 // update chart dimensions
 
 static inline void send_BEGIN(const char *type, const char *id, usec_t usec) {
-    fprintf(stdout, "BEGIN %s.%s %llu\n", type, id, usec);
+    fprintf(stdout, "BEGIN %s.%s %"PRIu64"\n", type, id, usec);
 }
 
 static inline void send_SET(const char *name, kernel_uint_t value) {
@@ -3515,11 +3518,11 @@ void send_resource_usage_to_netdata(usec_t dt) {
     }
 
     fprintf(stdout,
-        "BEGIN netdata.apps_cpu %llu\n"
-        "SET user = %llu\n"
-        "SET system = %llu\n"
+        "BEGIN netdata.apps_cpu %"PRIu64"\n"
+        "SET user = %"PRIu64"\n"
+        "SET system = %"PRIu64"\n"
         "END\n"
-        "BEGIN netdata.apps_sizes %llu\n"
+        "BEGIN netdata.apps_sizes %"PRIu64"\n"
         "SET calls = %zu\n"
         "SET files = %zu\n"
         "SET filenames = %zu\n"
@@ -3546,7 +3549,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
         );
 
     fprintf(stdout,
-            "BEGIN netdata.apps_fix %llu\n"
+            "BEGIN netdata.apps_fix %"PRIu64"\n"
             "SET utime = %u\n"
             "SET stime = %u\n"
             "SET gtime = %u\n"
@@ -3563,7 +3566,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
 
     if(include_exited_childs)
         fprintf(stdout,
-            "BEGIN netdata.apps_children_fix %llu\n"
+            "BEGIN netdata.apps_children_fix %"PRIu64"\n"
             "SET cutime = %u\n"
             "SET cstime = %u\n"
             "SET cgtime = %u\n"
@@ -4572,7 +4575,7 @@ static int check_capabilities() {
 }
 #endif
 
-netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 
 #define PROCESS_FILTER_CATEGORY "category:"
 #define PROCESS_FILTER_USER "user:"
@@ -4625,18 +4628,9 @@ static void get_MemTotal(void) {
 #endif
 }
 
-static void apps_plugin_function_error(const char *transaction, int code, const char *msg) {
-    char buffer[PLUGINSD_LINE_MAX + 1];
-    json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
-
-    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
-    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    pluginsd_function_result_end_to_stdout();
-}
-
 static void apps_plugin_function_processes_help(const char *transaction) {
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
-    fprintf(stdout, "%s",
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_sprintf(wb, "%s",
             "apps.plugin / processes\n"
             "\n"
             "Function `processes` presents all the currently running processes of the system.\n"
@@ -4666,7 +4660,9 @@ static void apps_plugin_function_processes_help(const char *transaction) {
             "\n"
             "Filters can be combined. Each filter can be given only one time.\n"
             );
-    pluginsd_function_result_end_to_stdout();
+
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
+    buffer_free(wb);
 }
 
 #define add_value_field_llu_with_max(wb, key, value) do {                                                       \
@@ -4681,7 +4677,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
-static void apps_plugin_function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
+static void function_processes(const char *transaction, char *function __maybe_unused, int timeout __maybe_unused, bool *cancelled __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -4702,21 +4698,24 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         if(!category && strncmp(keyword, PROCESS_FILTER_CATEGORY, strlen(PROCESS_FILTER_CATEGORY)) == 0) {
             category = find_target_by_name(apps_groups_root_target, &keyword[strlen(PROCESS_FILTER_CATEGORY)]);
             if(!category) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No category with that name found.");
+                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
+                                                       "No category with that name found.");
                 return;
             }
         }
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
             user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No user with that name found.");
+                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
+                                                       "No user with that name found.");
                 return;
             }
         }
         else if(strncmp(keyword, PROCESS_FILTER_GROUP, strlen(PROCESS_FILTER_GROUP)) == 0) {
             group = find_target_by_name(groups_root_target, &keyword[strlen(PROCESS_FILTER_GROUP)]);
             if(!group) {
-                apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, "No group with that name found.");
+                pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
+                                                       "No group with that name found.");
                 return;
             }
         }
@@ -4742,20 +4741,19 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         else {
             char msg[PLUGINSD_LINE_MAX];
             snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
-            apps_plugin_function_error(transaction, HTTP_RESP_BAD_REQUEST, msg);
+            pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, msg);
             return;
         }
     }
 
     time_t expires = now_realtime_sec() + update_every;
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
 
     unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100;
     unsigned int memory_divisor = 1024;
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
@@ -5232,7 +5230,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", RRDF_FIELD_TYPE_DURATION,
-                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION, 2,
+                                    RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION_S, 2,
                                     "seconds", Uptime_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
@@ -5526,68 +5524,12 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
-    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
+
     buffer_free(wb);
-
-    pluginsd_function_result_end_to_stdout();
 }
 
-bool apps_plugin_exit = false;
-
-void *reader_main(void *arg __maybe_unused) {
-    char buffer[PLUGINSD_LINE_MAX + 1];
-
-    char *s = NULL;
-    while(!apps_plugin_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
-
-        char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = quoted_strings_splitter_pluginsd(buffer, words, PLUGINSD_MAX_WORDS);
-
-        const char *keyword = get_word(words, num_words, 0);
-
-        if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
-
-            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                      keyword,
-                      transaction?transaction:"(unset)",
-                      timeout_s?timeout_s:"(unset)",
-                      function?function:"(unset)");
-            }
-            else {
-                int timeout = str2i(timeout_s);
-                if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
-
-//                internal_error(true, "Received function '%s', transaction '%s', timeout %d", function, transaction, timeout);
-
-                netdata_mutex_lock(&mutex);
-
-                if(strncmp(function, "processes", strlen("processes")) == 0)
-                    apps_plugin_function_processes(transaction, function, buffer, PLUGINSD_LINE_MAX + 1, timeout);
-                else
-                    apps_plugin_function_error(transaction, HTTP_RESP_NOT_FOUND, "No function with this name found in apps.plugin.");
-
-                fflush(stdout);
-                netdata_mutex_unlock(&mutex);
-
-//                internal_error(true, "Done with function '%s', transaction '%s', timeout %d", function, transaction, timeout);
-            }
-        }
-        else
-            netdata_log_error("Received unknown command: %s", keyword?keyword:"(unset)");
-    }
-
-    if(!s || feof(stdin) || ferror(stdin)) {
-        apps_plugin_exit = true;
-        netdata_log_error("Received error on stdin.");
-    }
-
-    exit(1);
-    return NULL;
-}
+static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
@@ -5692,16 +5634,25 @@ int main(int argc, char **argv) {
 
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max + 1);
 
-    netdata_thread_t reader_thread;
-    netdata_thread_create(&reader_thread, "APPS_READER", NETDATA_THREAD_OPTION_DONT_LOG, reader_main, NULL);
-    netdata_mutex_lock(&mutex);
+    // ------------------------------------------------------------------------
+    // the event loop for functions
+
+    struct functions_evloop_globals *wg =
+            functions_evloop_init(1, "APPS", &apps_and_stdout_mutex, &apps_plugin_exit);
+
+    functions_evloop_add_function(wg, "processes", function_processes, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+
+    // ------------------------------------------------------------------------
+
+    netdata_mutex_lock(&apps_and_stdout_mutex);
+    APPS_PLUGIN_GLOBAL_FUNCTIONS();
 
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(; !apps_plugin_exit ; global_iterations_counter++) {
-        netdata_mutex_unlock(&mutex);
+        netdata_mutex_unlock(&apps_and_stdout_mutex);
 
 #ifdef NETDATA_PROFILING
 #warning "compiling for profiling"
@@ -5712,17 +5663,15 @@ int main(int argc, char **argv) {
 #else
         usec_t dt = heartbeat_next(&hb, step);
 #endif
-        netdata_mutex_lock(&mutex);
+        netdata_mutex_lock(&apps_and_stdout_mutex);
 
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
         if (unlikely(poll(&pollfd, 1, 0) < 0)) {
-            netdata_mutex_unlock(&mutex);
-            netdata_thread_cancel(reader_thread);
+            netdata_mutex_unlock(&apps_and_stdout_mutex);
             fatal("Cannot check if a pipe is available");
         }
         if (unlikely(pollfd.revents & POLLERR)) {
-            netdata_mutex_unlock(&mutex);
-            netdata_thread_cancel(reader_thread);
+            netdata_mutex_unlock(&apps_and_stdout_mutex);
             fatal("Received error on read pipe.");
         }
 
@@ -5732,8 +5681,7 @@ int main(int argc, char **argv) {
         if(!collect_data_for_all_processes()) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
-            netdata_mutex_unlock(&mutex);
-            netdata_thread_cancel(reader_thread);
+            netdata_mutex_unlock(&apps_and_stdout_mutex);
             exit(1);
         }
 
@@ -5769,5 +5717,5 @@ int main(int argc, char **argv) {
 
         debug_log("done Loop No %zu", global_iterations_counter);
     }
-    netdata_mutex_unlock(&mutex);
+    netdata_mutex_unlock(&apps_and_stdout_mutex);
 }

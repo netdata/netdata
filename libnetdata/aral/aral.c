@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include "../libnetdata.h"
+#include "aral.h"
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 #define TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS , const char *file, const char *function, size_t line
@@ -1058,7 +1057,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
     }
 
     netdata_log_info("ARAL: did %zu malloc, %zu free, "
-         "using %zu threads, in %llu usecs",
+         "using %zu threads, in %"PRIu64" usecs",
          auc.ar->aral_lock.user_malloc_operations,
          auc.ar->aral_lock.user_free_operations,
          threads,

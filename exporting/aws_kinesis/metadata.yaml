@@ -6,7 +6,7 @@ meta:
   link: 'https://aws.amazon.com/kinesis/'
   categories:
     - export
-  icon_filename: 'kinesis.png'
+  icon_filename: 'aws-kinesis.svg'
 keywords:
   - exporter
   - AWS

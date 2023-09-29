@@ -196,7 +196,7 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
         int do_pci_slots = CONFIG_BOOLEAN_NO;
 
         char buffer[100 + 1] = "";
-        rrdlabels_get_value_strcpyz(rrdb.localhost->rrdlabels, buffer, 100, "_virtualization");
+        rrdlabels_get_value_strcpyz(localhost->rrdlabels, buffer, 100, "_virtualization");
         if(strcmp(buffer, "none") != 0) {
             // no need to run on virtualized environments
             do_root_ports = CONFIG_BOOLEAN_NO;
@@ -267,6 +267,11 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
                 case AER_ROOTPORT_TOTAL_ERR_FATAL:
                     title = "PCI Root-Port Advanced Error Reporting (AER) Fatal Errors";
                     context = "pci.rootport_aer_fatal";
+                    break;
+
+                default:
+                    title = "Unknown PCI Advanced Error Reporting";
+                    context = "pci.unknown_aer";
                     break;
             }
 

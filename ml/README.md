@@ -130,7 +130,7 @@ Below is a list of all the available configuration params and their default valu
 	# maximum num samples to train = 21600
 	# minimum num samples to train = 900
 	# train every = 10800
-	# number of models per dimension = 9
+	# number of models per dimension = 18
 	# dbengine anomaly rate every = 30
 	# num samples to diff = 1
 	# num samples to smooth = 3
@@ -144,7 +144,8 @@ Below is a list of all the available configuration params and their default valu
 	# hosts to skip from training = !*
 	# charts to skip from training = netdata.*
 	# dimension anomaly rate suppression window = 900
-	# dimension anomaly rate suppression threshold = 450    
+	# dimension anomaly rate suppression threshold = 450
+	# delete models older than = 604800
 ```
 
 ### Configuration Examples
@@ -189,7 +190,7 @@ This example assumes 3 child nodes [streaming](https://github.com/netdata/netdat
 - `maximum num samples to train`: (`3600`/`86400`) This is the maximum amount of time you would like to train each model on. For example, the default of `21600` trains on the preceding 6 hours of data, assuming an `update every` of 1 second.
 - `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `900` implies that once at least 15 minutes of data is available for training, a model is trained, otherwise it is skipped and checked again at the next training run.
 - `train every`: (`1800`/`21600`) This is how often each model will be retrained. For example, the default of `10800` means that each model is retrained every 3 hours. Note: The training of all models is spread out across the `train every` period for efficiency, so in reality, it means that each model will be trained in a staggered manner within each `train every` period.
-- `number of models per dimension`: (`1`/`168`) This is the number of trained models that will be used for scoring. For example the default `number of models per dimension = 9` means that just the most recently trained 9 models for the dimension will be used to determine the corresponding anomaly bit. This means that under default settings of `maximum num samples to train = 21600`, `train every = 10800` and `number of models per dimension = 9`, netdata will store and use the last 9 trained models for each dimension when determining the anomaly bit. This means that for the latest feature vector in this configuration to be considered anomalous it would need to look anomalous across _all_ the models trained for that dimension in the last 9*(10800/3600) ~= 27 hours. As such, increasing `number of models per dimension` may reduce some false positives since it will result in more models (covering a wider time frame of training) being used during scoring.
+- `number of models per dimension`: (`1`/`168`) This is the number of trained models that will be used for scoring. For example the default `number of models per dimension = 18` means that the most recently trained 18 models for the dimension will be used to determine the corresponding anomaly bit. This means that under default settings of `maximum num samples to train = 21600`, `train every = 10800` and `number of models per dimension = 18`, netdata will store and use the last 18 trained models for each dimension when determining the anomaly bit. This means that for the latest feature vector in this configuration to be considered anomalous it would need to look anomalous across _all_ the models trained for that dimension in the last 18*(10800/3600) ~= 54 hours. As such, increasing `number of models per dimension` may reduce some false positives since it will result in more models (covering a wider time frame of training) being used during scoring.
 - `dbengine anomaly rate every`: (`30`/`900`) This is how often netdata will aggregate all the anomaly bits into a single chart (`anomaly_detection.anomaly_rates`). The aggregation into a single chart allows enabling anomaly rate ranking over _all_ metrics with one API call as opposed to a call per chart.
 - `num samples to diff`: (`0`/`1`) This is a `0` or `1` to determine if you want the model to operate on differences of the raw data or just the raw data. For example, the default of `1` means that we take differences of the raw values. Using differences is more general and works on dimensions that might naturally tend to have some trends or cycles in them that is normal behavior to which we don't want to be too sensitive.
 - `num samples to smooth`: (`0`/`5`) This is a small integer that controls the amount of smoothing applied as part of the feature processing used by the model. For example, the default of `3` means that the rolling average of the last 3 values is used. Smoothing like this helps the model be a little more robust to spiky types of dimensions that naturally "jump" up or down as part of their normal behavior.
@@ -201,7 +202,8 @@ This example assumes 3 child nodes [streaming](https://github.com/netdata/netdat
 - `anomaly detection grouping method`: The grouping method used when calculating node level anomaly rate.
 - `anomaly detection grouping duration`: (`60`/`900`) The duration across which to calculate the node level anomaly rate, the default of `900` means that the node level anomaly rate is calculated across a rolling 5 minute window.
 - `hosts to skip from training`: This parameter allows you to turn off anomaly detection for any child hosts on a parent host by defining those you would like to skip from training here. For example, a value like `dev-*` skips all hosts on a parent that begin with the "dev-" prefix. The default value of `!*` means "don't skip any".
-- `charts to skip from training`: This parameter allows you to exclude certain charts from anomaly detection. By default, only netdata related charts are excluded. This is to avoid the scenario where accessing the netdata dashboard could itself trigger some anomalies if you don't access them regularly. If you want to include charts that are excluded by default, add them in small groups and then measure any impact on performance before adding additional ones. Example: If you want to include system, apps, and user charts:`!system.* !apps.* !user.* *`. 
+- `charts to skip from training`: This parameter allows you to exclude certain charts from anomaly detection. By default, only netdata related charts are excluded. This is to avoid the scenario where accessing the netdata dashboard could itself trigger some anomalies if you don't access them regularly. If you want to include charts that are excluded by default, add them in small groups and then measure any impact on performance before adding additional ones. Example: If you want to include system, apps, and user charts:`!system.* !apps.* !user.* *`.
+- `delete models older than`: (`86400`/`604800`) Delete old models from the database that are unused, by default models will be deleted after 7 days.
 
 ## Charts
 
@@ -212,7 +214,7 @@ Once enabled, the "Anomaly Detection" menu and charts will be available on the d
 In terms of anomaly detection, the most interesting charts would be the `anomaly_detection.dimensions` and `anomaly_detection.anomaly_rate` ones, which hold the `anomalous` and `anomaly_rate` dimensions that show the overall number of dimensions considered anomalous at any time and the corresponding anomaly rate.
 
 - `anomaly_detection.dimensions`: Total count of dimensions considered anomalous or normal.
-- `anomaly_detection.dimensions`: Percentage of anomalous dimensions.
+- `anomaly_detection.anomaly_rate`: Percentage of anomalous dimensions.
 - `anomaly_detection.anomaly_detection`: Flags (0 or 1) to show when an anomaly event has been triggered by the detector.
 
 Below is an example of how these charts may look in the presence of an anomaly event.
@@ -267,7 +269,7 @@ The anomaly rate across all dimensions of a node.
 
 - We would love to hear any feedback relating to this functionality, please email us at analytics-ml-team@netdata.cloud or come join us in the [🤖-ml-powered-monitoring](https://discord.gg/4eRSEUpJnc) channel of the Netdata discord.
 - We are working on additional UI/UX based features that build on these core components to make them as useful as possible out of the box.
-- Although not yet a core focus of this work, users could leverage the `anomaly_detection` chart dimensions and/or `anomaly-bit` options in defining alarms based on ML driven anomaly detection models.
+- Although not yet a core focus of this work, users could leverage the `anomaly_detection` chart dimensions and/or `anomaly-bit` options in defining alerts based on ML driven anomaly detection models.
 - [This presentation](https://docs.google.com/presentation/d/18zkCvU3nKP-Bw_nQZuXTEa4PIVM6wppH3VUnAauq-RU/edit?usp=sharing) walks through some of the main concepts covered above in a more informal way.
 - After restart Netdata will wait until `minimum num samples to train` observations of data are available before starting training and prediction.
 - Netdata uses [dlib](https://github.com/davisking/dlib) under the hood for its core ML features.

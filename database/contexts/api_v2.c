@@ -418,7 +418,7 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
         dfe_done(rm);
 
         size_t label_searches = 0;
-        if(unlikely(ri->rrdlabels && dictionary_entries(ri->rrdlabels) &&
+        if(unlikely(ri->rrdlabels && rrdlabels_entries(ri->rrdlabels) &&
                     rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, q, ':', &label_searches))) {
             ctl->q.fts.searches += label_searches;
             ctl->q.fts.char_searches += label_searches;
@@ -802,7 +802,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                 {
                     buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
                     buffer_json_member_add_string(wb, "liveness", rrdhost_db_liveness_to_string(s.db.liveness));
-                    buffer_json_member_add_string(wb, "mode", storage_engine_name(s.db.storage_engine_id));
+                    buffer_json_member_add_string(wb, "mode", rrd_memory_mode_name(s.db.mode));
                     buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
                     buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
                     buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
@@ -989,9 +989,9 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
     else
         buffer_json_member_add_object(wb, "agent");
 
-    buffer_json_member_add_string(wb, "mg", rrdb.localhost->machine_guid);
-    buffer_json_member_add_uuid(wb, "nd", rrdb.localhost->node_id);
-    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(rrdb.localhost));
+    buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
+    buffer_json_member_add_uuid(wb, "nd", localhost->node_id);
+    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
     buffer_json_member_add_time_t(wb, "now", now_s);
 
     if(array)
@@ -1005,13 +1005,14 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_cloud_status(wb, now_s);
 
         buffer_json_member_add_array(wb, "db_size");
-        for (size_t tier = 0; tier < rrdb.storage_tiers; tier++) {
-            STORAGE_ENGINE_ID storage_engine_id = rrdb.localhost->db[tier].id;
+        for (size_t tier = 0; tier < storage_tiers; tier++) {
+            STORAGE_ENGINE *eng = localhost->db[tier].eng;
+            if (!eng) continue;
 
-            size_t max = storage_engine_disk_space_max(storage_engine_id, rrdb.localhost->db[tier].instance);
-            size_t used = storage_engine_disk_space_used(storage_engine_id, rrdb.localhost->db[tier].instance);
-            time_t first_time_s = storage_engine_global_first_time_s(storage_engine_id, rrdb.localhost->db[tier].instance);
-            size_t currently_collected_metrics = storage_engine_collected_metrics(storage_engine_id, rrdb.localhost->db[tier].instance);
+            uint64_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
+            uint64_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
+            time_t first_time_s = storage_engine_global_first_time_s(eng->backend, localhost->db[tier].instance);
+            size_t currently_collected_metrics = storage_engine_collected_metrics(eng->backend, localhost->db[tier].instance);
 
             NETDATA_DOUBLE percent;
             if (used && max)
@@ -1103,9 +1104,20 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     o->count++;
 
     if(o->family != n->family) {
-        STRING *m = string_2way_merge(o->family, n->family);
-        string_freez(o->family);
-        o->family = m;
+        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+            // keep old
+            ;
+        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+            // keep new
+            string_freez(o->family);
+            o->family = string_dup(n->family);
+        }
+        else {
+            // merge
+            STRING *old_family = o->family;
+            o->family = string_2way_merge(o->family, n->family);
+            string_freez(old_family);
+        }
     }
 
     if(o->priority != n->priority) {
@@ -1257,7 +1269,7 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
         {
             buffer_json_member_add_string(wb, "type", "agent");
             buffer_json_member_add_string(wb, "exec", t->notification.exec ? t->notification.exec : NULL);
-            buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(rrdb.localhost->health.health_default_recipient));
+            buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(localhost->health.health_default_recipient));
             buffer_json_member_add_string(wb, "delay", t->notification.delay);
             buffer_json_member_add_string(wb, "repeat", t->notification.repeat);
             buffer_json_member_add_string(wb, "options", t->notification.options);
@@ -1286,7 +1298,7 @@ int contexts_v2_alert_config_to_json(struct web_client *w, const char *config_ha
 
     buffer_flush(w->response.data);
 
-    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     int added = sql_get_alert_configuration(configs, contexts_v2_alert_config_to_json_from_sql_alert_config_data, &data, false);
     buffer_json_finalize(w->response.data);
@@ -1574,7 +1586,7 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
             [ATF_CLASS] = t->classification,
             [ATF_TYPE] = t->type,
             [ATF_COMPONENT] = t->component,
-            [ATF_ROLE] = t->recipient && *t->recipient ? t->recipient : string2str(rrdb.localhost->health.health_default_recipient),
+            [ATF_ROLE] = t->recipient && *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient),
             [ATF_NODE] = machine_guid,
             [ATF_ALERT_NAME] = t->alert_name,
             [ATF_CHART_NAME] = t->chart_name,
@@ -1744,9 +1756,9 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
                 buffer_json_member_add_time_t(wb, "delay", t->delay);
                 buffer_json_member_add_time_t(wb, "delay_up_to_time", t->delay_up_to_timestamp);
                 health_entry_flags_to_json_array(wb, "flags", t->flags);
-                buffer_json_member_add_string(wb, "exec", *t->exec ? t->exec : string2str(rrdb.localhost->health.health_default_exec));
+                buffer_json_member_add_string(wb, "exec", *t->exec ? t->exec : string2str(localhost->health.health_default_exec));
                 buffer_json_member_add_uint64(wb, "exec_code", t->exec_code);
-                buffer_json_member_add_string(wb, "to", *t->recipient ? t->recipient : string2str(rrdb.localhost->health.health_default_recipient));
+                buffer_json_member_add_string(wb, "to", *t->recipient ? t->recipient : string2str(localhost->health.health_default_recipient));
             }
             buffer_json_object_close(wb); // notification
         }
@@ -1922,14 +1934,14 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     if(req->after || req->before) {
-        ctl.window.relative = rrdr_relative_window_to_absolute(&ctl.window.after, &ctl.window.before, &ctl.now);
+        ctl.window.relative = rrdr_relative_window_to_absolute(&ctl.window.after, &ctl.window.before, &ctl.now, false);
         ctl.window.enabled = !(mode & CONTEXTS_V2_ALERT_TRANSITIONS);
     }
     else
         ctl.now = now_realtime_sec();
 
-    buffer_json_initialize(wb, "\"", "\"", 0,
-                           true, (req->options & CONTEXT_V2_OPTION_MINIFY) && !(req->options & CONTEXT_V2_OPTION_DEBUG));
+    buffer_json_initialize(wb, "\"", "\"", 0, true,
+                           ((req->options & CONTEXT_V2_OPTION_MINIFY) && !(req->options & CONTEXT_V2_OPTION_DEBUG)) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_uint64(wb, "api", 2);
 
@@ -2011,7 +2023,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         }
         else {
             buffer_strcat(wb, "query interrupted");
-            resp = HTTP_RESP_BACKEND_FETCH_FAILED;
+            resp = HTTP_RESP_CLIENT_CLOSED_REQUEST;
         }
         goto cleanup;
     }

@@ -218,7 +218,7 @@ typedef struct statsd_app {
     const char *name;
     SIMPLE_PATTERN *metrics;
     STATS_METRIC_OPTIONS default_options;
-    STORAGE_ENGINE_ID storage_engine_id;
+    RRD_MEMORY_MODE rrd_memory_mode;
     int32_t rrd_history_entries;
     DICTIONARY *dict;
 
@@ -1296,8 +1296,8 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                 // a new app
                 app = callocz(sizeof(STATSD_APP), 1);
                 app->name = strdupz("unnamed");
-                app->storage_engine_id = rrdb.localhost->storage_engine_id;
-                app->rrd_history_entries = rrdb.localhost->rrd_history_entries;
+                app->rrd_memory_mode = localhost->rrd_memory_mode;
+                app->rrd_history_entries = localhost->rrd_history_entries;
 
                 app->next = statsd.apps;
                 statsd.apps = app;
@@ -1409,6 +1409,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             else if (!strcmp(name, "memory mode")) {
                 // this is not supported anymore
                 // with the implementation of storage engines, all charts have the same storage engine always
+                // app->rrd_memory_mode = rrd_memory_mode_id(value);
                 ;
             }
             else if (!strcmp(name, "history")) {
@@ -1598,7 +1599,7 @@ static inline RRDSET *statsd_private_rrdset_create(
         statsd.private_charts++;
 
     RRDSET *st = rrdset_create_custom(
-            rrdb.localhost    // host
+            localhost         // host
             , type            // type
             , id              // id
             , name            // name
@@ -1611,8 +1612,8 @@ static inline RRDSET *statsd_private_rrdset_create(
             , priority        // priority
             , update_every    // update every
             , chart_type      // chart type
-            , default_storage_engine_id     // storage_engine_id
-            , rrdb.default_rrd_history_entries // history
+            , default_rrd_memory_mode     // memory mode
+            , default_rrd_history_entries // history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
 
@@ -2203,7 +2204,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 
     if(!chart->st) {
         chart->st = rrdset_create_custom(
-                rrdb.localhost              // host
+                localhost                   // host
                 , app->name                 // type
                 , chart->id                 // id
                 , chart->name               // name
@@ -2216,7 +2217,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->priority           // priority
                 , statsd.update_every       // update every
                 , chart->chart_type         // chart type
-                , app->storage_engine_id    // storage engine id
+                , app->rrd_memory_mode      // memory mode
                 , app->rrd_history_entries  // history
         );
 
@@ -2431,11 +2432,11 @@ void *statsd_main(void *ptr) {
 
     statsd.enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, "statsd", statsd.enabled);
 
-    statsd.update_every = rrdb.default_update_every;
+    statsd.update_every = default_rrd_update_every;
     statsd.update_every = (int)config_get_number(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
-    if(statsd.update_every < rrdb.default_update_every) {
-        collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, rrdb.default_update_every);
-        statsd.update_every = rrdb.default_update_every;
+    if(statsd.update_every < default_rrd_update_every) {
+        collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
+        statsd.update_every = default_rrd_update_every;
     }
 
 #ifdef HAVE_RECVMMSG

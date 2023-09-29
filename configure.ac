@@ -70,6 +70,12 @@ AC_ARG_ENABLE(
     [enable_plugin_freeipmi="detect"]
 )
 AC_ARG_ENABLE(
+    [plugin-systemd-journal],
+    [AS_HELP_STRING([--enable-plugin-systemd-journal], [enable systemd-journal plugin @<:@default autodetect@:>@])],
+    ,
+    [enable_plugin_systemd_journal="detect"]
+)
+AC_ARG_ENABLE(
     [plugin-cups],
     [AS_HELP_STRING([--enable-plugin-cups], [enable cups plugin @<:@default autodetect@:>@])],
     ,
@@ -644,7 +650,7 @@ AC_C_BIGENDIAN([],
     [AC_MSG_ERROR([Could not find out system endiannnes])])
 
 AC_CHECK_SIZEOF(void *)
-if test "$ac_cv_sizeof_void_p" = 8; then 
+if test "$ac_cv_sizeof_void_p" = 8; then
     AC_MSG_RESULT(Detected 64-bit Build Environment)
     	LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -DJU_64BIT"
 else 
@@ -1105,6 +1111,52 @@ fi
 AC_MSG_RESULT([${enable_plugin_freeipmi}])
 AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "yes"])
 
+
+# -----------------------------------------------------------------------------
+# systemd-journal.plugin - systemd
+
+LIBS_BAK="${LIBS}"
+
+AC_CHECK_LIB([systemd], [sd_journal_open], [have_systemd_libs=yes], [have_systemd_libs=no])
+AC_CHECK_HEADERS([systemd/sd-journal.h], [have_systemd_journal_header=yes], [have_systemd_journal_header=no])
+
+if test "${have_systemd_libs}" = "yes" -a "${have_systemd_journal_header}" = "yes"; then
+    have_systemd="yes"
+else
+    have_systemd="no"
+fi
+
+test "${enable_plugin_systemd_journal}" = "yes" -a "${have_systemd}" != "yes" && \
+    AC_MSG_ERROR([systemd is required but not found. Try installing 'libsystemd-dev' or 'libsystemd-devel'])
+
+AC_MSG_CHECKING([if systemd-journal.plugin should be enabled])
+if test "${enable_plugin_systemd_journal}" != "no" -a "${have_systemd}" = "yes"; then
+    enable_plugin_systemd_journal="yes"
+    AC_DEFINE([HAVE_SYSTEMD], [1], [systemd usability])
+    OPTIONAL_SYSTEMD_CFLAGS="-I/usr/include"
+    OPTIONAL_SYSTEMD_LIBS="-lsystemd"
+else
+    enable_plugin_systemd_journal="no"
+fi
+AC_MSG_RESULT([${enable_plugin_systemd_journal}])
+AM_CONDITIONAL([ENABLE_PLUGIN_SYSTEMD_JOURNAL], [test "${enable_plugin_systemd_journal}" = "yes"])
+
+AC_MSG_NOTICE([OPTIONAL_SYSTEMD_LIBS is set to: ${OPTIONAL_SYSTEMD_LIBS}])
+
+if test "${enable_plugin_systemd_journal}" = "yes"; then
+    AC_MSG_CHECKING([for SD_JOURNAL_OS_ROOT in systemd])
+    AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM(
+            [[#include <systemd/sd-journal.h>]],
+            [[int x = SD_JOURNAL_OS_ROOT;]]
+        )],
+        [AC_DEFINE(HAVE_SD_JOURNAL_OS_ROOT, 1, [Define if SD_JOURNAL_OS_ROOT is available])
+            AC_MSG_RESULT(yes)],
+            [AC_MSG_RESULT(no)]
+    )
+fi
+
+LIBS="${LIBS_BAK}"
 
 # -----------------------------------------------------------------------------
 # cups.plugin - libcups
@@ -1874,6 +1926,7 @@ AC_SUBST([OPTIONAL_GTEST_CFLAGS])
 AC_SUBST([OPTIONAL_GTEST_LIBS])
 AC_SUBST([OPTIONAL_ML_CFLAGS])
 AC_SUBST([OPTIONAL_ML_LIBS])
+AC_SUBST(OPTIONAL_SYSTEMD_LIBS)
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1937,6 +1990,7 @@ AC_CONFIG_FILES([
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
+    collectors/systemd-journal.plugin/Makefile
     daemon/Makefile
     database/Makefile
     database/contexts/Makefile
@@ -1968,6 +2022,8 @@ AC_CONFIG_FILES([
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
+    libnetdata/facets/Makefile
+    libnetdata/functions_evloop/Makefile
     libnetdata/july/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
@@ -1992,6 +2048,7 @@ AC_CONFIG_FILES([
     web/Makefile
     web/api/Makefile
     web/api/badges/Makefile
+    web/api/ilove/Makefile
     web/api/exporters/Makefile
     web/api/exporters/shell/Makefile
     web/api/exporters/prometheus/Makefile

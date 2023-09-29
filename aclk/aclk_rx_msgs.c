@@ -279,7 +279,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
 
     RRDHOST *host = rrdhost_find_by_guid(res.machine_guid);
     if (likely(host)) {
-        if (host == rrdb.localhost) {
+        if (host == localhost) {
             node_state_update.live = 1;
             node_state_update.hops = 0;
         } else {
@@ -289,10 +289,10 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         node_state_update.capabilities = aclk_get_node_instance_capas(host);
     }
 
-    rrdhost_aclk_state_lock(rrdb.localhost);
-    node_state_update.claim_id = rrdb.localhost->aclk_state.claimed_id;
+    rrdhost_aclk_state_lock(localhost);
+    node_state_update.claim_id = localhost->aclk_state.claimed_id;
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
-    rrdhost_aclk_state_unlock(rrdb.localhost);
+    rrdhost_aclk_state_unlock(localhost);
 
     freez((void *)node_state_update.capabilities);
 
@@ -449,7 +449,7 @@ int stop_streaming_contexts(const char *msg, size_t msg_len)
 
 int cancel_pending_req(const char *msg, size_t msg_len)
 {
-    struct aclk_cancel_pending_req cmd;
+    struct aclk_cancel_pending_req cmd = {.request_id = NULL, .trace_id = NULL};
     if(parse_cancel_pending_req(msg, msg_len, &cmd)) {
         error_report("Error parsing CancelPendingReq");
         return 1;

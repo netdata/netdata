@@ -217,6 +217,11 @@ void *pluginsd_main(void *ptr)
 
     // disable some plugins by default
     config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
+    // it crashes (both threads) on Alpine after we made it multi-threaded
+    // works with "--device /dev/ipmi0", but this is not default
+    // see https://github.com/netdata/netdata/pull/15564 for details
+    if (getenv("NETDATA_LISTENER_PORT"))
+        config_get_boolean(CONFIG_SECTION_PLUGINS, "freeipmi", CONFIG_BOOLEAN_NO);
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
@@ -288,11 +293,11 @@ void *pluginsd_main(void *ptr)
                     strncpyz(cd->filename, file->d_name, FILENAME_MAX);
                     snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", directory_name, cd->filename);
 
-                    cd->host = rrdb.localhost;
+                    cd->host = localhost;
                     cd->unsafe.enabled = enabled;
                     cd->unsafe.running = false;
 
-                    cd->update_every = (int)config_get_number(cd->id, "update every", rrdb.localhost->update_every);
+                    cd->update_every = (int)config_get_number(cd->id, "update every", localhost->rrd_update_every);
                     cd->started_t = now_realtime_sec();
 
                     char *def = "";

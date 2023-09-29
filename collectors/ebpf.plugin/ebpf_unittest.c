@@ -12,8 +12,8 @@ ebpf_module_t test_em;
 void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
 {
     memset(&test_em, 0, sizeof(ebpf_module_t));
-    test_em.thread_name = strdupz("process");
-    test_em.config_name = test_em.thread_name;
+    test_em.info.thread_name = strdupz("process");
+    test_em.info.config_name = test_em.info.thread_name;
     test_em.kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 |
                       NETDATA_V5_14;
     test_em.pid_map_size = ND_EBPF_DEFAULT_PID_SIZE;
@@ -28,7 +28,7 @@ void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
  */
 void ebpf_ut_cleanup_memory()
 {
-    freez((void *)test_em.thread_name);
+    freez((void *)test_em.info.thread_name);
 }
 
 /**
@@ -70,14 +70,14 @@ int ebpf_ut_load_real_binary()
  */
 int ebpf_ut_load_fake_binary()
 {
-    const char *original = test_em.thread_name;
+    const char *original = test_em.info.thread_name;
 
-    test_em.thread_name = strdupz("I_am_not_here");
+    test_em.info.thread_name = strdupz("I_am_not_here");
     int ret = ebpf_ut_load_binary();
 
     ebpf_ut_cleanup_memory();
 
-    test_em.thread_name = original;
+    test_em.info.thread_name = original;
 
     return !ret;
 }

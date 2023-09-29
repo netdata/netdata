@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web/api/web_api_v1.h"
+#include "database/storage_engine.h"
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
@@ -99,7 +100,7 @@ int rrdset2value_api_v1(
         *db_points_read += r->stats.db_points_read;
 
     if(db_points_per_tier) {
-        for(size_t t = 0; t < rrdb.storage_tiers ;t++)
+        for(size_t t = 0; t < storage_tiers ;t++)
             db_points_per_tier[t] += r->internal.qt->db.tiers[t].points;
     }
 
@@ -169,7 +170,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
 
     if (r->view.flags & RRDR_RESULT_FLAG_CANCEL) {
         rrdr_free(owa, r);
-        return HTTP_RESP_BACKEND_FETCH_FAILED;
+        return HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
     if(r->view.flags & RRDR_RESULT_FLAG_RELATIVE)

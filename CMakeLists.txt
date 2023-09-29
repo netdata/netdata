@@ -488,9 +488,15 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
+        libnetdata/dyn_conf/dyn_conf.c
+        libnetdata/dyn_conf/dyn_conf.h
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
+        libnetdata/facets/facets.c
+        libnetdata/facets/facets.h
+        libnetdata/functions_evloop/functions_evloop.h
+        libnetdata/functions_evloop/functions_evloop.c
         libnetdata/http/http_defs.h
         )
 
@@ -671,6 +677,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/sys_fs_btrfs.c
         collectors/proc.plugin/sys_class_power_supply.c
         collectors/proc.plugin/sys_devices_pci_aer.c
+        collectors/proc.plugin/sys_class_drm.c
         )
 
 set(TC_PLUGIN_FILES
@@ -710,6 +717,10 @@ set(STATSD_PLUGIN_FILES
         collectors/statsd.plugin/statsd.c
         )
 
+set(SYSTEMD_JOURNAL_PLUGIN_FILES
+        collectors/systemd-journal.plugin/systemd-journal.c
+        )
+
 set(RRD_PLUGIN_FILES
         database/contexts/api_v1.c
         database/contexts/api_v2.c
@@ -744,7 +755,6 @@ set(RRD_PLUGIN_FILES
         database/rrdvar.h
         database/storage_engine.c
         database/storage_engine.h
-        database/storage_engine_types.h
         database/ram/rrddim_mem.c
         database/ram/rrddim_mem.h
         database/sqlite/sqlite_metadata.c
@@ -765,6 +775,9 @@ set(RRD_PLUGIN_FILES
         database/sqlite/sqlite_aclk_alert.h
         database/sqlite/sqlite3.c
         database/sqlite/sqlite3.h
+        database/sqlite/sqlite3recover.c
+        database/sqlite/sqlite3recover.h
+        database/sqlite/dbdata.c
         database/engine/rrdengine.c
         database/engine/rrdengine.h
         database/engine/rrddiskprotocol.h
@@ -776,7 +789,6 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdenginelib.h
         database/engine/rrdengineapi.c
         database/engine/rrdengineapi.h
-        database/engine/rrddim_eng.h
         database/engine/pagecache.c
         database/engine/pagecache.h
         database/engine/cache.c
@@ -1059,7 +1071,6 @@ ENDIF()
 
 set(NETDATA_FILES
         collectors/all.h
-        collectors/utils.h
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
@@ -1070,6 +1081,7 @@ set(NETDATA_FILES
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
+        ${SYSTEMD_JOURNAL_PLUGIN_FILES}
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}

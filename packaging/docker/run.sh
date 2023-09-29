@@ -46,9 +46,10 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
-if mountpoint -q /etc/netdata && [ -z "$(ls -A /etc/netdata)" ]; then
+if mountpoint -q /etc/netdata; then
   echo "Copying stock configuration to /etc/netdata"
-  cp -a /etc/netdata.stock/. /etc/netdata
+  cp -an /etc/netdata.stock/* /etc/netdata
+  cp -an /etc/netdata.stock/.[^.]* /etc/netdata
 fi
 
 if [ -w "/etc/netdata" ]; then

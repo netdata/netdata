@@ -10,6 +10,9 @@
 // this has to be in-sync with the same at receiver.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
+// this controls the max response size of a function
+#define PLUGINSD_MAX_DEFERRED_SIZE (20 * 1024 * 1024)
+
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
     PARSER_RC_OK,       // Callback was successful, go on
@@ -43,8 +46,8 @@ typedef struct parser_user_object {
     void    *opaque;
     struct plugind *cd;
     int trust_durations;
-    DICTIONARY *new_host_labels;
-    DICTIONARY *chart_rrdlabels_linked_temporarily;
+    RRDLABELS *new_host_labels;
+    RRDLABELS *chart_rrdlabels_linked_temporarily;
     size_t data_collections_count;
     int enabled;
 
@@ -55,7 +58,7 @@ typedef struct parser_user_object {
         uuid_t machine_guid;
         char machine_guid_str[UUID_STR_LEN];
         STRING *hostname;
-        DICTIONARY *rrdlabels;
+        RRDLABELS *rrdlabels;
     } host_define;
 
     struct parser_user_object_replay {
@@ -151,15 +154,15 @@ static inline int parser_action(PARSER *parser, char *input) {
     parser->line++;
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
-        char command[PLUGINSD_LINE_MAX + 1];
-        bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, isspace_map_pluginsd);
+        char command[100 + 1];
+        bool has_keyword = find_first_keyword(input, command, 100, isspace_map_pluginsd);
 
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
             if(parser->defer.response) {
                 buffer_strcat(parser->defer.response, input);
-                if(buffer_strlen(parser->defer.response) > 10 * 1024 * 1024) {
-                    // more than 10MB of data
-                    // a bad plugin that did not send the end_keyword
+                if(buffer_strlen(parser->defer.response) > PLUGINSD_MAX_DEFERRED_SIZE) {
+                    // more than PLUGINSD_MAX_DEFERRED_SIZE of data,
+                    // or a bad plugin that did not send the end_keyword
                     internal_error(true, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
                     return 1;
                 }
@@ -180,7 +183,7 @@ static inline int parser_action(PARSER *parser, char *input) {
         return 0;
     }
 
-    char *words[PLUGINSD_MAX_WORDS];
+    static __thread char *words[PLUGINSD_MAX_WORDS];
     size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
     const char *command = get_word(words, num_words, 0);
 

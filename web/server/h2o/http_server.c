@@ -46,6 +46,8 @@ static int create_listener(const char *ip, int port)
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1 ||
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_flag, sizeof(reuseaddr_flag)) != 0 ||
         bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0 || listen(fd, SOMAXCONN) != 0) {
+        if (fd != -1)
+            close(fd);
         return -1;
     }
 
@@ -235,7 +237,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
 static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 {
     UNUSED(self);
-    RRDHOST *host = rrdb.localhost;
+    RRDHOST *host = localhost;
 
     int ret = _netdata_uberhandler(req, &host);
 
@@ -249,7 +251,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
                    ", response: %d",
                    PRINTF_H2O_IOVEC(&req->method),
                    PRINTF_H2O_IOVEC(&req->input.path),
-                   host == rrdb.localhost ? "localhost" : host_uuid_str,
+                   host == localhost ? "localhost" : host_uuid_str,
                    req->res.status);
     } else {
         netdata_log_access("HTTPD %d"

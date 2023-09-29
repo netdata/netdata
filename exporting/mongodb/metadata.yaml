@@ -6,7 +6,7 @@ meta:
   link: 'https://www.mongodb.com/'
   categories:
     - export
-  icon_filename: 'json.png'
+  icon_filename: 'mongodb.svg'
 keywords:
   - exporter
   - MongoDB

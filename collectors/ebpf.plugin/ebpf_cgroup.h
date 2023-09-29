@@ -21,7 +21,7 @@ struct pid_on_target2 {
     ebpf_process_stat_t ps;
     netdata_dcstat_pid_t dc;
     netdata_publish_shm_t shm;
-    ebpf_bandwidth_t socket;
+    netdata_socket_t socket;
     netdata_cachestat_pid_t cachestat;
 
     struct pid_on_target2 *next;

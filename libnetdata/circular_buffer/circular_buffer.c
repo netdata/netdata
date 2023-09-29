@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include "../libnetdata.h"
 
 struct circular_buffer *cbuffer_new(size_t initial, size_t max, size_t *statistics) {

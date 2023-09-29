@@ -40,12 +40,12 @@ NETDATA_SYSTEM_CPU_VISIBLETOTAL=5
 echo ${NETDATA_SYSTEM_CPU_VISIBLETOTAL}
 5
 
-# what about alarms?
+# what about alerts?
 set | grep "^NETDATA_ALARM_SYSTEM_SWAP_"
 NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_STATUS=CLEAR
 NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_VALUE=51
 
-# let's get the current status of the alarm 'used swap'
+# let's get the current status of the alert 'used swap'
 echo ${NETDATA_ALARM_SYSTEM_SWAP_USED_SWAP_STATUS}
 CLEAR
 

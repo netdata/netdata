@@ -94,8 +94,8 @@ Netdata plugins and various aspects of Netdata can be enabled or benefit when th
 
 | package |description|
 |:-----:|-----------|
-| `bash`|for shell plugins and **alarm notifications**|
-| `curl`|for shell plugins and **alarm notifications**|
+| `bash`|for shell plugins and **alert notifications**|
+| `curl`|for shell plugins and **alert notifications**|
 | `iproute` or `iproute2`|for monitoring **Linux traffic QoS**<br/>use `iproute2` if `iproute` reports as not available or obsolete|
 | `python`|for most of the external plugins|
 | `python-yaml`|used for monitoring **beanstalkd**|
