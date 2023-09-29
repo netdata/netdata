@@ -325,7 +325,7 @@ int init_database_batch(sqlite3 *database, const char *batch[])
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
-            analytics_set_data_str(&analytics_data.netdata_fail_reason, err_msg);
+            analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(sqlite3_extended_errcode(database)));
             sqlite3_free(err_msg);
             if (SQLITE_CORRUPT == rc) {
                 if (mark_database_to_recover(NULL, database))
@@ -409,7 +409,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
-        analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(rc));
+        analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(sqlite3_extended_errcode(db_meta)));
         sqlite3_close(db_meta);
         db_meta = NULL;
         return 1;
