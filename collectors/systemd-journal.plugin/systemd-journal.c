@@ -16,6 +16,8 @@
 // fstat64 overloading to speed up libsystemd
 // https://github.com/systemd/systemd/pull/29261
 
+#define ND_SD_JOURNAL_OPEN_FLAGS (0)
+
 #ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
 
 #include <dlfcn.h>
@@ -582,7 +584,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     int fd = open(filename, O_RDONLY);
     fstat_cache_enable(fd);
 
-    if(sd_journal_open_files_fd(&j, &fd, 1, 0) < 0 || !j) {
+    if(sd_journal_open_files_fd(&j, &fd, 1, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
         fqs->cached_count += fstat_cache_disable(fd);
         close(fd);
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
@@ -593,7 +595,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
             [0] = filename,
             [1] = NULL,
     };
-    if(sd_journal_open_files(&j, paths, 0) < 0 || !j)
+    if(sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j)
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
 
 #endif // !HAVE_SD_JOURNAL_OPEN_FILES_FD
@@ -685,7 +687,7 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
     };
 
     sd_journal *j = NULL;
-    if(sd_journal_open_files(&j, files, 0) < 0 || !j) {
+    if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
         if(!jf->logged_failure) {
             netdata_log_error("cannot open journal file '%s', using file timestamps to understand time-frame.", filename);
             jf->logged_failure = true;
