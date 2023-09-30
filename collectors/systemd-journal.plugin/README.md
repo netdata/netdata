@@ -9,7 +9,9 @@ learn_rel_path: "Integrations/Logs"
 
 # SystemD Journal
 
-Netdata's SystemD Journal plugin allows viewing and analyzing `systemd` journal logs.
+The SystemD Journal plugin by Netdata makes viewing and analyzing systemd journal logs simple and efficient.
+It automatically discovers available journal sources, allows advanced filtering, offers interactive visual
+representations and supports both individual servers and logs centralization servers.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
@@ -27,7 +29,9 @@ Netdata's SystemD Journal plugin allows viewing and analyzing `systemd` journal 
 
 ### Prerequisites
 
-`systemd-journal.plugin` is a Netdata Function Plugin. To protect your privacy, as with all Netdata Functions, a free Netdata Cloud user account is required to access it.
+`systemd-journal.plugin` is a Netdata Function Plugin.
+
+To protect your privacy, as with all Netdata Functions, a free Netdata Cloud user account is required to access it.
 
 ### Limitations:
 
@@ -178,10 +182,36 @@ On centralized log servers, this provides a unified view of all the logs encount
 
 The plugin supports searching for any text on all fields of the log entries. Full text search is combined with the selected filters.
 
+## Query performance
+
+Journal files are designed to be accessed by multiple readers and one writer, concurrently.
+
+Readers (like this Netdata plugin), open the journal files and `libsystemd`, behind the scenes, maps regions of the files
+into memory, to satisfy each query.
+
+On logs aggregation servers, the performance of the queries depend on the following factors:
+
+1. The number of files involved in each query. This is why we suggest to select a source when possible.
+1. The speed of the disks hosting the journal files. Journal files perform a lot of reading while querying, so the fastest the disks, the faster the query will finish.
+2. The memory available for caching parts of the files. Increased memory will help the kernel cache the most frequently used of the journal files, speeding queries significantly.
+
+At the time of this writing, this Netdata plugin is about 25-30 times faster than `journalctl` on queries that access
+multiple journal files, over long time-frames.
+
+During the development of this plugin, we submitted, to `systemd`, a number of patches to improve `journalctl`
+performance by a factor of 14:
+
+- https://github.com/systemd/systemd/pull/29365
+- https://github.com/systemd/systemd/pull/29366
+- https://github.com/systemd/systemd/pull/29261
+
+However, even after these patches are merged, `journalctl` will still be 2x slower than this Netdata plugin.
+
+The problem lies in the way `libsystemd` handles multi-journal file queries. To overcome this problem,
+the Netdata plugin queries each file individually and it then it merges the results to be returned.
+This is transparent, thanks to the `facets` library in `libnetdata` that handles on-the-fly indexing, filtering,
+and searching of any dataset, independently of its source.
+
 ## Configuration and maintenance
 
 This Netdata plugin does not require any configuration or maintenance.
-
-## Access this plugin
-
-This Netdata plugin is available to be used via Netdata Parents and Netdata Cloud.
