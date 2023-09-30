@@ -193,11 +193,20 @@ The histogram presented by the plugin is interactive:
 
 The plugin supports PLAY mode, to continuously update the screen with new log entries found in the journal files.
 
-On centralized log servers, this provides a unified view of all the logs encountered across the entire infrastructure (depending on the selected sources and filters).
+On centralized log servers, this provides a unified view of all the logs encountered across the entire infrastructure
+(depending on the selected sources and filters).
+
+PLAY mode introduces ignorable load on the server when no new log entries are found.
+
+However, when new log entries are encountered, the plugin will have to recalculate the histogram for the entire
+time-frame, parsing all the log entries within the visible time-frame.
+
+To minimize the load on the server, we suggest to activate PLAY mode on small timeframes.
 
 ## Full text search
 
-The plugin supports searching for any text on all fields of the log entries. Full text search is combined with the selected filters.
+The plugin supports searching for any text on all fields of the log entries.
+Full text search is combined with the selected filters.
 
 ## Query performance
 
