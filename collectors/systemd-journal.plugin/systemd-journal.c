@@ -1832,6 +1832,22 @@ static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __may
     }
 }
 
+static void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        uint64_t ut = str2ull(buffer_tostring(wb), NULL);
+        if(ut) {
+            time_t timestamp_sec = ut / USEC_PER_SEC;
+            struct tm tm;
+            char buffer[30];
+
+            gmtime_r(&timestamp_sec, &tm);
+            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+            buffer_sprintf(wb, " (%s.%06llu UTC)", buffer, ut % USEC_PER_SEC);
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 static void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
@@ -2031,6 +2047,10 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_register_key_name_transformation(facets, "_AUDIT_LOGINUID",
                                             FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_uid, NULL);
+
+    facets_register_key_name_transformation(facets, "_SOURCE_REALTIME_TIMESTAMP",
+                                            FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_timestamp_usec, NULL);
 
     bool info = false, data_only = false, progress = false, slice = JOURNAL_DEFAULT_SLICE_MODE;
     time_t after_s = 0, before_s = 0;
