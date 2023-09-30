@@ -67,7 +67,6 @@ add_pythond_packages()
 
 from bases.collection import safe_print
 from bases.loggers import PythonDLogger
-from bases.loggers import NETDATA_SEVERITY_LEVELS
 from bases.loaders import load_config
 from third_party import filelock
 
@@ -262,9 +261,9 @@ class ModuleConfig:
 
 
 class JobsConfigsBuilder:
-    def __init__(self, config_dirs, netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']):
+    def __init__(self, config_dirs):
         self.config_dirs = config_dirs
-        self.log = PythonDLogger(severity_level = netdata_severity_level)
+        self.log = PythonDLogger()
         self.job_defaults = None
         self.module_defaults = None
         self.min_update_every = None
@@ -535,17 +534,16 @@ class Plugin:
     config_name = 'python.d.conf'
     jobs_status_dump_name = 'pythond-jobs-statuses.json'
 
-    def __init__(self, modules_to_run, min_update_every, registry, netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']):
+    def __init__(self, modules_to_run, min_update_every, registry):
         self.modules_to_run = modules_to_run
         self.min_update_every = min_update_every
         self.config = PluginConfig(PLUGIN_BASE_CONF)
-        self.log = PythonDLogger(severity_level = netdata_severity_level)
+        self.log = PythonDLogger()
         self.registry = registry
         self.started_jobs = collections.defaultdict(dict)
         self.jobs = list()
         self.saver = None
         self.runs = 0
-        self.netdata_severity_level = netdata_severity_level
 
     def load_config_file(self, filepath, expected):
         self.log.debug("looking for '{0}'".format(filepath))
@@ -596,7 +594,7 @@ class Plugin:
             DIRS.modules_stock_config,
         ]
 
-        builder = JobsConfigsBuilder(paths, self.netdata_severity_level)
+        builder = JobsConfigsBuilder(paths)
         builder.job_defaults = JOB_BASE_CONF
         builder.min_update_every = self.min_update_every
 
@@ -796,13 +794,12 @@ def parse_command_line():
     trace = False
     nolock = False
     update_every = 1
-    netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']
     modules_to_run = list()
 
-    def find_first_integer_value(values, start = 1):
-        return next((v for v in values if v.isdigit() and int(v) >= start), None)
+    def find_first_positive_value(values):
+        return next((v for v in values if v.isdigit() and int(v) >= 1), None)
 
-    u = find_first_integer_value(opts)
+    u = find_first_positive_value(opts)
     if u is not None:
         update_every = int(u)
         opts.remove(u)
@@ -815,15 +812,6 @@ def parse_command_line():
     if 'nolock' in opts:
         nolock = True
         opts.remove('nolock')
-    if 'severity-level' in opts:
-        opts.remove('severity-level')
-        if 'error' in opts:
-            netdata_severity_level = NETDATA_SEVERITY_LEVELS['error']
-            opts.remove('error')
-        elif 'info' in opts:
-            netdata_severity_level = NETDATA_SEVERITY_LEVELS['info']
-            opts.remove('info')
-
     if opts:
         modules_to_run = list(opts)
 
@@ -834,7 +822,6 @@ def parse_command_line():
             'debug',
             'trace',
             'nolock',
-            'netdata_severity_level',
             'modules_to_run',
         ])
     return cmd(
@@ -842,7 +829,6 @@ def parse_command_line():
         debug,
         trace,
         nolock,
-        netdata_severity_level,
         modules_to_run,
     )
 
@@ -888,7 +874,7 @@ def get_modules_to_run(cmd):
 
 def main():
     cmd = parse_command_line()
-    log = PythonDLogger(severity_level = cmd.netdata_severity_level)
+    log = PythonDLogger()
 
     if cmd.debug:
         log.logger.severity = 'DEBUG'
@@ -915,7 +901,6 @@ def main():
         get_modules_to_run(cmd),
         cmd.update_every,
         registry,
-        cmd.netdata_severity_level
     )
 
     # cheap attempt to reduce chance of python.d job running before go.d

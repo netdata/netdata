@@ -300,10 +300,7 @@ void *pluginsd_main(void *ptr)
                     cd->update_every = (int)config_get_number(cd->id, "update every", localhost->rrd_update_every);
                     cd->started_t = now_realtime_sec();
 
-                    char def[32];
-                    snprintfz(def, 31, "severity-level %s",
-                              log_severity_level_to_severity_string(use_severity_level));
-
+                    char *def = "";
                     snprintfz(
                         cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every,
                         config_get(cd->id, "command options", def));

@@ -23,9 +23,6 @@ LOGGING_LEVELS = {'CRITICAL': 50,
                   'DEBUG': 10,
                   'NOTSET': 0}
 
-NETDATA_SEVERITY_LEVELS = {'info': 0,
-                           'error': 1}
-
 DEFAULT_LOG_LINE_FORMAT = '%(asctime)s: %(name)s %(levelname)s : %(message)s'
 DEFAULT_LOG_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
@@ -144,8 +141,7 @@ class BaseLogger(object):
 
 
 class PythonDLogger(object):
-    def __init__(self, logger_name=PYTHON_D_LOG_NAME, log_fmt=PYTHON_D_LOG_LINE_FORMAT,
-                 severity_level=NETDATA_SEVERITY_LEVELS['info']):
+    def __init__(self, logger_name=PYTHON_D_LOG_NAME, log_fmt=PYTHON_D_LOG_LINE_FORMAT):
         """
         :param logger_name: <str>
         :param log_fmt: <str>
@@ -154,7 +150,6 @@ class PythonDLogger(object):
         self.module_name = 'plugin'
         self.job_name = 'main'
         self._logger_counters = LoggerCounters()
-        self.netdata_severity_level = severity_level
 
     _LOG_TRACEBACK = False
 
@@ -185,9 +180,6 @@ class PythonDLogger(object):
 
     @add_traceback
     def alert(self, *msg):
-        if self.netdata_severity_level < NETDATA_SEVERITY_LEVELS['error']:
-            return
-
         self.logger.alert(*msg, extra={'module_name': self.module_name,
                                        'job_name': self.job_name or self.module_name})
 

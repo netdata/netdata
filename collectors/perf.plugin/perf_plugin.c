@@ -1204,16 +1204,6 @@ void parse_command_line(int argc, char **argv) {
             debug = 1;
             continue;
         }
-        else if(strcmp("severity-level", argv[i]) == 0) {
-            if(argc <= i + 1) {
-                fprintf(stderr, "Parameter 'severity-level' requires a string ('info' or 'error') as argument.\n");
-                exit(1);
-            }
-            i++;
-            netdata_log_level_t slevel =  log_severity_string_to_severity_level(argv[i]);
-            log_collector_severity_level(slevel);
-            continue;
-        }
         else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "\n"
@@ -1262,9 +1252,6 @@ void parse_command_line(int argc, char **argv) {
                     "  ITLB                    enable ITLB cache operations chart\n"
                     "\n"
                     "  PBU                     enable PBU cache operations chart\n"
-                    "\n"
-                    " severity-level N         informs the log level used by plugin:\n"
-                    "                          0 - info; 1 - error \n"
                     "\n"
                     "  debug                   enable verbose output\n"
                     "                          default: disabled\n"

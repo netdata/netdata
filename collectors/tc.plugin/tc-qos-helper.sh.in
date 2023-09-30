@@ -17,7 +17,6 @@ export LC_ALL=C
 
 PROGRAM_NAME="$(basename "$0")"
 PROGRAM_NAME="${PROGRAM_NAME/.plugin/}"
-security_level=0
 
 logdate() {
 	date "+%Y-%m-%d %H:%M:%S"
@@ -128,23 +127,6 @@ t=${1}
 update_every=$((t))
 [ $((update_every)) -lt 1 ] && update_every=${NETDATA_UPDATE_EVERY}
 [ $((update_every)) -lt 1 ] && update_every=1
-
-# -----------------------------------------------------------------------------
-# check if we have a valid security-level
-
-security_level_option=${2}
-if [ -n "${security_level_option}" ]; then
-  security_level_value=${3}
-  if [ -n "${security_level_option}" ]; then
-    if [ "$security_level_value" != "info" ] && [ "$security_level_value" != "error" ]; then
-      error "Wrong security-level given, plugin will work with default 'info'."
-    else
-      security_level=1
-    fi
-  else
-    error "It is necessary to pass 'info' or 'error' with severity-level"
-  fi
-fi
 
 # -----------------------------------------------------------------------------
 # allow the user to override our defaults

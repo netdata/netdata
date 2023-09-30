@@ -4385,17 +4385,6 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
-        if(strcmp("severity-level", argv[i]) == 0) {
-            if(argc <= i + 1) {
-                fprintf(stderr, "Parameter 'severity-level' requires a string ('info' or 'error') as argument.\n");
-                exit(1);
-            }
-            i++;
-            netdata_log_level_t slevel =  log_severity_string_to_severity_level(argv[i]);
-            log_collector_severity_level(slevel);
-            continue;
-        }
-
         if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
             include_exited_childs = 0;
             continue;
@@ -4465,9 +4454,6 @@ static void parse_args(int argc, char **argv)
                     "                        it includes the command and passed arguments\n"
                     "                        it may include sensitive data such as passwords and tokens\n"
                     "                        enabling this could be a security risk\n"
-                    "\n"
-                    " severity-level N       informs the log level used by plugin:\n"
-                    "                        0 - info; 1 - error \n"
                     "\n"
                     " with-childs\n"
                     " without-childs         enable / disable aggregating exited\n"

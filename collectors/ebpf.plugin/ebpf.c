@@ -2310,9 +2310,6 @@ void ebpf_print_help()
             " [-]-legacy            Load legacy eBPF programs.\n"
             "\n"
             " [-]-core              Use CO-RE when available(Working in progress).\n"
-            "\n"
-            " [-]-severity-level N  Informs the log level used by plugin:\n"
-            "                       0 - info; 1 - error \n"
             "\n",
             VERSION,
             (year >= 116) ? year + 1900 : 2020);
@@ -3177,7 +3174,6 @@ static void ebpf_parse_args(int argc, char **argv)
         {"legacy",         no_argument,    0,  0 },
         {"core",           no_argument,    0,  0 },
         {"unittest",       no_argument,    0,  0 },
-        {"severity-level", required_argument,    0,  0 },
         {0, 0, 0, 0}
     };
 
@@ -3395,11 +3391,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 exit_code = 0;
 unittest:
                 exit(exit_code);
-            }
-            case EBPF_OPTION_SEVERITY_LEVEL: {
-                netdata_log_level_t slevel =  log_severity_string_to_severity_level(optarg);
-                log_collector_severity_level(slevel);
-                break;
             }
             default: {
                 break;
