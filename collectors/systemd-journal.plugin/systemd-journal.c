@@ -1088,12 +1088,12 @@ static void journal_files_registry_update() {
 
 // ----------------------------------------------------------------------------
 
-static bool jf_is_mine(struct journal_file *jf, const char *filename, FUNCTION_QUERY_STATUS *fqs) {
+static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
     if((fqs->source_type == SDJF_ALL || (jf->source_type & fqs->source_type) == fqs->source_type) &&
         (!fqs->source || fqs->source == jf->source)) {
 
-        usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+        usec_t anchor_delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
         usec_t first_ut = jf->msg_first_ut;
         usec_t last_ut = jf->msg_last_ut + anchor_delta;
 
@@ -1104,68 +1104,98 @@ static bool jf_is_mine(struct journal_file *jf, const char *filename, FUNCTION_Q
     return false;
 }
 
+static int journal_file_dict_items_backward_compar(const void *a, const void *b) {
+    const DICTIONARY_ITEM **ad = (const DICTIONARY_ITEM **)a, **bd = (const DICTIONARY_ITEM **)b;
+    struct journal_file *jfa = dictionary_acquired_item_value(*ad);
+    struct journal_file *jfb = dictionary_acquired_item_value(*bd);
+
+    if(jfa->msg_last_ut < jfb->msg_last_ut)
+        return 1;
+
+    if(jfa->msg_last_ut > jfb->msg_last_ut)
+        return -1;
+
+    if(jfa->msg_first_ut < jfb->msg_first_ut)
+        return 1;
+
+    if(jfa->msg_first_ut > jfb->msg_first_ut)
+        return -1;
+
+    return 0;
+}
+
+static int journal_file_dict_items_forward_compar(const void *a, const void *b) {
+    const DICTIONARY_ITEM **ad = (const DICTIONARY_ITEM **)a, **bd = (const DICTIONARY_ITEM **)b;
+    struct journal_file *jfa = dictionary_acquired_item_value(*ad);
+    struct journal_file *jfb = dictionary_acquired_item_value(*bd);
+
+    if(jfa->msg_last_ut < jfb->msg_last_ut)
+        return -1;
+
+    if(jfa->msg_last_ut > jfb->msg_last_ut)
+        return 1;
+
+    if(jfa->msg_first_ut < jfb->msg_first_ut)
+        return -1;
+
+    if(jfa->msg_first_ut > jfb->msg_first_ut)
+        return 1;
+
+    return 0;
+}
+
 static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_NO_FILE_MATCHED;
-
     struct journal_file *jf;
 
-    if(fqs->if_modified_since) {
-        bool modified = false;
+    fqs->files_matched = 0;
+    fqs->file_working = 0;
 
-        dfe_start_read(journal_files_registry, jf) {
-            if(!jf_is_mine(jf, jf_dfe.name, fqs))
-                continue;
+    size_t files_used = 0;
+    size_t files_max = dictionary_entries(journal_files_registry);
+    const DICTIONARY_ITEM *file_items[files_max];
 
-            if(jf->msg_last_ut > fqs->if_modified_since) {
-                modified = true;
-                break;
-            }
-        }
-        dfe_done(jf);
+    // count the files
+    bool files_are_newer = false;
+    dfe_start_read(journal_files_registry, jf) {
+        if(!jf_is_mine(jf, fqs))
+            continue;
 
-        if(!modified) {
-            buffer_flush(wb);
-            return HTTP_RESP_NOT_MODIFIED;
-        }
+        file_items[files_used++] = dictionary_acquired_item_dup(journal_files_registry, jf_dfe.item);
+
+        if(jf->msg_last_ut > fqs->if_modified_since)
+            files_are_newer = true;
+    }
+    dfe_done(jf);
+
+    fqs->files_matched = files_used;
+
+    if(fqs->if_modified_since && !files_are_newer) {
+        buffer_flush(wb);
+        return HTTP_RESP_NOT_MODIFIED;
     }
 
     // We will not do an if_modified_since query
     // we know something changed in the files
     fqs->if_modified_since = 0;
 
-    // count the files
-    fqs->files_matched = fqs->file_working = 0;
-    dfe_start_read(journal_files_registry, jf) {
-        if(!jf_is_mine(jf, jf_dfe.name, fqs))
-            continue;
+    // sort the files, so that they are optimal for facets
+    if(fqs->direction == FACETS_ANCHOR_DIRECTION_BACKWARD)
+        qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *), journal_file_dict_items_backward_compar);
+    else
+        qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *), journal_file_dict_items_forward_compar);
 
-        fqs->files_matched++;
-    }
-    dfe_done(jf);
-
-    buffer_json_member_add_array(wb, "_journal_files");
-
+    bool partial = false;
     usec_t started_ut;
     usec_t ended_ut = now_monotonic_usec();
 
-    bool partial = false;
-    dfe_start_reentrant(journal_files_registry, jf) {
-        bool is_mine = jf_is_mine(jf, jf_dfe.name, fqs);
+    buffer_json_member_add_array(wb, "_journal_files");
+    for(size_t f = 0; f < files_used ;f++) {
+        const char *filename = dictionary_acquired_item_name(file_items[f]);
+        jf = dictionary_acquired_item_value(file_items[f]);
 
-        buffer_json_add_array_item_object(wb); // journal file
-        buffer_json_member_add_boolean(wb, "__selected", is_mine);
-        buffer_json_member_add_string(wb, "_filename", jf_dfe.name);
-        buffer_json_member_add_uint64(wb, "_source_type", jf->source_type);
-        buffer_json_member_add_string(wb, "_source", string2str(jf->source));
-        buffer_json_member_add_uint64(wb, "_last_modified_ut", jf->file_last_modified_ut);
-        buffer_json_member_add_uint64(wb, "_msg_first_ut", jf->msg_first_ut);
-        buffer_json_member_add_uint64(wb, "_msg_last_ut", jf->msg_last_ut);
-        buffer_json_member_add_uint64(wb, "_journal_vs_realtime_delta_ut", jf->max_journal_vs_realtime_delta_ut);
-
-        if(!is_mine) {
-            buffer_json_object_close(wb); // journal file
+        if(!jf_is_mine(jf, fqs))
             continue;
-        }
 
         fqs->file_working++;
         fqs->cached_count = 0;
@@ -1175,7 +1205,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         size_t bytes_read = fqs->bytes_read;
         size_t matches_setup_ut = fqs->matches_setup_ut;
 
-        ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file( jf_dfe.name, wb, facets, jf, fqs);
+        ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file(filename, wb, facets, jf, fqs);
 
         rows_useful = fqs->rows_useful - rows_useful;
         rows_read = fqs->rows_read - rows_read;
@@ -1186,13 +1216,26 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         ended_ut = now_monotonic_usec();
         usec_t duration_ut = ended_ut - started_ut;
 
-        buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
-        buffer_json_member_add_uint64(wb, "rows_read", rows_read);
-        buffer_json_member_add_uint64(wb, "rows_useful", rows_useful);
-        buffer_json_member_add_double(wb, "rows_per_second", (double)rows_read / (double)duration_ut * (double)USEC_PER_SEC);
-        buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
-        buffer_json_member_add_double(wb, "bytes_per_second", (double)bytes_read / (double)duration_ut * (double)USEC_PER_SEC);
-        buffer_json_member_add_uint64(wb, "duration_matches_ut", matches_setup_ut);
+        buffer_json_add_array_item_object(wb); // journal file
+        {
+            // information about the file
+            buffer_json_member_add_string(wb, "_filename", filename);
+            buffer_json_member_add_uint64(wb, "_source_type", jf->source_type);
+            buffer_json_member_add_string(wb, "_source", string2str(jf->source));
+            buffer_json_member_add_uint64(wb, "_last_modified_ut", jf->file_last_modified_ut);
+            buffer_json_member_add_uint64(wb, "_msg_first_ut", jf->msg_first_ut);
+            buffer_json_member_add_uint64(wb, "_msg_last_ut", jf->msg_last_ut);
+            buffer_json_member_add_uint64(wb, "_journal_vs_realtime_delta_ut", jf->max_journal_vs_realtime_delta_ut);
+
+            // information about the current use of the file
+            buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
+            buffer_json_member_add_uint64(wb, "rows_read", rows_read);
+            buffer_json_member_add_uint64(wb, "rows_useful", rows_useful);
+            buffer_json_member_add_double(wb, "rows_per_second", (double) rows_read / (double) duration_ut * (double) USEC_PER_SEC);
+            buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
+            buffer_json_member_add_double(wb, "bytes_per_second", (double) bytes_read / (double) duration_ut * (double) USEC_PER_SEC);
+            buffer_json_member_add_uint64(wb, "duration_matches_ut", matches_setup_ut);
+        }
         buffer_json_object_close(wb); // journal file
 
         bool stop = false;
@@ -1224,9 +1267,11 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         if(stop)
             break;
     }
-    dfe_done(jf);
-
     buffer_json_array_close(wb); // _journal_files
+
+    // release the files
+    for(size_t f = 0; f < files_used ;f++)
+        dictionary_acquired_item_release(journal_files_registry, file_items[f]);
 
     switch (status) {
         case ND_SD_JOURNAL_OK:
