@@ -1808,7 +1808,7 @@ const char *linux_capabilities[] = {
         [CAP_AUDIT_READ] = "AUDIT_READ",
         [CAP_PERFMON] = "PERFMON",
         [CAP_BPF] = "BPF",
-        [CAP_CHECKPOINT_RESTORE] = "CHECKPOINT_RESTORE",
+        [40 /* CAP_CHECKPOINT_RESTORE */] = "CHECKPOINT_RESTORE",
 };
 
 static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
