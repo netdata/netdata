@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- \[Integrations Docs\] Add a badge for either netdata or community maintained [\#16073](https://github.com/netdata/netdata/pull/16073) ([Ancairon](https://github.com/Ancairon))
 - Improve description about tc.plugin [\#16068](https://github.com/netdata/netdata/pull/16068) ([thiagoftsm](https://github.com/thiagoftsm))
 - update go.d version to v0.56.0 [\#16061](https://github.com/netdata/netdata/pull/16061) ([ilyam8](https://github.com/ilyam8))
 - Bugfix on integrations/gen\_docs\_integrations.py [\#16059](https://github.com/netdata/netdata/pull/16059) ([Ancairon](https://github.com/Ancairon))
@@ -151,6 +152,7 @@
 - prevent reporting negative retention when the db is empty [\#15796](https://github.com/netdata/netdata/pull/15796) ([ktsaou](https://github.com/ktsaou))
 - Fix typo in Readme [\#15794](https://github.com/netdata/netdata/pull/15794) ([shyamvalsan](https://github.com/shyamvalsan))
 - fix hpssa handle unassigned drives [\#15793](https://github.com/netdata/netdata/pull/15793) ([ilyam8](https://github.com/ilyam8))
+- Dyncfg add streaming support [\#15791](https://github.com/netdata/netdata/pull/15791) ([underhood](https://github.com/underhood))
 - count functions as collections, to restart plugins [\#15787](https://github.com/netdata/netdata/pull/15787) ([ktsaou](https://github.com/ktsaou))
 - Set correct path for ansible-playbook in deployment tutorial [\#15786](https://github.com/netdata/netdata/pull/15786) ([novotnyJiri](https://github.com/novotnyJiri))
 - minor Dyncfg mvp0 fixes [\#15785](https://github.com/netdata/netdata/pull/15785) ([underhood](https://github.com/underhood))
@@ -425,7 +427,6 @@
 - Add community key in schema [\#15465](https://github.com/netdata/netdata/pull/15465) ([Ancairon](https://github.com/Ancairon))
 - Overhaul deployment strategies documentation [\#15464](https://github.com/netdata/netdata/pull/15464) ([ralphm](https://github.com/ralphm))
 - Update debugfs plugin metadata. [\#15463](https://github.com/netdata/netdata/pull/15463) ([Ferroin](https://github.com/Ferroin))
-- Update proc plugin yaml [\#15460](https://github.com/netdata/netdata/pull/15460) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
