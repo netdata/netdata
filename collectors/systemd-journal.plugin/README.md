@@ -76,58 +76,13 @@ Netdata's `systemd-journal.plugin` auto-detects the namespaces available and pro
 
 ### `remote` journals
 
-Remote journals are created by `systemd-journal-remote`. This feature allows creating logs centralization points within your infrastructure.
+Remote journals are created by `systemd-journal-remote`. This feature allows creating logs centralization points within
+your infrastructure.
 
-The Netdata plugin automatically extracts the remote IPs and based on their reverse DNS records it presents remote journals using the hostnames of the servers than pushed their metrics to the logs centralization server.
+The Netdata plugin automatically extracts the remote IPs and based on their reverse DNS records it presents remote
+journals using the hostnames of the servers than pushed their metrics to the logs centralization server.
 
-#### Configuring a journals centralization server
-
-On the centralization server install `systemd-journal-remote`, and enable it with `systemctl`, like this:
-
-```sh
-# change this according to your distro
-sudo apt-get install systemd-journal-remote
-
-# enable receiving
-sudo systemctl enable --now systemd-journal-remote.socket
-sudo systemctl enable systemd-journal-remote.service
-```
-
-`systemd-journal-remote` is now listening for incoming journals from remote hosts, on port `19532`. Please note that `systemd-journal-remote` supports using secure connections. To learn more run `man systemd-journal-remote`.
-
-#### Configuring clients to push their logs to the server
-
-On the clients you want to centralize their logs, install `systemd-journal-remote`, configure `systemd-journal-upload`, enable it and start it with `systemctl`.
-
-To install it run:
-
-```sh
-# change this according to your distro
-sudo apt-get install systemd-journal-remote
-```
-
-Then, edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like this:
-
-```
-[Upload]
-URL=http://centralization.server.ip:19532
-```
-
-Finally, enable and start `systemd-journal-upload`, like this:
-
-```sh
-sudo systemctl enable systemd-journal-upload
-sudo systemctl start systemd-journal-upload
-```
-
-Keep in mind that immediately after starting `systemd-journal-upload` on a server, a replication process starts pushing logs in the order they have been received. This means that depending on the size of the available logs, some time may be needed for Netdata to show the most recent logs of that server.
-
-#### Limitations when using a logs centralization server
-
-As of this writing `namespaces` support by systemd is limited:
-
-- Docker containers cannot log to namespaces. Check [this issue](https://github.com/moby/moby/issues/41879).
-- `systemd-journal-upload` automatically uploads `system` and `user` journals, but not `namespaces` journals. For this you need to spawn a `systemd-journal-upload` per namespace.
+For information about configuring a journals centralization severs, check [this FAQ item](#how-do-i-configure-a-journals-centralization-server).
 
 ## Journal Fields
 
@@ -298,3 +253,59 @@ in a structured way.
 
 For application and system logs, systemd journal is ideal and the visibility you can get
 by centralizing your system logs and this Netdata plugin, is unparalleled.
+
+### How do I configure a journals centralization server?
+
+Check the `systemd-journal-remote` and `systemd-journal-upload` documentation.
+
+A short summary to get something running quickly, follows:
+
+#### Configuring a journals centralization server
+
+On the centralization server install `systemd-journal-remote`, and enable it with `systemctl`, like this:
+
+```sh
+# change this according to your distro
+sudo apt-get install systemd-journal-remote
+
+# enable receiving
+sudo systemctl enable --now systemd-journal-remote.socket
+sudo systemctl enable systemd-journal-remote.service
+```
+
+`systemd-journal-remote` is now listening for incoming journals from remote hosts, on port `19532`. Please note that `systemd-journal-remote` supports using secure connections. To learn more run `man systemd-journal-remote`.
+
+#### Configuring journal clients to push their logs to the server
+
+On the clients you want to centralize their logs, install `systemd-journal-remote`, configure `systemd-journal-upload`, enable it and start it with `systemctl`.
+
+To install it run:
+
+```sh
+# change this according to your distro
+sudo apt-get install systemd-journal-remote
+```
+
+Then, edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like this:
+
+```
+[Upload]
+URL=http://centralization.server.ip:19532
+```
+
+Finally, enable and start `systemd-journal-upload`, like this:
+
+```sh
+sudo systemctl enable systemd-journal-upload
+sudo systemctl start systemd-journal-upload
+```
+
+Keep in mind that immediately after starting `systemd-journal-upload` on a server, a replication process starts pushing logs in the order they have been received. This means that depending on the size of the available logs, some time may be needed for Netdata to show the most recent logs of that server.
+
+#### Limitations when using a logs centralization server
+
+As of this writing `namespaces` support by systemd is limited:
+
+- Docker containers cannot log to namespaces. Check [this issue](https://github.com/moby/moby/issues/41879).
+- `systemd-journal-upload` automatically uploads `system` and `user` journals, but not `namespaces` journals. For this you need to spawn a `systemd-journal-upload` per namespace.
+
