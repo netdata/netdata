@@ -129,6 +129,19 @@ As of this writing `namespaces` support by systemd is limited:
 
 Fields found in the journal files are automatically added to the UI in multiple places to help you explore and filter the data.
 
+The plugin automatically enriches certain fields to make them more user friendly:
+
+- `PRIORITY`: the numeric value is replaced with the human readable name of each priority.
+- `SYSLOG_FACILITY`: the encoded value is replaced with the human readable name of each value.
+- `ERRNO`: the numeric value is annotated with the short name of each value.
+- `_UID` `_AUDIT_LOGINUID` and `_SYSTEMD_OWNER_UID`: the local user database is consulted to annotate them with usernames.
+- `_GID`: the local group database is consulted to annotate them with group names.
+- `_CAP_EFFECTIVE`: the encoded value is annotated with a human readable list of the linux capabilities.
+
+The annotations are not searchable with full text search. They are only added for the presentation of the fields. 
+
+The values of all other fields are presented as found in the journals.
+
 ### Journal fields as columns in the table
 
 All journal fields available in the journal files, are offered as columns on the UI, using the gear button above the table:

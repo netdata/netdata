@@ -9,6 +9,7 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#include <linux/capability.h>
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
@@ -1766,6 +1767,71 @@ static void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused,
     }
 }
 
+const char *linux_capabilities[] = {
+        [CAP_CHOWN] = "CHOWN",
+        [CAP_DAC_OVERRIDE] = "DAC_OVERRIDE",
+        [CAP_DAC_READ_SEARCH] = "DAC_READ_SEARCH",
+        [CAP_FOWNER] = "FOWNER",
+        [CAP_FSETID] = "FSETID",
+        [CAP_KILL] = "KILL",
+        [CAP_SETGID] = "SETGID",
+        [CAP_SETUID] = "SETUID",
+        [CAP_SETPCAP] = "SETPCAP",
+        [CAP_LINUX_IMMUTABLE] = "LINUX_IMMUTABLE",
+        [CAP_NET_BIND_SERVICE] = "NET_BIND_SERVICE",
+        [CAP_NET_BROADCAST] = "NET_BROADCAST",
+        [CAP_NET_ADMIN] = "NET_ADMIN",
+        [CAP_NET_RAW] = "NET_RAW",
+        [CAP_IPC_LOCK] = "IPC_LOCK",
+        [CAP_IPC_OWNER] = "IPC_OWNER",
+        [CAP_SYS_MODULE] = "SYS_MODULE",
+        [CAP_SYS_RAWIO] = "SYS_RAWIO",
+        [CAP_SYS_CHROOT] = "SYS_CHROOT",
+        [CAP_SYS_PTRACE] = "SYS_PTRACE",
+        [CAP_SYS_PACCT] = "SYS_PACCT",
+        [CAP_SYS_ADMIN] = "SYS_ADMIN",
+        [CAP_SYS_BOOT] = "SYS_BOOT",
+        [CAP_SYS_NICE] = "SYS_NICE",
+        [CAP_SYS_RESOURCE] = "SYS_RESOURCE",
+        [CAP_SYS_TIME] = "SYS_TIME",
+        [CAP_SYS_TTY_CONFIG] = "SYS_TTY_CONFIG",
+        [CAP_MKNOD] = "MKNOD",
+        [CAP_LEASE] = "LEASE",
+        [CAP_AUDIT_WRITE] = "AUDIT_WRITE",
+        [CAP_AUDIT_CONTROL] = "AUDIT_CONTROL",
+        [CAP_SETFCAP] = "SETFCAP",
+        [CAP_MAC_OVERRIDE] = "MAC_OVERRIDE",
+        [CAP_MAC_ADMIN] = "MAC_ADMIN",
+        [CAP_SYSLOG] = "SYSLOG",
+        [CAP_WAKE_ALARM] = "WAKE_ALARM",
+        [CAP_BLOCK_SUSPEND] = "BLOCK_SUSPEND",
+        [CAP_AUDIT_READ] = "AUDIT_READ",
+        [CAP_PERFMON] = "PERFMON",
+        [CAP_BPF] = "BPF",
+        [CAP_CHECKPOINT_RESTORE] = "CHECKPOINT_RESTORE",
+};
+
+static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+    const char *v = buffer_tostring(wb);
+    if(*v && isdigit(*v)) {
+        uint64_t cap = strtoul(buffer_tostring(wb), NULL, 16);
+        if(cap) {
+            buffer_fast_strcat(wb, " (", 2);
+            for (size_t i = 0, added = 0; i < sizeof(linux_capabilities) / sizeof(linux_capabilities[0]); i++) {
+                if (linux_capabilities[i] && (cap & (1ULL << i))) {
+
+                    if (added)
+                        buffer_fast_strcat(wb, " | ", 3);
+
+                    buffer_strcat(wb, linux_capabilities[i]);
+                    added++;
+                }
+            }
+            buffer_fast_strcat(wb, ")", 1);
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 static void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data __maybe_unused) {
@@ -1957,6 +2023,14 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_register_key_name_transformation(facets, "_GID",
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_gid, NULL);
+
+    facets_register_key_name_transformation(facets, "_CAP_EFFECTIVE",
+                                            FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_cap_effective, NULL);
+
+    facets_register_key_name_transformation(facets, "_AUDIT_LOGINUID",
+                                            FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_uid, NULL);
 
     bool info = false, data_only = false, progress = false, slice = JOURNAL_DEFAULT_SLICE_MODE;
     time_t after_s = 0, before_s = 0;
