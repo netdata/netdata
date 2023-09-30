@@ -7,6 +7,10 @@ learn_status: "Published"
 learn_rel_path: "Integrations/Logs"
 -->
 
+[KEY FEATURES](#key-features) | [JOURNAL SOURCES](#journal-sources) | [JOURNAL FIELDS](#journal-fields) |
+[PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [PERFORMANCE](#query-performance) |
+[CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq)
+
 # SystemD Journal
 
 The SystemD Journal plugin by Netdata makes viewing and analyzing systemd journal logs simple and efficient.
@@ -205,7 +209,7 @@ time-frame, parsing all the log entries within the visible time-frame.
 
 To minimize the load on the server, we suggest to activate PLAY mode on small timeframes.
 
-## Full text search
+## Full-text search
 
 The plugin supports searching for any text on all fields of the log entries.
 Full text search is combined with the selected filters.
@@ -221,7 +225,16 @@ On logs aggregation servers, the performance of the queries depend on the follow
 
 1. The number of files involved in each query. This is why we suggest to select a source when possible.
 1. The speed of the disks hosting the journal files. Journal files perform a lot of reading while querying, so the fastest the disks, the faster the query will finish.
-2. The memory available for caching parts of the files. Increased memory will help the kernel cache the most frequently used of the journal files, speeding queries significantly.
+2. The memory available for caching parts of the files. Increased memory will help the kernel cache the most frequently used parts of the journal files.
+3. The number of filters applied. Queries are significantly faster when just a few filters are selected.
+
+In general, for a faster experience, attempt to keep the number of rows within the visible timeframe low.
+Even on long timeframes, selecting a couple of filters that will result in a few dozen thousand log entries
+will provide fast / rapid responses, usually less than a second. Viewing timeframes with millions of entries may result
+in longer delays.
+
+The plugin aborts journal queries when your browser cancels the requests it makes. This allows you to work on the UI
+while there are in-flight queries.
 
 At the time of this writing, this Netdata plugin is about 25-30 times faster than `journalctl` on queries that access
 multiple journal files, over long time-frames.
@@ -243,3 +256,45 @@ and searching of any dataset, independently of its source.
 ## Configuration and maintenance
 
 This Netdata plugin does not require any configuration or maintenance.
+
+## FAQ
+
+### Can I use this plugin on a logs centralization server?
+
+Yes. You can centralize your logs using systemd journal, and then install Netdata
+on this logs centralization server to explore the logs of all your infrastructure.
+
+This plugin will automatically provide multi-node views of your logs.
+
+Check [configuring a logs centralization server](#configuring-a-journals-centralization-server).
+
+### Can I use this plugin from a parent Netdata?
+
+Yes. When your nodes are connected to a Netdata parent, all their functions are available
+via the parent's UI. So, from the parent UI, you can access the functions of all your nodes.
+
+Keep in mind that to protect your privacy, in order to access Netdata functions, you need a
+free Netdata Cloud account.
+
+### Is any of my data exposed to Netdata Cloud from this plugin?
+
+No. When you access the agent directly, none of your data passes through Netdata Cloud.
+You need a free Netdata Cloud account only to verify your identity and enable the use of
+Netdata Functions. Once this is done, all the data flow directly from your Netdata agent
+to your web browser.
+
+When you access Netdata via `https://app.netdata.cloud`, your data travel via Netdata Cloud,
+but they are not stored in Netdata Cloud. This is to allow you access your Netdata agents from
+anywhere. All communication from/to Netdata Cloud is encrypted.
+
+### Does it worth to build a systemd logs centralization server?
+
+Yes. It is simple, fast and the software to do it is already in your systems.
+
+Keep in mind however, that systemd journal may not currently be ideal for centralizing
+web server access logs. Systemd journal thrives when it comes to structured logs.
+Currently there aren't many options to send web server access logs to systemd journal
+in a structured way.
+
+For application and system logs, systemd journal is ideal and the visibility you can get
+by centralizing your system logs and this Netdata plugin, is unparalleled.
