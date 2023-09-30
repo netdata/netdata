@@ -138,9 +138,13 @@ The plugin automatically enriches certain fields to make them more user friendly
 - `_GID`: the local group database is consulted to annotate them with group names.
 - `_CAP_EFFECTIVE`: the encoded value is annotated with a human readable list of the linux capabilities.
 
-The annotations are not searchable with full text search. They are only added for the presentation of the fields. 
-
 The values of all other fields are presented as found in the journals.
+
+> IMPORTANT:</br>
+> `_UID` and `_GID` annotations are added during presentation and are taken from the
+> server running the plugin. For `remote` sources, they may not reflect the names on the origin server. 
+
+The annotations are not searchable with full text search. They are only added for the presentation of the fields. 
 
 ### Journal fields as columns in the table
 
