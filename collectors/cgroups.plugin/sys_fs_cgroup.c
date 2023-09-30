@@ -1658,8 +1658,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     FILE *fp_child_input, *fp_child_output;
     (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
     if(!fp_child_output) {
-        collector_error("CGROUP: cannot popen(%s --cgroup \"%s\".",
-                        cgroups_network_interface_script, cgroup_identifier);
+        collector_error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
