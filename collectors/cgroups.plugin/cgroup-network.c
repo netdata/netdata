@@ -641,7 +641,7 @@ char *fix_path_variable(void) {
 // main
 
 void usage(void) {
-    fprintf(stderr, "%s [ -p PID | --pid PID | --cgroup /path/to/cgroup ] [ --severity-level LEVEL ]\n", program_name);
+    fprintf(stderr, "%s [ -p PID | --pid PID | --cgroup /path/to/cgroup ]\n", program_name);
     exit(1);
 }
 
@@ -678,7 +678,7 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-    if(argc > 5)
+    if(argc != 3)
         usage();
 
     int arg = 1;
@@ -696,7 +696,6 @@ int main(int argc, char **argv) {
         }
 
         if(helper) call_the_helper(pid, NULL);
-        arg += 2;
     }
     else if(!strcmp(argv[arg], "--cgroup")) {
         char *cgroup = argv[arg+1];
@@ -712,23 +711,8 @@ int main(int argc, char **argv) {
             errno = 0;
             collector_error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
-
-        arg += 2;
     }
-
-    if(!strcmp(argv[arg], "--severity-level") || !strcmp(argv[arg], "severity-level")) {
-        if (argc < arg + 1) {
-            collector_error("Argument `[--]security-level` requires a string ('info' or 'error') as argument.");
-            return 3;
-        }
-
-        netdata_log_level_t slevel =  log_severity_string_to_severity_level(argv[arg + 1]);
-        log_collector_severity_level(slevel);
-        arg = 5;
-    } else if (argc == 3)
-        arg = 5;
-
-    if (arg != 5)
+    else
         usage();
 
     if(pid > 0)

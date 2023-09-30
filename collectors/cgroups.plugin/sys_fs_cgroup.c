@@ -1656,11 +1656,10 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
 
     netdata_log_debug(D_CGROUP, "executing cgroup_identifier %s --cgroup '%s' for cgroup '%s'", cgroups_network_interface_script, cgroup_identifier, cg->id);
     FILE *fp_child_input, *fp_child_output;
-    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier, "--severity-level", log_severity_level_to_severity_string(use_severity_level));
+    (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
     if(!fp_child_output) {
-        collector_error("CGROUP: cannot popen(%s --cgroup \"%s\", --severity-level \"%s\" \"r\").",
-                        cgroups_network_interface_script, cgroup_identifier,
-                        log_severity_level_to_severity_string(use_severity_level));
+        collector_error("CGROUP: cannot popen(%s --cgroup \"%s\".",
+                        cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
