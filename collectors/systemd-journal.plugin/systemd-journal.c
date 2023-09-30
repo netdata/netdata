@@ -213,7 +213,7 @@ typedef struct function_query_status {
     size_t cached_count;
 
     // progress statistics
-    usec_t filtering_setup_ut;
+    usec_t matches_setup_ut;
     size_t rows_useful;
     size_t rows_read;
     size_t bytes_read;
@@ -655,7 +655,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
             matches_filters = netdata_systemd_filtering_by_journal(j, facets, fqs) || !fqs->filters;
             usec_t ended = now_monotonic_usec();
 
-            fqs->filtering_setup_ut += (ended - started);
+            fqs->matches_setup_ut += (ended - started);
         }
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
@@ -1090,19 +1090,18 @@ static void journal_files_registry_update() {
 
 static bool jf_is_mine(struct journal_file *jf, const char *filename, FUNCTION_QUERY_STATUS *fqs) {
 
-    bool ret = (
-            (fqs->source_type == SDJF_ALL || (jf->source_type & fqs->source_type) == fqs->source_type) &&
-            (!fqs->source || fqs->source == jf->source) &&
-            (jf->msg_last_ut >= fqs->after_ut && jf->msg_first_ut <= fqs->before_ut)
-    );
+    if((fqs->source_type == SDJF_ALL || (jf->source_type & fqs->source_type) == fqs->source_type) &&
+        (!fqs->source || fqs->source == jf->source)) {
 
-//    internal_error(!ret, "Not selecting file '%s', wanted source type %d found %d, wanted source '%s' found '%s', duration [%"PRIu64" - %"PRIu64"] found [%"PRIu64" - %"PRIu64"]",
-//                   filename, fqs->source_type, jf->source_type,
-//                   string2str(fqs->source), string2str(jf->source),
-//                   fqs->after_ut, fqs->before_ut,
-//                   jf->msg_first_ut, jf->msg_last_ut);
+        usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
+        usec_t first_ut = jf->msg_first_ut;
+        usec_t last_ut = jf->msg_last_ut + anchor_delta;
 
-    return ret;
+        if(last_ut >= fqs->after_ut && first_ut <= fqs->before_ut)
+            return true;
+    }
+
+    return false;
 }
 
 static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
@@ -1151,46 +1150,49 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     bool partial = false;
     dfe_start_reentrant(journal_files_registry, jf) {
-        if(!jf_is_mine(jf, jf_dfe.name, fqs))
+        bool is_mine = jf_is_mine(jf, jf_dfe.name, fqs);
+
+        buffer_json_add_array_item_object(wb); // journal file
+        buffer_json_member_add_boolean(wb, "__selected", is_mine);
+        buffer_json_member_add_string(wb, "_filename", jf_dfe.name);
+        buffer_json_member_add_uint64(wb, "_source_type", jf->source_type);
+        buffer_json_member_add_string(wb, "_source", string2str(jf->source));
+        buffer_json_member_add_uint64(wb, "_last_modified_ut", jf->file_last_modified_ut);
+        buffer_json_member_add_uint64(wb, "_msg_first_ut", jf->msg_first_ut);
+        buffer_json_member_add_uint64(wb, "_msg_last_ut", jf->msg_last_ut);
+        buffer_json_member_add_uint64(wb, "_journal_vs_realtime_delta_ut", jf->max_journal_vs_realtime_delta_ut);
+
+        if(!is_mine) {
+            buffer_json_object_close(wb); // journal file
             continue;
+        }
 
         fqs->file_working++;
         fqs->cached_count = 0;
 
-        size_t cached_count = 0;
         size_t rows_useful = fqs->rows_useful;
         size_t rows_read = fqs->rows_read;
         size_t bytes_read = fqs->bytes_read;
-        size_t filtering_setup_ut = fqs->filtering_setup_ut;
+        size_t matches_setup_ut = fqs->matches_setup_ut;
+
         ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file( jf_dfe.name, wb, facets, jf, fqs);
 
         rows_useful = fqs->rows_useful - rows_useful;
         rows_read = fqs->rows_read - rows_read;
         bytes_read = fqs->bytes_read - bytes_read;
-        filtering_setup_ut = fqs->filtering_setup_ut - filtering_setup_ut;
+        matches_setup_ut = fqs->matches_setup_ut - matches_setup_ut;
 
         started_ut = ended_ut;
         ended_ut = now_monotonic_usec();
         usec_t duration_ut = ended_ut - started_ut;
 
-        buffer_json_add_array_item_object(wb); // journal file
-        {
-            buffer_json_member_add_string(wb, "filename", jf_dfe.name);
-            buffer_json_member_add_uint64(wb, "source_type", jf->source_type);
-            buffer_json_member_add_string(wb, "source", string2str(jf->source));
-            buffer_json_member_add_uint64(wb, "last_modified_ut", jf->file_last_modified_ut);
-            buffer_json_member_add_uint64(wb, "msg_first_ut", jf->msg_first_ut);
-            buffer_json_member_add_uint64(wb, "msg_last_ut", jf->msg_last_ut);
-            buffer_json_member_add_uint64(wb, "fstat_cached_count", cached_count);
-            buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
-            buffer_json_member_add_uint64(wb, "rows_read", rows_read);
-            buffer_json_member_add_uint64(wb, "rows_useful", rows_useful);
-            buffer_json_member_add_double(wb, "rows_per_second", (double)rows_read / (double)duration_ut * (double)USEC_PER_SEC);
-            buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
-            buffer_json_member_add_double(wb, "bytes_per_second", (double)bytes_read / (double)duration_ut * (double)USEC_PER_SEC);
-            buffer_json_member_add_uint64(wb, "filtering_setup_ut", filtering_setup_ut);
-            buffer_json_member_add_uint64(wb, "journal_vs_realtime_delta_ut", jf->max_journal_vs_realtime_delta_ut);
-        }
+        buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
+        buffer_json_member_add_uint64(wb, "rows_read", rows_read);
+        buffer_json_member_add_uint64(wb, "rows_useful", rows_useful);
+        buffer_json_member_add_double(wb, "rows_per_second", (double)rows_read / (double)duration_ut * (double)USEC_PER_SEC);
+        buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
+        buffer_json_member_add_double(wb, "bytes_per_second", (double)bytes_read / (double)duration_ut * (double)USEC_PER_SEC);
+        buffer_json_member_add_uint64(wb, "duration_matches_ut", matches_setup_ut);
         buffer_json_object_close(wb); // journal file
 
         bool stop = false;
@@ -2112,16 +2114,21 @@ static void function_systemd_journal(const char *transaction, char *function, in
     if(!last)
         last = SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY;
 
-    buffer_json_member_add_string(wb, "source", source ? source : "default");
-    buffer_json_member_add_time_t(wb, "after", after_s);
-    buffer_json_member_add_time_t(wb, "before", before_s);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_INFO, info);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_SLICE, slice);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_DATA_ONLY, data_only);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_PROGRESS, progress);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_ID, progress_id);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_SOURCE, source);
+    buffer_json_member_add_uint64(wb, "source_type", source_type);
+    buffer_json_member_add_time_t(wb, JOURNAL_PARAMETER_AFTER, after_s);
+    buffer_json_member_add_time_t(wb, JOURNAL_PARAMETER_BEFORE, before_s);
     buffer_json_member_add_uint64(wb, "if_modified_since", if_modified_since);
-    buffer_json_member_add_uint64(wb, "anchor", anchor);
-    buffer_json_member_add_string(wb, "direction", direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
-    buffer_json_member_add_uint64(wb, "last", last);
-    buffer_json_member_add_string(wb, "query", query);
-    buffer_json_member_add_string(wb, "chart", chart);
-    buffer_json_member_add_time_t(wb, "timeout", timeout);
+    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_ANCHOR, anchor);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_DIRECTION, direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
+    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_LAST, last);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_QUERY, query);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_HISTOGRAM, chart);
     buffer_json_object_close(wb); // request
 
     buffer_json_journal_versions(wb);
