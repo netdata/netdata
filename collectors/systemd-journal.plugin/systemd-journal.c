@@ -1125,23 +1125,7 @@ static int journal_file_dict_items_backward_compar(const void *a, const void *b)
 }
 
 static int journal_file_dict_items_forward_compar(const void *a, const void *b) {
-    const DICTIONARY_ITEM **ad = (const DICTIONARY_ITEM **)a, **bd = (const DICTIONARY_ITEM **)b;
-    struct journal_file *jfa = dictionary_acquired_item_value(*ad);
-    struct journal_file *jfb = dictionary_acquired_item_value(*bd);
-
-    if(jfa->msg_last_ut < jfb->msg_last_ut)
-        return -1;
-
-    if(jfa->msg_last_ut > jfb->msg_last_ut)
-        return 1;
-
-    if(jfa->msg_first_ut < jfb->msg_first_ut)
-        return -1;
-
-    if(jfa->msg_first_ut > jfb->msg_first_ut)
-        return 1;
-
-    return 0;
+    return -journal_file_dict_items_backward_compar(a, b);
 }
 
 static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QUERY_STATUS *fqs) {
