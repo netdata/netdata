@@ -24,7 +24,6 @@ MODULE_NAME="main"
 # create temp dir
 
 debug=0
-security_level=0
 TMP_DIR=
 chartsd_cleanup() {
 	trap '' EXIT QUIT HUP INT TERM
@@ -61,7 +60,7 @@ warning() {
 }
 
 error() {
-	[ $security_level -ge 1 ] && log ERROR "${@}"
+	log ERROR "${@}"
 }
 
 info() {

@@ -796,10 +796,10 @@ def parse_command_line():
     update_every = 1
     modules_to_run = list()
 
-    def find_first_positive_value(values):
+    def find_first_positive_int(values):
         return next((v for v in values if v.isdigit() and int(v) >= 1), None)
 
-    u = find_first_positive_value(opts)
+    u = find_first_positive_int(opts)
     if u is not None:
         update_every = int(u)
         opts.remove(u)
