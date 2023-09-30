@@ -1180,10 +1180,14 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     fqs->if_modified_since = 0;
 
     // sort the files, so that they are optimal for facets
-    if(fqs->direction == FACETS_ANCHOR_DIRECTION_BACKWARD)
-        qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *), journal_file_dict_items_backward_compar);
-    else
-        qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *), journal_file_dict_items_forward_compar);
+    if(files_used >= 2) {
+        if (fqs->direction == FACETS_ANCHOR_DIRECTION_BACKWARD)
+            qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
+                  journal_file_dict_items_backward_compar);
+        else
+            qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
+                  journal_file_dict_items_forward_compar);
+    }
 
     bool partial = false;
     usec_t started_ut;
