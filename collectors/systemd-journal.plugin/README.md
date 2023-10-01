@@ -295,7 +295,28 @@ sudo systemctl enable --now systemd-journal-remote.socket
 sudo systemctl enable systemd-journal-remote.service
 ```
 
-`systemd-journal-remote` is now listening for incoming journals from remote hosts, on port `19532`. Please note that `systemd-journal-remote` supports using secure connections. To learn more run `man systemd-journal-remote`.
+`systemd-journal-remote` is now listening for incoming journals from remote hosts, on port `19532`.
+Please note that `systemd-journal-remote` supports using secure connections.
+To learn more run `man systemd-journal-remote`.
+
+To change the protocol of the journal transfer (HTTP/HTTPS) and the save location, do:
+
+```sh
+# copy the service file
+sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
+
+# edit it
+# --listen-http=-3 specifies the incoming journal for http.
+# If you want to use https, change it to --listen-https=-3.
+nano /etc/systemd/system/systemd-journal-remote.service
+
+# reload systemd
+sudo systemctl daemon-reload
+```
+
+To change the port, copy `/lib/systemd/system/systemd-journal-remote.socket` to `/etc/systemd/system/` and edit it.
+Then do `sudo systemctrl daemon-reload`
+
 
 #### Configuring journal clients to push their logs to the server
 
@@ -314,6 +335,8 @@ Then, edit `/etc/systemd/journal-upload.conf` and set the IP address and the por
 [Upload]
 URL=http://centralization.server.ip:19532
 ```
+
+Remember to match the protocol (http/https) the server expects.
 
 Finally, enable and start `systemd-journal-upload`, like this:
 
