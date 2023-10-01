@@ -2959,7 +2959,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_LINE);
 
                 rrdset_update_rrdlabels(cg->st_mem_failcnt, cg->chart_labels);
                 rrddim_add(cg->st_mem_failcnt, "fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -3035,7 +3035,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_AREA);
 
                 rrdset_update_rrdlabels(cg->st_pgfaults, cg->chart_labels);
                 rrddim_add(cg->st_pgfaults, "minor", NULL, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3059,7 +3059,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_AREA);
 
                 rrdset_update_rrdlabels(cg->st_mem_activity, cg->chart_labels);
                 rrddim_add(cg->st_mem_activity, "in", NULL, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3085,7 +3085,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_AREA);
 
                 rrdset_update_rrdlabels(cg->st_io, cg->chart_labels);
                 rrddim_add(cg->st_io, "write", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3111,7 +3111,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_LINE);
 
                 rrdset_update_rrdlabels(cg->st_serviced_ops, cg->chart_labels);
                 rrddim_add(cg->st_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -3136,7 +3136,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_AREA);
 
                 rrdset_update_rrdlabels(cg->st_throttle_io, cg->chart_labels);
                 rrddim_add(cg->st_throttle_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -3162,7 +3162,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_LINE);
 
                 rrdset_update_rrdlabels(cg->st_throttle_serviced_ops, cg->chart_labels);
                 rrddim_add(cg->st_throttle_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -3188,7 +3188,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_LINE);
 
                 rrdset_update_rrdlabels(cg->st_queued_ops, cg->chart_labels);
                 rrddim_add(cg->st_queued_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -3213,7 +3213,7 @@ void update_systemd_services_charts(
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
                     prio++,
                     update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_LINE);
 
                 rrdset_update_rrdlabels(cg->st_merged_ops, cg->chart_labels);
                 rrddim_add(cg->st_merged_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
