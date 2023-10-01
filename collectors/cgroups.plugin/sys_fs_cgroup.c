@@ -2529,7 +2529,7 @@ static inline void discovery_share_cgroups_with_ebpf() {
 
     for (cg = cgroup_root, count = 0; cg; cg = cg->next, count++) {
         netdata_ebpf_cgroup_shm_body_t *ptr = &shm_cgroup_ebpf.body[count];
-        char *prefix = (is_cgroup_systemd_service(cg)) ? "" : "cgroup_";
+        char *prefix = (is_cgroup_systemd_service(cg)) ? services_chart_id_prefix : cgroup_chart_id_prefix;
         snprintfz(ptr->name, CGROUP_EBPF_NAME_SHARED_LENGTH - 1, "%s%s", prefix, cg->chart_id);
         ptr->hash = simple_hash(ptr->name);
         ptr->options = cg->options;
