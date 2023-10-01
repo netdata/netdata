@@ -273,13 +273,8 @@ For more information check `man systemd-journald`.
 
 Yes. It is simple, fast and the software to do it is already in your systems.
 
-Keep in mind however, that systemd journal may not currently be ideal for centralizing
-web server access logs. Systemd journal thrives when it comes to structured logs.
-Currently there aren't many options to send web server access logs to systemd journal
-in a structured way.
-
 For application and system logs, systemd journal is ideal and the visibility you can get
-by centralizing your system logs and this Netdata plugin, is unparalleled.
+by centralizing your system logs and the use of this Netdata plugin, is unparalleled.
 
 ### How do I configure a journals' centralization server?
 
