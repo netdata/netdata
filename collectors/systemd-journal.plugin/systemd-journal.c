@@ -125,44 +125,48 @@ int fstat64(int fd, struct stat64 *buf) {
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       \
-    "MESSAGE_ID"                                \
+    "*MESSAGE*"                                 \
     "|CODE_LINE"                                \
-    "|SYSLOG_RAW"                               \
-    "|MESSAGE"                                  \
-    "|DOCUMENTATION"                            \
+    "|*DOCUMENTATION*"                          \
     "|TID"                                      \
-    "|CPU_USAGE_NSEC"                           \
-    "|SYSLOG_PID"                               \
+    "|*_RAW"                                    \
+    "|*_NSEC"                                   \
     "|*TIMESTAMP*"                              \
     "|*_ID"                                     \
+    "|*_ID_*"                                   \
     "|*_PID"                                    \
     "|*_TID"                                    \
+    "|__*"                                      \
     ""
 
 #define SYSTEMD_KEYS_INCLUDED_IN_FACETS         \
-    "_TRANSPORT"                                \
+    "_COMM"                                     \
+    "|CONTAINER_NAME"                           \
+    "|CONTAINER_TAG"                            \
+    "|_TRANSPORT"                               \
     "|SYSLOG_IDENTIFIER"                        \
     "|SYSLOG_FACILITY"                          \
     "|PRIORITY"                                 \
+    "|_SYSTEMD_UNIT"                            \
+    "|_SYSTEMD_SLICE"                           \
+    "|_SYSTEMD_USER_UNIT"                       \
+    "|_SYSTEMD_USER_SLICE"                      \
     "|_SYSTEMD_OWNER_UID"                       \
     "|_UID"                                     \
     "|_GID"                                     \
-    "|_SYSTEMD_UNIT"                            \
-    "|_SYSTEMD_USER_UNIT"                       \
-    "|_SYSTEMD_SLICE"                           \
-    "|_SYSTEMD_USER_SLICE"                      \
-    "|_COMM"                                    \
     "|UNIT"                                     \
     "|USER_UNIT"                                \
-    "|CONTAINER_NAME"                           \
     "|IMAGE_NAME"                               \
     "|ERRNO"                                    \
     "|_NAMESPACE"                               \
     "|COREDUMP_COMM"                            \
     "|COREDUMP_UNIT"                            \
     "|COREDUMP_USER_UNIT"                       \
+    "|COREDUMP_SIGNAL_NAME"                     \
+    "|COREDUMP_CGROUP"                          \
     "|_HOSTNAME"                                \
     "|UNIT_RESULT"                              \
+    "|_RUNTIME_SCOPE"                           \
     ""
 
 static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
