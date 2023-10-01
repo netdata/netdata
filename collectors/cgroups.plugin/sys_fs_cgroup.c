@@ -3013,7 +3013,7 @@ void update_systemd_services_charts(
                     update_every,
                     RRDSET_TYPE_STACKED);
 
-                rrdset_update_rrdlabels(cg->st_mem, cg->chart_labels);
+                rrdset_update_rrdlabels(cg->st_writeback, cg->chart_labels);
                 rrddim_add(cg->st_writeback, "writeback", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(cg->st_writeback, "dirty", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             }
