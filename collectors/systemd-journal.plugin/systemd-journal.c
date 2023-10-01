@@ -562,7 +562,14 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
     size_t filters_added = 0;
 
     SD_JOURNAL_FOREACH_FIELD(j, field) {
-        if(facets_key_name_is_facet(facets, field)) {
+        bool interesting;
+
+        if(fqs->data_only)
+            interesting = facets_key_name_is_filter(facets, field);
+        else
+            interesting = facets_key_name_is_facet(facets, field);
+
+        if(interesting) {
             if(sd_journal_query_unique(j, field) >= 0) {
                 bool added_this_key = false;
                 size_t added_values = 0;
@@ -638,37 +645,37 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 #endif // !HAVE_SD_JOURNAL_OPEN_FILES_FD
 
     ND_SD_JOURNAL_STATUS status;
-
-    if(fqs->data_only && fqs->anchor /* && !netdata_systemd_journal_check_if_modified_since(j, fqs->before_ut, fqs->if_modified_since) */) {
-        facets_data_only_mode(facets);
-
-        // we can do a data-only query
-        if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-            status = netdata_systemd_journal_query_data_forward(j, wb, facets, jf, fqs);
-        else
-            status = netdata_systemd_journal_query_data_backward(j, wb, facets, jf, fqs);
-    }
-    else {
-        bool matches_filters = true;
-
-        // we have to do a full query
+    bool matches_filters = true;
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
-        if(fqs->slice) {
-            usec_t started = now_monotonic_usec();
+    if(fqs->slice) {
+        usec_t started = now_monotonic_usec();
 
-            matches_filters = netdata_systemd_filtering_by_journal(j, facets, fqs) || !fqs->filters;
-            usec_t ended = now_monotonic_usec();
+        matches_filters = netdata_systemd_filtering_by_journal(j, facets, fqs) || !fqs->filters;
+        usec_t ended = now_monotonic_usec();
 
-            fqs->matches_setup_ut += (ended - started);
-        }
+        fqs->matches_setup_ut += (ended - started);
+    }
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
-        if(matches_filters)
+    if(matches_filters) {
+        if(fqs->data_only &&
+           fqs->anchor /* && !netdata_systemd_journal_check_if_modified_since(j, fqs->before_ut, fqs->if_modified_since) */) {
+            facets_data_only_mode(facets);
+
+            // we can do a data-only query
+            if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
+                status = netdata_systemd_journal_query_data_forward(j, wb, facets, jf, fqs);
+            else
+                status = netdata_systemd_journal_query_data_backward(j, wb, facets, jf, fqs);
+        }
+        else {
+            // we have to do a full query
             status = netdata_systemd_journal_query_full(j, wb, facets, jf, fqs);
-        else
-            status = ND_SD_JOURNAL_NO_FILE_MATCHED;
+        }
     }
+    else
+        status = ND_SD_JOURNAL_NO_FILE_MATCHED;
 
     sd_journal_close(j);
 
