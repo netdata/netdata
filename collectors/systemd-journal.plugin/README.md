@@ -13,9 +13,10 @@ learn_rel_path: "Integrations/Logs"
 
 # SystemD Journal
 
-The SystemD Journal plugin by Netdata makes viewing and analyzing systemd journal logs simple and efficient.
+The SystemD Journal plugin by Netdata makes viewing, exploring and analyzing systemd journal logs simple and efficient.
 It automatically discovers available journal sources, allows advanced filtering, offers interactive visual
-representations and supports both individual servers and logs centralization servers.
+representations and supports exploring the logs of both individual servers and the logs on infrastructure wide 
+journal centralization servers.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
@@ -82,7 +83,7 @@ your infrastructure.
 The Netdata plugin automatically extracts the remote IPs and based on their reverse DNS records it presents remote
 journals using the hostnames of the servers than pushed their metrics to the logs centralization server.
 
-For information about configuring a journals centralization severs, check [this FAQ item](#how-do-i-configure-a-journals-centralization-server).
+For information about configuring a journals' centralization server, check [this FAQ item](#how-do-i-configure-a-journals-centralization-server).
 
 ## Journal Fields
 
@@ -214,12 +215,13 @@ This Netdata plugin does not require any configuration or maintenance.
 
 ## FAQ
 
-### Can I use this plugin on a logs centralization server?
+### Can I use this plugin on journals' centralization servers?
 
 Yes. You can centralize your logs using systemd journal, and then install Netdata
 on this logs centralization server to explore the logs of all your infrastructure.
 
-This plugin will automatically provide multi-node views of your logs.
+This plugin will automatically provide multi-node views of your logs and also give you the ability to combine the logs
+of multiple servers, as you see fit.
 
 Check [configuring a logs centralization server](#configuring-a-journals-centralization-server).
 
@@ -242,7 +244,17 @@ When you access Netdata via `https://app.netdata.cloud`, your data travel via Ne
 but they are not stored in Netdata Cloud. This is to allow you access your Netdata agents from
 anywhere. All communication from/to Netdata Cloud is encrypted.
 
-### Does it worth to build a systemd logs centralization server?
+### What are `volatile` and `persistent` journals?
+
+SystemD JournalD allows creating both `volatile` journals in a `tmpfs` ram drive,
+and `persistent` journals stored on disk.
+
+`volatile` journals are particularly useful when the system monitored is sensitive to
+disk I/O, or does not have any writable disks at all.
+
+For more information check `man systemd-journald`.
+
+### Is it worth to build a systemd logs centralization server?
 
 Yes. It is simple, fast and the software to do it is already in your systems.
 
@@ -254,13 +266,13 @@ in a structured way.
 For application and system logs, systemd journal is ideal and the visibility you can get
 by centralizing your system logs and this Netdata plugin, is unparalleled.
 
-### How do I configure a journals centralization server?
+### How do I configure a journals' centralization server?
 
-Check the `systemd-journal-remote` and `systemd-journal-upload` documentation.
+A short summary to get journal server running can be found below.
 
-A short summary to get something running quickly, follows:
+For more options and reference to documentation, check `man systemd-journal-remote` and `man systemd-journal-upload`.
 
-#### Configuring a journals centralization server
+#### Configuring a journals' centralization server
 
 On the centralization server install `systemd-journal-remote`, and enable it with `systemctl`, like this:
 
