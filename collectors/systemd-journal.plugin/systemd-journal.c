@@ -1408,6 +1408,18 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             "      Apply filters to the query, based on the facet IDs returned.\n"
             "      Each `facet_id` can be given once, but multiple `facet_ids` can be given.\n"
             "\n"
+            " There is special mode. By specifying:\n"
+            "\n"
+            "  - `"JOURNAL_PARAMETER_DIRECTION":forward`,\n"
+            "  - `"JOURNAL_PARAMETER_ANCHOR":TIMESTAMP_IN_USEC`,\n"
+            "  - `"JOURNAL_PARAMETER_DATA_ONLY"`, and\n"
+            "  - `"JOURNAL_PARAMETER_IF_MODIFIED_SINCE":TIMESTAMP_IN_USEC`\n"
+            "\n"
+            " The plugin understands the caller is interested to tail the journals.\n"
+            " In this mode, it returns up to `"JOURNAL_PARAMETER_LAST"` of the newest entries\n"
+            " and up to `"JOURNAL_PARAMETER_ANCHOR"`. This has been implemented so that if the journal\n"
+            " receives more than `"JOURNAL_PARAMETER_LAST"` entries, the return values will the latest.\n"
+            "\n"
             , program_name
             , SYSTEMD_JOURNAL_FUNCTION_NAME
             , SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION
