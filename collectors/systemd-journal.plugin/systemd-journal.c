@@ -205,7 +205,12 @@ typedef struct function_query_status {
     STRING *source;
     usec_t after_ut;
     usec_t before_ut;
-    usec_t anchor;
+
+    struct {
+        usec_t start_ut;
+        usec_t stop_ut;
+    } anchor;
+
     FACETS_ANCHOR_DIRECTION direction;
     size_t entries;
     usec_t if_modified_since;
@@ -213,6 +218,8 @@ typedef struct function_query_status {
     bool slice;
     size_t filters;
     usec_t last_modified;
+    const char *query;
+    const char *histogram;
 
     // per file progress info
     size_t cached_count;
@@ -342,8 +349,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = fqs->before_ut + anchor_delta;
-    usec_t stop_ut = fqs->after_ut;
+    usec_t start_ut = (fqs->anchor.start_ut ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
+    usec_t stop_ut = fqs->anchor.stop_ut ? fqs->anchor.stop_ut : fqs->after_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -355,7 +362,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
-    facets_rows_begin(facets);
+    facets_data_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
         usec_t msg_ut = 0;
         if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
@@ -410,8 +417,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = fqs->anchor;
-    usec_t stop_ut = fqs->before_ut + anchor_delta;
+    usec_t start_ut = fqs->anchor.start_ut ? fqs->anchor.start_ut : fqs->after_ut;
+    usec_t stop_ut = (fqs->anchor.stop_ut ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -422,7 +429,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
-    facets_rows_begin(facets);
+    facets_data_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_next(j) > 0) {
         usec_t msg_ut = 0;
         if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
@@ -473,8 +480,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = fqs->anchor + anchor_delta;
-    usec_t stop_ut = fqs->after_ut;
+    usec_t start_ut = (fqs->anchor.start_ut ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
+    usec_t stop_ut = fqs->anchor.stop_ut ? fqs->anchor.stop_ut : fqs->after_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -485,7 +492,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
-    facets_rows_begin(facets);
+    facets_data_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
         usec_t msg_ut = 0;
         if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
@@ -659,8 +666,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
     if(matches_filters) {
-        if(fqs->data_only &&
-           fqs->anchor /* && !netdata_systemd_journal_check_if_modified_since(j, fqs->before_ut, fqs->if_modified_since) */) {
+        if(fqs->data_only) {
             facets_data_only_mode(facets);
 
             // we can do a data-only query
@@ -2063,6 +2069,9 @@ static void function_systemd_journal(const char *transaction, char *function, in
                                             FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_timestamp_usec, NULL);
 
+    // ------------------------------------------------------------------------
+    // parse the parameters
+
     bool info = false, data_only = false, progress = false, slice = JOURNAL_DEFAULT_SLICE_MODE;
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
@@ -2214,10 +2223,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
         }
     }
 
-    if(progress) {
-        function_systemd_journal_progress(wb, transaction, progress_id);
-        goto cleanup;
-    }
+    // ------------------------------------------------------------------------
+    // put this request into the progress db
 
     if(progress_id && *progress_id) {
         fqs_item = dictionary_set_and_acquire_item(function_query_status_dict, progress_id, &tmp_fqs, sizeof(tmp_fqs));
@@ -2228,6 +2235,9 @@ static void function_systemd_journal(const char *transaction, char *function, in
         fqs = &tmp_fqs;
         fqs_item = NULL;
     }
+
+    // ------------------------------------------------------------------------
+    // validate parameters
 
     time_t expires = now_realtime_sec() + 1;
     time_t now_s;
@@ -2252,24 +2262,109 @@ static void function_systemd_journal(const char *transaction, char *function, in
     if(!last)
         last = SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY;
 
-    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_INFO, info);
-    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_SLICE, slice);
-    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_DATA_ONLY, data_only);
-    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_PROGRESS, progress);
+
+    // ------------------------------------------------------------------------
+    // set query time-frame, anchors and direction
+
+    fqs->after_ut = after_s * USEC_PER_SEC;
+    fqs->before_ut = before_s * USEC_PER_SEC;
+
+    if(anchor && anchor < fqs->after_ut) {
+        netdata_log_error("Received anchor %"PRIu64" is too small for query time-frame [%"PRIu64" - %"PRIu64"]",
+                          anchor, fqs->after_ut, fqs->before_ut);
+        anchor = 0;
+    }
+    else if(anchor > fqs->before_ut) {
+        netdata_log_error("Received anchor %"PRIu64" is too big for query time-frame [%"PRIu64" - %"PRIu64"]",
+                          anchor, fqs->after_ut, fqs->before_ut);
+        anchor = 0;
+    }
+
+    if(anchor) {
+        if(direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
+            if(fqs->if_modified_since && fqs->data_only) {
+                // a tail request
+                // we need the top X entries from BEFORE
+                // but, we need to calculate the facets and the
+                // histogram up to the anchor
+                fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
+                fqs->anchor.start_ut = 0;
+                fqs->anchor.stop_ut = anchor;
+            }
+            else {
+                fqs->direction = direction;
+                fqs->anchor.start_ut = anchor;
+                fqs->anchor.stop_ut = 0;
+            }
+        }
+        else {
+            fqs->direction = direction;
+            fqs->anchor.start_ut = anchor;
+            fqs->anchor.stop_ut = 0;
+        }
+    }
+    else {
+        fqs->direction = direction;
+        fqs->anchor.start_ut = 0;
+        fqs->anchor.stop_ut = 0;
+    }
+
+    facets_set_anchor(facets, fqs->anchor.start_ut, fqs->anchor.stop_ut, fqs->direction);
+
+    // ------------------------------------------------------------------------
+    // set the rest of the query parameters
+
+    fqs->source = string_strdupz(source);
+    fqs->source_type = source_type;
+    fqs->entries = last;
+    fqs->if_modified_since = if_modified_since;
+    fqs->data_only = data_only;
+    fqs->last_modified = 0;
+    fqs->filters = filters;
+    fqs->query = (query && *query) ? query : NULL;
+    fqs->histogram = (chart && *chart) ? chart : NULL;
+
+    facets_set_items(facets, fqs->entries);
+    facets_set_query(facets, fqs->query);
+
+#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
+    fqs->slice = slice;
+    if(slice)
+        facets_enable_slice_mode(facets);
+#else
+    fqs->slice = false;
+#endif
+
+    if(fqs->histogram)
+        facets_set_timeframe_and_histogram_by_id(facets, fqs->histogram, fqs->after_ut, fqs->before_ut);
+    else
+        facets_set_timeframe_and_histogram_by_name(facets, "PRIORITY", fqs->after_ut, fqs->before_ut);
+
+
+    // ------------------------------------------------------------------------
+    // complete the request object
+
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_INFO, false);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_SLICE, fqs->slice);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_DATA_ONLY, fqs->data_only);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_PROGRESS, false);
     buffer_json_member_add_string(wb, JOURNAL_PARAMETER_ID, progress_id);
-    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_SOURCE, source);
-    buffer_json_member_add_uint64(wb, "source_type", source_type);
-    buffer_json_member_add_time_t(wb, JOURNAL_PARAMETER_AFTER, after_s);
-    buffer_json_member_add_time_t(wb, JOURNAL_PARAMETER_BEFORE, before_s);
-    buffer_json_member_add_uint64(wb, "if_modified_since", if_modified_since);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_SOURCE, string2str(fqs->source));
+    buffer_json_member_add_uint64(wb, "source_type", fqs->source_type);
+    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_AFTER, fqs->after_ut / USEC_PER_SEC);
+    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_BEFORE, fqs->before_ut / USEC_PER_SEC);
+    buffer_json_member_add_uint64(wb, "if_modified_since", fqs->if_modified_since);
     buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_ANCHOR, anchor);
-    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_DIRECTION, direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
-    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_LAST, last);
-    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_QUERY, query);
-    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_HISTOGRAM, chart);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_DIRECTION, fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
+    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_LAST, fqs->entries);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_QUERY, fqs->query);
+    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_HISTOGRAM, fqs->histogram);
     buffer_json_object_close(wb); // request
 
     buffer_json_journal_versions(wb);
+
+    // ------------------------------------------------------------------------
+    // run the request
 
     int response;
 
@@ -2303,50 +2398,21 @@ static void function_systemd_journal(const char *transaction, char *function, in
         goto output;
     }
 
-    fqs->source = string_strdupz(source);
-    fqs->source_type = source_type;
-    fqs->after_ut = after_s * USEC_PER_SEC;
-    fqs->before_ut = before_s * USEC_PER_SEC;
-    fqs->anchor = anchor;
-    fqs->direction = direction;
-    fqs->entries = last;
-    fqs->if_modified_since = if_modified_since;
-    fqs->data_only = data_only;
-    fqs->last_modified = 0;
-    fqs->filters = filters;
-
-    if(fqs->anchor && fqs->anchor < fqs->after_ut) {
-        netdata_log_error("Received anchor %"PRIu64" is too small for query time-frame [%"PRIu64" - %"PRIu64"]",
-                fqs->anchor, fqs->after_ut, fqs->before_ut);
-        fqs->anchor = 0;
+    if(progress) {
+        function_systemd_journal_progress(wb, transaction, progress_id);
+        goto cleanup;
     }
-    else if(fqs->anchor > fqs->before_ut) {
-        netdata_log_error("Received anchor %"PRIu64" is too big for query time-frame [%"PRIu64" - %"PRIu64"]",
-                fqs->anchor, fqs->after_ut, fqs->before_ut);
-        fqs->anchor = 0;
-    }
-
-    facets_set_items(facets, fqs->entries);
-    facets_set_anchor(facets, fqs->anchor, fqs->direction);
-    facets_set_query(facets, query);
-
-#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
-    fqs->slice = slice;
-    if(slice)
-        facets_enable_slice_mode(facets);
-#else
-    fqs->slice = false;
-#endif
-
-    if(chart && *chart)
-        facets_set_timeframe_and_histogram_by_id(facets, chart, fqs->after_ut, fqs->before_ut);
-    else
-        facets_set_timeframe_and_histogram_by_name(facets, "PRIORITY", fqs->after_ut, fqs->before_ut);
 
     response = netdata_systemd_journal_query(wb, facets, fqs);
 
+    // ------------------------------------------------------------------------
+    // cleanup query params
+
     string_freez(fqs->source);
     fqs->source = NULL;
+
+    // ------------------------------------------------------------------------
+    // handle error response
 
     if(response != HTTP_RESP_OK) {
         netdata_mutex_lock(&stdout_mutex);

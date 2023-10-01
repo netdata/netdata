@@ -57,12 +57,12 @@ FACET_KEY *facets_register_key_name_transformation(FACETS *facets, const char *k
 void facets_register_row_severity(FACETS *facets, facet_row_severity_t cb, void *data);
 
 typedef enum __attribute__((packed)) {
-    FACETS_OPTION_ALL_FACETS_VISIBLE            = (1 << 0), // all facets, should be visible by default in the table
+    FACETS_OPTION_ALL_FACETS_VISIBLE            = (1 << 0), // all facets should be visible by default in the table
     FACETS_OPTION_ALL_KEYS_FTS                  = (1 << 1), // all keys are searchable by full text search
-    FACETS_OPTION_DISABLE_ALL_FACETS            = (1 << 2),
-    FACETS_OPTION_DISABLE_HISTOGRAM             = (1 << 3),
+    FACETS_OPTION_DONT_SEND_FACETS              = (1 << 2), // "facets" object will not be included in the report
+    FACETS_OPTION_DONT_SEND_HISTOGRAM           = (1 << 3), // "histogram" object will not be included in the report
     FACETS_OPTION_DATA_ONLY                     = (1 << 4),
-    FACETS_OPTION_NO_EMPTY_VALUE_FACETS         = (1 << 5),
+    FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS  = (1 << 5), // empty facet values will not be included in the report
     FACETS_OPTION_SORT_FACETS_ALPHABETICALLY    = (1 << 6),
 } FACETS_OPTIONS;
 
@@ -71,13 +71,13 @@ void facets_destroy(FACETS *facets);
 
 void facets_accepted_param(FACETS *facets, const char *param);
 
-void facets_rows_begin(FACETS *facets);
+void facets_data_begin(FACETS *facets);
 bool facets_row_finished(FACETS *facets, usec_t usec);
 
 FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options);
 void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
-void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION direction);
+void facets_set_anchor(FACETS *facets, usec_t start_ut, usec_t stop_ut, FACETS_ANCHOR_DIRECTION direction);
 void facets_enable_slice_mode(FACETS *facets);
 
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);

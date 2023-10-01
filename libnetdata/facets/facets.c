@@ -182,7 +182,8 @@ struct facets {
     FACETS_OPTIONS options;
 
     struct {
-        usec_t key;
+        usec_t start_ut;
+        usec_t stop_ut;
         FACETS_ANCHOR_DIRECTION direction;
     } anchor;
 
@@ -221,8 +222,10 @@ struct facets {
     } current_row;
 
     struct {
-        usec_t after_ut;
-        usec_t before_ut;
+        // the actual timeframe we want to keep lines for
+        // it is recalculated everytime facets_data_begin()
+        usec_t after_ut; // can be zero, meaning without a lower limit
+        usec_t before_ut; // can be UINT64_MAX, meaning without an upper limit
     } timeframe;
 
     struct {
@@ -1267,7 +1270,7 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k) {
         }
     }
 
-    if(included && !excluded && !(facets->options & FACETS_OPTION_DISABLE_ALL_FACETS)) {
+    if(included && !excluded) {
         k->options |= FACET_KEY_OPTION_FACET;
         k->options &= ~FACET_KEY_OPTION_NO_FACET;
         return true;
@@ -1295,7 +1298,8 @@ FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const ch
         facets->visible_keys = simple_pattern_create(visible_keys, "|", SIMPLE_PATTERN_EXACT, true);
 
     facets->max_items_to_return = items_to_return;
-    facets->anchor.key = 0;
+    facets->anchor.start_ut = 0;
+    facets->anchor.stop_ut = 0;
     facets->anchor.direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     facets->order = 1;
 
@@ -1361,13 +1365,21 @@ void facets_set_items(FACETS *facets, uint32_t items) {
     facets->max_items_to_return = items;
 }
 
-void facets_set_anchor(FACETS *facets, usec_t anchor, FACETS_ANCHOR_DIRECTION direction) {
-    facets->anchor.key = anchor;
+void facets_set_anchor(FACETS *facets, usec_t start_ut, usec_t stop_ut, FACETS_ANCHOR_DIRECTION direction) {
+    facets->anchor.start_ut = start_ut;
+    facets->anchor.stop_ut = stop_ut;
     facets->anchor.direction = direction;
+
+    if((facets->anchor.direction == FACETS_ANCHOR_DIRECTION_BACKWARD && facets->anchor.start_ut && facets->anchor.start_ut < facets->anchor.stop_ut) ||
+            (facets->anchor.direction == FACETS_ANCHOR_DIRECTION_FORWARD && facets->anchor.stop_ut && facets->anchor.stop_ut < facets->anchor.start_ut)) {
+        internal_error(true, "start and stop anchors are flipped");
+        facets->anchor.start_ut = stop_ut;
+        facets->anchor.stop_ut = start_ut;
+    }
 }
 
 void facets_enable_slice_mode(FACETS *facets) {
-    facets->options |= FACETS_OPTION_NO_EMPTY_VALUE_FACETS | FACETS_OPTION_SORT_FACETS_ALPHABETICALLY;
+    facets->options |= FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS | FACETS_OPTION_SORT_FACETS_ALPHABETICALLY;
 }
 
 inline FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options) {
@@ -1407,7 +1419,7 @@ void facets_register_row_severity(FACETS *facets, facet_row_severity_t cb, void 
 }
 
 void facets_data_only_mode(FACETS *facets) {
-    facets->options |= FACETS_OPTION_DISABLE_ALL_FACETS | FACETS_OPTION_DISABLE_HISTOGRAM | FACETS_OPTION_DATA_ONLY;
+    facets->options |= FACETS_OPTION_DATA_ONLY;
 }
 
 // ----------------------------------------------------------------------------
@@ -1589,7 +1601,7 @@ static void facets_row_keep_first_entry(FACETS *facets, usec_t usec) {
 static void facets_row_keep(FACETS *facets, usec_t usec) {
     facets->operations.rows.matched++;
 
-    if(facets->anchor.key) {
+    if(facets->anchor.start_ut || facets->anchor.stop_ut) {
         // we have an anchor key
         // we don't want to keep rows on the other side of the direction
 
@@ -1597,16 +1609,24 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
             default:
             case FACETS_ANCHOR_DIRECTION_BACKWARD:
                 // we need to keep only the smaller timestamps
-                if (usec >= facets->anchor.key) {
+                if (facets->anchor.start_ut && usec >= facets->anchor.start_ut) {
                     facets->operations.skips_before++;
+                    return;
+                }
+                if (facets->anchor.stop_ut && usec <= facets->anchor.stop_ut) {
+                    facets->operations.skips_after++;
                     return;
                 }
                 break;
 
             case FACETS_ANCHOR_DIRECTION_FORWARD:
                 // we need to keep only the bigger timestamps
-                if (usec <= facets->anchor.key) {
+                if (facets->anchor.start_ut && usec <= facets->anchor.start_ut) {
                     facets->operations.skips_after++;
+                    return;
+                }
+                if (facets->anchor.stop_ut && usec >= facets->anchor.stop_ut) {
+                    facets->operations.skips_before++;
                     return;
                 }
                 break;
@@ -1700,7 +1720,21 @@ static void facets_reset_keys_with_value_and_row(FACETS *facets) {
     facets->keys_in_row.used = 0;
 }
 
-void facets_rows_begin(FACETS *facets) {
+void facets_data_begin(FACETS *facets) {
+    facets->timeframe.before_ut = facets->timeframe.before_ut ? facets->timeframe.before_ut : UINT64_MAX;
+    facets->timeframe.after_ut = facets->timeframe.after_ut ? facets->timeframe.after_ut : 0;
+
+    if(facets->anchor.start_ut || facets->anchor.stop_ut) {
+        if(facets->anchor.direction == FACETS_ANCHOR_DIRECTION_BACKWARD) {
+            facets->timeframe.before_ut = facets->anchor.start_ut ? facets->anchor.start_ut : facets->timeframe.before_ut;
+            facets->timeframe.after_ut = facets->anchor.stop_ut ? facets->anchor.stop_ut : facets->timeframe.after_ut;
+        }
+        else {
+            facets->timeframe.before_ut = facets->anchor.stop_ut ? facets->anchor.stop_ut : facets->timeframe.before_ut;
+            facets->timeframe.after_ut = facets->anchor.start_ut ? facets->anchor.start_ut : facets->timeframe.after_ut;
+        }
+    }
+
     FACET_KEY *k;
     foreach_key_in_facets(facets, k) {
         facets_reset_key(k);
@@ -1715,9 +1749,9 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.rows.evaluated++;
 
     if((facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) ||
-            (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
-            (facets->timeframe.after_ut && usec < facets->timeframe.after_ut)) {
-        facets_rows_begin(facets);
+            (usec > facets->timeframe.before_ut) ||
+            (usec < facets->timeframe.after_ut)) {
+        facets_reset_keys_with_value_and_row(facets);
         return false;
     }
 
@@ -1921,7 +1955,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     FACET_VALUE *values[entries], *v;
     uint32_t used = 0;
     foreach_value_in_key(k, v) {
-        if((k->facets->options & FACETS_OPTION_NO_EMPTY_VALUE_FACETS) && v->empty)
+        if((k->facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
             continue;
 
         values[used] = v;
@@ -2023,8 +2057,11 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         facets_accepted_parameters_to_json_array(facets, wb, true);
     }
 
-    if(!(facets->options & FACETS_OPTION_DISABLE_ALL_FACETS)) {
-        buffer_json_member_add_array(wb, "facets");
+    if(!(facets->options & FACETS_OPTION_DONT_SEND_FACETS)) {
+        if(facets->options & FACETS_OPTION_DATA_ONLY)
+            buffer_json_member_add_array(wb, "facets_delta");
+        else
+            buffer_json_member_add_array(wb, "facets");
         {
             BUFFER *tb = NULL;
             FACET_KEY *k;
@@ -2048,7 +2085,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                     {
                         FACET_VALUE *v;
                         foreach_value_in_key(k, v) {
-                            if((facets->options & FACETS_OPTION_NO_EMPTY_VALUE_FACETS) && v->empty)
+                            if((facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
                                 continue;
 
                             buffer_json_add_array_item_object(wb);
@@ -2156,10 +2193,10 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         for(FACET_ROW *row = facets->base ; row ;row = row->next) {
 
             internal_fatal(
-                    facets->anchor.key && (
-                        (facets->anchor.direction == FACETS_ANCHOR_DIRECTION_BACKWARD && row->usec >= facets->anchor.key) ||
-                        (facets->anchor.direction == FACETS_ANCHOR_DIRECTION_FORWARD && row->usec <= facets->anchor.key)
-                    ), "Wrong data returned related to %s anchor!", facets->anchor.direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
+                    facets->anchor.start_ut && (
+                        (facets->anchor.direction == FACETS_ANCHOR_DIRECTION_BACKWARD && row->usec >= facets->anchor.start_ut) ||
+                        (facets->anchor.direction == FACETS_ANCHOR_DIRECTION_FORWARD && row->usec <= facets->anchor.start_ut)
+                    ), "Wrong data returned related to %s start anchor!", facets->anchor.direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
 
             internal_fatal(last_usec && row->usec > last_usec, "Wrong order of data returned!");
 
@@ -2211,7 +2248,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         buffer_json_array_close(wb);
     }
 
-    if(facets->histogram.enabled && !(facets->options & FACETS_OPTION_DISABLE_HISTOGRAM)) {
+    if(facets->histogram.enabled && !(facets->options & FACETS_OPTION_DONT_SEND_HISTOGRAM)) {
         FACETS_HASH first_histogram_hash = 0;
         buffer_json_member_add_array(wb, "available_histograms");
         {
@@ -2237,7 +2274,10 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             if(!k || !k->values.enabled)
                 k = FACETS_KEY_GET_FROM_INDEX(facets, first_histogram_hash);
 
-            buffer_json_member_add_object(wb, "histogram");
+            if(facets->options & FACETS_OPTION_DATA_ONLY)
+                buffer_json_member_add_object(wb, "histogram_delta");
+            else
+                buffer_json_member_add_object(wb, "histogram");
             {
                 buffer_json_member_add_string(wb, "id", k ? hash_to_static_string(k->hash) : "");
                 buffer_json_member_add_string(wb, "name", k ? k->name : "");
@@ -2249,18 +2289,19 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         }
     }
 
-    if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
+    if(facets->options & FACETS_OPTION_DATA_ONLY)
+        buffer_json_member_add_object(wb, "items_delta");
+    else
         buffer_json_member_add_object(wb, "items");
-        {
-            buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
-            buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
-            buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
-            buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
-            buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
-            buffer_json_member_add_uint64(wb, "after", facets->operations.skips_after + facets->operations.shifts);
-        }
-        buffer_json_object_close(wb); // items
+    {
+        buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
+        buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
+        buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
+        buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
+        buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
+        buffer_json_member_add_uint64(wb, "after", facets->operations.skips_after + facets->operations.shifts);
     }
+    buffer_json_object_close(wb); // items
 
     buffer_json_member_add_object(wb, "stats");
     {
