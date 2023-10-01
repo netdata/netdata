@@ -362,7 +362,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
-    facets_data_begin(facets);
+    facets_rows_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
         usec_t msg_ut = 0;
         if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
@@ -429,7 +429,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
-    facets_data_begin(facets);
+    facets_rows_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_next(j) > 0) {
         usec_t msg_ut = 0;
         if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
@@ -492,7 +492,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
-    facets_data_begin(facets);
+    facets_rows_begin(facets);
     while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
         usec_t msg_ut = 0;
         if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {

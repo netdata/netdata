@@ -222,10 +222,8 @@ struct facets {
     } current_row;
 
     struct {
-        // the actual timeframe we want to keep lines for
-        // it is recalculated everytime facets_data_begin()
-        usec_t after_ut; // can be zero, meaning without a lower limit
-        usec_t before_ut; // can be UINT64_MAX, meaning without an upper limit
+        usec_t after_ut;
+        usec_t before_ut;
     } timeframe;
 
     struct {
@@ -1598,9 +1596,7 @@ static void facets_row_keep_first_entry(FACETS *facets, usec_t usec) {
     facets->operations.first++;
 }
 
-static void facets_row_keep(FACETS *facets, usec_t usec) {
-    facets->operations.rows.matched++;
-
+static inline bool facets_is_entry_within_anchor(FACETS *facets, usec_t usec) {
     if(facets->anchor.start_ut || facets->anchor.stop_ut) {
         // we have an anchor key
         // we don't want to keep rows on the other side of the direction
@@ -1611,11 +1607,11 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
                 // we need to keep only the smaller timestamps
                 if (facets->anchor.start_ut && usec >= facets->anchor.start_ut) {
                     facets->operations.skips_before++;
-                    return;
+                    return false;
                 }
                 if (facets->anchor.stop_ut && usec <= facets->anchor.stop_ut) {
                     facets->operations.skips_after++;
-                    return;
+                    return false;
                 }
                 break;
 
@@ -1623,15 +1619,21 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
                 // we need to keep only the bigger timestamps
                 if (facets->anchor.start_ut && usec <= facets->anchor.start_ut) {
                     facets->operations.skips_after++;
-                    return;
+                    return false;
                 }
                 if (facets->anchor.stop_ut && usec >= facets->anchor.stop_ut) {
                     facets->operations.skips_before++;
-                    return;
+                    return false;
                 }
                 break;
         }
     }
+
+    return true;
+}
+
+static void facets_row_keep(FACETS *facets, usec_t usec) {
+    facets->operations.rows.matched++;
 
     if(unlikely(!facets->base)) {
         // the first row to keep
@@ -1720,21 +1722,7 @@ static void facets_reset_keys_with_value_and_row(FACETS *facets) {
     facets->keys_in_row.used = 0;
 }
 
-void facets_data_begin(FACETS *facets) {
-    facets->timeframe.before_ut = facets->timeframe.before_ut ? facets->timeframe.before_ut : UINT64_MAX;
-    facets->timeframe.after_ut = facets->timeframe.after_ut ? facets->timeframe.after_ut : 0;
-
-    if(facets->anchor.start_ut || facets->anchor.stop_ut) {
-        if(facets->anchor.direction == FACETS_ANCHOR_DIRECTION_BACKWARD) {
-            facets->timeframe.before_ut = facets->anchor.start_ut ? facets->anchor.start_ut : facets->timeframe.before_ut;
-            facets->timeframe.after_ut = facets->anchor.stop_ut ? facets->anchor.stop_ut : facets->timeframe.after_ut;
-        }
-        else {
-            facets->timeframe.before_ut = facets->anchor.stop_ut ? facets->anchor.stop_ut : facets->timeframe.before_ut;
-            facets->timeframe.after_ut = facets->anchor.start_ut ? facets->anchor.start_ut : facets->timeframe.after_ut;
-        }
-    }
-
+void facets_rows_begin(FACETS *facets) {
     FACET_KEY *k;
     foreach_key_in_facets(facets, k) {
         facets_reset_key(k);
@@ -1749,8 +1737,11 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.rows.evaluated++;
 
     if((facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) ||
-            (usec > facets->timeframe.before_ut) ||
-            (usec < facets->timeframe.after_ut)) {
+            (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
+            (facets->timeframe.after_ut && usec < facets->timeframe.after_ut)) {
+        // this row is not useful
+        // 1. not matched by full text search, or
+        // 2. not in our timeframe
         facets_reset_keys_with_value_and_row(facets);
         return false;
     }
@@ -1779,7 +1770,9 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
             facets->histogram.key = k;
     }
 
-    if(selected_keys >= total_keys - 1) {
+    bool within_anchor = facets_is_entry_within_anchor(facets, usec);
+
+    if(within_anchor && selected_keys >= total_keys - 1) {
         size_t found = 0; (void)found;
 
         for(size_t p = 0; p < entries ;p++) {
@@ -1805,7 +1798,9 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
         // we need to keep this row
 
         facets_histogram_update_value(facets, usec);
-        facets_row_keep(facets, usec);
+
+        if(within_anchor)
+            facets_row_keep(facets, usec);
     }
 
     facets_reset_keys_with_value_and_row(facets);
