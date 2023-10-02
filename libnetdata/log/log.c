@@ -1157,7 +1157,6 @@ char *log_severity_level_to_severity_string(netdata_log_level_t level)
 {
     switch (level) {
         case NETDATA_LOG_LEVEL_ERROR:
-        case NETDATA_LOG_LEVEL_ERROR_SHORT_STR:
             return NETDATA_LOG_LEVEL_ERROR_STR;
         case NETDATA_LOG_LEVEL_INFO:
         default:
