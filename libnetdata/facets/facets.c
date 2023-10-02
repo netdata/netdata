@@ -1941,10 +1941,7 @@ static int facets_key_values_reorder_by_name_numeric_compar(const void *a, const
     return facets_key_values_reorder_by_name_compar(a, b);
 }
 
-static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
-    if(!k->values.enabled || !k->values.ll || !k->values.used)
-        return 0;
-
+static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
     bool all_values_numeric = true;
     size_t entries = k->values.used;
     FACET_VALUE *values[entries], *v;
@@ -1965,6 +1962,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
         if(++used >= entries)
             break;
     }
+    foreach_value_in_key_done(v);
 
     if(!used)
         return 0;
@@ -1982,6 +1980,51 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
         values[i]->order = i + 1;
 
     return used;
+}
+
+static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
+    if(!k->values.enabled || !k->values.ll || !k->values.used)
+        return 0;
+
+    if(!k->transform.cb || !(k->facets->options & FACETS_OPTION_SORT_FACETS_ALPHABETICALLY))
+        return facets_sort_and_reorder_values_internal(k);
+
+    // we have a transformation and has to be sorted alphabetically
+
+    BUFFER *tb = buffer_create(0, NULL);
+    uint32_t ret = 0;
+
+    size_t entries = k->values.used;
+    const char *values[entries];
+    FACET_VALUE *v;
+    uint32_t used = 0;
+
+    foreach_value_in_key(k, v) {
+        values[used] = v->name;
+
+        k->transform.cb(k->facets, tb, FACETS_TRANSFORM_FACET, k->transform.data);
+        v->name = strdupz(buffer_tostring(tb));
+
+        if(++used >= entries)
+            break;
+    }
+    foreach_value_in_key_done(v);
+
+    ret = facets_sort_and_reorder_values_internal(k);
+
+    used = 0;
+    foreach_value_in_key(k, v) {
+
+        freez((void *)v->name);
+        v->name = values[used];
+
+        if(++used >= entries)
+            break;
+    }
+    foreach_value_in_key_done(v);
+
+    buffer_free(tb);
+    return ret;
 }
 
 void facets_table_config(BUFFER *wb) {
@@ -2124,8 +2167,8 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             }
             foreach_key_in_facets_done(k);
             buffer_free(tb);
+            buffer_json_array_close(wb); // facets
         }
-        buffer_json_array_close(wb); // facets
     }
 
     // ------------------------------------------------------------------------

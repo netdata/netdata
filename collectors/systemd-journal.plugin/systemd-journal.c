@@ -99,7 +99,6 @@ int fstat64(int fd, struct stat64 *buf) {
 #define SYSTEMD_JOURNAL_MAX_PARAMS              100
 #define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (3 * 3600)
 #define SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY 200
-#define SYSTEMD_JOURNAL_EXCESS_ROWS_ALLOWED     50
 #define SYSTEMD_JOURNAL_WORKER_THREADS          5
 
 #define JOURNAL_PARAMETER_HELP                  "help"
