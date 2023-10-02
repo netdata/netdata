@@ -877,14 +877,14 @@ def main():
     log = PythonDLogger()
 
     level = os.getenv('NETDATA_LOG_SEVERITY_LEVEL') or str()
-    level = level.upper()
-    if level == 'DEBUG':
+    level = level.lower()
+    if level == 'debug':
         log.logger.severity = 'DEBUG'
-    elif level == 'INFO':
+    elif level == 'info':
         log.logger.severity = 'INFO'
-    elif level == 'WARN' or level == 'WARNING':
+    elif level == 'warn' or level == 'warning':
         log.logger.severity = 'WARNING'
-    elif level == 'ERR' or level == 'ERROR':
+    elif level == 'err' or level == 'error':
         log.logger.severity = 'ERROR'
 
     if cmd.debug:
