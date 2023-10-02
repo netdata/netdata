@@ -1414,7 +1414,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
     return rrd_function_run(host, wb, timeout, function, true, NULL,
                             NULL, NULL,
-                            web_client_interrupt_callback, w);
+                            web_client_interrupt_callback, w, NULL);
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {

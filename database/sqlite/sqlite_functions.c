@@ -201,6 +201,55 @@ int execute_insert(sqlite3_stmt *res)
     return rc;
 }
 
+int configure_sqlite_database(sqlite3 *database, int target_version)
+{
+    char buf[1024 + 1] = "";
+    const char *list[2] = { buf, NULL };
+
+    // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
+    // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
+    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_synchronous
+    // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
+    snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_journal_mode
+    // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
+    snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_temp_store
+    // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
+    snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
+    // PRAGMA schema.journal_size_limit = N ;
+    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_cache_size
+    // PRAGMA schema.cache_size = pages;
+    // PRAGMA schema.cache_size = -kibibytes;
+    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    if (init_database_batch(database, list))
+        return 1;
+
+    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
+    if (init_database_batch(database, list))
+        return 1;
+
+    return 0;
+}
+
 #define MAX_OPEN_STATEMENTS (512)
 
 static void add_stmt_to_list(sqlite3_stmt *res)
@@ -382,9 +431,6 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
-    char buf[1024 + 1] = "";
-    const char *list[2] = { buf, NULL };
-
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to register internal u2h function");
@@ -402,39 +448,8 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (likely(!memory))
         target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
-    // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
-    // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
-    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_synchronous
-    // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
-    snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_journal_mode
-    // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
-    snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_temp_store
-    // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
-    snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
-    // PRAGMA schema.journal_size_limit = N ;
-    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_cache_size
-    // PRAGMA schema.cache_size = pages;
-    // PRAGMA schema.cache_size = -kibibytes;
-    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
-    if(init_database_batch(db_meta, list)) return 1;
+   if (configure_sqlite_database(db_meta, target_version))
+        return 1;
 
     if (init_database_batch(db_meta, &database_config[0]))
         return 1;

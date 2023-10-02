@@ -562,6 +562,9 @@ int is_legacy = 1;
          , string2str(host->health.health_default_recipient)
     );
 
+    host->configurable_plugins = dyncfg_dictionary_create();
+    dictionary_register_delete_callback(host->configurable_plugins, plugin_del_cb, NULL);
+
     if(!archived) {
         metaqueue_host_update_info(host);
         rrdhost_load_rrdcontext_data(host);

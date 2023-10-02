@@ -36,7 +36,14 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Create `tc-qos-helper.conf`
+            description: |
+              In order to view tc classes, you need to create the file `/etc/netdata/tc-qos-helper.conf` with content:
+
+              ```conf
+              tc_show="class"
+              ```
       configuration:
         file:
           name: "netdata.conf"
@@ -52,16 +59,42 @@ modules:
               description: Path to script `tc-qos-helper.sh`
               default_value: "usr/libexec/netdata/plugins.d/tc-qos-helper.s"
               required: false
+            - name: enable show all classes and qdiscs for all interfaces
+              description: yes/no flag to control what data is presented.
+              default_value: "yes"
+              required: false
         examples:
           folding:
             enabled: false
             title: "Config"
           list:
             - name: Basic
-              description: A basic example configuration.
+              description: |
+                A basic example configuration using classes defined in `/etc/iproute2/tc_cls`.
+
+                An example of class IDs mapped to names in that file can be:
+
+                ```conf
+                2:1 Standard
+                2:8 LowPriorityData
+                2:10 HighThroughputData
+                2:16 OAM
+                2:18 LowLatencyData
+                2:24 BroadcastVideo
+                2:26 MultimediaStreaming
+                2:32 RealTimeInteractive
+                2:34 MultimediaConferencing
+                2:40 Signalling
+                2:46 Telephony
+                2:48 NetworkControl
+                ```
+
+                You can read more about setting up the tc rules in rc.local in this [GitHub issue](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973).
+
               config: |
                 [plugin:tc]
                   script to run to get tc values = /usr/libexec/netdata/plugins.d/tc-qos-helper.sh
+                  enable show all classes and qdiscs for all interfaces = yes
     troubleshooting:
       problems:
         list: []
