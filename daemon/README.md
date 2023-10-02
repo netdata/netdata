@@ -38,7 +38,7 @@ The command line options of the Netdata 1.10.0 version are the following:
  Support    : https://github.com/netdata/netdata/issues
  License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
 
- Twitter    : https://twitter.com/linuxnetdata
+ Twitter    : https://twitter.com/netdatahq
  LinkedIn   : https://linkedin.com/company/netdata-cloud/
  Facebook   : https://facebook.com/linuxnetdata/
 
