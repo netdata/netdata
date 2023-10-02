@@ -61,9 +61,12 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ---
 
-> NEW: **Netdata and LOGS !** 🥳</br>
-> Check the [SystemD-Journal Plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query SystemD-Journal logs!<br/>
-> The plugin is available from 2013-10-03, to nightly channel users.
+NEW: **Netdata and LOGS !** 🥳</br>
+
+Check the [SystemD-Journal Plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query SystemD-Journal logs!
+The plugin is available from 2013-10-03, to nightly channel users.
+
+![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
 ---
 
