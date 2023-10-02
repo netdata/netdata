@@ -2514,6 +2514,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    log_set_global_severity_for_external_plugins();
+
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);
 
