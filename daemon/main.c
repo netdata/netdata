@@ -875,7 +875,7 @@ static void log_init(void) {
     setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
     setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
 
-    char *selected_level = config_get(CONFIG_SECTION_LOGS, "severity-level", NETDATA_LOG_LEVEL_ERROR_STR);
+    char *selected_level = config_get(CONFIG_SECTION_LOGS, "severity-level", NETDATA_LOG_LEVEL_INFO_STR);
     use_severity_level = log_severity_string_to_severity_level(selected_level);
     setenv("NETDATA_LOG_SEVERITY_LEVEL", selected_level , 1);
 }
