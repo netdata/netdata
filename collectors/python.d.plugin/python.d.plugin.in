@@ -876,6 +876,17 @@ def main():
     cmd = parse_command_line()
     log = PythonDLogger()
 
+    level = os.getenv('NETDATA_LOG_SEVERITY_LEVEL') or str()
+    level = level.upper()
+    if level == 'DEBUG':
+        log.logger.severity = 'DEBUG'
+    elif level == 'INFO':
+        log.logger.severity = 'INFO'
+    elif level == 'WARN' or level == 'WARNING':
+        log.logger.severity = 'WARNING'
+    elif level == 'ERR' or level == 'ERROR':
+        log.logger.severity = 'ERROR'
+
     if cmd.debug:
         log.logger.severity = 'DEBUG'
     if cmd.trace:
