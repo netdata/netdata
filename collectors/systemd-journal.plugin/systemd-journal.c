@@ -581,16 +581,16 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     sd_journal *j = NULL;
     errno = 0;
 
-#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
-    int fd = open(filename, O_RDONLY);
-    fstat_cache_enable(fd);
-
-    if(sd_journal_open_files_fd(&j, &fd, 1, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
-        fqs->cached_count += fstat_cache_disable(fd);
-        close(fd);
-        return ND_SD_JOURNAL_FAILED_TO_OPEN;
-    }
-#else // !HAVE_SD_JOURNAL_OPEN_FILES_FD
+//#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
+//    int fd = open(filename, O_RDONLY);
+//    fstat_cache_enable(fd);
+//
+//    if(sd_journal_open_files_fd(&j, &fd, 1, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+//        fqs->cached_count += fstat_cache_disable(fd);
+//        close(fd);
+//        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+//    }
+//#else // !HAVE_SD_JOURNAL_OPEN_FILES_FD
 
     const char *paths[2] = {
             [0] = filename,
@@ -599,7 +599,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     if(sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j)
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
 
-#endif // !HAVE_SD_JOURNAL_OPEN_FILES_FD
+//#endif // !HAVE_SD_JOURNAL_OPEN_FILES_FD
 
     ND_SD_JOURNAL_STATUS status;
     bool matches_filters = true;
@@ -626,10 +626,10 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 
     sd_journal_close(j);
 
-#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
-    fqs->cached_count += fstat_cache_disable(fd);
-    close(fd);
-#endif
+//#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
+//    fqs->cached_count += fstat_cache_disable(fd);
+//    close(fd);
+//#endif
 
     return status;
 }
