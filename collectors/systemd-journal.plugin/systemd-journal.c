@@ -349,8 +349,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = (fqs->anchor.start_ut ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
-    usec_t stop_ut = fqs->anchor.stop_ut ? fqs->anchor.stop_ut : fqs->after_ut;
+    usec_t start_ut = fqs->before_ut + anchor_delta;
+    usec_t stop_ut = fqs->after_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
