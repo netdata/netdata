@@ -742,7 +742,7 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
 
                     buffer_flush(tb);
                     buffer_strcat(tb, v->name);
-                    k->transform.cb(facets, tb, k->transform.data);
+                    k->transform.cb(facets, tb, FACETS_TRANSFORM_HISTOGRAM, k->transform.data);
                     buffer_json_add_array_item_string(wb, buffer_tostring(tb));
                 }
                 else
@@ -1456,7 +1456,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 
     if(k->transform.cb && !k->transform.view_only) {
         facets->operations.values.transformed++;
-        k->transform.cb(facets, k->current_value.b, k->transform.data);
+        k->transform.cb(facets, k->current_value.b, FACETS_TRANSFORM_VALUE, k->transform.data);
     }
 
 //    bool found = false;
@@ -2093,7 +2093,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
 
                                     buffer_flush(tb);
                                     buffer_strcat(tb, v->name);
-                                    k->transform.cb(facets, tb, k->transform.data);
+                                    k->transform.cb(facets, tb, FACETS_TRANSFORM_FACET, k->transform.data);
                                     buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
                                 }
                                 else
@@ -2224,7 +2224,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                         buffer_json_add_array_item_string(wb, NULL);
                     }
                     else if(unlikely(k->transform.cb && k->transform.view_only)) {
-                        k->transform.cb(facets, rkv->wb, k->transform.data);
+                        k->transform.cb(facets, rkv->wb, FACETS_TRANSFORM_DATA, k->transform.data);
                         buffer_json_add_array_item_string(wb, buffer_tostring(rkv->wb));
                     }
                     else

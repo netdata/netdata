@@ -1660,7 +1660,7 @@ static char *gid_to_groupname(gid_t gid, char* buffer, size_t buffer_size) {
     return buffer;
 }
 
-static void netdata_systemd_journal_transform_syslog_facility(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+static void netdata_systemd_journal_transform_syslog_facility(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         int facility = str2i(buffer_tostring(wb));
@@ -1672,7 +1672,7 @@ static void netdata_systemd_journal_transform_syslog_facility(FACETS *facets __m
     }
 }
 
-static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         int priority = str2i(buffer_tostring(wb));
@@ -1684,7 +1684,7 @@ static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_un
     }
 }
 
-static void netdata_systemd_journal_transform_errno(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+static void netdata_systemd_journal_transform_errno(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         unsigned err_no = str2u(buffer_tostring(wb));
@@ -1776,7 +1776,68 @@ const char *gid_to_groupname_cached(gid_t gid, size_t *length) {
     return (*e)->str;
 }
 
-static void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+DICTIONARY *boot_ids_to_first_ut = NULL;
+
+static void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    const char *boot_id = buffer_tostring(wb);
+    if(*boot_id && isxdigit(*boot_id)) {
+        usec_t ut = UINT64_MAX;
+        usec_t *p_ut = dictionary_get(boot_ids_to_first_ut, boot_id);
+        if(!p_ut) {
+            struct journal_file *jf;
+            dfe_start_read(journal_files_registry, jf) {
+                const char *files[2] = {
+                        [0] = jf_dfe.name,
+                        [1] = NULL,
+                };
+
+                sd_journal *j = NULL;
+                if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j)
+                    continue;
+
+                char m[100];
+                size_t len = snprintfz(m, sizeof(m), "_BOOT_ID=%s", boot_id);
+                usec_t t_ut = 0;
+                if(sd_journal_add_match(j, m, len) < 0 ||
+                   sd_journal_seek_head(j) < 0 ||
+                   sd_journal_next(j) < 0 ||
+                   sd_journal_get_realtime_usec(j, &t_ut) < 0 || !t_ut) {
+                    sd_journal_close(j);
+                    continue;
+                }
+
+                if(t_ut < ut)
+                    ut = t_ut;
+
+                sd_journal_close(j);
+            }
+            dfe_done(jf);
+
+            dictionary_set(boot_ids_to_first_ut, boot_id, &ut, sizeof(ut));
+        }
+        else
+            ut = *p_ut;
+
+        if(ut != UINT64_MAX) {
+            time_t timestamp_sec = (time_t)(ut / USEC_PER_SEC);
+            struct tm tm;
+            char buffer[30];
+
+            gmtime_r(&timestamp_sec, &tm);
+            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+
+            if(scope == FACETS_TRANSFORM_DATA || scope == FACETS_TRANSFORM_VALUE) {
+                buffer_sprintf(wb, " (%s UTC)  ", buffer);
+            }
+            else {
+                buffer_flush(wb);
+                buffer_sprintf(wb, "%s UTC", buffer);
+            }
+        }
+    }
+}
+
+static void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uid_t uid = str2i(buffer_tostring(wb));
@@ -1786,7 +1847,7 @@ static void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused,
     }
 }
 
-static void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+static void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         gid_t gid = str2i(buffer_tostring(wb));
@@ -1840,7 +1901,7 @@ const char *linux_capabilities[] = {
         [40 /* CAP_CHECKPOINT_RESTORE */] = "CHECKPOINT_RESTORE",
 };
 
-static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uint64_t cap = strtoul(buffer_tostring(wb), NULL, 16);
@@ -1861,7 +1922,7 @@ static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __may
     }
 }
 
-static void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unused, BUFFER *wb, void *data __maybe_unused) {
+static void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uint64_t ut = str2ull(buffer_tostring(wb), NULL);
@@ -2056,6 +2117,10 @@ static void function_systemd_journal(const char *transaction, char *function, in
 
     facets_register_key_name(facets, "USER_UNIT",
                              FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name_transformation(facets, "_BOOT_ID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_boot_id, NULL);
 
     facets_register_key_name_transformation(facets, "_SYSTEMD_OWNER_UID",
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
@@ -2510,6 +2575,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     dictionary_register_insert_callback(journal_files_registry, files_registry_insert_cb, NULL);
     dictionary_register_delete_callback(journal_files_registry, files_registry_delete_cb, NULL);
     dictionary_register_conflict_callback(journal_files_registry, files_registry_conflict_cb, NULL);
+
+    boot_ids_to_first_ut = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(usec_t));
 
     journal_files_registry_update();
 

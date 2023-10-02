@@ -13,6 +13,13 @@ typedef enum __attribute__((packed)) {
 } FACETS_ANCHOR_DIRECTION;
 
 typedef enum __attribute__((packed)) {
+    FACETS_TRANSFORM_VALUE,
+    FACETS_TRANSFORM_HISTOGRAM,
+    FACETS_TRANSFORM_FACET,
+    FACETS_TRANSFORM_DATA,
+} FACETS_TRANSFORMATION_SCOPE;
+
+typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_FACET          = (1 << 0), // filterable values
     FACET_KEY_OPTION_NO_FACET       = (1 << 1), // non-filterable value
     FACET_KEY_OPTION_NEVER_FACET    = (1 << 2), // never enable this field as facet
@@ -49,7 +56,7 @@ typedef struct facet_row {
 typedef struct facets FACETS;
 typedef struct facet_key FACET_KEY;
 
-typedef void (*facets_key_transformer_t)(FACETS *facets __maybe_unused, BUFFER *wb, void *data);
+typedef void (*facets_key_transformer_t)(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 typedef void (*facet_dynamic_row_t)(FACETS *facets, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row, void *data);
 typedef FACET_ROW_SEVERITY (*facet_row_severity_t)(FACETS *facets, FACET_ROW *row, void *data);
 FACET_KEY *facets_register_dynamic_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options, facet_dynamic_row_t cb, void *data);

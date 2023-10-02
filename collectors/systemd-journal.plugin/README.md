@@ -100,6 +100,7 @@ and filter the data.
 
 The plugin automatically enriches certain fields to make them more user-friendly:
 
+- `_BOOT_ID`: the hex value is annotated with the timestamp of the first message encountered for this boot id.
 - `PRIORITY`: the numeric value is replaced with the human-readable name of each priority.
 - `SYSLOG_FACILITY`: the encoded value is replaced with the human-readable name of each value.
 - `ERRNO`: the numeric value is annotated with the short name of each value.
