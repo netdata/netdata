@@ -223,8 +223,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Proxmox VE](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/proxmox_ve.md)
 
-- [VMWare](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/vmware.md)
-
 - [VMware vCenter Server](https://github.com/netdata/go.d.plugin/blob/master/modules/vsphere/integrations/vmware_vcenter_server.md)
 
 - [Virtual Machines](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/virtual_machines.md)
@@ -1122,8 +1120,6 @@ If you don't see the app/service you'd like to monitor in this list:
 - [Eaton UPS](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/eaton_ups.md)
 
 - [Network UPS Tools (NUT)](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/nut/integrations/network_ups_tools_nut.md)
-
-- [Network UPS Tools](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/network_ups_tools.md)
 
 - [UPS (NUT)](https://github.com/netdata/go.d.plugin/blob/master/modules/upsd/integrations/ups_nut.md)
 
