@@ -1416,8 +1416,8 @@ void facets_register_row_severity(FACETS *facets, facet_row_severity_t cb, void 
     facets->severity.data = data;
 }
 
-void facets_data_only_mode(FACETS *facets) {
-    facets->options |= FACETS_OPTION_DATA_ONLY;
+void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
+    facets->options |= options;
 }
 
 // ----------------------------------------------------------------------------
@@ -2052,12 +2052,24 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         facets_accepted_parameters_to_json_array(facets, wb, true);
     }
 
+    // ------------------------------------------------------------------------
+    // facets
+
     if(!(facets->options & FACETS_OPTION_DONT_SEND_FACETS)) {
-        if(facets->options & FACETS_OPTION_DATA_ONLY)
-            buffer_json_member_add_array(wb, "facets_delta");
-        else
+        bool show_facets = false;
+
+        if(facets->options & FACETS_OPTION_DATA_ONLY) {
+            if(facets->options & FACETS_OPTION_SHOW_DELTAS) {
+                buffer_json_member_add_array(wb, "facets_delta");
+                show_facets = true;
+            }
+        }
+        else {
             buffer_json_member_add_array(wb, "facets");
-        {
+            show_facets = true;
+        }
+
+        if(show_facets) {
             BUFFER *tb = NULL;
             FACET_KEY *k;
             foreach_key_in_facets(facets, k) {
@@ -2115,6 +2127,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         }
         buffer_json_array_close(wb); // facets
     }
+
+    // ------------------------------------------------------------------------
+    // columns
 
     buffer_json_member_add_object(wb, "columns");
     {
@@ -2181,6 +2196,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
     }
     buffer_json_object_close(wb); // columns
 
+    // ------------------------------------------------------------------------
+    // rows data
+
     buffer_json_member_add_array(wb, "data");
     {
         usec_t last_usec = 0; (void)last_usec;
@@ -2243,6 +2261,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         buffer_json_array_close(wb);
     }
 
+    // ------------------------------------------------------------------------
+    // histogram
+
     if(facets->histogram.enabled && !(facets->options & FACETS_OPTION_DONT_SEND_HISTOGRAM)) {
         FACETS_HASH first_histogram_hash = 0;
         buffer_json_member_add_array(wb, "available_histograms");
@@ -2269,34 +2290,59 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             if(!k || !k->values.enabled)
                 k = FACETS_KEY_GET_FROM_INDEX(facets, first_histogram_hash);
 
-            if(facets->options & FACETS_OPTION_DATA_ONLY)
-                buffer_json_member_add_object(wb, "histogram_delta");
-            else
+            bool show_histogram = false;
+
+            if(facets->options & FACETS_OPTION_DATA_ONLY) {
+                if(facets->options & FACETS_OPTION_SHOW_DELTAS) {
+                    buffer_json_member_add_object(wb, "histogram_delta");
+                    show_histogram = true;
+                }
+            }
+            else {
                 buffer_json_member_add_object(wb, "histogram");
-            {
+                show_histogram = true;
+            }
+
+            if(show_histogram) {
                 buffer_json_member_add_string(wb, "id", k ? hash_to_static_string(k->hash) : "");
                 buffer_json_member_add_string(wb, "name", k ? k->name : "");
                 buffer_json_member_add_object(wb, "chart");
-                facets_histogram_generate(facets, k, wb);
-                buffer_json_object_close(wb);
+                {
+                    facets_histogram_generate(facets, k, wb);
+                }
+                buffer_json_object_close(wb); // chart
+                buffer_json_object_close(wb); // histogram
             }
-            buffer_json_object_close(wb); // histogram
         }
     }
 
-    if(facets->options & FACETS_OPTION_DATA_ONLY)
-        buffer_json_member_add_object(wb, "items_delta");
-    else
+    // ------------------------------------------------------------------------
+    // items
+
+    bool show_items = false;
+    if(facets->options & FACETS_OPTION_DATA_ONLY) {
+        if(facets->options & FACETS_OPTION_SHOW_DELTAS) {
+            buffer_json_member_add_object(wb, "items_delta");
+            show_items = true;
+        }
+    }
+    else {
         buffer_json_member_add_object(wb, "items");
-    {
+        show_items = true;
+    }
+
+    if(show_items) {
         buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
         buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
         buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
         buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
         buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
         buffer_json_member_add_uint64(wb, "after", facets->operations.skips_after + facets->operations.shifts);
+        buffer_json_object_close(wb); // items
     }
-    buffer_json_object_close(wb); // items
+
+    // ------------------------------------------------------------------------
+    // stats
 
     buffer_json_member_add_object(wb, "stats");
     {

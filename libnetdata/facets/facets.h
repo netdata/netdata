@@ -71,6 +71,7 @@ typedef enum __attribute__((packed)) {
     FACETS_OPTION_DATA_ONLY                     = (1 << 4),
     FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS  = (1 << 5), // empty facet values will not be included in the report
     FACETS_OPTION_SORT_FACETS_ALPHABETICALLY    = (1 << 6),
+    FACETS_OPTION_SHOW_DELTAS                   = (1 << 7),
 } FACETS_OPTIONS;
 
 FACETS *facets_create(uint32_t items_to_return, FACETS_OPTIONS options, const char *visible_keys, const char *facet_keys, const char *non_facet_keys);
@@ -98,7 +99,7 @@ void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len
 void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry);
 void facets_accepted_parameters_to_json_array(FACETS *facets, BUFFER *wb, bool with_keys);
 void facets_set_current_row_severity(FACETS *facets, FACET_ROW_SEVERITY severity);
-void facets_data_only_mode(FACETS *facets);
+void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options);
 
 bool facets_key_name_is_filter(FACETS *facets, const char *key);
 bool facets_key_name_is_facet(FACETS *facets, const char *key);

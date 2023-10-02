@@ -118,6 +118,8 @@ int fstat64(int fd, struct stat64 *buf) {
 #define JOURNAL_PARAMETER_ID                    "id"
 #define JOURNAL_PARAMETER_PROGRESS              "progress"
 #define JOURNAL_PARAMETER_SLICE                 "slice"
+#define JOURNAL_PARAMETER_DELTA                 "delta"
+#define JOURNAL_PARAMETER_TAIL                  "tail"
 
 #define JOURNAL_DEFAULT_SLICE_MODE              true
 #define JOURNAL_DEFAULT_DIRECTION               FACETS_ANCHOR_DIRECTION_BACKWARD
@@ -214,6 +216,8 @@ typedef struct function_query_status {
     FACETS_ANCHOR_DIRECTION direction;
     size_t entries;
     usec_t if_modified_since;
+    bool delta;
+    bool tail;
     bool data_only;
     bool slice;
     size_t filters;
@@ -667,8 +671,6 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 
     if(matches_filters) {
         if(fqs->data_only) {
-            facets_data_only_mode(facets);
-
             // we can do a data-only query
             if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
                 status = netdata_systemd_journal_query_data_forward(j, wb, facets, jf, fqs);
@@ -1342,6 +1344,12 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             "      all the available systemd journal sources.\n"
             "      When `"JOURNAL_PARAMETER_INFO"` is requested, all other parameters are ignored.\n"
             "\n"
+            "   "JOURNAL_PARAMETER_DELTA"\n"
+            "      When doing data queries, include deltas for histogram and facets.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_TAIL"\n"
+            "      Do a tail query, to return the newest items between the anchor and before.\n"
+            "\n"
             "   "JOURNAL_PARAMETER_PROGRESS"\n"
             "      Request a progress report (the `id` of a running query is required).\n"
             "      When `"JOURNAL_PARAMETER_PROGRESS"` is requested, only parameter `"JOURNAL_PARAMETER_ID"` is used.\n"
@@ -1414,11 +1422,6 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             "  - `"JOURNAL_PARAMETER_ANCHOR":TIMESTAMP_IN_USEC`,\n"
             "  - `"JOURNAL_PARAMETER_DATA_ONLY"`, and\n"
             "  - `"JOURNAL_PARAMETER_IF_MODIFIED_SINCE":TIMESTAMP_IN_USEC`\n"
-            "\n"
-            " The plugin understands the caller is interested to tail the journals.\n"
-            " In this mode, it returns up to `"JOURNAL_PARAMETER_LAST"` of the newest entries\n"
-            " and up to `"JOURNAL_PARAMETER_ANCHOR"`. This has been implemented so that if the journal\n"
-            " receives more than `"JOURNAL_PARAMETER_LAST"` entries, the return values will the latest.\n"
             "\n"
             , program_name
             , SYSTEMD_JOURNAL_FUNCTION_NAME
@@ -2072,6 +2075,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_accepted_param(facets, JOURNAL_PARAMETER_DATA_ONLY);
     facets_accepted_param(facets, JOURNAL_PARAMETER_ID);
     facets_accepted_param(facets, JOURNAL_PARAMETER_PROGRESS);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_DELTA);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_TAIL);
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     facets_accepted_param(facets, JOURNAL_PARAMETER_SLICE);
@@ -2149,7 +2154,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    bool info = false, data_only = false, progress = false, slice = JOURNAL_DEFAULT_SLICE_MODE;
+    bool info = false, data_only = false, progress = false, slice = JOURNAL_DEFAULT_SLICE_MODE, delta = false, tail = false;
     time_t after_s = 0, before_s = 0;
     usec_t anchor = 0;
     usec_t if_modified_since = 0;
@@ -2177,8 +2182,32 @@ static void function_systemd_journal(const char *transaction, char *function, in
         else if(strcmp(keyword, JOURNAL_PARAMETER_INFO) == 0) {
             info = true;
         }
-        else if(strcmp(keyword, JOURNAL_PARAMETER_DATA_ONLY) == 0) {
-            data_only = true;
+        else if(strcmp(keyword, JOURNAL_PARAMETER_PROGRESS) == 0) {
+            progress = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_DELTA ":", sizeof(JOURNAL_PARAMETER_DELTA ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_DELTA ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                delta = false;
+            else
+                delta = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_TAIL ":", sizeof(JOURNAL_PARAMETER_TAIL ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_TAIL ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                tail = false;
+            else
+                tail = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_DATA_ONLY ":", sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1) == 0) {
+            char *v = &keyword[sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1];
+
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                data_only = false;
+            else
+                data_only = true;
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_SLICE ":", sizeof(JOURNAL_PARAMETER_SLICE ":") - 1) == 0) {
             char *v = &keyword[sizeof(JOURNAL_PARAMETER_SLICE ":") - 1];
@@ -2187,9 +2216,6 @@ static void function_systemd_journal(const char *transaction, char *function, in
                 slice = false;
             else
                 slice = true;
-        }
-        else if(strcmp(keyword, JOURNAL_PARAMETER_PROGRESS) == 0) {
-            progress = true;
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_ID ":", sizeof(JOURNAL_PARAMETER_ID ":") - 1) == 0) {
             char *id = &keyword[sizeof(JOURNAL_PARAMETER_ID ":") - 1];
@@ -2345,6 +2371,17 @@ static void function_systemd_journal(const char *transaction, char *function, in
 
     fqs->after_ut = after_s * USEC_PER_SEC;
     fqs->before_ut = before_s * USEC_PER_SEC;
+    fqs->if_modified_since = if_modified_since;
+    fqs->data_only = data_only;
+    fqs->delta = (fqs->data_only) ? delta : false;
+    fqs->tail = (fqs->data_only && fqs->if_modified_since) ? tail : false;
+    fqs->source = string_strdupz(source);
+    fqs->source_type = source_type;
+    fqs->entries = last;
+    fqs->last_modified = 0;
+    fqs->filters = filters;
+    fqs->query = (query && *query) ? query : NULL;
+    fqs->histogram = (chart && *chart) ? chart : NULL;
 
     if(anchor && anchor < fqs->after_ut) {
         netdata_log_error("Received anchor %"PRIu64" is too small for query time-frame [%"PRIu64" - %"PRIu64"]",
@@ -2357,49 +2394,29 @@ static void function_systemd_journal(const char *transaction, char *function, in
         anchor = 0;
     }
 
-    if(anchor) {
-        if(direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
-            if(fqs->if_modified_since && fqs->data_only) {
-                // a tail request
-                // we need the top X entries from BEFORE
-                // but, we need to calculate the facets and the
-                // histogram up to the anchor
-                fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
-                fqs->anchor.start_ut = 0;
-                fqs->anchor.stop_ut = anchor;
-            }
-            else {
-                fqs->direction = direction;
-                fqs->anchor.start_ut = anchor;
-                fqs->anchor.stop_ut = 0;
-            }
-        }
-        else {
-            fqs->direction = direction;
-            fqs->anchor.start_ut = anchor;
-            fqs->anchor.stop_ut = 0;
-        }
-    }
-    else {
-        fqs->direction = direction;
+    fqs->direction = direction;
+    fqs->anchor.start_ut = anchor;
+    fqs->anchor.stop_ut = 0;
+
+    if(fqs->anchor.start_ut && fqs->tail) {
+        // a tail request
+        // we need the top X entries from BEFORE
+        // but, we need to calculate the facets and the
+        // histogram up to the anchor
+        fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
         fqs->anchor.start_ut = 0;
-        fqs->anchor.stop_ut = 0;
+        fqs->anchor.stop_ut = anchor;
     }
 
     facets_set_anchor(facets, fqs->anchor.start_ut, fqs->anchor.stop_ut, fqs->direction);
 
+    facets_set_additional_options(facets,
+                                  ((fqs->data_only) ? FACETS_OPTION_DATA_ONLY : 0) |
+                                  ((fqs->delta) ? FACETS_OPTION_SHOW_DELTAS : 0));
+
     // ------------------------------------------------------------------------
     // set the rest of the query parameters
 
-    fqs->source = string_strdupz(source);
-    fqs->source_type = source_type;
-    fqs->entries = last;
-    fqs->if_modified_since = if_modified_since;
-    fqs->data_only = data_only;
-    fqs->last_modified = 0;
-    fqs->filters = filters;
-    fqs->query = (query && *query) ? query : NULL;
-    fqs->histogram = (chart && *chart) ? chart : NULL;
 
     facets_set_items(facets, fqs->entries);
     facets_set_query(facets, fqs->query);
@@ -2425,6 +2442,8 @@ static void function_systemd_journal(const char *transaction, char *function, in
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_SLICE, fqs->slice);
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_DATA_ONLY, fqs->data_only);
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_PROGRESS, false);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_DELTA, fqs->delta);
+    buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_TAIL, fqs->tail);
     buffer_json_member_add_string(wb, JOURNAL_PARAMETER_ID, progress_id);
     buffer_json_member_add_string(wb, JOURNAL_PARAMETER_SOURCE, string2str(fqs->source));
     buffer_json_member_add_uint64(wb, "source_type", fqs->source_type);
