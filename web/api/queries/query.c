@@ -1364,10 +1364,12 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
         if(!query_metric_is_valid_tier(qm, selected_tier))
             return false;
+    }
 
-        if(qm->tiers[selected_tier].db_first_time_s > before_wanted ||
-           qm->tiers[selected_tier].db_last_time_s < after_wanted)
-            return false;
+    if(qm->tiers[selected_tier].db_first_time_s > before_wanted ||
+       qm->tiers[selected_tier].db_last_time_s < after_wanted) {
+        // we don't have any data to satisfy this query
+        return false;
     }
 
     qm->plan.used = 1;
