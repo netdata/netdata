@@ -359,7 +359,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
-    usec_t first_msg_ut = 0;
+    usec_t earliest_msg_ut = 0;
     size_t row_counter = 0, last_row_counter = 0;
     size_t bytes = 0, last_bytes = 0;
 
@@ -373,12 +373,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
             continue;
         }
 
-        if(unlikely(!first_msg_ut)) {
-            if(msg_ut == fqs->if_modified_since)
-                return ND_SD_JOURNAL_NOT_MODIFIED;
-
-            first_msg_ut = msg_ut;
-        }
+        if(unlikely(msg_ut > earliest_msg_ut))
+            earliest_msg_ut = msg_ut;
 
         if (unlikely(msg_ut > start_ut))
             continue;
@@ -415,25 +411,26 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
-    if(first_msg_ut > fqs->last_modified)
-        fqs->last_modified = first_msg_ut;
+    if(earliest_msg_ut > fqs->last_modified)
+        fqs->last_modified = earliest_msg_ut;
 
     return status;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = fqs->anchor.start_ut ? fqs->anchor.start_ut : fqs->after_ut;
-    usec_t stop_ut = (fqs->anchor.stop_ut ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
+    usec_t start_ut = (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->after_ut;
+    usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
+    usec_t earliest_msg_ut = 0;
     size_t row_counter = 0, last_row_counter = 0;
     size_t bytes = 0, last_bytes = 0;
 
@@ -447,6 +444,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
             continue;
         }
 
+        if(likely(msg_ut > earliest_msg_ut))
+            earliest_msg_ut = msg_ut;
+
         if (unlikely(msg_ut < start_ut))
             continue;
 
@@ -458,7 +458,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
             fqs->rows_useful++;
 
         row_counter++;
-        if(row_counter % 100 == 0 && facets_rows(facets) >= fqs->entries) {
+        if(row_counter % 100 == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
             usec_t newest = facets_row_newest_ut(facets);
             if(newest && msg_ut > (newest + anchor_delta))
                 break;
@@ -480,6 +480,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
 
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
+
+    if(earliest_msg_ut > fqs->last_modified)
+        fqs->last_modified = earliest_msg_ut;
 
     return status;
 }
@@ -613,17 +616,10 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
     if(matches_filters) {
-        if(fqs->data_only) {
-            // we can do a data-only query
-            if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-                status = netdata_systemd_journal_query_data_forward(j, wb, facets, jf, fqs);
-            else
-                status = netdata_systemd_journal_query_backward(j, wb, facets, jf, fqs);
-        }
-        else {
-            // we have to do a full query
+        if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
+            status = netdata_systemd_journal_query_forward(j, wb, facets, jf, fqs);
+        else
             status = netdata_systemd_journal_query_backward(j, wb, facets, jf, fqs);
-        }
     }
     else
         status = ND_SD_JOURNAL_NO_FILE_MATCHED;
