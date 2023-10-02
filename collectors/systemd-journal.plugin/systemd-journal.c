@@ -1828,12 +1828,18 @@ static void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unu
             gmtime_r(&timestamp_sec, &tm);
             strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
 
-            if(scope == FACETS_TRANSFORM_DATA || scope == FACETS_TRANSFORM_VALUE) {
-                buffer_sprintf(wb, " (%s UTC)  ", buffer);
-            }
-            else {
-                buffer_flush(wb);
-                buffer_sprintf(wb, "%s UTC", buffer);
+            switch(scope) {
+                default:
+                case FACETS_TRANSFORM_DATA:
+                case FACETS_TRANSFORM_VALUE:
+                    buffer_sprintf(wb, " (%s UTC)  ", buffer);
+                    break;
+
+                case FACETS_TRANSFORM_FACET:
+                case FACETS_TRANSFORM_HISTOGRAM:
+                    buffer_flush(wb);
+                    buffer_sprintf(wb, "%s UTC", buffer);
+                    break;
             }
         }
     }

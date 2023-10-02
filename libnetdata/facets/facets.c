@@ -1950,7 +1950,10 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
         if((k->facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
             continue;
 
-        values[used] = v;
+        if(used >= entries)
+            break;
+
+        values[used++] = v;
 
         if(all_values_numeric && !v->empty && v->name) {
             const char *s = v->name;
@@ -1958,9 +1961,6 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
             if(*s != '\0')
                 all_values_numeric = false;
         }
-
-        if(++used >= entries)
-            break;
     }
     foreach_value_in_key_done(v);
 
@@ -2000,13 +2000,13 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     uint32_t used = 0;
 
     foreach_value_in_key(k, v) {
-        values[used] = v->name;
+        if(used >= entries)
+            break;
+
+        values[used++] = v->name;
 
         k->transform.cb(k->facets, tb, FACETS_TRANSFORM_FACET, k->transform.data);
         v->name = strdupz(buffer_tostring(tb));
-
-        if(++used >= entries)
-            break;
     }
     foreach_value_in_key_done(v);
 
@@ -2014,12 +2014,11 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
 
     used = 0;
     foreach_value_in_key(k, v) {
+        if(used >= entries)
+            break;
 
         freez((void *)v->name);
-        v->name = values[used];
-
-        if(++used >= entries)
-            break;
+        v->name = values[used++];
     }
     foreach_value_in_key_done(v);
 
