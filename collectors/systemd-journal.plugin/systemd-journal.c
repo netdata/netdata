@@ -1858,9 +1858,9 @@ const char *linux_capabilities[] = {
         [CAP_SYSLOG] = "SYSLOG",
         [CAP_WAKE_ALARM] = "WAKE_ALARM",
         [CAP_BLOCK_SUSPEND] = "BLOCK_SUSPEND",
-        [CAP_AUDIT_READ] = "AUDIT_READ",
-        [CAP_PERFMON] = "PERFMON",
-        [CAP_BPF] = "BPF",
+        [37 /*CAP_AUDIT_READ*/] = "AUDIT_READ",
+        [38 /*CAP_PERFMON*/] = "PERFMON",
+        [39 /*CAP_BPF*/] = "BPF",
         [40 /* CAP_CHECKPOINT_RESTORE */] = "CHECKPOINT_RESTORE",
 };
 
