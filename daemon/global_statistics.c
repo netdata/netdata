@@ -857,6 +857,7 @@ static void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
+    if (tier_page_type[0] == PAGE_GORILLA_METRICS)
     {
         static RRDSET *st_tier0_gorilla_pages = NULL;
         static RRDDIM *rd_num_gorilla_pages = NULL;
@@ -885,6 +886,7 @@ static void global_statistics_charts(void) {
         rrdset_done(st_tier0_gorilla_pages);
     }
 
+    if (tier_page_type[0] == PAGE_GORILLA_METRICS)
     {
         static RRDSET *st_tier0_compression_info = NULL;
 
