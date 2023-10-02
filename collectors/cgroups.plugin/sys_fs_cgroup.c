@@ -2708,7 +2708,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
         }
         if (!cg->chart_labels)
             cg->chart_labels = rrdlabels_create();
-        rrdlabels_add(cg->chart_labels, "cgroup_name", cg->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(cg->chart_labels, "service_name", cg->name, RRDLABEL_SRC_AUTO);
         cg->enabled = 1;
         return;
     }

@@ -824,7 +824,7 @@ modules:
         - name: systemd service
           description: ""
           labels:
-            - name: cgroup_name
+            - name: service_name
               description: Service name
           metrics:
             - name: systemd.service.cpu.utilization
