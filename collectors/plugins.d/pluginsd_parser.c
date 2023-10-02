@@ -888,7 +888,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
 
     string_freez(pf->function);
-    freez(pf->payload);
+    freez((void *)pf->payload);
 }
 
 void inflight_functions_init(PARSER *parser) {

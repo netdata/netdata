@@ -243,5 +243,6 @@ typedef struct socket_peers {
 } SOCKET_PEERS;
 
 SOCKET_PEERS socket_peers(int sock_fd);
+bool ip_to_hostname(const char *ip, char *dst, size_t dst_len);
 
 #endif //NETDATA_SOCKET_H

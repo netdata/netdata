@@ -10,6 +10,40 @@
 
 #include "../libnetdata.h"
 
+bool ip_to_hostname(const char *ip, char *dst, size_t dst_len) {
+    if(!dst || !dst_len)
+        return false;
+
+    struct sockaddr_in sa;
+    struct sockaddr_in6 sa6;
+    struct sockaddr *sa_ptr;
+    int sa_len;
+
+    // Try to convert the IP address to sockaddr_in (IPv4)
+    if (inet_pton(AF_INET, ip, &(sa.sin_addr)) == 1) {
+        sa.sin_family = AF_INET;
+        sa_ptr = (struct sockaddr *)&sa;
+        sa_len = sizeof(sa);
+    }
+        // Try to convert the IP address to sockaddr_in6 (IPv6)
+    else if (inet_pton(AF_INET6, ip, &(sa6.sin6_addr)) == 1) {
+        sa6.sin6_family = AF_INET6;
+        sa_ptr = (struct sockaddr *)&sa6;
+        sa_len = sizeof(sa6);
+    }
+
+    else {
+        dst[0] = '\0';
+        return false;
+    }
+
+    // Perform the reverse lookup
+    int res = getnameinfo(sa_ptr, sa_len, dst, dst_len, NULL, 0, NI_NAMEREQD);
+    if(res != 0)
+        return false;
+
+    return true;
+}
 
 SOCKET_PEERS socket_peers(int sock_fd) {
     SOCKET_PEERS peers;
