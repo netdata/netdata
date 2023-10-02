@@ -1882,7 +1882,7 @@ done:
     "SELECT h.host_id, h.alarm_id, h.config_hash_id, h.name, h.chart, h.chart_name, h.family, h.recipient, h.units, h.exec, " \
     "h.chart_context,  d.when_key, d.duration, d.non_clear_duration, d.flags, d.delay_up_to_timestamp, "                      \
     "d.info, d.exec_code, d.new_status, d.old_status, d.delay, d.new_value, d.old_value, d.last_repeat, "                     \
-    "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp"
+    "d.transition_id, d.global_id, ah.class, ah.type, ah.component, d.exec_run_timestamp, d.summary"
 
 #define SQL_SEARCH_ALERT_TRANSITION_COMMON_WHERE "h.config_hash_id = ah.hash_id AND h.health_log_id = d.health_log_id"
 
@@ -2054,6 +2054,7 @@ run_query:;
         atd.type = (const char *) sqlite3_column_text(res, 27);
         atd.component = (const char *) sqlite3_column_text(res, 28);
         atd.exec_run_timestamp = sqlite3_column_int64(res, 29);
+        atd.summary = (const char *) sqlite3_column_text(res, 30);
 
         cb(&atd, data);
     }
@@ -2079,7 +2080,7 @@ done_only_drop:
     "SELECT ah.hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, "                   \
     " units, calc, families, plugin, module, charts, green, red, warn, crit, "                                         \
     " exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, "           \
-    " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels "               \
+    " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels, summary "      \
     " FROM alert_hash ah, c_%p t where ah.hash_id = t.hash_id"
 
 int sql_get_alert_configuration(
@@ -2188,6 +2189,7 @@ int sql_get_alert_configuration(
         acd.value.update_every = (int32_t) sqlite3_column_int(res, param++);
         acd.source = (const char *) sqlite3_column_text(res, param++);
         acd.selectors.chart_labels = (const char *) sqlite3_column_text(res, param++);
+        acd.summary = (const char *) sqlite3_column_text(res, param++);
 
         cb(&acd, data);
         added++;

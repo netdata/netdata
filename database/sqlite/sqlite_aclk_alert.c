@@ -275,7 +275,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "
         " hl.chart, hl.family, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "
         " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, "
-        "hld.alarm_event_id, hl.chart_name  "
+        " hld.alarm_event_id, hl.chart_name, hld.summary  "
         " from health_log hl, aclk_alert_%s aa, alert_hash ha, health_log_detail hld "
         " where hld.unique_id = aa.alert_unique_id and hl.config_hash_id = ha.hash_id and aa.date_submitted is null "
         " and hl.host_id = @host_id and hl.health_log_id = hld.health_log_id "
@@ -388,6 +388,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         alarm_log.transition_id = sqlite3_uuid_unparse_strdupz(res, 27);
         alarm_log.event_id = (time_t) sqlite3_column_int64(res, 28);
         alarm_log.chart_name = sqlite3_text_strdupz_empty(res, 29);
+        alarm_log.summary = sqlite3_text_strdupz_empty(res, 30);
 
         aclk_send_alarm_log_entry(&alarm_log);
 
@@ -535,7 +536,7 @@ void aclk_send_alarm_configuration(char *config_hash)
     "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin,"                                       \
     "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after,"        \
-    "p_db_lookup_before, p_update_every, chart_labels FROM alert_hash WHERE hash_id = @hash_id;"
+    "p_db_lookup_before, p_update_every, chart_labels, summary FROM alert_hash WHERE hash_id = @hash_id;"
 
 int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
@@ -637,6 +638,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         alarm_config.p_update_every = sqlite3_column_int(res, 32);
 
         alarm_config.chart_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 33);
+        alarm_config.summary = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 34);
 
         p_alarm_config.cfg_hash = strdupz((char *) config_hash);
         p_alarm_config.cfg = alarm_config;
@@ -845,6 +847,8 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     alarm_log->transition_id = strdupz((char *)transition_id);
     alarm_log->event_id = (uint64_t) ae->alarm_event_id;
+
+    alarm_log->summary = strdupz(ae_summary(ae));
 
     freez(edit_command);
 }

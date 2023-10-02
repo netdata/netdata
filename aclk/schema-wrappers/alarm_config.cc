@@ -50,6 +50,7 @@ void destroy_aclk_alarm_configuration(struct aclk_alarm_configuration *cfg)
     freez(cfg->p_db_lookup_options);
 
     freez(cfg->chart_labels);
+    freez(cfg->summary);
 }
 
 char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_configuration *data)
@@ -131,6 +132,9 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
 
     if (data->cfg.chart_labels)
         cfg->set_chart_labels(data->cfg.chart_labels);
+
+    if (data->cfg.summary)
+        cfg->set_summary(data->cfg.summary);
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
