@@ -11,9 +11,11 @@
 #endif
 
 char environment_variable2[FILENAME_MAX + 50] = "";
+char environment_variable3[FILENAME_MAX + 50] = "";
 char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
         environment_variable2,
+        environment_variable3,
         NULL
 };
 
@@ -670,6 +672,10 @@ int main(int argc, char **argv) {
 
     // the first environment variable is a fixed PATH=
     snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
+
+    char *s = getenv("NETDATA_LOG_SEVERITY_LEVEL");
+    if (s)
+        snprintfz(environment_variable3, sizeof(environment_variable3) - 1, "NETDATA_LOG_SEVERITY_LEVEL=%s", s);
 
     // ------------------------------------------------------------------------
 
