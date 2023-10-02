@@ -783,7 +783,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
 void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (use_severity_level > NETDATA_LOG_LEVEL_INFO)
+    if (use_severity_level < NETDATA_LOG_LEVEL_INFO)
         return;
 #endif
 
@@ -916,7 +916,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (use_severity_level > NETDATA_LOG_LEVEL_ERROR)
+    if (use_severity_level < NETDATA_LOG_LEVEL_ERROR)
         return;
 #endif
 
