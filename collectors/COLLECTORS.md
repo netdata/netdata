@@ -1125,6 +1125,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Network UPS Tools](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/network_ups_tools.md)
 
+- [UPS (NUT)](https://github.com/netdata/go.d.plugin/blob/master/modules/upsd/integrations/ups_nut.md)
+
 ### VPNs
 
 - [Fastd](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/fastd.md)
