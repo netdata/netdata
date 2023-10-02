@@ -55,7 +55,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_process_thread,
                     .apps_routine = ebpf_process_create_apps_charts,
                     .fnct_routine = NULL},
-      .enabled = 0,
+                    .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &process_config,
@@ -74,7 +74,7 @@ ebpf_module_t ebpf_modules[] = {
                    .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION,
                    .fcnt_thread_chart_name = NULL,
                    .fcnt_thread_lifetime_name = NULL},
-      .enabled = 0,
+                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL,
@@ -87,7 +87,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_cachestat_thread,
                     .apps_routine = ebpf_cachestat_create_apps_charts,
                     .fnct_routine = NULL},
-      .enabled = 0,
+                    .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = cachestat_maps, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &cachestat_config,
@@ -102,7 +102,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_sync_thread,
                     .apps_routine = NULL,
                     .fnct_routine = NULL},
-      .enabled = 0, .maps = NULL,
+                    .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING, .maps = NULL,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &sync_config,
@@ -117,7 +117,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_dcstat_thread,
                     .apps_routine = ebpf_dcstat_create_apps_charts,
                     .fnct_routine = NULL},
-      .enabled = 0,
+                    .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = dcstat_maps,
@@ -130,7 +130,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_swap_thread,
                     .apps_routine = ebpf_swap_create_apps_charts,
                     .fnct_routine = NULL},
-      .enabled = 0,
+                    .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL,
@@ -145,7 +145,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_vfs_thread,
                    .apps_routine = ebpf_vfs_create_apps_charts,
                    .fnct_routine = NULL},
-      .enabled = 0,
+                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL,
@@ -158,7 +158,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_filesystem_thread,
                    .apps_routine = NULL,
                    .fnct_routine = NULL},
-      .enabled = 0,
+                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &fs_config,
@@ -172,7 +172,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_disk_thread,
                    .apps_routine = NULL,
                    .fnct_routine = NULL},
-     .enabled = 0,
+                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &disk_config,
@@ -186,7 +186,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_mount_thread,
                    .apps_routine = NULL,
                    .fnct_routine = NULL},
-      .enabled = 0,
+                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mount_config,
@@ -200,7 +200,7 @@ ebpf_module_t ebpf_modules[] = {
        .functions = {.start_routine = ebpf_fd_thread,
                      .apps_routine = ebpf_fd_create_apps_charts,
                      .fnct_routine = NULL},
-      .enabled = 0,
+                     .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL,
@@ -216,7 +216,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_hardirq_thread,
                     .apps_routine = NULL,
                     .fnct_routine = NULL},
-      .enabled = 0,
+                    .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &hardirq_config,
@@ -230,7 +230,7 @@ ebpf_module_t ebpf_modules[] = {
        .functions = {.start_routine = ebpf_softirq_thread,
                      .apps_routine = NULL,
                      .fnct_routine = NULL },
-      .enabled = 0,
+                     .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &softirq_config,
@@ -243,7 +243,7 @@ ebpf_module_t ebpf_modules[] = {
               .thread_description = NETDATA_EBPF_OOMKILL_MODULE_DESC},
       .functions = {.start_routine = ebpf_oomkill_thread,
                     .apps_routine = ebpf_oomkill_create_apps_charts,
-                    .fnct_routine = NULL},.enabled = 0,
+                    .fnct_routine = NULL},.enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL,
@@ -258,7 +258,7 @@ ebpf_module_t ebpf_modules[] = {
       .functions = {.start_routine = ebpf_shm_thread,
                    .apps_routine = ebpf_shm_create_apps_charts,
                    .fnct_routine = NULL},
-      .enabled = 0,
+                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL,
@@ -273,7 +273,7 @@ ebpf_module_t ebpf_modules[] = {
        .functions = {.start_routine = ebpf_mdflush_thread,
                    .apps_routine = NULL,
                    .fnct_routine = NULL},
-      .enabled = 0,
+                   .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = &mdflush_config,
@@ -287,7 +287,7 @@ ebpf_module_t ebpf_modules[] = {
        .functions = {.start_routine = ebpf_function_thread,
                    .apps_routine = NULL,
                    .fnct_routine = NULL},
-      .enabled = 1,
+                   .enabled = NETDATA_THREAD_EBPF_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = NULL,
@@ -297,7 +297,7 @@ ebpf_module_t ebpf_modules[] = {
       .thread = NULL, .maps_per_core = CONFIG_BOOLEAN_YES, .lifetime = EBPF_DEFAULT_LIFETIME, .running_time = 0},
     { .info = {.thread_name = NULL, .config_name = NULL},
       .functions = {.start_routine = NULL, .apps_routine = NULL, .fnct_routine = NULL},
-      .enabled = 0, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
+      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING, .update_every = EBPF_DEFAULT_UPDATE_EVERY,
       .global_charts = 0, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO, .apps_level = NETDATA_APPS_NOT_SET,
       .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0, .maps = NULL,
       .pid_map_size = 0, .names = NULL, .cfg = NULL, .kernels = 0, .load = EBPF_LOAD_LEGACY,
@@ -2168,7 +2168,7 @@ static inline void ebpf_set_thread_mode(netdata_run_mode_t lmode)
  */
 static inline void ebpf_enable_specific_chart(struct ebpf_module *em, int disable_cgroup)
 {
-    em->enabled = CONFIG_BOOLEAN_YES;
+    em->enabled = NETDATA_THREAD_EBPF_RUNNING;
 
     // oomkill stores data inside apps submenu, so it always need to have apps_enabled for plugin to create
     // its chart, without this comparison eBPF.plugin will try to store invalid data when apps is disabled.
@@ -2192,7 +2192,7 @@ static inline void disable_all_global_charts()
 {
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name; i++) {
-        ebpf_modules[i].enabled = 0;
+        ebpf_modules[i].enabled = NETDATA_THREAD_EBPF_NOT_RUNNING;
         ebpf_modules[i].global_charts = 0;
     }
 }
@@ -4123,13 +4123,13 @@ int main(int argc, char **argv)
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread = st;
         em->thread_id = i;
-        if (em->enabled) {
+        if (em->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) {
             st->thread = mallocz(sizeof(netdata_thread_t));
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
             netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
         } else {
-            em->enabled = NETDATA_THREAD_EBPF_NOT_RUNNING;
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
         }
     }
 
