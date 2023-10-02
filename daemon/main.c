@@ -761,7 +761,7 @@ int help(int exitcode) {
             " Support    : https://github.com/netdata/netdata/issues\n"
             " License    : https://github.com/netdata/netdata/blob/master/LICENSE.md\n"
             "\n"
-            " Twitter    : https://twitter.com/linuxnetdata\n"
+            " Twitter    : https://twitter.com/netdatahq\n"
             " LinkedIn   : https://linkedin.com/company/netdata-cloud/\n"
             " Facebook   : https://facebook.com/linuxnetdata/\n"
             "\n"
