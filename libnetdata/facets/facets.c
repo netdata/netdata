@@ -2005,7 +2005,9 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
 
         values[used++] = v->name;
 
-        k->transform.cb(k->facets, tb, FACETS_TRANSFORM_FACET, k->transform.data);
+        buffer_flush(tb);
+        buffer_strcat(tb, v->name);
+        k->transform.cb(k->facets, tb, FACETS_TRANSFORM_FACET_SORT, k->transform.data);
         v->name = strdupz(buffer_tostring(tb));
     }
     foreach_value_in_key_done(v);

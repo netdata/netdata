@@ -346,14 +346,14 @@ static inline ND_SD_JOURNAL_STATUS check_stop(const bool *cancelled, const usec_
     return ND_SD_JOURNAL_OK;
 }
 
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
+ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
         struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = fqs->before_ut + anchor_delta;
-    usec_t stop_ut = fqs->after_ut;
+    usec_t start_ut = ((fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
+    usec_t stop_ut = (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->after_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -391,6 +391,13 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_full(
             fqs->rows_useful++;
 
         row_counter++;
+        if(row_counter % 100 == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
+            // stop the data only query
+            usec_t oldest = facets_row_oldest_ut(facets);
+            if(oldest && msg_ut < (oldest - anchor_delta))
+                break;
+        }
+
         if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
             FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
             last_row_counter = row_counter;
@@ -454,69 +461,6 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_forward(
         if(row_counter % 100 == 0 && facets_rows(facets) >= fqs->entries) {
             usec_t newest = facets_row_newest_ut(facets);
             if(newest && msg_ut > (newest + anchor_delta))
-                break;
-        }
-
-        if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
-            FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
-            last_row_counter = row_counter;
-
-            FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
-            last_bytes = bytes;
-
-            status = check_stop(fqs->cancelled, &fqs->stop_monotonic_ut);
-        }
-    }
-
-    FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
-    FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
-
-    if(errors_no_timestamp)
-        netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
-
-    return status;
-}
-
-ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_data_backward(
-        sd_journal *j, BUFFER *wb __maybe_unused, FACETS *facets,
-        struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
-
-    usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
-
-    usec_t start_ut = (fqs->anchor.start_ut ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
-    usec_t stop_ut = fqs->anchor.stop_ut ? fqs->anchor.stop_ut : fqs->after_ut;
-
-    if(!netdata_systemd_journal_seek_to(j, start_ut))
-        return ND_SD_JOURNAL_FAILED_TO_SEEK;
-
-    size_t errors_no_timestamp = 0;
-    size_t row_counter = 0, last_row_counter = 0;
-    size_t bytes = 0, last_bytes = 0;
-
-    ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
-
-    facets_rows_begin(facets);
-    while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
-        usec_t msg_ut = 0;
-        if(sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
-            errors_no_timestamp++;
-            continue;
-        }
-
-        if (unlikely(msg_ut > start_ut))
-            continue;
-
-        if (unlikely(msg_ut < stop_ut))
-            break;
-
-        bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
-        if(facets_row_finished(facets, msg_ut))
-            fqs->rows_useful++;
-
-        row_counter++;
-        if(row_counter % 100 == 0 && facets_rows(facets) >= fqs->entries) {
-            usec_t oldest = facets_row_oldest_ut(facets);
-            if(oldest && msg_ut < (oldest - anchor_delta))
                 break;
         }
 
@@ -674,11 +618,11 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
             if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
                 status = netdata_systemd_journal_query_data_forward(j, wb, facets, jf, fqs);
             else
-                status = netdata_systemd_journal_query_data_backward(j, wb, facets, jf, fqs);
+                status = netdata_systemd_journal_query_backward(j, wb, facets, jf, fqs);
         }
         else {
             // we have to do a full query
-            status = netdata_systemd_journal_query_full(j, wb, facets, jf, fqs);
+            status = netdata_systemd_journal_query_backward(j, wb, facets, jf, fqs);
         }
     }
     else
@@ -1308,8 +1252,10 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     if(!fqs->data_only) {
         buffer_json_member_add_time_t(wb, "update_every", 1);
         buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
-        buffer_json_member_add_uint64(wb, "last_modified", fqs->last_modified);
     }
+
+    if(!fqs->data_only || fqs->tail)
+        buffer_json_member_add_uint64(wb, "last_modified", fqs->last_modified);
 
     facets_sort_and_reorder_keys(facets);
     facets_report(facets, wb, used_hashes_registry);
@@ -1675,6 +1621,9 @@ static void netdata_systemd_journal_transform_syslog_facility(FACETS *facets __m
 }
 
 static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    if(scope == FACETS_TRANSFORM_FACET_SORT)
+        return;
+
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         int priority = str2i(buffer_tostring(wb));
@@ -1687,6 +1636,9 @@ static void netdata_systemd_journal_transform_priority(FACETS *facets __maybe_un
 }
 
 static void netdata_systemd_journal_transform_errno(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    if(scope == FACETS_TRANSFORM_FACET_SORT)
+        return;
+
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         unsigned err_no = str2u(buffer_tostring(wb));
@@ -1836,6 +1788,7 @@ static void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unu
                     break;
 
                 case FACETS_TRANSFORM_FACET:
+                case FACETS_TRANSFORM_FACET_SORT:
                 case FACETS_TRANSFORM_HISTOGRAM:
                     buffer_flush(wb);
                     buffer_sprintf(wb, "%s UTC", buffer);
@@ -1846,6 +1799,9 @@ static void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unu
 }
 
 static void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    if(scope == FACETS_TRANSFORM_FACET_SORT)
+        return;
+
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uid_t uid = str2i(buffer_tostring(wb));
@@ -1856,6 +1812,9 @@ static void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused,
 }
 
 static void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    if(scope == FACETS_TRANSFORM_FACET_SORT)
+        return;
+
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         gid_t gid = str2i(buffer_tostring(wb));
@@ -1910,6 +1869,9 @@ const char *linux_capabilities[] = {
 };
 
 static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    if(scope == FACETS_TRANSFORM_FACET_SORT)
+        return;
+
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uint64_t cap = strtoul(buffer_tostring(wb), NULL, 16);
@@ -1931,6 +1893,9 @@ static void netdata_systemd_journal_transform_cap_effective(FACETS *facets __may
 }
 
 static void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    if(scope == FACETS_TRANSFORM_FACET_SORT)
+        return;
+
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uint64_t ut = str2ull(buffer_tostring(wb), NULL);

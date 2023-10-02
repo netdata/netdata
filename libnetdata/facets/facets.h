@@ -17,6 +17,7 @@ typedef enum __attribute__((packed)) {
     FACETS_TRANSFORM_HISTOGRAM,
     FACETS_TRANSFORM_FACET,
     FACETS_TRANSFORM_DATA,
+    FACETS_TRANSFORM_FACET_SORT,
 } FACETS_TRANSFORMATION_SCOPE;
 
 typedef enum __attribute__((packed)) {
