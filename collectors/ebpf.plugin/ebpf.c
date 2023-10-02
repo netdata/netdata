@@ -287,7 +287,7 @@ ebpf_module_t ebpf_modules[] = {
        .functions = {.start_routine = ebpf_function_thread,
                    .apps_routine = NULL,
                    .fnct_routine = NULL},
-      .enabled = 1,
+                   .enabled = NETDATA_THREAD_EBPF_RUNNING,
       .update_every = EBPF_DEFAULT_UPDATE_EVERY, .global_charts = 1, .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
       .apps_level = NETDATA_APPS_NOT_SET, .cgroup_charts = CONFIG_BOOLEAN_NO, .mode = MODE_ENTRY, .optional = 0,
       .maps = NULL, .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE, .names = NULL, .cfg = NULL,
