@@ -64,6 +64,9 @@ enum directory_cache_targets {
 };
 
 typedef struct netdata_publish_dcstat_pid {
+    uint64_t ct;
+    char name[TASK_COMM_LEN];
+
     uint64_t cache_access;
     uint64_t file_system;
     uint64_t not_found;
