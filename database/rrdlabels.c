@@ -671,6 +671,25 @@ void rrdlabels_destroy(RRDLABELS *labels)
     freez(labels);
 }
 
+static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABEL *label)
+{
+    if (unlikely(!labels))
+        return NULL;
+
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    bool first_then_next = true;
+    RRDLABEL *found = NULL;
+    while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
+        RRDLABEL *lb = (RRDLABEL *)Index;
+        if (lb->index.key == label->index.key && lb->index.value != label->index.value) {
+            found = (RRDLABEL *)Index;
+            break;
+        }
+    }
+    return found;
+}
+
 // ----------------------------------------------------------------------------
 // rrdlabels_add()
 
@@ -680,6 +699,8 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
 
     spinlock_lock(&labels->spinlock);
 
+    RRDLABEL *old_key = rrdlabels_find_label_with_key_unsafe(labels, label);
+
     size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
 
     Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t) label, PJE0);
@@ -687,8 +708,19 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         fatal("RRDLABELS: corrupted labels JudyL array");
 
     if (!*PValue) {
-        *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
+        RRDLABEL_SRC new_ls;
+        if (old_key)
+            new_ls = ((ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_OLD);
+        else
+            new_ls = ((ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW);
+        *((RRDLABEL_SRC *)PValue) = new_ls;
+
         labels->version++;
+
+        if (old_key) {
+            (void)JudyLDel(&labels->JudyL, (Word_t) old_key, PJE0);
+            delete_label((RRDLABEL *)old_key);
+        }
         size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
         STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
     }
@@ -876,12 +908,54 @@ void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const
     string_freez(this_key);
 }
 
-void rrdlabels_unmark_all(RRDLABELS *labels __maybe_unused) {
+static void rrdlabels_unmark_all_unsafe(RRDLABELS *labels)
+{
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    bool first_then_next = true;
+    while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next)))
+        *((RRDLABEL_SRC *)PValue) &= ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW);
 }
 
-void rrdlabels_remove_all_unmarked(RRDLABELS *labels __maybe_unused) {
+void rrdlabels_unmark_all(RRDLABELS *labels)
+{
+    spinlock_lock(&labels->spinlock);
+
+    rrdlabels_unmark_all_unsafe(labels);
+
+    spinlock_unlock(&labels->spinlock);
 }
 
+static void rrdlabels_remove_all_unmarked_unsafe(RRDLABELS *labels)
+{
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    bool first_then_next = true;
+
+    while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
+        if (!((*((RRDLABEL_SRC *)PValue)) & (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT))) {
+
+            size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
+            (void)JudyLDel(&labels->JudyL, Index, PJE0);
+            size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
+
+            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_before_judyl - mem_after_judyl, 0);
+
+            delete_label((RRDLABEL *)Index);
+            if (labels->JudyL != (Pvoid_t) NULL) {
+                Index = 0;
+                first_then_next = true;
+            }
+        }
+    }
+}
+
+void rrdlabels_remove_all_unmarked(RRDLABELS *labels)
+{
+    spinlock_lock(&labels->spinlock);
+    rrdlabels_remove_all_unmarked_unsafe(labels);
+    spinlock_unlock(&labels->spinlock);
+}
 
 // ----------------------------------------------------------------------------
 // rrdlabels_walkthrough_read()
@@ -916,13 +990,10 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     spinlock_lock(&dst->spinlock);
     spinlock_lock(&src->spinlock);
 
+    rrdlabels_unmark_all_unsafe(dst);
+
     RRDLABEL *label;
     Pvoid_t *PValue;
-    Word_t Index = 0;
-    bool first_then_next = true;
-    while ((PValue = JudyLFirstThenNext(dst->JudyL, &Index, &first_then_next))) {
-        *((RRDLABEL_SRC *)PValue) &= ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW);
-    }
 
     RRDLABEL_SRC ls;
     lfe_start_nolock(src, label, ls)
@@ -945,25 +1016,7 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     }
     lfe_done_nolock();
 
-    Index = 0;
-    first_then_next = true;
-    while ((PValue = JudyLFirstThenNext(dst->JudyL, &Index, &first_then_next))) {
-        if (!((*((RRDLABEL_SRC *)PValue)) & (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT))) {
-
-            size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
-            (void)JudyLDel(&dst->JudyL, Index, PJE0);
-            size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
-
-            STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_before_judyl - mem_after_judyl, 0);
-
-            delete_label((RRDLABEL *)Index);
-            if (dst->JudyL != (Pvoid_t) NULL) {
-                Index = 0;
-                first_then_next = true;
-            }
-        }
-    }
-
+    rrdlabels_remove_all_unmarked_unsafe(dst);
     dst->version = src->version;
 
     spinlock_unlock(&src->spinlock);
