@@ -4129,6 +4129,7 @@ int main(int argc, char **argv)
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
             netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
         } else {
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
             em->enabled = NETDATA_THREAD_EBPF_NOT_RUNNING;
         }
     }
