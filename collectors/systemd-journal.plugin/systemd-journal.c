@@ -314,10 +314,10 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
                         break;
                 } while(!__atomic_compare_exchange_n(&jf->max_journal_vs_realtime_delta_ut, &expected, delta, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
-                if(delta > expected)
-                    netdata_log_error("increased max_journal_vs_realtime_delta_ut from %"PRIu64" to %"PRIu64", "
-                                      "journal %"PRIu64", actual %"PRIu64" (delta %"PRIu64")"
-                                      , expected, delta, origin_journal_ut, *msg_ut, origin_journal_ut - (*msg_ut));
+                internal_error(delta > expected,
+                               "increased max_journal_vs_realtime_delta_ut from %"PRIu64" to %"PRIu64", "
+                               "journal %"PRIu64", actual %"PRIu64" (delta %"PRIu64")"
+                               , expected, delta, origin_journal_ut, *msg_ut, origin_journal_ut - (*msg_ut));
             }
         }
 
@@ -565,7 +565,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
     }
 
     if(failures) {
-        netdata_log_error("failed to setup journal filter, will run the full query");
+        netdata_log_error("failed to setup journal filter, will run the full query.");
         sd_journal_flush_matches(j);
         return true;
     }
@@ -975,7 +975,6 @@ static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, v
 }
 
 void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut) {
-
     static const char *ext = ".journal";
     static const size_t ext_len = sizeof(".journal") - 1;
 
@@ -989,7 +988,8 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
 
     // Open the directory.
     if ((dir = opendir(dirname)) == NULL) {
-        netdata_log_error("Cannot opendir() '%s'", dirname);
+        if(errno != ENOENT && errno != ENOTDIR)
+            netdata_log_error("Cannot opendir() '%s'", dirname);
         return;
     }
 
