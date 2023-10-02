@@ -4062,6 +4062,9 @@ static void ebpf_manage_pid(pid_t pid)
 int main(int argc, char **argv)
 {
     stderror = stderr;
+
+    log_set_global_severity_for_external_plugins();
+
     clocks_init();
     main_thread_id = gettid();
 
