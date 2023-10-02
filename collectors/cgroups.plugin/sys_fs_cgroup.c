@@ -2866,9 +2866,9 @@ void update_systemd_services_charts(
 {
     // update the values
     struct cgroup *cg;
-    // TODO: Remove constant (1000) when all charts are moved.
-    static int prio = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD;
+    int systemd_cgroup_chart_priority = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD;
     char type[RRD_ID_LENGTH_MAX + 1];
+
     for (cg = cgroup_root; cg; cg = cg->next) {
         if (unlikely(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg)))
             continue;
@@ -2886,7 +2886,7 @@ void update_systemd_services_charts(
                     "percentage",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority,
                     update_every,
                     RRDSET_TYPE_STACKED);
 
@@ -2918,7 +2918,7 @@ void update_systemd_services_charts(
                     "MiB",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 5,
                     update_every,
                     RRDSET_TYPE_STACKED);
 
@@ -2957,7 +2957,7 @@ void update_systemd_services_charts(
                     "failures/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 10,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -2981,7 +2981,7 @@ void update_systemd_services_charts(
                     "MiB",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 15,
                     update_every,
                     RRDSET_TYPE_STACKED);
 
@@ -3009,7 +3009,7 @@ void update_systemd_services_charts(
                     "MiB",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 20,
                     update_every,
                     RRDSET_TYPE_STACKED);
 
@@ -3033,7 +3033,7 @@ void update_systemd_services_charts(
                     "MiB/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 25,
                     update_every,
                     RRDSET_TYPE_AREA);
 
@@ -3057,7 +3057,7 @@ void update_systemd_services_charts(
                     "MiB/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 30,
                     update_every,
                     RRDSET_TYPE_AREA);
 
@@ -3083,7 +3083,7 @@ void update_systemd_services_charts(
                     "KiB/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 35,
                     update_every,
                     RRDSET_TYPE_AREA);
 
@@ -3109,7 +3109,7 @@ void update_systemd_services_charts(
                     "operations/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 40,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -3134,7 +3134,7 @@ void update_systemd_services_charts(
                     "KiB/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 45,
                     update_every,
                     RRDSET_TYPE_AREA);
 
@@ -3160,7 +3160,7 @@ void update_systemd_services_charts(
                     "operations/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 50,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -3186,7 +3186,7 @@ void update_systemd_services_charts(
                     "operations/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 55,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -3211,7 +3211,7 @@ void update_systemd_services_charts(
                     "operations/s",
                     PLUGIN_CGROUPS_NAME,
                     PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    prio++,
+                    systemd_cgroup_chart_priority + 60,
                     update_every,
                     RRDSET_TYPE_LINE);
 
