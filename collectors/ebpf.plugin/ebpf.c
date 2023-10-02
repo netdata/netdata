@@ -3399,8 +3399,7 @@ unittest:
     }
 
     if (disable_cgroups) {
-        if (disable_cgroups)
-            ebpf_disable_cgroups();
+        ebpf_disable_cgroups();
     }
 
     if (select_threads) {

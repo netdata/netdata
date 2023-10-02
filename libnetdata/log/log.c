@@ -34,6 +34,8 @@ const char *facility_log = NULL;
 const char *stdhealth_filename = NULL;
 const char *stdcollector_filename = NULL;
 
+netdata_log_level_t global_log_severity_level = NETDATA_LOG_LEVEL_INFO;
+
 #ifdef ENABLE_ACLK
 const char *aclklog_filename = NULL;
 int aclklog_fd = -1;
@@ -780,6 +782,11 @@ void debug_int( const char *file, const char *function, const unsigned long line
 
 void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
+#if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
+    if (NETDATA_LOG_LEVEL_INFO > global_log_severity_level)
+        return;
+#endif
+
     va_list args;
     FILE *fp = (is_collector || !stderror) ? stderr : stderror;
 
@@ -908,6 +915,11 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 }
 
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+#if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
+    if (NETDATA_LOG_LEVEL_ERROR > global_log_severity_level)
+        return;
+#endif
+
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
     FILE *fp = (is_collector || !stderror) ? stderr : stderror;
@@ -1125,3 +1137,29 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
     }
 }
 #endif
+
+void log_set_global_severity_level(netdata_log_level_t value)
+{
+    global_log_severity_level = value;
+}
+
+netdata_log_level_t log_severity_string_to_severity_level(char *level)
+{
+    if (!strcmp(level, NETDATA_LOG_LEVEL_INFO_STR))
+        return NETDATA_LOG_LEVEL_INFO;
+    if (!strcmp(level, NETDATA_LOG_LEVEL_ERROR_STR) || !strcmp(level, NETDATA_LOG_LEVEL_ERROR_SHORT_STR))
+        return NETDATA_LOG_LEVEL_ERROR;
+
+    return NETDATA_LOG_LEVEL_INFO;
+}
+
+char *log_severity_level_to_severity_string(netdata_log_level_t level)
+{
+    switch (level) {
+        case NETDATA_LOG_LEVEL_ERROR:
+            return NETDATA_LOG_LEVEL_ERROR_STR;
+        case NETDATA_LOG_LEVEL_INFO:
+        default:
+            return NETDATA_LOG_LEVEL_INFO_STR;
+    }
+}

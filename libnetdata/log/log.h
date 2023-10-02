@@ -105,6 +105,22 @@ typedef struct error_with_limit {
     usec_t sleep_ut;
 } ERROR_LIMIT;
 
+typedef enum netdata_log_level {
+    NETDATA_LOG_LEVEL_ERROR,
+    NETDATA_LOG_LEVEL_INFO,
+
+    NETDATA_LOG_LEVEL_END
+} netdata_log_level_t;
+
+#define NETDATA_LOG_LEVEL_INFO_STR "info"
+#define NETDATA_LOG_LEVEL_ERROR_STR "error"
+#define NETDATA_LOG_LEVEL_ERROR_SHORT_STR "err"
+
+extern netdata_log_level_t global_log_severity_level;
+netdata_log_level_t log_severity_string_to_severity_level(char *level);
+char *log_severity_level_to_severity_string(netdata_log_level_t level);
+void log_set_global_severity_level(netdata_log_level_t value);
+
 #define error_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 #define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 
