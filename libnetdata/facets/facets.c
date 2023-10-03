@@ -1772,40 +1772,40 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
 
     bool within_anchor = facets_is_entry_within_anchor(facets, usec);
 
-    if(within_anchor && selected_keys >= total_keys - 1) {
-        size_t found = 0; (void)found;
+    if(likely(within_anchor)) {
+        if(selected_keys >= total_keys - 1) {
+            size_t found = 0;
+            (void) found;
 
-        for(size_t p = 0; p < entries ;p++) {
-            FACET_KEY *k = facets->keys_with_values.array[p];
+            for(size_t p = 0; p < entries; p++) {
+                FACET_KEY *k = facets->keys_with_values.array[p];
 
-            size_t counted_by = selected_keys;
+                size_t counted_by = selected_keys;
 
-            if (counted_by != total_keys && !k->key_values_selected_in_row)
-                counted_by++;
+                if(counted_by != total_keys && !k->key_values_selected_in_row)
+                    counted_by++;
 
-            if (counted_by == total_keys) {
-                FACET_VALUE *v = FACET_VALUE_GET_CURRENT_VALUE(k);
-                v->final_facet_value_counter++;
+                if(counted_by == total_keys) {
+                    FACET_VALUE *v = FACET_VALUE_GET_CURRENT_VALUE(k);
+                    v->final_facet_value_counter++;
 
-                found++;
+                    found++;
+                }
             }
+
+            internal_fatal(!found, "We should find at least one facet to count this row");
         }
 
-        internal_fatal(!found, "We should find at least one facet to count this row");
-    }
-
-    if(selected_keys == total_keys) {
-        // we need to keep this row
-
-        facets_histogram_update_value(facets, usec);
-
-        if(within_anchor)
+        if(selected_keys == total_keys) {
+            // we need to keep this row
+            facets_histogram_update_value(facets, usec);
             facets_row_keep(facets, usec);
+        }
     }
 
     facets_reset_keys_with_value_and_row(facets);
 
-    return selected_keys == total_keys;
+    return selected_keys == total_keys &&  within_anchor;
 }
 
 // ----------------------------------------------------------------------------

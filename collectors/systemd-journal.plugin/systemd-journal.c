@@ -330,7 +330,8 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
 
 #define FUNCTION_PROGRESS_UPDATE_ROWS(rows_read, rows) __atomic_fetch_add(&(rows_read), rows, __ATOMIC_RELAXED)
 #define FUNCTION_PROGRESS_UPDATE_BYTES(bytes_read, bytes) __atomic_fetch_add(&(bytes_read), bytes, __ATOMIC_RELAXED)
-#define FUNCTION_PROGRESS_EVERY_ROWS 10000
+#define FUNCTION_PROGRESS_EVERY_ROWS (1ULL << 13)
+#define FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS (1ULL << 7)
 
 static inline ND_SD_JOURNAL_STATUS check_stop(const bool *cancelled, const usec_t *stop_monotonic_ut) {
     if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
@@ -352,7 +353,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = ((fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
+    usec_t start_ut = ((fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->before_ut + USEC_PER_SEC - 1) + anchor_delta;
     usec_t stop_ut = (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->after_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
@@ -360,7 +361,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
 
     size_t errors_no_timestamp = 0;
     usec_t earliest_msg_ut = 0;
-    size_t row_counter = 0, last_row_counter = 0;
+    size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
@@ -384,10 +385,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
-            fqs->rows_useful++;
+            rows_useful++;
 
         row_counter++;
-        if(row_counter % 100 == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
+        if(row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
             // stop the data only query
             usec_t oldest = facets_row_oldest_ut(facets);
             if(oldest && msg_ut < (oldest - anchor_delta))
@@ -408,6 +409,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
     FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
 
+    fqs->rows_useful += rows_useful;
+
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
@@ -424,14 +427,14 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
     usec_t start_ut = (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->after_ut;
-    usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
+    usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut + USEC_PER_SEC - 1) + anchor_delta;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
     usec_t earliest_msg_ut = 0;
-    size_t row_counter = 0, last_row_counter = 0;
+    size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
@@ -455,10 +458,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
         if(facets_row_finished(facets, msg_ut))
-            fqs->rows_useful++;
+            rows_useful++;
 
         row_counter++;
-        if(row_counter % 100 == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
+        if(row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
             usec_t newest = facets_row_newest_ut(facets);
             if(newest && msg_ut > (newest + anchor_delta))
                 break;
@@ -477,6 +480,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
 
     FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
     FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
+
+    fqs->rows_useful += rows_useful;
 
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
@@ -1093,6 +1098,9 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     fqs->files_matched = 0;
     fqs->file_working = 0;
+    fqs->rows_useful = 0;
+    fqs->rows_read = 0;
+    fqs->bytes_read = 0;
 
     size_t files_used = 0;
     size_t files_max = dictionary_entries(journal_files_registry);
@@ -1117,10 +1125,6 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         buffer_flush(wb);
         return HTTP_RESP_NOT_MODIFIED;
     }
-
-    // We will not do an if_modified_since query
-    // we know something changed in the files
-    fqs->if_modified_since = 0;
 
     // sort the files, so that they are optimal for facets
     if(files_used >= 2) {
@@ -1222,6 +1226,12 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
     switch (status) {
         case ND_SD_JOURNAL_OK:
+            if(fqs->if_modified_since && !fqs->rows_useful) {
+                buffer_flush(wb);
+                return HTTP_RESP_NOT_MODIFIED;
+            }
+            break;
+
         case ND_SD_JOURNAL_TIMED_OUT:
         case ND_SD_JOURNAL_NO_FILE_MATCHED:
             break;
@@ -2575,7 +2585,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         bool cancelled = false;
-        char buf[] = "systemd-journal after:-2592000 before:0 last:500";
+        char buf[] = "systemd-journal after:1696319393 before:1696320293 anchor:1696320283039944 direction:forward last:100 if_modified_since:1696320283039989 data_only:true delta:true tail:true slice:true source:all histogram:DHKucpqUoe1";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, 600, &cancelled);
