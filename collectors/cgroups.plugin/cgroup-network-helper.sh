@@ -31,6 +31,21 @@ export LC_ALL=C
 
 PROGRAM_NAME="$(basename "${0}")"
 
+LOG_LEVEL_ERR=1
+LOG_LEVEL_WARN=2
+LOG_LEVEL_INFO=3
+LOG_LEVEL="$LOG_LEVEL_INFO"
+
+set_log_severity_level() {
+  case ${NETDATA_LOG_SEVERITY_LEVEL,,} in
+    "info") LOG_LEVEL="$LOG_LEVEL_INFO";;
+    "warn" | "warning") LOG_LEVEL="$LOG_LEVEL_WARN";;
+    "err" | "error") LOG_LEVEL="$LOG_LEVEL_ERR";;
+  esac
+}
+
+set_log_severity_level
+
 logdate() {
     date "+%Y-%m-%d %H:%M:%S"
 }
@@ -43,16 +58,19 @@ log() {
 
 }
 
+info() {
+    [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_INFO" -gt "$LOG_LEVEL" ]] && return
+    log INFO "${@}"
+}
+
 warning() {
+    [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_WARN" -gt "$LOG_LEVEL" ]] && return
     log WARNING "${@}"
 }
 
 error() {
+    [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_ERR" -gt "$LOG_LEVEL" ]] && return
     log ERROR "${@}"
-}
-
-info() {
-    log INFO "${@}"
 }
 
 fatal() {

@@ -1163,3 +1163,11 @@ char *log_severity_level_to_severity_string(netdata_log_level_t level)
             return NETDATA_LOG_LEVEL_INFO_STR;
     }
 }
+
+void log_set_global_severity_for_external_plugins() {
+    char *s = getenv("NETDATA_LOG_SEVERITY_LEVEL");
+    if (!s)
+        return;
+    netdata_log_level_t level = log_severity_string_to_severity_level(s);
+    log_set_global_severity_level(level);
+}

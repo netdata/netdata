@@ -5549,6 +5549,8 @@ int main(int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    log_set_global_severity_for_external_plugins();
+
     bool send_resource_usage = true;
     {
         const char *s = getenv("NETDATA_INTERNALS_MONITORING");
