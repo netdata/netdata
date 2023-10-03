@@ -3932,7 +3932,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
        fprintf(stdout, "DIMENSION writes '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
 #else
-       fprintf(stdout, "CHART %s.%s_physical_io '' '%s disk physical IO' 'blocks/s' disk %s.disk_physical_block_io area 20100 %d\n", type, w->clean_name, title, type, update_every);
+       fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'blocks/s' disk %s.disk_physical_block_io area 20100 %d\n", type, w->clean_name, title, type, update_every);
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", RATES_DETAIL);
