@@ -3735,13 +3735,16 @@ static void normalize_utilization(struct target *root) {
 
 static void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt) {
     struct target *w;
+    char id[RRD_ID_LENGTH_MAX+1];
 
-    send_BEGIN(type, "cpu", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_cpu", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
+        if(unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("total", (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
+            send_END();
+        }
     }
-    send_END();
 
     send_BEGIN(type, "cpu_user", dt);
     for (w = root; w ; w = w->next) {
@@ -4019,12 +4022,13 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     // we have something new to show
     // update the charts
-    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (100%% = 1 core)' 'percentage' cpu %s.cpu stacked 20001 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_cpu '' '%s CPU Time (100%% = 1 core)' 'percentage' cpu %s.cpu stacked 20001 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION total '' absolute 1 %llu %s\n", time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
