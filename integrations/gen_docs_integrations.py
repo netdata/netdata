@@ -23,6 +23,9 @@ def cleanup():
         for element in Path("exporting").glob('**/*/'):
             if "integrations" in str(element):
                 shutil.rmtree(element)
+        for element in Path("integrations/cloud-notifications").glob('**/*/'):
+            if "integrations" in str(element):
+                shutil.rmtree(element)
 
 
 def generate_category_from_name(category_fragment, category_array):
