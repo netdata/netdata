@@ -1266,7 +1266,7 @@ done:
 #define SQL_SELECT_HEALTH_LOG                                                                                          \
      "SELECT hld.unique_id, hld.alarm_id, hld.alarm_event_id, hl.config_hash_id, hld.updated_by_id, hld.updates_id, "  \
      "hld.when_key, hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, "                         \
-     "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.family, hl.exec, hl.recipient, ah.source, "                     \
+     "hld.delay_up_to_timestamp, hl.name, hl.chart, hl.exec, hl.recipient, ah.source, "                                \
      "hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, "    \
      "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.summary "             \
      "FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hl.config_hash_id = ah.hash_id and "              \
@@ -1327,10 +1327,10 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
         uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), config_hash_id);
 
         char transition_id[UUID_STR_LEN] = {0};
-        if (sqlite3_column_type(res, 31) != SQLITE_NULL)
-            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 31)), transition_id);
+        if (sqlite3_column_type(res, 30) != SQLITE_NULL)
+            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 30)), transition_id);
 
-        char *edit_command = sqlite3_column_bytes(res, 17) > 0 ? health_edit_command_from_source((char *)sqlite3_column_text(res, 17)) : strdupz("UNKNOWN=0=UNKNOWN");
+        char *edit_command = sqlite3_column_bytes(res, 16) > 0 ? health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) : strdupz("UNKNOWN=0=UNKNOWN");
 
         if (count)
             buffer_sprintf(wb, ",");
@@ -1351,7 +1351,6 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             "\t\t\"name\": \"%s\",\n"
             "\t\t\"chart\": \"%s\",\n"
             "\t\t\"context\": \"%s\",\n"
-            "\t\t\"family\": \"%s\",\n"
             "\t\t\"class\": \"%s\",\n"
             "\t\t\"component\": \"%s\",\n"
             "\t\t\"type\": \"%s\",\n"
@@ -1376,7 +1375,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             "\t\t\"updates_id\": %u,\n"
             "\t\t\"value_string\": \"%s\",\n"
             "\t\t\"old_value_string\": \"%s\",\n"
-            "\t\t\"last_repeat\": \"%lu\",\n"
+            "\t\t\"last_repeat\": %lu,\n"
             "\t\t\"silenced\": \"%s\",\n",
             rrdhost_hostname(host),
             host->utc_offset,
@@ -1388,54 +1387,53 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *
             transition_id,
             sqlite3_column_text(res, 12),
             sqlite3_column_text(res, 13),
-            sqlite3_column_text(res, 30),
-            sqlite3_column_text(res, 14),
+            sqlite3_column_text(res, 29),
+            sqlite3_column_text(res, 26) ? (const char *) sqlite3_column_text(res, 26) : (char *) "Unknown",
             sqlite3_column_text(res, 27) ? (const char *) sqlite3_column_text(res, 27) : (char *) "Unknown",
             sqlite3_column_text(res, 28) ? (const char *) sqlite3_column_text(res, 28) : (char *) "Unknown",
-            sqlite3_column_text(res, 29) ? (const char *) sqlite3_column_text(res, 29) : (char *) "Unknown",
             (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
             (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
             (long unsigned int)sqlite3_column_int64(res, 10),
             (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
-            sqlite3_column_text(res, 15) ? (const char *) sqlite3_column_text(res, 15) : string2str(host->health.health_default_exec),
-            sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : string2str(host->health.health_default_recipient),
-            sqlite3_column_int(res, 20),
-            sqlite3_column_text(res, 17) ? (const char *) sqlite3_column_text(res, 17) : (char *) "Unknown",
+            sqlite3_column_text(res, 14) ? (const char *) sqlite3_column_text(res, 14) : string2str(host->health.health_default_exec),
+            sqlite3_column_text(res, 15) ? (const char *) sqlite3_column_text(res, 15) : string2str(host->health.health_default_recipient),
+            sqlite3_column_int(res, 19),
+            sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : (char *) "Unknown",
             edit_command,
-            sqlite3_column_text(res, 18),
+            sqlite3_column_text(res, 17),
             (long unsigned int)sqlite3_column_int64(res, 6),
             (long unsigned int)sqlite3_column_int64(res, 7),
             (long unsigned int)sqlite3_column_int64(res, 8),
+            rrdcalc_status2string(sqlite3_column_int(res, 20)),
             rrdcalc_status2string(sqlite3_column_int(res, 21)),
-            rrdcalc_status2string(sqlite3_column_int(res, 22)),
-            sqlite3_column_int(res, 23),
+            sqlite3_column_int(res, 22),
             (long unsigned int)sqlite3_column_int64(res, 11),
             (unsigned int)sqlite3_column_int64(res, 4),
             (unsigned int)sqlite3_column_int64(res, 5),
-            sqlite3_column_type(res, 24) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 24), (char *) sqlite3_column_text(res, 18), -1),
-            sqlite3_column_type(res, 25) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 25), (char *) sqlite3_column_text(res, 18), -1),
-            (long unsigned int)sqlite3_column_int64(res, 26),
+            sqlite3_column_type(res, 23) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 23), (char *) sqlite3_column_text(res, 17), -1),
+            sqlite3_column_type(res, 24) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 24), (char *) sqlite3_column_text(res, 17), -1),
+            (long unsigned int)sqlite3_column_int64(res, 25),
             (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
 
-        health_string2json(wb, "\t\t", "summary", (char *) sqlite3_column_text(res, 32), ",\n");
-        health_string2json(wb, "\t\t", "info", (char *) sqlite3_column_text(res, 19), ",\n");
+        health_string2json(wb, "\t\t", "summary", (char *) sqlite3_column_text(res, 31), ",\n");
+        health_string2json(wb, "\t\t", "info", (char *) sqlite3_column_text(res, 18), ",\n");
 
         if(unlikely(sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
             buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
         }
 
         buffer_strcat(wb, "\t\t\"value\":");
+        if (sqlite3_column_type(res, 23) == SQLITE_NULL)
+            buffer_strcat(wb, "null");
+        else
+            buffer_print_netdata_double(wb, sqlite3_column_double(res, 23));
+        buffer_strcat(wb, ",\n");
+
+        buffer_strcat(wb, "\t\t\"old_value\":");
         if (sqlite3_column_type(res, 24) == SQLITE_NULL)
             buffer_strcat(wb, "null");
         else
             buffer_print_netdata_double(wb, sqlite3_column_double(res, 24));
-        buffer_strcat(wb, ",\n");
-
-        buffer_strcat(wb, "\t\t\"old_value\":");
-        if (sqlite3_column_type(res, 25) == SQLITE_NULL)
-            buffer_strcat(wb, "null");
-        else
-            buffer_print_netdata_double(wb, sqlite3_column_double(res, 25));
         buffer_strcat(wb, "\n");
 
         buffer_strcat(wb, "\t}");
