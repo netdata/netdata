@@ -64,7 +64,7 @@ DYNCFG_ENABLE [plugin_url_name]
 
 This can be sent only once per lifetime of the plugin (at startup or later) sending it multiple times is considered a
 protocol violation and plugin might get terminated.
-After this command is sent the plugin has to be ready to accept all of the new commands/keywords related to dynamic
+After this command is sent the plugin has to be ready to accept all the new commands/keywords related to dynamic
 configuration (this command lets agent know this plugin is dyncfg capable and wishes to use dyncfg functionality).
 
 After this command agent can call
@@ -145,7 +145,6 @@ After module has been registered agent can call
 - `set_module_config [module]` FUNCTION_PAYLOAD
 - `get_module_config [module]` FUNCTION
 - `get_module_config_schema [module]` FUNCTION
--
 
 with same syntax as `set_plugin_config` and `get_plugin_config`. In case of `set` command the plugin has ability to
 reject the new configuration pushed to it.
