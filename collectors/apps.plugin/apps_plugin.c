@@ -3767,19 +3767,15 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 #endif
 
-    send_BEGIN(type, "threads", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_processes", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            send_SET(w->name, w->num_threads);
+        if(unlikely(w->exposed)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("processes", w->processes);
+            send_SET("threads", w->num_threads);
+            send_END();
+        }
     }
-    send_END();
-
-    send_BEGIN(type, "processes", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            send_SET(w->name, w->processes);
-    }
-    send_END();
 
 #ifndef __FreeBSD__
     send_BEGIN(type, "uptime", dt);
@@ -4027,19 +4023,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
     APPS_PLUGIN_FUNCTIONS();
 
-    fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20006 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_processes '' '%s Processes' 'processes' processes %s.processes stacked 20007 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION processes '' absolute 1 1\n");
+            fprintf(stdout, "DIMENSION threads '' absolute 1 1\n");
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
-
-    fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20007 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-    }
-    APPS_PLUGIN_FUNCTIONS();
 
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.uptime '' '%s Carried Over Uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
