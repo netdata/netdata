@@ -3778,34 +3778,26 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
 
 #ifndef __FreeBSD__
-    send_BEGIN(type, "uptime", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_uptime", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (global_uptime > w->starttime)?(global_uptime - w->starttime):0);
+        if(unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("uptime", (global_uptime > w->starttime)?(global_uptime - w->starttime):0);
+            send_END();
+        }
     }
-    send_END();
 
     if (enable_detailed_uptime_charts) {
-        send_BEGIN(type, "uptime_min", dt);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s_uptime_stats", type);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->uptime_min);
+            if(unlikely(w->exposed && w->processes)) {
+                send_BEGIN(type, id, dt);
+                send_SET("min", w->uptime_min);
+                send_SET("avg", w->uptime_sum / w->processes);
+                send_SET("max", w->uptime_max);
+                send_END();
+            }
         }
-        send_END();
-
-        send_BEGIN(type, "uptime_avg", dt);
-        for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->uptime_sum / w->processes);
-        }
-        send_END();
-
-        send_BEGIN(type, "uptime_max", dt);
-        for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->uptime_max);
-        }
-        send_END();
     }
 #endif
 
@@ -4033,34 +4025,24 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 
 #ifndef __FreeBSD__
-    fprintf(stdout, "CHART %s.uptime '' '%s Carried Over Uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_uptime '' '%s Carried Over Uptime' 'seconds' processes %s.uptime line 20008 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION uptime '' absolute 1 1\n");
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
 
     if (enable_detailed_uptime_charts) {
-        fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+            if(unlikely(w->exposed)) {
+                fprintf(stdout, "CHART %s.%s_uptime_stats '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", w->name, type, title, type, update_every);
+                fprintf(stdout, "DIMENSION min '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION avg '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION max '' absolute 1 1\n");
+                APPS_PLUGIN_FUNCTIONS();
+            }
         }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
-        for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
-        for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
     }
 #endif
 
