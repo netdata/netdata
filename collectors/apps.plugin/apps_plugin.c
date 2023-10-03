@@ -3744,17 +3744,11 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             send_SET("total", (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
             send_SET("user", (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
             send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
+            if(show_guest_time) {
+                send_SET("guest", (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
+            }
             send_END();
         }
-    }
-
-    if(show_guest_time) {
-        send_BEGIN(type, "cpu_guest", dt);
-        for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed && w->processes))
-                send_SET(w->name, (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
-        }
-        send_END();
     }
 
 #ifndef __FreeBSD__
@@ -4016,6 +4010,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION total '' absolute 1 %llu %s\n", time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
             fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
             fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
             APPS_PLUGIN_FUNCTIONS();
         }
     }
@@ -4086,15 +4081,6 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         APPS_PLUGIN_FUNCTIONS();
     }
 #endif
-
-    if(show_guest_time) {
-        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_guest stacked 20022 %d\n", type, title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if(unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-    }
 
 #ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.voluntary_ctxt_switches '' '%s Voluntary Context Switches' 'switches/s' cpu %s.voluntary_ctxt_switches stacked 20023 %d\n", type, title, type, update_every);
