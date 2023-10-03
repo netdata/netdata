@@ -1736,14 +1736,18 @@ void facets_rows_begin(FACETS *facets) {
 bool facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.rows.evaluated++;
 
-    if((facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) ||
+    if(unlikely((facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) ||
             (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
-            (facets->timeframe.after_ut && usec < facets->timeframe.after_ut) ||
-            !facets_is_entry_within_anchor(facets, usec) /* this has to be last */) {
+            (facets->timeframe.after_ut && usec < facets->timeframe.after_ut))) {
         // this row is not useful
         // 1. not matched by full text search, or
-        // 2. not in our timeframe, or
-        // 3. is not selected by the anchor
+        // 2. not in our timeframe
+        facets_reset_keys_with_value_and_row(facets);
+        return false;
+    }
+
+    bool within_anchor = facets_is_entry_within_anchor(facets, usec);
+    if(unlikely(!within_anchor && (facets->options & FACETS_OPTION_DATA_ONLY))) {
         facets_reset_keys_with_value_and_row(facets);
         return false;
     }
@@ -1798,7 +1802,9 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
     if(selected_keys == total_keys) {
         // we need to keep this row
         facets_histogram_update_value(facets, usec);
-        facets_row_keep(facets, usec);
+
+        if(within_anchor)
+            facets_row_keep(facets, usec);
     }
 
     facets_reset_keys_with_value_and_row(facets);
