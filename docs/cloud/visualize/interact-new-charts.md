@@ -61,7 +61,7 @@ multiple dimensions.
 
 Dimensions can be [hidden](#show-and-hide-dimensions) to help you focus your attention.
 
-## Contexts
+### Contexts
 
 A **context** is a way of grouping charts by the types of metrics collected and dimensions displayed. It's like a machine-readable naming and organization scheme.
 
@@ -73,7 +73,7 @@ By default, a chart's type affects where it fits in the menu, while its family c
 
 Netdata also relies on contexts for [alert configuration](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) (the [`on` line](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-on)).
 
-## Families
+### Families
 
 **Families** are a _single instance_ of a hardware or software resource that needs to be displayed separately from
 similar instances.
