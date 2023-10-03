@@ -3813,19 +3813,15 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
 #endif
 
-    send_BEGIN(type, "mem", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_mem_usage", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared):0ULL);
+        if(unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("mem", (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared):0ULL);
+            send_SET("rss", w->status_vmrss);
+            send_END();
+        }
     }
-    send_END();
-
-    send_BEGIN(type, "rss", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->status_vmrss);
-    }
-    send_END();
 
     send_BEGIN(type, "vmem", dt);
     for (w = root; w ; w = w->next) {
@@ -4015,19 +4011,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         }
     }
 
-    fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_mem_usage '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L);
+            fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
-
-    fprintf(stdout, "CHART %s.rss '' '%s Resident Set Size (w/shared)' 'MiB' mem %s.rss stacked 20004 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
-    }
-    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MiB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
