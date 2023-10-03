@@ -3770,8 +3770,11 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_END();
 #endif
         send_BEGIN(type, w->name, "mem_usage", dt);
-        send_SET("mem", (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared) : 0ULL);
         send_SET("rss", w->status_vmrss);
+        send_END();
+
+        send_BEGIN(type, w->name, "mem_private_usage", dt);
+        send_SET("mem", (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared) : 0ULL);
         send_END();
 
         send_BEGIN(type, w->name, "vmem_usage", dt);
@@ -3861,7 +3864,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
         w->exposed = 1;
 
-        fprintf(stdout, "CHART %s.%s_cpu_utilization '' '%s CPU Time (100%% = 1 core)' 'percentage' cpu %s.cpu_utilization stacked 20001 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_cpu_utilization '' '%s CPU utilization (100%% = 1 core)' 'percentage' cpu %s.cpu_utilization stacked 20001 %d\n", type, w->name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
@@ -3869,80 +3872,84 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
 #ifndef __FreeBSD__
         if (enable_guest_charts) {
-            fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n", type, w->name, title, type, update_every);
+            fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n", type, w->name, title, type, update_every);
             fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
             fprintf(stdout, "CLABEL_COMMIT\n");
             fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
         }
 
-        fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s Voluntary Context Switches' 'switches/s' cpu %s.cpu_context_switches line 20010 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n", type, w->name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION voluntary '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION involuntary '' absolute 1 %llu\n", RATES_DETAIL);
 #endif
 
-        fprintf(stdout, "CHART %s.%s_mem_usage '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem_usage stacked 20050 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20050 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
+        fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
+
+        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20055 %d\n", type, w->name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L);
-        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
 
-        fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s Virtual Memory Size' 'MiB' mem %s.vmem_usage line 20055 %d\n", type, w->name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L);
-
-        fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s Page Faults (swap read)' 'page faults/s' mem %s.mem_page_faults stacked 20060 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n", type, w->name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION minor '' absolute 1 %llu\n", RATES_DETAIL);
 
+        fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
+        fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L);
+
 #ifndef __FreeBSD__
-        fprintf(stdout, "CHART %s.%s_swap_usage '' '%s Swap Memory' 'MiB' mem %s.swap_usage line 20065 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n", type, w->name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L);
 #endif
 
 #ifndef __FreeBSD__
-       fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s Disk IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n", type, w->name, title, type, update_every);
+       fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n", type, w->name, title, type, update_every);
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
        fprintf(stdout, "DIMENSION writes '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
 
-       fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s Disk Logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n", type, w->name, title, type, update_every);
+       fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n", type, w->name, title, type, update_every);
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
        fprintf(stdout, "DIMENSION writes '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
 #else
-       fprintf(stdout, "CHART %s.%s_physical_io '' '%s Disk IO' 'blocks/s' disk %s.disk_physical_block_io area 20100 %d\n", type, w->name, title, type, update_every);
+       fprintf(stdout, "CHART %s.%s_physical_io '' '%s disk physical IO' 'blocks/s' disk %s.disk_physical_block_io area 20100 %d\n", type, w->name, title, type, update_every);
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", RATES_DETAIL);
        fprintf(stdout, "DIMENSION writes '' absolute 1 %llu\n", RATES_DETAIL);
 #endif
 
-        fprintf(stdout, "CHART %s.%s_processes '' '%s Processes' 'processes' processes %s.processes line 20150 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_processes '' '%s processes' 'processes' processes %s.processes line 20150 %d\n", type, w->name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION processes '' absolute 1 1\n");
 
-        fprintf(stdout, "CHART %s.%s_threads '' '%s Threads' 'threads' processes %s.threads line 20155 %d\n", type, w->name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_threads '' '%s threads' 'threads' processes %s.threads line 20155 %d\n", type, w->name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION threads '' absolute 1 1\n");
 
        if (enable_file_charts) {
-           fprintf(stdout, "CHART %s.%s_fds_open_limit '' '%s Open File Descriptors Limit' '%%' fds %s.fds_open_limit line 20200 %d\n", type, w->name, title, type, update_every);
+           fprintf(stdout, "CHART %s.%s_fds_open_limit '' '%s open file descriptors limit' '%%' fds %s.fds_open_limit line 20200 %d\n", type, w->name, title, type, update_every);
            fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
            fprintf(stdout, "CLABEL_COMMIT\n");
            fprintf(stdout, "DIMENSION limit '' absolute 1 100\n");
 
-           fprintf(stdout, "CHART %s.%s_fds_open '' '%s Open Files' 'fds' fds %s.fds_open stacked 20210 %d\n", type, w->name, title, type, update_every);
+           fprintf(stdout, "CHART %s.%s_fds_open '' '%s open files descriptors' 'fds' fds %s.fds_open stacked 20210 %d\n", type, w->name, title, type, update_every);
            fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
            fprintf(stdout, "CLABEL_COMMIT\n");
            fprintf(stdout, "DIMENSION files '' absolute 1 1\n");
@@ -3957,13 +3964,13 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
        }
 
 #ifndef __FreeBSD__
-       fprintf(stdout, "CHART %s.%s_uptime '' '%s Carried Over Uptime' 'seconds' uptime %s.uptime line 20250 %d\n", type, w->name, title, type, update_every);
+       fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n", type, w->name, title, type, update_every);
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION uptime '' absolute 1 1\n");
 
        if (enable_detailed_uptime_charts) {
-           fprintf(stdout, "CHART %s.%s_uptime_summary '' '%s Summary Uptime' 'seconds' uptime %s.uptime_summary area 20255 %d\n", type, w->name, title, type, update_every);
+           fprintf(stdout, "CHART %s.%s_uptime_summary '' '%s uptime summary' 'seconds' uptime %s.uptime_summary area 20255 %d\n", type, w->name, title, type, update_every);
            fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
            fprintf(stdout, "CLABEL_COMMIT\n");
            fprintf(stdout, "DIMENSION min '' absolute 1 1\n");
