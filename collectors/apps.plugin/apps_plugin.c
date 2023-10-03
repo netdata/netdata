@@ -3738,7 +3738,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     char id[RRD_ID_LENGTH_MAX+1];
 
     for (w = root; w ; w = w->next) {
-        if(likely(!w->exposed))
+        if(unlikely(!w->exposed))
             continue;
 
         send_BEGIN(type, w->name, "processes", dt);
@@ -3856,7 +3856,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed || (!w->exposed && !w->processes)))
+        if (likely(w->exposed || !w->processes))
             continue;
 
         w->exposed = 1;
