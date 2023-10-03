@@ -3752,19 +3752,15 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
 
 #ifndef __FreeBSD__
-    send_BEGIN(type, "voluntary_ctxt_switches", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_ctxt_switches", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->status_voluntary_ctxt_switches);
+        if(unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("voluntary", w->status_voluntary_ctxt_switches);
+            send_SET("involuntary", w->status_nonvoluntary_ctxt_switches);
+            send_END();
+        }
     }
-    send_END();
-
-    send_BEGIN(type, "involuntary_ctxt_switches", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->status_nonvoluntary_ctxt_switches);
-    }
-    send_END();
 #endif
 
     snprintfz(id, RRD_ID_LENGTH_MAX, "%s_processes", type);
@@ -4047,19 +4043,14 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 #endif
 
 #ifndef __FreeBSD__
-    fprintf(stdout, "CHART %s.voluntary_ctxt_switches '' '%s Voluntary Context Switches' 'switches/s' cpu %s.voluntary_ctxt_switches stacked 20023 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_ctxt_switches '' '%s Voluntary Context Switches' 'switches/s' cpu %s.ctxt_switches stacked 20023 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION voluntary '' absolute 1 %llu\n", RATES_DETAIL);
+            fprintf(stdout, "DIMENSION involuntary '' absolute 1 %llu\n", RATES_DETAIL);
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
-
-    fprintf(stdout, "CHART %s.involuntary_ctxt_switches '' '%s Involuntary Context Switches' 'switches/s' cpu %s.involuntary_ctxt_switches stacked 20024 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
-    }
-    APPS_PLUGIN_FUNCTIONS();
 #endif
 
 #ifndef __FreeBSD__
