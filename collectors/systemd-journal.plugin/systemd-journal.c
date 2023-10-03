@@ -248,6 +248,22 @@ struct journal_file {
     usec_t max_journal_vs_realtime_delta_ut;
 };
 
+static void log_fqs(FUNCTION_QUERY_STATUS *fqs, const char *msg) {
+    netdata_log_error("ERROR: %s, on query "
+                      "timeframe [%"PRIu64" - %"PRIu64"], "
+                      "anchor [%"PRIu64" - %"PRIu64"], "
+                      "if_modified_since %"PRIu64", "
+                      "data_only:%s, delta:%s, tail:%s, direction:%s"
+                      , msg
+                      , fqs->after_ut, fqs->before_ut
+                      , fqs->anchor.start_ut, fqs->anchor.stop_ut
+                      , fqs->if_modified_since
+                      , fqs->data_only ? "true" : "false"
+                      , fqs->delta ? "true" : "false"
+                      , fqs->tail ? "tail" : "false"
+                      , fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
+}
+
 static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timestamp) {
     if(sd_journal_seek_realtime_usec(j, timestamp) < 0) {
         netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to %" PRIu64, timestamp);
@@ -353,7 +369,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
 
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
-    usec_t start_ut = ((fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->before_ut + USEC_PER_SEC - 1) + anchor_delta;
+    usec_t start_ut = ((fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
     usec_t stop_ut = (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->after_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
@@ -427,7 +443,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     usec_t anchor_delta = __atomic_load_n(&jf->max_journal_vs_realtime_delta_ut, __ATOMIC_RELAXED);
 
     usec_t start_ut = (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->after_ut;
-    usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut + USEC_PER_SEC - 1) + anchor_delta;
+    usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -570,7 +586,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
     }
 
     if(failures) {
-        netdata_log_error("failed to setup journal filter, will run the full query.");
+        log_fqs(fqs, "failed to setup journal filter, will run the full query.");
         sd_journal_flush_matches(j);
         return true;
     }
@@ -2346,7 +2362,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     // set query time-frame, anchors and direction
 
     fqs->after_ut = after_s * USEC_PER_SEC;
-    fqs->before_ut = before_s * USEC_PER_SEC;
+    fqs->before_ut = (before_s * USEC_PER_SEC) + USEC_PER_SEC - 1;
     fqs->if_modified_since = if_modified_since;
     fqs->data_only = data_only;
     fqs->delta = (fqs->data_only) ? delta : false;
@@ -2358,18 +2374,6 @@ static void function_systemd_journal(const char *transaction, char *function, in
     fqs->filters = filters;
     fqs->query = (query && *query) ? query : NULL;
     fqs->histogram = (chart && *chart) ? chart : NULL;
-
-    if(anchor && anchor < fqs->after_ut) {
-        netdata_log_error("Received anchor %"PRIu64" is too small for query time-frame [%"PRIu64" - %"PRIu64"]",
-                          anchor, fqs->after_ut, fqs->before_ut);
-        anchor = 0;
-    }
-    else if(anchor > fqs->before_ut) {
-        netdata_log_error("Received anchor %"PRIu64" is too big for query time-frame [%"PRIu64" - %"PRIu64"]",
-                          anchor, fqs->after_ut, fqs->before_ut);
-        anchor = 0;
-    }
-
     fqs->direction = direction;
     fqs->anchor.start_ut = anchor;
     fqs->anchor.stop_ut = 0;
@@ -2382,6 +2386,21 @@ static void function_systemd_journal(const char *transaction, char *function, in
         fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
         fqs->anchor.start_ut = 0;
         fqs->anchor.stop_ut = anchor;
+    }
+
+    if(anchor && anchor < fqs->after_ut) {
+        log_fqs(fqs, "received anchor is too small for query timeframe, ignoring anchor");
+        anchor = 0;
+        fqs->anchor.start_ut = 0;
+        fqs->anchor.stop_ut = 0;
+        fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
+    }
+    else if(anchor > fqs->before_ut) {
+        log_fqs(fqs, "received anchor is too big for query timeframe, ignoring anchor");
+        anchor = 0;
+        fqs->anchor.start_ut = 0;
+        fqs->anchor.stop_ut = 0;
+        fqs->direction = direction = FACETS_ANCHOR_DIRECTION_BACKWARD;
     }
 
     facets_set_anchor(facets, fqs->anchor.start_ut, fqs->anchor.stop_ut, fqs->direction);
