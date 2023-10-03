@@ -1,5 +1,9 @@
 # Customize the standard dashboard
 
+> ### Disclaimer
+>
+> This document is only applicable to the v1 version of the dashboard and doesn't affect the [Netdata Dashboard](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
+
 While the [Netdata dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md) comes preconfigured with hundreds of charts and
 thousands of metrics, you may want to alter your experience based on a particular use case or preferences.
 
