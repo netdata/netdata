@@ -152,7 +152,7 @@ static int host_label_store_to_sql_callback(const char *name, const char *value,
         buffer_sprintf(lb->sql, STORE_HOST_LABEL);
     else
         buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, (int)ls & ~(RRDLABEL_FLAG_INTERNAL), name, value);
+    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, (int) (ls & ~(RRDLABEL_FLAG_INTERNAL)), name, value);
     lb->count++;
     return 1;
 }
@@ -163,7 +163,7 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
         buffer_sprintf(lb->sql, STORE_CHART_LABEL);
     else
         buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, ls, name, value);
+    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, (int) (ls & ~(RRDLABEL_FLAG_INTERNAL)), name, value);
     lb->count++;
     return 1;
 }
