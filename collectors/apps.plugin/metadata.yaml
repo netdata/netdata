@@ -67,160 +67,123 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: ""
-          labels: []
+        - name: applications group
+          description: These metrics refer to the application group.
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.cpu
-              description: Apps CPU Time (100% = 1 core)
-              unit: "percentage"
+            - name: app_group.cpu_utilization
+              description: Apps CPU utilization (100% = 1 core)
+              unit: percentage
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.cpu_user
-              description: Apps CPU User Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.cpu_system
-              description: Apps CPU System Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.cpu_guest
-              description: Apps CPU Guest Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.mem
-              description: Apps Real Memory (w/o shared)
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.rss
-              description: Apps Resident Set Size (w/shared)
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.vmem
-              description: Apps Virtual Memory Size
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.swap
-              description: Apps Swap Memory
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.major_faults
-              description: Apps Major Page Faults (swap read)
-              unit: "page faults/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.minor_faults
-              description: Apps Minor Page Faults (swap read)
-              unit: "page faults/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.preads
-              description: Apps Disk Reads
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.pwrites
-              description: Apps Disk Writes
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.lreads
-              description: Apps Disk Logical Reads
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.lwrites
-              description: Apps I/O Logical Writes
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.threads
-              description: Apps Threads
-              unit: "threads"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.processes
-              description: Apps Processes
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.voluntary_ctxt_switches
-              description: Apps Voluntary Context Switches
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.involuntary_ctxt_switches
-              description: Apps Involuntary Context Switches
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime
-              description: Apps Carried Over Uptime
-              unit: "seconds"
+                - name: user
+                - name: system
+            - name: app_group.cpu_guest_utilization
+              description: Apps CPU guest utilization (100% = 1 core)
+              unit: percentage
               chart_type: line
               dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime_min
-              description: Apps Minimum Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime_avg
-              description: Apps Average Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.uptime_max
-              description: Apps Maximum Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per app group
-            - name: apps.files
-              description: Apps Open Files
-              unit: "open files"
+                - name: guest
+            - name: app_group.cpu_context_switches
+              description: Apps CPU context switches
+              unit: switches/s
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.sockets
-              description: Apps Open Sockets
-              unit: "open sockets"
+                - name: voluntary
+                - name: involuntary
+            - name: app_group.mem_usage
+              description: Apps memory RSS usage
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: rss
+            - name: app_group.mem_private_usage
+              description: Apps memory usage without shared
+              unit: MiB
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.pipes
-              description: Apps Open Pipes
-              unit: "open pipes"
+                - name: mem
+            - name: app_group.vmem_usage
+              description: Apps virtual memory size
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: vmem
+            - name: app_group.mem_page_faults
+              description: Apps memory page faults
+              unit: pgfaults/s
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: minor
+                - name: major
+            - name: app_group.swap_usage
+              description: Apps swap usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: swap
+            - name: app_group.disk_physical_io
+              description: Apps disk physical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: app_group.disk_logical_io
+              description: Apps disk logical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: app_group.processes
+              description: Apps processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: processes
+            - name: app_group.threads
+              description: Apps threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: app_group.fds_open_limit
+              description: Apps open file descriptors limit
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: limit
+            - name: app_group.fds_open
+              description: Apps open file descriptors
+              unit: fds
+              chart_type: stacked
+              dimensions:
+                - name: files
+                - name: sockets
+                - name: pipes
+                - name: inotifies
+                - name: event
+                - name: timer
+                - name: signal
+                - name: eventpolls
+                - name: other
+            - name: app_group.uptime
+              description: Apps uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: app_group.uptime_summary
+              description: Apps uptime summary
+              unit: seconds
+              chart_type: area
+              dimensions:
+                - name: min
+                - name: avg
+                - name: max
   - meta:
       plugin_name: apps.plugin
       module_name: groups
@@ -289,160 +252,123 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: ""
-          labels: []
+        - name: user group
+          description: These metrics refer to the user group.
+          labels:
+            - name: user_group
+              description: The name of the user group.
           metrics:
-            - name: groups.cpu
-              description: User Groups CPU Time (100% = 1 core)
-              unit: "percentage"
+            - name: user_group.cpu_utilization
+              description: User Groups CPU utilization (100% = 1 core)
+              unit: percentage
               chart_type: stacked
               dimensions:
-                - name: a dimension per user group
-            - name: groups.cpu_user
-              description: User Groups CPU User Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.cpu_system
-              description: User Groups CPU System Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.cpu_guest
-              description: User Groups CPU Guest Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.mem
-              description: User Groups Real Memory (w/o shared)
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.rss
-              description: User Groups Resident Set Size (w/shared)
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.vmem
-              description: User Groups Virtual Memory Size
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.swap
-              description: User Groups Swap Memory
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.major_faults
-              description: User Groups Major Page Faults (swap read)
-              unit: "page faults/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.minor_faults
-              description: User Groups Page Faults (swap read)
-              unit: "page faults/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.preads
-              description: User Groups Disk Reads
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.pwrites
-              description: User Groups Disk Writes
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.lreads
-              description: User Groups Disk Logical Reads
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.lwrites
-              description: User Groups I/O Logical Writes
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.threads
-              description: User Groups Threads
-              unit: "threads"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.processes
-              description: User Groups Processes
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.voluntary_ctxt_switches
-              description: User Groups Voluntary Context Switches
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: groups.involuntary_ctxt_switches
-              description: User Groups Involuntary Context Switches
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: groups.uptime
-              description: User Groups Carried Over Uptime
-              unit: "seconds"
+                - name: user
+                - name: system
+            - name: user_group.cpu_guest_utilization
+              description: User Groups CPU guest utilization (100% = 1 core)
+              unit: percentage
               chart_type: line
               dimensions:
-                - name: a dimension per user group
-            - name: groups.uptime_min
-              description: User Groups Minimum Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.uptime_avg
-              description: User Groups Average Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.uptime_max
-              description: User Groups Maximum Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per user group
-            - name: groups.files
-              description: User Groups Open Files
-              unit: "open files"
+                - name: guest
+            - name: user_group.cpu_context_switches
+              description: User Groups CPU context switches
+              unit: switches/s
               chart_type: stacked
               dimensions:
-                - name: a dimension per user group
-            - name: groups.sockets
-              description: User Groups Open Sockets
-              unit: "open sockets"
+                - name: voluntary
+                - name: involuntary
+            - name: user_group.mem_usage
+              description: User Groups memory RSS usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: rss
+            - name: user_group.mem_private_usage
+              description: User Groups memory usage without shared
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: mem
+            - name: user_group.vmem_usage
+              description: User Groups virtual memory size
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: vmem
+            - name: user_group.mem_page_faults
+              description: User Groups memory page faults
+              unit: pgfaults/s
               chart_type: stacked
               dimensions:
-                - name: a dimension per user group
-            - name: groups.pipes
-              description: User Groups Open Pipes
-              unit: "open pipes"
+                - name: minor
+                - name: major
+            - name: user_group.swap_usage
+              description: User Groups swap usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: swap
+            - name: user_group.disk_physical_io
+              description: User Groups disk physical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: user_group.disk_logical_io
+              description: User Groups disk logical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: user_group.processes
+              description: User Groups processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: processes
+            - name: user_group.threads
+              description: User Groups threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: user_group.fds_open_limit
+              description: User Groups open file descriptors limit
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: limit
+            - name: user_group.fds_open
+              description: User Groups open file descriptors
+              unit: fds
               chart_type: stacked
               dimensions:
-                - name: a dimension per user group
+                - name: files
+                - name: sockets
+                - name: pipes
+                - name: inotifies
+                - name: event
+                - name: timer
+                - name: signal
+                - name: eventpolls
+                - name: other
+            - name: user_group.uptime
+              description: User Groups uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: user_group.uptime_summary
+              description: User Groups uptime summary
+              unit: seconds
+              chart_type: area
+              dimensions:
+                - name: min
+                - name: avg
+                - name: max
   - meta:
       plugin_name: apps.plugin
       module_name: users
@@ -509,157 +435,120 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: ""
-          labels: []
+        - name: user
+          description: These metrics refer to the user.
+          labels:
+            - name: user
+              description: The name of the user.
           metrics:
-            - name: users.cpu
-              description: Users CPU Time (100% = 1 core)
-              unit: "percentage"
+            - name: user.cpu_utilization
+              description: User CPU utilization (100% = 1 core)
+              unit: percentage
               chart_type: stacked
               dimensions:
-                - name: a dimension per user
-            - name: users.cpu_user
-              description: Users CPU User Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.cpu_system
-              description: Users CPU System Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.cpu_guest
-              description: Users CPU Guest Time (100% = 1 core)
-              unit: "percentage"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.mem
-              description: Users Real Memory (w/o shared)
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.rss
-              description: Users Resident Set Size (w/shared)
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.vmem
-              description: Users Virtual Memory Size
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.swap
-              description: Users Swap Memory
-              unit: "MiB"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.major_faults
-              description: Users Major Page Faults (swap read)
-              unit: "page faults/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.minor_faults
-              description: Users Page Faults (swap read)
-              unit: "page faults/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.preads
-              description: Users Disk Reads
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.pwrites
-              description: Users Disk Writes
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.lreads
-              description: Users Disk Logical Reads
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.lwrites
-              description: Users I/O Logical Writes
-              unit: "KiB/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.threads
-              description: Users Threads
-              unit: "threads"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.processes
-              description: Users Processes
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per user
-            - name: users.voluntary_ctxt_switches
-              description: Users Voluntary Context Switches
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: users.involuntary_ctxt_switches
-              description: Users Involuntary Context Switches
-              unit: "processes"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per app group
-            - name: users.uptime
-              description: Users Carried Over Uptime
-              unit: "seconds"
+                - name: user
+                - name: system
+            - name: user.cpu_guest_utilization
+              description: User CPU guest utilization (100% = 1 core)
+              unit: percentage
               chart_type: line
               dimensions:
-                - name: a dimension per user
-            - name: users.uptime_min
-              description: Users Minimum Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per user
-            - name: users.uptime_avg
-              description: Users Average Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per user
-            - name: users.uptime_max
-              description: Users Maximum Uptime
-              unit: "seconds"
-              chart_type: line
-              dimensions:
-                - name: a dimension per user
-            - name: users.files
-              description: Users Open Files
-              unit: "open files"
+                - name: guest
+            - name: user.cpu_context_switches
+              description: User CPU context switches
+              unit: switches/s
               chart_type: stacked
               dimensions:
-                - name: a dimension per user
-            - name: users.sockets
-              description: Users Open Sockets
-              unit: "open sockets"
+                - name: voluntary
+                - name: involuntary
+            - name: user.mem_usage
+              description: User memory RSS usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: rss
+            - name: user.mem_private_usage
+              description: User memory usage without shared
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: mem
+            - name: user.vmem_usage
+              description: User virtual memory size
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: vmem
+            - name: user.mem_page_faults
+              description: User memory page faults
+              unit: pgfaults/s
               chart_type: stacked
               dimensions:
-                - name: a dimension per user
-            - name: users.pipes
-              description: Users Open Pipes
-              unit: "open pipes"
+                - name: minor
+                - name: major
+            - name: user.swap_usage
+              description: User swap usage
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: swap
+            - name: user.disk_physical_io
+              description: User disk physical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: user.disk_logical_io
+              description: User disk logical IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: user.processes
+              description: User processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: processes
+            - name: user.threads
+              description: User threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: user.fds_open_limit
+              description: User open file descriptors limit
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: limit
+            - name: user.fds_open
+              description: User open file descriptors
+              unit: fds
               chart_type: stacked
               dimensions:
-                - name: a dimension per user
+                - name: files
+                - name: sockets
+                - name: pipes
+                - name: inotifies
+                - name: event
+                - name: timer
+                - name: signal
+                - name: eventpolls
+                - name: other
+            - name: user.uptime
+              description: User uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: user.uptime_summary
+              description: User uptime summary
+              unit: seconds
+              chart_type: area
+              dimensions:
+                - name: min
+                - name: avg
+                - name: max
