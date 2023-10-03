@@ -97,9 +97,12 @@ int fstat64(int fd, struct stat64 *buf) {
 #define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
 #define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
 #define SYSTEMD_JOURNAL_MAX_PARAMS              100
-#define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (3 * 3600)
+#define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (1 * 3600)
 #define SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY 200
 #define SYSTEMD_JOURNAL_WORKER_THREADS          5
+
+#define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (5 * USEC_PER_SEC) // assume always 5 seconds latency
+#define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2 minutes latency
 
 #define JOURNAL_PARAMETER_HELP                  "help"
 #define JOURNAL_PARAMETER_AFTER                 "after"
@@ -278,9 +281,6 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
 
 #define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
 
-#define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (2 * USEC_PER_SEC) // assume always 2 seconds latency
-#define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2 minutes delta
-
 static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
     const char *k = data;
     const char *equal = strchr(k, '=');
@@ -371,6 +371,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
 
     usec_t start_ut = ((fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->before_ut) + anchor_delta;
     usec_t stop_ut = (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->after_ut;
+    bool stop_when_full = (fqs->data_only && !fqs->anchor.stop_ut);
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -404,14 +405,16 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
             rows_useful++;
 
         row_counter++;
-        if(row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
+        if(unlikely((row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS) == 0 &&
+            stop_when_full &&
+            facets_rows(facets) >= fqs->entries)) {
             // stop the data only query
             usec_t oldest = facets_row_oldest_ut(facets);
             if(oldest && msg_ut < (oldest - anchor_delta))
                 break;
         }
 
-        if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
+        if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
             FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
             last_row_counter = row_counter;
 
@@ -444,6 +447,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
 
     usec_t start_ut = (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->after_ut;
     usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
+    bool stop_when_full = (fqs->data_only && !fqs->anchor.stop_ut);
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
@@ -477,13 +481,16 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
             rows_useful++;
 
         row_counter++;
-        if(row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS == 0 && fqs->data_only && facets_rows(facets) >= fqs->entries) {
+        if(unlikely((row_counter % FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS) == 0 &&
+            stop_when_full &&
+            facets_rows(facets) >= fqs->entries)) {
+            // stop the data only query
             usec_t newest = facets_row_newest_ut(facets);
             if(newest && msg_ut > (newest + anchor_delta))
                 break;
         }
 
-        if(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0) {
+        if(unlikely(row_counter % FUNCTION_PROGRESS_EVERY_ROWS == 0)) {
             FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
             last_row_counter = row_counter;
 
