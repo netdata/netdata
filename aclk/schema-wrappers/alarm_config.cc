@@ -15,28 +15,22 @@ void destroy_aclk_alarm_configuration(struct aclk_alarm_configuration *cfg)
     freez(cfg->alarm);
     freez(cfg->tmpl);
     freez(cfg->on_chart);
-    
     freez(cfg->classification);
     freez(cfg->type);
     freez(cfg->component);
-        
     freez(cfg->os);
     freez(cfg->hosts);
     freez(cfg->plugin);
     freez(cfg->module);
     freez(cfg->charts);
-    freez(cfg->families);
     freez(cfg->lookup);
     freez(cfg->every);
     freez(cfg->units);
-
     freez(cfg->green);
     freez(cfg->red);
-
     freez(cfg->calculation_expr);
     freez(cfg->warning_expr);
     freez(cfg->critical_expr);
-    
     freez(cfg->recipient);
     freez(cfg->exec);
     freez(cfg->delay);
@@ -44,11 +38,9 @@ void destroy_aclk_alarm_configuration(struct aclk_alarm_configuration *cfg)
     freez(cfg->info);
     freez(cfg->options);
     freez(cfg->host_labels);
-
     freez(cfg->p_db_lookup_dimensions);
     freez(cfg->p_db_lookup_method);
     freez(cfg->p_db_lookup_options);
-
     freez(cfg->chart_labels);
     freez(cfg->summary);
 }
@@ -66,14 +58,12 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
         cfg->set_template_(data->cfg.tmpl);
     if(data->cfg.on_chart)
         cfg->set_on_chart(data->cfg.on_chart);
-
     if (data->cfg.classification)
         cfg->set_classification(data->cfg.classification);
     if (data->cfg.type)
         cfg->set_type(data->cfg.type);
     if (data->cfg.component)
         cfg->set_component(data->cfg.component);
-
     if (data->cfg.os)
         cfg->set_os(data->cfg.os);
     if (data->cfg.hosts)
@@ -84,27 +74,22 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
         cfg->set_module(data->cfg.module);
     if(data->cfg.charts)
         cfg->set_charts(data->cfg.charts);
-    if(data->cfg.families)
-        cfg->set_families(data->cfg.families);
     if(data->cfg.lookup)
         cfg->set_lookup(data->cfg.lookup);
     if(data->cfg.every)
         cfg->set_every(data->cfg.every);
     if(data->cfg.units)
         cfg->set_units(data->cfg.units);
-
     if (data->cfg.green)
         cfg->set_green(data->cfg.green);
     if (data->cfg.red)
         cfg->set_red(data->cfg.red);
-
     if (data->cfg.calculation_expr)
         cfg->set_calculation_expr(data->cfg.calculation_expr);
     if (data->cfg.warning_expr)
         cfg->set_warning_expr(data->cfg.warning_expr);
     if (data->cfg.critical_expr)
         cfg->set_critical_expr(data->cfg.critical_expr);
-
     if (data->cfg.recipient)
         cfg->set_recipient(data->cfg.recipient);
     if (data->cfg.exec)
@@ -132,7 +117,6 @@ char *generate_provide_alarm_configuration(size_t *len, struct provide_alarm_con
 
     if (data->cfg.chart_labels)
         cfg->set_chart_labels(data->cfg.chart_labels);
-
     if (data->cfg.summary)
         cfg->set_summary(data->cfg.summary);
 

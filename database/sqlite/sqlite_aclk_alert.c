@@ -522,7 +522,7 @@ void aclk_send_alarm_configuration(char *config_hash)
 
 #define SQL_SELECT_ALERT_CONFIG                                                                                        \
     "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin,"                                       \
-    "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
+    "module, charts, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info,"           \
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after,"        \
     "p_db_lookup_before, p_update_every, chart_labels, summary FROM alert_hash WHERE hash_id = @hash_id;"
 
@@ -584,7 +584,6 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         alarm_config.plugin = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.module = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.charts = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
-        alarm_config.families = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.lookup = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.every = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.units = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
@@ -599,7 +598,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         alarm_config.repeat = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.info = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.options = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
-        alarm_config.host_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 26
+        alarm_config.host_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 25
 
         alarm_config.p_db_lookup_dimensions = NULL;
         alarm_config.p_db_lookup_method = NULL;
@@ -607,26 +606,26 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         alarm_config.p_db_lookup_after = 0;
         alarm_config.p_db_lookup_before = 0;
 
-        if (sqlite3_column_bytes(res, 30) > 0) {
+        if (sqlite3_column_bytes(res, 29) > 0) {
 
-            alarm_config.p_db_lookup_dimensions = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 27
-            alarm_config.p_db_lookup_method = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);      // Current param 28
-            if (param != 29)
+            alarm_config.p_db_lookup_dimensions = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 26
+            alarm_config.p_db_lookup_method = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);      // Current param 27
+            if (param != 28)
                 netdata_log_error("aclk_push_alert_config_event: Unexpected param number %d", param);
 
             BUFFER *tmp_buf = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
-            buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 29));
+            buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 28));
             alarm_config.p_db_lookup_options = strdupz((char *)buffer_tostring(tmp_buf));
             buffer_free(tmp_buf);
 
-            alarm_config.p_db_lookup_after = sqlite3_column_int(res, 30);
-            alarm_config.p_db_lookup_before = sqlite3_column_int(res, 31);
+            alarm_config.p_db_lookup_after = sqlite3_column_int(res, 29);
+            alarm_config.p_db_lookup_before = sqlite3_column_int(res, 30);
         }
 
-        alarm_config.p_update_every = sqlite3_column_int(res, 32);
+        alarm_config.p_update_every = sqlite3_column_int(res, 31);
 
-        alarm_config.chart_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 33);
-        alarm_config.summary = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 34);
+        alarm_config.chart_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 32);
+        alarm_config.summary = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 33);
 
         p_alarm_config.cfg_hash = strdupz((char *) config_hash);
         p_alarm_config.cfg = alarm_config;
