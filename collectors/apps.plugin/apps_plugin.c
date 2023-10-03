@@ -3858,82 +3858,40 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
 
     if (enable_file_charts) {
-        send_BEGIN(type, "fds_open_limit", dt);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s_fds_open_limit", type);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->max_open_files_percent * 100.0);
+            if (unlikely(w->exposed && w->processes)) {
+                send_BEGIN(w->name, id, dt);
+                send_SET("limit", w->max_open_files_percent * 100.0);
+                send_END();
+            }
         }
-        send_END();
 
-        send_BEGIN(type, "fds_open", dt);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s_file_open", type);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, pid_openfds_sum(w));
+            if (unlikely(w->exposed && w->processes)) {
+                send_BEGIN(w->name, id, dt);
+                send_SET("open", pid_openfds_sum(w));
+                send_END();
+            }
         }
-        send_END();
 
-        send_BEGIN(type, "fds_files", dt);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s_file_descriptors", type);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.files);
+            if (unlikely(w->exposed && w->processes)) {
+                send_BEGIN(w->name, id, dt);
+                send_SET("open", w->openfds.files);
+                send_SET("sockets", w->openfds.sockets);
+                send_SET("pipes", w->openfds.sockets);
+                send_SET("inotifies", w->openfds.inotifies);
+                send_SET("event", w->openfds.eventfds);
+                send_SET("timer", w->openfds.timerfds);
+                send_SET("signal", w->openfds.signalfds);
+                send_SET("eventpolls", w->openfds.eventpolls);
+                send_SET("other", w->openfds.other);
+                send_END();
+            }
         }
-        send_END();
-
-        send_BEGIN(type, "fds_sockets", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.sockets);
-        }
-        send_END();
-
-        send_BEGIN(type, "fds_pipes", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.pipes);
-        }
-        send_END();
-
-        send_BEGIN(type, "fds_inotifies", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.inotifies);
-        }
-        send_END();
-
-        send_BEGIN(type, "fds_eventfds", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.eventfds);
-        }
-        send_END();
-
-        send_BEGIN(type, "fds_timerfds", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.timerfds);
-        }
-        send_END();
-
-        send_BEGIN(type, "fds_signalfds", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.signalfds);
-        }
-        send_END();
-
-        send_BEGIN(type, "fds_eventpolls", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.eventpolls);
-        }
-        send_END();
-
-        send_BEGIN(type, "fds_other", dt);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed && w->processes))
-                send_SET(w->name, w->openfds.other);
-        }
-        send_END();
     }
 }
 
@@ -4098,96 +4056,54 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 #endif
 
     if(enable_file_charts) {
-        fprintf(stdout, "CHART %s.fds_open_limit '' '%s Open File Descriptors Limit' '%%' fds %s.fds_open_limit line 20050 %d\n", type,
-                title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 100\n", w->name);
+            if (unlikely(w->exposed)) {
+                fprintf(stdout, "CHART %s.%s_fds_open_limit '' '%s Open File Descriptors Limit' '%%' fds %s.fds_open_limit line 20050 %d\n",
+                        w->name,
+                        type,
+                        title,
+                        type,
+                        update_every);
+                fprintf(stdout, "DIMENSION limit '' absolute 1 100\n");
+                APPS_PLUGIN_FUNCTIONS();
+            }
         }
-        APPS_PLUGIN_FUNCTIONS();
 
-        fprintf(stdout, "CHART %s.fds_open '' '%s Open File Descriptors' 'fds' fds %s.fds_open stacked 20051 %d\n", type,
-                title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+            if (unlikely(w->exposed)) {
+                fprintf(stdout, "CHART %s.%s_file_open '' '%s Open File Descriptors' 'fds' fds %s.file_open stacked 20051 %d\n",
+                        w->name,
+                        type,
+                        title,
+                        type,
+                        update_every);
+                fprintf(stdout, "DIMENSION open '' absolute 1 1\n");
+                APPS_PLUGIN_FUNCTIONS();
+            }
         }
-        APPS_PLUGIN_FUNCTIONS();
 
-        fprintf(stdout, "CHART %s.fds_files '' '%s Open Files' 'fds' fds %s.fds_files stacked 20052 %d\n", type,
-                       title, type, update_every);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+            if (unlikely(w->exposed)) {
+                fprintf(stdout, "CHART %s.%s_file_descriptors '' '%s Open Files' 'fds' fds %s.file_descriptors stacked 20052 %d\n",
+                        w->name,
+                        type,
+                        title,
+                        type,
+                        update_every);
+                fprintf(stdout, "DIMENSION open '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION sockets '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION pipes '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION inotifies '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION event '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION timer '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION signal '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION eventpolls '' absolute 1 1\n");
+                fprintf(stdout, "DIMENSION other '' absolute 1 1\n");
+                APPS_PLUGIN_FUNCTIONS();
+            }
         }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_sockets '' '%s Open Sockets' 'fds' fds %s.fds_sockets stacked 20053 %d\n",
-                       type, title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_pipes '' '%s Pipes' 'fds' fds %s.fds_pipes stacked 20054 %d\n", type,
-                       title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_inotifies '' '%s iNotify File Descriptors' 'fds' fds %s.fds_inotifies stacked 20055 %d\n", type,
-                title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_eventfds '' '%s Event File Descriptors' 'fds' fds %s.fds_eventfds stacked 20056 %d\n", type,
-                title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_timerfds '' '%s Timer File Descriptors' 'fds' fds %s.fds_timerfds stacked 20057 %d\n", type,
-                title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_signalfds '' '%s Signal File Descriptors' 'fds' fds %s.fds_signalfds stacked 20058 %d\n", type,
-                title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_eventpolls '' '%s Event Poll File Descriptors' 'fds' fds %s.fds_eventpolls stacked 20059 %d\n", type,
-                title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
-
-        fprintf(stdout, "CHART %s.fds_other '' '%s Other File Descriptors' 'fds' fds %s.fds_other stacked 20060 %d\n", type,
-                title, type, update_every);
-        for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
-        }
-        APPS_PLUGIN_FUNCTIONS();
     }
 }
-
 
 #ifndef __FreeBSD__
 static void send_proc_states_count(usec_t dt)
