@@ -125,7 +125,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Sia](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/sia.md)
 
-### CI/CD Platforms
+### CICD Platforms
 
 - [Concourse](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/concourse.md)
 
