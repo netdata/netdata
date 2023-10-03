@@ -823,9 +823,6 @@ skip:
 
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to %s statement that deletes a chart uuid rc = %d", action_res ? "reset" : "finalize", rc);
-//    if (label_only == false)
-//        (void) exec_statement_with_uuid(SQL_DELETE_CHART_BY_UUID, chart_uuid);
-//    (void) exec_statement_with_uuid(SQL_DELETE_CHART_LABEL_BY_UUID, chart_uuid);
 }
 
 static void check_dimension_metadata(struct metadata_wc *wc)
