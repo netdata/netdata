@@ -330,7 +330,20 @@ URL=http://centralization.server.ip:19532
 
 Remember to match the protocol (http/https) the server expects.
 
-Finally, enable and start `systemd-journal-upload`, like this:
+Edit `systemd-journal-upload`, and add `Restart=always` to make sure the client will keep trying to push logs, even if the server is temporarily not there, like this:
+
+```sh
+sudo systemctl edit systemd-journal-upload
+```
+
+At the top, add:
+
+```
+[Service]
+Restart=always
+```
+
+Then, enable and start `systemd-journal-upload`, like this:
 
 ```sh
 sudo systemctl enable systemd-journal-upload
