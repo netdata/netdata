@@ -458,7 +458,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed) {
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
     snprintfz(command, MAX_HEALTH_SQL_SIZE, "aclk_alert_%s", uuid_str);
 
-    bool aclk_table_exists = table_exists_in_database(command);
+    bool aclk_table_exists = table_exists_in_database(db_meta, command);
 
     char *sql = SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED;
 
