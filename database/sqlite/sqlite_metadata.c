@@ -787,7 +787,7 @@ skip:
 #define SQL_DELETE_CHART_BY_UUID        "DELETE FROM chart WHERE chart_id = @chart_id"
 #define SQL_DELETE_CHART_LABEL_BY_UUID  "DELETE FROM chart_label WHERE chart_id = @chart_id"
 
-static void delete_chart_uuid(uuid_t(*chart_uuid), sqlite3_stmt **action_res, bool label_only)
+static void delete_chart_uuid(uuid_t *chart_uuid, sqlite3_stmt **action_res, bool label_only)
 {
     int rc;
     sqlite3_stmt *res = action_res ? *action_res : NULL;
