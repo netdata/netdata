@@ -3443,10 +3443,6 @@ static inline void send_END(void) {
     fprintf(stdout, "END\n\n");
 }
 
-static inline void send_newline(void) {
-    fprintf(stdout, "\n");
-}
-
 void send_resource_usage_to_netdata(usec_t dt) {
     static struct timeval last = { 0, 0 };
     static struct rusage me_last;
