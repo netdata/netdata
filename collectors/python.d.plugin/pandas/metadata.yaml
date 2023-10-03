@@ -26,8 +26,6 @@ modules:
           either locally or via some HTTP endpoint, you can easily ingest and present those metrics in Netdata, by leveraging the Pandas collector.
           
           This collector can be used to collect pretty much anything that can be read by Pandas, and then processed by Pandas.
-          
-          More detailed information can be found in the Netdata documentation [here](https://learn.netdata.cloud/docs/data-collection/generic-data-collection/structured-data-pandas).
         method_description: |
           The collector uses [pandas](https://pandas.pydata.org/) to pull data and do pandas-based preprocessing, before feeding to Netdata.
       supported_platforms:
