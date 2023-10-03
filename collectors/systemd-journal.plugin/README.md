@@ -1,17 +1,8 @@
-<!--
-title: "SystemD-Journal"
-description: "View and analyze logs available in systemd journal"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/systemd-journal.plugin/README.md"
-sidebar_label: "SystemD-Journal"
-learn_status: "Published"
-learn_rel_path: "Integrations/Logs"
--->
+# SystemD Journal
 
 [KEY FEATURES](#key-features) | [JOURNAL SOURCES](#journal-sources) | [JOURNAL FIELDS](#journal-fields) |
 [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [PERFORMANCE](#query-performance) |
 [CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq)
-
-# SystemD Journal
 
 The SystemD Journal plugin by Netdata makes viewing, exploring and analyzing systemd journal logs simple and efficient.
 It automatically discovers available journal sources, allows advanced filtering, offers interactive visual
@@ -20,7 +11,7 @@ journal centralization servers.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
-## Key features:
+## Key features
 
 - Works on both **individual servers** and **journal centralization servers**.
 - Supports `persistent` and `volatile` journals.
@@ -38,7 +29,7 @@ journal centralization servers.
 
 To protect your privacy, as with all Netdata Functions, a free Netdata Cloud user account is required to access it.
 
-### Limitations:
+### Limitations
 
 - This plugin is not available when Netdata is installed in a container. The problem is that `libsystemd` is not available in Alpine Linux (there is a `libsystemd`, but it is a dummy that returns failure on all calls). We plan to change this, by shipping Netdata containers based on Debian.
 - For the same reason (lack of `systemd` support for Alpine Linux), the plugin is not available on `static` builds of Netdata (which are based on `muslc`, not `glibc`).
@@ -111,7 +102,7 @@ The plugin automatically enriches certain fields to make them more user-friendly
 
 The values of all other fields are presented as found in the journals.
 
-> IMPORTANT:</br>
+> IMPORTANT:  
 > `_UID` `_AUDIT_LOGINUID`, `_SYSTEMD_OWNER_UID` and `_GID` annotations are added during presentation and are taken
 > from the server running the plugin. For `remote` sources, the names presented may not reflect the actual user and
 > group names on the origin server. 
