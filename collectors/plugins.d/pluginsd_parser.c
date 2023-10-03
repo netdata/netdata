@@ -1277,7 +1277,7 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
     const char *value = get_word(words, num_words, 2);
     const char *label_source = get_word(words, num_words, 3);
 
-    if (!name || !value || !*label_source) {
+    if (!name || !value || !label_source) {
         netdata_log_error("Ignoring malformed or empty CHART LABEL command.");
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
