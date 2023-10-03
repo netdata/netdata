@@ -56,7 +56,7 @@ FUNCTION_PAYLOAD_END
 
 plugin->agent:
 =============
-FUNCTION_RESULT_BEGIN [UUID] [(0/1)(accept/reject)] [text/plain] 5
+FUNCTION_RESULT_BEGIN [UUID] [(1/0)(accept/reject)] [text/plain] 5
 FUNCTION_RESULT_END
 ```
 to set the new config which can be accepted/rejected by plugin by sending answer for this FUNCTION as it would with any other regular function.
