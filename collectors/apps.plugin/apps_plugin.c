@@ -4036,7 +4036,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     if (enable_detailed_uptime_charts) {
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed)) {
-                fprintf(stdout, "CHART %s.%s_uptime_stats '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", w->name, type, title, type, update_every);
+                fprintf(stdout, "CHART %s.%s_uptime_stats '' '%s Minimum Uptime' 'seconds' processes %s.uptime_stats line 20009 %d\n", w->name, type, title, type, update_every);
                 fprintf(stdout, "DIMENSION min '' absolute 1 1\n");
                 fprintf(stdout, "DIMENSION avg '' absolute 1 1\n");
                 fprintf(stdout, "DIMENSION max '' absolute 1 1\n");
