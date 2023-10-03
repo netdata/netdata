@@ -1186,7 +1186,6 @@ send_pd() {
                     "alarm_id" : "${alarm_id}",
                     "name" : "${name}",
                     "chart" : "${chart}",
-                    "family" : "${family}",
                     "status" : "${status}",
                     "old_status" : "${old_status}",
                     "value" : "${value}",
@@ -1536,7 +1535,7 @@ send_slack() {
             "text": "${host} ${status_message}, \`${chart}\`, *${alarm}*",
             "attachments": [
                 {
-                    "fallback": "${alarm} - ${chart} (${family}) - ${info}",
+                    "fallback": "${alarm} - ${chart} - ${info}",
                     "color": "${color}",
                     "title": "${alarm}",
                     "title_link": "${goto_url}",
@@ -1648,7 +1647,7 @@ send_alerta() {
     resource=$chart
     event=$name
   else
-    resource="${host}:${family}"
+    resource="${host}"
     event="${chart}.${name}"
   fi
 
@@ -1669,7 +1668,6 @@ send_alerta() {
                 "roles": "${roles}",
                 "name": "${name}",
                 "chart": "${chart}",
-                "family": "${family}",
                 "source": "${src}",
                 "moreInfo": "<a href=\"${goto_url}\">View Netdata</a>"
             },
@@ -1726,7 +1724,7 @@ send_flock() {
             \"timestamp\": \"${when}\",
             \"attachments\": [
                 {
-                    \"description\": \"${chart} (${family}) - ${info}\",
+                    \"description\": \"${chart} - ${info}\",
                     \"color\": \"${color}\",
                     \"title\": \"${alarm}\",
                     \"url\": \"${goto_url}\",
@@ -1778,7 +1776,7 @@ send_discord() {
         {
             "channel": "#${channel}",
             "username": "${username}",
-            "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
+            "text": "${host} ${status_message}, \`${chart}\`, *${alarm}*",
             "icon_url": "${images_base_url}/images/banner-icon-144x144.png",
             "attachments": [
                 {
@@ -1789,7 +1787,6 @@ send_discord() {
                     "fields": [
                         {
                             "title": "${chart}",
-                            "value": "${family}"
                         }
                     ],
                     "thumb_url": "${image}",
@@ -1822,7 +1819,7 @@ EOF
 send_fleep() {
   local httpcode sent=0 webhooks="${1}" data message
   if [ "${SEND_FLEEP}" = "YES" ]; then
-    message="${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}"
+    message="${host} ${status_message}, \`${chart}\`, *${alarm}*\\n${info}"
 
     for hook in ${webhooks}; do
       data="{ "
@@ -1852,7 +1849,7 @@ send_fleep() {
 send_prowl() {
   local httpcode sent=0 data message keys prio=0 alarm_url event
   if [ "${SEND_PROWL}" = "YES" ]; then
-    message="$(urlencode "${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}")"
+    message="$(urlencode "${host} ${status_message}, \`${chart}\`, *${alarm}*\\n${info}")"
     message="description=${message}"
     keys="$(urlencode "$(echo "${1}" | tr ' ' ,)")"
     keys="apikey=${keys}"
@@ -1982,8 +1979,8 @@ send_matrix() {
   {
     "msgtype": "m.notice",
     "format": "org.matrix.custom.html",
-      "formatted_body": "${emoji} ${host} ${status_message} - <b>${name//_/ }</b><br>${chart} (${family})<br><a href=\"${goto_url}\">${alarm}</a><br><i>${info}</i>",
-      "body": "${emoji} ${host} ${status_message} - ${name//_/ } ${chart} (${family}) ${goto_url} ${alarm} ${info}"
+      "formatted_body": "${emoji} ${host} ${status_message} - <b>${name//_/ }</b><br>${chart}<br><a href=\"${goto_url}\">${alarm}</a><br><i>${info}</i>",
+      "body": "${emoji} ${host} ${status_message} - ${name//_/ } ${chart} ${goto_url} ${alarm} ${info}"
   }
 EOF
     )"
@@ -2081,7 +2078,7 @@ send_sms() {
   local recipients="${1}" errcode errmessage sent=0
 
     # Human readable SMS
-    local msg="${host} ${status_message}: ${chart} (${family}), ${alarm}"
+    local msg="${host} ${status_message}: ${chart}, ${alarm}"
 
     # limit it to 160 characters
     msg="${msg:0:160}"
@@ -2104,7 +2101,6 @@ send_sms() {
 
   return 1
 }
-
 
 # -----------------------------------------------------------------------------
 # Dynatrace sender
@@ -2188,7 +2184,6 @@ send_opsgenie() {
     "chart" : "${chart}",
     "when": ${when},
     "name" : "${name}",
-    "family" : "${family}",
     "priority" : "${priority}",
     "status" : "${status}",
     "old_status" : "${old_status}",
@@ -2323,14 +2318,12 @@ urlencode "${args_host}" >/dev/null
 url_host="${REPLY}"
 urlencode "${chart}" >/dev/null
 url_chart="${REPLY}"
-urlencode "${family}" >/dev/null
-url_family="${REPLY}"
 urlencode "${name}" >/dev/null
 url_name="${REPLY}"
 urlencode "${value_string}" >/dev/null
 url_value_string="${REPLY}"
 
-redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${chart}&alarm_value=${url_value_string}"
+redirect_params="host=${url_host}&chart=${url_chart}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}&alarm_status=${status}&alarm_chart=${chart}&alarm_value=${url_value_string}"
 
 if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
   if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
@@ -2509,7 +2502,6 @@ SENT_DISCORD=$?
 send_pushover "${PUSHOVER_APP_TOKEN}" "${to_pushover}" "${when}" "${goto_url}" "${status}" "${host} ${status_message} - ${name//_/ } - ${chart}" "
 <font color=\"${color}\"><b>${alarm}</b></font>${info_html}<br/>&nbsp;
 <small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>
-<small><b>${family}</b><br/>Family<br/>&nbsp;</small>
 <small><b>${severity}</b><br/>Severity<br/>&nbsp;</small>
 <small><b>${date}${raised_for_html}</b><br/>Time<br/>&nbsp;</small>
 <a href=\"${goto_url}\">View Netdata</a><br/>&nbsp;
@@ -2524,7 +2516,6 @@ SENT_PUSHOVER=$?
 send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\\n
 Severity: ${severity}\\n
 Chart: ${chart}\\n
-Family: ${family}\\n
 ${date}\\n
 The source of this alarm is line ${src}"
 
@@ -2536,7 +2527,6 @@ SENT_PUSHBULLET=$?
 send_twilio "${TWILIO_ACCOUNT_SID}" "${TWILIO_ACCOUNT_TOKEN}" "${TWILIO_NUMBER}" "${to_twilio}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
 Severity: ${severity}
 Chart: ${chart}
-Family: ${family}
 ${info}"
 
 SENT_TWILIO=$?
@@ -2547,7 +2537,6 @@ SENT_TWILIO=$?
 send_messagebird "${MESSAGEBIRD_ACCESS_KEY}" "${MESSAGEBIRD_NUMBER}" "${to_messagebird}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
 Severity: ${severity}
 Chart: ${chart}
-Family: ${family}
 ${info}"
 
 SENT_MESSAGEBIRD=$?
@@ -2558,7 +2547,6 @@ SENT_MESSAGEBIRD=$?
 send_kavenegar "${KAVENEGAR_API_KEY}" "${KAVENEGAR_SENDER}" "${to_kavenegar}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
 Severity: ${severity}
 Chart: ${chart}
-Family: ${family}
 ${info}"
 
 SENT_KAVENEGAR=$?
@@ -2568,7 +2556,7 @@ SENT_KAVENEGAR=$?
 
 # https://core.telegram.org/bots/api#formatting-options
 send_telegram "${TELEGRAM_BOT_TOKEN}" "${to_telegram}" "${host} ${status_message} - <b>${name//_/ }</b>
-${chart} (${family})
+${chart}
 <a href=\"${goto_url}\">${alarm}</a>
 <i>${info}</i>"
 
@@ -2604,7 +2592,6 @@ SENT_PROWL=$?
 send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${IRC_PORT}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm}
 Severity: ${severity}
 Chart: ${chart}
-Family: ${family}
 ${info}"
 
 SENT_IRC=$?
@@ -2639,7 +2626,7 @@ SENT_CUSTOM=$?
 send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
 ${host} ${status_message}<br/> \
 <b>${alarm}</b> ${info_html}<br/> \
-<b>${chart}</b> (family <b>${family}</b>)<br/> \
+<b>${chart}</b><br/> \
 <b>${date}${raised_for_html}</b><br/> \
 <a href=\\\"${goto_url}\\\">View netdata dashboard</a> \
 (source of alarm ${src}) \
@@ -2682,7 +2669,6 @@ ${alarm} ${info}
 ${raised_for}
 
 Chart   : ${chart}
-Family  : ${family}
 Severity: ${severity}
 URL     : ${goto_url}
 Source  : ${src}
@@ -2706,7 +2692,6 @@ ${email_thread_headers}
 X-Netdata-Severity: ${status,,}
 X-Netdata-Alert-Name: $name
 X-Netdata-Chart: $chart
-X-Netdata-Family: $family
 X-Netdata-Classification: $classification
 X-Netdata-Host: $host
 X-Netdata-Role: $roles
@@ -3460,7 +3445,6 @@ ${email_thread_headers}
 X-Netdata-Severity: ${status,,}
 X-Netdata-Alert-Name: $name
 X-Netdata-Chart: $chart
-X-Netdata-Family: $family
 X-Netdata-Classification: $classification
 X-Netdata-Host: $host
 X-Netdata-Role: $roles
