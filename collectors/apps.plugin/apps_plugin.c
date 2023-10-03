@@ -3742,23 +3742,11 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed && w->processes)) {
             send_BEGIN(w->name, id, dt);
             send_SET("total", (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
+            send_SET("user", (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
+            send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
             send_END();
         }
     }
-
-    send_BEGIN(type, "cpu_user", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
-    }
-    send_END();
-
-    send_BEGIN(type, "cpu_system", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
-    }
-    send_END();
 
     if(show_guest_time) {
         send_BEGIN(type, "cpu_guest", dt);
@@ -4026,6 +4014,8 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed)) {
             fprintf(stdout, "CHART %s.%s_cpu '' '%s CPU Time (100%% = 1 core)' 'percentage' cpu %s.cpu stacked 20001 %d\n", w->name, type, title, type, update_every);
             fprintf(stdout, "DIMENSION total '' absolute 1 %llu %s\n", time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+            fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
             APPS_PLUGIN_FUNCTIONS();
         }
     }
@@ -4096,20 +4086,6 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         APPS_PLUGIN_FUNCTIONS();
     }
 #endif
-
-    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (100%% = 1 core)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
-    }
-    APPS_PLUGIN_FUNCTIONS();
-
-    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (100%% = 1 core)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
-    }
-    APPS_PLUGIN_FUNCTIONS();
 
     if(show_guest_time) {
         fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (100%% = 1 core)' 'percentage' cpu %s.cpu_guest stacked 20022 %d\n", type, title, type, update_every);
