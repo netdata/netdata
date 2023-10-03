@@ -3827,7 +3827,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     snprintfz(id, RRD_ID_LENGTH_MAX, "%s_page_faults", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes)) {
+        if (unlikely(w->exposed && w->processes)) {
             send_BEGIN(w->name, id, dt);
             send_SET("minor", (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
             send_SET("major", (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
@@ -3836,36 +3836,28 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
 
 #ifndef __FreeBSD__
-    send_BEGIN(type, "lreads", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_logical_io", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->io_logical_bytes_read);
+        if (unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("read", w->io_logical_bytes_read);
+            send_SET("write", w->io_logical_bytes_written);
+            send_END();
+        }
     }
-    send_END();
-
-    send_BEGIN(type, "lwrites", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->io_logical_bytes_written);
-    }
-    send_END();
 #endif
 
-    send_BEGIN(type, "preads", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_physical_io", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->io_storage_bytes_read);
+        if (unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("read", w->io_storage_bytes_read);
+            send_SET("write", w->io_storage_bytes_written);
+            send_END();
+        }
     }
-    send_END();
 
-    send_BEGIN(type, "pwrites", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->io_storage_bytes_written);
-    }
-    send_END();
-
-    if(enable_file_charts) {
+    if (enable_file_charts) {
         send_BEGIN(type, "fds_open_limit", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes))
@@ -4086,33 +4078,23 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
     APPS_PLUGIN_FUNCTIONS();
 #else
-    fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'KiB/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_physical_io '' '%s Disk Reads' 'KiB/s' disk %s.physical.io stacked 20002 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION read '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
+            fprintf(stdout, "DIMENSION write '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
 
-    fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'KiB/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_logical_io '' '%s Disk Logical Reads' 'KiB/s' disk %s.logical.io stacked 20042 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION read '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
+            fprintf(stdout, "DIMENSION write '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
-
-    fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'KiB/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
-    }
-    APPS_PLUGIN_FUNCTIONS();
-
-    fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'KiB/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
-    }
-    APPS_PLUGIN_FUNCTIONS();
 #endif
 
     if(enable_file_charts) {
