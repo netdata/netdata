@@ -3815,27 +3815,25 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 
 #ifndef __FreeBSD__
-    send_BEGIN(type, "swap", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_swap", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->status_vmswap);
+        if(unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("swap", w->status_vmswap);
+            send_END();
+        }
     }
-    send_END();
 #endif
 
-    send_BEGIN(type, "minor_faults", dt);
+    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_page_faults", type);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
+        if(unlikely(w->exposed && w->processes)) {
+            send_BEGIN(w->name, id, dt);
+            send_SET("minor", (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
+            send_SET("major", (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
+            send_END();
+        }
     }
-    send_END();
-
-    send_BEGIN(type, "major_faults", dt);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
-    }
-    send_END();
 
 #ifndef __FreeBSD__
     send_BEGIN(type, "lreads", dt);
@@ -4054,27 +4052,23 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 #endif
 
 #ifndef __FreeBSD__
-    fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MiB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_swap '' '%s Swap Memory' 'MiB' swap %s.swap stacked 20011 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L);
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
 #endif
 
-    fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20012 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+        if(unlikely(w->exposed)) {
+            fprintf(stdout, "CHART %s.%s_page_faults '' '%s Page Faults (swap read)' 'page faults/s' swap %s.page_faults stacked 20012 %d\n", w->name, type, title, type, update_every);
+            fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
+            fprintf(stdout, "DIMENSION minor '' absolute 1 %llu\n", RATES_DETAIL);
+            APPS_PLUGIN_FUNCTIONS();
+        }
     }
-    APPS_PLUGIN_FUNCTIONS();
-
-    fprintf(stdout, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
-    }
-    APPS_PLUGIN_FUNCTIONS();
 
 #ifdef __FreeBSD__
     // FIXME: same metric name as in Linux but different units.
