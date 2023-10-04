@@ -782,7 +782,8 @@ static struct target *get_users_target(uid_t uid) {
             snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
     }
 
-    netdata_fix_chart_name(w->name);
+    strncpyz(w->clean_name, w->name, MAX_NAME);
+    netdata_fix_chart_name(w->clean_name);
 
     w->uid = uid;
 
@@ -830,7 +831,8 @@ struct target *get_groups_target(gid_t gid)
             snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
     }
 
-    netdata_fix_chart_name(w->name);
+    strncpyz(w->clean_name, w->name, MAX_NAME);
+    netdata_fix_chart_name(w->clean_name);
 
     w->gid = gid;
 
@@ -902,6 +904,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     
     // dots are used to distinguish chart type and id in streaming, so we should replace them
     strncpyz(w->clean_name, w->name, MAX_NAME);
+    netdata_fix_chart_name(w->clean_name);
     for (char *d = w->clean_name; *d; d++) {
         if (*d == '.')
             *d = '_';
