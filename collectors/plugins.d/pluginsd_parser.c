@@ -114,13 +114,15 @@ void pluginsd_rrdset_cleanup(RRDSET *st) {
     spinlock_lock(&st->pluginsd.spinlock);
 
     for(size_t i = 0; i < st->pluginsd.size ; i++) {
-        rrddim_acquired_release(st->pluginsd.rda[i]); // can be NULL
-        st->pluginsd.rda[i] = NULL;
+        rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
+        st->pluginsd.prd_array[i].rda = NULL;
+        st->pluginsd.prd_array[i].rd = NULL;
     }
 
-    freez(st->pluginsd.rda);
+    freez(st->pluginsd.prd_array);
+    st->pluginsd.prd_array = NULL;
+
     st->pluginsd.collector_tid = 0;
-    st->pluginsd.rda = NULL;
     st->pluginsd.size = 0;
     st->pluginsd.pos = 0;
 
@@ -178,11 +180,13 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
 
     size_t dims = dictionary_entries(st->rrddim_root_index);
     if(unlikely(st->pluginsd.size < dims)) {
-        st->pluginsd.rda = reallocz(st->pluginsd.rda, dims * sizeof(RRDDIM_ACQUIRED *));
+        st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, dims * sizeof(struct pluginsd_rrddim));
 
         // initialize the empty slots
-        for(ssize_t i = (ssize_t)dims - 1; i >= (ssize_t)st->pluginsd.size ;i--)
-            st->pluginsd.rda[i] = NULL;
+        for(ssize_t i = (ssize_t)dims - 1; i >= (ssize_t)st->pluginsd.size ;i--) {
+            st->pluginsd.prd_array[i].rda = NULL;
+            st->pluginsd.prd_array[i].rd = NULL;
+        }
 
         st->pluginsd.size = dims;
     }
@@ -203,24 +207,24 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     if(unlikely(st->pluginsd.pos >= st->pluginsd.size))
         st->pluginsd.pos = 0;
 
-    RRDDIM_ACQUIRED *rda = st->pluginsd.rda[st->pluginsd.pos];
+    struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[st->pluginsd.pos];
 
-    if(likely(rda)) {
-        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
-        if (likely(rd && string_strcmp(rd->id, dimension) == 0)) {
+    RRDDIM *rd = prd->rd;
+
+    if(rd) {
+        if(string_strcmp(rd->id, dimension) == 0) {
             // we found a cached RDA
             st->pluginsd.pos++;
             return rd;
         }
         else {
-            // the collector is sending dimensions in a different order
-            // release the previous one, to reuse this slot
-            rrddim_acquired_release(rda);
-            st->pluginsd.rda[st->pluginsd.pos] = NULL;
+            rrddim_acquired_release(prd->rda);
+            prd->rda = NULL;
+            prd->rd = NULL;
         }
     }
 
-    rda = rrddim_find_and_acquire(st, dimension);
+    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
     if (unlikely(!rda)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s but dimension does not exist.",
                           rrdhost_hostname(host), rrdset_id(st), dimension, cmd);
@@ -228,9 +232,11 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
         return NULL;
     }
 
-    st->pluginsd.rda[st->pluginsd.pos++] = rda;
+    prd->rda = rda;
+    prd->rd = rd = rrddim_acquired_to_rrddim(rda);
+    st->pluginsd.pos++;
 
-    return rrddim_acquired_to_rrddim(rda);
+    return rd;
 }
 
 static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, const char *cmd) {

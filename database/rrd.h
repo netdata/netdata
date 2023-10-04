@@ -720,6 +720,11 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 #define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) \
     && !rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED|RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
 
+struct pluginsd_rrddim {
+    RRDDIM_ACQUIRED *rda;
+    RRDDIM *rd;
+};
+
 struct rrdset {
     uuid_t chart_uuid;                             // the global UUID for this chart
 
@@ -838,7 +843,7 @@ struct rrdset {
         bool set;
         uint32_t pos;
         uint32_t size;
-        RRDDIM_ACQUIRED **rda;
+        struct pluginsd_rrddim *prd_array;
     } pluginsd;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
