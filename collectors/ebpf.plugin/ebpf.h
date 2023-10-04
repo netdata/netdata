@@ -111,6 +111,7 @@ typedef struct netdata_ebpf_judy_pid {
 
 typedef struct netdata_ebpf_judy_pid_stats {
     char name[TASK_COMM_LEN + 1];
+    uint32_t hash_name;
     char pname[TASK_COMM_LEN + 1];
     uint32_t tgid;
 
