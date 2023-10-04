@@ -48,41 +48,36 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per Users instance
+### Per user
 
+These metrics refer to the user.
 
+Labels:
 
-This scope has no labels.
+| Label      | Description     |
+|:-----------|:----------------|
+| user | The name of the user. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| users.cpu | a dimension per user | percentage |
-| users.cpu_user | a dimension per user | percentage |
-| users.cpu_system | a dimension per user | percentage |
-| users.cpu_guest | a dimension per user | percentage |
-| users.mem | a dimension per user | MiB |
-| users.rss | a dimension per user | MiB |
-| users.vmem | a dimension per user | MiB |
-| users.swap | a dimension per user | MiB |
-| users.major_faults | a dimension per user | page faults/s |
-| users.minor_faults | a dimension per user | page faults/s |
-| users.preads | a dimension per user | KiB/s |
-| users.pwrites | a dimension per user | KiB/s |
-| users.lreads | a dimension per user | KiB/s |
-| users.lwrites | a dimension per user | KiB/s |
-| users.threads | a dimension per user | threads |
-| users.processes | a dimension per user | processes |
-| users.voluntary_ctxt_switches | a dimension per app group | processes |
-| users.involuntary_ctxt_switches | a dimension per app group | processes |
-| users.uptime | a dimension per user | seconds |
-| users.uptime_min | a dimension per user | seconds |
-| users.uptime_avg | a dimension per user | seconds |
-| users.uptime_max | a dimension per user | seconds |
-| users.files | a dimension per user | open files |
-| users.sockets | a dimension per user | open sockets |
-| users.pipes | a dimension per user | open pipes |
+| user.cpu_utilization | user, system | percentage |
+| user.cpu_guest_utilization | guest | percentage |
+| user.cpu_context_switches | voluntary, involuntary | switches/s |
+| user.mem_usage | rss | MiB |
+| user.mem_private_usage | mem | MiB |
+| user.vmem_usage | vmem | MiB |
+| user.mem_page_faults | minor, major | pgfaults/s |
+| user.swap_usage | swap | MiB |
+| user.disk_physical_io | reads, writes | KiB/s |
+| user.disk_logical_io | reads, writes | KiB/s |
+| user.processes | processes | processes |
+| user.threads | threads | threads |
+| user.fds_open_limit | limit | percentage |
+| user.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| user.uptime | uptime | seconds |
+| user.uptime_summary | min, avg, max | seconds |
 
 
 
