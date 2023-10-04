@@ -783,6 +783,30 @@ static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
 }
 
 /**
+ * Select target
+ *
+ * @param name the process name from kernel ring.
+ * @param hash the calculated hash for the name.
+ */
+struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t hash)
+{
+    targets_assignment_counter++;
+
+    struct ebpf_target *w;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(
+                ((!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, name)) ||
+                 (w->starts_with && !w->ends_with && !strncmp(w->compare, name, w->comparelen)) ||
+                 (!w->starts_with && w->ends_with && length >= w->comparelen &&
+                  !strcmp(w->compare, &name[length - w->comparelen]))))) {
+            return w;
+        }
+    }
+
+    return NULL;
+}
+
+/**
  * Assign the PID to a target.
  *
  * @param p the pid_stat structure to assign for a target.

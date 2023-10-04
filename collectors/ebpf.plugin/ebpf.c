@@ -739,6 +739,8 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
         else {
             strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
             pid_ptr->hash_name = simple_hash(pid_ptr->name);
+            pid_ptr->name_len = strlen(pid_ptr->name);
+            pid_ptr->apps_target = ebpf_select_target(pid_ptr->name, pid_ptr->name_len, pid_ptr->hash_name);
         }
 
         pid_ptr->socket_stats.JudyLArray = NULL;
