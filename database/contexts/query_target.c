@@ -835,8 +835,8 @@ static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool quer
         if(query_instance_add(qtl, qn, qc, qt->request.ria, queryable_context, false))
             added++;
     }
-    else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {
-        if(query_instance_add(qtl, qn, qc, qtl->st->rrdinstance, queryable_context, false))
+    else if(unlikely(qtl->st && qtl->st->rrdcontexts.rrdcontext == rca && qtl->st->rrdcontexts.rrdinstance)) {
+        if(query_instance_add(qtl, qn, qc, qtl->st->rrdcontexts.rrdinstance, queryable_context, false))
             added++;
     }
     else {
@@ -894,11 +894,11 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
         qn->node_id[0] = '\0';
 
     // is the chart given valid?
-    if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
+    if(unlikely(qtl->st && (!qtl->st->rrdcontexts.rrdinstance || !qtl->st->rrdcontexts.rrdcontext))) {
         netdata_log_error("QUERY TARGET: RRDSET '%s' given, but it is not linked to rrdcontext structures. Linking it now.", rrdset_name(qtl->st));
         rrdinstance_from_rrdset(qtl->st);
 
-        if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
+        if(unlikely(qtl->st && (!qtl->st->rrdcontexts.rrdinstance || !qtl->st->rrdcontexts.rrdcontext))) {
             netdata_log_error("QUERY TARGET: RRDSET '%s' given, but failed to be linked to rrdcontext structures. Switching to context query.",
                               rrdset_name(qtl->st));
 
@@ -918,7 +918,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     }
     else if(unlikely(qtl->st)) {
         // single chart data queries
-        if(query_context_add(qtl, qtl->st->rrdcontext, true))
+        if(query_context_add(qtl, qtl->st->rrdcontexts.rrdcontext, true))
             added++;
     }
     else {

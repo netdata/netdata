@@ -338,10 +338,6 @@ inline const char *string2str(STRING *string) {
     return string->str;
 }
 
-int string_strcmp(STRING *string, const char *s) {
-    return strcmp(string2str(string), s);
-}
-
 STRING *string_2way_merge(STRING *a, STRING *b) {
     static STRING *X = NULL;
 

@@ -312,7 +312,11 @@ struct rrddim {
 
     struct rrdset *rrdset;
     rrd_ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
-    RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
+
+    struct {
+        RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
+        bool collected;
+    } rrdcontexts;
 
 #ifdef NETDATA_LOG_COLLECTION_ERRORS
     usec_t rrddim_store_metric_last_ut;             // the timestamp we last called rrddim_store_metric()
@@ -723,6 +727,7 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 struct pluginsd_rrddim {
     RRDDIM_ACQUIRED *rda;
     RRDDIM *rd;
+    const char *id;
 };
 
 struct rrdset {
@@ -773,8 +778,11 @@ struct rrdset {
 
     RRDHOST *rrdhost;                               // pointer to RRDHOST this chart belongs to
 
-    RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
-    RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
+    struct {
+        RRDINSTANCE_ACQUIRED *rrdinstance;              // the rrdinstance of this chart
+        RRDCONTEXT_ACQUIRED *rrdcontext;                // the rrdcontext this chart belongs to
+        bool collected;
+    } rrdcontexts;
 
     // ------------------------------------------------------------------------
     // data collection members

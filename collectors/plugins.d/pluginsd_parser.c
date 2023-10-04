@@ -117,6 +117,7 @@ void pluginsd_rrdset_cleanup(RRDSET *st) {
         rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
         st->pluginsd.prd_array[i].rda = NULL;
         st->pluginsd.prd_array[i].rd = NULL;
+        st->pluginsd.prd_array[i].id = NULL;
     }
 
     freez(st->pluginsd.prd_array);
@@ -186,6 +187,7 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
         for(ssize_t i = (ssize_t)dims - 1; i >= (ssize_t)st->pluginsd.size ;i--) {
             st->pluginsd.prd_array[i].rda = NULL;
             st->pluginsd.prd_array[i].rd = NULL;
+            st->pluginsd.prd_array[i].id = NULL;
         }
 
         st->pluginsd.size = dims;
@@ -210,9 +212,10 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[st->pluginsd.pos];
 
     RRDDIM *rd = prd->rd;
+    if(likely(rd)) {
+        const char *id = prd->id;
 
-    if(rd) {
-        if(string_strcmp(rd->id, dimension) == 0) {
+        if(strcmp(id, dimension) == 0) {
             // we found a cached RDA
             st->pluginsd.pos++;
             return rd;
@@ -221,6 +224,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
             rrddim_acquired_release(prd->rda);
             prd->rda = NULL;
             prd->rd = NULL;
+            prd->id = NULL;
         }
     }
 
@@ -234,6 +238,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
 
     prd->rda = rda;
     prd->rd = rd = rrddim_acquired_to_rrddim(rda);
+    prd->id = string2str(rd->id);
     st->pluginsd.pos++;
 
     return rd;
