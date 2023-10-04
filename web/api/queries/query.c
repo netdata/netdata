@@ -2203,7 +2203,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // convert our before_wanted and after_wanted to absolute
-    rrdr_relative_window_to_absolute(&after_wanted, &before_wanted, NULL, unittest_running);
+    rrdr_relative_window_to_absolute_query(&after_wanted, &before_wanted, NULL, unittest_running);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
     if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) && tier > 0 && storage_tiers > 1) {
