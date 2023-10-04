@@ -2341,16 +2341,15 @@ static void function_systemd_journal(const char *transaction, char *function, in
     // ------------------------------------------------------------------------
     // validate parameters
 
-    time_t expires = now_realtime_sec() + 1;
-    time_t now_s;
+    time_t now_s = now_realtime_sec();
+    time_t expires = now_s + 1;
 
     if(!after_s && !before_s) {
-        now_s = now_realtime_sec();
         before_s = now_s;
         after_s = before_s - SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION;
     }
     else
-        rrdr_relative_window_to_absolute(&after_s, &before_s, &now_s, false);
+        rrdr_relative_window_to_absolute(&after_s, &before_s, now_s);
 
     if(after_s > before_s) {
         time_t tmp = after_s;
