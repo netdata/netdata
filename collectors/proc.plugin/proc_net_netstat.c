@@ -1852,7 +1852,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         if(unlikely(!st_system_ip)) {
             st_system_ip = rrdset_create_localhost(
                     "system"
-                    , RRD_TYPE_NET_IP4
+                    , "ip" // FIXME: this is ipv4. Not changing it because it will require to do changes in cloud-frontend too
                     , NULL
                     , "network"
                     , NULL
