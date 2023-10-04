@@ -48,41 +48,36 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per Applications instance
+### Per applications group
 
+These metrics refer to the application group.
 
+Labels:
 
-This scope has no labels.
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.cpu | a dimension per app group | percentage |
-| apps.cpu_user | a dimension per app group | percentage |
-| apps.cpu_system | a dimension per app group | percentage |
-| apps.cpu_guest | a dimension per app group | percentage |
-| apps.mem | a dimension per app group | MiB |
-| apps.rss | a dimension per app group | MiB |
-| apps.vmem | a dimension per app group | MiB |
-| apps.swap | a dimension per app group | MiB |
-| apps.major_faults | a dimension per app group | page faults/s |
-| apps.minor_faults | a dimension per app group | page faults/s |
-| apps.preads | a dimension per app group | KiB/s |
-| apps.pwrites | a dimension per app group | KiB/s |
-| apps.lreads | a dimension per app group | KiB/s |
-| apps.lwrites | a dimension per app group | KiB/s |
-| apps.threads | a dimension per app group | threads |
-| apps.processes | a dimension per app group | processes |
-| apps.voluntary_ctxt_switches | a dimension per app group | processes |
-| apps.involuntary_ctxt_switches | a dimension per app group | processes |
-| apps.uptime | a dimension per app group | seconds |
-| apps.uptime_min | a dimension per app group | seconds |
-| apps.uptime_avg | a dimension per app group | seconds |
-| apps.uptime_max | a dimension per app group | seconds |
-| apps.files | a dimension per app group | open files |
-| apps.sockets | a dimension per app group | open sockets |
-| apps.pipes | a dimension per app group | open pipes |
+| app_group.cpu_utilization | user, system | percentage |
+| app_group.cpu_guest_utilization | guest | percentage |
+| app_group.cpu_context_switches | voluntary, involuntary | switches/s |
+| app_group.mem_usage | rss | MiB |
+| app_group.mem_private_usage | mem | MiB |
+| app_group.vmem_usage | vmem | MiB |
+| app_group.mem_page_faults | minor, major | pgfaults/s |
+| app_group.swap_usage | swap | MiB |
+| app_group.disk_physical_io | reads, writes | KiB/s |
+| app_group.disk_logical_io | reads, writes | KiB/s |
+| app_group.processes | processes | processes |
+| app_group.threads | threads | threads |
+| app_group.fds_open_limit | limit | percentage |
+| app_group.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| app_group.uptime | uptime | seconds |
+| app_group.uptime_summary | min, avg, max | seconds |
 
 
 
