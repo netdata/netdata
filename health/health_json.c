@@ -49,7 +49,6 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"config_hash_id\": \"%s\",\n"
                     "\t\t\t\"name\": \"%s\",\n"
                     "\t\t\t\"chart\": \"%s\",\n"
-                    "\t\t\t\"family\": \"%s\",\n"
                     "\t\t\t\"class\": \"%s\",\n"
                     "\t\t\t\"component\": \"%s\",\n"
                     "\t\t\t\"type\": \"%s\",\n"
@@ -83,7 +82,6 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , hash_id
                    , rrdcalc_name(rc)
                    , rrdcalc_chart_name(rc)
-                   , (rc->rrdset)?rrdset_family(rc->rrdset):""
                    , rc->classification?rrdcalc_classification(rc):"Unknown"
                    , rc->component?rrdcalc_component(rc):"Unknown"
                    , rc->type?rrdcalc_type(rc):"Unknown"

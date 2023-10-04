@@ -873,8 +873,8 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
 
 static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host, SILENCERS *silencers) {
     SILENCER *s;
-    netdata_log_debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s family:%s",
-          rrdcalc_name(rc), (rc->rrdset)?rrdset_context(rc->rrdset):"", rrdcalc_chart_name(rc), host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
+    netdata_log_debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s",
+          rrdcalc_name(rc), (rc->rrdset)?rrdset_context(rc->rrdset):"", rrdcalc_chart_name(rc), host);
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
