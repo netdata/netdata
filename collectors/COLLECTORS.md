@@ -209,8 +209,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Docker](https://github.com/netdata/go.d.plugin/blob/master/modules/docker/integrations/docker.md)
 
-- [Kubernetes Containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/kubernetes_containers.md)
-
 - [LXC Containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/lxc_containers.md)
 
 - [Libvirt Containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/libvirt_containers.md)
@@ -1096,8 +1094,6 @@ If you don't see the app/service you'd like to monitor in this list:
 - [systemd-logind users](https://github.com/netdata/go.d.plugin/blob/master/modules/logind/integrations/systemd-logind_users.md)
 
 ### Task Queues
-
-- [Beanstalk](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/beanstalk/integrations/beanstalk.md)
 
 - [Celery](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/celery.md)
 

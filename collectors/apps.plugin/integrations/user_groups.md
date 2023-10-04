@@ -48,41 +48,36 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per User Groups instance
+### Per user group
 
+These metrics refer to the user group.
 
+Labels:
 
-This scope has no labels.
+| Label      | Description     |
+|:-----------|:----------------|
+| user_group | The name of the user group. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| groups.cpu | a dimension per user group | percentage |
-| groups.cpu_user | a dimension per user group | percentage |
-| groups.cpu_system | a dimension per user group | percentage |
-| groups.cpu_guest | a dimension per user group | percentage |
-| groups.mem | a dimension per user group | MiB |
-| groups.rss | a dimension per user group | MiB |
-| groups.vmem | a dimension per user group | MiB |
-| groups.swap | a dimension per user group | MiB |
-| groups.major_faults | a dimension per user group | page faults/s |
-| groups.minor_faults | a dimension per user group | page faults/s |
-| groups.preads | a dimension per user group | KiB/s |
-| groups.pwrites | a dimension per user group | KiB/s |
-| groups.lreads | a dimension per user group | KiB/s |
-| groups.lwrites | a dimension per user group | KiB/s |
-| groups.threads | a dimension per user group | threads |
-| groups.processes | a dimension per user group | processes |
-| groups.voluntary_ctxt_switches | a dimension per app group | processes |
-| groups.involuntary_ctxt_switches | a dimension per app group | processes |
-| groups.uptime | a dimension per user group | seconds |
-| groups.uptime_min | a dimension per user group | seconds |
-| groups.uptime_avg | a dimension per user group | seconds |
-| groups.uptime_max | a dimension per user group | seconds |
-| groups.files | a dimension per user group | open files |
-| groups.sockets | a dimension per user group | open sockets |
-| groups.pipes | a dimension per user group | open pipes |
+| user_group.cpu_utilization | user, system | percentage |
+| user_group.cpu_guest_utilization | guest | percentage |
+| user_group.cpu_context_switches | voluntary, involuntary | switches/s |
+| user_group.mem_usage | rss | MiB |
+| user_group.mem_private_usage | mem | MiB |
+| user_group.vmem_usage | vmem | MiB |
+| user_group.mem_page_faults | minor, major | pgfaults/s |
+| user_group.swap_usage | swap | MiB |
+| user_group.disk_physical_io | reads, writes | KiB/s |
+| user_group.disk_logical_io | reads, writes | KiB/s |
+| user_group.processes | processes | processes |
+| user_group.threads | threads | threads |
+| user_group.fds_open_limit | limit | percentage |
+| user_group.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| user_group.uptime | uptime | seconds |
+| user_group.uptime_summary | min, avg, max | seconds |
 
 
 
