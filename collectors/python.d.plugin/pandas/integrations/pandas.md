@@ -22,8 +22,6 @@ either locally or via some HTTP endpoint, you can easily ingest and present thos
 
 This collector can be used to collect pretty much anything that can be read by Pandas, and then processed by Pandas.
 
-More detailed information can be found in the Netdata documentation [here](https://learn.netdata.cloud/docs/data-collection/generic-data-collection/structured-data-pandas).
-
 
 The collector uses [pandas](https://pandas.pydata.org/) to pull data and do pandas-based preprocessing, before feeding to Netdata.
 
@@ -133,8 +131,8 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 | chart_configs | an array of chart configuration dictionaries |  | True |
 | chart_configs.name | name of the chart to be displayed in the dashboard. |  | True |
 | chart_configs.title | title of the chart to be displayed in the dashboard. |  | True |
-| chart_configs.family | [family](https://learn.netdata.cloud/docs/data-collection/chart-dimensions-contexts-and-families#family) of the chart to be displayed in the dashboard. |  | True |
-| chart_configs.context | [context](https://learn.netdata.cloud/docs/data-collection/chart-dimensions-contexts-and-families#context) of the chart to be displayed in the dashboard. |  | True |
+| chart_configs.family | [family](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#families) of the chart to be displayed in the dashboard. |  | True |
+| chart_configs.context | [context](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#contexts) of the chart to be displayed in the dashboard. |  | True |
 | chart_configs.type | the type of the chart to be displayed in the dashboard. |  | True |
 | chart_configs.units | the units of the chart to be displayed in the dashboard. |  | True |
 | chart_configs.df_steps | a series of pandas operations (one per line) that each returns a dataframe. |  | True |
