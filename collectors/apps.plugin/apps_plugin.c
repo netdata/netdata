@@ -5404,8 +5404,8 @@ int main(int argc, char **argv) {
         }
 
         if (enable_groups_charts) {
-            send_charts_updates_to_netdata(groups_root_target, "user_group", "user_group", "User Groups");
-            send_collected_data_to_netdata(groups_root_target, "user_group", dt);
+            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Groups");
+            send_collected_data_to_netdata(groups_root_target, "usergroup", dt);
         }
 
         fflush(stdout);
