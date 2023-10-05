@@ -258,90 +258,90 @@ modules:
             - name: user_group
               description: The name of the user group.
           metrics:
-            - name: user_group.cpu_utilization
+            - name: usergroup.cpu_utilization
               description: User Groups CPU utilization (100% = 1 core)
               unit: percentage
               chart_type: stacked
               dimensions:
                 - name: user
                 - name: system
-            - name: user_group.cpu_guest_utilization
+            - name: usergroup.cpu_guest_utilization
               description: User Groups CPU guest utilization (100% = 1 core)
               unit: percentage
               chart_type: line
               dimensions:
                 - name: guest
-            - name: user_group.cpu_context_switches
+            - name: usergroup.cpu_context_switches
               description: User Groups CPU context switches
               unit: switches/s
               chart_type: stacked
               dimensions:
                 - name: voluntary
                 - name: involuntary
-            - name: user_group.mem_usage
+            - name: usergroup.mem_usage
               description: User Groups memory RSS usage
               unit: MiB
               chart_type: area
               dimensions:
                 - name: rss
-            - name: user_group.mem_private_usage
+            - name: usergroup.mem_private_usage
               description: User Groups memory usage without shared
               unit: MiB
               chart_type: area
               dimensions:
                 - name: mem
-            - name: user_group.vmem_usage
+            - name: usergroup.vmem_usage
               description: User Groups virtual memory size
               unit: MiB
               chart_type: line
               dimensions:
                 - name: vmem
-            - name: user_group.mem_page_faults
+            - name: usergroup.mem_page_faults
               description: User Groups memory page faults
               unit: pgfaults/s
               chart_type: stacked
               dimensions:
                 - name: minor
                 - name: major
-            - name: user_group.swap_usage
+            - name: usergroup.swap_usage
               description: User Groups swap usage
               unit: MiB
               chart_type: area
               dimensions:
                 - name: swap
-            - name: user_group.disk_physical_io
+            - name: usergroup.disk_physical_io
               description: User Groups disk physical IO
               unit: KiB/s
               chart_type: area
               dimensions:
                 - name: reads
                 - name: writes
-            - name: user_group.disk_logical_io
+            - name: usergroup.disk_logical_io
               description: User Groups disk logical IO
               unit: KiB/s
               chart_type: area
               dimensions:
                 - name: reads
                 - name: writes
-            - name: user_group.processes
+            - name: usergroup.processes
               description: User Groups processes
               unit: processes
               chart_type: line
               dimensions:
                 - name: processes
-            - name: user_group.threads
+            - name: usergroup.threads
               description: User Groups threads
               unit: threads
               chart_type: line
               dimensions:
                 - name: threads
-            - name: user_group.fds_open_limit
+            - name: usergroup.fds_open_limit
               description: User Groups open file descriptors limit
               unit: percentage
               chart_type: line
               dimensions:
                 - name: limit
-            - name: user_group.fds_open
+            - name: usergroup.fds_open
               description: User Groups open file descriptors
               unit: fds
               chart_type: stacked
@@ -355,13 +355,13 @@ modules:
                 - name: signal
                 - name: eventpolls
                 - name: other
-            - name: user_group.uptime
+            - name: usergroup.uptime
               description: User Groups uptime
               unit: seconds
               chart_type: line
               dimensions:
                 - name: uptime
-            - name: user_group.uptime_summary
+            - name: usergroup.uptime_summary
               description: User Groups uptime summary
               unit: seconds
               chart_type: area
