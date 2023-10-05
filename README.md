@@ -53,7 +53,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
-- 📖 **systemd Journals Explorer**<br/>
+- 📖 **systemd Journals Explorer** (beta, in the nightly release channel)<br/>
   systemd journals explorer to view, filter and analyze system and applications logs, by directly accessing systemd journal files on individual hosts and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
