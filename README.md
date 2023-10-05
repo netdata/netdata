@@ -53,8 +53,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
-- 📖 **systemd Journals Explorer** (beta, in the nightly release channel)<br/>
-  systemd journals explorer to view, filter and analyze system and applications logs, by directly accessing systemd journal files on individual hosts and infrastructure-wide logs centralization servers.
+- 📖 **systemd Journal Logs Explorer** (beta, in the nightly release channel)<br/>
+  Provides a systemd journal logs explorer, to view, filter and analyze system and applications logs by directly accessing systemd journal files on individual hosts and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
   Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
