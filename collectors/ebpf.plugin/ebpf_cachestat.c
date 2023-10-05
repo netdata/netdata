@@ -804,41 +804,65 @@ static void ebpf_update_cachestat_cgroup(int maps_per_core)
 void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     struct ebpf_target *root = ptr;
-    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_RATIO_CHART,
-                               "Hit ratio",
-                               EBPF_COMMON_DIMENSION_PERCENTAGE,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_LINE,
-                               20090,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+    struct ebpf_target *w;
+    int update_every = em->update_every;
+    for (w = root; w; w = w->next) {
+        if (likely(w->exposed || !w->processes))
+            continue;
 
-    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_DIRTY_CHART,
-                               "Number of dirty pages",
-                               EBPF_CACHESTAT_DIMENSION_PAGE,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20091,
-                               ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
-                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
+                             w->name,
+                             "_hit_ratio",
+                             "Hit ratio",
+                             EBPF_COMMON_DIMENSION_PERCENTAGE,
+                             NETDATA_CACHESTAT_SUBMENU,
+                             NETDATA_EBPF_CHART_TYPE_LINE,
+                             "apps_cachestat_ratio",
+                             20090,
+                             update_every,
+                             NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        fprintf(stdout, "DIMENSION ratio '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
-    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_HIT_CHART,
-                               "Number of accessed files",
-                               EBPF_CACHESTAT_DIMENSION_HITS,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20092,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
 
-    ebpf_create_charts_on_apps(NETDATA_CACHESTAT_MISSES_CHART,
-                               "Files out of page cache",
-                               EBPF_CACHESTAT_DIMENSION_MISSES,
-                               NETDATA_CACHESTAT_SUBMENU,
-                               NETDATA_EBPF_CHART_TYPE_STACKED,
-                               20093,
-                               ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                               root, em->update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
+                             w->name,
+                             "_dirty_pages",
+                             "Number of dirty pages",
+                             EBPF_CACHESTAT_DIMENSION_PAGE,
+                             NETDATA_CACHESTAT_SUBMENU,
+                             NETDATA_EBPF_CHART_TYPE_LINE,
+                             "apps_cachestat_dirty",
+                             20091,
+                             update_every,
+                             NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        fprintf(stdout, "DIMENSION dirties '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
+
+        ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
+                             w->name,
+                             "_cachestat_access",
+                             "Number of accessed files",
+                             EBPF_CACHESTAT_DIMENSION_HITS,
+                             NETDATA_CACHESTAT_SUBMENU,
+                             NETDATA_EBPF_CHART_TYPE_STACKED,
+                             "apps_cachestat_access",
+                             20092,
+                             update_every,
+                             NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        fprintf(stdout, "DIMENSION access '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+
+        ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
+                             w->name,
+                             "_cachestat_misses",
+                             "Files out of page cache",
+                             EBPF_CACHESTAT_DIMENSION_MISSES,
+                             NETDATA_CACHESTAT_SUBMENU,
+                             NETDATA_EBPF_CHART_TYPE_STACKED,
+                             "apps_cachestat_missees",
+                             20093,
+                             update_every,
+                             NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        fprintf(stdout, "DIMENSION misses '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+    }
 
     em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
 }

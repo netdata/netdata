@@ -610,7 +610,7 @@ static void ebpf_create_sync_chart(char *id,
                                    int end,
                                    int update_every)
 {
-    ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, title, EBPF_COMMON_DIMENSION_CALL,
+    ebpf_write_chart_cmd(NETDATA_EBPF_MEMORY_GROUP, id, "", title, EBPF_COMMON_DIMENSION_CALL,
                          NETDATA_EBPF_SYNC_SUBMENU, NETDATA_EBPF_CHART_TYPE_LINE, NULL, order,
                          update_every,
                          NETDATA_EBPF_MODULE_NAME_SYNC);

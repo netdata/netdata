@@ -238,6 +238,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is,
 
 void ebpf_write_chart_cmd(char *type,
                                  char *id,
+                                 char *suffix,
                                  char *title,
                                  char *units,
                                  char *family,

@@ -1182,7 +1182,8 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * Write chart cmd on standard output
  *
  * @param type          chart type
- * @param id            chart id
+ * @param id            chart id (the apps group name).
+ * @param suffix        suffix to differentiate charts
  * @param title         chart title
  * @param units         units label
  * @param family        group name used to attach the chart on dashboard
@@ -1192,12 +1193,13 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param update_every  update interval used by plugin
  * @param module        chart module name, this is the eBPF thread.
  */
-void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
+void ebpf_write_chart_cmd(char *type, char *id, char *suffix, char *title, char *units, char *family,
                           char *charttype, char *context, int order, int update_every, char *module)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
+    printf("CHART %s.%s%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
            type,
            id,
+           suffix,
            title,
            units,
            (family)?family:"",
@@ -1298,7 +1300,7 @@ void ebpf_create_chart(char *type,
                        int update_every,
                        char *module)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, update_every, module);
+    ebpf_write_chart_cmd(type, id, "", title, units, family, charttype, context, order, update_every, module);
 
     if (ncd) {
         ncd(move, end);
@@ -1323,7 +1325,7 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
                                 char *algorithm, struct ebpf_target *root, int update_every, char *module)
 {
     struct ebpf_target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order,
+    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, "", title, units, family, charttype, NULL, order,
                          update_every, module);
 
     for (w = root; w; w = w->next) {
@@ -1377,6 +1379,7 @@ int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          em->memory_usage,
+                         "",
                          "Bytes allocated for ARAL.",
                          "bytes",
                          NETDATA_EBPF_FAMILY,
@@ -1392,6 +1395,7 @@ int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          em->memory_allocations,
+                         "",
                          "Calls to allocate memory.",
                          "calls",
                          NETDATA_EBPF_FAMILY,
@@ -3586,6 +3590,7 @@ static void ebpf_create_thread_chart(char *name,
     // common call for specific and all charts.
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          name,
+                         "",
                          title,
                          units,
                          NETDATA_EBPF_FAMILY,
@@ -3625,6 +3630,7 @@ static inline void ebpf_create_statistic_load_chart(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_LOAD_METHOD,
+                         "",
                          "Load info.",
                          "methods",
                          NETDATA_EBPF_FAMILY,
@@ -3654,6 +3660,7 @@ static inline void ebpf_create_statistic_kernel_memory(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_KERNEL_MEMORY,
+                         "",
                          "Memory allocated for hash tables.",
                          "bytes",
                          NETDATA_EBPF_FAMILY,
@@ -3679,6 +3686,7 @@ static inline void ebpf_create_statistic_hash_tables(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_HASH_TABLES_LOADED,
+                         "",
                          "Number of hash tables loaded.",
                          "hash tables",
                          NETDATA_EBPF_FAMILY,
@@ -3704,6 +3712,7 @@ static inline void ebpf_create_statistic_hash_per_core(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_HASH_TABLES_PER_CORE,
+                         "",
                          "How threads are loading hash/array tables.",
                          "threads",
                          NETDATA_EBPF_FAMILY,
@@ -3733,6 +3742,7 @@ static void ebpf_create_statistic_hash_global_elements(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS,
+                         "",
                          "Controllers inside global table",
                          "rows",
                          NETDATA_EBPF_FAMILY,
@@ -3764,6 +3774,7 @@ static void ebpf_create_statistic_hash_pid_table(int update_every, char *id, cha
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          id,
+                         "",
                          title,
                          "rows",
                          NETDATA_EBPF_FAMILY,

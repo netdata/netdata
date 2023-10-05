@@ -10,6 +10,7 @@
 #include "libnetdata/ebpf/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
+#define NETDATA_APP_FAMILY "app"
 #define NETDATA_APPS_FILE_GROUP "file_access"
 #define NETDATA_APPS_FILE_CGROUP_GROUP "file_access (eBPF)"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
