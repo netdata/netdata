@@ -1,10 +1,10 @@
-# SystemD Journal
+# `systemd` journal plugin
 
 [KEY FEATURES](#key-features) | [JOURNAL SOURCES](#journal-sources) | [JOURNAL FIELDS](#journal-fields) |
 [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [PERFORMANCE](#query-performance) |
 [CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq)
 
-The SystemD Journal plugin by Netdata makes viewing, exploring and analyzing systemd journal logs simple and efficient.
+The `systemd` journal plugin by Netdata makes viewing, exploring and analyzing `systemd` journal logs simple and efficient.
 It automatically discovers available journal sources, allows advanced filtering, offers interactive visual
 representations and supports exploring the logs of both individual servers and the logs on infrastructure wide 
 journal centralization servers.
@@ -68,7 +68,7 @@ The plugin allows viewing, exploring and querying the journal files of all users
 ### `namespaces` journals
 
 Journal 'namespaces' are both a mechanism for logically isolating the log stream of projects consisting
-of one or more services from the rest of the system and a mechanism for improving performance. Systemd service
+of one or more services from the rest of the system and a mechanism for improving performance. `systemd` service
 units may be assigned to a specific journal namespace through the `LogNamespace=` unit file setting.
 
 The plugin auto-detects the namespaces available and provides a list of all namespaces at the "sources" list on the UI.
@@ -224,7 +224,7 @@ This Netdata plugin does not require any configuration or maintenance.
 
 ### Can I use this plugin on journals' centralization servers?
 
-Yes. You can centralize your logs using systemd journal, and then install Netdata
+Yes. You can centralize your logs using `systemd-journal-remote`, and then install Netdata
 on this logs centralization server to explore the logs of all your infrastructure.
 
 This plugin will automatically provide multi-node views of your logs and also give you the ability to combine the logs
@@ -255,7 +255,7 @@ anywhere. All communication from/to Netdata Cloud is encrypted.
 
 ### What are `volatile` and `persistent` journals?
 
-SystemD JournalD allows creating both `volatile` journals in a `tmpfs` ram drive,
+`systemd` `journald` allows creating both `volatile` journals in a `tmpfs` ram drive,
 and `persistent` journals stored on disk.
 
 `volatile` journals are particularly useful when the system monitored is sensitive to
@@ -263,11 +263,11 @@ disk I/O, or does not have any writable disks at all.
 
 For more information check `man systemd-journald`.
 
-### Is it worth to build a systemd logs centralization server?
+### Is it worth to build a `systemd` logs centralization server?
 
 Yes. It is simple, fast and the software to do it is already in your systems.
 
-For application and system logs, systemd journal is ideal and the visibility you can get
+For application and system logs, `systemd` journal is ideal and the visibility you can get
 by centralizing your system logs and the use of this Netdata plugin, is unparalleled.
 
 ### How do I configure a journals' centralization server?
@@ -356,7 +356,7 @@ Keep in mind that immediately after starting `systemd-journal-upload` on a serve
 
 #### Limitations when using a logs centralization server
 
-As of this writing `namespaces` support by systemd is limited:
+As of this writing `namespaces` support by `systemd` is limited:
 
 - Docker containers cannot log to namespaces. Check [this issue](https://github.com/moby/moby/issues/41879).
 - `systemd-journal-upload` automatically uploads `system` and `user` journals, but not `namespaces` journals. For this you need to spawn a `systemd-journal-upload` per namespace.
