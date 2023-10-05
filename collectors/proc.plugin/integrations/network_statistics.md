@@ -59,12 +59,6 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.ip | received, sent | kilobits/s |
-| ip.inerrors | noroutes, truncated, checksum | packets/s |
-| ip.mcast | received, sent | kilobits/s |
-| ip.bcast | received, sent | kilobits/s |
-| ip.mcastpkts | received, sent | packets/s |
-| ip.bcastpkts | received, sent | packets/s |
-| ip.ecnpkts | CEP, NoECTP, ECTP0, ECTP1 | packets/s |
 | ip.tcpmemorypressures | pressures | events/s |
 | ip.tcpconnaborts | baddata, userclosed, nomemory, timeout, linger, failed | connections/s |
 | ip.tcpreorders | timestamp, sack, fack, reno | packets/s |
@@ -72,34 +66,37 @@ Metrics:
 | ip.tcpsyncookies | received, sent, failed | packets/s |
 | ip.tcp_syn_queue | drops, cookies | packets/s |
 | ip.tcp_accept_queue | overflows, drops | packets/s |
+| ip.tcpsock | connections | active connections |
+| ip.tcppackets | received, sent | packets/s |
+| ip.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
+| ip.tcpopens | active, passive | connections/s |
+| ip.tcphandshake | EstabResets, OutRsts, AttemptFails, SynRetrans | events/s |
 | ipv4.packets | received, sent, forwarded, delivered | packets/s |
-| ipv4.fragsout | ok, failed, created | packets/s |
-| ipv4.fragsin | ok, failed, all | packets/s |
-| ipv4.errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |
+| ipv4.errors | InDiscards, OutDiscards, InNoRoutes, OutNoRoutes, InHdrErrors, InAddrErrors, InTruncatedPkts, InCsumErrors | packets/s |
+| ipc4.bcast | received, sent | kilobits/s |
+| ipv4.bcastpkts | received, sent | packets/s |
+| ipv4.mcast | received, sent | kilobits/s |
+| ipv4.mcastpkts | received, sent | packets/s |
 | ipv4.icmp | received, sent | packets/s |
-| ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
 | ipv4.icmpmsg | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
-| ipv4.tcpsock | connections | active connections |
-| ipv4.tcppackets | received, sent | packets/s |
-| ipv4.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
-| ipv4.tcpopens | active, passive | connections/s |
-| ipv4.tcphandshake | EstabResets, OutRsts, AttemptFails, SynRetrans | events/s |
+| ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
 | ipv4.udppackets | received, sent | packets/s |
 | ipv4.udperrors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
 | ipv4.udplite | received, sent | packets/s |
 | ipv4.udplite_errors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | packets/s |
+| ipv4.ecnpkts | CEP, NoECTP, ECTP0, ECTP1 | packets/s |
+| ipv4.fragsin | ok, failed, all | packets/s |
+| ipv4.fragsout | ok, failed, created | packets/s |
 | system.ipv6 | received, sent | kilobits/s |
-| system.ipv6 | received, sent, forwarded, delivers | packets/s |
-| ipv6.fragsout | ok, failed, all | packets/s |
-| ipv6.fragsin | ok, failed, timeout, all | packets/s |
+| ipv6.packets | received, sent, forwarded, delivers | packets/s |
 | ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InUnknownProtos, InTooBigErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
+| ipv6.bcast | received, sent | kilobits/s |
+| ipv6.mcast | received, sent | kilobits/s |
+| ipv6.mcastpkts | received, sent | packets/s |
 | ipv6.udppackets | received, sent | packets/s |
 | ipv6.udperrors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
 | ipv6.udplitepackets | received, sent | packets/s |
 | ipv6.udpliteerrors | RcvbufErrors, SndbufErrors, InErrors, NoPorts, InCsumErrors | events/s |
-| ipv6.mcast | received, sent | kilobits/s |
-| ipv6.bcast | received, sent | kilobits/s |
-| ipv6.mcastpkts | received, sent | packets/s |
 | ipv6.icmp | received, sent | messages/s |
 | ipv6.icmpredir | received, sent | redirects/s |
 | ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutPktTooBigs, OutTimeExcds, OutParmProblems | errors/s |
@@ -111,6 +108,8 @@ Metrics:
 | ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
 | ipv6.ect | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
 | ipv6.ect | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
+| ipv6.fragsin | ok, failed, timeout, all | packets/s |
+| ipv6.fragsout | ok, failed, all | packets/s |
 
 
 
@@ -125,11 +124,11 @@ The following alerts are available:
 | [ 1m_tcp_syn_queue_cookies ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf) | ip.tcp_syn_queue | average number of sent SYN cookies due to the full TCP SYN queue over the last minute |
 | [ 1m_tcp_accept_queue_overflows ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf) | ip.tcp_accept_queue | average number of overflows in the TCP accept queue over the last minute |
 | [ 1m_tcp_accept_queue_drops ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf) | ip.tcp_accept_queue | average number of dropped packets in the TCP accept queue over the last minute |
-| [ tcp_connections ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf) | ipv4.tcpsock | IPv4 TCP connections utilization |
-| [ 1m_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last minute |
-| [ 10s_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm. |
-| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last minute |
-| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
+| [ tcp_connections ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf) | ip.tcpsock | TCP connections utilization |
+| [ 1m_ip_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of sent TCP RESETS over the last minute |
+| [ 10s_ip_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm. |
+| [ 1m_ip_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of received TCP RESETS over the last minute |
+| [ 10s_ip_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
 | [ 1m_ipv4_udp_receive_buffer_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP receive buffer errors over the last minute |
 | [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
 

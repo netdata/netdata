@@ -58,7 +58,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| ipv4.sockstat_sockets | used | sockets |
+| ip.sockstat_sockets | used | sockets |
 | ipv4.sockstat_tcp_sockets | alloc, orphan, inuse, timewait | sockets |
 | ipv4.sockstat_tcp_mem | mem | KiB |
 | ipv4.sockstat_udp_sockets | inuse | sockets |
