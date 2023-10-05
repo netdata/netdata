@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- Remove multiple categories due to bug [\#16126](https://github.com/netdata/netdata/pull/16126) ([Ancairon](https://github.com/Ancairon))
+- Regenerate integrations.js [\#16125](https://github.com/netdata/netdata/pull/16125) ([netdatabot](https://github.com/netdatabot))
+- update UI to v6.45.0 [\#16124](https://github.com/netdata/netdata/pull/16124) ([ilyam8](https://github.com/ilyam8))
+- journal: fix the 1 second latency in play mode [\#16123](https://github.com/netdata/netdata/pull/16123) ([ktsaou](https://github.com/ktsaou))
+- dont strip newlines when forwarding FUNCTION\_PAYLOAD [\#16120](https://github.com/netdata/netdata/pull/16120) ([underhood](https://github.com/underhood))
 - Do not force OOMKill [\#16115](https://github.com/netdata/netdata/pull/16115) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix crash on parsing clabel command with no source [\#16114](https://github.com/netdata/netdata/pull/16114) ([ilyam8](https://github.com/ilyam8))
 - update UI to v6.43.0 [\#16112](https://github.com/netdata/netdata/pull/16112) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16111](https://github.com/netdata/netdata/pull/16111) ([netdatabot](https://github.com/netdatabot))
 - journal: respect anchor on non-data-only queries [\#16109](https://github.com/netdata/netdata/pull/16109) ([ktsaou](https://github.com/ktsaou))
 - Fix in generate integrations docs script [\#16108](https://github.com/netdata/netdata/pull/16108) ([Ancairon](https://github.com/Ancairon))
 - journal: go up to stop anchor on data only queries [\#16107](https://github.com/netdata/netdata/pull/16107) ([ktsaou](https://github.com/ktsaou))
@@ -21,6 +27,7 @@
 - journal: fix incremental queries [\#16098](https://github.com/netdata/netdata/pull/16098) ([ktsaou](https://github.com/ktsaou))
 - Update categories.yaml [\#16097](https://github.com/netdata/netdata/pull/16097) ([Ancairon](https://github.com/Ancairon))
 - Fix systemd-journal.plugin README and prepare it for Learn [\#16096](https://github.com/netdata/netdata/pull/16096) ([Ancairon](https://github.com/Ancairon))
+- Split apps charts [\#16095](https://github.com/netdata/netdata/pull/16095) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix querying out of retention [\#16094](https://github.com/netdata/netdata/pull/16094) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16093](https://github.com/netdata/netdata/pull/16093) ([netdatabot](https://github.com/netdatabot))
 - update go.d.plugin to v0.56.1 [\#16092](https://github.com/netdata/netdata/pull/16092) ([ilyam8](https://github.com/ilyam8))
@@ -427,12 +434,6 @@
 - Python collector yaml updates [\#15517](https://github.com/netdata/netdata/pull/15517) ([Ancairon](https://github.com/Ancairon))
 - eBPF Yaml complement [\#15516](https://github.com/netdata/netdata/pull/15516) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add AMD GPU collector  [\#15515](https://github.com/netdata/netdata/pull/15515) ([Dim-P](https://github.com/Dim-P))
-- Update metadata.yaml for some python collectors [\#15513](https://github.com/netdata/netdata/pull/15513) ([MrZammler](https://github.com/MrZammler))
-- Update metadata.yaml for some python collectors [\#15510](https://github.com/netdata/netdata/pull/15510) ([andrewm4894](https://github.com/andrewm4894))
-- Add schema for deployment integrations and centralize integrations schemas. [\#15509](https://github.com/netdata/netdata/pull/15509) ([Ferroin](https://github.com/Ferroin))
-- update gitignore to include vscode settings for schema validation [\#15508](https://github.com/netdata/netdata/pull/15508) ([andrewm4894](https://github.com/andrewm4894))
-- Add Samba collector yaml [\#15507](https://github.com/netdata/netdata/pull/15507) ([Ancairon](https://github.com/Ancairon))
-- Fill in metadata for idlejitter plugin. [\#15506](https://github.com/netdata/netdata/pull/15506) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
