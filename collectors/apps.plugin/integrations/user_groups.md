@@ -62,22 +62,22 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| user_group.cpu_utilization | user, system | percentage |
-| user_group.cpu_guest_utilization | guest | percentage |
-| user_group.cpu_context_switches | voluntary, involuntary | switches/s |
-| user_group.mem_usage | rss | MiB |
-| user_group.mem_private_usage | mem | MiB |
-| user_group.vmem_usage | vmem | MiB |
-| user_group.mem_page_faults | minor, major | pgfaults/s |
-| user_group.swap_usage | swap | MiB |
-| user_group.disk_physical_io | reads, writes | KiB/s |
-| user_group.disk_logical_io | reads, writes | KiB/s |
-| user_group.processes | processes | processes |
-| user_group.threads | threads | threads |
-| user_group.fds_open_limit | limit | percentage |
-| user_group.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
-| user_group.uptime | uptime | seconds |
-| user_group.uptime_summary | min, avg, max | seconds |
+| usergroup.cpu_utilization | user, system | percentage |
+| usergroup.cpu_guest_utilization | guest | percentage |
+| usergroup.cpu_context_switches | voluntary, involuntary | switches/s |
+| usergroup.mem_usage | rss | MiB |
+| usergroup.mem_private_usage | mem | MiB |
+| usergroup.vmem_usage | vmem | MiB |
+| usergroup.mem_page_faults | minor, major | pgfaults/s |
+| usergroup.swap_usage | swap | MiB |
+| usergroup.disk_physical_io | reads, writes | KiB/s |
+| usergroup.disk_logical_io | reads, writes | KiB/s |
+| usergroup.processes | processes | processes |
+| usergroup.threads | threads | threads |
+| usergroup.fds_open_limit | limit | percentage |
+| usergroup.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| usergroup.uptime | uptime | seconds |
+| usergroup.uptime_summary | min, avg, max | seconds |
 
 
 
