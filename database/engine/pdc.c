@@ -718,9 +718,16 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 
     bool updated = false;
 
+    size_t max_page_length = RRDENG_BLOCK_SIZE;
+
+    // If gorilla can not compress the data we might end up needing slightly more
+    // than 4KiB. However, gorilla pages extend the page length by increments of
+    // 512 bytes.
+    max_page_length += ((page_type == PAGE_GORILLA_METRICS) * GORILLA_BUFFER_SIZE);
+
     if( have_read_error                                         ||
         vd.page_length == 0                                     ||
-        vd.page_length > RRDENG_BLOCK_SIZE                      ||
+        vd.page_length > max_page_length                        ||
         vd.start_time_s > vd.end_time_s                         ||
         (now_s && vd.end_time_s > now_s)                        ||
         vd.start_time_s <= 0                                    ||
