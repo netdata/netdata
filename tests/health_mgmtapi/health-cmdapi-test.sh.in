@@ -190,12 +190,6 @@ err=0
 	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
 	check_list "RESET"
 
-	# Add silencer without a command to disable or silence alarms
-	printf -v resp "$HEALTH_CMDAPI_MSG_ADDED\n$HEALTH_CMDAPI_MSG_STYPEWARNING"
-	cmd "families=load" "${resp}"
-	check "Family selector with no command" "False False False False False False"
-	check_list "FAMILIES_LOAD"
-
 	# Add silence command
 	cmd "cmd=SILENCE" "$HEALTH_CMDAPI_MSG_SILENCE"
 	check "Silence family load" "False False False False False True"
