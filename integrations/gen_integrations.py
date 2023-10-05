@@ -462,7 +462,7 @@ def render_collectors(categories, collectors, ids):
             item['meta']['monitored_instance']['categories'] = list(default_cats)
             warn(f'{ item["id"] } does not list any caregories, adding it to: { default_cats }', item["_src_path"])
         else:
-            item['meta']['monitored_instance']['categories'] = list(actual_cats)
+            item['meta']['monitored_instance']['categories'] =  [x for x in item['meta']['monitored_instance']['categories'] if x in list(actual_cats)]
 
         for scope in item['metrics']['scopes']:
             if scope['name'] == 'global':
