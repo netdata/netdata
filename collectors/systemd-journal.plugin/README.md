@@ -247,6 +247,8 @@ You need a free Netdata Cloud account only to verify your identity and enable th
 Netdata Functions. Once this is done, all the data flow directly from your Netdata agent
 to your web browser.
 
+To understand why this is required, check [this discussion](https://github.com/netdata/netdata/discussions/16136).
+
 When you access Netdata via `https://app.netdata.cloud`, your data travel via Netdata Cloud,
 but they are not stored in Netdata Cloud. This is to allow you access your Netdata agents from
 anywhere. All communication from/to Netdata Cloud is encrypted.
