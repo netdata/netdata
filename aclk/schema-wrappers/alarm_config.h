@@ -24,7 +24,6 @@ struct aclk_alarm_configuration {
     char *plugin;
     char *module;
     char *charts;
-    char *families;
     char *lookup;
     char *every;
     char *units;
