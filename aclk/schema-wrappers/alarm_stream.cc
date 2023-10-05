@@ -66,11 +66,8 @@ static alarms::v1::AlarmStatus aclk_alarm_status_to_proto(enum aclk_alarm_status
 
 void destroy_alarm_log_entry(struct alarm_log_entry *entry)
 {
-    //freez(entry->node_id);
-    //freez(entry->claim_id);
     freez(entry->chart);
     freez(entry->name);
-    freez(entry->family);
     freez(entry->config_hash);
     freez(entry->timezone);
     freez(entry->exec_path);
@@ -89,32 +86,21 @@ static void fill_alarm_log_entry(struct alarm_log_entry *data, AlarmLogEntry *pr
 {
     proto->set_node_id(data->node_id);
     proto->set_claim_id(data->claim_id);
-
     proto->set_chart(data->chart);
     proto->set_name(data->name);
-    if (data->family)
-        proto->set_family(data->family);
-
     proto->set_when(data->when);
-
     proto->set_config_hash(data->config_hash);
-
     proto->set_utc_offset(data->utc_offset);
     proto->set_timezone(data->timezone);
-
     proto->set_exec_path(data->exec_path);
     proto->set_conf_source(data->conf_source);
     proto->set_command(data->command);
-
     proto->set_duration(data->duration);
     proto->set_non_clear_duration(data->non_clear_duration);
-
-
     proto->set_status(aclk_alarm_status_to_proto(data->status));
     proto->set_old_status(aclk_alarm_status_to_proto(data->old_status));
     proto->set_delay(data->delay);
     proto->set_delay_up_to_timestamp(data->delay_up_to_timestamp);
-
     proto->set_last_repeat(data->last_repeat);
     proto->set_silenced(data->silenced);
 

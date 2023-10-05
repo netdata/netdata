@@ -61,7 +61,6 @@ static bool prepare_command(BUFFER *wb,
                             uint32_t when,
                             const char *alert_name,
                             const char *alert_chart_name,
-                            const char *alert_family,
                             const char *new_status,
                             const char *old_status,
                             NETDATA_DOUBLE new_value,
@@ -115,10 +114,6 @@ static bool prepare_command(BUFFER *wb,
     buffer_sprintf(wb, " '%s'", buf);
 
     if (!sanitize_command_argument_string(buf, alert_chart_name, n))
-        return false;
-    buffer_sprintf(wb, " '%s'", buf);
-
-    if (!sanitize_command_argument_string(buf, alert_family, n))
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
@@ -565,7 +560,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               (unsigned long)ae->when,
                               ae_name(ae),
                               ae->chart?ae_chart_id(ae):"NOCHART",
-                              ae->family?ae_family(ae):"NOFAMILY",
                               rrdcalc_status2string(ae->new_status),
                               rrdcalc_status2string(ae->old_status),
                               ae->new_value,
@@ -879,28 +873,26 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
 
 static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host, SILENCERS *silencers) {
     SILENCER *s;
-    netdata_log_debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s family:%s",
-          rrdcalc_name(rc), (rc->rrdset)?rrdset_context(rc->rrdset):"", rrdcalc_chart_name(rc), host, (rc->rrdset)?rrdset_family(rc->rrdset):"");
+    netdata_log_debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s",
+          rrdcalc_name(rc), (rc->rrdset)?rrdset_context(rc->rrdset):"", rrdcalc_chart_name(rc), host);
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
                 (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches_string(s->alarms_pattern, rc->name))) &&
                 (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches_string(s->contexts_pattern, rc->rrdset->context))) &&
                 (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern, host))) &&
-                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches_string(s->charts_pattern, rc->chart))) &&
-                (!s->families_pattern || (rc->rrdset && rc->rrdset->family && s->families_pattern && simple_pattern_matches_string(s->families_pattern, rc->rrdset->family)))
+                (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches_string(s->charts_pattern, rc->chart)))
                 ) {
-            netdata_log_debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts, s->families);
+            netdata_log_debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts);
             if (unlikely(silencers->stype == STYPE_NONE)) {
                 netdata_log_debug(D_HEALTH, "Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rrdcalc_name(rc));
             } else {
-                netdata_log_debug(D_HEALTH, "Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
+                netdata_log_debug(D_HEALTH, "Alarm %s via the command API - name:%s context:%s chart:%s host:%s"
                         , (silencers->stype == STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
                         , rrdcalc_name(rc)
                         , (rc->rrdset)?rrdset_context(rc->rrdset):""
                         , rrdcalc_chart_name(rc)
                         , host
-                        , (rc->rrdset)?rrdset_family(rc->rrdset):""
                         );
             }
             return silencers->stype;
@@ -1151,7 +1143,6 @@ void *health_main(void *ptr) {
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
                                                                     rc->type,
@@ -1419,7 +1410,6 @@ void *health_main(void *ptr) {
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
                                                                     rc->type,
@@ -1507,7 +1497,6 @@ void *health_main(void *ptr) {
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->rrdset->family,
                                                                     rc->classification,
                                                                     rc->component,
                                                                     rc->type,

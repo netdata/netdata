@@ -21,7 +21,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *chart,
     STRING *chart_context,
     STRING *chart_name,
-    STRING *family,
     STRING *class,
     STRING *component,
     STRING *type,
@@ -52,7 +51,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     uuid_generate_random(ae->transition_id);
     ae->global_id = now_realtime_usec();
 
-    ae->family = string_dup(family);
     ae->classification = string_dup(class);
     ae->component = string_dup(component);
     ae->type = string_dup(type);
@@ -134,7 +132,6 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     string_freez(ae->name);
     string_freez(ae->chart);
     string_freez(ae->chart_context);
-    string_freez(ae->family);
     string_freez(ae->classification);
     string_freez(ae->component);
     string_freez(ae->type);

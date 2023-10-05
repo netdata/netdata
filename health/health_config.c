@@ -9,7 +9,6 @@
 #define HEALTH_ON_KEY "on"
 #define HEALTH_HOST_KEY "hosts"
 #define HEALTH_OS_KEY "os"
-#define HEALTH_FAMILIES_KEY "families"
 #define HEALTH_PLUGIN_KEY "plugin"
 #define HEALTH_MODULE_KEY "module"
 #define HEALTH_CHARTS_KEY "charts"
@@ -475,7 +474,6 @@ static inline void alert_config_free(struct alert_config *cfg)
     string_freez(cfg->os);
     string_freez(cfg->host);
     string_freez(cfg->on);
-    string_freez(cfg->families);
     string_freez(cfg->plugin);
     string_freez(cfg->module);
     string_freez(cfg->charts);
@@ -517,7 +515,6 @@ static int health_readfile(const char *filename, void *data) {
             hash_os = 0,
             hash_on = 0,
             hash_host = 0,
-            hash_families = 0,
             hash_plugin = 0,
             hash_module = 0,
             hash_charts = 0,
@@ -550,7 +547,6 @@ static int health_readfile(const char *filename, void *data) {
         hash_on = simple_uhash(HEALTH_ON_KEY);
         hash_os = simple_uhash(HEALTH_OS_KEY);
         hash_host = simple_uhash(HEALTH_HOST_KEY);
-        hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
         hash_plugin = simple_uhash(HEALTH_PLUGIN_KEY);
         hash_module = simple_uhash(HEALTH_MODULE_KEY);
         hash_charts = simple_uhash(HEALTH_CHARTS_KEY);
@@ -1087,15 +1083,6 @@ static int health_readfile(const char *filename, void *data) {
                     string_freez(rt->type);
                 }
                 rt->type = string_strdupz(value);
-            }
-            else if(hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
-                alert_cfg->families = string_strdupz(value);
-                string_freez(rt->family_match);
-                simple_pattern_free(rt->family_pattern);
-
-                rt->family_match = string_strdupz(value);
-                rt->family_pattern = simple_pattern_create(rrdcalctemplate_family_match(rt), NULL, SIMPLE_PATTERN_EXACT,
-                                                           true);
             }
             else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
                 alert_cfg->plugin = string_strdupz(value);

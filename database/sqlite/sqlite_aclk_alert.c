@@ -273,7 +273,7 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         sql,
         "select aa.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, "
         " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "
-        " hl.chart, hl.family, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "
+        " hl.chart, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "
         " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, "
         " hld.alarm_event_id, hl.chart_name, hld.summary  "
         " from health_log hl, aclk_alert_%s aa, alert_hash ha, health_log_detail hld "
@@ -331,64 +331,52 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
         alarm_log.node_id = wc->node_id;
         alarm_log.claim_id = claim_id;
-
         alarm_log.chart = strdupz((char *)sqlite3_column_text(res, 12));
         alarm_log.name = strdupz((char *)sqlite3_column_text(res, 11));
-        alarm_log.family = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) : NULL;
-
-        //alarm_log.batch_id = wc->alerts_batch_id;
-        //alarm_log.sequence_id = (uint64_t) sqlite3_column_int64(res, 0);
         alarm_log.when = (time_t) sqlite3_column_int64(res, 5);
-
         alarm_log.config_hash = sqlite3_uuid_unparse_strdupz(res, 3);
-
         alarm_log.utc_offset = wc->host->utc_offset;
         alarm_log.timezone = strdupz(rrdhost_abbrev_timezone(wc->host));
-        alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) :
+        alarm_log.exec_path = sqlite3_column_bytes(res, 13) > 0 ? strdupz((char *)sqlite3_column_text(res, 13)) :
                                                                   strdupz((char *)string2str(wc->host->health.health_default_exec));
+        alarm_log.conf_source = sqlite3_column_bytes(res, 15) > 0 ? strdupz((char *)sqlite3_column_text(res, 15)) : strdupz("");
 
-        alarm_log.conf_source = sqlite3_column_bytes(res, 16) > 0 ? strdupz((char *)sqlite3_column_text(res, 16)) : strdupz("");
-
-        char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
-                                 health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) :
+        char *edit_command = sqlite3_column_bytes(res, 15) > 0 ?
+                                 health_edit_command_from_source((char *)sqlite3_column_text(res, 15)) :
                                  strdupz("UNKNOWN=0=UNKNOWN");
         alarm_log.command = strdupz(edit_command);
 
         alarm_log.duration = (time_t) sqlite3_column_int64(res, 6);
         alarm_log.non_clear_duration = (time_t) sqlite3_column_int64(res, 7);
-        alarm_log.status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 20));
-        alarm_log.old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 21));
-        alarm_log.delay = (int) sqlite3_column_int(res, 22);
+        alarm_log.status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 19));
+        alarm_log.old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 20));
+        alarm_log.delay = (int) sqlite3_column_int(res, 21);
         alarm_log.delay_up_to_timestamp = (time_t) sqlite3_column_int64(res, 10);
-        alarm_log.last_repeat = (time_t) sqlite3_column_int64(res, 25);
-
+        alarm_log.last_repeat = (time_t) sqlite3_column_int64(res, 24);
         alarm_log.silenced = ((sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_SILENCED) ||
-                              (sqlite3_column_type(res, 15) != SQLITE_NULL &&
-                               !strncmp((char *)sqlite3_column_text(res, 15), "silent", 6))) ?
+                              (sqlite3_column_type(res, 14) != SQLITE_NULL &&
+                               !strncmp((char *)sqlite3_column_text(res, 14), "silent", 6))) ?
                                  1 :
                                  0;
-
         alarm_log.value_string =
+            sqlite3_column_type(res, 22) == SQLITE_NULL ?
+                strdupz((char *)"-") :
+                strdupz((char *)format_value_and_unit(
+                    new_value_string, 100, sqlite3_column_double(res, 22), (char *)sqlite3_column_text(res, 16), -1));
+        alarm_log.old_value_string =
             sqlite3_column_type(res, 23) == SQLITE_NULL ?
                 strdupz((char *)"-") :
                 strdupz((char *)format_value_and_unit(
-                    new_value_string, 100, sqlite3_column_double(res, 23), (char *)sqlite3_column_text(res, 17), -1));
-
-        alarm_log.old_value_string =
-            sqlite3_column_type(res, 24) == SQLITE_NULL ?
-                strdupz((char *)"-") :
-                strdupz((char *)format_value_and_unit(
-                    old_value_string, 100, sqlite3_column_double(res, 24), (char *)sqlite3_column_text(res, 17), -1));
-
-        alarm_log.value = (NETDATA_DOUBLE) sqlite3_column_double(res, 23);
-        alarm_log.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 24);
+                    old_value_string, 100, sqlite3_column_double(res, 23), (char *)sqlite3_column_text(res, 16), -1));
+        alarm_log.value = (NETDATA_DOUBLE) sqlite3_column_double(res, 22);
+        alarm_log.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 23);
         alarm_log.updated = (sqlite3_column_int64(res, 8) & HEALTH_ENTRY_FLAG_UPDATED) ? 1 : 0;
-        alarm_log.rendered_info = sqlite3_text_strdupz_empty(res, 18);
-        alarm_log.chart_context = sqlite3_text_strdupz_empty(res, 26);
-        alarm_log.transition_id = sqlite3_uuid_unparse_strdupz(res, 27);
-        alarm_log.event_id = (time_t) sqlite3_column_int64(res, 28);
-        alarm_log.chart_name = sqlite3_text_strdupz_empty(res, 29);
-        alarm_log.summary = sqlite3_text_strdupz_empty(res, 30);
+        alarm_log.rendered_info = sqlite3_text_strdupz_empty(res, 17);
+        alarm_log.chart_context = sqlite3_text_strdupz_empty(res, 25);
+        alarm_log.transition_id = sqlite3_uuid_unparse_strdupz(res, 26);
+        alarm_log.event_id = (time_t) sqlite3_column_int64(res, 27);
+        alarm_log.chart_name = sqlite3_text_strdupz_empty(res, 28);
+        alarm_log.summary = sqlite3_text_strdupz_empty(res, 29);
 
         aclk_send_alarm_log_entry(&alarm_log);
 
@@ -534,7 +522,7 @@ void aclk_send_alarm_configuration(char *config_hash)
 
 #define SQL_SELECT_ALERT_CONFIG                                                                                        \
     "SELECT alarm, template, on_key, class, type, component, os, hosts, plugin,"                                       \
-    "module, charts, families, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info," \
+    "module, charts, lookup, every, units, green, red, calc, warn, crit, to_key, exec, delay, repeat, info,"           \
     "options, host_labels, p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after,"        \
     "p_db_lookup_before, p_update_every, chart_labels, summary FROM alert_hash WHERE hash_id = @hash_id;"
 
@@ -596,7 +584,6 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         alarm_config.plugin = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.module = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.charts = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
-        alarm_config.families = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.lookup = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.every = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.units = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
@@ -611,7 +598,7 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         alarm_config.repeat = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.info = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.options = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
-        alarm_config.host_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 26
+        alarm_config.host_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 25
 
         alarm_config.p_db_lookup_dimensions = NULL;
         alarm_config.p_db_lookup_method = NULL;
@@ -619,26 +606,26 @@ int aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash
         alarm_config.p_db_lookup_after = 0;
         alarm_config.p_db_lookup_before = 0;
 
-        if (sqlite3_column_bytes(res, 30) > 0) {
+        if (sqlite3_column_bytes(res, 29) > 0) {
 
-            alarm_config.p_db_lookup_dimensions = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 27
-            alarm_config.p_db_lookup_method = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);      // Current param 28
-            if (param != 29)
+            alarm_config.p_db_lookup_dimensions = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);  // Current param 26
+            alarm_config.p_db_lookup_method = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);      // Current param 27
+            if (param != 28)
                 netdata_log_error("aclk_push_alert_config_event: Unexpected param number %d", param);
 
             BUFFER *tmp_buf = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
-            buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 29));
+            buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 28));
             alarm_config.p_db_lookup_options = strdupz((char *)buffer_tostring(tmp_buf));
             buffer_free(tmp_buf);
 
-            alarm_config.p_db_lookup_after = sqlite3_column_int(res, 30);
-            alarm_config.p_db_lookup_before = sqlite3_column_int(res, 31);
+            alarm_config.p_db_lookup_after = sqlite3_column_int(res, 29);
+            alarm_config.p_db_lookup_before = sqlite3_column_int(res, 30);
         }
 
-        alarm_config.p_update_every = sqlite3_column_int(res, 32);
+        alarm_config.p_update_every = sqlite3_column_int(res, 31);
 
-        alarm_config.chart_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 33);
-        alarm_config.summary = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 34);
+        alarm_config.chart_labels = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 32);
+        alarm_config.summary = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, 33);
 
         p_alarm_config.cfg_hash = strdupz((char *) config_hash);
         p_alarm_config.cfg = alarm_config;
@@ -806,7 +793,6 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     alarm_log->chart = strdupz(ae_chart_id(ae));
     alarm_log->name = strdupz(ae_name(ae));
-    alarm_log->family = strdupz(ae_family(ae));
 
     alarm_log->batch_id = 0;
     alarm_log->sequence_id = 0;

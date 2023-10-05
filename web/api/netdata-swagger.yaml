@@ -1059,11 +1059,6 @@ paths:
           description: The hostnames that will need to match.
           schema:
             type: string
-        - name: families
-          in: query
-          description: The alarm families.
-          schema:
-            type: string
       responses:
         "200":
           description: A plain text response based on the result of the command.
