@@ -228,16 +228,16 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    "ipv4"
+                    "ip"
                     , "sockstat_sockets"
                     , NULL
                     , "sockets"
                     , NULL
-                    , "IPv4 Sockets Used"
+                    , "Sockets used for all address families"
                     , "sockets"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_SOCKETS
+                    , NETDATA_CHART_PRIO_IP_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -272,7 +272,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "tcp"
                     , NULL
-                    , "IPv4 TCP Sockets"
+                    , "TCP Sockets"
                     , "sockets"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
@@ -310,11 +310,11 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "tcp"
                     , NULL
-                    , "IPv4 TCP Sockets Memory"
+                    , "TCP Sockets Memory"
                     , "KiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_TCP_MEM
+                    , NETDATA_CHART_PRIO_IPV4_TCP_SOCKETS_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -347,7 +347,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "sockets"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_UDP
+                    , NETDATA_CHART_PRIO_IPV4_UDP_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -380,7 +380,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "KiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_UDP_MEM
+                    , NETDATA_CHART_PRIO_IPV4_UDP_SOCKETS_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -413,7 +413,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "sockets"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_UDPLITE
+                    , NETDATA_CHART_PRIO_IPV4_UDPLITE_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -479,7 +479,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "fragments"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -512,7 +512,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "KiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_SOCKETS_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
             );
