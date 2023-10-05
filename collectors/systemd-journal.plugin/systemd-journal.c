@@ -1307,30 +1307,32 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             "   "JOURNAL_PARAMETER_HELP"\n"
             "      Shows this help message.\n"
             "\n"
-            "   "JOURNAL_PARAMETER_ID":STRING\n"
-            "      Caller supplied unique ID of the request.\n"
-            "      This can be used later to request a progress report of the query.\n"
-            "      Optional, but if omitted no `"JOURNAL_PARAMETER_PROGRESS"` can be requested.\n"
-            "\n"
             "   "JOURNAL_PARAMETER_INFO"\n"
             "      Request initial configuration information about the plugin.\n"
             "      The key entity returned is the required_params array, which includes\n"
             "      all the available systemd journal sources.\n"
             "      When `"JOURNAL_PARAMETER_INFO"` is requested, all other parameters are ignored.\n"
             "\n"
-            "   "JOURNAL_PARAMETER_DELTA"\n"
-            "      When doing data queries, include deltas for histogram and facets.\n"
-            "\n"
-            "   "JOURNAL_PARAMETER_TAIL"\n"
-            "      Do a tail query, to return the newest items between the anchor and before.\n"
+            "   "JOURNAL_PARAMETER_ID":STRING\n"
+            "      Caller supplied unique ID of the request.\n"
+            "      This can be used later to request a progress report of the query.\n"
+            "      Optional, but if omitted no `"JOURNAL_PARAMETER_PROGRESS"` can be requested.\n"
             "\n"
             "   "JOURNAL_PARAMETER_PROGRESS"\n"
             "      Request a progress report (the `id` of a running query is required).\n"
             "      When `"JOURNAL_PARAMETER_PROGRESS"` is requested, only parameter `"JOURNAL_PARAMETER_ID"` is used.\n"
             "\n"
-            "   "JOURNAL_PARAMETER_DATA_ONLY"\n"
+            "   "JOURNAL_PARAMETER_DATA_ONLY":true or "JOURNAL_PARAMETER_DATA_ONLY":false\n"
             "      Quickly respond with data requested, without generating a\n"
-            "      histogram and facets counters.\n"
+            "      `histogram`, `facets` counters and `items`.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_DELTA":true or "JOURNAL_PARAMETER_DELTA":false\n"
+            "      When doing data only queries, include deltas for histogram, facets and items.\n"
+            "\n"
+            "   "JOURNAL_PARAMETER_TAIL":true or "JOURNAL_PARAMETER_TAIL":false\n"
+            "      When doing data only queries, respond with the newest messages,\n"
+            "      and up to the anchor, but calculate deltas (if requested) for\n"
+            "      the duration [anchor - before].\n"
             "\n"
             "   "JOURNAL_PARAMETER_SLICE":true or "JOURNAL_PARAMETER_SLICE":false\n"
             "      When it is turned on, the plugin is executing filtering via libsystemd,\n"
@@ -1389,13 +1391,6 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             "   facet_id:value_id1,value_id2,value_id3,...\n"
             "      Apply filters to the query, based on the facet IDs returned.\n"
             "      Each `facet_id` can be given once, but multiple `facet_ids` can be given.\n"
-            "\n"
-            " There is special mode. By specifying:\n"
-            "\n"
-            "  - `"JOURNAL_PARAMETER_DIRECTION":forward`,\n"
-            "  - `"JOURNAL_PARAMETER_ANCHOR":TIMESTAMP_IN_USEC`,\n"
-            "  - `"JOURNAL_PARAMETER_DATA_ONLY"`, and\n"
-            "  - `"JOURNAL_PARAMETER_IF_MODIFIED_SINCE":TIMESTAMP_IN_USEC`\n"
             "\n"
             , program_name
             , SYSTEMD_JOURNAL_FUNCTION_NAME
@@ -2166,7 +2161,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     SD_JOURNAL_FILE_SOURCE_TYPE source_type = SDJF_ALL;
     size_t filters = 0;
 
-    buffer_json_member_add_object(wb, "request");
+    buffer_json_member_add_object(wb, "_request");
 
     char *words[SYSTEMD_JOURNAL_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, SYSTEMD_JOURNAL_MAX_PARAMS);

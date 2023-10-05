@@ -2392,7 +2392,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
     // ------------------------------------------------------------------------
     // stats
 
-    buffer_json_member_add_object(wb, "stats");
+    buffer_json_member_add_object(wb, "_stats");
     {
         buffer_json_member_add_uint64(wb, "first", facets->operations.first);
         buffer_json_member_add_uint64(wb, "forwards", facets->operations.forwards);
