@@ -1029,8 +1029,15 @@ static int health_readfile(const char *filename, void *data) {
                                                                 true);
             }
             else {
-                netdata_log_error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
-                                  line, filename, rrdcalc_name(rc), key);
+                // "families" has become obsolete and has been removed from standard alarms, but some still have it:
+                // alarms of obsolete collectors (e.g. fping, wmi).
+                if (strcmp(key, "families"))
+                    netdata_log_error(
+                        "Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
+                        line,
+                        filename,
+                        rrdcalc_name(rc),
+                        key);
             }
         }
         else if(rt) {
