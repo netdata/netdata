@@ -530,6 +530,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   "apps_cachestat_missees",
                                   20093,
                                   update_every);
+        w->charts_created &= ~(1<<EBPF_MODULE_CACHESTAT_IDX);
     }
 }
 
@@ -890,6 +891,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
         ebpf_create_chart_labels("app_group", w->name, 0);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION misses '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        w->charts_created |= 1<<EBPF_MODULE_CACHESTAT_IDX;
     }
 
     em->apps_charts |= NETDATA_EBPF_APPS_FLAG_CHART_CREATED;
@@ -992,7 +994,8 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     collected_number value;
 
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed && w->processes))
+        uint32_t cache_flag = w->charts_created & 1<<EBPF_MODULE_CACHESTAT_IDX;
+        if (likely(w->exposed && w->processes && !cache_flag))
             continue;
 
         ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);

@@ -48,6 +48,7 @@ struct ebpf_target {
 
     char id[EBPF_MAX_NAME + 1];
     uint32_t idhash;
+    uint32_t charts_created;
 
     char name[EBPF_MAX_NAME + 1];
     char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
