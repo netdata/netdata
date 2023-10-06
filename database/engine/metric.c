@@ -541,7 +541,7 @@ inline time_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *met
 }
 
 inline bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
-    pid_t expected = 0;
+    pid_t expected = __atomic_load_n(&metric->writer, __ATOMIC_RELAXED);
     pid_t wanted = gettid();
     bool done = true;
 
@@ -561,12 +561,14 @@ inline bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
 }
 
 inline bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
-    pid_t expected = gettid();
+    // this function can be called from a different thread than the one than the writer
+
+    pid_t expected = __atomic_load_n(&metric->writer, __ATOMIC_RELAXED);
     pid_t wanted = 0;
     bool done = true;
 
     do {
-        if(expected != gettid()) {
+        if(!expected) {
             done = false;
             break;
         }
