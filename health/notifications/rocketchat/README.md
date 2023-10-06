@@ -49,7 +49,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_ROCKETCHAT | Set `SEND_ROCKETCHAT` to `YES` |  | True |
+| SEND_ROCKETCHAT | Set `SEND_ROCKETCHAT` to `YES` | YES | True |
 | ROCKETCHAT_WEBHOOK_URL | set `ROCKETCHAT_WEBHOOK_URL` to your webhook URL. |  | True |
 | DEFAULT_RECIPIENT_ROCKETCHAT | Set `DEFAULT_RECIPIENT_ROCKETCHAT` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`. |  | True |
 

@@ -118,13 +118,13 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. |  | False |
-| priority | Controls the order of charts at the netdata dashboard. |  | False |
-| autodetection_retry | Sets the job re-check interval in seconds. |  | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. |  | False |
+| update_every | Sets the default data collection frequency. | 5 | False |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
 | name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
-| control_addr | Tor control IP address |  | False |
-| control_port | Tor control port. Can be either a tcp port, or a path to a socket file. |  | False |
+| control_addr | Tor control IP address | 127.0.0.1 | False |
+| control_port | Tor control port. Can be either a tcp port, or a path to a socket file. | 9051 | False |
 | password | Tor control password |  | False |
 
 </details>

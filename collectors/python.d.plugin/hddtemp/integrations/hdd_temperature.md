@@ -117,15 +117,14 @@ By default this collector will try to autodetect disks (autodetection works only
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. |  | False |
-| priority | Controls the order of charts at the netdata dashboard. |  | False |
-| autodetection_retry | Sets the job re-check interval in seconds. |  | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. |  | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
- |  | False |
+| update_every | Sets the default data collection frequency. | 1 | False |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. | local | False |
 | devices | Array of desired disks to detect, in case their name doesn't start with `sd`. |  | False |
-| host | The IP or HOSTNAME to connect to. |  | True |
-| port | The port to connect to. |  | False |
+| host | The IP or HOSTNAME to connect to. | localhost | True |
+| port | The port to connect to. | 7634 | False |
 
 </details>
 

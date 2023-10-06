@@ -84,13 +84,13 @@ Configuration for this specific integration is located in the `[plugin:freebsd:n
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -107,9 +107,9 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| IPv4 ICMP packets | Enable or disable IPv4 ICMP packets metric. |  | False |
-| IPv4 ICMP error | Enable or disable IPv4 ICMP error metric. |  | False |
-| IPv4 ICMP messages | Enable or disable IPv4 ICMP messages metric. |  | False |
+| IPv4 ICMP packets | Enable or disable IPv4 ICMP packets metric. | yes | False |
+| IPv4 ICMP error | Enable or disable IPv4 ICMP error metric. | yes | False |
+| IPv4 ICMP messages | Enable or disable IPv4 ICMP messages metric. | yes | False |
 
 </details>
 

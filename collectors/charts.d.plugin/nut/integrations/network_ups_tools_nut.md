@@ -125,11 +125,11 @@ The following collapsed table contains all the options that can be configured fo
 |:----|:-----------|:-------|:--------:|
 | nut_ups | A space separated list of UPS names. If empty, the list returned by `upsc -l` will be used. |  | False |
 | nut_names | Each line represents an alias for one UPS. If empty, the FQDN will be used. |  | False |
-| nut_timeout | How long to wait for nut to respond. |  | False |
-| nut_clients_chart | Set this to 1 to enable another chart showing the number of UPS clients connected to `upsd`. |  | False |
-| nut_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. |  | False |
-| nut_priority | The charts priority on the dashboard |  | False |
-| nut_retries | The number of retries to do in case of failure before disabling the collector. |  | False |
+| nut_timeout | How long to wait for nut to respond. | 2 | False |
+| nut_clients_chart | Set this to 1 to enable another chart showing the number of UPS clients connected to `upsd`. | 1 | False |
+| nut_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 2 | False |
+| nut_priority | The charts priority on the dashboard | 90000 | False |
+| nut_retries | The number of retries to do in case of failure before disabling the collector. | 10 | False |
 
 </details>
 

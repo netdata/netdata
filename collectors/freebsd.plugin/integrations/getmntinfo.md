@@ -89,13 +89,13 @@ Configuration for this specific integration is located in the `[plugin:freebsd:g
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -112,11 +112,11 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable new mount points detected at runtime | Cheeck new mount points during runtime. |  | False |
-| space usage for all disks | Enable or disable space usage for all disks metric. |  | False |
-| inodes usage for all disks | Enable or disable inodes usage for all disks metric. |  | False |
-| exclude space metrics on paths | Do not show metrics for listed paths. |  | False |
-| exclude space metrics on filesystems | Do not monitor listed filesystems. |  | False |
+| enable new mount points detected at runtime | Cheeck new mount points during runtime. | auto | False |
+| space usage for all disks | Enable or disable space usage for all disks metric. | auto | False |
+| inodes usage for all disks | Enable or disable inodes usage for all disks metric. | auto | False |
+| exclude space metrics on paths | Do not show metrics for listed paths. | /proc/* | False |
+| exclude space metrics on filesystems | Do not monitor listed filesystems. | autofs procfs subfs devfs none | False |
 
 </details>
 

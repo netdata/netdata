@@ -49,7 +49,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_SLACK | Set `SEND_SLACK` to YES |  | True |
+| SEND_SLACK | Set `SEND_SLACK` to YES | YES | True |
 | SLACK_WEBHOOK_URL | set `SLACK_WEBHOOK_URL` to your Slack app's webhook URL. |  | True |
 | DEFAULT_RECIPIENT_SLACK | Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to. The syntax for channels is `#channel` or `channel`. |  | True |
 

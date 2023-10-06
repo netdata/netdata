@@ -118,14 +118,14 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. |  | False |
-| priority | Controls the order of charts at the netdata dashboard. |  | False |
-| autodetection_retry | Sets the job re-check interval in seconds. |  | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. |  | False |
-| name | The JOB's name as it will appear at the dashboard (by default is the job_name) |  | False |
-| socket | The 'path/to/uwsgistats.sock' |  | False |
-| host | The host to connect to |  | False |
-| port | The port to connect to |  | False |
+| update_every | Sets the default data collection frequency. | 5 | False |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
+| name | The JOB's name as it will appear at the dashboard (by default is the job_name) | job_name | False |
+| socket | The 'path/to/uwsgistats.sock' | no | False |
+| host | The host to connect to | no | False |
+| port | The port to connect to | no | False |
 
 </details>
 

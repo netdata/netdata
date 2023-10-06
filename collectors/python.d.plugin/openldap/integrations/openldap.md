@@ -148,18 +148,18 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. |  | False |
-| priority | Controls the order of charts at the netdata dashboard. |  | False |
-| autodetection_retry | Sets the job re-check interval in seconds. |  | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. |  | False |
+| update_every | Sets the default data collection frequency. | 5 | False |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
 | name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
 | username | The bind user with right to access monitor statistics |  | True |
 | password | The password for the binded user |  | True |
 | server | The listening address of the LDAP server. In case of TLS, use the hostname which the certificate is published for. |  | True |
-| port | The listening port of the LDAP server. Change to 636 port in case of TLS connection. |  | True |
-| use_tls | Make True if a TLS connection is used over ldaps:// |  | False |
-| use_start_tls | Make True if a TLS connection is used over ldap:// |  | False |
-| cert_check | False if you want to ignore certificate check |  | True |
+| port | The listening port of the LDAP server. Change to 636 port in case of TLS connection. | 389 | True |
+| use_tls | Make True if a TLS connection is used over ldaps:// | False | False |
+| use_start_tls | Make True if a TLS connection is used over ldap:// | False | False |
+| cert_check | False if you want to ignore certificate check | True | True |
 | timeout | Seconds to timeout if no connection exist |  | True |
 
 </details>

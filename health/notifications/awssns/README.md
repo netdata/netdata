@@ -68,8 +68,8 @@ The following options can be defined for this notification
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | aws path | The full path of the aws command. If empty, the system `$PATH` will be searched for it. If not found, Amazon SNS notifications will be silently disabled. |  | True |
-| SEND_AWSNS | Set `SEND_AWSNS` to YES |  | True |
-| AWSSNS_MESSAGE_FORMAT | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. |  | True |
+| SEND_AWSNS | Set `SEND_AWSNS` to YES | YES | True |
+| AWSSNS_MESSAGE_FORMAT | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. | ${status} on ${host} at ${date}: ${chart} ${value_string} | True |
 | DEFAULT_RECIPIENT_AWSSNS | Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic. |  | True |
 
 ##### AWSSNS_MESSAGE_FORMAT
@@ -92,8 +92,6 @@ The supported variables are:
 | `${url_name}`               | Same as ${name} but URL encoded                                                  |
 | `${chart}`                  | The name of the chart (type.id)                                                  |
 | `${url_chart}`              | Same as ${chart} but URL encoded                                                 |
-| `${family}`                 | The family of the chart                                                          |
-| `${url_family}`             | Same as ${family} but URL encoded                                                |
 | `${status}`                 | The current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
 | `${old_status}`             | The previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
 | `${value}`                  | The current value of the alarm                                                   |

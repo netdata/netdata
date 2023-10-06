@@ -52,13 +52,13 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_DYNATRACE | Set `SEND_DYNATRACE` to YES |  | True |
+| SEND_DYNATRACE | Set `SEND_DYNATRACE` to YES | YES | True |
 | DYNATRACE_SERVER | Set `DYNATRACE_SERVER` to the Dynatrace server with the protocol prefix, for example `https://monitor.example.com`. |  | True |
 | DYNATRACE_TOKEN | Set `DYNATRACE_TOKEN` to your Dynatrace API authentication token |  | True |
 | DYNATRACE_SPACE | Set `DYNATRACE_SPACE` to the API Space, it is the URL part of the page you have access in order to generate the API Token. |  | True |
 | DYNATRACE_TAG_VALUE | Set `DYNATRACE_TAG_VALUE` to your Dynatrace Server Tag. |  | True |
-| DYNATRACE_ANNOTATION_TYPE | `DYNATRACE_ANNOTATION_TYPE` can be left to its default value Netdata Alarm, but you can change it to better fit your needs. |  | False |
-| DYNATRACE_EVENT | Set `DYNATRACE_EVENT` to the Dynatrace eventType you want. |  | False |
+| DYNATRACE_ANNOTATION_TYPE | `DYNATRACE_ANNOTATION_TYPE` can be left to its default value Netdata Alarm, but you can change it to better fit your needs. | Netdata Alarm | False |
+| DYNATRACE_EVENT | Set `DYNATRACE_EVENT` to the Dynatrace eventType you want. | Netdata Alarm | False |
 
 ##### DYNATRACE_SPACE
 

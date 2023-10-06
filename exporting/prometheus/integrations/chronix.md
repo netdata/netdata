@@ -53,25 +53,21 @@ The following options can be defined for this exporter.
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enabled | Enables or disables an exporting connector instance (yes|no). |  | True |
-| destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. |  | True |
-| username | Username for HTTP authentication |  | False |
-| password | Password for HTTP authentication |  | False |
-| data source | Selects the kind of data that will be sent to the external database. (as collected|average|sum) |  | False |
-| hostname | The hostname to be used for sending data to the external database server. |  | False |
-| prefix | The prefix to add to all metrics. |  | False |
-| update every | Frequency of sending sending data to the external database, in seconds.
- |  | False |
-| buffer on failures | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available.
- |  | False |
-| timeout ms | The timeout in milliseconds to wait for the external database server to process the data. |  | False |
-| send hosts matching | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns).
- |  | False |
-| send charts matching | One or more space separated patterns (use * as wildcard) checked against both chart id and chart name.
- |  | False |
-| send names instead of ids | Controls the metric names Netdata should send to the external database (yes|no). |  | False |
-| send configured labels | Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes|no). |  | False |
-| send automatic labels | Controls if automatically created labels, like `_os_name` or `_architecture` should be sent to the external database (yes|no). |  | False |
+| enabled | Enables or disables an exporting connector instance (yes/no). | no | True |
+| destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | no | True |
+| username | Username for HTTP authentication | my_username | False |
+| password | Password for HTTP authentication | my_password | False |
+| data source | Selects the kind of data that will be sent to the external database. (as collected/average/sum) |  | False |
+| hostname | The hostname to be used for sending data to the external database server. | [global].hostname | False |
+| prefix | The prefix to add to all metrics. | netdata | False |
+| update every | Frequency of sending sending data to the external database, in seconds. | 10 | False |
+| buffer on failures | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. | 10 | False |
+| timeout ms | The timeout in milliseconds to wait for the external database server to process the data. | 20000 | False |
+| send hosts matching | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns). | localhost * | False |
+| send charts matching | One or more space separated patterns (use * as wildcard) checked against both chart id and chart name. | * | False |
+| send names instead of ids | Controls the metric names Netdata should send to the external database (yes/no). |  | False |
+| send configured labels | Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes/no). |  | False |
+| send automatic labels | Controls if automatically created labels, like `_os_name` or `_architecture` should be sent to the external database (yes/no). |  | False |
 
 ##### destination
 

@@ -49,7 +49,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_MSTEAMS | Set `SEND_MSTEAMS` to YES |  | True |
+| SEND_MSTEAMS | Set `SEND_MSTEAMS` to YES | YES | True |
 | MSTEAMS_WEBHOOK_URL | set `MSTEAMS_WEBHOOK_URL` to the incoming webhook URL as given by Microsoft Teams. |  | True |
 | DEFAULT_RECIPIENT_MSTEAMS | Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to. |  | True |
 

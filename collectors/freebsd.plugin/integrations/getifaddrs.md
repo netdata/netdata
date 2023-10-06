@@ -118,13 +118,13 @@ Configuration for this specific integration is located in the `[plugin:freebsd:g
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -141,18 +141,18 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable new interfaces detected at runtime | Enable or disable possibility to discover new interface after plugin starts. |  | False |
-| total bandwidth for physical interfaces | Enable or disable total bandwidth for physical interfaces  metric. |  | False |
-| total packets for physical interfaces | Enable or disable total packets for physical interfaces metric. |  | False |
-| total bandwidth for ipv4 interface | Enable or disable total bandwidth for IPv4 interface metric. |  | False |
-| total bandwidth for ipv6 interfaces | Enable or disable total bandwidth for ipv6 interfaces metric. |  | False |
-| bandwidth for all interfaces | Enable or disable bandwidth for all interfaces metric. |  | False |
-| packets for all interfaces | Enable or disable packets for all interfaces metric. |  | False |
-| errors for all interfaces | Enable or disable errors for all interfaces metric. |  | False |
-| drops for all interfaces | Enable or disable drops for all interfaces metric. |  | False |
-| collisions for all interface | Enable or disable collisions for all interface metric. |  | False |
-| disable by default interfaces matching | Do not display data for intterfaces listed. |  | False |
-| set physical interfaces for system.net | Do not show network traffic for listed interfaces. |  | False |
+| enable new interfaces detected at runtime | Enable or disable possibility to discover new interface after plugin starts. | auto | False |
+| total bandwidth for physical interfaces | Enable or disable total bandwidth for physical interfaces  metric. | auto | False |
+| total packets for physical interfaces | Enable or disable total packets for physical interfaces metric. | auto | False |
+| total bandwidth for ipv4 interface | Enable or disable total bandwidth for IPv4 interface metric. | auto | False |
+| total bandwidth for ipv6 interfaces | Enable or disable total bandwidth for ipv6 interfaces metric. | auto | False |
+| bandwidth for all interfaces | Enable or disable bandwidth for all interfaces metric. | auto | False |
+| packets for all interfaces | Enable or disable packets for all interfaces metric. | auto | False |
+| errors for all interfaces | Enable or disable errors for all interfaces metric. | auto | False |
+| drops for all interfaces | Enable or disable drops for all interfaces metric. | auto | False |
+| collisions for all interface | Enable or disable collisions for all interface metric. | auto | False |
+| disable by default interfaces matching | Do not display data for intterfaces listed. | lo* | False |
+| set physical interfaces for system.net | Do not show network traffic for listed interfaces. | igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc* | False |
 
 </details>
 

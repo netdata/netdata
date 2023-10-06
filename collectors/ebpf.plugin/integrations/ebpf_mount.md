@@ -121,11 +121,11 @@ All options are defined inside section `[global]`.
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. |  | False |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). |  | False |
-| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). |  | False |
-| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). |  | False |
-| lifetime | Set default lifetime for thread when enabled by cloud. |  | False |
+| update every | Data collection frequency. | 5 | False |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | False |
+| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | False |
+| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | False |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | False |
 
 </details>
 

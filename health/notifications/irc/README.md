@@ -49,9 +49,9 @@ The following options can be defined for this notification
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | nc path | Set the path for nc, otherwise Netdata will search for it in your system $PATH |  | True |
-| SEND_IRC | Set `SEND_IRC` YES. |  | True |
+| SEND_IRC | Set `SEND_IRC` YES. | YES | True |
 | IRC_NETWORK | Set `IRC_NETWORK` to the IRC network which your preferred channels belong to. |  | True |
-| IRC_PORT  | Set `IRC_PORT` to the IRC port to which a connection will occur. |  | False |
+| IRC_PORT | Set `IRC_PORT` to the IRC port to which a connection will occur. |  | False |
 | IRC_NICKNAME | Set `IRC_NICKNAME` to the IRC nickname which is required to send the notification. It must not be an already registered name as the connection's MODE is defined as a guest. |  | True |
 | IRC_REALNAME | Set `IRC_REALNAME` to the IRC realname which is required in order to make the connection. |  | True |
 | DEFAULT_RECIPIENT_IRC | You can have different channels per role, by editing `DEFAULT_RECIPIENT_IRC` with the channel you want |  | True |

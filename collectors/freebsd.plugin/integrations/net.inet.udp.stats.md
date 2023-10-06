@@ -89,13 +89,13 @@ Configuration for this specific integration is located in the `[plugin:freebsd:n
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -112,8 +112,8 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| ipv4 UDP packets | Enable or disable ipv4 UDP packets metric. |  | False |
-| ipv4 UDP errors | Enable or disable ipv4 UDP errors metric. |  | False |
+| ipv4 UDP packets | Enable or disable ipv4 UDP packets metric. | yes | False |
+| ipv4 UDP errors | Enable or disable ipv4 UDP errors metric. | yes | False |
 
 </details>
 

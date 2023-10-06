@@ -124,12 +124,12 @@ The following collapsed table contains all the options that can be configured fo
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| opensips_opts | Specify parameters to the `opensipsctl` command. If the default value fails to get global status, set here whatever options are needed to connect to the opensips server. |  | False |
+| opensips_opts | Specify parameters to the `opensipsctl` command. If the default value fails to get global status, set here whatever options are needed to connect to the opensips server. | fifo get_statistics all | False |
 | opensips_cmd | If `opensipsctl` is not in $PATH, specify it's full path here. |  | False |
-| opensips_timeout | How long to wait for `opensipsctl` to respond. |  | False |
-| opensips_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. |  | False |
-| opensips_priority | The charts priority on the dashboard. |  | False |
-| opensips_retries | The number of retries to do in case of failure before disabling the collector. |  | False |
+| opensips_timeout | How long to wait for `opensipsctl` to respond. | 2 | False |
+| opensips_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 5 | False |
+| opensips_priority | The charts priority on the dashboard. | 80000 | False |
+| opensips_retries | The number of retries to do in case of failure before disabling the collector. | 10 | False |
 
 </details>
 

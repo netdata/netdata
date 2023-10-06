@@ -83,13 +83,13 @@ The configuration file name for this integration is `netdata.conf`.
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -105,8 +105,7 @@ This integration only supports a single configuration option, and most users wil
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| loop time in ms | Specifies the target time for the data collection thread to sleep, measured in miliseconds.
- |  | False |
+| loop time in ms | Specifies the target time for the data collection thread to sleep, measured in miliseconds. | 20 | False |
 
 #### Examples
 There are no configuration examples.

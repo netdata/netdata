@@ -48,7 +48,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_FLOCK | Set `SEND_FLOCK` to YES |  | True |
+| SEND_FLOCK | Set `SEND_FLOCK` to YES | YES | True |
 | FLOCK_WEBHOOK_URL | set `FLOCK_WEBHOOK_URL` to your webhook URL. |  | True |
 | DEFAULT_RECIPIENT_FLOCK | Set `DEFAULT_RECIPIENT_FLOCK` to  the Flock channel you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | True |
 
