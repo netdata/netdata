@@ -269,7 +269,7 @@ static inline ssize_t pluginsd_extract_chart_slot(char **words, size_t num_words
 }
 
 static inline void pluginsd_chart_set_to_slot(RRDHOST *host, PARSER *parser, RRDSET *st, ssize_t slot) {
-    if(slot < 0) return;
+    if(slot < 1) return;
 
     if((size_t)slot >= parser->user.expected_charts.slots) {
         size_t old_slots = parser->user.expected_charts.slots;
@@ -286,7 +286,7 @@ static inline void pluginsd_chart_set_to_slot(RRDHOST *host, PARSER *parser, RRD
 }
 
 static inline RRDSET *pluginsd_chart_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot, const char *keyword) {
-    if(slot < 0 || (size_t)slot >= parser->user.expected_charts.slots)
+    if(slot < 1 || (size_t)slot >= parser->user.expected_charts.slots)
         return pluginsd_find_chart(host, id, keyword);
 
     RRDSET *st = parser->user.expected_charts.array[slot];
@@ -1823,7 +1823,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     if(parser->user.v2.stream_buffer.v2 && parser->user.v2.stream_buffer.wb) {
         // check if receiver and sender have the same number parsing capabilities
         bool can_copy = stream_has_capability(&parser->user, STREAM_CAP_IEEE754) == stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754);
-        NUMBER_ENCODING encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
+        NUMBER_ENCODING integer_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
 
         BUFFER *wb = parser->user.v2.stream_buffer.wb;
 
@@ -1832,28 +1832,35 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
         if(unlikely(parser->user.v2.stream_buffer.begin_v2_added))
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
 
-        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
+
+        if(stream_has_capability(&parser->user, STREAM_CAP_CHART_SLOT)) {
+            buffer_fast_strcat(wb, " sl:", 4);
+            buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_chart_slot);
+        }
+
+        buffer_fast_strcat(wb, " '", 2);
         buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
         buffer_fast_strcat(wb, "' ", 2);
 
         if(can_copy)
             buffer_strcat(wb, update_every_str);
         else
-            buffer_print_uint64_encoded(wb, encoding, update_every);
+            buffer_print_uint64_encoded(wb, integer_encoding, update_every);
 
         buffer_fast_strcat(wb, " ", 1);
 
         if(can_copy)
             buffer_strcat(wb, end_time_str);
         else
-            buffer_print_uint64_encoded(wb, encoding, end_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, end_time);
 
         buffer_fast_strcat(wb, " ", 1);
 
         if(can_copy)
             buffer_strcat(wb, wall_clock_time_str);
         else
-            buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, wall_clock_time);
 
         buffer_fast_strcat(wb, "\n", 1);
 
