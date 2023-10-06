@@ -13,7 +13,7 @@ struct metric {
 
     time_t first_time_s;            //
     time_t latest_time_s_clean;     // archived pages latest time
-    time_t latest_time_s_hot;       // latest time of the currently collected page
+    time_t latest_time_s_hot;       // latest time of the currently collected page - get/set with atomic!
     uint32_t latest_update_every_s; //
     pid_t writer;
     uint8_t partition;
@@ -97,13 +97,13 @@ static inline size_t uuid_partition(MRG *mrg __maybe_unused, uuid_t *uuid) {
     return *n % mrg->partitions;
 }
 
-static inline bool metric_has_retention_unsafe(MRG *mrg __maybe_unused, METRIC *metric) {
+static inline bool metric_has_retention_with_latest_hot_unsafe(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s_hot) {
     size_t partition = metric->partition;
 
     if(unlikely(!metric->first_time_s))
-        metric->first_time_s = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
+        metric->first_time_s = MAX(metric->latest_time_s_clean, latest_time_s_hot);
 
-    bool has_retention = (metric->first_time_s > 0 || metric->latest_time_s_clean > 0 || metric->latest_time_s_hot > 0);
+    bool has_retention = (metric->first_time_s > 0 || metric->latest_time_s_clean > 0 || latest_time_s_hot > 0);
 
     if(has_retention && !(metric->flags & METRIC_FLAG_HAS_RETENTION)) {
         metric->flags |= METRIC_FLAG_HAS_RETENTION;
@@ -115,6 +115,11 @@ static inline bool metric_has_retention_unsafe(MRG *mrg __maybe_unused, METRIC *
     }
 
     return has_retention;
+}
+
+static inline bool metric_has_retention_unsafe(MRG *mrg, METRIC *metric) {
+    time_t latest_time_s_hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
+    return metric_has_retention_with_latest_hot_unsafe(mrg, metric, latest_time_s_hot);
 }
 
 static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric, bool having_spinlock) {
@@ -471,8 +476,10 @@ inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, ti
 
     metric_has_retention_unsafe(mrg, metric);
 
+    time_t latest_time_s_hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
+
     *first_time_s = metric->first_time_s;
-    *last_time_s = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
+    *last_time_s = MAX(metric->latest_time_s_clean, latest_time_s_hot);
     *update_every_s = metric->latest_update_every_s;
 
     metric_unlock(metric);
@@ -533,7 +540,7 @@ inline bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metr
             min_first_time_s = 0;
 
         metric_lock(metric);
-        if (--countdown && !min_first_time_s && metric->latest_time_s_hot)
+        if (--countdown && !min_first_time_s && __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED))
             do_again = true;
         else {
             internal_error(!countdown, "METRIC: giving up on updating the retention of metric without disk retention");
@@ -559,9 +566,7 @@ inline bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *me
     if(unlikely(latest_time_s < 0))
         return false;
 
-    metric_lock(metric);
-    metric->latest_time_s_hot = latest_time_s;
-    metric_unlock(metric);
+    __atomic_store_n(&metric->latest_time_s_hot, latest_time_s, __ATOMIC_RELAXED);
 
     return true;
 }
@@ -570,8 +575,9 @@ inline time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metr
     time_t max;
 
     metric_lock(metric);
-    metric_has_retention_unsafe(mrg, metric);
-    max = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
+    time_t latest_time_s_hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
+    metric_has_retention_with_latest_hot_unsafe(mrg, metric, latest_time_s_hot);
+    max = MAX(metric->latest_time_s_clean, latest_time_s_hot);
     metric_unlock(metric);
 
     return max;

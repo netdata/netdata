@@ -492,7 +492,7 @@ void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, cons
 
     buffer_strcat(wb, "\n");
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 
@@ -506,7 +506,7 @@ void rrdpush_send_job_deleted(RRDHOST *host, const char *plugin_name, const char
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_DELETE_JOB " %s %s %s\n", plugin_name, module_name, job_name);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
@@ -538,7 +538,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     if(unlikely(host_flags & RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
         BUFFER *wb = sender_start(host->sender);
         rrd_functions_expose_global_rrdpush(host, wb);
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     }
 
     RRDSET_FLAGS rrdset_flags = __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST);
@@ -600,7 +600,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
 
     rrd_functions_expose_global_rrdpush(host, wb);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
     sender_thread_buffer_free();
 }
@@ -633,7 +633,7 @@ void rrdpush_send_dyncfg(RRDHOST *host) {
     }
     dfe_done(plug);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
@@ -659,7 +659,7 @@ void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, cons
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE " %s %s %s\n", plugin_name, module_name, module_type2str(type));
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
@@ -672,7 +672,7 @@ void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const c
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB " %s %s %s %s %"PRIu32"\n", plugin_name, module_name, job_name, job_type2str(type), flags);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
