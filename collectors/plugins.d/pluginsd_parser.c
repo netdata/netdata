@@ -285,8 +285,9 @@ static inline void pluginsd_chart_set_to_slot(RRDHOST *host, PARSER *parser, RRD
     parser->user.expected_charts.array[slot] = st;
 }
 
-static inline RRDSET *pluginsd_chart_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot) {
-    if(slot < 0 || (size_t)slot >= parser->user.expected_charts.slots) return NULL;
+static inline RRDSET *pluginsd_chart_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot, const char *keyword) {
+    if(slot < 0 || (size_t)slot >= parser->user.expected_charts.slots)
+        return pluginsd_find_chart(host, id, keyword);
 
     RRDSET *st = parser->user.expected_charts.array[slot];
 
@@ -295,7 +296,6 @@ static inline RRDSET *pluginsd_chart_get_from_slot(RRDHOST *host __maybe_unused,
 
     return st;
 }
-
 
 static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg) {
     parser->user.enabled = 0;
@@ -1773,7 +1773,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
     timing_step(TIMING_STEP_BEGIN2_PREPARE);
 
-    RRDSET *st = pluginsd_chart_get_from_slot(host, parser, id, slot);
+    RRDSET *st = pluginsd_chart_get_from_slot(host, parser, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
 
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
