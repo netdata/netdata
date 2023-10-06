@@ -508,10 +508,12 @@ inline bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *me
 //    internal_fatal(latest_time_s > max_acceptable_collected_time(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
 
-    if(likely(latest_time_s > 0))
-        return set_metric_field_with_condition(metric->latest_time_s_hot, latest_time_s, true);
+    if(likely(latest_time_s > 0)) {
+        __atomic_store_n(&metric->latest_time_s_hot, latest_time_s, __ATOMIC_RELAXED);
+        return true;
+    }
 
-    return true;
+    return false;
 }
 
 inline time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
