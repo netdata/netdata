@@ -65,7 +65,7 @@ There is no configuration file.
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 [% for item in entry.setup.configuration.options.list %]
-| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default) ]] | [[ strfy(item.required) ]] |
+| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
 [% endfor %]
 
 [% for item in entry.setup.configuration.options.list %]
