@@ -158,7 +158,7 @@ create_tmp_directory() {
     fi
   fi
 
-  mktemp -d -t netdata-kickstart-XXXXXXXXXX
+  mktemp -d -t netdata-uninstaller-XXXXXXXXXX
 }
 
 tmpdir="$(create_tmp_directory)"
@@ -725,6 +725,8 @@ rm_file /usr/lib/systemd/system/netdata-updater.service
 rm_file /etc/systemd/system/netdata-updater.timer
 rm_file /lib/systemd/system/netdata-updater.timer
 rm_file /usr/lib/systemd/system/netdata-updater.timer
+rm_file /usr/lib/systemd/system-preset/50-netdata.preset
+rm_file /lib/systemd/system-preset/50-netdata.preset
 rm_file /etc/init.d/netdata
 rm_file /etc/periodic/daily/netdata-updater
 rm_file /etc/cron.daily/netdata-updater
@@ -737,6 +739,7 @@ else
   rm_file "/usr/sbin/netdata"
   rm_file "/usr/sbin/netdatacli"
   rm_file "/tmp/netdata-ipc"
+  rm_file "/tmp/netdata-service-cmds"
   rm_file "/usr/sbin/netdata-claim.sh"
   rm_dir "/usr/share/netdata"
   rm_dir "/usr/libexec/netdata"
@@ -744,6 +747,10 @@ else
   rm_dir "/var/cache/netdata"
   rm_dir "/var/log/netdata"
   rm_dir "/etc/netdata"
+fi
+
+if [ -n "${tmpdir}" ]; then
+  run rm -rf "${tmpdir}" || true
 fi
 
 FILE_REMOVAL_STATUS=1
