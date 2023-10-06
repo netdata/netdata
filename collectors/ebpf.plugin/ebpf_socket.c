@@ -1061,7 +1061,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_tcp_v4_connection));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1084,7 +1084,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_sent));
             // We multiply by 0.008, because we read bytes, but we display bits
-            write_chart_dimension(w->name, ((value)*8)/1000);
+            write_chart_dimension(w->clean_name, ((value)*8)/1000);
         }
     }
     write_end_chart();
@@ -1095,7 +1095,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           bytes_received));
             // We multiply by 0.008, because we read bytes, but we display bits
-            write_chart_dimension(w->name, ((value)*8)/1000);
+            write_chart_dimension(w->clean_name, ((value)*8)/1000);
         }
     }
     write_end_chart();
@@ -1105,7 +1105,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_tcp_sent));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1115,7 +1115,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_tcp_received));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1125,7 +1125,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           retransmit));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1135,7 +1135,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_udp_sent));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1145,7 +1145,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_udp_received));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();

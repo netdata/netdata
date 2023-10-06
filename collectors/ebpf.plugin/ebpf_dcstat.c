@@ -766,7 +766,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
             dcstat_update_publish(&w->dcstat, cache, not_found);
             value = (collected_number) w->dcstat.ratio;
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -780,7 +780,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
             w->dcstat.cache_access = (long long)w->dcstat.curr.cache_access - (long long)w->dcstat.prev.cache_access;
             value = (collected_number) w->dcstat.cache_access;
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
             w->dcstat.prev.cache_access = w->dcstat.curr.cache_access;
         }
     }
@@ -795,7 +795,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
             value = (collected_number) (!w->dcstat.cache_access) ? 0 :
                     (long long )w->dcstat.curr.file_system - (long long)w->dcstat.prev.file_system;
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
             w->dcstat.prev.file_system = w->dcstat.curr.file_system;
         }
     }
@@ -809,7 +809,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
             }
             value = (collected_number) (!w->dcstat.cache_access) ? 0 :
                     (long long)w->dcstat.curr.not_found - (long long)w->dcstat.prev.not_found;
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
             w->dcstat.prev.not_found = w->dcstat.curr.not_found;
         }
     }

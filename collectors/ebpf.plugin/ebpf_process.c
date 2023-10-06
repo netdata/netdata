@@ -207,7 +207,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_process));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -216,7 +216,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_thread));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -226,7 +226,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
                                                                            exit_call));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -236,7 +236,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
                                                                            release_call));
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -247,7 +247,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
             if (unlikely(w->exposed && w->processes)) {
                 value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
                                                                                task_err));
-                write_chart_dimension(w->name, value);
+                write_chart_dimension(w->clean_name, value);
             }
         }
         write_end_chart();

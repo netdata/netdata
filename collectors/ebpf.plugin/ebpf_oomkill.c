@@ -169,7 +169,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
             }
 
         write_dim:;
-            write_chart_dimension(w->name, was_oomkilled);
+            write_chart_dimension(w->clean_name, was_oomkilled);
         }
     }
 

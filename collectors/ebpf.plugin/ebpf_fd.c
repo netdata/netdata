@@ -820,7 +820,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->fd.open_call);
+            write_chart_dimension(w->clean_name, w->fd.open_call);
         }
     }
     write_end_chart();
@@ -829,7 +829,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                write_chart_dimension(w->name, w->fd.open_err);
+                write_chart_dimension(w->clean_name, w->fd.open_err);
             }
         }
         write_end_chart();
@@ -838,7 +838,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSED);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->fd.close_call);
+            write_chart_dimension(w->clean_name, w->fd.close_call);
         }
     }
     write_end_chart();
@@ -847,7 +847,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                write_chart_dimension(w->name, w->fd.close_err);
+                write_chart_dimension(w->clean_name, w->fd.close_err);
             }
         }
         write_end_chart();

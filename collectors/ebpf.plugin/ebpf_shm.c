@@ -716,7 +716,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMGET_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, (long long) w->shm.get);
+            write_chart_dimension(w->clean_name, (long long) w->shm.get);
         }
     }
     write_end_chart();
@@ -724,7 +724,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMAT_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, (long long) w->shm.at);
+            write_chart_dimension(w->clean_name, (long long) w->shm.at);
         }
     }
     write_end_chart();
@@ -732,7 +732,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMDT_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, (long long) w->shm.dt);
+            write_chart_dimension(w->clean_name, (long long) w->shm.dt);
         }
     }
     write_end_chart();
@@ -740,7 +740,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SHMCTL_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, (long long) w->shm.ctl);
+            write_chart_dimension(w->clean_name, (long long) w->shm.ctl);
         }
     }
     write_end_chart();

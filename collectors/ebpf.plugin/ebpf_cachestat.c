@@ -824,7 +824,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
             continue;
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
-                             w->name,
+                             w->clean_name,
                              "_hit_ratio",
                              "Hit ratio",
                              EBPF_COMMON_DIMENSION_PERCENTAGE,
@@ -838,7 +838,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
 
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
-                             w->name,
+                             w->clean_name,
                              "_dirty_pages",
                              "Number of dirty pages",
                              EBPF_CACHESTAT_DIMENSION_PAGE,
@@ -851,7 +851,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
         fprintf(stdout, "DIMENSION dirties '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
-                             w->name,
+                             w->clean_name,
                              "_cachestat_access",
                              "Number of accessed files",
                              EBPF_CACHESTAT_DIMENSION_HITS,
@@ -864,7 +864,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
         fprintf(stdout, "DIMENSION access '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
-                             w->name,
+                             w->clean_name,
                              "_cachestat_misses",
                              "Files out of page cache",
                              EBPF_CACHESTAT_DIMENSION_MISSES,
@@ -992,7 +992,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
             cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
             value = (collected_number) w->cachestat.ratio;
             // Here we are using different approach to have a chart more smooth
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1001,7 +1001,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = (collected_number) w->cachestat.dirty;
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1010,7 +1010,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = (collected_number) w->cachestat.hit;
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();
@@ -1019,7 +1019,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = (collected_number) w->cachestat.miss;
-            write_chart_dimension(w->name, value);
+            write_chart_dimension(w->clean_name, value);
         }
     }
     write_end_chart();

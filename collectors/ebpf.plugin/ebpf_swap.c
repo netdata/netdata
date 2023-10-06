@@ -581,7 +581,7 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_MEM_SWAP_READ_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, (long long) w->swap.read);
+            write_chart_dimension(w->clean_name, (long long) w->swap.read);
         }
     }
     write_end_chart();
@@ -589,7 +589,7 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, (long long) w->swap.write);
+            write_chart_dimension(w->clean_name, (long long) w->swap.write);
         }
     }
     write_end_chart();

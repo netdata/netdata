@@ -1130,7 +1130,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_FILE_DELETED);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.unlink_call);
+            write_chart_dimension(w->clean_name, w->vfs.unlink_call);
         }
     }
     write_end_chart();
@@ -1138,7 +1138,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.write_call + w->vfs.writev_call);
+            write_chart_dimension(w->clean_name, w->vfs.write_call + w->vfs.writev_call);
         }
     }
     write_end_chart();
@@ -1147,7 +1147,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                write_chart_dimension(w->name, w->vfs.write_err + w->vfs.writev_err);
+                write_chart_dimension(w->clean_name, w->vfs.write_err + w->vfs.writev_err);
             }
         }
         write_end_chart();
@@ -1156,7 +1156,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.read_call + w->vfs.readv_call);
+            write_chart_dimension(w->clean_name, w->vfs.read_call + w->vfs.readv_call);
         }
     }
     write_end_chart();
@@ -1165,7 +1165,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                write_chart_dimension(w->name, w->vfs.read_err + w->vfs.readv_err);
+                write_chart_dimension(w->clean_name, w->vfs.read_err + w->vfs.readv_err);
             }
         }
         write_end_chart();
@@ -1174,7 +1174,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.write_bytes + w->vfs.writev_bytes);
+            write_chart_dimension(w->clean_name, w->vfs.write_bytes + w->vfs.writev_bytes);
         }
     }
     write_end_chart();
@@ -1182,7 +1182,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.read_bytes + w->vfs.readv_bytes);
+            write_chart_dimension(w->clean_name, w->vfs.read_bytes + w->vfs.readv_bytes);
         }
     }
     write_end_chart();
@@ -1190,7 +1190,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_FSYNC);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.fsync_call);
+            write_chart_dimension(w->clean_name, w->vfs.fsync_call);
         }
     }
     write_end_chart();
@@ -1199,7 +1199,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                write_chart_dimension(w->name, w->vfs.fsync_err);
+                write_chart_dimension(w->clean_name, w->vfs.fsync_err);
             }
         }
         write_end_chart();
@@ -1208,7 +1208,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_OPEN);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.open_call);
+            write_chart_dimension(w->clean_name, w->vfs.open_call);
         }
     }
     write_end_chart();
@@ -1217,7 +1217,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                write_chart_dimension(w->name, w->vfs.open_err);
+                write_chart_dimension(w->clean_name, w->vfs.open_err);
             }
         }
         write_end_chart();
@@ -1226,7 +1226,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_CREATE);
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            write_chart_dimension(w->name, w->vfs.create_call);
+            write_chart_dimension(w->clean_name, w->vfs.create_call);
         }
     }
     write_end_chart();
@@ -1235,7 +1235,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
-                write_chart_dimension(w->name, w->vfs.create_err);
+                write_chart_dimension(w->clean_name, w->vfs.create_err);
             }
         }
         write_end_chart();
