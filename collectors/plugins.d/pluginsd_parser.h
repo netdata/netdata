@@ -81,6 +81,11 @@ typedef struct parser_user_object {
         time_t wall_clock_time;
         bool ml_locked;
     } v2;
+
+    struct {
+        size_t slots;
+        RRDSET **array;
+    } expected_charts;
 } PARSER_USER_OBJECT;
 
 typedef struct parser {

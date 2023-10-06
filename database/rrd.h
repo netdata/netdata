@@ -761,6 +761,8 @@ struct rrdset {
 
     RRDSET_TYPE chart_type;                         // line, area, stacked
 
+    uint32_t rrdpush_chart_slot;
+
     // ------------------------------------------------------------------------
     // operational state members
 
@@ -1170,6 +1172,7 @@ struct rrdhost {
     struct rrdpush_destinations *destination;       // the current destination from the above list
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
+    uint32_t rrdpush_chart_slot;
     int32_t rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step

@@ -259,6 +259,44 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
+static inline ssize_t pluginsd_extract_chart_slot(char **words, size_t num_words) {
+    ssize_t slot = -1;
+    char *id = get_word(words, num_words, 1);
+    if(id && id[0] == 's' && id[1] == 'l' && id[2] == ':')
+        slot = (ssize_t) str2ull_encoded(&id[3]);
+
+    return slot;
+}
+
+static inline void pluginsd_chart_set_to_slot(RRDHOST *host, PARSER *parser, RRDSET *st, ssize_t slot) {
+    if(slot < 0) return;
+
+    if((size_t)slot >= parser->user.expected_charts.slots) {
+        size_t old_slots = parser->user.expected_charts.slots;
+        size_t new_slots = (old_slots < 1024) ? 1024 : old_slots * 2;
+        parser->user.expected_charts.array = reallocz(parser->user.expected_charts.array, new_slots * sizeof(RRDSET *));
+
+        for(size_t i = old_slots; i < new_slots ;i++)
+            parser->user.expected_charts.array[i] = NULL;
+
+        parser->user.expected_charts.slots = new_slots;
+    }
+
+    parser->user.expected_charts.array[slot] = st;
+}
+
+static inline RRDSET *pluginsd_chart_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot) {
+    if(slot < 0 || (size_t)slot >= parser->user.expected_charts.slots) return NULL;
+
+    RRDSET *st = parser->user.expected_charts.array[slot];
+
+    internal_fatal(st && string_strcmp(st->id, id) != 0, "wrong chart in slot %zd, expected '%s', found '%s",
+                   slot, id, string2str(st->id));
+
+    return st;
+}
+
+
 static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg) {
     parser->user.enabled = 0;
 
@@ -503,18 +541,23 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    char *type = get_word(words, num_words, 1);
-    char *name = get_word(words, num_words, 2);
-    char *title = get_word(words, num_words, 3);
-    char *units = get_word(words, num_words, 4);
-    char *family = get_word(words, num_words, 5);
-    char *context = get_word(words, num_words, 6);
-    char *chart = get_word(words, num_words, 7);
-    char *priority_s = get_word(words, num_words, 8);
-    char *update_every_s = get_word(words, num_words, 9);
-    char *options = get_word(words, num_words, 10);
-    char *plugin = get_word(words, num_words, 11);
-    char *module = get_word(words, num_words, 12);
+    int idx = 1;
+    ssize_t slot = pluginsd_extract_chart_slot(words, num_words);
+    if(slot >= 0)
+        idx++;
+
+    char *type = get_word(words, num_words, idx++);
+    char *name = get_word(words, num_words, idx++);
+    char *title = get_word(words, num_words, idx++);
+    char *units = get_word(words, num_words, idx++);
+    char *family = get_word(words, num_words, idx++);
+    char *context = get_word(words, num_words, idx++);
+    char *chart = get_word(words, num_words, idx++);
+    char *priority_s = get_word(words, num_words, idx++);
+    char *update_every_s = get_word(words, num_words, idx++);
+    char *options = get_word(words, num_words, idx++);
+    char *plugin = get_word(words, num_words, idx++);
+    char *module = get_word(words, num_words, idx++);
 
     // parse the id from type
     char *id = NULL;
@@ -613,6 +656,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+
+        pluginsd_chart_set_to_slot(host, parser, st, slot);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART);
@@ -1710,10 +1755,15 @@ static inline PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
 static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER *parser) {
     timing_init();
 
-    char *id = get_word(words, num_words, 1);
-    char *update_every_str = get_word(words, num_words, 2);
-    char *end_time_str = get_word(words, num_words, 3);
-    char *wall_clock_time_str = get_word(words, num_words, 4);
+    int idx = 1;
+    ssize_t slot = pluginsd_extract_chart_slot(words, num_words);
+    if(slot >= 0)
+        idx++;
+
+    char *id = get_word(words, num_words, idx++);
+    char *update_every_str = get_word(words, num_words, idx++);
+    char *end_time_str = get_word(words, num_words, idx++);
+    char *wall_clock_time_str = get_word(words, num_words, idx++);
 
     if(unlikely(!id || !update_every_str || !end_time_str || !wall_clock_time_str))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_BEGIN_V2, "missing parameters");
@@ -1723,7 +1773,8 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
     timing_step(TIMING_STEP_BEGIN2_PREPARE);
 
-    RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN_V2);
+    RRDSET *st = pluginsd_chart_get_from_slot(host, parser, id, slot);
+
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
@@ -2687,6 +2738,12 @@ void pluginsd_process_thread_cleanup(void *ptr) {
     pluginsd_host_define_cleanup(parser);
 
     rrd_collector_finished();
+
+    if(parser->user.expected_charts.array) {
+        freez(parser->user.expected_charts.array);
+        parser->user.expected_charts.array = NULL;
+        parser->user.expected_charts.slots = 0;
+    }
 
     parser_destroy(parser);
 }

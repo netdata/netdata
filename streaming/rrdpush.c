@@ -264,10 +264,21 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         }
     }
 
+    buffer_fast_strcat(wb, "CHART ", 6);
+
+    if(stream_has_capability(host->sender, STREAM_CAP_CHART_SLOT)) {
+        if(!st->rrdpush_chart_slot)
+            st->rrdpush_chart_slot = __atomic_add_fetch(&host->rrdpush_chart_slot, 1, __ATOMIC_RELAXED);
+
+        buffer_fast_strcat(wb, "sl:", 3);
+        buffer_print_uint64_encoded(wb, NUMBER_ENCODING_HEX, st->rrdpush_chart_slot);
+        buffer_fast_strcat(wb, " ", 1);
+    }
+
     // send the chart
     buffer_sprintf(
             wb
-            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+            , "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , rrdset_id(st)
             , name
             , rrdset_title(st)
@@ -1419,7 +1430,8 @@ static struct {
     { STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     { STREAM_CAP_IEEE754, "IEEE754" },
     { STREAM_CAP_DATA_WITH_ML, "ML" },
-    { STREAM_CAP_DYNCFG, "DYN_CFG" },
+    { STREAM_CAP_DYNCFG, "DYNCFG" },
+    { STREAM_CAP_CHART_SLOT, "SLOT" },
     { 0 , NULL },
 };
 
