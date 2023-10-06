@@ -140,6 +140,7 @@ static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete("mdstat",
                               "mdstat_flush",
+                              "",
                               "MD flushes",
                               "flushes",
                               "flush (eBPF)",

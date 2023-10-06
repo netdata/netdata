@@ -305,6 +305,7 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SHMGET_CHART,
+                              "",
                               "Calls to syscall <code>shmget(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -315,6 +316,7 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SHMAT_CHART,
+                              "",
                               "Calls to syscall <code>shmat(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -325,6 +327,7 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SHMDT_CHART,
+                              "",
                               "Calls to syscall <code>shmdt(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -335,6 +338,7 @@ static void ebpf_obsolete_shm_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SHMCTL_CHART,
+                              "",
                               "Calls to syscall <code>shmctl(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -377,6 +381,7 @@ void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
 {
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SHMGET_CHART,
+                              "",
                               "Calls to syscall <code>shmget(2)</code>.",
                                EBPF_COMMON_DIMENSION_CALL,
                                NETDATA_APPS_IPC_SHM_GROUP,
@@ -387,6 +392,7 @@ void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SHMAT_CHART,
+                              "",
                               "Calls to syscall <code>shmat(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -397,6 +403,7 @@ void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SHMDT_CHART,
+                              "",
                               "Calls to syscall <code>shmdt(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -407,6 +414,7 @@ void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SHMCTL_CHART,
+                              "",
                               "Calls to syscall <code>shmctl(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -427,6 +435,7 @@ static void ebpf_obsolete_shm_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
                               NETDATA_SHM_GLOBAL_CHART,
+                              "",
                               "Calls to shared memory system calls",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_SYSTEM_IPC_SHM_SUBMENU,
@@ -831,6 +840,7 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
 static void ebpf_obsolete_specific_shm_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_SHMGET_CHART,
+                              "",
                               "Calls to syscall <code>shmget(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -838,6 +848,7 @@ static void ebpf_obsolete_specific_shm_charts(char *type, int update_every)
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5800, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SHMAT_CHART,
+                              "",
                               "Calls to syscall <code>shmat(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -845,6 +856,7 @@ static void ebpf_obsolete_specific_shm_charts(char *type, int update_every)
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5801, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SHMDT_CHART,
+                              "",
                               "Calls to syscall <code>shmdt(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,
@@ -852,6 +864,7 @@ static void ebpf_obsolete_specific_shm_charts(char *type, int update_every)
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5802, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_SHMCTL_CHART,
+                              "",
                               "Calls to syscall <code>shmctl(2)</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_APPS_IPC_SHM_GROUP,

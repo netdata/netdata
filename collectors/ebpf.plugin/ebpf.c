@@ -1215,6 +1215,7 @@ void ebpf_write_chart_cmd(char *type, char *id, char *suffix, char *title, char 
  *
  * @param type      chart type
  * @param id        chart id
+ * @param suffix    add suffix to obsolete charts.
  * @param title     chart title
  * @param units     units label
  * @param family    group name used to attach the chart on dashboard
@@ -1223,12 +1224,13 @@ void ebpf_write_chart_cmd(char *type, char *id, char *suffix, char *title, char 
  * @param order     chart order
  * @param update_every value to overwrite the update frequency set by the server.
  */
-void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
+void ebpf_write_chart_obsolete(char *type, char *id, char *suffix, char *title, char *units, char *family,
                                char *charttype, char *context, int order, int update_every)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
+    printf("CHART %s.%s%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
            type,
            id,
+           suffix,
            title,
            units,
            (family)?family:"",
@@ -1425,6 +1427,7 @@ void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
 {
     ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
                               em->memory_allocations,
+                              "",
                               "Calls to allocate memory.",
                               "calls",
                               NETDATA_EBPF_FAMILY,
@@ -1435,6 +1438,7 @@ void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
 
     ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
                               em->memory_allocations,
+                              "",
                               "Calls to allocate memory.",
                               "calls",
                               NETDATA_EBPF_FAMILY,

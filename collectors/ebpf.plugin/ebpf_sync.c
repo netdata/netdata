@@ -298,6 +298,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
     if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_FILE_SYNC_CHART,
+                                  "",
                                   "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
@@ -309,6 +310,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
     if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_MSYNC_CHART,
+                                  "",
                                "Monitor calls for <code>msync(2)</code>.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
@@ -320,6 +322,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
     if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_SYNC_CHART,
+                                  "",
                                "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
@@ -331,6 +334,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
     if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_FILE_SEGMENT_CHART,
+                                  "",
                                "Monitor calls for <code>sync_file_range(2)</code>.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,

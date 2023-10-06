@@ -335,7 +335,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
 void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1);
 collected_number get_value_from_structure(char *basis, size_t offset);
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
-void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
+void ebpf_write_chart_obsolete(char *type, char *id, char *suffix, char *title, char *units, char *family,
                                       char *charttype, char *context, int order, int update_every);
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);

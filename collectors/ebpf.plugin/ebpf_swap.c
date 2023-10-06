@@ -234,6 +234,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_MEM_SWAP_READ_CHART,
+                              "",
                               "Calls to function <code>swap_readpage</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
@@ -244,6 +245,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_MEM_SWAP_WRITE_CHART,
+                              "",
                               "Calls to function <code>swap_writepage</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
@@ -286,6 +288,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
 {
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_MEM_SWAP_READ_CHART,
+                              "",
                               "Calls to function <code>swap_readpage</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_SWAP_SUBMENU,
@@ -296,6 +299,7 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_MEM_SWAP_WRITE_CHART,
+                              "",
                               "Calls to function <code>swap_writepage</code>.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_SWAP_SUBMENU,
@@ -316,6 +320,7 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                               NETDATA_MEM_SWAP_CHART,
+                              "",
                               "Calls to access swap memory",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
@@ -679,12 +684,12 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
  */
 static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
 {
-    ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART,"Calls to function <code>swap_readpage</code>.",
+    ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART, "", "Calls to function <code>swap_readpage</code>.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_READ_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100, update_every);
 
-    ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "Calls to function <code>swap_writepage</code>.",
+    ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "",  "Calls to function <code>swap_writepage</code>.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101, update_every);

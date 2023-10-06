@@ -226,6 +226,7 @@ static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
                               "hardirq_latency",
+                              "",
                               "Hardware IRQ latency",
                               EBPF_COMMON_DIMENSION_MILLISECONDS,
                               "interrupts",

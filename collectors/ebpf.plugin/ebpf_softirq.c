@@ -71,6 +71,7 @@ static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_EBPF_SYSTEM_GROUP,
                               "softirq_latency",
+                              "",
                               "Software IRQ latency",
                               EBPF_COMMON_DIMENSION_MILLISECONDS,
                               "softirqs",

@@ -420,6 +420,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_FILE_DELETED,
+                              "",
                               "Files deleted",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -430,6 +431,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
+                              "",
                               "Write to disk",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -441,6 +443,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
+                                  "",
                                   "Fails to write",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_CGROUP_GROUP,
@@ -452,6 +455,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
+                              "",
                               "Read from disk",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -463,6 +467,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
+                                  "",
                                   "Fails to read",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_CGROUP_GROUP,
@@ -474,6 +479,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
+                              "",
                               "Bytes written on disk",
                               EBPF_COMMON_DIMENSION_BYTES,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -484,6 +490,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
+                              "",
                               "Bytes read from disk",
                               EBPF_COMMON_DIMENSION_BYTES,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -494,6 +501,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_FSYNC,
+                              "",
                               "Calls to <code>vfs_fsync</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -505,6 +513,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR,
+                                  "",
                                   "Sync error",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_CGROUP_GROUP,
@@ -515,6 +524,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     }
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_OPEN,
+                              "",
                               "Calls to <code>vfs_open</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -526,6 +536,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR,
+                                  "",
                                   "Open error",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_CGROUP_GROUP,
@@ -537,6 +548,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_CREATE,
+                              "",
                               "Calls to <code>vfs_create</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
@@ -548,6 +560,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR,
+                                  "",
                                   "Create error",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_CGROUP_GROUP,
@@ -591,6 +604,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 {
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_FILE_DELETED,
+                              "",
                               "Files deleted",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -601,6 +615,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
+                              "",
                               "Write to disk",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -612,6 +627,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
+                                  "",
                                   "Fails to write",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -623,6 +639,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
+                              "",
                               "Read from disk",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -634,6 +651,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
+                                  "",
                                   "Fails to read",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -645,6 +663,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
+                              "",
                               "Bytes written on disk",
                               EBPF_COMMON_DIMENSION_BYTES,
                               NETDATA_VFS_GROUP,
@@ -655,6 +674,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
+                              "",
                               "Bytes read from disk",
                               EBPF_COMMON_DIMENSION_BYTES,
                               NETDATA_VFS_GROUP,
@@ -665,6 +685,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_FSYNC,
+                              "",
                               "Calls for <code>vfs_fsync</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -676,6 +697,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR,
+                                  "",
                                   "Sync error",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -687,6 +709,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_OPEN,
+                              "",
                               "Calls for <code>vfs_open</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -698,6 +721,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR,
+                                  "",
                                   "Open error",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -709,6 +733,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
     ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_CREATE,
+                              "",
                               "Calls for <code>vfs_create</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -720,6 +745,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                                   NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR,
+                                  "",
                                   "Create error",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -741,6 +767,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_FILE_CLEAN_COUNT,
+                              "",
                               "Remove files",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -751,6 +778,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_FILE_IO_COUNT,
+                              "",
                               "Calls to IO",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -761,6 +789,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_IO_FILE_BYTES,
+                              "",
                               "Bytes written and read",
                               EBPF_COMMON_DIMENSION_BYTES,
                               NETDATA_VFS_GROUP,
@@ -772,6 +801,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   NETDATA_VFS_FILE_ERR_COUNT,
+                                  "",
                                   "Fails to write or read",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -783,6 +813,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_FSYNC,
+                              "",
                               "Calls for <code>vfs_fsync</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -794,6 +825,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   NETDATA_VFS_FSYNC_ERR,
+                                  "",
                                   "Fails to synchronize",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -805,6 +837,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_OPEN,
+                              "",
                               "Calls for <code>vfs_open</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -816,6 +849,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   NETDATA_VFS_OPEN_ERR,
+                                  "",
                                   "Fails to open a file",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -827,6 +861,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_CREATE,
+                              "",
                               "Calls for <code>vfs_create</code>",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
@@ -838,6 +873,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
     if (em->mode < MODE_ENTRY) {
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   NETDATA_VFS_CREATE_ERR,
+                                  "",
                                   "Fails to create a file.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
@@ -1504,76 +1540,76 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
  */
 static void ebpf_obsolete_specific_vfs_charts(char *type, ebpf_module_t *em)
 {
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_FILE_DELETED, "Files deleted",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_FILE_DELETED, "", "Files deleted",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_UNLINK_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5500, em->update_every);
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS, "Write to disk",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS, "", "Write to disk",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_WRITE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5501, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR, "Fails to write",
+        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR, "", "Fails to write",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_WRITE_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5502, em->update_every);
     }
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_READ_CALLS, "Read from disk",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_READ_CALLS, "", "Read from disk",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_READ_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5503, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR, "Fails to read",
+        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR, "", "Fails to read",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_READ_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5504, em->update_every);
     }
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES, "Bytes written on disk",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES, "", "Bytes written on disk",
                               EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_WRITE_BYTES_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5505, em->update_every);
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "Bytes read from disk",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "", "Bytes read from disk",
                               EBPF_COMMON_DIMENSION_BYTES, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5506, em->update_every);
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls for <code>vfs_fsync</code>",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "", "Calls for <code>vfs_fsync</code>",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_FSYNC_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5507, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "Sync error",
+        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR, "", "Sync error",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_FSYNC_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5508, em->update_every);
     }
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls for <code>vfs_open</code>",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "", "Calls for <code>vfs_open</code>",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_OPEN_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5509, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "Open error",
+        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR, "", "Open error",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_OPEN_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5510, em->update_every);
     }
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls for <code>vfs_create</code>",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "", "Calls for <code>vfs_create</code>",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_CREATE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5511, em->update_every);
 
     if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "Create error",
+        ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR, "", "Create error",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_CREATE_ERROR_CONTEXT,
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5512, em->update_every);
