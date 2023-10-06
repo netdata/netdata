@@ -101,13 +101,13 @@ The configuration file name for this integration is `netdata.conf`.
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -124,7 +124,7 @@ The netdata main configuration file.
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| kern.cp_time | Enable or disable Total CPU usage. |  | False |
+| kern.cp_time | Enable or disable Total CPU usage. | yes | False |
 
 </details>
 

@@ -47,7 +47,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_CUSTOM | Set `SEND_CUSTOM` to YES |  | True |
+| SEND_CUSTOM | Set `SEND_CUSTOM` to YES | YES | True |
 | DEFAULT_RECIPIENT_CUSTOM | This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function. |  | True |
 | custom_sender() | You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file. |  | False |
 
@@ -114,8 +114,6 @@ The supported variables that you can use for the function's `msg` variable are:
 | `${url_name}`               | Same as ${name} but URL encoded                                                  |
 | `${chart}`                  | The name of the chart (type.id)                                                  |
 | `${url_chart}`              | Same as ${chart} but URL encoded                                                 |
-| `${family}`                 | The family of the chart                                                          |
-| `${url_family}`             | Same as ${family} but URL encoded                                                |
 | `${status}`                 | The current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
 | `${old_status}`             | The previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
 | `${value}`                  | The current value of the alarm                                                   |

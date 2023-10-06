@@ -54,7 +54,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_PROWL | Set `SEND_PROWL` to YES |  | True |
+| SEND_PROWL | Set `SEND_PROWL` to YES | YES | True |
 | DEFAULT_RECIPIENT_PROWL | Set `DEFAULT_RECIPIENT_PROWL` to  the Prowl API key you want the alert notifications to be sent to. You can define multiple API keys like this: `APIKEY1`, `APIKEY2`. |  | True |
 
 ##### DEFAULT_RECIPIENT_PROWL

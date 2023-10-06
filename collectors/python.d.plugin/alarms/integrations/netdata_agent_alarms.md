@@ -110,18 +110,16 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| url | Netdata agent alarms endpoint to collect from. Can be local or remote so long as reachable by agent. |  | True |
-| status_map | Mapping of alarm status to integer number that will be the metric value collected. |  | True |
-| collect_alarm_values | set to true to include a chart with calculated alarm values over time. |  | True |
-| alarm_status_chart_type | define the type of chart for plotting status over time e.g. 'line' or 'stacked'. |  | True |
-| alarm_contains_words | A "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only alarms with "cpu" or "load" in alarm name. Default includes all.
- |  | True |
-| alarm_excludes_words | A "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude all alarms with "cpu" or "load" in alarm name. Default excludes None.
- |  | True |
-| update_every | Sets the default data collection frequency. |  | False |
-| priority | Controls the order of charts at the netdata dashboard. |  | False |
-| autodetection_retry | Sets the job re-check interval in seconds. |  | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. |  | False |
+| url | Netdata agent alarms endpoint to collect from. Can be local or remote so long as reachable by agent. | http://127.0.0.1:19999/api/v1/alarms?all | True |
+| status_map | Mapping of alarm status to integer number that will be the metric value collected. | {"CLEAR": 0, "WARNING": 1, "CRITICAL": 2} | True |
+| collect_alarm_values | set to true to include a chart with calculated alarm values over time. | False | True |
+| alarm_status_chart_type | define the type of chart for plotting status over time e.g. 'line' or 'stacked'. | line | True |
+| alarm_contains_words | A "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only alarms with "cpu" or "load" in alarm name. Default includes all. |  | True |
+| alarm_excludes_words | A "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude all alarms with "cpu" or "load" in alarm name. Default excludes None. |  | True |
+| update_every | Sets the default data collection frequency. | 10 | False |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
 | name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
 
 </details>

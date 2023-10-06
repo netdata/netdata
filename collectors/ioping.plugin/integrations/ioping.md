@@ -104,10 +104,10 @@ sudo ./edit-config ioping.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. |  | False |
+| update_every | Data collection frequency. | 1s | False |
 | destination | The directory/file/device to ioping. |  | True |
-| request_size | The request size in bytes to ioping the destination (symbolic modifiers are supported) |  | False |
-| ioping_opts | Options passed to `ioping` commands. |  | False |
+| request_size | The request size in bytes to ioping the destination (symbolic modifiers are supported) | 4k | False |
+| ioping_opts | Options passed to `ioping` commands. | -T 1000000 | False |
 
 </details>
 

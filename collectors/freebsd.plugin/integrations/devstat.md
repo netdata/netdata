@@ -106,13 +106,13 @@ Configuration for this specific integration is located in the `[plugin:freebsd:k
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -129,17 +129,17 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable new disks detected at runtime | Enable or disable possibility to detect new disks. |  | False |
-| performance metrics for pass devices | Enable or disable metrics for disks with type `PASS`. |  | False |
-| total bandwidth for all disks | Enable or disable total bandwidth metric for all disks. |  | False |
-| bandwidth for all disks | Enable or disable bandwidth for all disks metric. |  | False |
-| operations for all disks | Enable or disable operations for all disks metric. |  | False |
-| queued operations for all disks | Enable or disable queued operations for all disks  metric. |  | False |
-| utilization percentage for all disks | Enable or disable utilization percentage for all disks metric. |  | False |
-| i/o time for all disks | Enable or disable I/O time for all disks metric. |  | False |
-| average completed i/o time for all disks | Enable or disable average completed I/O time for all disks metric. |  | False |
-| average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. |  | False |
-| average service time for all disks | Enable or disable average service time for all disks metric. |  | False |
+| enable new disks detected at runtime | Enable or disable possibility to detect new disks. | auto | False |
+| performance metrics for pass devices | Enable or disable metrics for disks with type `PASS`. | auto | False |
+| total bandwidth for all disks | Enable or disable total bandwidth metric for all disks. | yes | False |
+| bandwidth for all disks | Enable or disable bandwidth for all disks metric. | auto | False |
+| operations for all disks | Enable or disable operations for all disks metric. | auto | False |
+| queued operations for all disks | Enable or disable queued operations for all disks  metric. | auto | False |
+| utilization percentage for all disks | Enable or disable utilization percentage for all disks metric. | auto | False |
+| i/o time for all disks | Enable or disable I/O time for all disks metric. | auto | False |
+| average completed i/o time for all disks | Enable or disable average completed I/O time for all disks metric. | auto | False |
+| average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. | auto | False |
+| average service time for all disks | Enable or disable average service time for all disks metric. | auto | False |
 | disable by default disks matching | Do not create charts for disks listed. |  | False |
 
 </details>

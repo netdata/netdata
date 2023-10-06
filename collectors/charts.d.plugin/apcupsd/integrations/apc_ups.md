@@ -122,11 +122,11 @@ The following collapsed table contains all the options that can be configured fo
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| apcupsd_sources | This is an array of apcupsd sources. You can have multiple entries there. Please refer to the example below on how to set it. |  | False |
-| apcupsd_timeout | How long to wait for apcupsd to respond. |  | False |
-| apcupsd_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. |  | False |
-| apcupsd_priority | The charts priority on the dashboard. |  | False |
-| apcupsd_retries | The number of retries to do in case of failure before disabling the collector. |  | False |
+| apcupsd_sources | This is an array of apcupsd sources. You can have multiple entries there. Please refer to the example below on how to set it. | 127.0.0.1:3551 | False |
+| apcupsd_timeout | How long to wait for apcupsd to respond. | 3 | False |
+| apcupsd_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | False |
+| apcupsd_priority | The charts priority on the dashboard. | 90000 | False |
+| apcupsd_retries | The number of retries to do in case of failure before disabling the collector. | 10 | False |
 
 </details>
 

@@ -156,15 +156,15 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. |  | False |
-| priority | Controls the order of charts at the netdata dashboard. |  | False |
-| autodetection_retry | Sets the job re-check interval in seconds. |  | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. |  | False |
-| user | The username for the user account. |  | True |
-| password | The password for the user account. |  | True |
-| server | The IP address or hostname (and port) of the Oracle Database Server. |  | True |
-| service | The Oracle Database service name. To view the services available on your server run this query, `select SERVICE_NAME from gv$session where sid in (select sid from V$MYSTAT)`. |  | True |
-| protocol | one of the strings "tcp" or "tcps" indicating whether to use unencrypted network traffic or encrypted network traffic |  | True |
+| update_every | Sets the default data collection frequency. | 5 | False |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
+| user | The username for the user account. | no | True |
+| password | The password for the user account. | no | True |
+| server | The IP address or hostname (and port) of the Oracle Database Server. | no | True |
+| service | The Oracle Database service name. To view the services available on your server run this query, `select SERVICE_NAME from gv$session where sid in (select sid from V$MYSTAT)`. | no | True |
+| protocol | one of the strings "tcp" or "tcps" indicating whether to use unencrypted network traffic or encrypted network traffic | no | True |
 
 </details>
 

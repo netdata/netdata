@@ -89,13 +89,13 @@ Configuration for this specific integration is located in the `[plugin:timex]` s
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -112,9 +112,9 @@ At least one option ('clock synchronization state', 'time offset') needs to be e
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. |  | False |
-| clock synchronization state | Make chart showing system clock synchronization state. |  | True |
-| time offset | Make chart showing computed time offset between local system and reference clock |  | True |
+| update every | Data collection frequency. | 1 | False |
+| clock synchronization state | Make chart showing system clock synchronization state. | yes | True |
+| time offset | Make chart showing computed time offset between local system and reference clock | yes | True |
 
 </details>
 

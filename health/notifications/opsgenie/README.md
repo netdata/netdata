@@ -49,9 +49,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_OPSGENIE | Set `SEND_OPSGENIE` to YES |  | True |
+| SEND_OPSGENIE | Set `SEND_OPSGENIE` to YES | YES | True |
 | OPSGENIE_API_KEY | Set `OPSGENIE_API_KEY` to your API key. |  | True |
-| OPSGENIE_API_URL | Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`. |  | False |
+| OPSGENIE_API_URL | Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`. | https://api.opsgenie.com | False |
 
 </details>
 

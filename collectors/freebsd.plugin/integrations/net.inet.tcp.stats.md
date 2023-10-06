@@ -97,13 +97,13 @@ Configuration for this specific integration is located in the `[plugin:freebsd:n
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -120,14 +120,14 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| ipv4 TCP packets | Enable or disable ipv4 TCP packets metric. |  | False |
-| ipv4 TCP errors | Enable or disable pv4 TCP errors metric. |  | False |
-| ipv4 TCP handshake issues | Enable or disable ipv4 TCP handshake issue metric. |  | False |
-| TCP connection aborts | Enable or disable TCP connection aborts metric. |  | False |
-| TCP out-of-order queue | Enable or disable TCP out-of-order queue metric. |  | False |
-| TCP SYN cookies | Enable or disable TCP SYN cookies metric. |  | False |
-| TCP listen issues | Enable or disable TCP listen issues metric. |  | False |
-| ECN packets | Enable or disable ECN packets metric. |  | False |
+| ipv4 TCP packets | Enable or disable ipv4 TCP packets metric. | yes | False |
+| ipv4 TCP errors | Enable or disable pv4 TCP errors metric. | yes | False |
+| ipv4 TCP handshake issues | Enable or disable ipv4 TCP handshake issue metric. | yes | False |
+| TCP connection aborts | Enable or disable TCP connection aborts metric. | auto | False |
+| TCP out-of-order queue | Enable or disable TCP out-of-order queue metric. | auto | False |
+| TCP SYN cookies | Enable or disable TCP SYN cookies metric. | auto | False |
+| TCP listen issues | Enable or disable TCP listen issues metric. | auto | False |
+| ECN packets | Enable or disable ECN packets metric. | auto | False |
 
 </details>
 

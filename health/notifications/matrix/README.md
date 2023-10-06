@@ -50,7 +50,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_MATRIX | Set `SEND_MATRIX` to YES |  | True |
+| SEND_MATRIX | Set `SEND_MATRIX` to YES | YES | True |
 | MATRIX_HOMESERVER | set `MATRIX_HOMESERVER` to the URL of the Matrix homeserver. |  | True |
 | MATRIX_ACCESSTOKEN | Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account. |  | True |
 | DEFAULT_RECIPIENT_MATRIX | Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`. |  | True |

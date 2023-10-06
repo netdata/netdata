@@ -88,13 +88,13 @@ Configuration for this specific integration is located in the `[plugin:freebsd:n
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -111,13 +111,13 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| icmp | Enable or disable ICMP metric. |  | False |
-| icmp redirects | Enable or disable ICMP redirects metric. |  | False |
-| icmp errors | Enable or disable ICMP errors metric. |  | False |
-| icmp echos | Enable or disable ICMP echos metric. |  | False |
-| icmp router | Enable or disable ICMP router metric. |  | False |
-| icmp neighbor | Enable or disable ICMP neighbor metric. |  | False |
-| icmp types | Enable or disable ICMP types metric. |  | False |
+| icmp | Enable or disable ICMP metric. | auto | False |
+| icmp redirects | Enable or disable ICMP redirects metric. | auto | False |
+| icmp errors | Enable or disable ICMP errors metric. | auto | False |
+| icmp echos | Enable or disable ICMP echos metric. | auto | False |
+| icmp router | Enable or disable ICMP router metric. | auto | False |
+| icmp neighbor | Enable or disable ICMP neighbor metric. | auto | False |
+| icmp types | Enable or disable ICMP types metric. | auto | False |
 
 </details>
 

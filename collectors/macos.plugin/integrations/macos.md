@@ -175,13 +175,13 @@ The configuration file name for this integration is `netdata.conf`.
 
 The file format is a modified INI syntax. The general structure is:
 
-```toml
+```ini
 [section1]
-    option 1 = some value
-    option 2 = some other value
+    option1 = some value
+    option2 = some other value
 
 [section2]
-    option 3 = some third value
+    option3 = some third value
 ```
 You can edit the configuration file using the `edit-config` script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
@@ -203,44 +203,44 @@ There are three sections in the file which you can configure:
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable load average | Enable or disable monitoring of load average metrics (load1, load5, load15). |  | False |
-| system swap | Enable or disable monitoring of system swap metrics (free, used). |  | False |
-| bandwidth | Enable or disable monitoring of network bandwidth metrics (received, sent). |  | False |
-| ipv4 TCP packets | Enable or disable monitoring of IPv4 TCP total packets metrics (received, sent). |  | False |
-| ipv4 TCP errors | Enable or disable monitoring of IPv4 TCP packets metrics (Input Errors, Checksum, Retransmission segments). |  | False |
-| ipv4 TCP handshake issues | Enable or disable monitoring of IPv4 TCP handshake metrics (Established Resets, Active Opens, Passive Opens, Attempt Fails). |  | False |
-| ECN packets | Enable or disable monitoring of ECN statistics metrics (InCEPkts, InNoECTPkts). |  | False |
-| TCP SYN cookies | Enable or disable monitoring of TCP SYN cookies metrics (received, sent, failed). |  | False |
-| TCP out-of-order queue | Enable or disable monitoring of TCP out-of-order queue metrics (inqueue). |  | False |
-| TCP connection aborts | Enable or disable monitoring of TCP connection aborts metrics (Bad Data, User closed, No memory, Timeout). |  | False |
-| ipv4 UDP packets | Enable or disable monitoring of ipv4 UDP packets metrics (sent, received.). |  | False |
-| ipv4 UDP errors | Enable or disable monitoring of ipv4 UDP errors metrics (Recieved Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi). |  | False |
-| ipv4 icmp packets | Enable or disable monitoring of IPv4 ICMP packets metrics (sent, received, in error, OUT error, IN Checksum error). |  | False |
-| ipv4 icmp messages | Enable or disable monitoring of ipv4 ICMP messages metrics (I/O messages, I/O Errors, In Checksum). |  | False |
-| ipv4 packets | Enable or disable monitoring of ipv4 packets metrics (received, sent, forwarded, delivered). |  | False |
-| ipv4 fragments sent | Enable or disable monitoring of IPv4 fragments sent metrics (ok, fails, creates). |  | False |
-| ipv4 fragments assembly | Enable or disable monitoring of IPv4 fragments assembly metrics (ok, failed, all). |  | False |
-| ipv4 errors | Enable or disable monitoring of IPv4 errors metrics (I/O discard, I/O HDR errors, In Addr errors, In Unknown protos, OUT No Routes). |  | False |
-| ipv6 packets | Enable or disable monitoring of IPv6 packets metrics (received, sent, forwarded, delivered). |  | False |
-| ipv6 fragments sent | Enable or disable monitoring of IPv6 fragments sent metrics (ok, failed, all). |  | False |
-| ipv6 fragments assembly | Enable or disable monitoring of IPv6 fragments assembly metrics (ok, failed, timeout, all). |  | False |
-| ipv6 errors | Enable or disable monitoring of IPv6 errors metrics (I/O Discards, In Hdr Errors, In Addr Errors, In Truncaedd Packets, I/O No Routes). |  | False |
-| icmp | Enable or disable monitoring of ICMP metrics (sent, received). |  | False |
-| icmp redirects | Enable or disable monitoring of ICMP redirects metrics (received, sent). |  | False |
-| icmp errors | Enable or disable monitoring of ICMP metrics (I/O Errors, In Checksums, In Destination Unreachable, In Packet too big, In Time Exceeds, In Parm Problem, Out Dest Unreachable, Out Timee Exceeds, Out Parm Problems.). |  | False |
-| icmp echos | Enable or disable monitoring of ICMP echos metrics (I/O Echos, I/O Echo Reply). |  | False |
-| icmp router | Enable or disable monitoring of ICMP router metrics (I/O Solicits, I/O Advertisements). |  | False |
-| icmp neighbor | Enable or disable monitoring of ICMP neighbor metrics (I/O Solicits, I/O Advertisements). |  | False |
-| icmp types | Enable or disable monitoring of ICMP types metrics (I/O Type1, I/O Type128, I/O Type129, Out Type133, Out Type135, In Type136, Out Type145). |  | False |
-| space usage for all disks | Enable or disable monitoring of space usage for all disks metrics (available, used, reserved for root). |  | False |
-| inodes usage for all disks | Enable or disable monitoring of inodes usage for all disks metrics (available, used, reserved for root). |  | False |
-| bandwidth | Enable or disable monitoring of bandwidth metrics (received, sent). |  | False |
-| system uptime | Enable or disable monitoring of system uptime metrics (uptime). |  | False |
-| cpu utilization | Enable or disable monitoring of CPU utilization metrics (user, nice, system, idel). |  | False |
-| system ram | Enable or disable monitoring of system RAM metrics (Active, Wired, throttled, compressor, inactive, purgeable, speculative, free). |  | False |
-| swap i/o | Enable or disable monitoring of SWAP I/O metrics (I/O Swap). |  | False |
-| memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). |  | False |
-| disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). |  | False |
+| enable load average | Enable or disable monitoring of load average metrics (load1, load5, load15). | yes | False |
+| system swap | Enable or disable monitoring of system swap metrics (free, used). | yes | False |
+| bandwidth | Enable or disable monitoring of network bandwidth metrics (received, sent). | yes | False |
+| ipv4 TCP packets | Enable or disable monitoring of IPv4 TCP total packets metrics (received, sent). | yes | False |
+| ipv4 TCP errors | Enable or disable monitoring of IPv4 TCP packets metrics (Input Errors, Checksum, Retransmission segments). | yes | False |
+| ipv4 TCP handshake issues | Enable or disable monitoring of IPv4 TCP handshake metrics (Established Resets, Active Opens, Passive Opens, Attempt Fails). | yes | False |
+| ECN packets | Enable or disable monitoring of ECN statistics metrics (InCEPkts, InNoECTPkts). | auto | False |
+| TCP SYN cookies | Enable or disable monitoring of TCP SYN cookies metrics (received, sent, failed). | auto | False |
+| TCP out-of-order queue | Enable or disable monitoring of TCP out-of-order queue metrics (inqueue). | auto | False |
+| TCP connection aborts | Enable or disable monitoring of TCP connection aborts metrics (Bad Data, User closed, No memory, Timeout). | auto | False |
+| ipv4 UDP packets | Enable or disable monitoring of ipv4 UDP packets metrics (sent, received.). | yes | False |
+| ipv4 UDP errors | Enable or disable monitoring of ipv4 UDP errors metrics (Recieved Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi). | yes | False |
+| ipv4 icmp packets | Enable or disable monitoring of IPv4 ICMP packets metrics (sent, received, in error, OUT error, IN Checksum error). | yes | False |
+| ipv4 icmp messages | Enable or disable monitoring of ipv4 ICMP messages metrics (I/O messages, I/O Errors, In Checksum). | yes | False |
+| ipv4 packets | Enable or disable monitoring of ipv4 packets metrics (received, sent, forwarded, delivered). | yes | False |
+| ipv4 fragments sent | Enable or disable monitoring of IPv4 fragments sent metrics (ok, fails, creates). | yes | False |
+| ipv4 fragments assembly | Enable or disable monitoring of IPv4 fragments assembly metrics (ok, failed, all). | yes | False |
+| ipv4 errors | Enable or disable monitoring of IPv4 errors metrics (I/O discard, I/O HDR errors, In Addr errors, In Unknown protos, OUT No Routes). | yes | False |
+| ipv6 packets | Enable or disable monitoring of IPv6 packets metrics (received, sent, forwarded, delivered). | auto | False |
+| ipv6 fragments sent | Enable or disable monitoring of IPv6 fragments sent metrics (ok, failed, all). | auto | False |
+| ipv6 fragments assembly | Enable or disable monitoring of IPv6 fragments assembly metrics (ok, failed, timeout, all). | auto | False |
+| ipv6 errors | Enable or disable monitoring of IPv6 errors metrics (I/O Discards, In Hdr Errors, In Addr Errors, In Truncaedd Packets, I/O No Routes). | auto | False |
+| icmp | Enable or disable monitoring of ICMP metrics (sent, received). | auto | False |
+| icmp redirects | Enable or disable monitoring of ICMP redirects metrics (received, sent). | auto | False |
+| icmp errors | Enable or disable monitoring of ICMP metrics (I/O Errors, In Checksums, In Destination Unreachable, In Packet too big, In Time Exceeds, In Parm Problem, Out Dest Unreachable, Out Timee Exceeds, Out Parm Problems.). | auto | False |
+| icmp echos | Enable or disable monitoring of ICMP echos metrics (I/O Echos, I/O Echo Reply). | auto | False |
+| icmp router | Enable or disable monitoring of ICMP router metrics (I/O Solicits, I/O Advertisements). | auto | False |
+| icmp neighbor | Enable or disable monitoring of ICMP neighbor metrics (I/O Solicits, I/O Advertisements). | auto | False |
+| icmp types | Enable or disable monitoring of ICMP types metrics (I/O Type1, I/O Type128, I/O Type129, Out Type133, Out Type135, In Type136, Out Type145). | auto | False |
+| space usage for all disks | Enable or disable monitoring of space usage for all disks metrics (available, used, reserved for root). | yes | False |
+| inodes usage for all disks | Enable or disable monitoring of inodes usage for all disks metrics (available, used, reserved for root). | yes | False |
+| bandwidth | Enable or disable monitoring of bandwidth metrics (received, sent). | yes | False |
+| system uptime | Enable or disable monitoring of system uptime metrics (uptime). | yes | False |
+| cpu utilization | Enable or disable monitoring of CPU utilization metrics (user, nice, system, idel). | yes | False |
+| system ram | Enable or disable monitoring of system RAM metrics (Active, Wired, throttled, compressor, inactive, purgeable, speculative, free). | yes | False |
+| swap i/o | Enable or disable monitoring of SWAP I/O metrics (I/O Swap). | yes | False |
+| memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). | yes | False |
+| disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). | yes | False |
 
 </details>
 

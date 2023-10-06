@@ -50,7 +50,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_NTFY | Set `SEND_NTFY` to YES |  | True |
+| SEND_NTFY | Set `SEND_NTFY` to YES | YES | True |
 | DEFAULT_RECIPIENT_NTFY | URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://ntfy.sh. |  | True |
 | NTFY_USERNAME | The username for netdata to use to authenticate with an ntfy server. |  | False |
 | NTFY_PASSWORD | The password for netdata to use to authenticate with an ntfy server. |  | False |

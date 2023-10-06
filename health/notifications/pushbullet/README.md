@@ -48,7 +48,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| Send_PUSHBULLET | Set `Send_PUSHBULLET` to YES |  | True |
+| Send_PUSHBULLET | Set `Send_PUSHBULLET` to YES | YES | True |
 | PUSHBULLET_ACCESS_TOKEN | set `PUSHBULLET_ACCESS_TOKEN` to the access token you generated. |  | True |
 | DEFAULT_RECIPIENT_PUSHBULLET | Set `DEFAULT_RECIPIENT_PUSHBULLET` to the email (e.g. `example@domain.com`) or the channel tag (e.g. `#channel`) you want the alert notifications to be sent to. |  | True |
 

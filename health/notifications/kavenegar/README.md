@@ -49,7 +49,7 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_KAVENEGAR | Set `SEND_KAVENEGAR` to YES |  | True |
+| SEND_KAVENEGAR | Set `SEND_KAVENEGAR` to YES | YES | True |
 | KAVENEGAR_API_KEY | Set `KAVENEGAR_API_KEY` to your API key. |  | True |
 | KAVENEGAR_SENDER | Set `KAVENEGAR_SENDER` to the value of your Sender. |  | True |
 | DEFAULT_RECIPIENT_KAVENEGAR | Set `DEFAULT_RECIPIENT_KAVENEGAR` to the SMS recipient you want the alert notifications to be sent to. You can define multiple recipients like this: 09155555555 09177777777. |  | True |
