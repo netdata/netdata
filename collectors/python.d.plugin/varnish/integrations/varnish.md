@@ -157,7 +157,7 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| instance_name | the name of the varnishd instance to get logs from. If not specified, the host name is used. | <host name> | True |
+| instance_name | the name of the varnishd instance to get logs from. If not specified, the local host name is used. |  | True |
 | update_every | Sets the default data collection frequency. | 10 | False |
 | priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
 | autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
