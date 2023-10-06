@@ -268,11 +268,13 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     buffer_fast_strcat(wb, "CHART ", 6);
 
     if(stream_has_capability(host->sender, STREAM_CAP_CHART_SLOT)) {
+        NUMBER_ENCODING integer_encoding = stream_has_capability(host->sender, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
+
         if(!st->rrdpush_chart_slot)
             st->rrdpush_chart_slot = __atomic_add_fetch(&host->rrdpush_chart_slot, 1, __ATOMIC_RELAXED);
 
         buffer_fast_strcat(wb, "sl:", 3);
-        buffer_print_uint64_encoded(wb, NUMBER_ENCODING_HEX, st->rrdpush_chart_slot);
+        buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_chart_slot);
         buffer_fast_strcat(wb, " ", 1);
     }
 
@@ -435,10 +437,10 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 
         if(stream_has_capability(rsb, STREAM_CAP_CHART_SLOT)) {
             buffer_fast_strcat(wb, " sl:", 4);
-            buffer_print_uint64_encoded(wb, NUMBER_ENCODING_HEX, rd->rrdset->rrdpush_chart_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush_chart_slot);
         }
 
-        buffer_fast_strcat(wb, " '", 1);
+        buffer_fast_strcat(wb, " '", 2);
         buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
         buffer_fast_strcat(wb, "' ", 2);
         buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->update_every);

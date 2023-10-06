@@ -291,7 +291,7 @@ static inline RRDSET *pluginsd_chart_get_from_slot(RRDHOST *host __maybe_unused,
 
     RRDSET *st = parser->user.expected_charts.array[slot];
 
-    internal_fatal(st && string_strcmp(st->id, id) != 0, "wrong chart in slot %zd, expected '%s', found '%s",
+    internal_fatal(st && string_strcmp(st->id, id) != 0, "wrong chart in slot %zd, expected '%s', found '%s'",
                    slot, id, string2str(st->id));
 
     return st;
