@@ -96,6 +96,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
             STREAM_HAS_COMPRESSION |
+            STREAM_CAP_CHART_SLOT |
 #ifdef NETDATA_TEST_DYNCFG
             STREAM_CAP_DYNCFG |
 #endif
