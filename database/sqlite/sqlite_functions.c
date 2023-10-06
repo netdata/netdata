@@ -185,18 +185,10 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
 int execute_insert(sqlite3_stmt *res)
 {
     int rc;
-    int cnt = 0;
-    while ((rc = sqlite3_step_monitored(res)) != SQLITE_DONE && ++cnt < SQL_MAX_RETRY && likely(!netdata_exit)) {
-        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
-            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
-            error_report("Failed to insert/update, rc = %d -- attempt %d", rc, cnt);
-        }
-        else {
-            if (rc == SQLITE_CORRUPT)
-                (void) mark_database_to_recover(res, NULL);
-            error_report("SQLite error %d", rc);
-            break;
-        }
+    rc =  sqlite3_step_monitored(res);
+    if (rc == SQLITE_CORRUPT) {
+        (void)mark_database_to_recover(res, NULL);
+        error_report("SQLite error %d", rc);
     }
     return rc;
 }
@@ -320,7 +312,6 @@ int init_database_batch(sqlite3 *database, const char *batch[])
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
-        netdata_log_debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
@@ -496,7 +487,7 @@ int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
 
     rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host parameter to %s, rc = %d", sql, rc);
+        error_report("Failed to bind UUID parameter to %s, rc = %d", sql, rc);
         goto skip;
     }
 
@@ -616,44 +607,6 @@ failed:
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
     return rc - 1;
-}
-
-#define SQL_SELECT_HOST_BY_NODE_ID  "select host_id from node_instance where node_id = @node_id;"
-
-int get_host_id(uuid_t *node_id, uuid_t *host_id)
-{
-    static __thread sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return 1;
-    }
-
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_SELECT_HOST_BY_NODE_ID, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to select node instance information for a node");
-            return 1;
-        }
-    }
-
-    rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to select node instance information");
-        goto failed;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW && host_id))
-        uuid_copy(*host_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
-
-failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset the prepared statement when selecting node instance information");
-
-    return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
 #define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL;"
@@ -811,7 +764,7 @@ failed:
 
 void sql_load_node_id(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -820,13 +773,11 @@ void sql_load_node_id(RRDHOST *host)
         return;
     }
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_GET_HOST_NODE_ID, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to fetch node id");
-            return;
-        };
-    }
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_HOST_NODE_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch node id");
+        return;
+    };
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
@@ -843,8 +794,8 @@ void sql_load_node_id(RRDHOST *host)
     }
 
 failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset the prepared statement when loading node instance information");
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when loading node instance information");
 };
 
 

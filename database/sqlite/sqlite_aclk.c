@@ -65,9 +65,7 @@ static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
     uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
 
     /* wake up event loop */
-    int rc = uv_async_send(&aclk_sync_config.async);
-    if (unlikely(rc))
-        netdata_log_debug(D_ACLK_SYNC, "Failed to wake up event loop");
+    (void) uv_async_send(&aclk_sync_config.async);
 }
 
 enum {
@@ -226,14 +224,8 @@ static void sql_delete_aclk_table_list(char *host_guid)
     uuid_unparse_lower(host_uuid, host_str);
     uuid_unparse_lower_fix(&host_uuid, uuid_str);
 
-    netdata_log_debug(D_ACLK_SYNC, "Checking if I should delete aclk tables for node %s", host_str);
-
-    if (is_host_available(&host_uuid)) {
-        netdata_log_debug(D_ACLK_SYNC, "Host %s exists, not deleting aclk sync tables", host_str);
+    if (is_host_available(&host_uuid))
         return;
-    }
-
-    netdata_log_debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str);
 
     sqlite3_stmt *res = NULL;
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
@@ -265,7 +257,6 @@ fail:
 
 static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
 {
-    netdata_log_debug(D_ACLK_SYNC,"Scheduling aclk sync table check for node %s", (char *) argv[0]);
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_DELETE_HOST;
@@ -280,7 +271,6 @@ static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unus
 static void sql_check_aclk_table_list(void)
 {
     char *err_msg = NULL;
-    netdata_log_debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
     int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, NULL, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
@@ -305,7 +295,6 @@ static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __ma
 static void sql_maint_aclk_sync_database_all(void)
 {
     char *err_msg = NULL;
-    netdata_log_debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
     int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ALERT_LIST, sql_maint_aclk_sync_database, NULL, &err_msg);
     if (rc != SQLITE_OK) {
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
@@ -444,7 +433,6 @@ static void aclk_synchronization(void *arg __maybe_unused)
                     sql_process_queue_removed_alerts_to_aclk(cmd.param[0]);
                     break;
                 default:
-                    netdata_log_debug(D_ACLK_SYNC, "%s: default.", __func__);
                     break;
             }
             if (cmd.completion)
