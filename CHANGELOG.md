@@ -6,10 +6,16 @@
 
 **Merged pull requests:**
 
+- fix journal help and mark debug keys in the output [\#16133](https://github.com/netdata/netdata/pull/16133) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16132](https://github.com/netdata/netdata/pull/16132) ([netdatabot](https://github.com/netdatabot))
+- apps: change user\_group to usergroup [\#16131](https://github.com/netdata/netdata/pull/16131) ([ilyam8](https://github.com/ilyam8))
+- Retain a list structure instead of a set for data collection integrations categories [\#16130](https://github.com/netdata/netdata/pull/16130) ([Ancairon](https://github.com/Ancairon))
+- Add summary to alerts configurations [\#16129](https://github.com/netdata/netdata/pull/16129) ([MrZammler](https://github.com/MrZammler))
 - Remove multiple categories due to bug [\#16126](https://github.com/netdata/netdata/pull/16126) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#16125](https://github.com/netdata/netdata/pull/16125) ([netdatabot](https://github.com/netdatabot))
 - update UI to v6.45.0 [\#16124](https://github.com/netdata/netdata/pull/16124) ([ilyam8](https://github.com/ilyam8))
 - journal: fix the 1 second latency in play mode [\#16123](https://github.com/netdata/netdata/pull/16123) ([ktsaou](https://github.com/ktsaou))
+- fix proc netstat metrics [\#16122](https://github.com/netdata/netdata/pull/16122) ([ilyam8](https://github.com/ilyam8))
 - dont strip newlines when forwarding FUNCTION\_PAYLOAD [\#16120](https://github.com/netdata/netdata/pull/16120) ([underhood](https://github.com/underhood))
 - Do not force OOMKill [\#16115](https://github.com/netdata/netdata/pull/16115) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix crash on parsing clabel command with no source [\#16114](https://github.com/netdata/netdata/pull/16114) ([ilyam8](https://github.com/ilyam8))
@@ -65,6 +71,7 @@
 - use `status` as units for `anomaly_detection.detector_events` [\#16028](https://github.com/netdata/netdata/pull/16028) ([andrewm4894](https://github.com/andrewm4894))
 - add description for Homebrew on Apple Silicon Mac\(netdata/learn/\#1789\) [\#16027](https://github.com/netdata/netdata/pull/16027) ([theggs](https://github.com/theggs))
 - Fix package builds on Rocky Linux. [\#16026](https://github.com/netdata/netdata/pull/16026) ([Ferroin](https://github.com/Ferroin))
+- Remove family from alerts [\#16025](https://github.com/netdata/netdata/pull/16025) ([MrZammler](https://github.com/MrZammler))
 - add systemd-journal.plugin to apps\_groups.conf [\#16024](https://github.com/netdata/netdata/pull/16024) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of CI skipping. [\#16022](https://github.com/netdata/netdata/pull/16022) ([Ferroin](https://github.com/Ferroin))
 - update bundled UI to v6.39.0 [\#16020](https://github.com/netdata/netdata/pull/16020) ([ilyam8](https://github.com/ilyam8))
@@ -428,12 +435,6 @@
 - wait for node\_id while claiming [\#15526](https://github.com/netdata/netdata/pull/15526) ([ktsaou](https://github.com/ktsaou))
 - add `diskquota` collector to third party collectors list [\#15524](https://github.com/netdata/netdata/pull/15524) ([andrewm4894](https://github.com/andrewm4894))
 - Add quick\_start key to deploy schema. [\#15522](https://github.com/netdata/netdata/pull/15522) ([Ferroin](https://github.com/Ferroin))
-- Add a schema for the categories.yaml file. [\#15521](https://github.com/netdata/netdata/pull/15521) ([Ferroin](https://github.com/Ferroin))
-- fix collector multi schema [\#15520](https://github.com/netdata/netdata/pull/15520) ([ilyam8](https://github.com/ilyam8))
-- Allow to create alert hashes with --disable-cloud [\#15519](https://github.com/netdata/netdata/pull/15519) ([MrZammler](https://github.com/MrZammler))
-- Python collector yaml updates [\#15517](https://github.com/netdata/netdata/pull/15517) ([Ancairon](https://github.com/Ancairon))
-- eBPF Yaml complement [\#15516](https://github.com/netdata/netdata/pull/15516) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add AMD GPU collector  [\#15515](https://github.com/netdata/netdata/pull/15515) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
