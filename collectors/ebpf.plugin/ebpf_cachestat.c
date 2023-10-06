@@ -828,7 +828,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed))
+        if (likely(w->exposed && w->processes))
             continue;
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
