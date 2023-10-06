@@ -40,7 +40,7 @@
     "INSERT INTO dimension (dim_id, chart_id, id, name, multiplier, divisor , algorithm, options) "                    \
     "VALUES (@dim_id, @chart_id, @id, @name, @multiplier, @divisor, @algorithm, @options) "                            \
     "ON CONFLICT(dim_id) DO UPDATE SET id=excluded.id, name=excluded.name, multiplier=excluded.multiplier, "           \
-    "divisor=excluded.divisor, algorithm=excluded.divisor, options=excluded.options"
+    "divisor=excluded.divisor, algorithm=excluded.algorithm, options=excluded.options"
 
 #define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
 #define SELECT_CHART_LIST "SELECT chart_id, rowid FROM chart WHERE rowid > @row_id"
