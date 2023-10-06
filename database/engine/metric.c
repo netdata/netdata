@@ -444,8 +444,13 @@ inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *
 //    internal_fatal(metric->latest_time_s_clean > latest_time_s,
 //                   "DBENGINE METRIC: metric new clean latest time is older than the previous one");
 
-    if(latest_time_s > 0)
-        return set_metric_field_with_condition(metric->latest_time_s_clean, latest_time_s, true);
+    if(latest_time_s > 0) {
+        if(set_metric_field_with_condition(metric->latest_time_s_clean, latest_time_s, true)) {
+            set_metric_field_with_condition(metric->first_time_s, latest_time_s, _current <= 0 || latest_time_s < _current);
+
+            return true;
+        }
+    }
 
     return false;
 }
