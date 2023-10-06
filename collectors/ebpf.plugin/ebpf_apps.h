@@ -50,6 +50,7 @@ struct ebpf_target {
     uint32_t idhash;
 
     char name[EBPF_MAX_NAME + 1];
+    char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
 
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;

@@ -512,6 +512,9 @@ struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char
         // copy the id
         strncpyz(w->name, nid, EBPF_MAX_NAME);
 
+    strncpyz(w->clean_name, w->name, EBPF_MAX_NAME);
+    netdata_fix_chart_name(w->clean_name);
+
     strncpyz(w->compare, nid, EBPF_MAX_COMPARE_NAME);
     size_t len = strlen(w->compare);
     if (w->compare[len - 1] == '*') {
