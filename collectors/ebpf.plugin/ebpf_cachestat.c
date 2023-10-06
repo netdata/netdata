@@ -484,7 +484,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = apps_groups_root_target; w; w = w->next) {
-        if (likely(w->exposed || !w->processes))
+        if (likely(w->exposed && w->processes))
             continue;
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -496,7 +496,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   "apps_cachestat_ratio",
                                   20090,
-                                  em->update_every);
+                                  update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
@@ -507,7 +507,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "apps_cachestat_dirty",
                                   20091,
-                                  em->update_every);
+                                  update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
@@ -518,7 +518,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "apps_cachestat_access",
                                   20092,
-                                  em->update_every);
+                                  update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
@@ -529,7 +529,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "apps_cachestat_missees",
                                   20093,
-                                  em->update_every);
+                                  update_every);
     }
 }
 
@@ -827,7 +827,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed || !w->processes))
+        if (likely(w->exposed))
             continue;
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
@@ -991,53 +991,42 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     struct ebpf_target *w;
     collected_number value;
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART, "");
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
-            netdata_cachestat_pid_t *current = &w->cachestat.current;
-            netdata_cachestat_pid_t *prev = &w->cachestat.prev;
+        if (likely(w->exposed && w->processes))
+            continue;
 
-            uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
-            uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
-            w->cachestat.dirty = mbd;
-            uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
-            uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+        ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
+        netdata_cachestat_pid_t *current = &w->cachestat.current;
+        netdata_cachestat_pid_t *prev = &w->cachestat.prev;
 
-            cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
-            value = (collected_number) w->cachestat.ratio;
-            // Here we are using different approach to have a chart more smooth
-            write_chart_dimension(w->clean_name, value);
-        }
+        uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
+        uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+        w->cachestat.dirty = mbd;
+        uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
+        uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+
+        cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
+
+        value = (collected_number) w->cachestat.ratio;
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_hit_ratio");
+        write_chart_dimension("ratio", value);
+        write_end_chart();
+
+        value = (collected_number) w->cachestat.dirty;
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_dirty_pages");
+        write_chart_dimension("dirties", value);
+        write_end_chart();
+
+        value = (collected_number) w->cachestat.hit;
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_cachestat_access");
+        write_chart_dimension("access", value);
+        write_end_chart();
+
+        value = (collected_number) w->cachestat.miss;
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_cachestat_misses");
+        write_chart_dimension("misses", value);
+        write_end_chart();
     }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART, "");
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->cachestat.dirty;
-            write_chart_dimension(w->clean_name, value);
-        }
-    }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_HIT_CHART, "");
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->cachestat.hit;
-            write_chart_dimension(w->clean_name, value);
-        }
-    }
-    write_end_chart();
-
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_CACHESTAT_MISSES_CHART, "");
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            value = (collected_number) w->cachestat.miss;
-            write_chart_dimension(w->clean_name, value);
-        }
-    }
-    write_end_chart();
 }
 
 /**
