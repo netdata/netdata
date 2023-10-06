@@ -3,10 +3,6 @@
 typedef int32_t REFCOUNT;
 #define REFCOUNT_DELETING (-100)
 
-typedef enum __attribute__ ((__packed__)) {
-    METRIC_FLAG_NONE = 0,
-} METRIC_FLAGS;
-
 struct metric {
     uuid_t uuid;                    // never changes
     Word_t section;                 // never changes
@@ -17,7 +13,6 @@ struct metric {
     uint32_t latest_update_every_s; // the latest data collection frequency
     pid_t writer;
     uint8_t partition;
-    METRIC_FLAGS flags;
     REFCOUNT refcount;
 
     // THIS IS allocated with malloc()
@@ -223,7 +218,6 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     metric->latest_update_every_s = entry->latest_update_every_s;
     metric->writer = 0;
     metric->refcount = 0;
-    metric->flags = 0;
     metric->partition = partition;
     metric_acquire(mrg, metric);
     *PValue = metric;
