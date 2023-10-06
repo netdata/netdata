@@ -834,6 +834,8 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20090,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_commit_label();
         fprintf(stdout, "DIMENSION ratio '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
 
@@ -848,6 +850,8 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20091,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_commit_label();
         fprintf(stdout, "DIMENSION dirties '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
@@ -861,6 +865,8 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20092,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_commit_label();
         fprintf(stdout, "DIMENSION access '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
@@ -874,6 +880,8 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20093,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_commit_label();
         fprintf(stdout, "DIMENSION misses '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
     }
 
