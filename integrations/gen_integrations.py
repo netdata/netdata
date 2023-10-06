@@ -140,7 +140,17 @@ def get_jinja_env():
             lstrip_blocks=True,
         )
 
+        _jinja_env.globals.update(strfy=strfy)
+
     return _jinja_env
+
+
+def strfy(value):
+    if not isinstance(value, str):
+        return value
+
+    return ' '.join([v.strip() for v in value.strip().split("\n") if v])
+
 
 
 def get_category_sets(categories):
