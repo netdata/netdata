@@ -356,7 +356,7 @@ static void mdflush_collector(ebpf_module_t *em)
         mdflush_read_count_map(maps_per_core);
         pthread_mutex_lock(&lock);
         // write dims now for all hitherto discovered devices.
-        write_begin_chart("mdstat", "mdstat_flush");
+        write_begin_chart("mdstat", "mdstat_flush", "");
         avl_traverse_lock(&mdflush_pub, mdflush_write_dims, NULL);
         write_end_chart();
 

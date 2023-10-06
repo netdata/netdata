@@ -266,8 +266,6 @@ void ebpf_create_chart(char *type,
                               int update_every,
                               char *module);
 
-void write_begin_chart(char *family, char *name);
-
 void write_chart_dimension(char *dim, long long value);
 
 void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end);
@@ -308,6 +306,26 @@ static inline void ebpf_create_chart_labels(char *name, char *value, int source)
 static inline void ebpf_commit_label()
 {
     fprintf(stdout, "CLABEL_COMMIT\n");
+}
+
+/**
+ * Write begin command on standard output
+ *
+ * @param family the chart family name
+ * @param name   the chart name
+ * @param suffix the chart suffix (used with apps and cgroups)
+ */
+static inline void write_begin_chart(char *family, char *name, char *suffix)
+{
+    printf("BEGIN %s.%s%s\n", family, name, suffix);
+}
+
+/**
+ * Write END command on stdout.
+ */
+static inline void write_end_chart()
+{
+    printf("END\n");
 }
 
 void write_end_chart();

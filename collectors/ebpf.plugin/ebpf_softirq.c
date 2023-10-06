@@ -229,7 +229,7 @@ static void softirq_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
-        write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "softirq_latency");
+        write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "softirq_latency", "");
         softirq_write_dims();
         write_end_chart();
 

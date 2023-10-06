@@ -756,7 +756,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
     struct ebpf_target *w;
     collected_number value;
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_HIT_CHART);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_HIT_CHART, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_dcstat_sum_pids(&w->dcstat, w->root_pid);
@@ -771,7 +771,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REFERENCE_CHART);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REFERENCE_CHART, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             if (w->dcstat.curr.cache_access < w->dcstat.prev.cache_access) {
@@ -786,7 +786,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             if (w->dcstat.curr.file_system < w->dcstat.prev.file_system) {
@@ -801,7 +801,7 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             if (w->dcstat.curr.not_found < w->dcstat.prev.not_found) {
@@ -1043,7 +1043,7 @@ static void ebpf_send_systemd_dc_charts()
 {
     collected_number value;
     ebpf_cgroup_target_t *ect;
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_HIT_CHART);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_HIT_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_dc.ratio);
@@ -1051,7 +1051,7 @@ static void ebpf_send_systemd_dc_charts()
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REFERENCE_CHART);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REFERENCE_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_dc.cache_access);
@@ -1059,7 +1059,7 @@ static void ebpf_send_systemd_dc_charts()
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
@@ -1071,7 +1071,7 @@ static void ebpf_send_systemd_dc_charts()
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
@@ -1094,12 +1094,12 @@ static void ebpf_send_systemd_dc_charts()
 static void ebpf_send_specific_dc_data(char *type, netdata_publish_dcstat_t *pdc)
 {
     collected_number value;
-    write_begin_chart(type, NETDATA_DC_HIT_CHART);
+    write_begin_chart(type, NETDATA_DC_HIT_CHART, "");
     write_chart_dimension(dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_RATIO].name,
                           (long long) pdc->ratio);
     write_end_chart();
 
-    write_begin_chart(type, NETDATA_DC_REFERENCE_CHART);
+    write_begin_chart(type, NETDATA_DC_REFERENCE_CHART, "");
     write_chart_dimension(dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE].name,
                           (long long) pdc->cache_access);
     write_end_chart();
@@ -1108,7 +1108,7 @@ static void ebpf_send_specific_dc_data(char *type, netdata_publish_dcstat_t *pdc
         (long long )pdc->curr.file_system - (long long)pdc->prev.file_system;
     pdc->prev.file_system = pdc->curr.file_system;
 
-    write_begin_chart(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
+    write_begin_chart(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART, "");
     write_chart_dimension(dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_SLOW].name, (long long) value);
     write_end_chart();
 
@@ -1116,7 +1116,7 @@ static void ebpf_send_specific_dc_data(char *type, netdata_publish_dcstat_t *pdc
         (long long)pdc->curr.not_found - (long long)pdc->prev.not_found;
     pdc->prev.not_found = pdc->curr.not_found;
 
-    write_begin_chart(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
+    write_begin_chart(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART, "");
     write_chart_dimension(dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_MISS].name, (long long) value);
     write_end_chart();
 }

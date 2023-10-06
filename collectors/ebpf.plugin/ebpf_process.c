@@ -116,7 +116,7 @@ static void ebpf_update_global_publish(netdata_publish_syscall_t *publish, netda
  */
 static void write_status_chart(char *family, netdata_publish_vfs_common_t *pvc)
 {
-    write_begin_chart(family, NETDATA_PROCESS_STATUS_NAME);
+    write_begin_chart(family, NETDATA_PROCESS_STATUS_NAME, "");
 
     write_chart_dimension(status[0], (long long)pvc->running);
     write_chart_dimension(status[1], (long long)pvc->zombie);
@@ -203,7 +203,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     struct ebpf_target *w;
     collected_number value;
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_process));
@@ -212,7 +212,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_thread));
@@ -221,7 +221,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_EXIT);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_EXIT, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
@@ -231,7 +231,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_CLOSE);
+    write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_CLOSE, "");
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
@@ -242,7 +242,7 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     write_end_chart();
 
     if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_ERROR);
+        write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_ERROR, "");
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
                 value = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
@@ -833,28 +833,28 @@ static void ebpf_process_sum_cgroup_pids(ebpf_process_stat_t *ps, struct pid_on_
  */
 static void ebpf_send_specific_process_data(char *type, ebpf_process_stat_t *values, ebpf_module_t *em)
 {
-    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS);
+    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "");
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK].name,
                           (long long) values->create_process);
     write_end_chart();
 
-    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD);
+    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "");
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_CLONE].name,
                           (long long) values->create_thread);
     write_end_chart();
 
-    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_EXIT);
+    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_EXIT, "");
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT].name,
                           (long long) values->release_call);
     write_end_chart();
 
-    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_CLOSE);
+    write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_CLOSE, "");
     write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK].name,
                           (long long) values->release_call);
     write_end_chart();
 
     if (em->mode < MODE_ENTRY) {
-        write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_ERROR);
+        write_begin_chart(type, NETDATA_SYSCALL_APPS_TASK_ERROR, "");
         write_chart_dimension(process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT].name,
                               (long long) values->task_err);
         write_end_chart();
@@ -1003,7 +1003,7 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
 static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
 {
     ebpf_cgroup_target_t *ect;
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_ps.create_process);
@@ -1011,7 +1011,7 @@ static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_THREAD, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_ps.create_thread);
@@ -1019,7 +1019,7 @@ static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_EXIT);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_EXIT, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_ps.exit_call);
@@ -1027,7 +1027,7 @@ static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
     }
     write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_CLOSE);
+    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_CLOSE, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, ect->publish_systemd_ps.release_call);
@@ -1036,7 +1036,7 @@ static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
     write_end_chart();
 
     if (em->mode < MODE_ENTRY) {
-        write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_ERROR);
+        write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_TASK_ERROR, "");
         for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
             if (unlikely(ect->systemd) && unlikely(ect->updated)) {
                 write_chart_dimension(ect->name, ect->publish_systemd_ps.task_err);
