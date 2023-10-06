@@ -100,6 +100,9 @@ static inline size_t uuid_partition(MRG *mrg __maybe_unused, uuid_t *uuid) {
 static inline bool metric_has_retention_unsafe(MRG *mrg __maybe_unused, METRIC *metric) {
     size_t partition = metric->partition;
 
+    if(unlikely(!metric->first_time_s))
+        metric->first_time_s = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
+
     bool has_retention = (metric->first_time_s > 0 || metric->latest_time_s_clean > 0 || metric->latest_time_s_hot > 0);
 
     if(has_retention && !(metric->flags & METRIC_FLAG_HAS_RETENTION)) {
@@ -391,7 +394,7 @@ inline bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric,
 
     metric_lock(metric);
     metric->first_time_s = first_time_s;
-    metric_has_retention_unsafe(mrg, metric);
+    // metric_has_retention_unsafe(mrg, metric);
     metric_unlock(metric);
 
     return true;
@@ -431,7 +434,6 @@ inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric,
     else if(unlikely(!metric->latest_update_every_s && update_every_s))
         metric->latest_update_every_s = (uint32_t) update_every_s;
 
-    metric_has_retention_unsafe(mrg, metric);
     metric_unlock(metric);
 }
 
@@ -445,7 +447,6 @@ inline bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRI
         metric->first_time_s = first_time_s;
         ret = true;
     }
-    metric_has_retention_unsafe(mrg, metric);
     metric_unlock(metric);
 
     return ret;
@@ -456,13 +457,7 @@ inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metri
 
     metric_lock(metric);
 
-    if(unlikely(!metric->first_time_s)) {
-        if(metric->latest_time_s_clean)
-            metric->first_time_s = metric->latest_time_s_clean;
-
-        else if(metric->latest_time_s_hot)
-            metric->first_time_s = metric->latest_time_s_hot;
-    }
+    metric_has_retention_unsafe(mrg, metric);
 
     first_time_s = metric->first_time_s;
 
@@ -474,13 +469,7 @@ inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metri
 inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, time_t *update_every_s) {
     metric_lock(metric);
 
-    if(unlikely(!metric->first_time_s)) {
-        if(metric->latest_time_s_clean)
-            metric->first_time_s = metric->latest_time_s_clean;
-
-        else if(metric->latest_time_s_hot)
-            metric->first_time_s = metric->latest_time_s_hot;
-    }
+    metric_has_retention_unsafe(mrg, metric);
 
     *first_time_s = metric->first_time_s;
     *last_time_s = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
@@ -505,10 +494,6 @@ inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *
 
     metric->latest_time_s_clean = latest_time_s;
 
-    if(unlikely(!metric->first_time_s))
-        metric->first_time_s = latest_time_s;
-
-    metric_has_retention_unsafe(mrg, metric);
     metric_unlock(metric);
     return true;
 }
@@ -576,20 +561,19 @@ inline bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *me
 
     metric_lock(metric);
     metric->latest_time_s_hot = latest_time_s;
-
-    if(unlikely(!metric->first_time_s))
-        metric->first_time_s = latest_time_s;
-
-    metric_has_retention_unsafe(mrg, metric);
     metric_unlock(metric);
+
     return true;
 }
 
 inline time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t max;
+
     metric_lock(metric);
+    metric_has_retention_unsafe(mrg, metric);
     max = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
     metric_unlock(metric);
+
     return max;
 }
 
@@ -624,6 +608,7 @@ inline time_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *met
     time_t update_every_s;
 
     metric_lock(metric);
+    metric_has_retention_unsafe(mrg, metric);
     update_every_s = metric->latest_update_every_s;
     metric_unlock(metric);
 
