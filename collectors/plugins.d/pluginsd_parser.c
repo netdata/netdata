@@ -1834,7 +1834,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
-        if(stream_has_capability(&parser->user, STREAM_CAP_CHART_SLOT)) {
+        if(stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_CHART_SLOT)) {
             buffer_fast_strcat(wb, " sl:", 4);
             buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_chart_slot);
         }
