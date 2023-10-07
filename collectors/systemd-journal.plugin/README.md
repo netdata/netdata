@@ -35,6 +35,8 @@ For more information check [this discussion](https://github.com/netdata/netdata/
 - This plugin is not available when Netdata is installed in a container. The problem is that `libsystemd` is not available in Alpine Linux (there is a `libsystemd`, but it is a dummy that returns failure on all calls). We plan to change this, by shipping Netdata containers based on Debian.
 - For the same reason (lack of `systemd` support for Alpine Linux), the plugin is not available on `static` builds of Netdata (which are based on `muslc`, not `glibc`).
 
+To use the plugin, install one of our native distribution packages, or install it from source.
+
 ## Journal Sources
 
 The plugin automatically detects the available journal sources, based on the journal files available in
