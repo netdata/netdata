@@ -270,7 +270,8 @@ even if every single message has unique fields and values.
 
 When you send `systemd` journal logs to Loki, even if you use the `relabel_rules` argument to
 `loki.source.journal` with a JSON format, you need to specify which of the fields from journald
-you want inherited by Loki. This means you loose all the flexibility `systemd` journal provides:
+you want inherited by Loki. This means you need to know the most important fields beforehand.
+At the same time you loose all the flexibility `systemd` journal provides:
 **indexing on all fields and all their values**.
 
 Loki generally assumes that all logs are like a table. All entries in a stream share the same
