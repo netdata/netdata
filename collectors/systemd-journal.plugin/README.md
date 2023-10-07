@@ -47,36 +47,44 @@ The plugin, by default, merges all journal sources together, to provide a unifie
 
 ### `system` journals
 
-These are the default journals available on all systems.
+`system` journals are the default journals available on all `systemd` based systems.
 
 `system` journals contain:
 
 - kernel log messages (via `kmsg`),
 - audit records, originating from the kernel audit subsystem,
-- messages received via `syslog`,
+- messages received by `systemd-journald` via `syslog`,
 - messages received via the standard output and error of service units,
 - structured messages received via the native journal API.
 
 ### `user` journals
 
+Unlike `journalctl`, the Netdata plugin allows viewing, exploring and querying the journal files of **all users**.
+
 By default, each user, with a UID outside the range of system users (0 - 999), dynamic service users,
 and the nobody user (65534), will get their own set of `user` journal files. For more information about
 this policy check [Users, Groups, UIDs and GIDs on systemd Systems](https://systemd.io/UIDS-GIDS/).
 
-The plugin allows viewing, exploring and querying the journal files of all users.
+Keep in mind that `user` journals are merged with the `system` journals when they are propagated to a journal
+centralization server. So, at the centralization server, the `remote` journals contain both the `system` and `user`
+journals of the sender.
 
 ### `namespaces` journals
 
-Journal 'namespaces' are both a mechanism for logically isolating the log stream of projects consisting
-of one or more services from the rest of the system and a mechanism for improving performance. `systemd` service
-units may be assigned to a specific journal namespace through the `LogNamespace=` unit file setting.
-
 The plugin auto-detects the namespaces available and provides a list of all namespaces at the "sources" list on the UI.
+
+Journal namespaces are both a mechanism for logically isolating the log stream of projects consisting
+of one or more services from the rest of the system and a mechanism for improving performance.
+
+`systemd` service units may be assigned to a specific journal namespace through the `LogNamespace=` unit file setting.
+
+Keep in mind that namespaces require special configuration to be propagated to a journal centralization server.
+This makes them a little more difficult to handle, from the administration perspective.
 
 ### `remote` journals
 
-Remote journals are created by `systemd-journal-remote`. This feature allows creating logs centralization points within
-your infrastructure.
+Remote journals are created by `systemd-journal-remote`. This `systemd` feature allows creating logs centralization points within
+your infrastructure, based exclusively on `systemd`.
 
 Usually `remote` journals are named by the IP of the server sending these logs. The Netdata plugin automatically
 extracts these IPs and performs a reverse DNS lookup to find their hostnames. When this is successful,
@@ -93,7 +101,7 @@ The plugin automatically enriches certain fields to make them more user-friendly
 
 - `_BOOT_ID`: the hex value is annotated with the timestamp of the first message encountered for this boot id.
 - `PRIORITY`: the numeric value is replaced with the human-readable name of each priority.
-- `SYSLOG_FACILITY`: the encoded value is replaced with the human-readable name of each value.
+- `SYSLOG_FACILITY`: the encoded value is replaced with the human-readable name of each facility.
 - `ERRNO`: the numeric value is annotated with the short name of each value.
 - `_UID` `_AUDIT_LOGINUID` and `_SYSTEMD_OWNER_UID`: the local user database is consulted to annotate them with usernames.
 - `_GID`: the local group database is consulted to annotate them with group names.
@@ -102,10 +110,10 @@ The plugin automatically enriches certain fields to make them more user-friendly
 
 The values of all other fields are presented as found in the journals.
 
-> IMPORTANT:  
+> IMPORTANT:
 > `_UID` `_AUDIT_LOGINUID`, `_SYSTEMD_OWNER_UID` and `_GID` annotations are added during presentation and are taken
 > from the server running the plugin. For `remote` sources, the names presented may not reflect the actual user and
-> group names on the origin server. 
+> group names on the origin server. The numeric value will still be visible though, as-is on the origin server.
 
 The annotations are not searchable with full text search. They are only added for the presentation of the fields. 
 
@@ -117,8 +125,8 @@ All journal fields available in the journal files are offered as columns on the 
 
 ### Journal fields as additional info to each log entry
 
-When you click a log line, the sidebar, on the right of the screen, provides the full list of fields related to this
-log line. You can close this info sidebar, by selecting the filter icon at its top.
+When you click a log line, the `info` sidebar will open on the right of the screen, to provide the full list of fields related to this
+log line. You can close this `info` sidebar, by selecting the filter icon at its top.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/3207794c-a61b-444c-8ffe-6c07cbc90ae2)
 
@@ -143,7 +151,7 @@ When "full data queries" is off, empty values are hidden and cannot be selected.
 
 When "full data queries" is on, Netdata is applying all filtering to the data (not `libsystemd`), but this means
 that all the data of the entire time-frame, without any filtering applied, have to be read by the plugin to prepare
-the response required.
+the response required. So, "full data queries" can be significantly slower over long time-frames.
 
 ### Journal fields as histogram sources
 
