@@ -175,14 +175,18 @@ The histogram presented by the plugin is interactive:
 ## PLAY mode
 
 The plugin supports PLAY mode, to continuously update the screen with new log entries found in the journal files.
+Just hit the "play" button at the top of the Netdata dashboard screen.
 
-On centralized log servers, this provides a unified view of all the logs encountered across the entire infrastructure.
+On centralized log servers, PLAY mode provides a unified view of all the new logs encountered across the entire infrastructure,
+from all hosts sending logs to the central logs server via `systemd-remote`.
 
 ## Full-text search
 
 The plugin supports searching for any text on all fields of the log entries.
 
 Full text search is combined with the selected filters.
+
+The text box accepts asterisks `*` as wildcards. So, `a*b*c` means match anything that contains `a`, then `b` and then `c` with anything between them.
 
 ## Query performance
 
