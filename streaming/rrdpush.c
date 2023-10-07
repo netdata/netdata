@@ -96,8 +96,8 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
             STREAM_HAS_COMPRESSION |
-            STREAM_CAP_CHART_SLOT |
-#ifdef NETDATA_TEST_DYNCFG
+            STREAM_CAP_SLOTS |
+            #ifdef NETDATA_TEST_DYNCFG
             STREAM_CAP_DYNCFG |
 #endif
             (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
@@ -246,9 +246,11 @@ static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
 static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
-    bool replication_progress = false;
-
     RRDHOST *host = st->rrdhost;
+    NUMBER_ENCODING integer_encoding = stream_has_capability(host->sender, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
+    bool with_slots = stream_has_capability(host->sender, STREAM_CAP_SLOTS) ? true : false;
+
+    bool replication_progress = false;
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -265,23 +267,17 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         }
     }
 
-    buffer_fast_strcat(wb, "CHART ", 6);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_CHART, sizeof(PLUGINSD_KEYWORD_CHART) - 1);
 
-    if(stream_has_capability(host->sender, STREAM_CAP_CHART_SLOT)) {
-        NUMBER_ENCODING integer_encoding = stream_has_capability(host->sender, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
-
-        if(!st->rrdpush_chart_slot)
-            st->rrdpush_chart_slot = __atomic_add_fetch(&host->rrdpush_chart_slot, 1, __ATOMIC_RELAXED);
-
-        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 1);
-        buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_chart_slot);
-        buffer_fast_strcat(wb, " ", 1);
+    if(with_slots) {
+        buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+        buffer_print_uint64_encoded(wb, integer_encoding, rrdset_rrdpush_send_chart_slot_get(st));
     }
 
     // send the chart
     buffer_sprintf(
             wb
-            , "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+            , " \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , rrdset_id(st)
             , name
             , rrdset_title(st)
@@ -306,17 +302,27 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // send the dimensions
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_DIMENSION, sizeof(PLUGINSD_KEYWORD_DIMENSION) - 1);
+
+        if(with_slots) {
+            if(!rd->rrdpush_sender_dim_slot)
+                rd->rrdpush_sender_dim_slot = __atomic_add_fetch(&st->rrdpush_sender_dim_last_slot_used, 1, __ATOMIC_RELAXED);
+
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+            buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_sender_chart_slot);
+        }
+
         buffer_sprintf(
-                wb
-                , "DIMENSION \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\"\n"
-                , rrddim_id(rd)
-                , rrddim_name(rd)
-                , rrd_algorithm_name(rd->algorithm)
-                , rd->multiplier
-                , rd->divisor
-                , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
-                , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
-                , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+            wb
+            , " \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\"\n"
+            , rrddim_id(rd)
+            , rrddim_name(rd)
+            , rrd_algorithm_name(rd->algorithm)
+            , rd->multiplier
+            , rd->divisor
+            , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
+            , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
+            , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
         rrddim_set_exposed(rd);
     }
@@ -424,6 +430,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
         return;
 
+    bool with_slots = stream_has_capability(rsb, STREAM_CAP_SLOTS) ? true : false;
     NUMBER_ENCODING integer_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
     NUMBER_ENCODING doubles_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     BUFFER *wb = rsb->wb;
@@ -435,9 +442,9 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
-        if(stream_has_capability(rsb, STREAM_CAP_CHART_SLOT)) {
+        if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush_chart_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush_sender_chart_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -457,7 +464,14 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         rsb->begin_v2_added = true;
     }
 
-    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2, sizeof(PLUGINSD_KEYWORD_SET_V2) - 1);
+
+    if(with_slots) {
+        buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+        buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush_sender_dim_slot);
+    }
+
+    buffer_fast_strcat(wb, " '", 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
     buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
@@ -1431,18 +1445,18 @@ static struct {
     { STREAM_CAP_VN, "VN" },
     { STREAM_CAP_VCAPS, "VCAPS" },
     { STREAM_CAP_HLABELS, "HLABELS" },
-    { STREAM_CAP_CLAIM, "CLAIM" },
-    { STREAM_CAP_CLABELS, "CLABELS" },
-    { STREAM_CAP_COMPRESSION, "COMPRESSION" },
-    { STREAM_CAP_FUNCTIONS, "FUNCTIONS" },
-    { STREAM_CAP_REPLICATION, "REPLICATION" },
-    { STREAM_CAP_BINARY, "BINARY" },
-    { STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
-    { STREAM_CAP_IEEE754, "IEEE754" },
-    { STREAM_CAP_DATA_WITH_ML, "ML" },
-    { STREAM_CAP_DYNCFG, "DYNCFG" },
-    { STREAM_CAP_CHART_SLOT, "SLOT" },
-    { 0 , NULL },
+    {STREAM_CAP_CLAIM,        "CLAIM" },
+    {STREAM_CAP_CLABELS,      "CLABELS" },
+    {STREAM_CAP_COMPRESSION,  "COMPRESSION" },
+    {STREAM_CAP_FUNCTIONS,    "FUNCTIONS" },
+    {STREAM_CAP_REPLICATION,  "REPLICATION" },
+    {STREAM_CAP_BINARY,       "BINARY" },
+    {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
+    {STREAM_CAP_IEEE754,      "IEEE754" },
+    {STREAM_CAP_DATA_WITH_ML, "ML" },
+    {STREAM_CAP_DYNCFG,       "DYNCFG" },
+    {STREAM_CAP_SLOTS,        "SLOTS" },
+    {0 , NULL },
 };
 
 static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {

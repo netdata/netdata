@@ -307,6 +307,8 @@ struct rrddim {
     int32_t multiplier;                             // the multiplier of the collected values
     int32_t divisor;                                // the divider of the collected values
 
+    uint32_t rrdpush_sender_dim_slot;
+
     // ------------------------------------------------------------------------
     // operational state members
 
@@ -761,7 +763,8 @@ struct rrdset {
 
     RRDSET_TYPE chart_type;                         // line, area, stacked
 
-    uint32_t rrdpush_chart_slot;
+    uint32_t rrdpush_sender_chart_slot;
+    uint32_t rrdpush_sender_dim_last_slot_used;
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -851,6 +854,7 @@ struct rrdset {
         SPINLOCK spinlock; // used only for cleanup
         pid_t collector_tid;
         bool set;
+        bool with_slots;
         uint32_t pos;
         uint32_t size;
         struct pluginsd_rrddim *prd_array;
@@ -1166,13 +1170,29 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // streaming of data to remote hosts - rrdpush sender
 
+    struct {
+        struct {
+            struct {
+                SPINLOCK spinlock;
+
+                struct {
+                    bool ignore;                    // when set, freeing slots will not put them in the available
+                    uint32_t pos;
+                    uint32_t size;
+                    uint32_t *array;
+                } available;                        // keep track of the available chart slots per host
+
+                uint32_t last_used;                 // the last slot we used for a chart (increments only)
+            } chart_slots;
+        } send;
+    } rrdpush;
+
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
     struct rrdpush_destinations *destinations;      // a linked list of possible destinations
     struct rrdpush_destinations *destination;       // the current destination from the above list
     SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
-    uint32_t rrdpush_chart_slot;
     int32_t rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step
@@ -1572,6 +1592,10 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
     if(to)
         *to = online ? now : last_time_s;
 }
+
+uint32_t rrdset_rrdpush_send_chart_slot_get(RRDSET *st);
+void rrdset_rrdpush_send_chart_slot_release(RRDSET *st);
+void rrdhost_rrdpush_send_chart_slots_free(RRDHOST *host);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

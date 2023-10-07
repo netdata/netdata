@@ -213,31 +213,38 @@ static struct replication_query *replication_query_prepare(
 }
 
 static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STREAM_CAPABILITIES capabilities) {
-    NUMBER_ENCODING encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
+    bool with_slots = (capabilities & STREAM_CAP_SLOTS) ? true : false;
+    NUMBER_ENCODING integer_encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st){
         if (!rrddim_check_exposed(rd)) continue;
 
-        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '",
-                           sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1);
+
+        if(with_slots) {
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush_sender_dim_slot);
+        }
+
+        buffer_fast_strcat(wb, " '", 2);
         buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
         buffer_fast_strcat(wb, "' ", 2);
-        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->collector.last_collected_time.tv_sec * USEC_PER_SEC +
-                                    (usec_t) rd->collector.last_collected_time.tv_usec);
+        buffer_print_uint64_encoded(wb, integer_encoding, (usec_t) rd->collector.last_collected_time.tv_sec * USEC_PER_SEC +
+                                                          (usec_t) rd->collector.last_collected_time.tv_usec);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_int64_encoded(wb, encoding, rd->collector.last_collected_value);
+        buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_calculated_value);
+        buffer_print_netdata_double_encoded(wb, integer_encoding, rd->collector.last_calculated_value);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_netdata_double_encoded(wb, encoding, rd->collector.last_stored_value);
+        buffer_print_netdata_double_encoded(wb, integer_encoding, rd->collector.last_stored_value);
         buffer_fast_strcat(wb, "\n", 1);
     }
     rrddim_foreach_done(rd);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " ", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE) - 1 + 1);
-    buffer_print_uint64_encoded(wb, encoding, (usec_t) st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t) st->last_collected_time.tv_usec);
+    buffer_print_uint64_encoded(wb, integer_encoding, (usec_t) st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t) st->last_collected_time.tv_usec);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_uint64_encoded(wb, encoding, (usec_t) st->last_updated.tv_sec * USEC_PER_SEC + (usec_t) st->last_updated.tv_usec);
+    buffer_print_uint64_encoded(wb, integer_encoding, (usec_t) st->last_updated.tv_sec * USEC_PER_SEC + (usec_t) st->last_updated.tv_usec);
     buffer_fast_strcat(wb, "\n", 1);
 }
 
@@ -313,7 +320,8 @@ static void replication_query_align_to_optimal_before(struct replication_query *
 static bool replication_query_execute(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
     replication_query_align_to_optimal_before(q);
 
-    NUMBER_ENCODING encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
+    bool with_slots = (q->query.capabilities & STREAM_CAP_SLOTS) ? true : false;
+    NUMBER_ENCODING integer_encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     time_t after = q->query.after;
     time_t before = q->query.before;
     size_t dimensions = q->dimensions;
@@ -445,11 +453,11 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             last_end_time_in_buffer = min_end_time;
 
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' ", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 4);
-            buffer_print_uint64_encoded(wb, encoding, min_start_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, min_start_time);
             buffer_fast_strcat(wb, " ", 1);
-            buffer_print_uint64_encoded(wb, encoding, min_end_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, min_end_time);
             buffer_fast_strcat(wb, " ", 1);
-            buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, wall_clock_time);
             buffer_fast_strcat(wb, "\n", 1);
 
             // output the replay values for this time
@@ -462,10 +470,17 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                             !storage_point_is_unset(d->sp) &&
                             !storage_point_is_gap(d->sp))) {
 
-                    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"", sizeof(PLUGINSD_KEYWORD_REPLAY_SET) - 1 + 2);
+                    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_SET, sizeof(PLUGINSD_KEYWORD_REPLAY_SET) - 1);
+
+                    if(with_slots) {
+                        buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+                        buffer_print_uint64_encoded(wb, integer_encoding, d->rd->rrdpush_sender_dim_slot);
+                    }
+
+                    buffer_fast_strcat(wb, " \"", 2);
                     buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
                     buffer_fast_strcat(wb, "\" ", 2);
-                    buffer_print_netdata_double_encoded(wb, encoding, d->sp.sum);
+                    buffer_print_netdata_double_encoded(wb, integer_encoding, d->sp.sum);
                     buffer_fast_strcat(wb, " ", 1);
                     buffer_print_sn_flags(wb, d->sp.flags, q->query.capabilities & STREAM_CAP_INTERPOLATED);
                     buffer_fast_strcat(wb, "\n", 1);

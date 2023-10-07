@@ -6,6 +6,68 @@
 #include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
+// RRDSET rrdpush send chart_slots
+
+uint32_t rrdset_rrdpush_send_chart_slot_get(RRDSET *st) {
+    if(likely(st->rrdpush_sender_chart_slot))
+        return st->rrdpush_sender_chart_slot;
+
+    RRDHOST *host = st->rrdhost;
+    spinlock_lock(&host->rrdpush.send.chart_slots.spinlock);
+
+    if(host->rrdpush.send.chart_slots.available.pos > 0)
+        st->rrdpush_sender_chart_slot =
+                host->rrdpush.send.chart_slots.available.array[--host->rrdpush.send.chart_slots.available.pos];
+    else
+        st->rrdpush_sender_chart_slot = ++host->rrdpush.send.chart_slots.last_used;
+
+    spinlock_unlock(&host->rrdpush.send.chart_slots.spinlock);
+
+    return st->rrdpush_sender_chart_slot;
+}
+
+void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
+    if(!st->rrdpush_sender_chart_slot || st->rrdhost->rrdpush.send.chart_slots.available.ignore)
+        return;
+
+    RRDHOST *host = st->rrdhost;
+    spinlock_lock(&host->rrdpush.send.chart_slots.spinlock);
+
+    if(host->rrdpush.send.chart_slots.available.pos >= host->rrdpush.send.chart_slots.available.size) {
+        uint32_t old_size = host->rrdpush.send.chart_slots.available.size;
+        uint32_t new_size = old_size * 2;
+
+        host->rrdpush.send.chart_slots.available.array =
+                reallocz(host->rrdpush.send.chart_slots.available.array, new_size * sizeof(uint32_t));
+
+        host->rrdpush.send.chart_slots.available.size = new_size;
+    }
+
+    host->rrdpush.send.chart_slots.available.array[host->rrdpush.send.chart_slots.available.pos++] =
+            st->rrdpush_sender_chart_slot;
+
+    st->rrdpush_sender_chart_slot = 0;
+    spinlock_unlock(&host->rrdpush.send.chart_slots.spinlock);
+}
+
+void rrdhost_rrdpush_send_chart_slots_free(RRDHOST *host) {
+    spinlock_lock(&host->rrdpush.send.chart_slots.spinlock);
+    host->rrdpush.send.chart_slots.available.ignore = true;
+    freez(host->rrdpush.send.chart_slots.available.array);
+    host->rrdpush.send.chart_slots.available.array = NULL;
+    host->rrdpush.send.chart_slots.available.pos = 0;
+    host->rrdpush.send.chart_slots.available.size = 0;
+    spinlock_unlock(&host->rrdpush.send.chart_slots.spinlock);
+
+    // zero all the slots on all charts, so that they will not attempt to access the array
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        st->rrdpush_sender_chart_slot = 0;
+    }
+    rrdset_foreach_done(st);
+}
+
+// ----------------------------------------------------------------------------
 // RRDSET name index
 
 static void rrdset_name_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
@@ -219,6 +281,8 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
     rrdset_finalize_collection(st, false);
+
+    rrdset_rrdpush_send_chart_slot_release(st);
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
