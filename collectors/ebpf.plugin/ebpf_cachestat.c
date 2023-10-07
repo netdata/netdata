@@ -494,7 +494,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   EBPF_COMMON_DIMENSION_PERCENTAGE,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  "apps_cachestat_ratio",
+                                  "ebpf.app_cachestat_ratio",
                                   20090,
                                   update_every);
 
@@ -505,7 +505,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   EBPF_CACHESTAT_DIMENSION_PAGE,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "apps_cachestat_dirty",
+                                  "ebpf.app_cachestat_dirty",
                                   20091,
                                   update_every);
 
@@ -516,7 +516,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   EBPF_CACHESTAT_DIMENSION_HITS,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "apps_cachestat_access",
+                                  "ebpf.app_cachestat_access",
                                   20092,
                                   update_every);
 
@@ -527,7 +527,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   EBPF_CACHESTAT_DIMENSION_MISSES,
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "apps_cachestat_missees",
+                                  "ebpf.app_cachestat_missees",
                                   20093,
                                   update_every);
         w->charts_created &= ~(1<<EBPF_MODULE_CACHESTAT_IDX);
@@ -838,7 +838,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_COMMON_DIMENSION_PERCENTAGE,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
-                             "apps_cachestat_ratio",
+                             "ebpf.app_cachestat_ratio",
                              20090,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
@@ -854,7 +854,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_CACHESTAT_DIMENSION_PAGE,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
-                             "apps_cachestat_dirty",
+                             "ebpf.app_cachestat_dirty",
                              20091,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
@@ -869,7 +869,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_CACHESTAT_DIMENSION_HITS,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "apps_cachestat_access",
+                             "ebpf.app_cachestat_access",
                              20092,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
@@ -884,7 +884,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_CACHESTAT_DIMENSION_MISSES,
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "apps_cachestat_missees",
+                             "ebpf.app_cachestat_missees",
                              20093,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
@@ -994,8 +994,8 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     collected_number value;
 
     for (w = root; w; w = w->next) {
-        uint32_t cache_flag = w->charts_created & 1<<EBPF_MODULE_CACHESTAT_IDX;
-        if (likely(w->exposed && w->processes && !cache_flag))
+        uint32_t flag = w->charts_created & 1<<EBPF_MODULE_CACHESTAT_IDX;
+        if (likely(w->exposed && w->processes && !flag))
             continue;
 
         ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
