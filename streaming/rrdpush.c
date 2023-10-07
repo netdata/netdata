@@ -271,7 +271,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     if(with_slots) {
         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-        buffer_print_uint64_encoded(wb, integer_encoding, rrdset_rrdpush_send_chart_slot_get(st));
+        buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_sender_chart_slot);
     }
 
     // send the chart
@@ -305,9 +305,6 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_DIMENSION, sizeof(PLUGINSD_KEYWORD_DIMENSION) - 1);
 
         if(with_slots) {
-            if(!rd->rrdpush_sender_dim_slot)
-                rd->rrdpush_sender_dim_slot = __atomic_add_fetch(&st->rrdpush_sender_dim_last_slot_used, 1, __ATOMIC_RELAXED);
-
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
             buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_sender_chart_slot);
         }

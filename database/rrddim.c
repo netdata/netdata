@@ -48,6 +48,8 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrdset = st;
 
+    rd->rrdpush_sender_dim_slot = __atomic_add_fetch(&st->rrdpush_sender_dim_last_slot_used, 1, __ATOMIC_RELAXED);
+
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collector.counter = 1;
 

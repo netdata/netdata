@@ -188,10 +188,9 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
 static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd, ssize_t slot)  {
     size_t wanted_size = st->pluginsd.size;
 
-    if(slot > 0) {
-        slot--;
+    if(slot >= 1) {
         st->pluginsd.with_slots = true;
-        wanted_size = slot + 1;
+        wanted_size = slot;
     }
     else
         wanted_size = dictionary_entries(st->rrddim_root_index);
@@ -229,16 +228,28 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     struct pluginsd_rrddim *prd;
     RRDDIM *rd;
 
-    slot--; // slot zero is not allowed and our array has exactly the slots we need
+    if(likely(st->pluginsd.with_slots)) {
+        // caching with slots
 
-    if(unlikely(slot < 0 || slot >= st->pluginsd.size)) {
-        // caching without slots
-
-        if(unlikely(st->pluginsd.with_slots)) {
+        if(unlikely(slot < 1 || slot > st->pluginsd.size)) {
             netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %zu] are expected.",
-                    rrdhost_hostname(host), rrdset_id(st), cmd, slot, st->pluginsd.size - 1);
+                    rrdhost_hostname(host), rrdset_id(st), cmd, slot, st->pluginsd.size);
             return NULL;
         }
+
+        prd = &st->pluginsd.prd_array[slot - 1];
+
+        rd = prd->rd;
+        if(likely(rd)) {
+            internal_fatal(strcmp(prd->id, dimension) != 0,
+                    "PLUGINSD: expected to find dimension '%s' on slot %zd, but found '%s'",
+                    dimension, slot, prd->id);
+
+            return rd;
+        }
+    }
+    else {
+        // caching without slots
 
         if(unlikely(st->pluginsd.pos >= st->pluginsd.size))
             st->pluginsd.pos = 0;
@@ -260,20 +271,6 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
                 prd->rd = rd = NULL;
                 prd->id = NULL;
             }
-        }
-    }
-    else {
-        // caching with slots
-
-        prd = &st->pluginsd.prd_array[slot];
-
-        rd = prd->rd;
-        if(likely(rd)) {
-            internal_fatal(strcmp(prd->id, dimension) != 0,
-                    "PLUGINSD: expected to find dimension '%s' on slot %zd, but found '%s'",
-                    dimension, slot, prd->id);
-
-            return rd;
         }
     }
 

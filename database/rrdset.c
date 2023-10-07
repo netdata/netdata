@@ -8,10 +8,7 @@
 // ----------------------------------------------------------------------------
 // RRDSET rrdpush send chart_slots
 
-uint32_t rrdset_rrdpush_send_chart_slot_get(RRDSET *st) {
-    if(likely(st->rrdpush_sender_chart_slot))
-        return st->rrdpush_sender_chart_slot;
-
+static void rrdset_rrdpush_send_chart_slot_assign(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     spinlock_lock(&host->rrdpush.send.chart_slots.spinlock);
 
@@ -22,11 +19,9 @@ uint32_t rrdset_rrdpush_send_chart_slot_get(RRDSET *st) {
         st->rrdpush_sender_chart_slot = ++host->rrdpush.send.chart_slots.last_used;
 
     spinlock_unlock(&host->rrdpush.send.chart_slots.spinlock);
-
-    return st->rrdpush_sender_chart_slot;
 }
 
-void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
+static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
     if(!st->rrdpush_sender_chart_slot || st->rrdhost->rrdpush.send.chart_slots.available.ignore)
         return;
 
@@ -196,6 +191,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     st->chart_type = ctr->chart_type;
     st->rrdhost = host;
+
+    rrdset_rrdpush_send_chart_slot_assign(st);
 
     spinlock_init(&st->data_collection_lock);
 

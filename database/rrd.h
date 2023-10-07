@@ -1593,8 +1593,6 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
         *to = online ? now : last_time_s;
 }
 
-uint32_t rrdset_rrdpush_send_chart_slot_get(RRDSET *st);
-void rrdset_rrdpush_send_chart_slot_release(RRDSET *st);
 void rrdhost_rrdpush_send_chart_slots_free(RRDHOST *host);
 
 // ----------------------------------------------------------------------------
