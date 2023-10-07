@@ -196,7 +196,7 @@ static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd, ssize_t s
     else
         wanted_size = dictionary_entries(st->rrddim_root_index);
 
-    if(wanted_size < st->pluginsd.size) {
+    if(wanted_size > st->pluginsd.size) {
         st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, wanted_size * sizeof(struct pluginsd_rrddim));
 
         // initialize the empty slots
