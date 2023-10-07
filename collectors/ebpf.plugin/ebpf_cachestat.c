@@ -484,7 +484,8 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = apps_groups_root_target; w; w = w->next) {
-        if (likely(w->exposed && w->processes))
+        uint32_t flag = w->charts_created & (1 << EBPF_MODULE_CACHESTAT_IDX);
+        if (likely(w->exposed && w->processes && !flag))
             continue;
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
