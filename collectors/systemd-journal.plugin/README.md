@@ -197,16 +197,27 @@ of the files into memory, to satisfy each query.
 
 On logs aggregation servers, the performance of the queries depend on the following factors:
 
-1. The number of files involved in each query. This is why we suggest to select a source when possible.
-2. The speed of the disks hosting the journal files. Journal files perform a lot of reading while querying, so the fastest the disks, the faster the query will finish.
-3. The memory available for caching parts of the files. Increased memory will help the kernel cache the most frequently used parts of the journal files, avoiding disk I/O and speeding up queries.
-4. The number of filters applied. Queries are significantly faster when just a few filters are selected.
+1. The **number of files** involved in each query.
 
-In general, for a faster experience, keep a low number of rows within the visible timeframe.
+   This is why we suggest to select a source when possible.
+   
+2. The **speed of the disks** hosting the journal files.
 
-Even on long timeframes, selecting a couple of filters that will result in a few dozen thousand log entries
-will provide fast / rapid responses, usually less than a second. To the contrary, viewing timeframes with millions
-of entries may result in longer delays.
+   Journal files perform a lot of reading while querying, so the fastest the disks, the faster the query will finish.
+   
+3. The **memory available** for caching parts of the files.
+
+   Increased memory will help the kernel cache the most frequently used parts of the journal files, avoiding disk I/O and speeding up queries.
+   
+4. The **number of filters** applied.
+
+   Queries are significantly faster when just a few filters are selected.
+
+In general, for a faster experience, **keep a low number of rows within the visible timeframe**.
+
+Even on long timeframes, selecting a couple of filters that will result in a **few dozen thousand** log entries
+will provide fast / rapid responses, usually less than a second. To the contrary, viewing timeframes with **millions
+of entries** may result in longer delays.
 
 The plugin aborts journal queries when your browser cancels inflight requests. This allows you to work on the UI
 while there are background queries running.
