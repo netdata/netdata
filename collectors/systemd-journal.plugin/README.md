@@ -34,6 +34,7 @@ For more information check [this discussion](https://github.com/netdata/netdata/
 
 - This plugin is not available when Netdata is installed in a container. The problem is that `libsystemd` is not available in Alpine Linux (there is a `libsystemd`, but it is a dummy that returns failure on all calls). We plan to change this, by shipping Netdata containers based on Debian.
 - For the same reason (lack of `systemd` support for Alpine Linux), the plugin is not available on `static` builds of Netdata (which are based on `muslc`, not `glibc`).
+- On old systemd systems (like Centos 7), the plugin runs always in "full data query" mode, which makes it slower. The reason, is that systemd API is missing some important calls we need to use the field indexes of `systemd` journal. However, when running in this mode, the plugin offers also negative matches on the data (like filtering for all logs that do not have set some field), and this is the reason "full data query" mode is also offered as an option even on newer versions of `systemd`.
 
 To use the plugin, install one of our native distribution packages, or install it from source.
 
