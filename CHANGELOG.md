@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- fix `test -x` check for uninstaller script [\#16146](https://github.com/netdata/netdata/pull/16146) ([ilyam8](https://github.com/ilyam8))
+- health: don't log an unknown key error for "families" [\#16145](https://github.com/netdata/netdata/pull/16145) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16144](https://github.com/netdata/netdata/pull/16144) ([netdatabot](https://github.com/netdatabot))
+- Update python.d./varnish/metadata.yaml [\#16143](https://github.com/netdata/netdata/pull/16143) ([Ancairon](https://github.com/Ancairon))
+- Bugfix in integrations/setup/template [\#16142](https://github.com/netdata/netdata/pull/16142) ([Ancairon](https://github.com/Ancairon))
+- Fixes in integration generation script [\#16141](https://github.com/netdata/netdata/pull/16141) ([Ancairon](https://github.com/Ancairon))
+- Introduce stringify function for integrations [\#16140](https://github.com/netdata/netdata/pull/16140) ([Ancairon](https://github.com/Ancairon))
+- Regenerate integrations.js [\#16138](https://github.com/netdata/netdata/pull/16138) ([netdatabot](https://github.com/netdatabot))
+- fix random crashes on pthread\_detach\(\) [\#16137](https://github.com/netdata/netdata/pull/16137) ([ktsaou](https://github.com/ktsaou))
 - fix journal help and mark debug keys in the output [\#16133](https://github.com/netdata/netdata/pull/16133) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16132](https://github.com/netdata/netdata/pull/16132) ([netdatabot](https://github.com/netdatabot))
 - apps: change user\_group to usergroup [\#16131](https://github.com/netdata/netdata/pull/16131) ([ilyam8](https://github.com/ilyam8))
@@ -25,6 +34,7 @@
 - Fix in generate integrations docs script [\#16108](https://github.com/netdata/netdata/pull/16108) ([Ancairon](https://github.com/Ancairon))
 - journal: go up to stop anchor on data only queries [\#16107](https://github.com/netdata/netdata/pull/16107) ([ktsaou](https://github.com/ktsaou))
 - Update collectors/python.d.plugin/pandas/metadata.yaml [\#16106](https://github.com/netdata/netdata/pull/16106) ([Ancairon](https://github.com/Ancairon))
+- Code improvements [\#16104](https://github.com/netdata/netdata/pull/16104) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#16103](https://github.com/netdata/netdata/pull/16103) ([netdatabot](https://github.com/netdatabot))
 - Add integrations/cloud-notifications to cleanup [\#16102](https://github.com/netdata/netdata/pull/16102) ([Ancairon](https://github.com/Ancairon))
 - better journal logging [\#16101](https://github.com/netdata/netdata/pull/16101) ([ktsaou](https://github.com/ktsaou))
@@ -422,19 +432,6 @@
 - docs: fix apps fd badges and typos [\#15539](https://github.com/netdata/netdata/pull/15539) ([ilyam8](https://github.com/ilyam8))
 - change api.netdata.cloud to app.netdata.cloud [\#15538](https://github.com/netdata/netdata/pull/15538) ([ilyam8](https://github.com/ilyam8))
 - Update metadata.yaml for some python collectors - 2 [\#15537](https://github.com/netdata/netdata/pull/15537) ([MrZammler](https://github.com/MrZammler))
-- Change nvidia\_smi link to go version in COLLECTORS.md [\#15536](https://github.com/netdata/netdata/pull/15536) ([Ancairon](https://github.com/Ancairon))
-- Update nfacct yaml [\#15535](https://github.com/netdata/netdata/pull/15535) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update ioping yaml [\#15534](https://github.com/netdata/netdata/pull/15534) ([thiagoftsm](https://github.com/thiagoftsm))
-- Freeimpi yaml [\#15533](https://github.com/netdata/netdata/pull/15533) ([thiagoftsm](https://github.com/thiagoftsm))
-- Updated all Linux distros, macOS and Docker [\#15532](https://github.com/netdata/netdata/pull/15532) ([sashwathn](https://github.com/sashwathn))
-- Update platform support info and add a schema. [\#15531](https://github.com/netdata/netdata/pull/15531) ([Ferroin](https://github.com/Ferroin))
-- added cloud status in registry?action=hello [\#15530](https://github.com/netdata/netdata/pull/15530) ([ktsaou](https://github.com/ktsaou))
-- update memcached metadata.yaml [\#15529](https://github.com/netdata/netdata/pull/15529) ([andrewm4894](https://github.com/andrewm4894))
-- Update python d varnish metadata [\#15528](https://github.com/netdata/netdata/pull/15528) ([andrewm4894](https://github.com/andrewm4894))
-- Update yaml description \(diskspace\) [\#15527](https://github.com/netdata/netdata/pull/15527) ([thiagoftsm](https://github.com/thiagoftsm))
-- wait for node\_id while claiming [\#15526](https://github.com/netdata/netdata/pull/15526) ([ktsaou](https://github.com/ktsaou))
-- add `diskquota` collector to third party collectors list [\#15524](https://github.com/netdata/netdata/pull/15524) ([andrewm4894](https://github.com/andrewm4894))
-- Add quick\_start key to deploy schema. [\#15522](https://github.com/netdata/netdata/pull/15522) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
