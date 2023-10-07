@@ -46,6 +46,8 @@
 
 #define PLUGINSD_KEYWORD_EXIT                   "EXIT"
 
+#define PLUGINSD_KEYWORD_SLOT                   "SLOT" // to change the length of this, update pluginsd_extract_chart_slot() too
+
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
 typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, int timeout, bool *cancelled);

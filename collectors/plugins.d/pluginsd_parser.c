@@ -156,6 +156,22 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     parser->user.st = NULL;
 }
 
+static inline void pluginsd_adjust_scope_chart_cache(PARSER *parser, RRDSET *st)  {
+    size_t dims = dictionary_entries(st->rrddim_root_index);
+    if(unlikely(st->pluginsd.size < dims)) {
+        st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, dims * sizeof(struct pluginsd_rrddim));
+
+        // initialize the empty slots
+        for(ssize_t i = (ssize_t)dims - 1; i >= (ssize_t)st->pluginsd.size ;i--) {
+            st->pluginsd.prd_array[i].rda = NULL;
+            st->pluginsd.prd_array[i].rd = NULL;
+            st->pluginsd.prd_array[i].id = NULL;
+        }
+
+        st->pluginsd.size = dims;
+    }
+}
+
 static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
     RRDSET *old_st = parser->user.st;
     pid_t old_collector_tid = (old_st) ? old_st->pluginsd.collector_tid : 0;
@@ -178,20 +194,6 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
     st->pluginsd.collector_tid = my_collector_tid;
 
     pluginsd_clear_scope_chart(parser, keyword);
-
-    size_t dims = dictionary_entries(st->rrddim_root_index);
-    if(unlikely(st->pluginsd.size < dims)) {
-        st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, dims * sizeof(struct pluginsd_rrddim));
-
-        // initialize the empty slots
-        for(ssize_t i = (ssize_t)dims - 1; i >= (ssize_t)st->pluginsd.size ;i--) {
-            st->pluginsd.prd_array[i].rda = NULL;
-            st->pluginsd.prd_array[i].rd = NULL;
-            st->pluginsd.prd_array[i].id = NULL;
-        }
-
-        st->pluginsd.size = dims;
-    }
 
     st->pluginsd.pos = 0;
     parser->user.st = st;
@@ -259,37 +261,38 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
-static inline ssize_t pluginsd_extract_chart_slot(char **words, size_t num_words) {
+static inline ssize_t pluginsd_extract_optional_slot(char **words, size_t num_words) {
     ssize_t slot = -1;
     char *id = get_word(words, num_words, 1);
-    if(id && id[0] == 's' && id[1] == 'l' && id[2] == ':')
-        slot = (ssize_t) str2ull_encoded(&id[3]);
+    if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
+        id[2] == PLUGINSD_KEYWORD_SLOT[2] && id[3] == PLUGINSD_KEYWORD_SLOT[3] && id[4] == ':')
+        slot = (ssize_t) str2ull_encoded(&id[5]);
 
     return slot;
 }
 
-static inline void pluginsd_chart_set_to_slot(RRDHOST *host, PARSER *parser, RRDSET *st, ssize_t slot) {
+static inline void pluginsd_rrdset_cache_set_to_slot(RRDHOST *host, PARSER *parser, RRDSET *st, ssize_t slot) {
     if(slot < 1) return;
 
-    if((size_t)slot >= parser->user.expected_charts.slots) {
-        size_t old_slots = parser->user.expected_charts.slots;
+    if((size_t)slot >= parser->user.rrd_pointers_cache.rrdset.slots) {
+        size_t old_slots = parser->user.rrd_pointers_cache.rrdset.slots;
         size_t new_slots = (old_slots < 1024) ? 1024 : old_slots * 2;
-        parser->user.expected_charts.array = reallocz(parser->user.expected_charts.array, new_slots * sizeof(RRDSET *));
+        parser->user.rrd_pointers_cache.rrdset.array = reallocz(parser->user.rrd_pointers_cache.rrdset.array, new_slots * sizeof(RRDSET *));
 
         for(size_t i = old_slots; i < new_slots ;i++)
-            parser->user.expected_charts.array[i] = NULL;
+            parser->user.rrd_pointers_cache.rrdset.array[i] = NULL;
 
-        parser->user.expected_charts.slots = new_slots;
+        parser->user.rrd_pointers_cache.rrdset.slots = new_slots;
     }
 
-    parser->user.expected_charts.array[slot] = st;
+    parser->user.rrd_pointers_cache.rrdset.array[slot] = st;
 }
 
-static inline RRDSET *pluginsd_chart_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot, const char *keyword) {
-    if(slot < 1 || (size_t)slot >= parser->user.expected_charts.slots)
+static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot, const char *keyword) {
+    if(slot < 1 || (size_t)slot >= parser->user.rrd_pointers_cache.rrdset.slots)
         return pluginsd_find_chart(host, id, keyword);
 
-    RRDSET *st = parser->user.expected_charts.array[slot];
+    RRDSET *st = parser->user.rrd_pointers_cache.rrdset.array[slot];
 
     internal_fatal(st && string_strcmp(st->id, id) != 0, "wrong chart in slot %zd, expected '%s', found '%s'",
                    slot, id, string2str(st->id));
@@ -542,7 +545,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     int idx = 1;
-    ssize_t slot = pluginsd_extract_chart_slot(words, num_words);
+    ssize_t slot = pluginsd_extract_optional_slot(words, num_words);
     if(slot >= 0)
         idx++;
 
@@ -657,7 +660,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-        pluginsd_chart_set_to_slot(host, parser, st, slot);
+        pluginsd_rrdset_cache_set_to_slot(host, parser, st, slot);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART);
@@ -782,6 +785,8 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
         rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
+
+    pluginsd_adjust_scope_chart_cache(parser, st);
 
     return PARSER_RC_OK;
 }
@@ -1756,7 +1761,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     timing_init();
 
     int idx = 1;
-    ssize_t slot = pluginsd_extract_chart_slot(words, num_words);
+    ssize_t slot = pluginsd_extract_optional_slot(words, num_words);
     if(slot >= 0)
         idx++;
 
@@ -1773,7 +1778,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
     timing_step(TIMING_STEP_BEGIN2_PREPARE);
 
-    RRDSET *st = pluginsd_chart_get_from_slot(host, parser, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
+    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(host, parser, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
 
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
@@ -1835,7 +1840,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
         if(stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_CHART_SLOT)) {
-            buffer_fast_strcat(wb, " sl:", 4);
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
             buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_chart_slot);
         }
 
@@ -2746,10 +2751,10 @@ void pluginsd_process_thread_cleanup(void *ptr) {
 
     rrd_collector_finished();
 
-    if(parser->user.expected_charts.array) {
-        freez(parser->user.expected_charts.array);
-        parser->user.expected_charts.array = NULL;
-        parser->user.expected_charts.slots = 0;
+    if(parser->user.rrd_pointers_cache.rrdset.array) {
+        freez(parser->user.rrd_pointers_cache.rrdset.array);
+        parser->user.rrd_pointers_cache.rrdset.array = NULL;
+        parser->user.rrd_pointers_cache.rrdset.slots = 0;
     }
 
     parser_destroy(parser);

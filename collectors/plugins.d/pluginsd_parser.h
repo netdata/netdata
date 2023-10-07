@@ -83,9 +83,11 @@ typedef struct parser_user_object {
     } v2;
 
     struct {
-        size_t slots;
-        RRDSET **array;
-    } expected_charts;
+        struct {
+            size_t slots;
+            RRDSET **array;
+        } rrdset;
+    } rrd_pointers_cache;
 } PARSER_USER_OBJECT;
 
 typedef struct parser {

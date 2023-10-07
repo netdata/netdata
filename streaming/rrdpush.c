@@ -273,7 +273,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         if(!st->rrdpush_chart_slot)
             st->rrdpush_chart_slot = __atomic_add_fetch(&host->rrdpush_chart_slot, 1, __ATOMIC_RELAXED);
 
-        buffer_fast_strcat(wb, "sl:", 3);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 1);
         buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_chart_slot);
         buffer_fast_strcat(wb, " ", 1);
     }
@@ -436,7 +436,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
         if(stream_has_capability(rsb, STREAM_CAP_CHART_SLOT)) {
-            buffer_fast_strcat(wb, " sl:", 4);
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
             buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush_chart_slot);
         }
 
