@@ -379,8 +379,8 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = apps_groups_root_target; w; w = w->next) {
-        uint32_t cache_flag = w->charts_created & 1<<EBPF_MODULE_DCSTAT_IDX;
-        if (likely(w->exposed && w->processes && !cache_flag))
+        uint32_t flag = w->charts_created & 1<<EBPF_MODULE_DCSTAT_IDX;
+        if (likely(w->exposed && w->processes && !flag))
             continue;
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -390,7 +390,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   EBPF_COMMON_DIMENSION_PERCENTAGE,
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
-                                  "app_cachestat_ratio",
+                                  "ebpf.app_cachestat_ratio",
                                   20100,
                                   update_every);
 
@@ -401,7 +401,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   EBPF_COMMON_DIMENSION_FILES,
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "app_cachestat_ratio",
+                                  "ebpf.app_cachestat_ratio",
                                   20101,
                                   update_every);
 
@@ -412,7 +412,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   EBPF_COMMON_DIMENSION_FILES,
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "app_dc_not_cache",
+                                  "ebpf.app_dc_not_cache",
                                   20102,
                                   update_every);
 
@@ -423,7 +423,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   EBPF_COMMON_DIMENSION_FILES,
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "app_dc_not_cache",
+                                  "ebpf.app_dc_not_cache",
                                   20103,
                                   update_every);
 
@@ -546,7 +546,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_COMMON_DIMENSION_PERCENTAGE,
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
-                             "app_dc_hit",
+                             "ebpf.app_dc_hit",
                              20100,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
@@ -561,7 +561,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_COMMON_DIMENSION_FILES,
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "app_dc_hit",
+                             "ebpf.app_dc_hit",
                              20101,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
@@ -576,7 +576,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_COMMON_DIMENSION_FILES,
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "app_dc_not_cache",
+                             "ebpf.app_dc_not_cache",
                              20102,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
@@ -591,7 +591,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              EBPF_COMMON_DIMENSION_FILES,
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "app_dc_not_cache",
+                             "ebpf.app_dc_not_cache",
                              20103,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
@@ -800,8 +800,8 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
     collected_number value;
 
     for (w = root; w; w = w->next) {
-        uint32_t cache_flag = w->charts_created & 1<<EBPF_MODULE_DCSTAT_IDX;
-        if (unlikely(w->exposed && w->processes && !cache_flag))
+        uint32_t flag = w->charts_created & 1<<EBPF_MODULE_DCSTAT_IDX;
+        if (unlikely(w->exposed && w->processes && !flag))
             continue;
 
         ebpf_dcstat_sum_pids(&w->dcstat, w->root_pid);
