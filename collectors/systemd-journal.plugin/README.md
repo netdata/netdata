@@ -263,6 +263,25 @@ disk I/O, or does not have any writable disks at all.
 
 For more information check `man systemd-journald`.
 
+### I centralize my logs with Loki. Why to use Netdata for my journals?
+
+`systemd` journals have almost infinite cardinality at their labels and all of them are indexed,
+even if every single message has unique fields and values.
+
+When you send `systemd` journal logs to Loki, even if you use the `relabel_rules` argument to
+`loki.source.journal` with a JSON format, you need to specify which of the fields from journald
+you want inherited by Loki. This means you loose all the flexibility `systemd` journal provides:
+**indexing on all fields and all their values**.
+
+Loki generally assumes that all logs are like a table. All entries in a stream share the same
+fields. But journald does exactly the opposite. Each log entry is unique and may have its own unique fields.
+
+So, Loki and `systemd-journal` are good for different use cases.
+
+`systemd-journal` already runs in your systems. You use it today. It is there inside all your systems
+collecting the system and applications logs. And for its use case, it has advantages over other
+centralization solutions. So, why not use it?
+
 ### Is it worth to build a `systemd` logs centralization server?
 
 Yes. It is simple, fast and the software to do it is already in your systems.
