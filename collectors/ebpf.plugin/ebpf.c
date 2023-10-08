@@ -1291,33 +1291,6 @@ void ebpf_create_chart(char *type,
 }
 
 /**
- * Create charts on apps submenu
- *
- * @param id   the chart id
- * @param title  the value displayed on vertical axis.
- * @param units  the value displayed on vertical axis.
- * @param family Submenu that the chart will be attached on dashboard.
- * @param charttype chart type
- * @param order  the chart order
- * @param algorithm the algorithm used by dimension
- * @param root   structure used to create the dimensions.
- * @param update_every  update interval used by plugin
- * @param module    chart module name, this is the eBPF thread.
- */
-void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct ebpf_target *root, int update_every, char *module)
-{
-    struct ebpf_target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, "", title, units, family, charttype, NULL, order,
-                         update_every, module);
-
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
-    }
-}
-
-/**
  * Call the necessary functions to create a name.
  *
  *  @param family     family name

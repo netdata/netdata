@@ -275,17 +275,6 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
 void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite,
                            char *dread, long long vread);
 
-void ebpf_create_charts_on_apps(char *name,
-                                       char *title,
-                                       char *units,
-                                       char *family,
-                                       char *charttype,
-                                       int order,
-                                       char *algorithm,
-                                       struct ebpf_target *root,
-                                       int update_every,
-                                       char *module);
-
 /**
  * Create Chart labels
  *
