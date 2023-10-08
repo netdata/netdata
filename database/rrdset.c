@@ -30,7 +30,7 @@ static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
 
     if(host->rrdpush.send.chart_slots.available.pos >= host->rrdpush.send.chart_slots.available.size) {
         uint32_t old_size = host->rrdpush.send.chart_slots.available.size;
-        uint32_t new_size = old_size * 2;
+        uint32_t new_size = (old_size > 0) ? (old_size * 2) : 1024;
 
         host->rrdpush.send.chart_slots.available.array =
                 reallocz(host->rrdpush.send.chart_slots.available.array, new_size * sizeof(uint32_t));
