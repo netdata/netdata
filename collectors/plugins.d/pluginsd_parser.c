@@ -185,7 +185,7 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
     return true;
 }
 
-static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd __maybe_unused, ssize_t slot)  {
+static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd, ssize_t slot)  {
     size_t wanted_size = st->pluginsd.size;
 
     if(slot >= 1) {
@@ -208,8 +208,19 @@ static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd __maybe_un
         st->pluginsd.size = wanted_size;
     }
 
-    // we don't have to put it in the slot
-    // it will happen via pluginsd_acquire_dimension()
+    if(st->pluginsd.with_slots) {
+        struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
+
+        if(prd->rd != rd) {
+            // we have to do this, because the child may restart and renumber its dimensions
+            rrddim_acquired_release(prd->rda);
+
+            // set the new dimension
+            prd->rda = rrddim_find_and_acquire(st, string2str(rd->id));
+            prd->rd = rrddim_acquired_to_rrddim(prd->rda);
+            prd->id = string2str(prd->rd->id);
+        }
+    }
 }
 
 static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, ssize_t slot, const char *cmd) {
