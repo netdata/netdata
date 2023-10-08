@@ -13,6 +13,14 @@
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
+/*
+ * TODO
+ *
+ * _UDEV_DEVLINK is frequently set more than once per field - support multi-value faces
+ *
+ */
+
+
 // ----------------------------------------------------------------------------
 // fstat64 overloading to speed up libsystemd
 // https://github.com/systemd/systemd/pull/29261
@@ -130,47 +138,114 @@ int fstat64(int fd, struct stat64 *buf) {
 
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       \
     "*MESSAGE*"                                 \
-    "|CODE_LINE"                                \
-    "|*DOCUMENTATION*"                          \
-    "|TID"                                      \
     "|*_RAW"                                    \
+    "|*_USEC"                                   \
     "|*_NSEC"                                   \
     "|*TIMESTAMP*"                              \
     "|*_ID"                                     \
     "|*_ID_*"                                   \
-    "|*_PID"                                    \
-    "|*_TID"                                    \
     "|__*"                                      \
     ""
 
 #define SYSTEMD_KEYS_INCLUDED_IN_FACETS         \
-    "_COMM"                                     \
-    "|CONTAINER_NAME"                           \
-    "|CONTAINER_TAG"                            \
-    "|_TRANSPORT"                               \
-    "|SYSLOG_IDENTIFIER"                        \
-    "|SYSLOG_FACILITY"                          \
+                                                \
+    /* --- USER JOURNAL FIELDS --- */           \
+                                                \
+    /* "|MESSAGE" */                            \
+    /* "|MESSAGE_ID" */                         \
     "|PRIORITY"                                 \
-    "|_SYSTEMD_UNIT"                            \
-    "|_SYSTEMD_SLICE"                           \
-    "|_SYSTEMD_USER_UNIT"                       \
-    "|_SYSTEMD_USER_SLICE"                      \
-    "|_SYSTEMD_OWNER_UID"                       \
-    "|_UID"                                     \
-    "|_GID"                                     \
+    "|CODE_FILE"                                \
+    /* "|CODE_LINE" */                          \
+    "|CODE_FUNC"                                \
+    "|ERRNO"                                    \
+    /* "|INVOCATION_ID" */                      \
+    /* "|USER_INVOCATION_ID" */                 \
+    "|SYSLOG_FACILITY"                          \
+    "|SYSLOG_IDENTIFIER"                        \
+    /* "|SYSLOG_PID" */                         \
+    /* "|SYSLOG_TIMESTAMP" */                   \
+    /* "|SYSLOG_RAW" */                         \
+    /* "!DOCUMENTATION" */                      \
+    /* "|TID" */                                \
     "|UNIT"                                     \
     "|USER_UNIT"                                \
-    "|IMAGE_NAME"                               \
-    "|ERRNO"                                    \
+    "|UNIT_RESULT" /* undocumented */           \
+                                                \
+                                                \
+    /* --- TRUSTED JOURNAL FIELDS --- */        \
+                                                \
+    /* "|_PID" */                               \
+    "|_UID"                                     \
+    "|_GID"                                     \
+    "|_COMM"                                    \
+    /* "|_EXE" */                               \
+    /* "|_CMDLINE" */                           \
+    "|_CAP_EFFECTIVE"                           \
+    /* "|_AUDIT_SESSION" */                     \
+    "|_AUDIT_LOGINUID"                          \
+    "|_SYSTEMD_CGROUP"                          \
+    "|_SYSTEMD_SLICE"                           \
+    "|_SYSTEMD_UNIT"                            \
+    "|_SYSTEMD_USER_UNIT"                       \
+    "|_SYSTEMD_USER_SLICE"                      \
+    "|_SYSTEMD_SESSION"                         \
+    "|_SYSTEMD_OWNER_UID"                       \
+    "|_SELINUX_CONTEXT"                         \
+    /* "|_SOURCE_REALTIME_TIMESTAMP" */         \
+    "|_BOOT_ID"                                 \
+    "|_MACHINE_ID"                              \
+    /* "|_SYSTEMD_INVOCATION_ID" */             \
+    "|_HOSTNAME"                                \
+    "|_TRANSPORT"                               \
+    "|_STREAM_ID"                               \
+    /* "|LINE_BREAK" */                         \
     "|_NAMESPACE"                               \
+    "|_RUNTIME_SCOPE"                           \
+                                                \
+                                                \
+    /* --- KERNEL JOURNAL FIELDS --- */         \
+                                                \
+    /* "|_KERNEL_DEVICE" */                     \
+    "|_KERNEL_SUBSYSTEM"                        \
+    /* "|_UDEV_SYSNAME" */                      \
+    "|_UDEV_DEVNODE"                            \
+    /* "|_UDEV_DEVLINK" */                      \
+                                                \
+                                                \
+    /* --- LOGGING ON BEHALF --- */             \
+                                                \
+    "|OBJECT_UID"                               \
+    "|OBJECT_GID"                               \
+    "|OBJECT_COMM"                              \
+    /* "|OBJECT_EXE" */                         \
+    /* "|OBJECT_CMDLINE" */                     \
+    /* "|OBJECT_AUDIT_SESSION" */               \
+    "|OBJECT_AUDIT_LOGINUID"                    \
+    "|OBJECT_SYSTEMD_CGROUP"                    \
+    "|OBJECT_SYSTEMD_SESSION"                   \
+    "|OBJECT_SYSTEMD_OWNER_UID"                 \
+    "|OBJECT_SYSTEMD_UNIT"                      \
+    "|OBJECT_SYSTEMD_USER_UNIT"                 \
+                                                \
+                                                \
+    /* --- CORE DUMPS --- */                    \
+                                                \
     "|COREDUMP_COMM"                            \
     "|COREDUMP_UNIT"                            \
     "|COREDUMP_USER_UNIT"                       \
     "|COREDUMP_SIGNAL_NAME"                     \
     "|COREDUMP_CGROUP"                          \
-    "|_HOSTNAME"                                \
-    "|UNIT_RESULT"                              \
-    "|_RUNTIME_SCOPE"                           \
+                                                \
+                                                \
+    /* --- DOCKER --- */                        \
+                                                \
+    "|CONTAINER_ID"                             \
+    /* "|CONTAINER_ID_FULL" */                  \
+    "|CONTAINER_NAME"                           \
+    "|CONTAINER_TAG"                            \
+    "|IMAGE_NAME" /* undocumented */            \
+    /* "|CONTAINER_PARTIAL_MESSAGE" */          \
+                                                \
     ""
 
 static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -2129,7 +2204,19 @@ static void function_systemd_journal(const char *transaction, char *function, in
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_uid, NULL);
 
+    facets_register_key_name_transformation(facets, "OBJECT_SYSTEMD_OWNER_UID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_uid, NULL);
+
+    facets_register_key_name_transformation(facets, "OBJECT_UID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_uid, NULL);
+
     facets_register_key_name_transformation(facets, "_GID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_gid, NULL);
+
+    facets_register_key_name_transformation(facets, "OBJECT_GID",
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_gid, NULL);
 
@@ -2138,6 +2225,10 @@ static void function_systemd_journal(const char *transaction, char *function, in
                                             netdata_systemd_journal_transform_cap_effective, NULL);
 
     facets_register_key_name_transformation(facets, "_AUDIT_LOGINUID",
+                                            FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_uid, NULL);
+
+    facets_register_key_name_transformation(facets, "OBJECT_AUDIT_LOGINUID",
                                             FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_uid, NULL);
 
@@ -2605,7 +2696,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         bool cancelled = false;
-        char buf[] = "systemd-journal after:1696319393 before:1696320293 anchor:1696320283039944 direction:forward last:100 if_modified_since:1696320283039989 data_only:true delta:true tail:true slice:true source:all histogram:DHKucpqUoe1";
+        char buf[] = "systemd-journal after:-8000000 before:0 last:1";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, 600, &cancelled);
