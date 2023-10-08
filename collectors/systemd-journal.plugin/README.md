@@ -102,7 +102,8 @@ For information about configuring a journals' centralization server, check [this
 unlike other log management systems, it supports dynamic and variable fields for each log message,
 while all fields and their values are indexed for fast querying.
 
-This means that each application can log messages annotated with its own unique fields.
+This means that each application can log messages annotated with its own unique fields and values, and `systemd`
+journals will automatically index all of them, without any configuration or manual action.
 
 For a description of the most frequent fields found in `systemd` journals, check `man systemd.journal-fields`. 
 
