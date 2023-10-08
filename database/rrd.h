@@ -239,7 +239,6 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
     RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
     RRDDIM_OPTION_BACKFILLED_HIGH_TIERS             = (1 << 2), // when set, we have backfilled higher tiers
     RRDDIM_OPTION_UPDATED                           = (1 << 3), // single-threaded collector updated flag
-    RRDDIM_OPTION_EXPOSED                           = (1 << 4), // single-threaded collector exposed flag
 
     // this is 8-bit
 } RRDDIM_OPTIONS;
@@ -253,6 +252,8 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
     RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
 
+    RRDDIM_FLAG_EXPOSED                         = (1 << 1), // exposed flag for streaming
+
     RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
@@ -261,12 +262,13 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
 
     RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
 
+
     // this is 8 bit
 } RRDDIM_FLAGS;
 
-#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_SEQ_CST)
-#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_RELAXED) & (flag))
+#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_RELAXED)
+#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_RELAXED)
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -373,9 +375,14 @@ size_t rrddim_size(void);
 #define rrddim_set_updated(rd) (rd)->collector.options |= RRDDIM_OPTION_UPDATED
 #define rrddim_clear_updated(rd) (rd)->collector.options &= ~RRDDIM_OPTION_UPDATED
 
-#define rrddim_check_exposed(rd) ((rd)->collector.options & RRDDIM_OPTION_EXPOSED)
-#define rrddim_set_exposed(rd) (rd)->collector.options |= RRDDIM_OPTION_EXPOSED
-#define rrddim_clear_exposed(rd) (rd)->collector.options &= ~RRDDIM_OPTION_EXPOSED
+#define rrddim_check_exposed(rd) rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED)
+#define rrddim_set_exposed(rd) rrddim_flag_set(rd, RRDDIM_FLAG_EXPOSED)
+#define rrddim_clear_exposed(rd) rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED)
+
+// the collector sets the exposed flag, but anyone can remove it
+// still, it can be removed, after the collector has finished
+// so, it is safe to check it without atomics
+#define rrddim_check_exposed_collector(rd) ((rd)->flags & RRDDIM_FLAG_EXPOSED)
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 const char *rrddim_cache_filename(RRDDIM *rd);

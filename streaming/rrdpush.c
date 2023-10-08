@@ -252,8 +252,6 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     bool replication_progress = false;
 
-    rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-
     // properly set the name for the remote end to parse it
     char *name = "";
     if(likely(st->name)) {
@@ -321,7 +319,6 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
             , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
             , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
-        rrddim_set_exposed(rd);
     }
     rrddim_foreach_done(rd);
 
@@ -356,6 +353,16 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 #endif
     }
 
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    // we can set the exposed flag, after we commit the buffer
+    // because replication may pick it up prematurely
+    rrddim_foreach_read(rd, st) {
+        rrddim_set_exposed(rd);
+    }
+    rrddim_foreach_done(rd);
+    rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
     st->upstream_resync_time_s = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
     return replication_progress;
 }
@@ -378,7 +385,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
         if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
-        if(likely(rrddim_check_exposed(rd))) {
+        if(likely(rrddim_check_exposed_collector(rd))) {
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
@@ -412,7 +419,6 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
 
     BUFFER *wb = sender_start(host->sender);
     rrdpush_send_chart_definition(wb, st);
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     sender_thread_buffer_free();
 
     return true;
@@ -584,7 +590,6 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     if(unlikely(!exposed_upstream)) {
         BUFFER *wb = sender_start(host->sender);
         replication_in_progress = rrdpush_send_chart_definition(wb, st);
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     }
 
     if(replication_in_progress)
