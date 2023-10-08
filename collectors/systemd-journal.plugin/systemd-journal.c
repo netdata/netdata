@@ -27,8 +27,6 @@
 
 #define ND_SD_JOURNAL_OPEN_FLAGS (0)
 
-#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
-
 #include <dlfcn.h>
 #include <sys/stat.h>
 
@@ -40,32 +38,25 @@ struct fdstat64_cache_entry {
     struct stat64 stat;
     int ret;
     size_t cached_count;
+    size_t session;
 };
+
 struct fdstat64_cache_entry fstat64_cache[FSTAT_CACHE_MAX] = {0 };
-
-static void fstat_cache_enable(int fd) {
-    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
-        fstat64_cache[fd].enabled = true;
-        fstat64_cache[fd].updated = false;
-        fstat64_cache[fd].cached_count = 0;
-    }
-}
-
-static size_t fstat_cache_disable(int fd) {
-    size_t cached_count = 0;
-
-    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
-        fstat64_cache[fd].enabled = false;
-        fstat64_cache[fd].updated = false;
-        cached_count = fstat64_cache[fd].cached_count;
-        fstat64_cache[fd].cached_count = 0;
-    }
-
-    return cached_count;
-}
-
 static size_t fstat_calls = 0;
 static size_t fstat_cached_responses = 0;
+static __thread bool enable_thread_fstat = false;
+static __thread size_t fstat_caching_thread_session = 0;
+static size_t fstat_caching_global_session = 0;
+
+static void fstat_cache_enable_on_thread(void) {
+    fstat_caching_thread_session = __atomic_add_fetch(&fstat_caching_global_session, 1, __ATOMIC_ACQUIRE);
+    enable_thread_fstat = true;
+}
+
+static void fstat_cache_disable_on_thread(void) {
+    fstat_caching_thread_session = __atomic_add_fetch(&fstat_caching_global_session, 1, __ATOMIC_RELEASE);
+    enable_thread_fstat = false;
+}
 
 int fstat64(int fd, struct stat64 *buf) {
     static int (*real_fstat)(int, struct stat64 *) = NULL;
@@ -74,12 +65,20 @@ int fstat64(int fd, struct stat64 *buf) {
 
     fstat_calls++;
 
-    if(fd >= 0 && fd < FSTAT_CACHE_MAX && fstat64_cache[fd].enabled && fstat64_cache[fd].updated) {
-        fstat_cached_responses++;
-        errno = fstat64_cache[fd].err_no;
-        *buf = fstat64_cache[fd].stat;
-        fstat64_cache[fd].cached_count++;
-        return fstat64_cache[fd].ret;
+    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
+        if(enable_thread_fstat && fstat64_cache[fd].session != fstat_caching_thread_session) {
+            fstat64_cache[fd].session = fstat_caching_thread_session;
+            fstat64_cache[fd].enabled = true;
+            fstat64_cache[fd].updated = false;
+        }
+
+        if(fstat64_cache[fd].enabled && fstat64_cache[fd].updated && fstat64_cache[fd].session == fstat_caching_thread_session) {
+            fstat_cached_responses++;
+            errno = fstat64_cache[fd].err_no;
+            *buf = fstat64_cache[fd].stat;
+            fstat64_cache[fd].cached_count++;
+            return fstat64_cache[fd].ret;
+        }
     }
 
     int ret = real_fstat(fd, buf);
@@ -89,12 +88,11 @@ int fstat64(int fd, struct stat64 *buf) {
         fstat64_cache[fd].updated = true;
         fstat64_cache[fd].err_no = errno;
         fstat64_cache[fd].stat = *buf;
+        fstat64_cache[fd].session = fstat_caching_thread_session;
     }
 
     return ret;
 }
-
-#endif // HAVE_SD_JOURNAL_OPEN_FILES_FD
 
 // ----------------------------------------------------------------------------
 
@@ -684,25 +682,17 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     sd_journal *j = NULL;
     errno = 0;
 
-//#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
-//    int fd = open(filename, O_RDONLY);
-//    fstat_cache_enable(fd);
-//
-//    if(sd_journal_open_files_fd(&j, &fd, 1, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
-//        fqs->cached_count += fstat_cache_disable(fd);
-//        close(fd);
-//        return ND_SD_JOURNAL_FAILED_TO_OPEN;
-//    }
-//#else // !HAVE_SD_JOURNAL_OPEN_FILES_FD
+    fstat_cache_enable_on_thread();
 
     const char *paths[2] = {
             [0] = filename,
             [1] = NULL,
     };
-    if(sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j)
-        return ND_SD_JOURNAL_FAILED_TO_OPEN;
 
-//#endif // !HAVE_SD_JOURNAL_OPEN_FILES_FD
+    if(sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+        fstat_cache_disable_on_thread();
+        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+    }
 
     ND_SD_JOURNAL_STATUS status;
     bool matches_filters = true;
@@ -728,11 +718,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         status = ND_SD_JOURNAL_NO_FILE_MATCHED;
 
     sd_journal_close(j);
-
-//#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
-//    fqs->cached_count += fstat_cache_disable(fd);
-//    close(fd);
-//#endif
+    fstat_cache_disable_on_thread();
 
     return status;
 }
@@ -764,6 +750,8 @@ static void buffer_json_journal_versions(BUFFER *wb) {
 }
 
 static void journal_file_update_msg_ut(const char *filename, struct journal_file *jf) {
+    fstat_cache_enable_on_thread();
+
     const char *files[2] = {
             [0] = filename,
             [1] = NULL,
@@ -771,6 +759,8 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
 
     sd_journal *j = NULL;
     if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+        fstat_cache_disable_on_thread();
+
         if(!jf->logged_failure) {
             netdata_log_error("cannot open journal file '%s', using file timestamps to understand time-frame.", filename);
             jf->logged_failure = true;
@@ -794,6 +784,7 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
     }
 
     sd_journal_close(j);
+    fstat_cache_disable_on_thread();
 
     if(first_ut > last_ut) {
         internal_error(true, "timestamps are flipped in file '%s'", filename);
