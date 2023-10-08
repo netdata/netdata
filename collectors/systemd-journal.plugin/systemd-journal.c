@@ -13,13 +13,19 @@
 #include <systemd/sd-journal.h>
 #include <syslog.h>
 
+/*
+ * TODO
+ *
+ * _UDEV_DEVLINK is frequently set more than once per field - support multi-value faces
+ *
+ */
+
+
 // ----------------------------------------------------------------------------
 // fstat64 overloading to speed up libsystemd
 // https://github.com/systemd/systemd/pull/29261
 
 #define ND_SD_JOURNAL_OPEN_FLAGS (0)
-
-#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
 
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -32,46 +38,47 @@ struct fdstat64_cache_entry {
     struct stat64 stat;
     int ret;
     size_t cached_count;
+    size_t session;
 };
+
 struct fdstat64_cache_entry fstat64_cache[FSTAT_CACHE_MAX] = {0 };
+static __thread size_t fstat_thread_calls = 0;
+static __thread size_t fstat_thread_cached_responses = 0;
+static __thread bool enable_thread_fstat = false;
+static __thread size_t fstat_caching_thread_session = 0;
+static size_t fstat_caching_global_session = 0;
 
-static void fstat_cache_enable(int fd) {
-    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
-        fstat64_cache[fd].enabled = true;
-        fstat64_cache[fd].updated = false;
-        fstat64_cache[fd].cached_count = 0;
-    }
+static void fstat_cache_enable_on_thread(void) {
+    fstat_caching_thread_session = __atomic_add_fetch(&fstat_caching_global_session, 1, __ATOMIC_ACQUIRE);
+    enable_thread_fstat = true;
 }
 
-static size_t fstat_cache_disable(int fd) {
-    size_t cached_count = 0;
-
-    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
-        fstat64_cache[fd].enabled = false;
-        fstat64_cache[fd].updated = false;
-        cached_count = fstat64_cache[fd].cached_count;
-        fstat64_cache[fd].cached_count = 0;
-    }
-
-    return cached_count;
+static void fstat_cache_disable_on_thread(void) {
+    fstat_caching_thread_session = __atomic_add_fetch(&fstat_caching_global_session, 1, __ATOMIC_RELEASE);
+    enable_thread_fstat = false;
 }
-
-static size_t fstat_calls = 0;
-static size_t fstat_cached_responses = 0;
 
 int fstat64(int fd, struct stat64 *buf) {
     static int (*real_fstat)(int, struct stat64 *) = NULL;
     if (!real_fstat)
         real_fstat = dlsym(RTLD_NEXT, "fstat64");
 
-    fstat_calls++;
+    fstat_thread_calls++;
 
-    if(fd >= 0 && fd < FSTAT_CACHE_MAX && fstat64_cache[fd].enabled && fstat64_cache[fd].updated) {
-        fstat_cached_responses++;
-        errno = fstat64_cache[fd].err_no;
-        *buf = fstat64_cache[fd].stat;
-        fstat64_cache[fd].cached_count++;
-        return fstat64_cache[fd].ret;
+    if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
+        if(enable_thread_fstat && fstat64_cache[fd].session != fstat_caching_thread_session) {
+            fstat64_cache[fd].session = fstat_caching_thread_session;
+            fstat64_cache[fd].enabled = true;
+            fstat64_cache[fd].updated = false;
+        }
+
+        if(fstat64_cache[fd].enabled && fstat64_cache[fd].updated && fstat64_cache[fd].session == fstat_caching_thread_session) {
+            fstat_thread_cached_responses++;
+            errno = fstat64_cache[fd].err_no;
+            *buf = fstat64_cache[fd].stat;
+            fstat64_cache[fd].cached_count++;
+            return fstat64_cache[fd].ret;
+        }
     }
 
     int ret = real_fstat(fd, buf);
@@ -81,12 +88,11 @@ int fstat64(int fd, struct stat64 *buf) {
         fstat64_cache[fd].updated = true;
         fstat64_cache[fd].err_no = errno;
         fstat64_cache[fd].stat = *buf;
+        fstat64_cache[fd].session = fstat_caching_thread_session;
     }
 
     return ret;
 }
-
-#endif // HAVE_SD_JOURNAL_OPEN_FILES_FD
 
 // ----------------------------------------------------------------------------
 
@@ -130,47 +136,114 @@ int fstat64(int fd, struct stat64 *buf) {
 
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       \
     "*MESSAGE*"                                 \
-    "|CODE_LINE"                                \
-    "|*DOCUMENTATION*"                          \
-    "|TID"                                      \
     "|*_RAW"                                    \
+    "|*_USEC"                                   \
     "|*_NSEC"                                   \
     "|*TIMESTAMP*"                              \
     "|*_ID"                                     \
     "|*_ID_*"                                   \
-    "|*_PID"                                    \
-    "|*_TID"                                    \
     "|__*"                                      \
     ""
 
 #define SYSTEMD_KEYS_INCLUDED_IN_FACETS         \
-    "_COMM"                                     \
-    "|CONTAINER_NAME"                           \
-    "|CONTAINER_TAG"                            \
-    "|_TRANSPORT"                               \
-    "|SYSLOG_IDENTIFIER"                        \
-    "|SYSLOG_FACILITY"                          \
+                                                \
+    /* --- USER JOURNAL FIELDS --- */           \
+                                                \
+    /* "|MESSAGE" */                            \
+    /* "|MESSAGE_ID" */                         \
     "|PRIORITY"                                 \
-    "|_SYSTEMD_UNIT"                            \
-    "|_SYSTEMD_SLICE"                           \
-    "|_SYSTEMD_USER_UNIT"                       \
-    "|_SYSTEMD_USER_SLICE"                      \
-    "|_SYSTEMD_OWNER_UID"                       \
-    "|_UID"                                     \
-    "|_GID"                                     \
+    "|CODE_FILE"                                \
+    /* "|CODE_LINE" */                          \
+    "|CODE_FUNC"                                \
+    "|ERRNO"                                    \
+    /* "|INVOCATION_ID" */                      \
+    /* "|USER_INVOCATION_ID" */                 \
+    "|SYSLOG_FACILITY"                          \
+    "|SYSLOG_IDENTIFIER"                        \
+    /* "|SYSLOG_PID" */                         \
+    /* "|SYSLOG_TIMESTAMP" */                   \
+    /* "|SYSLOG_RAW" */                         \
+    /* "!DOCUMENTATION" */                      \
+    /* "|TID" */                                \
     "|UNIT"                                     \
     "|USER_UNIT"                                \
-    "|IMAGE_NAME"                               \
-    "|ERRNO"                                    \
+    "|UNIT_RESULT" /* undocumented */           \
+                                                \
+                                                \
+    /* --- TRUSTED JOURNAL FIELDS --- */        \
+                                                \
+    /* "|_PID" */                               \
+    "|_UID"                                     \
+    "|_GID"                                     \
+    "|_COMM"                                    \
+    /* "|_EXE" */                               \
+    /* "|_CMDLINE" */                           \
+    "|_CAP_EFFECTIVE"                           \
+    /* "|_AUDIT_SESSION" */                     \
+    "|_AUDIT_LOGINUID"                          \
+    "|_SYSTEMD_CGROUP"                          \
+    "|_SYSTEMD_SLICE"                           \
+    "|_SYSTEMD_UNIT"                            \
+    "|_SYSTEMD_USER_UNIT"                       \
+    "|_SYSTEMD_USER_SLICE"                      \
+    "|_SYSTEMD_SESSION"                         \
+    "|_SYSTEMD_OWNER_UID"                       \
+    "|_SELINUX_CONTEXT"                         \
+    /* "|_SOURCE_REALTIME_TIMESTAMP" */         \
+    "|_BOOT_ID"                                 \
+    "|_MACHINE_ID"                              \
+    /* "|_SYSTEMD_INVOCATION_ID" */             \
+    "|_HOSTNAME"                                \
+    "|_TRANSPORT"                               \
+    "|_STREAM_ID"                               \
+    /* "|LINE_BREAK" */                         \
     "|_NAMESPACE"                               \
+    "|_RUNTIME_SCOPE"                           \
+                                                \
+                                                \
+    /* --- KERNEL JOURNAL FIELDS --- */         \
+                                                \
+    /* "|_KERNEL_DEVICE" */                     \
+    "|_KERNEL_SUBSYSTEM"                        \
+    /* "|_UDEV_SYSNAME" */                      \
+    "|_UDEV_DEVNODE"                            \
+    /* "|_UDEV_DEVLINK" */                      \
+                                                \
+                                                \
+    /* --- LOGGING ON BEHALF --- */             \
+                                                \
+    "|OBJECT_UID"                               \
+    "|OBJECT_GID"                               \
+    "|OBJECT_COMM"                              \
+    /* "|OBJECT_EXE" */                         \
+    /* "|OBJECT_CMDLINE" */                     \
+    /* "|OBJECT_AUDIT_SESSION" */               \
+    "|OBJECT_AUDIT_LOGINUID"                    \
+    "|OBJECT_SYSTEMD_CGROUP"                    \
+    "|OBJECT_SYSTEMD_SESSION"                   \
+    "|OBJECT_SYSTEMD_OWNER_UID"                 \
+    "|OBJECT_SYSTEMD_UNIT"                      \
+    "|OBJECT_SYSTEMD_USER_UNIT"                 \
+                                                \
+                                                \
+    /* --- CORE DUMPS --- */                    \
+                                                \
     "|COREDUMP_COMM"                            \
     "|COREDUMP_UNIT"                            \
     "|COREDUMP_USER_UNIT"                       \
     "|COREDUMP_SIGNAL_NAME"                     \
     "|COREDUMP_CGROUP"                          \
-    "|_HOSTNAME"                                \
-    "|UNIT_RESULT"                              \
-    "|_RUNTIME_SCOPE"                           \
+                                                \
+                                                \
+    /* --- DOCKER --- */                        \
+                                                \
+    "|CONTAINER_ID"                             \
+    /* "|CONTAINER_ID_FULL" */                  \
+    "|CONTAINER_NAME"                           \
+    "|CONTAINER_TAG"                            \
+    "|IMAGE_NAME" /* undocumented */            \
+    /* "|CONTAINER_PARTIAL_MESSAGE" */          \
+                                                \
     ""
 
 static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -609,25 +682,17 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     sd_journal *j = NULL;
     errno = 0;
 
-//#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
-//    int fd = open(filename, O_RDONLY);
-//    fstat_cache_enable(fd);
-//
-//    if(sd_journal_open_files_fd(&j, &fd, 1, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
-//        fqs->cached_count += fstat_cache_disable(fd);
-//        close(fd);
-//        return ND_SD_JOURNAL_FAILED_TO_OPEN;
-//    }
-//#else // !HAVE_SD_JOURNAL_OPEN_FILES_FD
+    fstat_cache_enable_on_thread();
 
     const char *paths[2] = {
             [0] = filename,
             [1] = NULL,
     };
-    if(sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j)
-        return ND_SD_JOURNAL_FAILED_TO_OPEN;
 
-//#endif // !HAVE_SD_JOURNAL_OPEN_FILES_FD
+    if(sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+        fstat_cache_disable_on_thread();
+        return ND_SD_JOURNAL_FAILED_TO_OPEN;
+    }
 
     ND_SD_JOURNAL_STATUS status;
     bool matches_filters = true;
@@ -653,11 +718,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
         status = ND_SD_JOURNAL_NO_FILE_MATCHED;
 
     sd_journal_close(j);
-
-//#ifdef HAVE_SD_JOURNAL_OPEN_FILES_FD
-//    fqs->cached_count += fstat_cache_disable(fd);
-//    close(fd);
-//#endif
+    fstat_cache_disable_on_thread();
 
     return status;
 }
@@ -689,6 +750,8 @@ static void buffer_json_journal_versions(BUFFER *wb) {
 }
 
 static void journal_file_update_msg_ut(const char *filename, struct journal_file *jf) {
+    fstat_cache_enable_on_thread();
+
     const char *files[2] = {
             [0] = filename,
             [1] = NULL,
@@ -696,6 +759,8 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
 
     sd_journal *j = NULL;
     if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+        fstat_cache_disable_on_thread();
+
         if(!jf->logged_failure) {
             netdata_log_error("cannot open journal file '%s', using file timestamps to understand time-frame.", filename);
             jf->logged_failure = true;
@@ -719,6 +784,7 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
     }
 
     sd_journal_close(j);
+    fstat_cache_disable_on_thread();
 
     if(first_ut > last_ut) {
         internal_error(true, "timestamps are flipped in file '%s'", filename);
@@ -1174,6 +1240,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         fqs->file_working++;
         fqs->cached_count = 0;
 
+        size_t fs_calls = fstat_thread_calls;
+        size_t fs_cached = fstat_thread_cached_responses;
         size_t rows_useful = fqs->rows_useful;
         size_t rows_read = fqs->rows_read;
         size_t bytes_read = fqs->bytes_read;
@@ -1185,6 +1253,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         rows_read = fqs->rows_read - rows_read;
         bytes_read = fqs->bytes_read - bytes_read;
         matches_setup_ut = fqs->matches_setup_ut - matches_setup_ut;
+        fs_calls = fstat_thread_calls - fs_calls;
+        fs_cached = fstat_thread_cached_responses - fs_cached;
 
         started_ut = ended_ut;
         ended_ut = now_monotonic_usec();
@@ -1209,6 +1279,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
             buffer_json_member_add_double(wb, "bytes_per_second", (double) bytes_read / (double) duration_ut * (double) USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "duration_matches_ut", matches_setup_ut);
+            buffer_json_member_add_uint64(wb, "fstat_query_calls", fs_calls);
+            buffer_json_member_add_uint64(wb, "fstat_query_cached_responses", fs_cached);
         }
         buffer_json_object_close(wb); // journal file
 
@@ -1290,6 +1362,13 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     facets_report(facets, wb, used_hashes_registry);
 
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + (fqs->data_only ? 3600 : 0));
+
+    buffer_json_member_add_object(wb, "_fstat_caching");
+    {
+        buffer_json_member_add_uint64(wb, "calls", fstat_thread_calls);
+        buffer_json_member_add_uint64(wb, "cached", fstat_thread_cached_responses);
+    }
+    buffer_json_object_close(wb); // _fstat_caching
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
@@ -2035,6 +2114,8 @@ static void function_systemd_journal_progress(BUFFER *wb, const char *transactio
 }
 
 static void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
+    fstat_thread_calls = 0;
+    fstat_thread_cached_responses = 0;
     journal_files_registry_update();
 
     BUFFER *wb = buffer_create(0, NULL);
@@ -2129,7 +2210,19 @@ static void function_systemd_journal(const char *transaction, char *function, in
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_uid, NULL);
 
+    facets_register_key_name_transformation(facets, "OBJECT_SYSTEMD_OWNER_UID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_uid, NULL);
+
+    facets_register_key_name_transformation(facets, "OBJECT_UID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_uid, NULL);
+
     facets_register_key_name_transformation(facets, "_GID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_gid, NULL);
+
+    facets_register_key_name_transformation(facets, "OBJECT_GID",
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_gid, NULL);
 
@@ -2138,6 +2231,10 @@ static void function_systemd_journal(const char *transaction, char *function, in
                                             netdata_systemd_journal_transform_cap_effective, NULL);
 
     facets_register_key_name_transformation(facets, "_AUDIT_LOGINUID",
+                                            FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            netdata_systemd_journal_transform_uid, NULL);
+
+    facets_register_key_name_transformation(facets, "OBJECT_AUDIT_LOGINUID",
                                             FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_uid, NULL);
 
@@ -2605,7 +2702,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         bool cancelled = false;
-        char buf[] = "systemd-journal after:1696319393 before:1696320293 anchor:1696320283039944 direction:forward last:100 if_modified_since:1696320283039989 data_only:true delta:true tail:true slice:true source:all histogram:DHKucpqUoe1";
+        char buf[] = "systemd-journal after:-8000000 before:0 last:1";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, 600, &cancelled);
