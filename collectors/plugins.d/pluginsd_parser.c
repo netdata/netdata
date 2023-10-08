@@ -185,6 +185,17 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
     return true;
 }
 
+static inline void pluginsd_rrddim_slots_reset(RRDSET *st) {
+    for(size_t i = 0; i < st->pluginsd.size ;i++) {
+        struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[i];
+
+        rrddim_acquired_release(prd->rda);
+        prd->rda = NULL;
+        prd->rd = NULL;
+        prd->id = NULL;
+    }
+}
+
 static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd, ssize_t slot)  {
     size_t wanted_size = st->pluginsd.size;
 
@@ -212,10 +223,6 @@ static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd, ssize_t s
         struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
 
         if(prd->rd != rd) {
-            // we have to do this, because the child may restart and renumber its dimensions
-            rrddim_acquired_release(prd->rda);
-
-            // set the new dimension
             prd->rda = rrddim_find_and_acquire(st, string2str(rd->id));
             prd->rd = rrddim_acquired_to_rrddim(prd->rda);
             prd->id = string2str(prd->rd->id);
@@ -341,7 +348,7 @@ static inline ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
     return slot;
 }
 
-static inline void pluginsd_rrdset_cache_put_to_slot(RRDHOST *host __maybe_unused, PARSER *parser, RRDSET *st, ssize_t slot) {
+static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st, ssize_t slot) {
     if(unlikely(slot < 1)) return;
 
     if(unlikely((size_t)slot >= parser->user.rrd_pointers_cache.rrdset.slots)) {
@@ -349,10 +356,11 @@ static inline void pluginsd_rrdset_cache_put_to_slot(RRDHOST *host __maybe_unuse
         size_t new_slots = (old_slots < PLUGINSD_MIN_RRDSET_POINTERS_CACHE) ? PLUGINSD_MIN_RRDSET_POINTERS_CACHE : old_slots * 2;
 
         if(unlikely((size_t)slot >= new_slots)) {
-//            netdata_log_error(
-//                    "PLUGINSD: RRDSET slot received %zd is way too big, more than double of the target allocation %zu. "
-//                    "Not caching this.",
-//                    slot, new_slots);
+            internal_error(
+                    true,
+                    "PLUGINSD: RRDSET slot received %zd is way too big, more than double of the target allocation %zu. "
+                    "Not caching this now (may be later).",
+                    slot, new_slots);
             return;
         }
 
@@ -377,7 +385,7 @@ static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_
     if(unlikely((size_t)slot >= parser->user.rrd_pointers_cache.rrdset.slots)) {
         st = pluginsd_find_chart(host, id, keyword);
         // we have to increase the slots array to make room for this
-        pluginsd_rrdset_cache_put_to_slot(host, parser, st, slot);
+        pluginsd_rrdset_cache_put_to_slot(parser, st, slot);
     }
     else
         st = parser->user.rrd_pointers_cache.rrdset.array[slot];
@@ -756,7 +764,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-        pluginsd_rrdset_cache_put_to_slot(host, parser, st, slot);
+        pluginsd_rrddim_slots_reset(st);
+        pluginsd_rrdset_cache_put_to_slot(parser, st, slot);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART);
