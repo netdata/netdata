@@ -431,7 +431,6 @@
 - Fix deployment and categories [\#15540](https://github.com/netdata/netdata/pull/15540) ([sashwathn](https://github.com/sashwathn))
 - docs: fix apps fd badges and typos [\#15539](https://github.com/netdata/netdata/pull/15539) ([ilyam8](https://github.com/ilyam8))
 - change api.netdata.cloud to app.netdata.cloud [\#15538](https://github.com/netdata/netdata/pull/15538) ([ilyam8](https://github.com/ilyam8))
-- Update metadata.yaml for some python collectors - 2 [\#15537](https://github.com/netdata/netdata/pull/15537) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
