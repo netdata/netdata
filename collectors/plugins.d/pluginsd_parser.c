@@ -2187,13 +2187,27 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // ------------------------------------------------------------------------
     // cleanup RRDSET / RRDDIM
 
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        rd->collector.calculated_value = 0;
-        rd->collector.collected_value = 0;
-        rrddim_clear_updated(rd);
+    if(likely(st->pluginsd.with_slots)) {
+        for(size_t i = 0; i < st->pluginsd.size ;i++) {
+            RRDDIM *rd = st->pluginsd.prd_array[i].rd;
+
+            if(!rd)
+                continue;
+
+            rd->collector.calculated_value = 0;
+            rd->collector.collected_value = 0;
+            rrddim_clear_updated(rd);
+        }
     }
-    rrddim_foreach_done(rd);
+    else {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st){
+            rd->collector.calculated_value = 0;
+            rd->collector.collected_value = 0;
+            rrddim_clear_updated(rd);
+        }
+        rrddim_foreach_done(rd);
+    }
 
     // ------------------------------------------------------------------------
     // reset state
