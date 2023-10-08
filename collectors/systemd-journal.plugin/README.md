@@ -98,11 +98,12 @@ For information about configuring a journals' centralization server, check [this
 
 ## Journal Fields
 
-`systemd` journals are designed to support multiple fields per log entry. The power of `systemd` journals is that
-unlike other log management systems, it supports different, dynamic and variable fields for each log message
-while all fields are indexed for fast queries.
+`systemd` journals are designed to support multiple fields per log entry. The power of `systemd` journals is that,
+unlike other log management systems, it supports dynamic and variable fields for each log message,
+while all fields and their values are indexed for fast querying.
 
-This means that each application can log using its own unique fields.
+This means that each application can log messages annotated with its own unique fields.
+
 For a description of the most frequent fields found in `systemd` journals, check `man systemd.journal-fields`. 
 
 Fields found in the journal files are automatically added to the UI in multiple places to help you explore
