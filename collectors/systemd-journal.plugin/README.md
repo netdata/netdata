@@ -43,7 +43,7 @@ To use the plugin, install one of our native distribution packages, or install i
 The following are limitations related to the features of `systemd` journal:
 
 - This plugin does not support binary field values. `systemd` journal has the ability to assign fields with binary data. This plugin assumes all fields contain text values (text in this context includes numbers).
-- This plugin does not support multiple values per field. `systemd` journal has the ability to accept the same field key, multiple times, with multiple values. This plugin will present the last value and ignore the others.
+- This plugin does not support multiple values per field. `systemd` journal has the ability to accept the same field key, multiple times, with multiple values on a single log entry. This plugin will present the last value and ignore the others for this log entry.
 
 
 ## Journal Sources
