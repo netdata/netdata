@@ -42,8 +42,8 @@ struct fdstat64_cache_entry {
 };
 
 struct fdstat64_cache_entry fstat64_cache[FSTAT_CACHE_MAX] = {0 };
-static size_t fstat_calls = 0;
-static size_t fstat_cached_responses = 0;
+static __thread size_t fstat_thread_calls = 0;
+static __thread size_t fstat_thread_cached_responses = 0;
 static __thread bool enable_thread_fstat = false;
 static __thread size_t fstat_caching_thread_session = 0;
 static size_t fstat_caching_global_session = 0;
@@ -63,7 +63,7 @@ int fstat64(int fd, struct stat64 *buf) {
     if (!real_fstat)
         real_fstat = dlsym(RTLD_NEXT, "fstat64");
 
-    fstat_calls++;
+    fstat_thread_calls++;
 
     if(fd >= 0 && fd < FSTAT_CACHE_MAX) {
         if(enable_thread_fstat && fstat64_cache[fd].session != fstat_caching_thread_session) {
@@ -73,7 +73,7 @@ int fstat64(int fd, struct stat64 *buf) {
         }
 
         if(fstat64_cache[fd].enabled && fstat64_cache[fd].updated && fstat64_cache[fd].session == fstat_caching_thread_session) {
-            fstat_cached_responses++;
+            fstat_thread_cached_responses++;
             errno = fstat64_cache[fd].err_no;
             *buf = fstat64_cache[fd].stat;
             fstat64_cache[fd].cached_count++;
@@ -1240,6 +1240,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         fqs->file_working++;
         fqs->cached_count = 0;
 
+        size_t fs_calls = fstat_thread_calls;
+        size_t fs_cached = fstat_thread_cached_responses;
         size_t rows_useful = fqs->rows_useful;
         size_t rows_read = fqs->rows_read;
         size_t bytes_read = fqs->bytes_read;
@@ -1251,6 +1253,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         rows_read = fqs->rows_read - rows_read;
         bytes_read = fqs->bytes_read - bytes_read;
         matches_setup_ut = fqs->matches_setup_ut - matches_setup_ut;
+        fs_calls = fstat_thread_calls - fs_calls;
+        fs_cached = fstat_thread_cached_responses - fs_cached;
 
         started_ut = ended_ut;
         ended_ut = now_monotonic_usec();
@@ -1275,6 +1279,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
             buffer_json_member_add_double(wb, "bytes_per_second", (double) bytes_read / (double) duration_ut * (double) USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "duration_matches_ut", matches_setup_ut);
+            buffer_json_member_add_uint64(wb, "fstat_query_calls", fs_calls);
+            buffer_json_member_add_uint64(wb, "fstat_query_cached_responses", fs_cached);
         }
         buffer_json_object_close(wb); // journal file
 
@@ -1356,6 +1362,13 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     facets_report(facets, wb, used_hashes_registry);
 
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + (fqs->data_only ? 3600 : 0));
+
+    buffer_json_member_add_object(wb, "_fstat_caching");
+    {
+        buffer_json_member_add_uint64(wb, "calls", fstat_thread_calls);
+        buffer_json_member_add_uint64(wb, "cached", fstat_thread_cached_responses);
+    }
+    buffer_json_object_close(wb); // _fstat_caching
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
@@ -2101,6 +2114,8 @@ static void function_systemd_journal_progress(BUFFER *wb, const char *transactio
 }
 
 static void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
+    fstat_thread_calls = 0;
+    fstat_thread_cached_responses = 0;
     journal_files_registry_update();
 
     BUFFER *wb = buffer_create(0, NULL);
