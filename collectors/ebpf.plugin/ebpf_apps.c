@@ -132,16 +132,6 @@ ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
     return target;
 }
 
-/**
- * eBPF socket release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
-{
-    aral_freez(ebpf_aral_socket_pid, stat);
-}
-
 /*****************************************************************
  *
  *  CACHESTAT ARAL FUNCTIONS

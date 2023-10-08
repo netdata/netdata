@@ -221,7 +221,6 @@ extern ebpf_process_stat_t *process_stat_vector;
 extern ARAL *ebpf_aral_socket_pid;
 void ebpf_socket_aral_init();
 ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
-void ebpf_socket_release(ebpf_socket_publish_apps_t *stat);
 
 extern ARAL *ebpf_aral_cachestat_pid;
 void ebpf_cachestat_aral_init();
