@@ -647,19 +647,15 @@ static inline void ebpf_obsolete_socket_cgroup_charts(ebpf_module_t *em) {
 void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
 {
     int order = 20080;
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_CONNECTION_TCP_V4,
-                              "",
-                              "Calls to tcp_v4_connection",
-                              EBPF_COMMON_DIMENSION_CONNECTIONS,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
+    struct ebpf_target *w;
+    int update_every = em->update_every;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        uint32_t flag = w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX);
+        if (likely(w->exposed && w->processes && !flag))
+            continue;
 
-    if (tcp_v6_connect_address.type == 'T') {
-        ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
+        if (tcp_v6_connect_address.type == 'T') {
+            ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                                   NETDATA_NET_APPS_CONNECTION_TCP_V6,
                                   "Calls to tcp_v6_connection",
                                   EBPF_COMMON_DIMENSION_CONNECTIONS,
@@ -668,84 +664,98 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
                                   NULL,
                                   order++,
                                   em->update_every);
+        }
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_call_tcp_v4_connection",
+                                  "Calls to tcp_v4_connection.",
+                                  EBPF_COMMON_DIMENSION_CONNECTIONS,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_call_tcp_v4_connection",
+                                  order++,
+                                  update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_sock_bytes_sent",
+                                  "Bytes sent.",
+                                  EBPF_COMMON_DIMENSION_BITS,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_sock_bytes_sent",
+                                  order++,
+                                  update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_sock_bytes_received",
+                                  "Bytes received.",
+                                  EBPF_COMMON_DIMENSION_BITS,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_sock_bytes_received",
+                                  order++,
+                                  update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_call_tcp_sendmsg",
+                                  "Calls to tcp_sendmsg.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_call_tcp_sendmsg",
+                                  order++,
+                                  update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_call_tcp_cleanup_rbuf",
+                                  "Calls to tcp_cleanup_rbuf.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_call_tcp_cleanup_rbuf",
+                                  order++,
+                                  update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_call_tcp_retransmit",
+                                  "Calls to tcp_retransmit.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_call_tcp_retransmit",
+                                  order++,
+                                  update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_call_udp_sendmsg",
+                                  "Calls to udp_sendmsg.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_call_udp_sendmsg",
+                                  order++,
+                                  update_every);
+
+        ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
+                                  w->clean_name,
+                                  "_call_udp_recvmsg",
+                                  "Calls to udp_recvmsg.",
+                                  EBPF_COMMON_DIMENSION_CALL,
+                                  NETDATA_APPS_NET_GROUP,
+                                  NETDATA_EBPF_CHART_TYPE_STACKED,
+                                  "ebpf.app_call_udp_recvmsg",
+                                  order++,
+                                  update_every);
+
+        w->charts_created &= ~(1<<EBPF_MODULE_SOCKET_IDX);
     }
-
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_BANDWIDTH_SENT,
-                              "",
-                              "Bytes sent",
-                              EBPF_COMMON_DIMENSION_BITS,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
-
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_BANDWIDTH_RECV,
-                              "",
-                               "bytes received",
-                              EBPF_COMMON_DIMENSION_BITS,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
-
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
-                              "",
-                              "Calls for tcp_sendmsg",
-                              EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
-
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
-                              "",
-                              "Calls for tcp_cleanup_rbuf",
-                              EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
-
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
-                              "",
-                              "Calls for tcp_retransmit",
-                              EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
-
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
-                              "",
-                              "Calls for udp_sendmsg",
-                              EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
-
-    ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                              NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
-                              "",
-                              "Calls for udp_recvmsg",
-                              EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_APPS_NET_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                              NULL,
-                              order++,
-                              em->update_every);
 }
 
 /**
