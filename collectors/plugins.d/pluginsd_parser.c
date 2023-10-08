@@ -185,7 +185,7 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
     return true;
 }
 
-static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd, ssize_t slot)  {
+static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd __maybe_unused, ssize_t slot)  {
     size_t wanted_size = st->pluginsd.size;
 
     if(slot >= 1) {
@@ -232,7 +232,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
         // caching with slots
 
         if(unlikely(slot < 1 || slot > st->pluginsd.size)) {
-            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %zu] are expected.",
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %u] are expected.",
                     rrdhost_hostname(host), rrdset_id(st), cmd, slot, st->pluginsd.size);
             return NULL;
         }
@@ -241,10 +241,22 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
 
         rd = prd->rd;
         if(likely(rd)) {
-            internal_fatal(strcmp(prd->id, dimension) != 0,
-                    "PLUGINSD: expected to find dimension '%s' on slot %zd, but found '%s'",
-                    dimension, slot, prd->id);
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(strcmp(prd->id, dimension) != 0) {
+                ssize_t t;
+                for(t = 0; t < st->pluginsd.size ;t++) {
+                    if (strcmp(st->pluginsd.prd_array[t].id, dimension) == 0)
+                        break;
+                }
+                if(t >= st->pluginsd.size)
+                    t = -1;
 
+                internal_fatal(true,
+                               "PLUGINSD: expected to find dimension '%s' on slot %zd, but found '%s', "
+                               "the right slot is %zd",
+                               dimension, slot, prd->id, t);
+            }
+#endif
             return rd;
         }
     }
@@ -318,7 +330,7 @@ static inline ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
     return slot;
 }
 
-static inline void pluginsd_rrdset_cache_put_to_slot(RRDHOST *host, PARSER *parser, RRDSET *st, ssize_t slot) {
+static inline void pluginsd_rrdset_cache_put_to_slot(RRDHOST *host __maybe_unused, PARSER *parser, RRDSET *st, ssize_t slot) {
     if(unlikely(slot < 1)) return;
 
     if(unlikely((size_t)slot >= parser->user.rrd_pointers_cache.rrdset.slots)) {
