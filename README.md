@@ -54,7 +54,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
 - 📖 **systemd Journal Logs Explorer** (beta, in the nightly release channel)<br/>
-  Provides a systemd journal logs explorer, to view, filter and analyze system and applications logs by directly accessing systemd journal files on individual hosts and infrastructure-wide logs centralization servers.
+  Provides a `systemd` journal logs explorer, to view, filter and analyze system and applications logs by directly accessing `systemd` journal files on individual hosts and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
   Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
@@ -66,7 +66,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 NEW: **Netdata and LOGS !** 🥳</br>
 
-Check the [SystemD-Journal Plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query SystemD-Journal logs!
+Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query `systemd` journal logs!
 The plugin is available from Oct 3, 2023 to nightly channel users.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
@@ -119,9 +119,9 @@ The plugin is available from Oct 3, 2023 to nightly channel users.
 |:-----------------------------:|:---------------------------------------------------------------------------------------------------:|:------------:|:-------------------------------------------------------------------------------------------------------:|
 |            WebRTC             |                             Browser to Agent communication via WebRTC.                              |    later     |                                                   POC                                                   |
 |   Advanced Troubleshooting    | Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor, and many more. |    later     |                                               interrupted                                               |
-|  Easy Custom<br/>Dashboards   |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     next     |                                                 planned                                                 |
-|     More Customizability      |                           Set default settings for all charts and views!                            |     next     |                                                 planned                                                 |
-|        SystemD Journal        |                     View the SystemD Journal of your systems on the dashboard.                      |     soon     |                                               in nightly                                               |
+|  Easy Custom<br/>Dashboards   |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     soon     |                                                 planned                                                 |
+|     More Customizability      |                           Set default settings for all charts and views!                            |     soon     |                                                 planned                                                 |
+|        `systemd` journal      |                     View the `systemd` journal logs of your systems on the dashboard.                      |     now     |                                               in nightly                                               |
 |          UCUM Units           |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon     |                                               in progress                                               |
 | **Netdata Cloud<br/>On-Prem** |                        **Netdata Cloud available for On-Prem installation!**                        |   **soon**   |                                             **in progress**                                             |
 |       Click to Activate       |                          Configure Alerts and Data Collectors from the UI!                          |     soon     |                                               in progress                                               |
@@ -262,7 +262,7 @@ Each Netdata Agent can perform the following functions:
 1. **`COLLECT` metrics from their sources**<br/>
    Uses [internal](https://github.com/netdata/netdata/tree/master/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources.
 
-   Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, SystemD Units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
+   Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, `systemd` units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
 
    It collects application metrics from applications: PostgreSQL, MySQL/MariaDB, Redis, MongoDB, Nginx, Apache, and hundreds more.
 
