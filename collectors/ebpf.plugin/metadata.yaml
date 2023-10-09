@@ -381,36 +381,36 @@ modules:
           description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
-            - name: apps.process_create
+            - name: app_group.process_create
               description: Process started
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.thread_create
+                - name: calls
+            - name: app_group.thread_create
               description: Threads started
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.task_exit
+                - name: call
+            - name: app_group.task_exit
               description: Tasks starts exit process
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.task_close
+                - name: callp
+            - name: app_group.task_close
               description: Tasks closed
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.task_error
+                - name: call
+            - name: app_group.task_error
               description: Errors to create process or threads
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: app
         - name: cgroup
           description: "These Metrics show grouped information per cgroup/service."
           labels: []

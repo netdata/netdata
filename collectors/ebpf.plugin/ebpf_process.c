@@ -218,25 +218,25 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
         values[4] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
                                                                            task_err));
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_process_start");
-        write_chart_dimension("processes", values[0]);
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_process_start");
+        write_chart_dimension("calls", values[0]);
         write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_thread_start");
-        write_chart_dimension("threads", values[1]);
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_thread_start");
+        write_chart_dimension("calls", values[1]);
         write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_task_exit");
-        write_chart_dimension("tasks", values[2]);
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_exit");
+        write_chart_dimension("calls", values[2]);
         write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_task_released");
-        write_chart_dimension("tasks", values[3]);
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_released");
+        write_chart_dimension("calls", values[3]);
         write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_task_error");
-            write_chart_dimension("tasks", values[4]);
+            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_error");
+            write_chart_dimension("calls", values[4]);
             write_end_chart();
         }
     }
@@ -429,79 +429,79 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_process_start",
+                             "_ebpf_process_start",
                              "Process started.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_process_start",
+                             "app.ebpf_process_start",
                              20065,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION processes '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_thread_start",
+                             "_ebpf_thread_start",
                              "Threads started.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_thread_start",
+                             "app.ebpf_thread_start",
                              20066,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION threads '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_task_exit",
+                             "_ebpf_task_exit",
                              "Tasks starts exit process.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_task_exit",
+                             "app.ebpf_task_exit",
                              20067,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION tasks '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_task_released",
+                             "_ebpf_task_released",
                              "Tasks released.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_task_released",
+                             "app.ebpf_task_released",
                              20068,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION tasks '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                                  w->clean_name,
-                                 "_task_error",
+                                 "_ebpf_task_error",
                                  "Errors to create process or threads.",
                                  EBPF_COMMON_DIMENSION_CALL,
                                  NETDATA_PROCESS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                 "ebpf.app_task_error",
+                                 "app.ebpf_task_error",
                                  20069,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_PROCESS);
             ebpf_create_chart_labels("app_group", w->name, 0);
             ebpf_commit_label();
-            fprintf(stdout, "DIMENSION tasks '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+            fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
         }
         w->charts_created |= 1<<EBPF_MODULE_PROCESS_IDX;
     }
@@ -624,76 +624,62 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_process_start",
+                                  "_ebpf_process_start",
                                   "Process started.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_process_start",
+                                  "app.ebpf_process_start",
                                   20065,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_thread_start",
+                                  "_ebpf_thread_start",
                                   "Threads started.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_thread_start",
+                                  "app.ebpf_thread_start",
                                   20066,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_task_exit",
+                                  "_ebpf_task_exit",
                                   "Tasks starts exit process.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_task_exit",
+                                  "app.ebpf_task_exit",
                                   20067,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_task_released",
+                                  "_ebpf_task_released",
                                   "Tasks released.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_task_released",
+                                  "app.ebpf_task_released",
                                   20068,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                       w->clean_name,
-                                      "_task_error",
+                                      "_ebpf_task_error",
                                       "Errors to create process or threads.",
                                       EBPF_COMMON_DIMENSION_CALL,
                                       NETDATA_PROCESS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      "ebpf.app_task_error",
+                                      "app.ebpf_task_error",
                                       20069,
                                       update_every);
         }
 
         w->charts_created &= ~(1<<EBPF_MODULE_PROCESS_IDX);
-    }
-
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
-                                  NETDATA_SYSCALL_APPS_TASK_ERROR,
-                                  "",
-                                  "Errors to create process or threads.",
-                                  EBPF_COMMON_DIMENSION_CALL,
-                                  NETDATA_PROCESS_GROUP,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  NULL,
-                                  20069,
-                                  em->update_every);
     }
 }
 
