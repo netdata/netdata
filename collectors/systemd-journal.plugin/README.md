@@ -358,7 +358,7 @@ We will focus on providing some instructions to setting up a _passive_ centraliz
     the parent server. Especially in public faced servers you need to make sure that the endpoints of this service
     are protected from "bad actors" (for instance; on the centralization server, allow traffic to the 
     `systemd-journal-remote` specific port (`19532`) only from each individual server)
-2. Even with TLS enabled on the centralization server, we don't advise you to push systemd journal logs over untrusted 
+2. Even with TLS enabled on the centralization server, we don't advise you to push systemd journal logs over public 
    network. Prefer cleaner approaches, for instance, create one centralization server per one specific subnet of your VPC.
 
 #### Configuring a journals' centralization server
@@ -381,30 +381,30 @@ Please note that `systemd-journal-remote` supports using secure connections.
 
 To change the protocol of the journal transfer (HTTP/HTTPS) and the save location, do:
 
-1. Edit the service file of the systemd-journal-remote
+1. Edit the service file of the `systemd-journal-remote` service
 
 ```sh
-# copy the service file
-sudo systemctl edit systemd-journal-remote.service
-```
+sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
 
-2. Add the following lines into the instructed place, save and exit.
-    
-```sh
-[Service]
-ExecStart=/usr/lib/systemd/systemd-journal-remote --listen-http=-3 --output=/var/log/journal/remote/
+# edit it
+# --listen-http=-3 specifies the incoming journal for http.
+# If you want to use https, change it to --listen-https=-3.
+nano /etc/systemd/system/systemd-journal-remote.service
+
+# reload systemd
+sudo systemctl daemon-reload
 ```
 
 This will make http requests as priority.
 
-3. Reload the daemon configs
+2. Reload the daemon configs
 
 ```sh
 # reload systemd
 sudo systemctl daemon-reload
 ```
 
-4. (OPTIONAL) If you want to change the port, edit the socket file of the `systemd-journal-remote`
+3. (OPTIONAL) If you want to change the port, edit the socket file of the `systemd-journal-remote`
 ```sh
 # copy the service file
 sudo systemctl edit systemd-journal-remote.socket
@@ -419,7 +419,7 @@ ListenStream=<DESIRED_PORT>
 ```
     
 
-5. Secure the endpoint from unauthorized access. That depends on your setup (e.g firewall setting, reverse proxies etc)
+4. Secure the endpoint from unauthorized access. That depends on your setup (e.g firewall setting, reverse proxies etc)
 
 
 ##### Centralization server with TLS and self-signed certificate
@@ -504,9 +504,9 @@ for i in "${!CLIENT_CNS[@]}"; do
 done
 ```
 
-Keep in mind we have already produced the client certificates, we will make use of them when we configure the clients.
+Keep in mind we have already produced the client certificates, we will make use of them when we will configure the clients.
 
-5. Copy the keys and the certificates into the systemd Journal predefined places
+5. Copy the keys and the certificates into the `systemd-journal-remote`'s predefined places
 
 
 ```sh
@@ -519,7 +519,7 @@ sudo cp "${SERVER_CN}".pem /etc/ssl/certs/journal-remote.pem
 sudo cp ca.pem /etc/ssl/ca/trusted.pem
 ```
 
-6. Adjust the permission for the `systemd-journal-remote` to access them.
+6. Adjust the permissions for the `systemd-journal-remote` to access them.
 
 ```sh
 sudo chgrp systemd-journal-remote /etc/ssl/private/journal-remote.key
@@ -532,14 +532,14 @@ sudo chmod 755 /etc/ssl/certs/journal-remote.pem
 sudo chmod 755 /etc/ssl/ca/trusted.pem
 ```
 
-6. Edit the `systemd-journal-remote.conf` to change the predefined key place an enable SSL.
+6. Edit the `systemd-journal-remote.conf` to change the predefined key place and enable SSL.
 
 
 sh```
 sudo nano /etc/systemd/journal-remote.conf
 ```
 
-You need to transfrom the corresponding section to something like this
+You need to transform the corresponding section to something like this
 ```
 [Remote]
 Seal=false
@@ -552,7 +552,8 @@ TrustedCertificateFile=/etc/ssl/ca/trusted.pem
 
 #### Configuring journal clients to push their logs to the server
 
-On the clients you want to centralize their logs, install `systemd-journal-remote`, configure `systemd-journal-upload`, enable it and start it with `systemctl`.
+In this section we will configure the clients/hosts to push their journal logs into the centralization server. You will install `systemd-journal-remote`, 
+configure `systemd-journal-upload` (with or without SSL), enable and start it.
 
 
 1. Install the `systemd-journal-remote` it run:
@@ -564,7 +565,7 @@ sudo apt-get install systemd-journal-remote
 ```
 
 
-2. [With SSL] Copy to the client/hosts the self signed certificates we created before (we created one per host)
+2. [With SSL] Copy to the client/hosts the self-signed certificates you created before (you created one per host)
 
     After this step in a folder (eg `home/user/incoming`), each host must have the following
     ```
@@ -586,11 +587,12 @@ sudo adduser --system --home /run/systemd --no-create-home --disabled-login --gr
 
 
 ```sh
-sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions
+sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
 sudo chmod 755 /etc/ssl/private
-sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions
+sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
 sudo chmod 755 /etc/ssl/ca
-cd home/user/incoming #change it accordingly
+
+cd home/user/incoming #change it accordingly, this is the place where you copied your certificates.
 sudo cp clientX.example.com.key /etc/ssl/private/journal-upload.key
 sudo cp clientX.example.com.pem /etc/ssl/certs/journal-upload.pem
 sudo cp ca.pem /etc/ssl/ca/trusted.pem
@@ -615,7 +617,7 @@ sudo  chmod 755 /etc/ssl/ca/trusted.pem
 URL=http://centralization.server.ip:19532
 ```
 
-⚠️ With SSL
+⚠️ OR with SSL
 
 
 ```
