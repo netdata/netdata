@@ -25,6 +25,10 @@
 #define mw_realloc(...) realloc(__VA_ARGS__)
 #endif
 
+#ifndef MQTT_WSS_FRAG_MEMALIGN
+#define MQTT_WSS_FRAG_MEMALIGN (8)
+#endif
+
 #define OPENSSL_VERSION_095 0x00905100L
 #define OPENSSL_VERSION_097 0x00907000L
 #define OPENSSL_VERSION_110 0x10100000L

@@ -447,14 +447,18 @@ static void buffer_purge(struct header_buffer *buf) {
     buf->tail_frag = NULL;
 }
 
+#define FRAG_PADDING(addr) ((MQTT_WSS_FRAG_MEMALIGN - ((uintptr_t)addr % MQTT_WSS_FRAG_MEMALIGN)) % MQTT_WSS_FRAG_MEMALIGN)
 static struct buffer_fragment *buffer_new_frag(struct header_buffer *buf, buffer_frag_flag_t flags)
 {
-    if (BUFFER_BYTES_AVAILABLE(buf) < sizeof(struct buffer_fragment))
+    uint8_t padding = FRAG_PADDING(buf->tail);
+
+    if (BUFFER_BYTES_AVAILABLE(buf) < sizeof(struct buffer_fragment) + padding)
         return NULL;
 
-    struct buffer_fragment *frag = (struct buffer_fragment *)buf->tail;
+    struct buffer_fragment *frag = (struct buffer_fragment *)(buf->tail + padding);
+
     memset(frag, 0, sizeof(*frag));
-    buf->tail += sizeof(*frag);
+    buf->tail += sizeof(*frag) + padding;
 
     if (/*!((frag)->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) &&*/ buf->tail_frag)
         buf->tail_frag->next = frag;
@@ -479,7 +483,7 @@ static void buffer_rebuild(struct header_buffer *buf)
             buf->tail += frag->len;
         }
         if (frag->next != NULL)
-            frag->next = (struct buffer_fragment*)buf->tail;
+            frag->next = (struct buffer_fragment*)(buf->tail + FRAG_PADDING(buf->tail));
         frag = frag->next;
     } while(frag);
 }
