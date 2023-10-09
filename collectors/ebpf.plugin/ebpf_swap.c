@@ -295,23 +295,23 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_swap_readpage",
+                                  "_ebpf_call_swap_readpage",
                                   "Calls to function swap_readpage.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_SWAP_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_swap_readpage",
+                                  "app.ebpf_call_swap_readpage",
                                   20191,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_swap_writepage",
+                                  "_ebpf_call_swap_writepage",
                                   "Calls to function swap_writepage.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_SWAP_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_swap_writepage",
+                                  "app.ebpf_call_swap_writepage",
                                   20192,
                                   update_every);
         w->charts_created &= ~(1<<EBPF_MODULE_SWAP_IDX);
@@ -588,11 +588,11 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
 
         ebpf_swap_sum_pids(&w->swap, w->root_pid);
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_swap_readpage");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_swap_readpage");
         write_chart_dimension("calls", (long long) w->swap.read);
         write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_swap_writepage");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_swap_writepage");
         write_chart_dimension("calls", (long long) w->swap.write);
         write_end_chart();
     }
@@ -867,12 +867,12 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_swap_readpage",
+                             "_ebpf_call_swap_readpage",
                              "Calls to function swap_readpage.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_SWAP_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_swap_readpage",
+                             "app.ebpf_call_swap_readpage",
                              20191,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SWAP);
@@ -882,12 +882,12 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_swap_writepage",
+                             "_ebpf_call_swap_writepage",
                              "Calls to function swap_writepage.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_SWAP_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_swap_writepage",
+                             "app.ebpf_call_swap_writepage",
                              20192,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SWAP);

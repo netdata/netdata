@@ -1360,13 +1360,13 @@ modules:
           description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
-            - name: apps.swap_read_call
+            - name: app_group.ebpf_call_swap_readpage
               description: Calls to function <code>swap_readpage</code>.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
-            - name: apps.swap_write_call
+            - name: app_group.ebpf_call_swap_writepage
               description: Calls to function <code>swap_writepage</code>.
               unit: "calls/s"
               chart_type: stacked
