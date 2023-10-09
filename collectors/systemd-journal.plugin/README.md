@@ -19,9 +19,9 @@ journal centralization servers.
 - Allows filtering on **any journal field** or **field value**, for any time-frame.
 - Allows **full text search** (`grep`) on all journal fields, for any time-frame.
 - Provides a **histogram** for log entries over time, with a break down per field-value, for any field and any time-frame.
-- Works directly on journal files, without any other third party components.
+- Works directly on journal files, without any other third-party components.
 - Supports coloring log entries, the same way `journalctl` does.
-- In PLAY mode provides the same experience as `journalctl -f`, showing new logs entries immediately after they are received.
+- In PLAY mode provides the same experience as `journalctl -f`, showing new log entries immediately after they are received.
 
 ### Prerequisites
 
@@ -142,7 +142,7 @@ The values of all other fields are presented as found in the journals.
 > For `remote` sources, the names presented may not reflect the actual user and group names on the origin server.
 > The numeric value will still be visible though, as-is on the origin server.
 
-The annotations are not searchable with full text search. They are only added for the presentation of the fields. 
+The annotations are not searchable with full-text search. They are only added for the presentation of the fields. 
 
 ### Journal fields as columns in the table
 
@@ -355,10 +355,10 @@ We will focus on providing some instructions to setting up a _passive_ centraliz
 ⚠️ Two things to keep always in mind: 
 
 1. `systemd-journal-remote` doesn't provide a mechanism to authorize each individual server to write its logs to
-    the parent server. Especially in public faced servers you need to make sure that the endpoints of this service
+    the parent server. Especially in public-faced servers you need to make sure that the endpoints of this service
     are protected from "bad actors" (for instance; on the centralization server, allow traffic to the 
     `systemd-journal-remote` specific port (`19532`) only from each individual server)
-2. Even with TLS enabled on the centralization server, we don't advise you to push systemd journal logs over public 
+2. Even with TLS enabled on the centralization server, we don't advise you to push systemd journal logs over the public 
    network. Prefer cleaner approaches, for instance, create one centralization server per one specific subnet of your VPC.
 
 #### Configuring a journals' centralization server
@@ -419,7 +419,7 @@ ListenStream=<DESIRED_PORT>
 ```
     
 
-4. Secure the endpoint from unauthorized access. That depends on your setup (e.g firewall setting, reverse proxies etc)
+4. Secure the endpoint from unauthorized access. That depends on your setup (e.g firewall setting, reverse proxies, etc)
 
 
 ##### Centralization server with TLS and self-signed certificate
@@ -429,7 +429,7 @@ but omit step 2. Instead of step two, make the following steps
 
 >💡 You need to handcraft and use a self-signed certificate. A pretty straightforward way to do that is:
 
-1. Download openssl
+1. Download OpenSSL
 
 ```sh
 # change this according to your distro
@@ -583,7 +583,7 @@ sudo apt-get install systemd-journal-remote
 sudo adduser --system --home /run/systemd --no-create-home --disabled-login --group systemd-journal-upload
 ```
 
-4.[With SSL] _On each client/host;_ Navigate under the folder you placed the certificates, copy them into the expected locations (by the `systemd-journal-upload` service)
+4. [With SSL] _On each client/host;_ Navigate under the folder you placed the certificates, copy them into the expected locations (by the `systemd-journal-upload` service)
 
 
 ```sh
@@ -598,7 +598,7 @@ sudo cp clientX.example.com.pem /etc/ssl/certs/journal-upload.pem
 sudo cp ca.pem /etc/ssl/ca/trusted.pem
 ```
 
-5. [With SSL]  _On each client/host;_ Adjust the permission so the `systemd-journal-upload` service can accces them
+5. [With SSL]  _On each client/host;_ Adjust the permission so the `systemd-journal-upload` service can access them
 
 ```sh
 sudo  chgrp systemd-journal-upload /etc/ssl/private/journal-upload.key
