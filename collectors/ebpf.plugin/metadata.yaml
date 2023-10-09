@@ -3076,84 +3076,84 @@ modules:
           description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
-            - name: apps.file_deleted
+            - name: app_group.ebpf_call_vfs_unlink
               description: Files deleted
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_write_call
+                - name: calls
+            - name: app_group.ebpf_call_vfs_write
               description: Write to disk
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_write_error
+                - name: calls
+            - name: app_group.ebpf_call_vfs_write_error
               description: Fails to write
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_read_call
+                - name: calls
+            - name: app_group.ebpf_call_vfs_read
               description: Read from disk
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_read_error
+                - name: calls
+            - name: app_group.ebpf_call_vfs_read_error
               description: Fails to read
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_write_bytes
+                - name: calls
+            - name: app_group.ebpf_call_vfs_write_bytes
               description: Bytes written on disk
               unit: "bytes/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_read_bytes
+                - name: writes
+            - name: app_group.ebpf_call_vfs_read_bytes
               description: Bytes read on disk
               unit: "bytes/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_fsync
+                - name: reads
+            - name: app_group.ebpf_call_vfs_fsync
               description: Calls for <code>vfs_fsync</code>
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_fsync_error
+                - name: calls
+            - name: app_group.ebpf_call_vfs_fsync_error
               description: Sync error
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_open
+                - name: calls
+            - name: app_group.ebpf_call_vfs_open
               description: Calls for <code>vfs_open</code>
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_open_error
+                - name: calls
+            - name: app_group.ebpf_call_vfs_open_error
               description: Open error
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_create
+                - name: calls
+            - name: app_group.ebpf_call_vfs_create
               description: Calls for <code>vfs_create</code>
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_create_error
+                - name: calls
+            - name: app_group.ebpf_call_vfs_create_error
               description: Create error
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: calls
   - meta:
       plugin_name: ebpf.plugin
       module_name: process

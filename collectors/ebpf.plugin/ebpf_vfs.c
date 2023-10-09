@@ -612,153 +612,153 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_unlink",
+                                  "_ebpf_call_vfs_unlink",
                                   "Files deleted.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_unlink",
+                                  "app.ebpf_call_vfs_unlink",
                                   order++,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_write",
+                                  "_ebpf_call_vfs_write",
                                   "Write to disk.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_write",
+                                  "app.ebpf_call_vfs_write",
                                   order++,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                       w->clean_name,
-                                      "_call_vfs_write_error",
+                                      "_ebpf_call_vfs_write_error",
                                       "Fails to write.",
                                       EBPF_COMMON_DIMENSION_CALL,
                                       NETDATA_VFS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      "ebpf.app_call_vfs_write_error",
+                                      "app.ebpf_call_vfs_write_error",
                                       order++,
                                       update_every);
         }
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_read",
+                                  "_ebpf_call_vfs_read",
                                   "Read from disk.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_read",
+                                  "app.ebpf_call_vfs_read",
                                   order++,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                       w->clean_name,
-                                      "_call_vfs_read_error",
+                                      "_ebpf_call_vfs_read_error",
                                       "Fails to read.",
                                       EBPF_COMMON_DIMENSION_CALL,
                                       NETDATA_VFS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      "ebpf.app_call_vfs_read_error",
+                                      "app.ebpf_call_vfs_read_error",
                                       order++,
                                       update_every);
         }
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_write_bytes",
+                                  "_ebpf_call_vfs_write_bytes",
                                   "Bytes written on disk.",
                                   EBPF_COMMON_DIMENSION_BYTES,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_write_bytes",
+                                  "app.ebpf_call_vfs_write_bytes",
                                   order++,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_read_bytes",
+                                  "_ebpf_call_vfs_read_bytes",
                                   "Bytes read from disk.",
                                   EBPF_COMMON_DIMENSION_BYTES,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_read_bytes",
+                                  "app.ebpf_call_vfs_read_bytes",
                                   order++,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_fsync",
+                                  "_ebpf_call_vfs_fsync",
                                   "Calls to vfs_fsync.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_fsync",
+                                  "app.ebpf_call_vfs_fsync",
                                   order++,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                       w->clean_name,
-                                      "_call_vfs_fsync_error",
+                                      "_ebpf_call_vfs_fsync_error",
                                       "Fails to sync.",
                                       EBPF_COMMON_DIMENSION_CALL,
                                       NETDATA_VFS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      "ebpf.app_call_vfs_fsync_error",
+                                      "app.ebpf_call_vfs_fsync_error",
                                       order++,
                                       update_every);
         }
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_open",
+                                  "_ebpf_call_vfs_open",
                                   "Calls to vfs_open.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_open",
+                                  "app.ebpf_call_vfs_open",
                                   order++,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                       w->clean_name,
-                                      "_call_vfs_open_error",
+                                      "_ebpf_call_vfs_open_error",
                                       "Fails to open.",
                                       EBPF_COMMON_DIMENSION_CALL,
                                       NETDATA_VFS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      "ebpf.app_call_vfs_open_error",
+                                      "app.ebpf_call_vfs_open_error",
                                       order++,
                                       update_every);
         }
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                   w->clean_name,
-                                  "_call_vfs_create",
+                                  "_ebpf_call_vfs_create",
                                   "Calls to vfs_create.",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_VFS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
-                                  "ebpf.app_call_vfs_create",
+                                  "app.ebpf_call_vfs_create",
                                   order++,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
                                       w->clean_name,
-                                      "_call_vfs_create_error",
+                                      "_ebpf_call_vfs_create_error",
                                       "Fails to create.",
                                       EBPF_COMMON_DIMENSION_CALL,
                                       NETDATA_VFS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
-                                      "ebpf.app_call_vfs_create_error",
+                                      "app.ebpf_call_vfs_create_error",
                                       order++,
                                       update_every);
         }
@@ -1138,64 +1138,64 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
         ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_unlink");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_unlink");
         write_chart_dimension("calls", w->vfs.unlink_call);
         write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_write");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_write");
         write_chart_dimension("calls", w->vfs.write_call + w->vfs.writev_call);
         write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_write_error");
+            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_write_error");
             write_chart_dimension("calls", w->vfs.write_err + w->vfs.writev_err);
             write_end_chart();
         }
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_read");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_read");
         write_chart_dimension("calls", w->vfs.read_call + w->vfs.readv_call);
         write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_read_error");
+            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_read_error");
             write_chart_dimension("calls", w->vfs.read_err + w->vfs.readv_err);
             write_end_chart();
         }
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_write_bytes");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_write_bytes");
         write_chart_dimension("writes", w->vfs.write_bytes + w->vfs.writev_bytes);
         write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_read_bytes");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_read_bytes");
         write_chart_dimension("reads", w->vfs.read_bytes + w->vfs.readv_bytes);
         write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_fsync");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_fsync");
         write_chart_dimension("calls", w->vfs.fsync_call);
         write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_fsync_error");
+            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_fsync_error");
             write_chart_dimension("calls", w->vfs.fsync_err);
             write_end_chart();
         }
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_open");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_open");
         write_chart_dimension("calls", w->vfs.open_call);
         write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_open_error");
+            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_open_error");
             write_chart_dimension("calls", w->vfs.open_err);
             write_end_chart();
         }
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_create");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_create");
         write_chart_dimension("calls", w->vfs.create_call);
         write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_vfs_create_error");
+            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_create_error");
             write_chart_dimension("calls", w->vfs.create_err);
             write_end_chart();
         }
@@ -2193,12 +2193,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_unlink",
+                             "_ebpf_call_vfs_unlink",
                              "Files deleted.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_unlink",
+                             "app.ebpf_call_vfs_unlink",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2208,12 +2208,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_write",
+                             "_ebpf_call_vfs_write",
                              "Write to disk.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_write",
+                             "app.ebpf_call_vfs_write",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2224,12 +2224,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                                  w->clean_name,
-                                 "_call_vfs_write_error",
+                                 "_ebpf_call_vfs_write_error",
                                  "Fails to write.",
                                  EBPF_COMMON_DIMENSION_CALL,
                                  NETDATA_VFS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                 "ebpf.app_call_vfs_write_error",
+                                 "app.ebpf_call_vfs_write_error",
                                  order++,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2240,12 +2240,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_read",
+                             "_ebpf_call_vfs_read",
                              "Read from disk.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_read",
+                             "app.ebpf_call_vfs_read",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2256,12 +2256,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                                  w->clean_name,
-                                 "_call_vfs_read_error",
+                                 "_ebpf_call_vfs_read_error",
                                  "Fails to read.",
                                  EBPF_COMMON_DIMENSION_CALL,
                                  NETDATA_VFS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                 "ebpf.app_call_vfs_read_error",
+                                 "app.ebpf_call_vfs_read_error",
                                  order++,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2272,12 +2272,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_write_bytes",
+                             "_ebpf_call_vfs_write_bytes",
                              "Bytes written on disk.",
                              EBPF_COMMON_DIMENSION_BYTES,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_write_bytes",
+                             "app.ebpf_call_vfs_write_bytes",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2287,12 +2287,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_read_bytes",
+                             "_ebpf_call_vfs_read_bytes",
                              "Bytes read from disk.",
                              EBPF_COMMON_DIMENSION_BYTES,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_read_bytes",
+                             "app.ebpf_call_vfs_read_bytes",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2302,12 +2302,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_fsync",
+                             "_ebpf_call_vfs_fsync",
                              "Calls to vfs_fsync.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_fsync",
+                             "app.ebpf_call_vfs_fsync",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2318,12 +2318,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                                  w->clean_name,
-                                 "_call_vfs_fsync_error",
+                                 "_ebpf_call_vfs_fsync_error",
                                  "Fails to sync.",
                                  EBPF_COMMON_DIMENSION_CALL,
                                  NETDATA_VFS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                 "ebpf.app_call_vfs_fsync_error",
+                                 "app.ebpf_call_vfs_fsync_error",
                                  order++,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2334,12 +2334,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_open",
+                             "_ebpf_call_vfs_open",
                              "Calls to vfs_open.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_open",
+                             "app.ebpf_call_vfs_open",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2350,12 +2350,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                                  w->clean_name,
-                                 "_call_vfs_open_error",
+                                 "_ebpf_call_vfs_open_error",
                                  "Fails to open.",
                                  EBPF_COMMON_DIMENSION_CALL,
                                  NETDATA_VFS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                 "ebpf.app_call_vfs_open_error",
+                                 "app.ebpf_call_vfs_open_error",
                                  order++,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2366,12 +2366,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_call_vfs_create",
+                             "_ebpf_call_vfs_create",
                              "Calls to vfs_create.",
                              EBPF_COMMON_DIMENSION_CALL,
                              NETDATA_VFS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_call_vfs_create",
+                             "app.ebpf_call_vfs_create",
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_VFS);
@@ -2382,12 +2382,12 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                                  w->clean_name,
-                                 "_call_vfs_create_error",
+                                 "_ebpf_call_vfs_create_error",
                                  "Fails to create a file.",
                                  EBPF_COMMON_DIMENSION_CALL,
                                  NETDATA_VFS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
-                                 "ebpf.app_call_vfs_create_error",
+                                 "app.ebpf_call_vfs_create_error",
                                  order++,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_VFS);
