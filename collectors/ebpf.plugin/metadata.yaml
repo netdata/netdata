@@ -1715,66 +1715,60 @@ modules:
           description: "These metrics show grouped information per apps group."
           labels: []
           metrics:
-            - name: apps.outbound_conn_v4
+            - name: app_group.ebpf_call_tcp_v4_connection
               description: Calls to tcp_v4_connection
               unit: "connections/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.outbound_conn_v6
+                - name: connections
+            - name: app_group.app.ebpf_call_tcp_v6_connection
               description: Calls to tcp_v6_connection
               unit: "connections/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.total_bandwidth_sent
+                - name: connections
+            - name: app_group.ebpf_sock_bytes_sent
               description: Bytes sent
               unit: "kilobits/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.total_bandwidth_recv
+                - name: bandwidth
+            - name: app_group.ebpf_sock_bytes_received
               description: bytes received
               unit: "kilobits/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_tcp_send
+                - name: bandwidth
+            - name: app_group.ebpf_call_tcp_sendmsg
               description: Calls for tcp_sendmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_tcp_recv
+                - name: calls
+            - name: app_group.ebpf_call_tcp_cleanup_rbuf
               description: Calls for tcp_cleanup_rbuf
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_tcp_retransmit
+                - name: calls
+            - name: app_group.ebpf_call_tcp_retransmit
               description: Calls for tcp_retransmit
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_udp_send
+                - name: calls
+            - name: app_group.ebpf_call_udp_sendmsg
               description: Calls for udp_sendmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_udp_recv
+                - name: calls
+            - name: app_group.ebpf_call_udp_recvmsg
               description: Calls for udp_recvmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: services.net_conn_ipv4
-              description: Calls to tcp_v4_connection
-              unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
+                - name: calls
         - name: cgroup
           description: ""
           labels: []
