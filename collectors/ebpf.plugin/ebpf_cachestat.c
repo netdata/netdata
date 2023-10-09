@@ -876,7 +876,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION access '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION hits '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
@@ -1023,7 +1023,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
 
         value = (collected_number) w->cachestat.hit;
         write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_access");
-        write_chart_dimension("access", value);
+        write_chart_dimension("hits", value);
         write_end_chart();
 
         value = (collected_number) w->cachestat.miss;

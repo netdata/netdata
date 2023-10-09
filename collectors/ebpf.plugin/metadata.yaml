@@ -848,25 +848,25 @@ modules:
               unit: "%"
               chart_type: line
               dimensions:
-                - name: a dimension per app group
+                - name: ratio
             - name: app_group.ebpf_cachestat_dirty_pages
               description: Number of dirty pages
               unit: "page/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: pages
             - name: app_group.ebpf_cachestat_access
               description: Number of accessed files
               unit: "hits/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: hits
             - name: app_group.ebpf_cachestat_misses
               description: Files out of page cache
               unit: "misses/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: misses
         - name: cgroup
           description: ""
           labels: []
@@ -2007,30 +2007,30 @@ modules:
           description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
-            - name: apps.dc_ratio
+            - name: app_group.ebpf_dc_ratio
               description: Percentage of files inside directory cache
               unit: "%"
               chart_type: line
               dimensions:
-                - name: a dimension per app group
-            - name: apps.dc_reference
+                - name: ratio
+            - name: app_group.ebpf_dc_reference
               description: Count file access
               unit: "files"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.dc_not_cache
+                - name: files
+            - name: app_group.ebpf_dc_not_cache
               description: Files not present inside directory cache
               unit: "files"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.dc_not_found
+                - name: files
+            - name: app_group.ebpf_dc_not_found
               description: Files not found
               unit: "files"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: files
         - name: filesystem
           description: "These metrics show total number of calls to functions inside kernel."
           labels: []
