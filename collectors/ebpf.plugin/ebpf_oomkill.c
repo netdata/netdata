@@ -183,7 +183,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
             }
         }
 write_dim:
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_app_oomkill");
+        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_oomkill");
         write_chart_dimension(EBPF_COMMON_DIMENSION_KILLS, was_oomkilled);
         write_end_chart();
     }
@@ -488,12 +488,12 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
-                             "_app_oomkill",
+                             "_ebpf_oomkill",
                              "OOM kills.",
                              EBPF_COMMON_DIMENSION_KILLS,
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
-                             "ebpf.app_oomkill",
+                             "app.ebpf_oomkill",
                              20020,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_OOMKILL);

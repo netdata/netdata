@@ -1503,12 +1503,12 @@ modules:
           description: "These metrics show cgroup/service that reached OOM."
           labels: []
           metrics:
-            - name: apps.oomkills
+            - name: app_group.oomkill
               description: OOM kills
               unit: "kills"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: kills
   - meta:
       plugin_name: ebpf.plugin
       module_name: socket
