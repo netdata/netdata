@@ -3063,7 +3063,7 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_mem_activity, cg->chart_labels);
                 rrddim_add(cg->st_mem_activity, "in", NULL, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_mem_activity, "out", NULL, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_mem_activity, "out", NULL, -system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
             }
 
             rrddim_set(cg->st_mem_activity, "in", cg->memory.total_pgpgin);
@@ -3088,12 +3088,11 @@ void update_systemd_services_charts(
                     RRDSET_TYPE_AREA);
 
                 rrdset_update_rrdlabels(cg->st_io, cg->chart_labels);
-                rrddim_add(cg->st_io, "write", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
                 rrddim_add(cg->st_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_io, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
-
-            rrddim_set(cg->st_io, "write", cg->io_service_bytes.Write);
             rrddim_set(cg->st_io, "read", cg->io_service_bytes.Read);
+            rrddim_set(cg->st_io, "write", cg->io_service_bytes.Write);
             rrdset_done(cg->st_io);
         }
 
@@ -3115,10 +3114,10 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_serviced_ops, cg->chart_labels);
                 rrddim_add(cg->st_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_serviced_ops, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_serviced_ops, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
-            rrddim_set(cg->st_serviced_ops, "write", cg->io_serviced.Write);
             rrddim_set(cg->st_serviced_ops, "read", cg->io_serviced.Read);
+            rrddim_set(cg->st_serviced_ops, "write", cg->io_serviced.Write);
             rrdset_done(cg->st_serviced_ops);
         }
 
@@ -3140,11 +3139,10 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_throttle_io, cg->chart_labels);
                 rrddim_add(cg->st_throttle_io, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_throttle_io, "write", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_throttle_io, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
-
-            rrddim_set(cg->st_throttle_io, "write", cg->throttle_io_service_bytes.Write);
             rrddim_set(cg->st_throttle_io, "read", cg->throttle_io_service_bytes.Read);
+            rrddim_set(cg->st_throttle_io, "write", cg->throttle_io_service_bytes.Write);
             rrdset_done(cg->st_throttle_io);
         }
 
@@ -3166,11 +3164,10 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_throttle_serviced_ops, cg->chart_labels);
                 rrddim_add(cg->st_throttle_serviced_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_throttle_serviced_ops, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_throttle_serviced_ops, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
-
-            rrddim_set(cg->st_throttle_serviced_ops, "write", cg->throttle_io_serviced.Write);
             rrddim_set(cg->st_throttle_serviced_ops, "read", cg->throttle_io_serviced.Read);
+            rrddim_set(cg->st_throttle_serviced_ops, "write", cg->throttle_io_serviced.Write);
             rrdset_done(cg->st_throttle_serviced_ops);
         }
 
@@ -3192,10 +3189,10 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_queued_ops, cg->chart_labels);
                 rrddim_add(cg->st_queued_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_queued_ops, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_queued_ops, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
-            rrddim_set(cg->st_queued_ops, "write", cg->io_queued.Write);
             rrddim_set(cg->st_queued_ops, "read", cg->io_queued.Read);
+            rrddim_set(cg->st_queued_ops, "write", cg->io_queued.Write);
             rrdset_done(cg->st_queued_ops);
         }
 
@@ -3217,11 +3214,10 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_merged_ops, cg->chart_labels);
                 rrddim_add(cg->st_merged_ops, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_merged_ops, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_merged_ops, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
-
-            rrddim_set(cg->st_merged_ops, "write", cg->io_merged.Write);
             rrddim_set(cg->st_merged_ops, "read", cg->io_merged.Read);
+            rrddim_set(cg->st_merged_ops, "write", cg->io_merged.Write);
             rrdset_done(cg->st_merged_ops);
         }
     }
