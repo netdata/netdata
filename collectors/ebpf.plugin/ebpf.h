@@ -302,11 +302,24 @@ static inline void ebpf_commit_label()
  *
  * @param family the chart family name
  * @param name   the chart name
- * @param suffix the chart suffix (used with apps and cgroups)
+ * @param metric the chart suffix (used with apps and cgroups)
  */
-static inline void write_begin_chart(char *family, char *name, char *suffix)
+static inline void write_begin_chart(char *family, char *name, char *metric)
 {
-    printf("BEGIN %s.%s%s\n", family, name, suffix);
+    printf("BEGIN %s.%s%s\n", family, name, metric);
+}
+
+/**
+ * Write begin command on standard output
+ *
+ * @param family the chart family name
+ * @param name   the chart name
+ * @param metric the chart suffix (used with apps and cgroups)
+ * @param dt     the last heartbit
+ */
+static inline void write_begin_chart_with_time(char *family, char *name, char *metric, usec_t dt)
+{
+    printf("BEGIN %s.%s_%s %"PRIu64"\n", family, name, metric, dt);
 }
 
 /**
@@ -317,14 +330,15 @@ static inline void write_end_chart()
     printf("END\n");
 }
 
-void write_end_chart();
-
 int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
 int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
 uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 
 void ebpf_pid_file(char *filename, size_t length);
 
+#define EBPF_PROGRAMS_SECTION "ebpf programs"
+
+#define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 
 #define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
