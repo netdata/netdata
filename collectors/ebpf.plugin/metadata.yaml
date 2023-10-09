@@ -2460,30 +2460,30 @@ modules:
           description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
-            - name: apps.shmget_call
+            - name: app_group.ebpf_shmget_call
               description: Calls to syscall <code>shmget(2)</code>.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.shmat_call
+                - name: calls
+            - name: app_group.ebpf_shmat_call
               description: Calls to syscall <code>shmat(2)</code>.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.shmdt_call
+                - name: calls
+            - name: app_group.ebpf_shmdt_call
               description: Calls to syscall <code>shmdt(2)</code>.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.shmctl_call
+                - name: calls
+            - name: app_group.ebpf_shmctl_call
               description: Calls to syscall <code>shmctl(2)</code>.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: calls
         - name: global
           description: "These Metrics show number of calls for specified syscall."
           labels: []
