@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- journal: updates [\#16150](https://github.com/netdata/netdata/pull/16150) ([ktsaou](https://github.com/ktsaou))
 - fix `test -x` check for uninstaller script [\#16146](https://github.com/netdata/netdata/pull/16146) ([ilyam8](https://github.com/ilyam8))
 - health: don't log an unknown key error for "families" [\#16145](https://github.com/netdata/netdata/pull/16145) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16144](https://github.com/netdata/netdata/pull/16144) ([netdatabot](https://github.com/netdatabot))
@@ -430,7 +431,6 @@
 - Fill in yaml files for some python collectors [\#15541](https://github.com/netdata/netdata/pull/15541) ([Ancairon](https://github.com/Ancairon))
 - Fix deployment and categories [\#15540](https://github.com/netdata/netdata/pull/15540) ([sashwathn](https://github.com/sashwathn))
 - docs: fix apps fd badges and typos [\#15539](https://github.com/netdata/netdata/pull/15539) ([ilyam8](https://github.com/ilyam8))
-- change api.netdata.cloud to app.netdata.cloud [\#15538](https://github.com/netdata/netdata/pull/15538) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
