@@ -3927,19 +3927,19 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
-       fprintf(stdout, "DIMENSION writes '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
+       fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
 
        fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n", type, w->clean_name, title, type, update_every);
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
-       fprintf(stdout, "DIMENSION writes '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
+       fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
 #else
        fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'blocks/s' disk %s.disk_physical_block_io area 20100 %d\n", type, w->clean_name, title, type, update_every);
        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
        fprintf(stdout, "CLABEL_COMMIT\n");
        fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", RATES_DETAIL);
-       fprintf(stdout, "DIMENSION writes '' absolute 1 %llu\n", RATES_DETAIL);
+       fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", RATES_DETAIL);
 #endif
 
         fprintf(stdout, "CHART %s.%s_processes '' '%s processes' 'processes' processes %s.processes line 20150 %d\n", type, w->clean_name, title, type, update_every);
