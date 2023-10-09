@@ -198,30 +198,30 @@ modules:
           description: "These Metrics show grouped information per apps group."
           labels: []
           metrics:
-            - name: apps.file_open
+            - name: app_group.ebpf_file_open
               description: Number of open files
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.file_open_error
+                - name: calls
+            - name: app_group.ebpf_file_open_error
               description: Fails to open files
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.file_closed
+                - name: calls
+            - name: app_group.ebpf_file_closed
               description: Files closed
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.file_close_error
+                - name: calls
+            - name: app_group.ebpf_file_close_error
               description: Fails to close files
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: calls
   - meta:
       plugin_name: ebpf.plugin
       module_name: processes
