@@ -690,6 +690,7 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
     "WHERE hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id AND hld.new_status = -2 AND hld.updated_by_id = 0 " \
     "AND hld.unique_id NOT IN (SELECT alert_unique_id FROM aclk_alert_%s) " \
     "AND hl.config_hash_id NOT IN (select hash_id from alert_hash where warn is null and crit is null) " \
+    "AND hl.name || hl.chart NOT IN (select name || chart from health_log where name = hl.name and chart = hl.chart and alarm_id > hl.alarm_id and host_id = hl.host_id) " \
     "ORDER BY hld.unique_id ASC ON CONFLICT (alert_unique_id) DO NOTHING;"
 void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 {
