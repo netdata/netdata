@@ -1082,7 +1082,7 @@ void *ebpf_function_thread(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!ebpf_exit_plugin) {
+    while(!ebpf_plugin_exit) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
         if (ebpf_function_plugin_exit) {

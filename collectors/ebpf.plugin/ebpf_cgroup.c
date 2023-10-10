@@ -373,7 +373,7 @@ void *ebpf_cgroup_integration(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
-    while (!ebpf_exit_plugin) {
+    while (!ebpf_plugin_exit) {
         (void)heartbeat_next(&hb, step);
 
         // We are using a small heartbeat time to wake up thread,
