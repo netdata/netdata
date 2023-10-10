@@ -582,7 +582,7 @@ void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_mod
     } else if (((lmap->type & apps_type) == apps_type) && (!em->apps_charts) && (!em->cgroup_charts) && (!em->functions.fnct_routine)) {
         lmap->user_input = ND_EBPF_DEFAULT_MIN_PID;
     } else if (((em->apps_charts) || (em->functions.fnct_routine) || (em->cgroup_charts)) && (em->apps_level != NETDATA_APPS_NOT_SET)) {
-        if (em->apps_level == NETDATA_APPS_NOT_SET && em->functions.fnct_routine)
+        if (em->functions.fnct_routine)
             em->apps_level = NETDATA_APPS_LEVEL_ALL;
 
         switch (em->apps_level) {
