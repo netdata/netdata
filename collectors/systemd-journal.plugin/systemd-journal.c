@@ -384,8 +384,9 @@ static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *
         if(!parse_journal_field(data, length, &key, &key_length, &value, &value_length))
             continue;
 
+#ifdef NETDATA_INTERNAL_CHECKS
         usec_t origin_journal_ut = *msg_ut;
-
+#endif
         if(unlikely(key_length == sizeof(JD_SOURCE_REALTIME_TIMESTAMP) - 1 &&
             memcmp(key, JD_SOURCE_REALTIME_TIMESTAMP, sizeof(JD_SOURCE_REALTIME_TIMESTAMP) - 1) == 0)) {
             usec_t ut = str2ull(value, NULL);
