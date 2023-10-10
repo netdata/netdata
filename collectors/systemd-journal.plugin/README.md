@@ -471,7 +471,10 @@ touch index
 echo 0001 >serial
 
 3. Specify the Common Names for both the server and the clients (server who will push its journal logs). 
-   How each a client will reach the centralized the server? For instance if you want to reach them via public IP or DNS 
+   How each a client will reach the centralized the server? For instance if you want to reach them via public IP or DNS.
+   There is a 1:1 correlation among the elements of `CLIENT_CNS`, `CLIENT_IPS` and `CLIENT_DNES`, if you want to omit a field,
+   replace it with a placeholder string. You can also omit the DNSes but keep in mind to also omit the field `DNS:$SERVER_DNS`
+   when you are signing the client certificates.
 
 ```sh
 SERVER_CN="myserver.example.com"
@@ -601,13 +604,13 @@ sudo cp ca.pem /etc/ssl/ca/trusted.pem
 5. [With SSL]  _On each client/host;_ Adjust the permission so the `systemd-journal-upload` service can access them
 
 ```sh
-sudo  chgrp systemd-journal-upload /etc/ssl/private/journal-upload.key
-sudo  chgrp systemd-journal-upload /etc/ssl/certs/journal-upload.pem
+sudo chgrp systemd-journal-upload /etc/ssl/private/journal-upload.key
+sudo chgrp systemd-journal-upload /etc/ssl/certs/journal-upload.pem
 sudo chgrp systemd-journal-upload /etc/ssl/ca/trusted.pem
 
 sudo chmod 0640 /etc/ssl/private/journal-upload.key
 sudo chmod 755 /etc/ssl/certs/journal-upload.pem
-sudo  chmod 755 /etc/ssl/ca/trusted.pem
+sudo chmod 755 /etc/ssl/ca/trusted.pem
 ```
 
 6. Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like this:
