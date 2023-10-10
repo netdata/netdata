@@ -674,6 +674,25 @@ static struct netdev *get_netdev(const char *name) {
     return d;
 }
 
+// Used when Netdata is installed inside an LXC container.
+// In this case the goal is to monitor the container, not the host system.
+// There is no reason to use a host prefix. 
+static bool is_iface_double_linked(struct netdev *d) {
+    char filename[FILENAME_MAX + 1];
+    unsigned long long iflink = 0;
+    unsigned long long ifindex = 0;
+ 
+    snprintfz(filename, FILENAME_MAX, "/sys/class/net/%s/iflink", d->name);
+    if (read_single_number_file(filename, &iflink))
+        return false;
+
+    snprintfz(filename, FILENAME_MAX, "/sys/class/net/%s/ifindex", d->name);
+    if (read_single_number_file(filename, &ifindex))
+        return false;
+
+    return iflink != ifindex;
+}
+
 #define NETDEV_VIRTUAL_COLLECT_DELAY 15 // 1 full run of the cgroups discovery thread (10 secs by default)
 
 int do_proc_net_dev(int update_every, usec_t dt) {
@@ -782,15 +801,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             char buffer[FILENAME_MAX + 1];
 
             snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
-            if (likely(access(buffer, R_OK) == 0)) {
-                d->virtual = 1;
-                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
-            }
-            else {
-                d->virtual = 0;
-                rrdlabels_add(d->chart_labels, "interface_type", "real", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
-            }
-            rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
+
+            d->virtual = likely(access(buffer, R_OK) == 0) ? 1 : 0;
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed
@@ -800,6 +812,17 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
                 d->filename_duplex = strdupz(buffer);
             }
+
+            // At least on Proxmox inside LXC: eth0 is virtual.
+            if (inside_lxc_container && d->virtual)
+                d->virtual = is_iface_double_linked(d) ? 0 : 1;
+
+            if (d->virtual)
+                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO | RRDLABEL_FLAG_PERMANENT);
+            else
+                rrdlabels_add(d->chart_labels, "interface_type", "real", RRDLABEL_SRC_AUTO | RRDLABEL_FLAG_PERMANENT);
+
+            rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
 
             snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
             d->filename_operstate = strdupz(buffer);
