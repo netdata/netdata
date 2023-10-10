@@ -154,7 +154,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     netdata_log_info("     to %s", new_sqlite_database);
 
     // This will remove the -shm and -wal files when we close the database
-    db_execute(database, "select count(*) from sqlite_master limit 0");
+    (void) db_execute(database, "select count(*) from sqlite_master limit 0");
 
     sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
     if (recover) {

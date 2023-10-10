@@ -812,7 +812,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     return false;
 }
 
-void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
+void delete_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug, const char *fnc_sig, int code) {
     if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
@@ -838,7 +838,7 @@ void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug
     freez(params_local);
 }
 
-void set_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
+void set_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug __maybe_unused, const char *fnc_sig, int code) {
     if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
