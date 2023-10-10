@@ -349,20 +349,15 @@ static inline ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
 }
 
 static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st, ssize_t slot) {
-    if(unlikely(slot < 1)) return;
+    if(unlikely(slot < 1))
+        return;
 
-    if(unlikely((size_t)slot >= parser->user.rrd_pointers_cache.rrdset.slots)) {
+    if(unlikely((size_t)slot > parser->user.rrd_pointers_cache.rrdset.slots)) {
         size_t old_slots = parser->user.rrd_pointers_cache.rrdset.slots;
         size_t new_slots = (old_slots < PLUGINSD_MIN_RRDSET_POINTERS_CACHE) ? PLUGINSD_MIN_RRDSET_POINTERS_CACHE : old_slots * 2;
 
-        if(unlikely((size_t)slot >= new_slots)) {
-            internal_error(
-                    true,
-                    "PLUGINSD: RRDSET slot received %zd is way too big, more than double of the target allocation %zu. "
-                    "Not caching this now (may be later).",
-                    slot, new_slots);
-            return;
-        }
+        if(new_slots < (size_t)slot)
+            new_slots = slot;
 
         parser->user.rrd_pointers_cache.rrdset.array =
                 reallocz(parser->user.rrd_pointers_cache.rrdset.array, new_slots * sizeof(RRDSET *));
@@ -373,7 +368,7 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
         parser->user.rrd_pointers_cache.rrdset.slots = new_slots;
     }
 
-    parser->user.rrd_pointers_cache.rrdset.array[slot] = st;
+    parser->user.rrd_pointers_cache.rrdset.array[slot - 1] = st;
 }
 
 static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot, const char *keyword) {
@@ -382,13 +377,13 @@ static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_
 
     RRDSET *st;
 
-    if(unlikely((size_t)slot >= parser->user.rrd_pointers_cache.rrdset.slots)) {
-        st = pluginsd_find_chart(host, id, keyword);
-        // we have to increase the slots array to make room for this
-        pluginsd_rrdset_cache_put_to_slot(parser, st, slot);
+    if(unlikely((size_t)slot > parser->user.rrd_pointers_cache.rrdset.slots)) {
+        netdata_log_error("PLUGINSD: received chart slot %zd, but the available slots are [1 - %zu]",
+                          slot, parser->user.rrd_pointers_cache.rrdset.slots);
+        return NULL;
     }
     else
-        st = parser->user.rrd_pointers_cache.rrdset.array[slot];
+        st = parser->user.rrd_pointers_cache.rrdset.array[slot - 1];
 
     internal_fatal(st && string_strcmp(st->id, id) != 0,
                    "wrong chart in slot %zd, expected '%s', found '%s'",
