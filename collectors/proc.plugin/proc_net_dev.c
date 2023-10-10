@@ -814,6 +814,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
 
             // At least on Proxmox inside LXC: eth0 is virtual.
+            // TODO: this is wrong if the container shares the host's network namespace.
+            // need to find a way to determine if network ns == host network ns.
             if (inside_lxc_container && d->virtual)
                 d->virtual = is_iface_double_linked(d) ? 0 : 1;
 
