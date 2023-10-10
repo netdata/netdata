@@ -55,7 +55,7 @@
 #define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id;"
 #define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
 
-#define METADATA_CMD_Q_MAX_SIZE (1024)              // Max queue size; callers will block until there is room
+#define METADATA_CMD_Q_MAX_SIZE (2048)              // Max queue size; callers will block until there is room
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
@@ -105,6 +105,7 @@ struct metadata_database_cmdqueue {
 typedef enum {
     METADATA_FLAG_PROCESSING    = (1 << 0), // store or cleanup
     METADATA_FLAG_SHUTDOWN      = (1 << 1), // Shutting down
+    METADATA_FLAG_ML_LOADING    = (1 << 2), // ML model load in progress
 } METADATA_FLAG;
 
 struct metadata_wc {
@@ -1231,6 +1232,13 @@ void run_metadata_cleanup(struct metadata_wc *wc)
     (void) sqlite3_wal_checkpoint(db_meta, NULL);
 }
 
+struct ml_model_payload {
+    uv_work_t request;
+    struct metadata_wc *wc;
+    Pvoid_t JudyL;
+    size_t count;
+};
+
 struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
@@ -1556,6 +1564,42 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     worker_is_idle();
 }
 
+// Callback after scan of hosts is done
+static void after_start_ml_model_load(uv_work_t *req, int status __maybe_unused)
+{
+    struct ml_model_payload *ml_data = req->data;
+    struct metadata_wc *wc = ml_data->wc;
+    metadata_flag_clear(wc, METADATA_FLAG_ML_LOADING);
+    JudyLFreeArray(&ml_data->JudyL, PJE0);
+    freez(ml_data);
+}
+
+static void start_ml_model_load(uv_work_t *req __maybe_unused)
+{
+    register_libuv_worker_jobs();
+
+    struct ml_model_payload *ml_data = req->data;
+
+    worker_is_busy(UV_EVENT_METADATA_ML_LOAD);
+
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    bool first = true;
+    RRDDIM *rd;
+    RRDDIM_ACQUIRED *rda;
+    internal_error(true, "Batch ML load loader, %zu items", ml_data->count);
+    while((PValue = JudyLFirstThenNext(ml_data->JudyL, &Index, &first))) {
+        UNUSED(PValue);
+        rda = (RRDDIM_ACQUIRED *) Index;
+        rd = rrddim_acquired_to_rrddim(rda);
+        ml_dimension_load_models(rd);
+        rrddim_acquired_release(rda);
+    }
+    worker_is_idle();
+}
+
+
+
 static void metadata_event_loop(void *arg)
 {
     worker_register("METASYNC");
@@ -1610,6 +1654,7 @@ static void metadata_event_loop(void *arg)
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
 
+    struct ml_model_payload *ml_data = NULL;
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         uuid_t  *uuid;
         RRDHOST *host = NULL;
@@ -1636,6 +1681,24 @@ static void metadata_event_loop(void *arg)
             if (likely(opcode != METADATA_DATABASE_NOOP))
                 worker_is_busy(opcode);
 
+            // Have pending ML models to load?
+            if (opcode != METADATA_ML_LOAD_MODELS && ml_data && ml_data->count) {
+                static usec_t ml_submit_last = 0;
+                usec_t now = now_monotonic_usec();
+                if (!ml_submit_last)
+                    ml_submit_last = now;
+
+                if (!metadata_flag_check(wc, METADATA_FLAG_ML_LOADING) && (now - ml_submit_last > 150 * USEC_PER_MS)) {
+                    metadata_flag_set(wc, METADATA_FLAG_ML_LOADING);
+                    if (unlikely(uv_queue_work(loop, &ml_data->request, start_ml_model_load, after_start_ml_model_load)))
+                        metadata_flag_clear(wc, METADATA_FLAG_ML_LOADING);
+                    else {
+                        ml_submit_last = now;
+                        ml_data = NULL;
+                    }
+                }
+            }
+
             switch (opcode) {
                 case METADATA_DATABASE_NOOP:
                 case METADATA_DATABASE_TIMER:
@@ -1643,8 +1706,16 @@ static void metadata_event_loop(void *arg)
 
                 case METADATA_ML_LOAD_MODELS: {
                     RRDDIM *rd = (RRDDIM *) cmd.param[0];
-                    if (!shutdown)
-                        ml_dimension_load_models(rd);
+                    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(rd->rrdset, rrddim_id(rd));
+                    if (likely(rda)) {
+                        if (!ml_data) {
+                            ml_data = callocz(1,sizeof(*ml_data));
+                            ml_data->request.data = ml_data;
+                            ml_data->wc = wc;
+                        }
+                        JudyLIns(&ml_data->JudyL, (Word_t)rda, PJE0);
+                        ml_data->count++;
+                    }
                     break;
                 }
                 case METADATA_DEL_DIMENSION:
