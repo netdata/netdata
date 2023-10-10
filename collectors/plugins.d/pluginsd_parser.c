@@ -110,41 +110,6 @@ static inline bool pluginsd_unlock_rrdset_data_collection(PARSER *parser) {
     return false;
 }
 
-void pluginsd_rrdset_cleanup(RRDSET *st) {
-    if(!st)
-        return;
-
-    spinlock_lock(&st->pluginsd.spinlock);
-
-    for(size_t i = 0; i < st->pluginsd.size ; i++) {
-        rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
-        st->pluginsd.prd_array[i].rda = NULL;
-        st->pluginsd.prd_array[i].rd = NULL;
-        st->pluginsd.prd_array[i].id = NULL;
-    }
-
-    freez(st->pluginsd.prd_array);
-    st->pluginsd.prd_array = NULL;
-
-    st->pluginsd.collector_tid = 0;
-    st->pluginsd.size = 0;
-    st->pluginsd.pos = 0;
-
-    spinlock_unlock(&st->pluginsd.spinlock);
-}
-
-void pluginsd_slots_cleanup(PARSER *parser) {
-    if(!parser->user.rrd_pointers_cache.rrdset.array)
-        return;
-
-    for(size_t s = 0; s < parser->user.rrd_pointers_cache.rrdset.slots ;s++)
-        pluginsd_rrdset_cleanup(parser->user.rrd_pointers_cache.rrdset.array[s]);
-
-    freez(parser->user.rrd_pointers_cache.rrdset.array);
-    parser->user.rrd_pointers_cache.rrdset.array = NULL;
-    parser->user.rrd_pointers_cache.rrdset.slots = 0;
-}
-
 static inline void pluginsd_unlock_previous_scope_chart(PARSER *parser, const char *keyword, bool stale) {
     if(unlikely(pluginsd_unlock_rrdset_data_collection(parser))) {
         if(stale)
@@ -198,17 +163,6 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
     parser->user.st = st;
 
     return true;
-}
-
-static inline void pluginsd_rrddim_slots_reset(RRDSET *st) {
-    for(size_t i = 0; i < st->pluginsd.size ;i++) {
-        struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[i];
-
-        rrddim_acquired_release(prd->rda);
-        prd->rda = NULL;
-        prd->rd = NULL;
-        prd->id = NULL;
-    }
 }
 
 static inline void pluginsd_rrddim_put_to_slot(RRDSET *st, RRDDIM *rd, ssize_t slot)  {
@@ -363,7 +317,27 @@ static inline ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
     return slot;
 }
 
+static inline void pluginsd_rrdset_slots_reset(PARSER *parser, RRDSET *st) {
+    for(size_t i = 0; i < st->pluginsd.size ;i++) {
+        struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[i];
+
+        rrddim_acquired_release(prd->rda);
+        prd->rda = NULL;
+        prd->rd = NULL;
+        prd->id = NULL;
+    }
+
+    if(st->pluginsd.last_slot >= 0 && (uint32_t)st->pluginsd.last_slot < parser->user.rrd_pointers_cache.rrdset.slots)
+        parser->user.rrd_pointers_cache.rrdset.array[st->pluginsd.last_slot] = NULL;
+
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.with_slots = false;
+}
+
 static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st, ssize_t slot) {
+    // clean the old cached data if they are there
+    pluginsd_rrdset_slots_reset(parser, st);
+
     if(unlikely(slot < 1))
         return;
 
@@ -384,6 +358,7 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
     }
 
     parser->user.rrd_pointers_cache.rrdset.array[slot - 1] = st;
+    st->pluginsd.last_slot = (int32_t)slot - 1;
 }
 
 static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot, const char *keyword) {
@@ -405,6 +380,43 @@ static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_
                    slot, id, string2str(st->id));
 
     return st;
+}
+
+void pluginsd_rrdset_cleanup(RRDSET *st) {
+    if(!st)
+        return;
+
+    spinlock_lock(&st->pluginsd.spinlock);
+
+    for(size_t i = 0; i < st->pluginsd.size ; i++) {
+        rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
+        st->pluginsd.prd_array[i].rda = NULL;
+        st->pluginsd.prd_array[i].rd = NULL;
+        st->pluginsd.prd_array[i].id = NULL;
+    }
+
+    freez(st->pluginsd.prd_array);
+    st->pluginsd.prd_array = NULL;
+    st->pluginsd.size = 0;
+    st->pluginsd.pos = 0;
+    st->pluginsd.set = false;
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.with_slots = false;
+    st->pluginsd.collector_tid = 0;
+
+    spinlock_unlock(&st->pluginsd.spinlock);
+}
+
+void pluginsd_slots_cleanup(PARSER *parser) {
+    if(!parser->user.rrd_pointers_cache.rrdset.array)
+        return;
+
+    for(size_t s = 0; s < parser->user.rrd_pointers_cache.rrdset.slots ;s++)
+        pluginsd_rrdset_cleanup(parser->user.rrd_pointers_cache.rrdset.array[s]);
+
+    freez(parser->user.rrd_pointers_cache.rrdset.array);
+    parser->user.rrd_pointers_cache.rrdset.array = NULL;
+    parser->user.rrd_pointers_cache.rrdset.slots = 0;
 }
 
 static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg) {
@@ -774,7 +786,6 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-        pluginsd_rrddim_slots_reset(st);
         pluginsd_rrdset_cache_put_to_slot(parser, st, slot);
     }
     else

@@ -86,7 +86,7 @@ typedef struct parser_user_object {
 
     struct {
         struct {
-            size_t slots;
+            uint32_t slots;
             RRDSET **array;
         } rrdset;
     } rrd_pointers_cache;

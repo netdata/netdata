@@ -860,9 +860,10 @@ struct rrdset {
     struct {
         SPINLOCK spinlock; // used only for cleanup
         pid_t collector_tid;
-        bool set;
         bool with_slots;
+        bool set;
         uint32_t pos;
+        int32_t last_slot;
         uint32_t size;
         struct pluginsd_rrddim *prd_array;
     } pluginsd;
