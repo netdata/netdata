@@ -509,7 +509,7 @@ done
 
 Keep in mind we have already produced the client certificates, we will make use of them when we will configure the clients.
 
-5. Copy the keys and the certificates into the `systemd-journal-remote`'s predefined places
+5. Copy the key and the certificates into the `systemd-journal-remote`'s predefined places
 
 
 ```sh
