@@ -4013,7 +4013,7 @@ static void ebpf_kill_previous_process(char *filename, pid_t pid)
  */
 void ebpf_pid_file(char *filename, size_t length)
 {
-    snprintfz(filename, length, "%s%s/ebpf.d/ebpf.pid", netdata_configured_host_prefix, ebpf_plugin_dir);
+    snprintfz(filename, length, "%s/var/run/ebpf.pid", netdata_configured_host_prefix);
 }
 
 /**
