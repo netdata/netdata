@@ -102,8 +102,7 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = apps_groups_root_target; w; w = w->next) {
-        uint32_t flag = w->charts_created & (1 << EBPF_MODULE_OOMKILL_IDX);
-        if (likely(w->exposed && w->processes && !flag))
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_OOMKILL_IDX))))
             continue;
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -483,7 +482,7 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed && w->processes))
+        if (unlikely(!w->exposed))
             continue;
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,

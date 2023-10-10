@@ -606,8 +606,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = apps_groups_root_target; w; w = w->next) {
-        uint32_t flag = w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX);
-        if (likely(w->exposed && w->processes && !flag))
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_VFS_IDX))))
             continue;
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -1132,8 +1131,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
-        uint32_t flag = w->charts_created & 1 << EBPF_MODULE_VFS_IDX;
-        if (likely(w->exposed && w->processes && !flag))
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_VFS_IDX))))
             continue;
 
         ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
@@ -2188,7 +2186,7 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
     int order = 20065;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed && w->processes))
+        if (unlikely(!w->exposed))
             continue;
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,

@@ -651,8 +651,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = apps_groups_root_target; w; w = w->next) {
-        uint32_t flag = w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX);
-        if (likely(w->exposed && w->processes && !flag))
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -1070,8 +1069,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     collected_number values[9];
 
     for (w = root; w; w = w->next) {
-        uint32_t flag = w->charts_created & 1 << EBPF_MODULE_PROCESS_IDX;
-        if (likely(w->exposed && w->processes && !flag))
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
 
         values[0] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
@@ -1279,7 +1277,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
     int order = 20080;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed && w->processes))
+        if (unlikely(!w->exposed))
             continue;
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
