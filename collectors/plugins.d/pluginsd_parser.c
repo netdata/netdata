@@ -372,8 +372,19 @@ static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_
                           slot, parser->user.rrd_pointers_cache.rrdset.slots);
         return NULL;
     }
-    else
+    else {
         st = parser->user.rrd_pointers_cache.rrdset.array[slot - 1];
+        if(!st) {
+            netdata_log_error("PLUGINSD: no chart is found on slot %zd, looking for chart '%s' on host '%s', during %s",
+                              slot, id, rrdhost_hostname(host), keyword);
+
+            st = pluginsd_find_chart(host, id, keyword);
+            if(st) {
+                parser->user.rrd_pointers_cache.rrdset.array[slot - 1] = st;
+                st->pluginsd.last_slot = (int32_t)slot - 1;
+            }
+        }
+    }
 
     internal_fatal(st && string_strcmp(st->id, id) != 0,
                    "wrong chart in slot %zd, expected '%s', found '%s'",
