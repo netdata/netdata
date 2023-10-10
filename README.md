@@ -231,11 +231,12 @@ navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostnam
    
    When your Netdata nodes are connected to Netdata Cloud, you can (on top of the above):
 
+   - Access your Netdata agents from anywhere
+   - Access sensitive Netdata agent features (like "Netdata Functions": processes, systemd-journal)
    - Organize your infra in spaces and rooms
    - Create, manage, and share **custom dashboards**
    - Invite your team and assign roles to them (Role Based Access Control - RBAC)
-   - Access Netdata Functions (processes top from the UI and more)
-   - Get infinite horizontal scalability (multiple independent parents are viewed as one infra)
+   - Get infinite horizontal scalability (multiple independent Netdata Agents are viewed as one infra)
    - Configure alerts from the UI (coming soon)
    - Configure data collection from the UI (coming soon)
    - Netdata Mobile App notifications (coming soon)
@@ -561,12 +562,14 @@ Subscribing to Netdata Cloud is optional but many users find it enhances their e
 
 The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still, Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
 
-  1. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
-  2. Configuration of Alerts and Data Collection from the UI (coming soon)
-  3. Security (role-based access control - RBAC).
-  4. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
-  5. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
-  6. Mobile App for Alert Notifications (coming soon)
+  1. Access your infrastructure from anywhere.
+  2. Have SSO to protect sensitive features. 
+  3. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
+  4. Configuration of Alerts and Data Collection from the UI (coming soon)
+  5. Security (role-based access control - RBAC).
+  6. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
+  7. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
+  8. Mobile App for Alert Notifications (coming soon)
 
 So, although it is not required, you can get the most out of your Netdata setup by using Netdata Cloud.
 
