@@ -323,6 +323,21 @@ static inline void ebpf_create_chart_labels(char *name, char *value, int source)
 }
 
 /**
+<<<<<<< HEAD
+=======
+ * Create Chart labels
+ *
+ * @param name    the label name.
+ * @param value   the label value.
+ * @param origin  the labeel source.
+ */
+static inline void ebpf_create_chart_labels(char *name, char *value, int source)
+{
+    fprintf(stdout, "CLABEL '%s' '%s' %d\n", name, value, source);
+}
+
+/**
+>>>>>>> ec8c02713 (improve_ebpf_performance: Sync ebpf.[ch] code with 16139)
  * Commit label
  *
  * Write commit label to stdout
@@ -339,15 +354,38 @@ static inline void ebpf_commit_label()
  * @param name   the chart name
  * @param metric the chart suffix (used with apps and cgroups)
  */
+<<<<<<< HEAD
 static inline void ebpf_write_begin_chart(char *family, char *name, char *metric)
 {
     printf("BEGIN %s.%s%s\n", family, name, metric);
+=======
+static inline void write_begin_chart(char *family, char *name)
+{
+    printf("BEGIN %s.%s\n", family, name);
+}
+
+/**
+ * Write begin command on standard output
+ *
+ * @param family the chart family name
+ * @param name   the chart name
+ * @param metric the chart suffix (used with apps and cgroups)
+ * @param dt     the last heartbit
+ */
+static inline void write_begin_chart_with_time(char *family, char *name, char *metric, usec_t dt)
+{
+    printf("BEGIN %s.%s_%s %"PRIu64"\n", family, name, metric, dt);
+>>>>>>> ec8c02713 (improve_ebpf_performance: Sync ebpf.[ch] code with 16139)
 }
 
 /**
  * Write END command on stdout.
  */
+<<<<<<< HEAD
 static inline void ebpf_write_end_chart()
+=======
+static inline void write_end_chart()
+>>>>>>> ec8c02713 (improve_ebpf_performance: Sync ebpf.[ch] code with 16139)
 {
     printf("END\n");
 }
