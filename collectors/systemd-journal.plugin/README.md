@@ -439,7 +439,6 @@ sudo apt-get install openssl
 2. Create your own private certificate authority.
 
 ```sh
-
 mkdir self-signed-certificates && cd self-signed-certificates
 
 openssl req -newkey rsa:2048 -days 3650 -x509 -nodes \
@@ -469,6 +468,7 @@ EOF
 
 touch index
 echo 0001 >serial
+```
 
 3. Specify the Common Names for both the server and the clients (server who will push its journal logs). 
    How each a client will reach the centralized the server? For instance if you want to reach them via public IP or DNS.
