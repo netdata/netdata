@@ -1076,27 +1076,27 @@ modules:
           labels: []
           metrics:
             - name: mem.file_sync
-              description: Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.
+              description: Monitor calls to fsync(2) and fdatasync(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: fsync
                 - name: fdatasync
             - name: mem.meory_map
-              description: Monitor calls for <code>msync(2)</code>.
+              description: Monitor calls to msync(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: msync
             - name: mem.sync
-              description: Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.
+              description: Monitor calls to sync(2) and syncfs(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: sync
                 - name: syncfs
             - name: mem.file_segment
-              description: Monitor calls for <code>sync_file_range(2)</code>.
+              description: Monitor calls to sync_file_range(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -1333,25 +1333,25 @@ modules:
           labels: []
           metrics:
             - name: cgroup.swap_read
-              description: Calls to function <code>swap_readpage</code>.
+              description: Calls to function swap_readpage.
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: read
             - name: cgroup.swap_write
-              description: Calls to function <code>swap_writepage</code>.
+              description: Calls to function swap_writepage.
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: write
             - name: services.swap_read
-              description: Calls to <code>swap_readpage</code>.
+              description: Calls to swap_readpage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.swap_write
-              description: Calls to function <code>swap_writepage</code>.
+              description: Calls to function swap_writepage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -1361,13 +1361,13 @@ modules:
           labels: []
           metrics:
             - name: app_group.ebpf_call_swap_readpage
-              description: Calls to function <code>swap_readpage</code>.
+              description: Calls to function swap_readpage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
             - name: app_group.ebpf_call_swap_writepage
-              description: Calls to function <code>swap_writepage</code>.
+              description: Calls to function swap_writepage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -2403,49 +2403,49 @@ modules:
           labels: []
           metrics:
             - name: cgroup.shmget
-              description: Calls to syscall <code>shmget(2)</code>.
+              description: Calls to syscall shmget(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: get
             - name: cgroup.shmat
-              description: Calls to syscall <code>shmat(2)</code>.
+              description: Calls to syscall shmat(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: at
             - name: cgroup.shmdt
-              description: Calls to syscall <code>shmdt(2)</code>.
+              description: Calls to syscall shmdt(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: dt
             - name: cgroup.shmctl
-              description: Calls to syscall <code>shmctl(2)</code>.
+              description: Calls to syscall shmctl(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: ctl
             - name: services.shmget
-              description: Calls to syscall <code>shmget(2)</code>.
+              description: Calls to syscall shmget(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.shmat
-              description: Calls to syscall <code>shmat(2)</code>.
+              description: Calls to syscall shmat(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.shmdt
-              description: Calls to syscall <code>shmdt(2)</code>.
+              description: Calls to syscall shmdt(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.shmctl
-              description: Calls to syscall <code>shmctl(2)</code>.
+              description: Calls to syscall shmctl(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -2455,25 +2455,25 @@ modules:
           labels: []
           metrics:
             - name: app_group.ebpf_shmget_call
-              description: Calls to syscall <code>shmget(2)</code>.
+              description: Calls to syscall shmget(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: calls
             - name: app_group.ebpf_shmat_call
-              description: Calls to syscall <code>shmat(2)</code>.
+              description: Calls to syscall shmat(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: calls
             - name: app_group.ebpf_shmdt_call
-              description: Calls to syscall <code>shmdt(2)</code>.
+              description: Calls to syscall shmdt(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: calls
             - name: app_group.ebpf_shmctl_call
-              description: Calls to syscall <code>shmctl(2)</code>.
+              description: Calls to syscall shmctl(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -2892,7 +2892,7 @@ modules:
               dimensions:
                 - name: read
             - name: cgroup.vfs_fsync
-              description: Calls for <code>vfs_fsync</code>
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -2904,7 +2904,7 @@ modules:
               dimensions:
                 - name: fsync
             - name: cgroup.vfs_open
-              description: Calls for <code>vfs_open</code>
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -2916,7 +2916,7 @@ modules:
               dimensions:
                 - name: open
             - name: cgroup.vfs_create
-              description: Calls for <code>vfs_create</code>
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -2970,7 +2970,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
             - name: services.vfs_fsync
-              description: Calls to <code>vfs_fsync</code>
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -2982,7 +2982,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
             - name: services.vfs_open
-              description: Calls to <code>vfs_open</code>
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -2994,7 +2994,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
             - name: services.vfs_create
-              description: Calls to <code>vfs_create</code>
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -3037,7 +3037,7 @@ modules:
                 - name: read
                 - name: write
             - name: filesystem.vfs_fsync
-              description: Calls for <code>vfs_fsync</code>
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -3049,7 +3049,7 @@ modules:
               dimensions:
                 - name: fsync
             - name: filesystem.vfs_open
-              description: Calls for <code>vfs_open</code>
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -3061,7 +3061,7 @@ modules:
               dimensions:
                 - name: open
             - name: filesystem.vfs_create
-              description: Calls for <code>vfs_create</code>
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -3119,7 +3119,7 @@ modules:
               dimensions:
                 - name: reads
             - name: app_group.ebpf_call_vfs_fsync
-              description: Calls for <code>vfs_fsync</code>
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -3131,7 +3131,7 @@ modules:
               dimensions:
                 - name: calls
             - name: app_group.ebpf_call_vfs_open
-              description: Calls for <code>vfs_open</code>
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -3143,7 +3143,7 @@ modules:
               dimensions:
                 - name: calls
             - name: app_group.ebpf_call_vfs_create
-              description: Calls for <code>vfs_create</code>
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: stacked
               dimensions:

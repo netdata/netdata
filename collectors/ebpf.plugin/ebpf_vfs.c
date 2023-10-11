@@ -502,7 +502,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_FSYNC,
                               "",
-                              "Calls to <code>vfs_fsync</code>",
+                              "Calls to vfs_fsync.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -525,7 +525,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_OPEN,
                               "",
-                              "Calls to <code>vfs_open</code>",
+                              "Calls to vfs_open.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -549,7 +549,7 @@ static void ebpf_obsolete_vfs_services(ebpf_module_t *em)
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               NETDATA_SYSCALL_APPS_VFS_CREATE,
                               "",
-                              "Calls to <code>vfs_create</code>",
+                              "Calls to vfs_create.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_CGROUP_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
@@ -823,7 +823,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_FSYNC,
                               "",
-                              "Calls for <code>vfs_fsync</code>",
+                              "Calls to vfs_fsync.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
@@ -847,7 +847,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_OPEN,
                               "",
-                              "Calls for <code>vfs_open</code>",
+                              "Calls to vfs_open.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
@@ -871,7 +871,7 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
     ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                               NETDATA_VFS_CREATE,
                               "",
-                              "Calls for <code>vfs_create</code>",
+                              "Calls to vfs_create.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE,
@@ -1445,7 +1445,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
 
-    ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls for <code>vfs_fsync</code>",
+    ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls to vfs_fsync.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_FSYNC_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5507,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
@@ -1459,7 +1459,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
-    ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls for <code>vfs_open</code>",
+    ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls to vfs_open.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_OPEN_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5509,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
@@ -1473,7 +1473,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
     }
 
-    ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls for <code>vfs_create</code>",
+    ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls to vfs_create.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP, NETDATA_CGROUP_VFS_CREATE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5511,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
@@ -1537,7 +1537,7 @@ static void ebpf_obsolete_specific_vfs_charts(char *type, ebpf_module_t *em)
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_READ_BYTES_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5506, em->update_every);
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "", "Calls for <code>vfs_fsync</code>",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "", "Calls to vfs_fsync.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_FSYNC_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5507, em->update_every);
@@ -1549,7 +1549,7 @@ static void ebpf_obsolete_specific_vfs_charts(char *type, ebpf_module_t *em)
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5508, em->update_every);
     }
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "", "Calls for <code>vfs_open</code>",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_OPEN, "", "Calls to vfs_open.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_OPEN_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5509, em->update_every);
@@ -1561,7 +1561,7 @@ static void ebpf_obsolete_specific_vfs_charts(char *type, ebpf_module_t *em)
                                   NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5510, em->update_every);
     }
 
-    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "", "Calls for <code>vfs_create</code>",
+    ebpf_write_chart_obsolete(type, NETDATA_SYSCALL_APPS_VFS_CREATE, "", "Calls to vfs_create.",
                               EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_GROUP,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_VFS_CREATE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5511, em->update_every);
@@ -1716,7 +1716,7 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT,
                                   NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
 
-    ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls to <code>vfs_fsync</code>",
+    ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls to vfs_fsync.",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20072,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT,
@@ -1729,7 +1729,7 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
                                       ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT,
                                       NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
     }
-    ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls to <code>vfs_open</code>",
+    ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_OPEN, "Calls to vfs_open.",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20074,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_OPEN_CONTEXT,
@@ -1743,7 +1743,7 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
                                       NETDATA_EBPF_MODULE_NAME_VFS, em->update_every);
     }
 
-    ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls to <code>vfs_create</code>",
+    ebpf_create_charts_on_systemd(NETDATA_SYSCALL_APPS_VFS_CREATE, "Calls to vfs_create.",
                                   EBPF_COMMON_DIMENSION_CALL, NETDATA_VFS_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED, 20076,
                                   ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_VFS_CREATE_CONTEXT,
@@ -2091,7 +2091,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
                       NETDATA_VFS_FSYNC,
-                      "Calls for <code>vfs_fsync</code>",
+                      "Calls to vfs_fsync.",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_VFS_GROUP,
                       NULL,
@@ -2117,7 +2117,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
                       NETDATA_VFS_OPEN,
-                      "Calls for <code>vfs_open</code>",
+                      "Calls to vfs_open.",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_VFS_GROUP,
                       NULL,
@@ -2143,7 +2143,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
 
     ebpf_create_chart(NETDATA_FILESYSTEM_FAMILY,
                       NETDATA_VFS_CREATE,
-                      "Calls for <code>vfs_create</code>",
+                      "Calls to vfs_create.",
                       EBPF_COMMON_DIMENSION_CALL,
                       NETDATA_VFS_GROUP,
                       NULL,

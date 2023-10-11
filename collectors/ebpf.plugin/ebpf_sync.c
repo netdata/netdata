@@ -299,7 +299,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_FILE_SYNC_CHART,
                                   "",
-                                  "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.",
+                                  "Monitor calls to fsync(2) and fdatasync(2).",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
@@ -311,7 +311,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_MSYNC_CHART,
                                   "",
-                               "Monitor calls for <code>msync(2)</code>.",
+                                  "Monitor calls to msync(2).",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
@@ -323,7 +323,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_SYNC_CHART,
                                   "",
-                               "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.",
+                                  "Monitor calls to sync(2) and syncfs(2).",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
@@ -335,7 +335,7 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
         ebpf_write_chart_obsolete(NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_FILE_SEGMENT_CHART,
                                   "",
-                               "Monitor calls for <code>sync_file_range(2)</code>.",
+                                  "Monitor calls to sync_file_range(2).",
                                   EBPF_COMMON_DIMENSION_CALL,
                                   NETDATA_EBPF_SYNC_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
@@ -641,22 +641,22 @@ static void ebpf_create_sync_charts(int update_every)
 {
     if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SYNC_CHART,
-                               "Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.", 21300,
+                               "Monitor calls to fsync(2) and fdatasync(2).", 21300,
                                NETDATA_SYNC_FSYNC_IDX, NETDATA_SYNC_FDATASYNC_IDX, update_every);
 
     if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_MSYNC_CHART,
-                               "Monitor calls for <code>msync(2)</code>.", 21301,
+                               "Monitor calls to msync(2).", 21301,
                                NETDATA_SYNC_MSYNC_IDX, NETDATA_SYNC_MSYNC_IDX, update_every);
 
     if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_SYNC_CHART,
-                               "Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.", 21302,
+                               "Monitor calls to sync(2) and syncfs(2).", 21302,
                                NETDATA_SYNC_SYNC_IDX, NETDATA_SYNC_SYNCFS_IDX, update_every);
 
     if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
         ebpf_create_sync_chart(NETDATA_EBPF_FILE_SEGMENT_CHART,
-                               "Monitor calls for <code>sync_file_range(2)</code>.", 21303,
+                               "Monitor calls to sync_file_range(2).", 21303,
                                NETDATA_SYNC_SYNC_FILE_RANGE_IDX, NETDATA_SYNC_SYNC_FILE_RANGE_IDX, update_every);
 
     fflush(stdout);
