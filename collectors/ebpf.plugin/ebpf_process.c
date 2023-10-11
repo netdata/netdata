@@ -474,9 +474,9 @@ void *ebpf_read_process_thread(void *ptr)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     usec_t period = update_every * USEC_PER_SEC;
-    while (!ebpf_exit_plugin && running_time < lifetime) {
+    while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
-        if (ebpf_exit_plugin || ++counter != update_every)
+        if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
         ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
