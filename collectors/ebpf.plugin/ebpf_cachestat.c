@@ -1010,24 +1010,24 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
         cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
 
         value = (collected_number) w->cachestat.ratio;
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_hit_ratio");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_hit_ratio");
         write_chart_dimension("ratio", value);
-        write_end_chart();
+        ebpf_write_end_chart();
 
         value = (collected_number) w->cachestat.dirty;
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_dirty_pages");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_dirty_pages");
         write_chart_dimension("pages", value);
-        write_end_chart();
+        ebpf_write_end_chart();
 
         value = (collected_number) w->cachestat.hit;
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_access");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_access");
         write_chart_dimension("hits", value);
-        write_end_chart();
+        ebpf_write_end_chart();
 
         value = (collected_number) w->cachestat.miss;
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_misses");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_misses");
         write_chart_dimension("misses", value);
-        write_end_chart();
+        ebpf_write_end_chart();
     }
 }
 
@@ -1130,37 +1130,37 @@ static void ebpf_send_systemd_cachestat_charts()
 {
     ebpf_cgroup_target_t *ect;
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_RATIO_CHART, "");
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_cachestat.ratio);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART, "");
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_cachestat.dirty);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_CHART, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_HIT_CHART, "");
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_cachestat.hit);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_MISSES_CHART, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_MISSES_CHART, "");
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_cachestat.miss);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -1170,21 +1170,21 @@ static void ebpf_send_systemd_cachestat_charts()
  */
 static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_cachestat_t *npc)
 {
-    write_begin_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART, "");
+    ebpf_write_begin_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART, "");
     write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_RATIO].name, (long long)npc->ratio);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_CACHESTAT_DIRTY_CHART, "");
+    ebpf_write_begin_chart(type, NETDATA_CACHESTAT_DIRTY_CHART, "");
     write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY].name, (long long)npc->dirty);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_CACHESTAT_HIT_CHART, "");
+    ebpf_write_begin_chart(type, NETDATA_CACHESTAT_HIT_CHART, "");
     write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT].name, (long long)npc->hit);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_CACHESTAT_MISSES_CHART, "");
+    ebpf_write_begin_chart(type, NETDATA_CACHESTAT_MISSES_CHART, "");
     write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS].name, (long long)npc->miss);
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**

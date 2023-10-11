@@ -304,28 +304,15 @@ static inline void ebpf_commit_label()
  * @param name   the chart name
  * @param metric the chart suffix (used with apps and cgroups)
  */
-static inline void write_begin_chart(char *family, char *name, char *metric)
+static inline void ebpf_write_begin_chart(char *family, char *name, char *metric)
 {
     printf("BEGIN %s.%s%s\n", family, name, metric);
 }
 
 /**
- * Write begin command on standard output
- *
- * @param family the chart family name
- * @param name   the chart name
- * @param metric the chart suffix (used with apps and cgroups)
- * @param dt     the last heartbit
- */
-static inline void write_begin_chart_with_time(char *family, char *name, char *metric, usec_t dt)
-{
-    printf("BEGIN %s.%s_%s %"PRIu64"\n", family, name, metric, dt);
-}
-
-/**
  * Write END command on stdout.
  */
-static inline void write_end_chart()
+static inline void ebpf_write_end_chart()
 {
     printf("END\n");
 }

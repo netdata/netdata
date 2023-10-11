@@ -594,10 +594,10 @@ static void hardirq_collector(ebpf_module_t *em)
         pthread_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
-        write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "hardirq_latency", "");
+        ebpf_write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "hardirq_latency", "");
         avl_traverse_lock(&hardirq_pub, hardirq_write_dims, NULL);
         hardirq_write_static_dims();
-        write_end_chart();
+        ebpf_write_end_chart();
 
         pthread_mutex_unlock(&lock);
 

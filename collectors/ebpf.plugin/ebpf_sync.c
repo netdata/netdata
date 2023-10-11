@@ -511,7 +511,7 @@ static void ebpf_send_sync_chart(char *id,
                                    int idx,
                                    int end)
 {
-    write_begin_chart(NETDATA_EBPF_MEMORY_GROUP, id, "");
+    ebpf_write_begin_chart(NETDATA_EBPF_MEMORY_GROUP, id, "");
 
     netdata_publish_syscall_t *move = &sync_counter_publish_aggregated[idx];
 
@@ -523,7 +523,7 @@ static void ebpf_send_sync_chart(char *id,
         idx++;
     }
 
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**

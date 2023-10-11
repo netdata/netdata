@@ -985,10 +985,10 @@ static void ebpf_socket_send_global_inbound_conn()
         move = move->next;
     }
 
-    write_begin_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_INBOUND_CONNECTIONS, "");
+    ebpf_write_begin_chart(NETDATA_EBPF_IP_FAMILY, NETDATA_INBOUND_CONNECTIONS, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_TCP].name, (long long) tcp_conn);
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_INCOMING_CONNECTION_UDP].name, (long long) udp_conn);
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -1092,9 +1092,9 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         values[8] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
                                                                           call_udp_received));
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_v4_connection");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_v4_connection");
         write_chart_dimension("connections", values[0]);
-        write_end_chart();
+        ebpf_write_end_chart();
 
         if (tcp_v6_connect_address.type == 'T') {
             write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_tcp_v6_connection");
@@ -1102,35 +1102,35 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
             write_end_chart();
         }
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_sent");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_sent");
         // We multiply by 0.008, because we read bytes, but we display bits
         write_chart_dimension("bandwidth", ((values[2])*8)/1000);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_received");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_received");
         // We multiply by 0.008, because we read bytes, but we display bits
         write_chart_dimension("bandwidth", ((values[3])*8)/1000);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_sendmsg");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_sendmsg");
         write_chart_dimension("calls", values[4]);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_cleanup_rbuf");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_cleanup_rbuf");
         write_chart_dimension("calls", values[5]);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_retransmit");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_retransmit");
         write_chart_dimension("calls", values[6]);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_sendmsg");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_sendmsg");
         write_chart_dimension("calls", values[7]);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_recvmsg");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_recvmsg");
         write_chart_dimension("calls", values[8]);
-        write_end_chart();
+        ebpf_write_end_chart();
     }
 }
 
@@ -2296,10 +2296,10 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
  */
 static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_t *values)
 {
-    write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V4, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V4, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4].name,
                           (long long) values->call_tcp_v4_connection);
-    write_end_chart();
+    ebpf_write_end_chart();
 
     if (tcp_v6_connect_address.type == 'T') {
         write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V6, "");
@@ -2308,40 +2308,40 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
         write_end_chart();
     }
 
-    write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_SENDMSG].name,
                           (long long) values->bytes_sent);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_RECV, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_RECV, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF].name,
                           (long long) values->bytes_received);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_SENDMSG].name,
                           (long long) values->call_tcp_sent);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF].name,
                           (long long) values->call_tcp_received);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT].name,
                           (long long) values->retransmit);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_UDP_SENDMSG].name,
                           (long long) values->call_udp_sent);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS, "");
+    ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS, "");
     write_chart_dimension(socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF].name,
                           (long long) values->call_udp_received);
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -2453,13 +2453,13 @@ static void ebpf_create_systemd_socket_charts(int update_every)
 static void ebpf_send_systemd_socket_charts()
 {
     ebpf_cgroup_target_t *ect;
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v4_connection);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
     if (tcp_v6_connect_address.type == 'T') {
         write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6, "");
@@ -2471,61 +2471,61 @@ static void ebpf_send_systemd_socket_charts()
         write_end_chart();
     }
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.bytes_sent);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_RECV, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.bytes_received);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_sent);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_received);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.retransmit);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_udp_sent);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long)ect->publish_socket.call_udp_received);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**

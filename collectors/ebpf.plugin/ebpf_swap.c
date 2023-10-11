@@ -586,13 +586,13 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
 
         ebpf_swap_sum_pids(&w->swap, w->root_pid);
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_swap_readpage");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_swap_readpage");
         write_chart_dimension("calls", (long long) w->swap.read);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_swap_writepage");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_swap_writepage");
         write_chart_dimension("calls", (long long) w->swap.write);
-        write_end_chart();
+        ebpf_write_end_chart();
     }
 }
 
@@ -630,21 +630,21 @@ static void ebpf_swap_sum_cgroup_pids(netdata_publish_swap_t *swap, struct pid_o
 static void ebpf_send_systemd_swap_charts()
 {
     ebpf_cgroup_target_t *ect;
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_READ_CHART, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_READ_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.read);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.write);
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -706,13 +706,13 @@ static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
  */
 static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *values)
 {
-    write_begin_chart(type, NETDATA_MEM_SWAP_READ_CHART, "");
+    ebpf_write_begin_chart(type, NETDATA_MEM_SWAP_READ_CHART, "");
     write_chart_dimension(swap_publish_aggregated[NETDATA_KEY_SWAP_READPAGE_CALL].name, (long long) values->read);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(type, NETDATA_MEM_SWAP_WRITE_CHART, "");
+    ebpf_write_begin_chart(type, NETDATA_MEM_SWAP_WRITE_CHART, "");
     write_chart_dimension(swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name, (long long) values->write);
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**

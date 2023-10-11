@@ -182,9 +182,9 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
             }
         }
 write_dim:
-        write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_oomkill");
+    ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_oomkill");
         write_chart_dimension(EBPF_COMMON_DIMENSION_KILLS, was_oomkilled);
-        write_end_chart();
+        ebpf_write_end_chart();
     }
 
     // for any remaining keys for which we couldn't find a group, this could be
@@ -247,14 +247,14 @@ static void ebpf_create_systemd_oomkill_charts(int update_every)
 static void ebpf_send_systemd_oomkill_charts()
 {
     ebpf_cgroup_target_t *ect;
-    write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_OOMKILL_CHART, "");
+    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_OOMKILL_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
             write_chart_dimension(ect->name, (long long) ect->oomkill);
             ect->oomkill = 0;
         }
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /*
@@ -267,9 +267,9 @@ static void ebpf_send_systemd_oomkill_charts()
  */
 static void ebpf_send_specific_oomkill_data(char *type, int value)
 {
-    write_begin_chart(type, NETDATA_OOMKILL_CHART, "");
+    ebpf_write_begin_chart(type, NETDATA_OOMKILL_CHART, "");
     write_chart_dimension(oomkill_publish_aggregated.name, (long long)value);
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
