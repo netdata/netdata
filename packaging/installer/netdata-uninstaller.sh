@@ -733,20 +733,20 @@ rm_file /etc/cron.daily/netdata-updater
 rm_file /etc/cron.d/netdata-updater
 
 
-if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
+if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ] && [ "netdata" = "$(basename "$NETDATA_PREFIX")" ] ; then
   rm_dir "${NETDATA_PREFIX}"
 else
-  rm_file "/usr/sbin/netdata"
-  rm_file "/usr/sbin/netdatacli"
+  rm_file "${NETDATA_PREFIX}/usr/sbin/netdata"
+  rm_file "${NETDATA_PREFIX}/usr/sbin/netdatacli"
   rm_file "/tmp/netdata-ipc"
   rm_file "/tmp/netdata-service-cmds"
-  rm_file "/usr/sbin/netdata-claim.sh"
-  rm_dir "/usr/share/netdata"
-  rm_dir "/usr/libexec/netdata"
-  rm_dir "/var/lib/netdata"
-  rm_dir "/var/cache/netdata"
-  rm_dir "/var/log/netdata"
-  rm_dir "/etc/netdata"
+  rm_file "${NETDATA_PREFIX}/usr/sbin/netdata-claim.sh"
+  rm_dir "${NETDATA_PREFIX}/usr/share/netdata"
+  rm_dir "${NETDATA_PREFIX}/usr/libexec/netdata"
+  rm_dir "${NETDATA_PREFIX}/var/lib/netdata"
+  rm_dir "${NETDATA_PREFIX}/var/cache/netdata"
+  rm_dir "${NETDATA_PREFIX}/var/log/netdata"
+  rm_dir "${NETDATA_PREFIX}/etc/netdata"
 fi
 
 if [ -n "${tmpdir}" ]; then
