@@ -627,10 +627,9 @@ void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, ui
  * @param publish
  */
 static void save_previous_values(netdata_publish_cachestat_t *publish) {
-    publish->prev.mark_page_accessed = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED];
-    publish->prev.account_page_dirtied = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED];
-    publish->prev.add_to_page_cache_lru = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU];
-    publish->prev.mark_buffer_dirty = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY];
+    publish->prev.misses = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED];
+    publish->prev.total = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU];
+    publish->prev.dirty = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY];
 }
 
 /**
@@ -639,20 +638,19 @@ static void save_previous_values(netdata_publish_cachestat_t *publish) {
  * @param publish the structure where we will store the data.
  */
 static void calculate_stats(netdata_publish_cachestat_t *publish) {
-    if (!publish->prev.mark_page_accessed) {
+    if (!publish->prev.misses) {
         save_previous_values(publish);
         return;
     }
 
-    uint64_t mpa = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED] - publish->prev.mark_page_accessed;
-    uint64_t mbd = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY] - publish->prev.mark_buffer_dirty;
-    uint64_t apcl = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU] - publish->prev.add_to_page_cache_lru;
-    uint64_t apd = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED] - publish->prev.account_page_dirtied;
+    uint64_t mpa = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED] - publish->prev.misses;
+    uint64_t mbd = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY] - publish->prev.dirty;
+    uint64_t apcl = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU] - publish->prev.total;
 
     save_previous_values(publish);
 
     // We are changing the original algorithm to have a smooth ratio.
-    cachestat_update_publish(publish, mpa, mbd, apcl, apd);
+    cachestat_update_publish(publish, mpa, mbd, apcl, 0);
 }
 
 
@@ -677,10 +675,9 @@ static void ebpf_cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int ma
     uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_cachestat_pid_t *w = &out[i];
-        total->account_page_dirtied += w->account_page_dirtied;
-        total->add_to_page_cache_lru += w->add_to_page_cache_lru;
-        total->mark_buffer_dirty += w->mark_buffer_dirty;
-        total->mark_page_accessed += w->mark_page_accessed;
+        total->total += w->total;
+        total->dirty += w->dirty;
+        total->misses += w->misses;
 
         if (!isascii(total->name[0]) && isascii(w->name[0])) {
             strncpyz(total->name, w->name, TASK_COMM_LEN);
@@ -702,7 +699,7 @@ static void ebpf_cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int ma
  */
 static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *publish)
 {
-    if (!out->current.mark_page_accessed) {
+    if (!out->current.misses) {
         memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
         return;
     }
@@ -723,13 +720,12 @@ static inline void ebpf_cachestat_update_individual_group(netdata_publish_caches
     netdata_cachestat_pid_t *current = &w->current;
     netdata_cachestat_pid_t *prev = &w->prev;
 
-    uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
-    uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+    uint64_t mpa = current->misses - prev->misses;
+    uint64_t mbd = current->dirty - prev->dirty;
     w->dirty = (long long)mbd;
-    uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
-    uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+    uint64_t apcl = current->total - prev->total;
 
-    cachestat_update_publish(w, mpa, mbd, apcl, apd);
+    cachestat_update_publish(w, mpa, mbd, apcl, 0);
 }
 
 /**
@@ -782,7 +778,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
             cachestat_save_pid_values(cs_ptr, cv);
             ebpf_cachestat_update_individual_group(cs_ptr);
         }  else {
-            if (cv[0].mark_page_accessed != cs_ptr->prev.mark_page_accessed) {
+            if (cv[0].misses != cs_ptr->prev.misses) {
                 cs_ptr->current_timestamp = update_time;
                 cachestat_save_pid_values(cs_ptr, cv);
                 ebpf_cachestat_update_individual_group(cs_ptr);
@@ -870,15 +866,13 @@ static void ebpf_update_cachestat_cgroup()
                         (cache_value =
                              JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
                         netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                        out->prev.mark_page_accessed += values->prev.mark_page_accessed;
-                        out->prev.account_page_dirtied += values->prev.account_page_dirtied;
-                        out->prev.add_to_page_cache_lru += values->prev.add_to_page_cache_lru;
-                        out->prev.mark_buffer_dirty += values->prev.mark_buffer_dirty;
+                        out->prev.misses += values->prev.misses;
+                        out->prev.total += values->prev.total;
+                        out->prev.dirty += values->prev.dirty;
 
-                        out->current.mark_page_accessed += values->current.mark_page_accessed;
-                        out->current.account_page_dirtied += values->current.account_page_dirtied;
-                        out->current.add_to_page_cache_lru += values->current.add_to_page_cache_lru;
-                        out->current.mark_buffer_dirty += values->current.mark_buffer_dirty;
+                        out->current.misses += values->current.misses;
+                        out->current.total += values->current.total;
+                        out->current.dirty += values->current.dirty;
                     }
                 }
                 rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
@@ -1057,15 +1051,13 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
                     (cache_value =
                         JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
                     netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                    publish->prev.mark_page_accessed += values->prev.mark_page_accessed;
-                    publish->prev.account_page_dirtied += values->prev.account_page_dirtied;
-                    publish->prev.add_to_page_cache_lru += values->prev.add_to_page_cache_lru;
-                    publish->prev.mark_buffer_dirty += values->prev.mark_buffer_dirty;
+                    publish->prev.misses += values->prev.misses;
+                    publish->prev.total += values->prev.total;
+                    publish->prev.dirty += values->prev.dirty;
 
-                    publish->current.mark_page_accessed += values->current.mark_page_accessed;
-                    publish->current.account_page_dirtied += values->current.account_page_dirtied;
-                    publish->current.add_to_page_cache_lru += values->current.add_to_page_cache_lru;
-                    publish->current.mark_buffer_dirty += values->current.mark_buffer_dirty;
+                    publish->current.misses += values->current.misses;
+                    publish->current.total += values->current.total;
+                    publish->current.dirty += values->current.dirty;
                 }
             }
             rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
@@ -1158,10 +1150,9 @@ void ebpf_cachestat_sum_cgroup_pids(netdata_publish_cachestat_t *publish, struct
     while (root) {
         netdata_cachestat_pid_t *src = &root->cachestat;
 
-        dst->account_page_dirtied += src->account_page_dirtied;
-        dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
-        dst->mark_buffer_dirty += src->mark_buffer_dirty;
-        dst->mark_page_accessed += src->mark_page_accessed;
+        dst->total += src->total;
+        dst->dirty += src->dirty;
+        dst->misses += src->misses;
 
         root = root->next;
     }
@@ -1181,13 +1172,12 @@ void ebpf_cachestat_calc_chart_values()
         netdata_cachestat_pid_t *current = &ect->publish_cachestat.current;
         netdata_cachestat_pid_t *prev = &ect->publish_cachestat.prev;
 
-        uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
-        uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+        uint64_t mpa = current->misses - prev->misses;
+        uint64_t mbd = current->dirty - prev->dirty;
         ect->publish_cachestat.dirty = mbd;
-        uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
-        uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+        uint64_t apcl = current->total - prev->total;
 
-        cachestat_update_publish(&ect->publish_cachestat, mpa, mbd, apcl, apd);
+        cachestat_update_publish(&ect->publish_cachestat, mpa, mbd, apcl, 0);
     }
 }
 
