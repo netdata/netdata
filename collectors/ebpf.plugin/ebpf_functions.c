@@ -1069,11 +1069,10 @@ void *ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
-    bool ebpf_function_plugin_exit = false;
     struct functions_evloop_globals *wg = functions_evloop_init(1,
                                                                 "EBPF",
                                                                 &lock,
-                                                                &ebpf_function_plugin_exit);
+                                                                &ebpf_plugin_exit);
 
     functions_evloop_add_function(wg,
                                   "ebpf_socket",
@@ -1082,13 +1081,10 @@ void *ebpf_function_thread(void *ptr)
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!ebpf_exit_plugin) {
+    while(!ebpf_plugin_exit) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-        if (ebpf_function_plugin_exit) {
-            pthread_mutex_lock(&ebpf_exit_cleanup);
-            ebpf_stop_threads(0);
-            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        if (ebpf_plugin_exit) {
             break;
         }
     }

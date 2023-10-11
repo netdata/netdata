@@ -642,6 +642,7 @@ ebpf_plugin_stats_t plugin_statistics = {.core = 0, .legacy = 0, .running = 0, .
                                          .probes = 0, .retprobes = 0, .trampolines = 0, .memlock_kern = 0,
                                          .hash_tables = 0};
 netdata_ebpf_judy_pid_t ebpf_judy_pid = {.pid_table = NULL, .index = {.JudyLArray = NULL}};
+bool ebpf_plugin_exit = false;
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
@@ -914,7 +915,6 @@ static void ebpf_unload_sync()
     }
 }
 
-int ebpf_exit_plugin = 0;
 /**
  * Close the collector gracefully
  *
@@ -950,7 +950,7 @@ void ebpf_stop_threads(int sig)
 #endif
     pthread_mutex_unlock(&mutex_cgroup_shm);
 
-    ebpf_exit_plugin = 1;
+    ebpf_plugin_exit = true;
 
     ebpf_check_before2go();
 
@@ -4013,7 +4013,7 @@ static void ebpf_kill_previous_process(char *filename, pid_t pid)
  */
 void ebpf_pid_file(char *filename, size_t length)
 {
-    snprintfz(filename, length, "%s%s/ebpf.d/ebpf.pid", netdata_configured_host_prefix, ebpf_plugin_dir);
+    snprintfz(filename, length, "%s/var/run/ebpf.pid", netdata_configured_host_prefix);
 }
 
 /**
@@ -4136,7 +4136,7 @@ int main(int argc, char **argv)
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
-    for ( ; !ebpf_exit_plugin ; global_iterations_counter++) {
+    for ( ; !ebpf_plugin_exit; global_iterations_counter++) {
         (void)heartbeat_next(&hb, step);
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
