@@ -161,8 +161,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
     struct ebpf_target *w;
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
-        uint32_t flag = w->charts_created & 1 << EBPF_MODULE_OOMKILL_IDX;
-        if (likely(w->exposed && w->processes && !flag))
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_OOMKILL_IDX))))
             continue;
 
         bool was_oomkilled = false;
@@ -182,7 +181,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
             }
         }
 write_dim:
-    ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_oomkill");
+        ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_oomkill");
         write_chart_dimension(EBPF_COMMON_DIMENSION_KILLS, was_oomkilled);
         ebpf_write_end_chart();
     }
