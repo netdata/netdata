@@ -6,8 +6,15 @@
 
 **Merged pull requests:**
 
+- fix repo path for openSUSE 15.5 packages [\#16161](https://github.com/netdata/netdata/pull/16161) ([tkatsoulas](https://github.com/tkatsoulas))
+- Fix compilation warnings [\#16158](https://github.com/netdata/netdata/pull/16158) ([stelfrag](https://github.com/stelfrag))
+- Don't queue removed when there is a newer alert [\#16157](https://github.com/netdata/netdata/pull/16157) ([MrZammler](https://github.com/MrZammler))
+- docker: make chmod o+rX /  non fatal [\#16156](https://github.com/netdata/netdata/pull/16156) ([ilyam8](https://github.com/ilyam8))
+- Batch ML model load commands [\#16155](https://github.com/netdata/netdata/pull/16155) ([stelfrag](https://github.com/stelfrag))
+- \[BUGFIX\] MQTT ARM fix [\#16154](https://github.com/netdata/netdata/pull/16154) ([underhood](https://github.com/underhood))
 - make io charts "write" negative in apps and cgroups \(systemd\) [\#16152](https://github.com/netdata/netdata/pull/16152) ([ilyam8](https://github.com/ilyam8))
 - journal: updates [\#16150](https://github.com/netdata/netdata/pull/16150) ([ktsaou](https://github.com/ktsaou))
+- uninstaller: remove ND systemd preset and tmp dir [\#16148](https://github.com/netdata/netdata/pull/16148) ([ilyam8](https://github.com/ilyam8))
 - fix `test -x` check for uninstaller script [\#16146](https://github.com/netdata/netdata/pull/16146) ([ilyam8](https://github.com/ilyam8))
 - health: don't log an unknown key error for "families" [\#16145](https://github.com/netdata/netdata/pull/16145) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16144](https://github.com/netdata/netdata/pull/16144) ([netdatabot](https://github.com/netdatabot))
@@ -422,15 +429,6 @@
 - Fixes for `deploy.yaml`. [\#15551](https://github.com/netdata/netdata/pull/15551) ([Ferroin](https://github.com/Ferroin))
 - bump ui to v6.22.1 [\#15550](https://github.com/netdata/netdata/pull/15550) ([ilyam8](https://github.com/ilyam8))
 - Add schema and examples for notification method metadata. [\#15549](https://github.com/netdata/netdata/pull/15549) ([Ferroin](https://github.com/Ferroin))
-- Update python sensors metadata yaml [\#15548](https://github.com/netdata/netdata/pull/15548) ([andrewm4894](https://github.com/andrewm4894))
-- fix yamls [\#15547](https://github.com/netdata/netdata/pull/15547) ([Ancairon](https://github.com/Ancairon))
-- fix expiration dates for API responses [\#15546](https://github.com/netdata/netdata/pull/15546) ([ktsaou](https://github.com/ktsaou))
-- Add exporter integration schema. [\#15545](https://github.com/netdata/netdata/pull/15545) ([Ferroin](https://github.com/Ferroin))
-- postfix metadata.yaml - add links and some descriptions [\#15544](https://github.com/netdata/netdata/pull/15544) ([andrewm4894](https://github.com/andrewm4894))
-- Update metadata for multiple python collectors. [\#15543](https://github.com/netdata/netdata/pull/15543) ([tkatsoulas](https://github.com/tkatsoulas))
-- bump ui to v6.22.0 [\#15542](https://github.com/netdata/netdata/pull/15542) ([ilyam8](https://github.com/ilyam8))
-- Fill in yaml files for some python collectors [\#15541](https://github.com/netdata/netdata/pull/15541) ([Ancairon](https://github.com/Ancairon))
-- Fix deployment and categories [\#15540](https://github.com/netdata/netdata/pull/15540) ([sashwathn](https://github.com/sashwathn))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
