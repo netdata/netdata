@@ -1199,8 +1199,8 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // clean up streaming chart slots
 
-    rrdhost_rrdpush_send_chart_slots_free(host);
-
+    rrdhost_pluginsd_send_chart_slots_free(host);
+    rrdhost_pluginsd_receive_chart_slots_free(host);
 
     // ------------------------------------------------------------------------
     // clean up streaming

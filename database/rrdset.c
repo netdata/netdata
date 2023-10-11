@@ -10,49 +10,49 @@
 
 static void rrdset_rrdpush_send_chart_slot_assign(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    spinlock_lock(&host->rrdpush.send.chart_slots.spinlock);
+    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 
-    if(host->rrdpush.send.chart_slots.available.pos > 0)
+    if(host->rrdpush.send.pluginsd_chart_slots.available.used > 0)
         st->rrdpush_sender_chart_slot =
-                host->rrdpush.send.chart_slots.available.array[--host->rrdpush.send.chart_slots.available.pos];
+                host->rrdpush.send.pluginsd_chart_slots.available.array[--host->rrdpush.send.pluginsd_chart_slots.available.used];
     else
-        st->rrdpush_sender_chart_slot = ++host->rrdpush.send.chart_slots.last_used;
+        st->rrdpush_sender_chart_slot = ++host->rrdpush.send.pluginsd_chart_slots.last_used;
 
-    spinlock_unlock(&host->rrdpush.send.chart_slots.spinlock);
+    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 }
 
 static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
-    if(!st->rrdpush_sender_chart_slot || st->rrdhost->rrdpush.send.chart_slots.available.ignore)
+    if(!st->rrdpush_sender_chart_slot || st->rrdhost->rrdpush.send.pluginsd_chart_slots.available.ignore)
         return;
 
     RRDHOST *host = st->rrdhost;
-    spinlock_lock(&host->rrdpush.send.chart_slots.spinlock);
+    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 
-    if(host->rrdpush.send.chart_slots.available.pos >= host->rrdpush.send.chart_slots.available.size) {
-        uint32_t old_size = host->rrdpush.send.chart_slots.available.size;
+    if(host->rrdpush.send.pluginsd_chart_slots.available.used >= host->rrdpush.send.pluginsd_chart_slots.available.size) {
+        uint32_t old_size = host->rrdpush.send.pluginsd_chart_slots.available.size;
         uint32_t new_size = (old_size > 0) ? (old_size * 2) : 1024;
 
-        host->rrdpush.send.chart_slots.available.array =
-                reallocz(host->rrdpush.send.chart_slots.available.array, new_size * sizeof(uint32_t));
+        host->rrdpush.send.pluginsd_chart_slots.available.array =
+                reallocz(host->rrdpush.send.pluginsd_chart_slots.available.array, new_size * sizeof(uint32_t));
 
-        host->rrdpush.send.chart_slots.available.size = new_size;
+        host->rrdpush.send.pluginsd_chart_slots.available.size = new_size;
     }
 
-    host->rrdpush.send.chart_slots.available.array[host->rrdpush.send.chart_slots.available.pos++] =
+    host->rrdpush.send.pluginsd_chart_slots.available.array[host->rrdpush.send.pluginsd_chart_slots.available.used++] =
             st->rrdpush_sender_chart_slot;
 
     st->rrdpush_sender_chart_slot = 0;
-    spinlock_unlock(&host->rrdpush.send.chart_slots.spinlock);
+    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 }
 
-void rrdhost_rrdpush_send_chart_slots_free(RRDHOST *host) {
-    spinlock_lock(&host->rrdpush.send.chart_slots.spinlock);
-    host->rrdpush.send.chart_slots.available.ignore = true;
-    freez(host->rrdpush.send.chart_slots.available.array);
-    host->rrdpush.send.chart_slots.available.array = NULL;
-    host->rrdpush.send.chart_slots.available.pos = 0;
-    host->rrdpush.send.chart_slots.available.size = 0;
-    spinlock_unlock(&host->rrdpush.send.chart_slots.spinlock);
+void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
+    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+    host->rrdpush.send.pluginsd_chart_slots.available.ignore = true;
+    freez(host->rrdpush.send.pluginsd_chart_slots.available.array);
+    host->rrdpush.send.pluginsd_chart_slots.available.array = NULL;
+    host->rrdpush.send.pluginsd_chart_slots.available.used = 0;
+    host->rrdpush.send.pluginsd_chart_slots.available.size = 0;
+    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 
     // zero all the slots on all charts, so that they will not attempt to access the array
     RRDSET *st;
@@ -60,6 +60,58 @@ void rrdhost_rrdpush_send_chart_slots_free(RRDHOST *host) {
         st->rrdpush_sender_chart_slot = 0;
     }
     rrdset_foreach_done(st);
+}
+
+void rrdset_pluginsd_receive_all_slots_reset(RRDSET *st) {
+    for(size_t i = 0; i < st->pluginsd.size ;i++) {
+        rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
+        st->pluginsd.prd_array[i].rda = NULL;
+        st->pluginsd.prd_array[i].rd = NULL;
+        st->pluginsd.prd_array[i].id = NULL;
+    }
+
+    RRDHOST *host = st->rrdhost;
+
+    if(st->pluginsd.last_slot >= 0 && (uint32_t)st->pluginsd.last_slot < host->rrdpush.receive.pluginsd_chart_slots.size)
+        host->rrdpush.receive.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
+
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.with_slots = false;
+}
+
+void rrdset_pluginsd_receive_dims_slots_free(RRDSET *st) {
+    if(!st)
+        return;
+
+    spinlock_lock(&st->pluginsd.spinlock);
+
+    rrdset_pluginsd_receive_all_slots_reset(st);
+
+    freez(st->pluginsd.prd_array);
+    st->pluginsd.prd_array = NULL;
+    st->pluginsd.size = 0;
+    st->pluginsd.pos = 0;
+    st->pluginsd.set = false;
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.with_slots = false;
+    st->pluginsd.collector_tid = 0;
+
+    spinlock_unlock(&st->pluginsd.spinlock);
+}
+
+void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
+    spinlock_lock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+
+    if(host->rrdpush.receive.pluginsd_chart_slots.array) {
+        for (size_t s = 0; s < host->rrdpush.receive.pluginsd_chart_slots.size; s++)
+            rrdset_pluginsd_receive_dims_slots_free(host->rrdpush.receive.pluginsd_chart_slots.array[s]);
+
+        freez(host->rrdpush.receive.pluginsd_chart_slots.array);
+        host->rrdpush.receive.pluginsd_chart_slots.array = NULL;
+        host->rrdpush.receive.pluginsd_chart_slots.size = 0;
+    }
+
+    spinlock_unlock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -243,8 +295,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
-void pluginsd_rrdset_cleanup(RRDSET *st);
-
 void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
     RRDHOST *host = st->rrdhost;
 
@@ -267,7 +317,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         }
     }
 
-    pluginsd_rrdset_cleanup(st);
+    rrdset_pluginsd_receive_dims_slots_free(st);
 }
 
 // the destructor - the dictionary is write locked while this runs

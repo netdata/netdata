@@ -1181,18 +1181,26 @@ struct rrdhost {
     struct {
         struct {
             struct {
-                SPINLOCK spinlock;
-
                 struct {
+                    SPINLOCK spinlock;
+
                     bool ignore;                    // when set, freeing slots will not put them in the available
-                    uint32_t pos;
+                    uint32_t used;
                     uint32_t size;
                     uint32_t *array;
                 } available;                        // keep track of the available chart slots per host
 
                 uint32_t last_used;                 // the last slot we used for a chart (increments only)
-            } chart_slots;
+            } pluginsd_chart_slots;
         } send;
+
+        struct {
+            struct {
+                SPINLOCK spinlock;                  // lock for the management of the allocation
+                uint32_t size;
+                RRDSET **array;
+            } pluginsd_chart_slots;
+        } receive;
     } rrdpush;
 
     char *rrdpush_send_destination;                 // where to send metrics to
@@ -1601,7 +1609,10 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
         *to = online ? now : last_time_s;
 }
 
-void rrdhost_rrdpush_send_chart_slots_free(RRDHOST *host);
+void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host);
+void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host);
+void rrdset_pluginsd_receive_dims_slots_free(RRDSET *st);
+void rrdset_pluginsd_receive_all_slots_reset(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

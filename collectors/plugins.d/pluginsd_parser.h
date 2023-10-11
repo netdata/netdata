@@ -83,13 +83,6 @@ typedef struct parser_user_object {
         time_t wall_clock_time;
         bool ml_locked;
     } v2;
-
-    struct {
-        struct {
-            uint32_t slots;
-            RRDSET **array;
-        } rrdset;
-    } rrd_pointers_cache;
 } PARSER_USER_OBJECT;
 
 typedef struct parser {
