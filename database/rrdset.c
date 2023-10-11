@@ -99,6 +99,11 @@ void rrdset_pluginsd_receive_dims_slots_free(RRDSET *st) {
     spinlock_unlock(&st->pluginsd.spinlock);
 }
 
+static void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
+    spinlock_init(&st->pluginsd.spinlock);
+    st->pluginsd.last_slot = -1;
+}
+
 void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
     spinlock_lock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
 
@@ -289,6 +294,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     st->green = NAN;
     st->red = NAN;
+
+    rrdset_pluginsd_receive_slots_initialize(st);
 
     ctr->react_action = RRDSET_REACT_NEW;
 
