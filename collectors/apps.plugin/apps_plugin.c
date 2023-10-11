@@ -3777,13 +3777,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_SET("voluntary", w->status_voluntary_ctxt_switches);
         send_SET("involuntary", w->status_nonvoluntary_ctxt_switches);
         send_END();
-#endif
-        send_BEGIN(type, w->clean_name, "mem_usage", dt);
-        send_SET("rss", w->status_vmrss);
-        send_END();
 
         send_BEGIN(type, w->clean_name, "mem_private_usage", dt);
         send_SET("mem", (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared) : 0ULL);
+        send_END();
+#endif
+
+        send_BEGIN(type, w->clean_name, "mem_usage", dt);
+        send_SET("rss", w->status_vmrss);
         send_END();
 
         send_BEGIN(type, w->clean_name, "vmem_usage", dt);
@@ -3892,17 +3893,17 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION voluntary '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION involuntary '' absolute 1 %llu\n", RATES_DETAIL);
-#endif
 
-        fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20050 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
-
-        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20055 %d\n", type, w->clean_name, title, type, update_every);
+        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L);
+#endif
+
+        fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n", type, w->clean_name, title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
+        fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
 
         fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 0\n", lbl_name, w->name);
