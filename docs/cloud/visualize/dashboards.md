@@ -51,14 +51,12 @@ new location. Once you release your mouse, other charts re-sort to the grid syst
 To resize any card on a dashboard, click on the bottom-right corner and drag to the card's new size. Other cards re-sort
 to the grid system automatically.
 
-## Jump to single-node dashboards
+## Go to chart
 
-Quickly jump to any node's dashboard by clicking the 3-dot icon in the corner of any card to open a menu. Hit the **Go
-to Chart** item.
+Quickly jump to the location of the chart in either the Overview tab or if the card refers to a single node, its single node dashboard by clicking the 3-dot icon in the corner of any card to open a menu. Hit the **Go to Chart** item.
 
 You'll land directly on that chart of interest, but you can now scroll up and down to correlate your findings with other
-charts. Of course, you can continue to zoom, highlight, and pan through time just as you're used to with Agent
-dashboards.
+charts. Of course, you can continue to zoom, highlight, and pan through time just as you're used to with Netdata Charts.
 
 ## Managing your dashboard
 
