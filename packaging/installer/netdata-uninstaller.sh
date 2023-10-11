@@ -734,7 +734,7 @@ rm_file /etc/cron.d/netdata-updater
 
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
-  rm_dir "${NETDATA_PREFIX}"
+  rm_dir "${NETDATA_PREFIX}/netdata"
 else
   rm_file "/usr/sbin/netdata"
   rm_file "/usr/sbin/netdatacli"
