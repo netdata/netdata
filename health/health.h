@@ -117,6 +117,6 @@ struct health_virtual {
     time_t before;
 };
 
-void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv);
+void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv, int min_run_every);
 void health_config_setup_rc_from_api(BUFFER *wb, RRDHOST *host, DICTIONARY *dict_rcvs, struct health_virtual *hv);
 #endif //NETDATA_HEALTH_H

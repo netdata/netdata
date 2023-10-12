@@ -2,6 +2,23 @@
 
 #include "health.h"
 
+static void rcv_free(RRDCALC *rcv) {
+    if(unlikely(!rcv)) return;
+
+    expression_free(rcv->calculation);
+    expression_free(rcv->warning);
+    expression_free(rcv->critical);
+
+    string_freez(rcv->key);
+    string_freez(rcv->name);
+    string_freez(rcv->chart);
+    string_freez(rcv->dimensions);
+    string_freez(rcv->foreach_dimension);
+    string_freez(rcv->units);
+
+    simple_pattern_free(rcv->foreach_dimension_pattern);
+}
+
 void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
     bool vraised_warn = false;
     bool vraised_crit = false;
@@ -118,44 +135,34 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
     buffer_json_object_close(wb);
 }
 
-void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv) {
-    int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
-    if(min_run_every < 1) min_run_every = 1;
+void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv, int min_run_every) {
 
-    buffer_json_member_add_object(wb, "alert_eval"                     );
-    buffer_json_member_add_int64 (wb, "health_run_every", min_run_every);
-    buffer_json_member_add_time_t(wb, "after",            hv->after    );
-    buffer_json_member_add_time_t(wb, "before",           hv->before   );
     buffer_json_member_add_object(wb, "configuration"                  );
 
     DICTIONARY *dict_rcvs = NULL;
     dict_rcvs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
-    //TODO get from the v2 nodes which one to run on
-    health_config_setup_rc_from_api(wb, localhost, dict_rcvs, hv);
+    health_config_setup_rc_from_api(wb, host, dict_rcvs, hv);
     buffer_json_object_close(wb);
-    buffer_json_member_add_object(wb, localhost->machine_guid);
 
     RRDCALC *rcv;
     dfe_start_read(dict_rcvs, rcv) {
         buffer_json_member_add_array(wb, string2str(rcv->chart));
 
         //small adjustment to match health's results
-        time_t now = now_realtime_sec();
-        time_t at  = hv->after  ? hv->after - 1  : now;
-        hv->before = hv->before ? hv->before - 1 : now;
+        time_t now      = now_realtime_sec();
+        time_t at       = hv->after  ? hv->after - 1  : now;
+        time_t before_t = hv->before ? hv->before - 1 : now;
 
-        while (at <= hv->before) {
-            health_virtual_run(localhost, wb, rcv, at);
+        while (at <= before_t) {
+            health_virtual_run(host, wb, rcv, at);
             at += min_run_every;
         }
 
         buffer_json_array_close(wb);
+        rcv_free(rcv);
+        freez(rcv);
     }
     dfe_done(rcv);
-    buffer_json_object_close(wb);
-    buffer_json_object_close(wb);
-
-    //free rcv
-    //free rrdvars
+    dictionary_destroy(dict_rcvs);
 }

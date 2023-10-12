@@ -1660,7 +1660,23 @@ static void contexts_v2_alert_eval_to_json(BUFFER *wb, struct rrdcontext_to_json
         .after = ctl->window.after,
         .before = ctl->window.before,
     };
-    health_virtual(ctl->nodes.dict, wb, &hv);
+
+    int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
+    if(min_run_every < 1) min_run_every = 1;
+
+    buffer_json_member_add_array(wb, "alert_eval"                     );
+    /* buffer_json_member_add_int64 (wb, "health_run_every", min_run_every); */
+    /* buffer_json_member_add_time_t(wb, "after",            hv.after    ); */
+    /* buffer_json_member_add_time_t(wb, "before",           hv.before   ); */
+
+    struct contexts_v2_node *t;
+    dfe_start_read(ctl->nodes.dict, t) {
+        buffer_json_add_array_item_object(wb);
+        health_virtual(t->host, wb, &hv, min_run_every);
+        buffer_json_object_close(wb);
+    }
+    dfe_done(t);
+    buffer_json_array_close(wb);
 }
 
 static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {

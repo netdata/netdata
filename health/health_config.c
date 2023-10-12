@@ -1380,11 +1380,14 @@ void health_config_setup_rc_from_api_do_lookup(BUFFER *wb, RRDCALC *rcv, char *l
         return;
 
     buffer_json_member_add_string_or_omit(wb, "lookup", lookup);
-    health_parse_db_lookup(0, NULL, lookup, &rcv->group, &rcv->after, &rcv->before,
+    char *lookup_tmp = strdupz(lookup);
+    health_parse_db_lookup(0, NULL, lookup_tmp, &rcv->group, &rcv->after, &rcv->before,
                            &rcv->update_every, &rcv->options, &rcv->dimensions, &rcv->foreach_dimension);
 
     if(rcv->foreach_dimension)
         rcv->foreach_dimension_pattern = health_pattern_from_foreach(rrdcalc_foreachdim(rcv));
+
+    freez(lookup_tmp);
 }
 
 void health_config_setup_rc_from_api_do_calc(BUFFER *wb, RRDCALC *rcv, char *calc)
