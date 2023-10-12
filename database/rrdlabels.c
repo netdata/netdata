@@ -671,6 +671,7 @@ void rrdlabels_destroy(RRDLABELS *labels)
     freez(labels);
 }
 
+// Check in labels to see if we have the key specified in label
 static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABEL *label)
 {
     if (unlikely(!labels))
@@ -682,7 +683,7 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
     RRDLABEL *found = NULL;
     while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
         RRDLABEL *lb = (RRDLABEL *)Index;
-        if (lb->index.key == label->index.key && lb->index.value != label->index.value) {
+        if (lb->index.key == label->index.key) {
             found = (RRDLABEL *)Index;
             break;
         }
@@ -695,39 +696,42 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
 
 static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC ls)
 {
-    RRDLABEL *label = add_label_name_value(key, value);
+    RRDLABEL *new_label = add_label_name_value(key, value);
 
     spinlock_lock(&labels->spinlock);
 
-    RRDLABEL *old_key = rrdlabels_find_label_with_key_unsafe(labels, label);
+    RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(labels, new_label);
+
+    if (old_label_with_key == new_label) {
+        spinlock_unlock(&labels->spinlock);
+        delete_label(new_label);
+        return;
+    }
 
     size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
 
-    Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t) label, PJE0);
-    if(unlikely(!PValue || PValue == PJERR))
+    Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t)new_label, PJE0);
+    if (!PValue || PValue == PJERR)
         fatal("RRDLABELS: corrupted labels JudyL array");
 
-    if (!*PValue) {
-        RRDLABEL_SRC new_ls;
-        if (old_key)
-            new_ls = ((ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_OLD);
-        else
-            new_ls = ((ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW);
-        *((RRDLABEL_SRC *)PValue) = new_ls;
+    RRDLABEL_SRC new_ls = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
+    labels->version++;
 
-        labels->version++;
+    if (old_label_with_key) {
+        (void)JudyLDel(&labels->JudyL, (Word_t)old_label_with_key, PJE0);
+        new_ls |= RRDLABEL_FLAG_OLD;
+    } else
+        new_ls |= RRDLABEL_FLAG_NEW;
 
-        if (old_key) {
-            (void)JudyLDel(&labels->JudyL, (Word_t) old_key, PJE0);
-            delete_label((RRDLABEL *)old_key);
-        }
-        size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
-        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
-    }
-    else
-        delete_label(label);
+    *((RRDLABEL_SRC *)PValue) = new_ls;
+
+    size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
+    STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
 
     spinlock_unlock(&labels->spinlock);
+
+    if (old_label_with_key)
+        delete_label((RRDLABEL *)old_label_with_key);
 }
 
 void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLABEL_SRC ls)
@@ -984,7 +988,7 @@ int rrdlabels_walkthrough_read(RRDLABELS *labels, int (*callback)(const char *na
 // migrate an existing label list to a new list
 
 void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
-    if (!dst || !src)
+    if (!dst || !src || (dst == src))
         return;
 
     spinlock_lock(&dst->spinlock);
@@ -1025,7 +1029,7 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
 
 void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
 {
-    if (!dst || !src)
+    if (!dst || !src || (dst == src))
         return;
 
     RRDLABEL *label;
@@ -1265,6 +1269,9 @@ void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb)
 
 size_t rrdlabels_entries(RRDLABELS *labels __maybe_unused)
 {
+    if (unlikely(!labels))
+        return 0;
+
     size_t count;
     spinlock_lock(&labels->spinlock);
     count = JudyLCount(labels->JudyL, 0, -1, PJE0);
@@ -1274,6 +1281,9 @@ size_t rrdlabels_entries(RRDLABELS *labels __maybe_unused)
 
 size_t rrdlabels_version(RRDLABELS *labels __maybe_unused)
 {
+    if (unlikely(!labels))
+        return 0;
+
     return (size_t) labels->version;
 }
 
