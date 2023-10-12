@@ -189,11 +189,6 @@ endmeta-->
             sidebar_label = integration['meta']['name']
             learn_rel_path = generate_category_from_name(integration['meta']['categories'][0].split("."), categories)
 
-            split = re.split(r'(#.*\n)', integration['overview'], 1)
-
-            first_overview_part = split[1]
-            rest_overview_part = split[2]
-
             # build the markdown string
             md = \
                 f"""<!--startmeta
@@ -225,11 +220,6 @@ endmeta-->
             meta_yaml = integration['edit_link'].replace("blob", "edit")
             sidebar_label = integration['meta']['name']
             learn_rel_path = generate_category_from_name(integration['meta']['categories'][0].split("."), categories)
-
-            split = re.split(r'(#.*\n)', integration['overview'], 1)
-
-            first_overview_part = split[1]
-            rest_overview_part = split[2]
 
             # build the markdown string
             md = \
