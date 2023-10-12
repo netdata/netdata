@@ -345,12 +345,12 @@ by centralizing your system logs and the use of this Netdata plugin, is unparall
 A short summary to get journal server running can be found below.
 There are two strategies you can apply, when it comes down to a centralized server for systemd journal logs.
 
-1. _Active sources_, where the centralized server fetch the logs from each individual server
-2. _Passive sources_, where the centralized server accept log stream from an individual server.
+1. _Active sources_, where the centralized server fetches the logs from each individual server
+2. _Passive sources_, where the centralized server accepts a log stream from an individual server.
 
 For more options and reference to documentation, check `man systemd-journal-remote` and `man systemd-journal-upload`.
 
-We will focus on providing some instructions to setting up a _passive_ centralized server.
+We will focus on providing some instructions on setting up a _passive_ centralized server.
 
 ⚠️ Two things to keep always in mind: 
 
@@ -395,7 +395,7 @@ nano /etc/systemd/system/systemd-journal-remote.service
 sudo systemctl daemon-reload
 ```
 
-This will make http requests as priority.
+This will make HTTP requests as priority.
 
 2. Reload the daemon configs
 
@@ -425,7 +425,7 @@ ListenStream=<DESIRED_PORT>
 ##### Centralization server with TLS and self-signed certificate
 
 Follow **all** the steps from the [Centralization server without TLS (use case; only in secure intranets](#centralization-server-without-tls--use-case-only-in-secure-intranets-)
-but omit step 2. Instead of step two, make the following steps 
+but omit step 2. Instead of step two, take the following steps:
 
 >💡 You need to handcraft and use a self-signed certificate. A pretty straightforward way to do that is:
 
@@ -559,7 +559,7 @@ In this section we will configure the clients/hosts to push their journal logs i
 configure `systemd-journal-upload` (with or without SSL), enable and start it.
 
 
-1. Install the `systemd-journal-remote` it run:
+1. To install `systemd-journal-remote`, run:
 
 
 ```sh
@@ -568,9 +568,9 @@ sudo apt-get install systemd-journal-remote
 ```
 
 
-2. [With SSL] Copy to the client/hosts the self-signed certificates you created before (you created one per host)
+2. **With SSL**: Copy to the client/hosts the self-signed certificates you created before (you created one per host)
 
-    After this step in a folder (eg `home/user/incoming`), each host must have the following
+    After this step, each host must have the following inside a directory (e.g. `home/user/incoming`),
     ```
     clientX.example.com.key
     clientX.example.com.pem
@@ -579,57 +579,57 @@ sudo apt-get install systemd-journal-remote
 
 
 
-3. [With SSL] _On each client/host;_ create a user and a group (with the same name) called `systemd-journal-upload` 
+3. **With SSL**: _On each client/host;_ create a user and a group (with the same name) called `systemd-journal-upload` 
 
 
-```sh
-sudo adduser --system --home /run/systemd --no-create-home --disabled-login --group systemd-journal-upload
-```
+	```sh
+	sudo adduser --system --home /run/systemd --no-create-home --disabled-login --group systemd-journal-upload
+	```
 
-4. [With SSL] _On each client/host;_ Navigate under the folder you placed the certificates, copy them into the expected locations (by the `systemd-journal-upload` service)
-
-
-```sh
-sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
-sudo chmod 755 /etc/ssl/private
-sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
-sudo chmod 755 /etc/ssl/ca
-
-cd home/user/incoming #change it accordingly, this is the place where you copied your certificates.
-sudo cp clientX.example.com.key /etc/ssl/private/journal-upload.key
-sudo cp clientX.example.com.pem /etc/ssl/certs/journal-upload.pem
-sudo cp ca.pem /etc/ssl/ca/trusted.pem
-```
-
-5. [With SSL]  _On each client/host;_ Adjust the permission so the `systemd-journal-upload` service can access them
-
-```sh
-sudo chgrp systemd-journal-upload /etc/ssl/private/journal-upload.key
-sudo chgrp systemd-journal-upload /etc/ssl/certs/journal-upload.pem
-sudo chgrp systemd-journal-upload /etc/ssl/ca/trusted.pem
-
-sudo chmod 0640 /etc/ssl/private/journal-upload.key
-sudo chmod 755 /etc/ssl/certs/journal-upload.pem
-sudo chmod 755 /etc/ssl/ca/trusted.pem
-```
-
-6. Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like this:
-
-```
-[Upload]
-URL=http://centralization.server.ip:19532
-```
-
-⚠️ OR with SSL
+4. **With SSL**: _On each client/host;_ Navigate under the directory you placed the certificates, copy them into the expected locations (by the `systemd-journal-upload` service)
 
 
-```
-[Upload]
-URL=https://CENTRALIZED_SERVER_IP/DOMAIN :19532 #replace it accordingly
-ServerKeyFile=/etc/ssl/private/journal-upload.key
-ServerCertificateFile=/etc/ssl/certs/journal-upload.pem
-TrustedCertificateFile=/etc/ssl/ca/trusted.pem
-```
+	```sh
+	sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
+	sudo chmod 755 /etc/ssl/private
+	sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
+	sudo chmod 755 /etc/ssl/ca
+	
+	cd home/user/incoming #change it accordingly, this is the place where you copied your certificates.
+	sudo cp clientX.example.com.key /etc/ssl/private/journal-upload.key
+	sudo cp clientX.example.com.pem /etc/ssl/certs/journal-upload.pem
+	sudo cp ca.pem /etc/ssl/ca/trusted.pem
+	```
+
+5. **With SSL**:  _On each client/host;_ Adjust the permission so that the `systemd-journal-upload` service can access the files
+
+	```sh
+	sudo chgrp systemd-journal-upload /etc/ssl/private/journal-upload.key
+	sudo chgrp systemd-journal-upload /etc/ssl/certs/journal-upload.pem
+	sudo chgrp systemd-journal-upload /etc/ssl/ca/trusted.pem
+	
+	sudo chmod 0640 /etc/ssl/private/journal-upload.key
+	sudo chmod 755 /etc/ssl/certs/journal-upload.pem
+	sudo chmod 755 /etc/ssl/ca/trusted.pem
+	```
+
+6. Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like so:
+
+	```
+	[Upload]
+	URL=http://centralization.server.ip:19532
+	```
+
+	⚠️ OR with SSL
+
+
+	```
+	[Upload]
+	URL=https://CENTRALIZED_SERVER_IP/DOMAIN :19532 #replace it accordingly
+	ServerKeyFile=/etc/ssl/private/journal-upload.key
+	ServerCertificateFile=/etc/ssl/certs/journal-upload.pem
+	TrustedCertificateFile=/etc/ssl/ca/trusted.pem
+	```
 
 
 
