@@ -1165,7 +1165,7 @@ static void ebpf_fill_cachestat_function_buffer(BUFFER *wb, uint32_t pid, netdat
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->ratio);
 
     // Dirty
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->dirty);
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->plot.dirty);
 
     // Hit
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->hit);

@@ -690,25 +690,6 @@ static void ebpf_cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int ma
 }
 
 /**
- * Save Pid values
- *
- * Save the current values inside the structure
- *
- * @param out     vector used to plot charts
- * @param publish vector with values read from hash tables.
- */
-static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *publish)
-{
-    if (!out->current.misses) {
-        memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
-        return;
-    }
-
-    memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_pid_t));
-    memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
-}
-
-/**
  * Update individual group
  *
  * Update statistics for individual group after prev and current to be filled.
@@ -722,7 +703,6 @@ static inline void ebpf_cachestat_update_individual_group(netdata_publish_caches
 
     uint64_t mpa = current->misses - prev->misses;
     uint64_t mbd = current->dirty - prev->dirty;
-    w->dirty = (long long)mbd;
     uint64_t apcl = current->total - prev->total;
 
     cachestat_update_publish(w, mpa, mbd, apcl, 0);
@@ -775,12 +755,12 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
             cs_ptr = *cs_pptr;
 
             cs_ptr->current_timestamp = update_time;
-            cachestat_save_pid_values(cs_ptr, cv);
+            memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
             ebpf_cachestat_update_individual_group(cs_ptr);
         }  else {
             if (cv[0].misses != cs_ptr->prev.misses) {
                 cs_ptr->current_timestamp = update_time;
-                cachestat_save_pid_values(cs_ptr, cv);
+                memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
                 ebpf_cachestat_update_individual_group(cs_ptr);
             } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
                 JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
@@ -1174,7 +1154,6 @@ void ebpf_cachestat_calc_chart_values()
 
         uint64_t mpa = current->misses - prev->misses;
         uint64_t mbd = current->dirty - prev->dirty;
-        ect->publish_cachestat.dirty = mbd;
         uint64_t apcl = current->total - prev->total;
 
         cachestat_update_publish(&ect->publish_cachestat, mpa, mbd, apcl, 0);
@@ -1241,7 +1220,7 @@ static void ebpf_send_systemd_cachestat_charts()
     ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_CACHESTAT_DIRTY_CHART, "");
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, (long long)ect->publish_cachestat.dirty);
+            write_chart_dimension(ect->name, (long long)ect->publish_cachestat.plot.dirty);
         }
     }
     ebpf_write_end_chart();
