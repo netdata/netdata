@@ -101,8 +101,8 @@ This makes them a little more difficult to handle, from the administration persp
 
 ### `remote` journals
 
-Remote journals are created by `systemd-journal-remote`. This `systemd` feature allows creating logs centralization points within
-your infrastructure, based exclusively on `systemd`.
+Remote journals are created by `systemd-journal-remote`. This `systemd` feature allows creating logs centralization 
+points within your infrastructure, based exclusively on `systemd`.
 
 Usually `remote` journals are named by the IP of the server sending these logs. The Netdata plugin automatically
 extracts these IPs and performs a reverse DNS lookup to find their hostnames. When this is successful,
@@ -130,7 +130,8 @@ The plugin automatically enriches certain fields to make them more user-friendly
 - `PRIORITY`: the numeric value is replaced with the human-readable name of each priority.
 - `SYSLOG_FACILITY`: the encoded value is replaced with the human-readable name of each facility.
 - `ERRNO`: the numeric value is annotated with the short name of each value.
-- `_UID` `_AUDIT_LOGINUID`, `_SYSTEMD_OWNER_UID`, `OBJECT_UID`, `OBJECT_SYSTEMD_OWNER_UID`, `OBJECT_AUDIT_LOGINUID`: the local user database is consulted to annotate them with usernames.
+- `_UID` `_AUDIT_LOGINUID`, `_SYSTEMD_OWNER_UID`, `OBJECT_UID`, `OBJECT_SYSTEMD_OWNER_UID`, `OBJECT_AUDIT_LOGINUID`: 
+   the local user database is consulted to annotate them with usernames.
 - `_GID`, `OBJECT_GID`: the local group database is consulted to annotate them with group names.
 - `_CAP_EFFECTIVE`: the encoded value is annotated with a human-readable list of the linux capabilities.
 - `_SOURCE_REALTIME_TIMESTAMP`: the numeric value is annotated with human-readable datetime in UTC.
@@ -152,8 +153,8 @@ All journal fields available in the journal files are offered as columns on the 
 
 ### Journal fields as additional info to each log entry
 
-When you click a log line, the `info` sidebar will open on the right of the screen, to provide the full list of fields related to this
-log line. You can close this `info` sidebar, by selecting the filter icon at its top.
+When you click a log line, the `info` sidebar will open on the right of the screen, to provide the full list of fields 
+related to this log line. You can close this `info` sidebar, by selecting the filter icon at its top.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/3207794c-a61b-444c-8ffe-6c07cbc90ae2)
 
@@ -166,7 +167,9 @@ of the query.
 Internally the plugin has:
 
 1. A white-list of fields, to be presented as filters.
-2. A black-list of fields, to prevent them from becoming filters. This list includes fields with a very high cardinality, like timestamps, unique message ids, etc. This is mainly for protecting the server's performance, to avoid building in memory indexes for the fields that almost each of their values is unique.
+2. A black-list of fields, to prevent them from becoming filters. This list includes fields with a very high 
+   cardinality, like timestamps, unique message ids, etc. This is mainly for protecting the server's performance, 
+   to avoid building in memory indexes for the fields that almost each of their values is unique.
 
 Keep in mind that the values presented in the filters, and their sorting is affected by the "full data queries"
 setting:
@@ -330,7 +333,7 @@ fields. But journald does exactly the opposite. Each log entry is unique and may
 So, Loki and `systemd-journal` are good for different use cases.
 
 `systemd-journal` already runs in your systems. You use it today. It is there inside all your systems
-collecting the system and applications logs. And for its use case, it has advantages over other
+collecting the system and app~~~~lications logs. And for its use case, it has advantages over other
 centralization solutions. So, why not use it?
 
 ### Is it worth to build a `systemd` logs centralization server?
@@ -379,44 +382,43 @@ Please note that `systemd-journal-remote` supports using secure connections.
 
 ##### Centralization server without TLS (use case; only for secure intranets)
 
-To change the protocol of the journal transfer (HTTP/HTTPS) and the save location, do:
+1. To change the protocol of the journal transfer (from HTTPS, which is the default to HTTP), edit the service file of 
+   the `systemd-journal-remote` service.
 
-1. Edit the service file of the `systemd-journal-remote` service
+    ```sh
+    sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
+    
+    # edit it
+    # --listen-http=-3 specifies the incoming journal for http.
+    # If you want to use https, change it to --listen-https=-3.
+    nano /etc/systemd/system/systemd-journal-remote.service
+    
+    # reload systemd
+    sudo systemctl daemon-reload
+    ```
 
-```sh
-sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
-
-# edit it
-# --listen-http=-3 specifies the incoming journal for http.
-# If you want to use https, change it to --listen-https=-3.
-nano /etc/systemd/system/systemd-journal-remote.service
-
-# reload systemd
-sudo systemctl daemon-reload
-```
-
-This will make HTTP requests as priority.
+    This will make HTTP requests as priority.
 
 2. Reload the daemon configs
 
-```sh
-# reload systemd
-sudo systemctl daemon-reload
-```
+    ```sh
+    # reload systemd
+    sudo systemctl daemon-reload
+    ```
 
 3. (OPTIONAL) If you want to change the port, edit the socket file of the `systemd-journal-remote`
-```sh
-# copy the service file
-sudo systemctl edit systemd-journal-remote.socket
-```
 
-and add the following lines into the instructed place, and choose your desired port; save and exit.
+    ```sh
+    # copy the service file
+    sudo systemctl edit systemd-journal-remote.socket
+    ```
+    
+    and add the following lines into the instructed place, and choose your desired port; save and exit.
 
-
-```sh
-[Socket]
-ListenStream=<DESIRED_PORT>
-```
+    ```sh
+    [Socket]
+    ListenStream=<DESIRED_PORT>
+    ```
     
 
 4. Secure the endpoint from unauthorized access. That depends on your setup (e.g firewall setting, reverse proxies, etc)
@@ -431,126 +433,124 @@ but omit step 2. Instead of step two, take the following steps:
 
 1. Download OpenSSL
 
-```sh
-# change this according to your distro
-sudo apt-get install openssl
-```
+    ```sh
+    # change this according to your distro
+    sudo apt-get install openssl
+    ```
 
 2. Create your own private certificate authority.
 
-```sh
-mkdir self-signed-certificates && cd self-signed-certificates
-
-openssl req -newkey rsa:2048 -days 3650 -x509 -nodes \
-      -out ca.pem -keyout ca.key -subj '/CN=My Certificate authority/'
-      
-cat >ca.conf <<EOF
-[ ca ]
-default_ca = CA_default
-[ CA_default ]
-new_certs_dir = .
-certificate = ca.pem
-database = ./index
-private_key = ca.key
-serial = ./serial
-default_days = 3650
-default_md = default
-policy = policy_anything
-[ policy_anything ]
-countryName             = optional
-stateOrProvinceName     = optional
-localityName            = optional
-organizationName        = optional
-organizationalUnitName  = optional
-commonName              = supplied
-emailAddress            = optional
-EOF
-
-touch index
-echo 0001 >serial
-```
+    ```sh
+    mkdir self-signed-certificates && cd self-signed-certificates
+    
+    openssl req -newkey rsa:2048 -days 3650 -x509 -nodes \
+          -out ca.pem -keyout ca.key -subj '/CN=My Certificate authority/'
+          
+    cat >ca.conf <<EOF
+    [ ca ]
+    default_ca = CA_default
+    [ CA_default ]
+    new_certs_dir = .
+    certificate = ca.pem
+    database = ./index
+    private_key = ca.key
+    serial = ./serial
+    default_days = 3650
+    default_md = default
+    policy = policy_anything
+    [ policy_anything ]
+    countryName             = optional
+    stateOrProvinceName     = optional
+    localityName            = optional
+    organizationName        = optional
+    organizationalUnitName  = optional
+    commonName              = supplied
+    emailAddress            = optional
+    EOF
+    
+    touch index
+    echo 0001 >serial
+    ```
 
 3. Specify the Common Names for both the server and the clients (server who will push its journal logs). 
-   How each a client will reach the centralized the server? For instance if you want to reach them via public IP or DNS.
-   There is a 1:1 correlation among the elements of `CLIENT_CNS`, `CLIENT_IPS` and `CLIENT_DNES`, if you want to omit a field,
-   replace it with a placeholder string. You can also omit the DNSes but keep in mind to also omit the field `DNS:$SERVER_DNS`
-   when you are signing the client certificates.
+   
+    How each a client will reach the centralized the server? For instance if you want to reach them via public IP or DNS.
+    There is a 1:1 correlation among the elements of `CLIENT_CNS`, `CLIENT_IPS` and `CLIENT_DNES`, if you want to omit 
+    a field, replace it with a placeholder string. You can also omit the DNSes but keep in mind to also omit the field 
+    `DNS:$SERVER_DNS` when you are signing the client certificates.
 
-```sh
-SERVER_CN="myserver.example.com"
-SERVER_IP="Server_IP"
-SERVER_DNS="myserver.example.com"
-
-CLIENT_CNS=("client1.example.com" "client2.example.com")
-CLIENT_IPS=("client1_ip" "client2_ip")
-CLIENT_DNES=("client1.example.com" "client2.example.com")
-```
+    ```sh
+    SERVER_CN="myserver.example.com"
+    SERVER_IP="Server_IP"
+    SERVER_DNS="myserver.example.com"
+    
+    CLIENT_CNS=("client1.example.com" "client2.example.com")
+    CLIENT_IPS=("client1_ip" "client2_ip")
+    CLIENT_DNES=("client1.example.com" "client2.example.com")
+    ```
 
 4. Create the self-signed certificates for the server and the clients
 
+    ```sh
+    openssl req -newkey rsa:2048 -nodes -out $SERVER_CN.csr -keyout $SERVER_CN.key -subj "/CN=$SERVER_CN/"
+    echo "subjectAltName = IP:$SERVER_IP, DNS:$SERVER_DNS" > $SERVER_CN.ext
+    openssl ca -batch -config ca.conf -notext -in $SERVER_CN.csr -out $SERVER_CN.pem -extfile $SERVER_CN.ext
+    
+    for i in "${!CLIENT_CNS[@]}"; do
+          CLIENT_CN="${CLIENT_CNS[$i]}"
+          CLIENT_IP="${CLIENT_IPS[$i]}"
+          CLIENT_DNS="${CLIENT_DNES[$i]}"
+          # Generate the client CSR
+          openssl req -newkey rsa:2048 -nodes -out $CLIENT_CN.csr -keyout $CLIENT_CN.key -subj "/CN=$CLIENT_CN/"
+          echo "subjectAltName = IP:$CLIENT_IP" > $CLIENT_CN.ext
+    
+          # Sign the client certificate using the CA configuration
+          openssl ca -batch -config ca.conf -notext -in $CLIENT_CN.csr -out $CLIENT_CN.pem -extfile $CLIENT_CN.ext
+    done
+    ```
 
-```sh
-openssl req -newkey rsa:2048 -nodes -out $SERVER_CN.csr -keyout $SERVER_CN.key -subj "/CN=$SERVER_CN/"
-echo "subjectAltName = IP:$SERVER_IP, DNS:$SERVER_DNS" > $SERVER_CN.ext
-openssl ca -batch -config ca.conf -notext -in $SERVER_CN.csr -out $SERVER_CN.pem -extfile $SERVER_CN.ext
-
-for i in "${!CLIENT_CNS[@]}"; do
-      CLIENT_CN="${CLIENT_CNS[$i]}"
-      CLIENT_IP="${CLIENT_IPS[$i]}"
-      CLIENT_DNS="${CLIENT_DNES[$i]}"
-      # Generate the client CSR
-      openssl req -newkey rsa:2048 -nodes -out $CLIENT_CN.csr -keyout $CLIENT_CN.key -subj "/CN=$CLIENT_CN/"
-      echo "subjectAltName = IP:$CLIENT_IP" > $CLIENT_CN.ext
-
-      # Sign the client certificate using the CA configuration
-      openssl ca -batch -config ca.conf -notext -in $CLIENT_CN.csr -out $CLIENT_CN.pem -extfile $CLIENT_CN.ext
-done
-```
-
-Keep in mind we have already produced the client certificates, we will make use of them when we will configure the clients.
+    Keep in mind we have already produced the client certificates, we will make use of them when we will configure the clients.
 
 5. Copy the key and the certificates into the `systemd-journal-remote`'s predefined places
 
-
-```sh
-sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions
-sudo chmod 755 /etc/ssl/private
-sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions
-sudo chmod 755 /etc/ssl/ca
-sudo cp "${SERVER_CN}".key /etc/ssl/private/journal-remote.key # This is not predefined but we need to clarify the key
-sudo cp "${SERVER_CN}".pem /etc/ssl/certs/journal-remote.pem
-sudo cp ca.pem /etc/ssl/ca/trusted.pem
-```
+    ```sh
+    sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions
+    sudo chmod 755 /etc/ssl/private
+    sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions
+    sudo chmod 755 /etc/ssl/ca
+    sudo cp "${SERVER_CN}".key /etc/ssl/private/journal-remote.key # This is not predefined but we need to clarify the key
+    sudo cp "${SERVER_CN}".pem /etc/ssl/certs/journal-remote.pem
+    sudo cp ca.pem /etc/ssl/ca/trusted.pem
+    ```
 
 6. Adjust the permissions for the `systemd-journal-remote` to access them.
 
-```sh
-sudo chgrp systemd-journal-remote /etc/ssl/private/journal-remote.key
-sudo chgrp systemd-journal-remote /etc/ssl/certs/journal-remote.pem
-sudo chgrp systemd-journal-remote /etc/ssl/ca/trusted.pem
+    ```sh
+    sudo chgrp systemd-journal-remote /etc/ssl/private/journal-remote.key
+    sudo chgrp systemd-journal-remote /etc/ssl/certs/journal-remote.pem
+    sudo chgrp systemd-journal-remote /etc/ssl/ca/trusted.pem
+    
+    
+    sudo chmod 0640 /etc/ssl/private/journal-remote.key
+    sudo chmod 755 /etc/ssl/certs/journal-remote.pem
+    sudo chmod 755 /etc/ssl/ca/trusted.pem
+    ```
 
+7. Edit the `systemd-journal-remote.conf` to change the predefined key place and enable SSL.
 
-sudo chmod 0640 /etc/ssl/private/journal-remote.key
-sudo chmod 755 /etc/ssl/certs/journal-remote.pem
-sudo chmod 755 /etc/ssl/ca/trusted.pem
-```
-
-6. Edit the `systemd-journal-remote.conf` to change the predefined key place and enable SSL.
-
-
-sh```
-sudo nano /etc/systemd/journal-remote.conf
-```
-
-You need to transform the corresponding section to something like this
-```
-[Remote]
-Seal=false
-SplitMode=host
-ServerKeyFile=/etc/ssl/private/journal-remote.key
-ServerCertificateFile=/etc/ssl/certs/journal-remote.pem
-TrustedCertificateFile=/etc/ssl/ca/trusted.pem
-```
+    ```sh
+    sudo nano /etc/systemd/journal-remote.conf
+    ```
+    
+    You need to transform the corresponding section to something like this
+    ```
+    [Remote]
+    Seal=false
+    SplitMode=host
+    ServerKeyFile=/etc/ssl/private/journal-remote.key
+    ServerCertificateFile=/etc/ssl/certs/journal-remote.pem
+    TrustedCertificateFile=/etc/ssl/ca/trusted.pem
+    ```
 
 
 #### Configuring journal clients to push their logs to the server
@@ -561,11 +561,10 @@ configure `systemd-journal-upload` (with or without SSL), enable and start it.
 
 1. To install `systemd-journal-remote`, run:
 
-
-```sh
-# change this according to your distro
-sudo apt-get install systemd-journal-remote
-```
+    ```sh
+    # change this according to your distro
+    sudo apt-get install systemd-journal-remote
+    ```
 
 
 2. **With SSL**: Copy to the client/hosts the self-signed certificates you created before (you created one per host)
@@ -577,10 +576,7 @@ sudo apt-get install systemd-journal-remote
     ca.pem #common between the servers
     ```
 
-
-
 3. **With SSL**: _On each client/host;_ create a user and a group (with the same name) called `systemd-journal-upload` 
-
 
 	```sh
 	sudo adduser --system --home /run/systemd --no-create-home --disabled-login --group systemd-journal-upload
@@ -588,70 +584,66 @@ sudo apt-get install systemd-journal-remote
 
 4. **With SSL**: _On each client/host;_ Navigate under the directory you placed the certificates, copy them into the expected locations (by the `systemd-journal-upload` service)
 
-
-	```sh
-	sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
-	sudo chmod 755 /etc/ssl/private
-	sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
-	sudo chmod 755 /etc/ssl/ca
-	
-	cd home/user/incoming #change it accordingly, this is the place where you copied your certificates.
-	sudo cp clientX.example.com.key /etc/ssl/private/journal-upload.key
-	sudo cp clientX.example.com.pem /etc/ssl/certs/journal-upload.pem
-	sudo cp ca.pem /etc/ssl/ca/trusted.pem
-	```
+    ```sh
+    sudo mkdir /etc/ssl/private # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
+    sudo chmod 755 /etc/ssl/private
+    sudo mkdir /etc/ssl/ca/ # make sure that you havent created this folder, and use it already, you may dont want to change it's permissions.
+    sudo chmod 755 /etc/ssl/ca
+    
+    cd home/user/incoming #change it accordingly, this is the place where you copied your certificates.
+    sudo cp clientX.example.com.key /etc/ssl/private/journal-upload.key
+    sudo cp clientX.example.com.pem /etc/ssl/certs/journal-upload.pem
+    sudo cp ca.pem /etc/ssl/ca/trusted.pem
+    ```
 
 5. **With SSL**:  _On each client/host;_ Adjust the permission so that the `systemd-journal-upload` service can access the files
 
-	```sh
-	sudo chgrp systemd-journal-upload /etc/ssl/private/journal-upload.key
-	sudo chgrp systemd-journal-upload /etc/ssl/certs/journal-upload.pem
-	sudo chgrp systemd-journal-upload /etc/ssl/ca/trusted.pem
-	
-	sudo chmod 0640 /etc/ssl/private/journal-upload.key
-	sudo chmod 755 /etc/ssl/certs/journal-upload.pem
-	sudo chmod 755 /etc/ssl/ca/trusted.pem
-	```
+    ```sh
+    sudo chgrp systemd-journal-upload /etc/ssl/private/journal-upload.key
+    sudo chgrp systemd-journal-upload /etc/ssl/certs/journal-upload.pem
+    sudo chgrp systemd-journal-upload /etc/ssl/ca/trusted.pem
+    
+    sudo chmod 0640 /etc/ssl/private/journal-upload.key
+    sudo chmod 755 /etc/ssl/certs/journal-upload.pem
+    sudo chmod 755 /etc/ssl/ca/trusted.pem
+    ```
 
 6. Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like so:
 
-	```
-	[Upload]
-	URL=http://centralization.server.ip:19532
-	```
+    ```
+    [Upload]
+    URL=http://centralization.server.ip:19532
+    ```
 
 	⚠️ OR with SSL
 
-
-	```
-	[Upload]
-	URL=https://CENTRALIZED_SERVER_IP/DOMAIN :19532 #replace it accordingly
-	ServerKeyFile=/etc/ssl/private/journal-upload.key
-	ServerCertificateFile=/etc/ssl/certs/journal-upload.pem
-	TrustedCertificateFile=/etc/ssl/ca/trusted.pem
-	```
-
-
+    ```
+    [Upload]
+    URL=https://CENTRALIZED_SERVER_IP/DOMAIN :19532 #replace it accordingly
+    ServerKeyFile=/etc/ssl/private/journal-upload.key
+    ServerCertificateFile=/etc/ssl/certs/journal-upload.pem
+    TrustedCertificateFile=/etc/ssl/ca/trusted.pem
+    ```
 
 7. Edit `systemd-journal-upload`, and add `Restart=always` to make sure the client will keep trying to push logs, even if the server is temporarily not there, like this:
 
-```sh
-sudo systemctl edit systemd-journal-upload
-```
+    ```sh
+    sudo systemctl edit systemd-journal-upload
+    ```
 
-At the top, add:
-
-```
-[Service]
-Restart=always
-```
+    At the top, add:
+    
+    ```
+    [Service]
+    Restart=always
+    ```
 
 8. Enable and start `systemd-journal-upload`, like this:
 
-```sh
-sudo systemctl enable systemd-journal-upload
-sudo systemctl start systemd-journal-upload
-```
+    ```sh
+    sudo systemctl enable systemd-journal-upload
+    sudo systemctl start systemd-journal-upload
+    ```
 
 Keep in mind that immediately after starting `systemd-journal-upload` on a server, a replication process starts pushing logs in the order they have been received. This means that depending on the size of the available logs, some time may be needed for Netdata to show the most recent logs of that server.
 
