@@ -10,7 +10,7 @@ static netdata_publish_syscall_t cachestat_counter_publish_aggregated[NETDATA_CA
 
 netdata_cachestat_pid_t *cachestat_vector = NULL;
 
-static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
+static int64_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
 
 ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
@@ -587,72 +587,36 @@ static void ebpf_cachestat_exit(void *ptr)
  * Update publish values before to write dimension.
  *
  * @param out  structure that will receive data.
- * @param mpa  calls for mark_page_accessed during the last second.
- * @param mbd  calls for mark_buffer_dirty during the last second.
- * @param apcl calls for add_to_page_cache_lru during the last second.
- * @param apd  calls for account_page_dirtied during the last second.
  */
-void cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, uint64_t mbd,
-                              uint64_t apcl, uint64_t apd)
+void cachestat_update_publish(netdata_publish_cachestat_t *out)
 {
     // Adapted algorithm from https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138
-    NETDATA_DOUBLE total = (NETDATA_DOUBLE) (((long long)mpa) - ((long long)mbd));
-    if (total < 0)
-        total = 0;
+    NETDATA_DOUBLE total;
+    if (out->plot.total < 0)
+        total = 0.0;
+    else
+        total = (NETDATA_DOUBLE)out->plot.total;
 
-    NETDATA_DOUBLE misses = (NETDATA_DOUBLE) ( ((long long) apcl) - ((long long) apd) );
-    if (misses < 0)
-        misses = 0;
+    NETDATA_DOUBLE misses = (NETDATA_DOUBLE) out->plot.misses;
+    if (out->plot.misses < 0)
+        misses = 0.0;
+    else
+        misses = (NETDATA_DOUBLE) out->plot.misses;
 
     // If hits are < 0, then its possible misses are overestimate due to possibly page cache read ahead adding
     // more pages than needed. In this case just assume misses as total and reset hits.
     NETDATA_DOUBLE hits = total - misses;
-    if (hits < 0 ) {
+    if (out->plot.misses > out->plot.total ) {
         misses = total;
-        hits = 0;
+        hits = 0.0;
     }
 
-    NETDATA_DOUBLE ratio = (total > 0) ? hits/total : 1;
+    NETDATA_DOUBLE ratio = (out->plot.total > 0) ? hits/total : 1;
 
     out->ratio = (long long )(ratio*100);
     out->hit = (long long)hits;
     out->miss = (long long)misses;
 }
-
-/**
- * Save previous values
- *
- * Save values used this time.
- *
- * @param publish
- */
-static void save_previous_values(netdata_publish_cachestat_t *publish) {
-    publish->prev.misses = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED];
-    publish->prev.total = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU];
-    publish->prev.dirty = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY];
-}
-
-/**
- * Calculate statistics
- *
- * @param publish the structure where we will store the data.
- */
-static void calculate_stats(netdata_publish_cachestat_t *publish) {
-    if (!publish->prev.misses) {
-        save_previous_values(publish);
-        return;
-    }
-
-    uint64_t mpa = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED] - publish->prev.misses;
-    uint64_t mbd = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY] - publish->prev.dirty;
-    uint64_t apcl = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU] - publish->prev.total;
-
-    save_previous_values(publish);
-
-    // We are changing the original algorithm to have a smooth ratio.
-    cachestat_update_publish(publish, mpa, mbd, apcl, 0);
-}
-
 
 /*****************************************************************
  *
@@ -687,25 +651,6 @@ static void ebpf_cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int ma
             ct = w->ct;
     }
     total->ct = ct;
-}
-
-/**
- * Update individual group
- *
- * Update statistics for individual group after prev and current to be filled.
- *
- * @param w a pointer with values.
- */
-static inline void ebpf_cachestat_update_individual_group(netdata_publish_cachestat_t *w)
-{
-    netdata_cachestat_pid_t *current = &w->current;
-    netdata_cachestat_pid_t *prev = &w->prev;
-
-    uint64_t mpa = current->misses - prev->misses;
-    uint64_t mbd = current->dirty - prev->dirty;
-    uint64_t apcl = current->total - prev->total;
-
-    cachestat_update_publish(w, mpa, mbd, apcl, 0);
 }
 
 /**
@@ -756,12 +701,12 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
 
             cs_ptr->current_timestamp = update_time;
             memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
-            ebpf_cachestat_update_individual_group(cs_ptr);
+            cachestat_update_publish(cs_ptr);
         }  else {
-            if (cv[0].misses != cs_ptr->prev.misses) {
+            if (cv[0].total != cs_ptr->plot.total) {
                 cs_ptr->current_timestamp = update_time;
                 memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
-                ebpf_cachestat_update_individual_group(cs_ptr);
+                cachestat_update_publish(cs_ptr);
             } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
                 JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
                 ebpf_cachestat_release(cs_ptr);
@@ -830,7 +775,7 @@ static void ebpf_update_cachestat_cgroup()
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         netdata_publish_cachestat_t *out = &ect->publish_cachestat;
-        memset(out, 0, sizeof(netdata_publish_cachestat_t));
+        memset(&out->plot, 0, sizeof(struct netdata_publish_cachestat_pid));
         rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
@@ -846,13 +791,9 @@ static void ebpf_update_cachestat_cgroup()
                         (cache_value =
                              JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
                         netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                        out->prev.misses += values->prev.misses;
-                        out->prev.total += values->prev.total;
-                        out->prev.dirty += values->prev.dirty;
-
-                        out->current.misses += values->current.misses;
-                        out->current.total += values->current.total;
-                        out->current.dirty += values->current.dirty;
+                        out->plot.misses += values->plot.misses;
+                        out->plot.total += values->plot.total;
+                        out->plot.dirty += values->plot.dirty;
                     }
                 }
                 rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
@@ -893,7 +834,6 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
         ebpf_create_chart_labels("app_group", w->name, 0);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION ratio '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
-
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
@@ -961,12 +901,12 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_cachestat_read_global_tables(netdata_idx_t *stats, int maps_per_core)
 {
-    ebpf_read_global_table_stats(cachestat_hash_values,
+    ebpf_read_global_table_stats((netdata_idx_t *)cachestat_hash_values,
                                  cachestat_values,
                                  cachestat_maps[NETDATA_CACHESTAT_GLOBAL_STATS].map_fd,
                                  maps_per_core,
-                                 NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU,
-                                 NETDATA_CACHESTAT_END);
+                                 NETDATA_CACHESTAT_KERNEL_VAR_TOTAL,
+                                 NETDATA_CACHESTAT_KERNEL_VAR_END);
 
     ebpf_read_global_table_stats(stats,
                                  cachestat_values,
@@ -980,10 +920,15 @@ static void ebpf_cachestat_read_global_tables(netdata_idx_t *stats, int maps_per
  * Send global
  *
  * Send global charts to Netdata
+ *
+ * @param publish is the structure with data to plot.
  */
 static void cachestat_send_global(netdata_publish_cachestat_t *publish)
 {
-    calculate_stats(publish);
+    publish->plot.total = cachestat_hash_values[NETDATA_CACHESTAT_KERNEL_VAR_TOTAL];
+    publish->plot.dirty = (uint64_t )cachestat_hash_values[NETDATA_CACHESTAT_KERNEL_VAR_DIRTY];
+    publish->plot.misses = cachestat_hash_values[NETDATA_CACHESTAT_KERNEL_VAR_MISSES];
+    cachestat_update_publish(publish);
 
     netdata_publish_syscall_t *ptr = cachestat_counter_publish_aggregated;
     ebpf_one_dimension_write_charts(
@@ -992,7 +937,7 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
 
     ebpf_one_dimension_write_charts(
         NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART, ptr[NETDATA_CACHESTAT_IDX_DIRTY].dimension,
-        cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY]);
+        cachestat_hash_values[NETDATA_CACHESTAT_KERNEL_VAR_DIRTY]);
 
     ebpf_one_dimension_write_charts(
         NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART, ptr[NETDATA_CACHESTAT_IDX_HIT].dimension, publish->hit);
@@ -1015,7 +960,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
     if (!root)
         return;
 
-    memset(publish, 0, sizeof(netdata_publish_cachestat_t));
+    memset(&publish->plot, 0, sizeof(struct netdata_publish_cachestat_pid));
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
     while (root) {
@@ -1031,13 +976,9 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
                     (cache_value =
                         JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
                     netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                    publish->prev.misses += values->prev.misses;
-                    publish->prev.total += values->prev.total;
-                    publish->prev.dirty += values->prev.dirty;
-
-                    publish->current.misses += values->current.misses;
-                    publish->current.total += values->current.total;
-                    publish->current.dirty += values->current.dirty;
+                    publish->plot.misses += values->plot.misses;
+                    publish->plot.total += values->plot.total;
+                    publish->plot.dirty += values->plot.dirty;
                 }
             }
             rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
@@ -1060,7 +1001,7 @@ void ebpf_cache_update_apps_data(struct ebpf_target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
-            ebpf_cachestat_update_individual_group(&w->cachestat);
+            cachestat_update_publish(&w->cachestat);
         }
     }
 }
@@ -1123,10 +1064,8 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
  */
 void ebpf_cachestat_sum_cgroup_pids(netdata_publish_cachestat_t *publish, struct pid_on_target2 *root)
 {
-    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
-    memset(&publish->current, 0, sizeof(publish->current));
-
-    netdata_cachestat_pid_t *dst = &publish->current;
+    netdata_cachestat_pid_t *dst = &publish->plot;
+    memset(dst, 0, sizeof(*dst));
     while (root) {
         netdata_cachestat_pid_t *src = &root->cachestat;
 
@@ -1149,14 +1088,7 @@ void ebpf_cachestat_calc_chart_values()
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         ebpf_cachestat_sum_cgroup_pids(&ect->publish_cachestat, ect->pids);
 
-        netdata_cachestat_pid_t *current = &ect->publish_cachestat.current;
-        netdata_cachestat_pid_t *prev = &ect->publish_cachestat.prev;
-
-        uint64_t mpa = current->misses - prev->misses;
-        uint64_t mbd = current->dirty - prev->dirty;
-        uint64_t apcl = current->total - prev->total;
-
-        cachestat_update_publish(&ect->publish_cachestat, mpa, mbd, apcl, 0);
+        cachestat_update_publish(&ect->publish_cachestat);
     }
 }
 
@@ -1533,7 +1465,7 @@ static void ebpf_cachestat_allocate_global_vectors()
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
-    memset(cachestat_hash_values, 0, NETDATA_CACHESTAT_END * sizeof(netdata_idx_t));
+    memset(cachestat_hash_values, 0, NETDATA_CACHESTAT_END * sizeof(int64_t));
     memset(cachestat_counter_aggregated_data, 0, NETDATA_CACHESTAT_END * sizeof(netdata_syscall_stat_t));
     memset(cachestat_counter_publish_aggregated, 0, NETDATA_CACHESTAT_END * sizeof(netdata_publish_syscall_t));
 }
@@ -1641,7 +1573,7 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_cachestat_allocate_global_vectors();
 
     int algorithms[NETDATA_CACHESTAT_END] = {
-        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
+        NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX
     };
 
     ebpf_global_labels(cachestat_counter_aggregated_data, cachestat_counter_publish_aggregated,

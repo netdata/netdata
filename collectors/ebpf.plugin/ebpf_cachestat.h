@@ -47,6 +47,14 @@ enum cachestat_counters {
     NETDATA_CACHESTAT_END
 };
 
+enum cachestat_variables_counter {
+    NETDATA_CACHESTAT_KERNEL_VAR_TOTAL,
+    NETDATA_CACHESTAT_KERNEL_VAR_MISSES,
+    NETDATA_CACHESTAT_KERNEL_VAR_DIRTY,
+
+    NETDATA_CACHESTAT_KERNEL_VAR_END
+};
+
 enum cachestat_account_dirty_pages {
     NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY,
     NETDATA_CACHESTAT_SET_PAGE_DIRTY,
@@ -87,9 +95,6 @@ typedef struct netdata_publish_cachestat {
     long long ratio;
     long long hit;
     long long miss;
-
-    netdata_cachestat_pid_t current;
-    netdata_cachestat_pid_t prev;
 } netdata_publish_cachestat_t;
 
 void *ebpf_cachestat_thread(void *ptr);

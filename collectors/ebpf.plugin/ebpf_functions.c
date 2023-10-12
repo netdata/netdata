@@ -1174,10 +1174,10 @@ static void ebpf_fill_cachestat_function_buffer(BUFFER *wb, uint32_t pid, netdat
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->miss);
 
     // Total page access
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->current.misses);
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->plot.misses);
 
     // Pages modified since start
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->current.dirty);
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->plot.dirty);
 
     buffer_json_array_close(wb);
 }
