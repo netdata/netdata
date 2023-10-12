@@ -1415,6 +1415,97 @@ int rrdlabels_unittest_add_pairs() {
     return errors;
 }
 
+int rrdlabels_unittest_double_check() {
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+
+    int errors = 1;
+    int ret = 0;
+    RRDLABELS *labels = rrdlabels_create();
+
+    const char *pair = "key1=value1";
+
+    struct rrdlabels_unittest_add_a_pair tmp = {
+        .pair = pair,
+        .expected_name = "key1",
+        .expected_value = NULL,
+        .errors = 0
+    };
+
+    fprintf(stderr, "rrdlabels_add_pair(labels, %s) ...\n ", pair);
+
+    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
+    size_t count = rrdlabels_entries(labels);
+    fprintf(stderr, "Added one key with \"value1\", entries found %zu\n", count);
+    tmp.expected_value = "value1";
+    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
+
+    fprintf(stderr, "Adding key with same value \"value1\" (collision check)\n");
+    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
+    count = rrdlabels_entries(labels);
+    fprintf(stderr, "Added same key again \"value1\", entries found %zu\n", count);
+
+    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
+
+    // Add same key with different value
+    pair = "key1=value2";
+    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
+    count = rrdlabels_entries(labels);
+    fprintf(stderr, "Added same key again with \"value2\", entries found %zu\n", count);
+
+    tmp.expected_value = "value2";
+    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
+
+    fprintf(stderr, "Adding key with same value \"value2\" (collision check)\n");
+    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
+    count = rrdlabels_entries(labels);
+    fprintf(stderr, "Added same key again with \"value2\", entries found %zu\n", count);
+
+    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
+    errors = tmp.errors;
+    if(ret != 1) {
+        fprintf(stderr, "failed to get \"%s\" label", "key1");
+        errors++;
+    }
+
+    if(!errors)
+        fprintf(stderr, " OK, name='%s' and value='%s'\n", tmp.name, tmp.value?tmp.value:"(null)");
+    else
+        fprintf(stderr, " FAILED\n");
+
+    rrdlabels_destroy(labels);
+
+    return errors;
+}
+
+int rrdlabels_unittest_migrate_check() {
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+
+    RRDLABELS *labels1 = NULL;
+    RRDLABELS *labels2 = NULL;
+
+    labels1 = rrdlabels_create();
+    labels2 = rrdlabels_create();
+
+    rrdlabels_add(labels1, "key1", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels1, "key1", "value2", RRDLABEL_SRC_CONFIG);
+
+    rrdlabels_add(labels2, "new_key1", "value2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels2, "new_key2", "value2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels2, "key1", "value2", RRDLABEL_SRC_CONFIG);
+
+    fprintf(stderr, "Labels1 entries found %zu  (should be 1)\n",  rrdlabels_entries(labels1));
+    fprintf(stderr, "Labels2 entries found %zu  (should be 3)\n",  rrdlabels_entries(labels2));
+
+    rrdlabels_migrate_to_these(labels1, labels2);
+    fprintf(stderr, "labels1 (migrated) entries found %zu (should be 3)\n",  rrdlabels_entries(labels1));
+    size_t entries = rrdlabels_entries(labels1);
+
+    rrdlabels_destroy(labels1);
+    rrdlabels_destroy(labels2);
+
+    return entries != 3;
+}
+
 int rrdlabels_unittest_check_simple_pattern(RRDLABELS *labels, const char *pattern, bool expected) {
     fprintf(stderr, "rrdlabels_match_simple_pattern(labels, \"%s\") ... ", pattern);
 
@@ -1507,6 +1598,8 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_sanitization();
     errors += rrdlabels_unittest_add_pairs();
     errors += rrdlabels_unittest_simple_pattern();
+    errors += rrdlabels_unittest_double_check();
+    errors += rrdlabels_unittest_migrate_check();
 
     fprintf(stderr, "%d errors found\n", errors);
     return errors;
