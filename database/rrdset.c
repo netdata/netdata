@@ -72,8 +72,11 @@ void rrdset_pluginsd_receive_all_slots_reset(RRDSET *st) {
 
     RRDHOST *host = st->rrdhost;
 
-    if(st->pluginsd.last_slot >= 0 && (uint32_t)st->pluginsd.last_slot < host->rrdpush.receive.pluginsd_chart_slots.size)
+    if(st->pluginsd.last_slot >= 0 &&
+        (uint32_t)st->pluginsd.last_slot < host->rrdpush.receive.pluginsd_chart_slots.size &&
+        host->rrdpush.receive.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
         host->rrdpush.receive.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
+    }
 
     st->pluginsd.last_slot = -1;
     st->pluginsd.with_slots = false;

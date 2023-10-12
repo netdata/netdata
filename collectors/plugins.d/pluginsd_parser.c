@@ -318,10 +318,10 @@ static inline ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
 }
 
 static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st, ssize_t slot) {
-    // clean the old cached data if they are there
+    // clean possible old cached data
     rrdset_pluginsd_receive_all_slots_reset(st);
 
-    if(unlikely(slot < 1))
+    if(unlikely(slot < 1 || slot >= INT32_MAX))
         return;
 
     RRDHOST *host = st->rrdhost;
@@ -348,34 +348,15 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
     st->pluginsd.last_slot = (int32_t)slot - 1;
 }
 
-static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host __maybe_unused, PARSER *parser, const char *id __maybe_unused, ssize_t slot, const char *keyword) {
-    if(unlikely(slot < 1))
+static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
+    if(unlikely(slot < 1 || (size_t)slot > host->rrdpush.receive.pluginsd_chart_slots.size))
         return pluginsd_find_chart(host, id, keyword);
 
-    RRDSET *st;
-
-    if(unlikely((size_t)slot > host->rrdpush.receive.pluginsd_chart_slots.size)) {
-        netdata_log_error("PLUGINSD: received chart slot %zd, but the available slots are [1 - %zu]",
-                          slot, host->rrdpush.receive.pluginsd_chart_slots.size);
-        return NULL;
-    }
-    else {
-        st = host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1];
-        if(!st) {
-            netdata_log_error("PLUGINSD: no chart is found on slot %zd, looking for chart '%s' on host '%s', during %s",
-                              slot, id, rrdhost_hostname(host), keyword);
-
-            st = pluginsd_find_chart(host, id, keyword);
-            if(st) {
-                host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1] = st;
-                st->pluginsd.last_slot = (int32_t)slot - 1;
-            }
-        }
-    }
+    RRDSET *st = host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1];
 
     internal_fatal(st && string_strcmp(st->id, id) != 0,
                    "wrong chart in slot %zd, expected '%s', found '%s'",
-                   slot, id, string2str(st->id));
+                   slot - 1, id, string2str(st->id));
 
     return st;
 }
@@ -431,7 +412,7 @@ static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *p
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_BEGIN);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(host, parser, id, slot, PLUGINSD_KEYWORD_BEGIN);
+    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(host, id, slot, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN))
@@ -1486,7 +1467,7 @@ static inline PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     if (likely(!id || !*id))
         st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     else
-        st = pluginsd_rrdset_cache_get_from_slot(host, parser, id, slot, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+        st = pluginsd_rrdset_cache_get_from_slot(host, id, slot, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
@@ -1881,7 +1862,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
     timing_step(TIMING_STEP_BEGIN2_PREPARE);
 
-    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(host, parser, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
+    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(host, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
 
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
@@ -1929,8 +1910,11 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
         parser->user.v2.stream_buffer = rrdset_push_metric_initialize(parser->user.st, wall_clock_time);
 
     if(parser->user.v2.stream_buffer.v2 && parser->user.v2.stream_buffer.wb) {
-        // check if receiver and sender have the same number parsing capabilities
+        // check receiver capabilities
         bool can_copy = stream_has_capability(&parser->user, STREAM_CAP_IEEE754) == stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754);
+
+        // check sender capabilities
+        bool with_slots = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_SLOTS) ? true : false;
         NUMBER_ENCODING integer_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
 
         BUFFER *wb = parser->user.v2.stream_buffer.wb;
@@ -1942,7 +1926,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
-        if(stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_SLOTS)) {
+        if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
             buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_sender_chart_slot);
         }

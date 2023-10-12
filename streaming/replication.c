@@ -452,7 +452,14 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             }
             last_end_time_in_buffer = min_end_time;
 
-            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' ", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 4);
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN, sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1);
+
+            if(with_slots) {
+                buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+                buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush_sender_chart_slot);
+            }
+
+            buffer_fast_strcat(wb, " '' ", 4);
             buffer_print_uint64_encoded(wb, integer_encoding, min_start_time);
             buffer_fast_strcat(wb, " ", 1);
             buffer_print_uint64_encoded(wb, integer_encoding, min_end_time);
@@ -610,7 +617,8 @@ void replication_response_cancel_and_finalize(struct replication_query *q) {
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
 
 bool replication_response_execute_and_finalize(struct replication_query *q, size_t max_msg_size) {
-    NUMBER_ENCODING encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
+    bool with_slots = (q->query.capabilities & STREAM_CAP_SLOTS) ? true : false;
+    NUMBER_ENCODING integer_encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     struct replication_request *rq = q->rq;
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
@@ -620,11 +628,16 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     // holding the host's buffer lock for too long
     BUFFER *wb = sender_start(host->sender);
 
-    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 2);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN, sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1);
+
+    if(with_slots) {
+        buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+        buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush_sender_chart_slot);
+    }
+
+    buffer_fast_strcat(wb, " '", 2);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "'\n", 2);
-
-//    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
     bool locked_data_collection = q->query.locked_data_collection;
     q->query.locked_data_collection = false;
@@ -649,19 +662,19 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     // last end time of the data we sent
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_END " ", sizeof(PLUGINSD_KEYWORD_REPLAY_END) - 1 + 1);
-    buffer_print_int64_encoded(wb, encoding, st->update_every);
+    buffer_print_int64_encoded(wb, integer_encoding, st->update_every);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_uint64_encoded(wb, encoding, db_first_entry);
+    buffer_print_uint64_encoded(wb, integer_encoding, db_first_entry);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_uint64_encoded(wb, encoding, db_last_entry);
+    buffer_print_uint64_encoded(wb, integer_encoding, db_last_entry);
 
     buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
 
-    buffer_print_uint64_encoded(wb, encoding, after);
+    buffer_print_uint64_encoded(wb, integer_encoding, after);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_uint64_encoded(wb, encoding, before);
+    buffer_print_uint64_encoded(wb, integer_encoding, before);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
+    buffer_print_uint64_encoded(wb, integer_encoding, wall_clock_time);
     buffer_fast_strcat(wb, "\n", 1);
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
