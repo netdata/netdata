@@ -7,7 +7,7 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
     bool vraised_crit = false;
 
     buffer_json_add_array_item_object(wb);
-    buffer_json_member_add_time_t(wb, "when", at);
+    buffer_json_member_add_time_t(wb, "when", at + 1); //small adjustment to match health's results
 
     if (unlikely(RRDCALC_HAS_DB_LOOKUP(rcv))) {
         int value_is_null = 0;
@@ -16,7 +16,7 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
 
         int ret = rrdset2value_api_v1(rcv->rrdset, NULL, &rcv->value, rrdcalc_dimensions(rcv), 1,
                                       after, before, rcv->group, NULL,
-                                      0, rcv->options,
+                                      0, rcv->options | RRDR_OPTION_SELECTED_TIER,
                                       &rcv->db_after,&rcv->db_before,
                                       NULL, NULL, NULL,
                                       &value_is_null, NULL, 0, 0,
@@ -140,9 +140,10 @@ void health_virtual(DICTIONARY *nodes, BUFFER *wb, struct health_virtual *hv) {
     dfe_start_read(dict_rcvs, rcv) {
         buffer_json_member_add_array(wb, string2str(rcv->chart));
 
+        //small adjustment to match health's results
         time_t now = now_realtime_sec();
-        time_t at  = hv->after  ? hv->after  : now;
-        hv->before = hv->before ? hv->before : now;
+        time_t at  = hv->after  ? hv->after - 1  : now;
+        hv->before = hv->before ? hv->before - 1 : now;
 
         while (at <= hv->before) {
             health_virtual_run(localhost, wb, rcv, at);

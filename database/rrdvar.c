@@ -291,11 +291,15 @@ int health_variable_lookup_and_query(STRING *variable, RRDCALC *rc, NETDATA_DOUB
         int value_is_null = 0;
         rrdset2value_api_v1(st, NULL, result, string2str(variable), 1,
                             v_at, v_at, 0, NULL,
-                            0, 0,
+                            0, RRDR_OPTION_SELECTED_TIER,
                             NULL,NULL,
                             NULL, NULL, NULL,
                             &value_is_null, NULL, 0, 0,
                             QUERY_SOURCE_HEALTH, STORAGE_PRIORITY_LOW);
+
+        if (value_is_null)
+            *result = rrdvar2number(rva);
+
         dictionary_acquired_item_release(st->rrdvars, (const DICTIONARY_ITEM *)rva);
         return 1;
     }
