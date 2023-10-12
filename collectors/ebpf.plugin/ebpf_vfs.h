@@ -75,6 +75,9 @@
 
 typedef struct netdata_publish_vfs {
     uint64_t ct;
+    uint32_t tgid;
+    uint32_t uid;
+    uint32_t gid;
     char name[TASK_COMM_LEN];
 
     //Counter
