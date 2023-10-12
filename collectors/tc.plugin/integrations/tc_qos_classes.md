@@ -9,6 +9,10 @@ endmeta-->
 
 # tc QoS classes
 
+
+<img src="https://netdata.cloud/img/netdata.png" width="150"/>
+
+
 Plugin: tc.plugin
 Module: tc.plugin
 

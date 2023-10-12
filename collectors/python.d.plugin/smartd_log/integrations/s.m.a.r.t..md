@@ -9,6 +9,10 @@ endmeta-->
 
 # S.M.A.R.T.
 
+
+<img src="https://netdata.cloud/img/smart.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: smartd_log
 

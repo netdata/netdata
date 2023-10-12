@@ -9,6 +9,10 @@ endmeta-->
 
 # Entropy
 
+
+<img src="https://netdata.cloud/img/syslog.png" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/sys/kernel/random/entropy_avail
 

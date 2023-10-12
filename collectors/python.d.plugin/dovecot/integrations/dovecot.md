@@ -9,6 +9,10 @@ endmeta-->
 
 # Dovecot
 
+
+<img src="https://netdata.cloud/img/dovecot.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: dovecot
 

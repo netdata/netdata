@@ -9,6 +9,10 @@ endmeta-->
 
 # Linux Sensors (sysfs)
 
+
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
+
+
 Plugin: charts.d.plugin
 Module: sensors
 

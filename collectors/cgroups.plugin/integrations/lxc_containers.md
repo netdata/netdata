@@ -9,6 +9,10 @@ endmeta-->
 
 # LXC Containers
 
+
+<img src="https://netdata.cloud/img/lxc.png" width="150"/>
+
+
 Plugin: cgroups.plugin
 Module: /sys/fs/cgroup
 

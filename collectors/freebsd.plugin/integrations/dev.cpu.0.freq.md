@@ -9,6 +9,10 @@ endmeta-->
 
 # dev.cpu.0.freq
 
+
+<img src="https://netdata.cloud/img/freebsd.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: dev.cpu.0.freq
 

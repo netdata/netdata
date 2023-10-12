@@ -9,6 +9,10 @@ endmeta-->
 
 # APC UPS
 
+
+<img src="https://netdata.cloud/img/apc.svg" width="150"/>
+
+
 Plugin: charts.d.plugin
 Module: apcupsd
 

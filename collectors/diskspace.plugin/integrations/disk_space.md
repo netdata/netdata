@@ -9,6 +9,10 @@ endmeta-->
 
 # Disk space
 
+
+<img src="https://netdata.cloud/img/hard-drive.svg" width="150"/>
+
+
 Plugin: diskspace.plugin
 Module: diskspace.plugin
 

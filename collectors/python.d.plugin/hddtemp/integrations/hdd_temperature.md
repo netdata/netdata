@@ -9,6 +9,10 @@ endmeta-->
 
 # HDD temperature
 
+
+<img src="https://netdata.cloud/img/hard-drive.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: hddtemp
 

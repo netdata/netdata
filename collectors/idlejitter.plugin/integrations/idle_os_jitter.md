@@ -9,6 +9,10 @@ endmeta-->
 
 # Idle OS Jitter
 
+
+<img src="https://netdata.cloud/img/syslog.png" width="150"/>
+
+
 Plugin: idlejitter.plugin
 Module: idlejitter.plugin
 

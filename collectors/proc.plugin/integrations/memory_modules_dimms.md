@@ -9,6 +9,10 @@ endmeta-->
 
 # Memory modules (DIMMs)
 
+
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /sys/devices/system/edac/mc
 

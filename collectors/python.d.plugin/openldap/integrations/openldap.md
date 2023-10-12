@@ -9,6 +9,10 @@ endmeta-->
 
 # OpenLDAP
 
+
+<img src="https://netdata.cloud/img/statsd.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: openldap
 

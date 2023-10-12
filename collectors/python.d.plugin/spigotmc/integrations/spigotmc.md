@@ -9,6 +9,10 @@ endmeta-->
 
 # SpigotMC
 
+
+<img src="https://netdata.cloud/img/spigot.jfif" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: spigotmc
 

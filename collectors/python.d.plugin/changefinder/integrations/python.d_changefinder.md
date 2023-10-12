@@ -9,6 +9,10 @@ endmeta-->
 
 # python.d changefinder
 
+
+<img src="https://netdata.cloud/img/" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: changefinder
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Custom
 
+
+<img src="https://netdata.cloud/img/custom.png" width="150"/>
+
+
 Netdata Agent's alert notification feature allows you to send custom notifications to any endpoint you choose.
 
 

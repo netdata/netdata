@@ -9,6 +9,10 @@ endmeta-->
 
 # Power Capping
 
+
+<img src="https://netdata.cloud/img/powersupply.svg" width="150"/>
+
+
 Plugin: debugfs.plugin
 Module: intel_rapl
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Power Supply
 
+
+<img src="https://netdata.cloud/img/powersupply.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /sys/class/power_supply
 

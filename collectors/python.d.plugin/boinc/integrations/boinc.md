@@ -9,6 +9,10 @@ endmeta-->
 
 # BOINC
 
+
+<img src="https://netdata.cloud/img/bolt.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: boinc
 

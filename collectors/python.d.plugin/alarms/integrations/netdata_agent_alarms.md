@@ -9,6 +9,10 @@ endmeta-->
 
 # Netdata Agent alarms
 
+
+<img src="https://netdata.cloud/img/" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: alarms
 

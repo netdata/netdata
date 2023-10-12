@@ -9,6 +9,10 @@ endmeta-->
 
 # Samba
 
+
+<img src="https://netdata.cloud/img/samba.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: samba
 

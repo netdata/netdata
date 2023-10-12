@@ -9,6 +9,10 @@ endmeta-->
 
 # Intelligent Platform Management Interface (IPMI)
 
+
+<img src="https://netdata.cloud/img/netdata.png" width="150"/>
+
+
 Plugin: freeipmi.plugin
 Module: freeipmi
 

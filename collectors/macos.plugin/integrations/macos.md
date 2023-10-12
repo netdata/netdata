@@ -9,6 +9,10 @@ endmeta-->
 
 # macOS
 
+
+<img src="https://netdata.cloud/img/macos.svg" width="150"/>
+
+
 Plugin: macos.plugin
 Module: mach_smi
 

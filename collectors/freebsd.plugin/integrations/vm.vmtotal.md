@@ -9,6 +9,10 @@ endmeta-->
 
 # vm.vmtotal
 
+
+<img src="https://netdata.cloud/img/memory.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: vm.vmtotal
 

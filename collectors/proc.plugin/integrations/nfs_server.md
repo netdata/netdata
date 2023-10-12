@@ -9,6 +9,10 @@ endmeta-->
 
 # NFS Server
 
+
+<img src="https://netdata.cloud/img/nfs.png" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/net/rpc/nfsd
 

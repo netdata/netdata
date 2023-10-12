@@ -9,6 +9,10 @@ endmeta-->
 
 # Network statistics
 
+
+<img src="https://netdata.cloud/img/network-wired.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/net/netstat
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Xen/XCP-ng
 
+
+<img src="https://netdata.cloud/img/xen.png" width="150"/>
+
+
 Plugin: xenstat.plugin
 Module: xenstat.plugin
 

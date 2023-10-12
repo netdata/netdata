@@ -9,6 +9,10 @@ endmeta-->
 
 # Google BigQuery
 
+
+<img src="https://netdata.cloud/img/bigquery.png" width="150"/>
+
+
 Use the Prometheus remote write exporting connector to archive your Netdata metrics to the external storage provider of your choice for long-term storage and further analysis.
 
 

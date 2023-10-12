@@ -9,6 +9,10 @@ endmeta-->
 
 # MessageBird
 
+
+<img src="https://netdata.cloud/img/messagebird.svg" width="150"/>
+
+
 Send notifications to MessageBird using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

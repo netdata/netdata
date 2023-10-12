@@ -9,6 +9,10 @@ endmeta-->
 
 # PagerDuty
 
+
+<img src="https://netdata.cloud/img/pagerduty.png" width="150"/>
+
+
 From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on PagerDuty.
 
 

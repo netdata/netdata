@@ -9,6 +9,10 @@ endmeta-->
 
 # IPFS
 
+
+<img src="https://netdata.cloud/img/ipfs.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: ipfs
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Pandas
 
+
+<img src="https://netdata.cloud/img/pandas.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: pandas
 

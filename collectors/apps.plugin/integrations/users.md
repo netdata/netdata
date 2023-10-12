@@ -9,6 +9,10 @@ endmeta-->
 
 # Users
 
+
+<img src="https://netdata.cloud/img/users.svg" width="150"/>
+
+
 Plugin: apps.plugin
 Module: users
 

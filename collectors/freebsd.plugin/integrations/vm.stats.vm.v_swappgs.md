@@ -9,6 +9,10 @@ endmeta-->
 
 # vm.stats.vm.v_swappgs
 
+
+<img src="https://netdata.cloud/img/memory.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: vm.stats.vm.v_swappgs
 

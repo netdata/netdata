@@ -9,6 +9,10 @@ endmeta-->
 
 # AdaptecRAID
 
+
+<img src="https://netdata.cloud/img/adaptec.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: adaptec_raid
 

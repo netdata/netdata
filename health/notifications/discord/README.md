@@ -9,6 +9,10 @@ endmeta-->
 
 # Discord
 
+
+<img src="https://netdata.cloud/img/discord.png" width="150"/>
+
+
 Send notifications to Discord using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Matrix
 
+
+<img src="https://netdata.cloud/img/matrix.svg" width="150"/>
+
+
 Send notifications to Matrix network rooms using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

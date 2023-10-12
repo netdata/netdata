@@ -9,6 +9,10 @@ endmeta-->
 
 # Memcached
 
+
+<img src="https://netdata.cloud/img/memcached.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: memcached
 
