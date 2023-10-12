@@ -825,7 +825,7 @@ static json_object *job_statuses_flat() {
     return ret;
 }
 
-static int web_client_api_request_v2_job_statuses(RRDHOST *host, struct web_client *w, char *query) {
+static int web_client_api_request_v2_job_statuses(RRDHOST *host __maybe_unused, struct web_client *w, char *query) {
     json_object *json;
     if (strstr(query, "grouped") != NULL)
         json = job_statuses_grouped();

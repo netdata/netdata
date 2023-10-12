@@ -956,6 +956,8 @@ void execute_commands(struct sender_state *s) {
         *newline = '\0';
 
         if (s->receiving_function_payload && unlikely(strcmp(start, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END) != 0)) {
+            if (buffer_strlen(s->function_payload.payload) != 0)
+                buffer_strcat(s->function_payload.payload, "\n");
             buffer_strcat(s->function_payload.payload, start);
             start = newline + 1;
             continue;

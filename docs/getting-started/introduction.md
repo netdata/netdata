@@ -155,7 +155,7 @@ ask questions, find resources, and engage with passionate professionals. The tea
 
 You can also find Netdata on:
 
-- [Twitter](https://twitter.com/linuxnetdata)
+- [Twitter](https://twitter.com/netdatahq)
 - [YouTube](https://www.youtube.com/c/Netdata)
 - [Reddit](https://www.reddit.com/r/netdata/)
 - [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)

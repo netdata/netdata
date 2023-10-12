@@ -218,9 +218,9 @@ static void softirq_collector(ebpf_module_t *em)
     //This will be cancelled by its parent
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    while (!ebpf_exit_plugin && running_time < lifetime) {
+    while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_exit_plugin || ++counter != update_every)
+        if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
         counter = 0;

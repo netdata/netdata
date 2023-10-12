@@ -244,7 +244,9 @@ void unlink_job(const char *plugin_name, const char *module_name, const char *jo
         return;
     BUFFER *buffer = buffer_create(DYN_CONF_PATH_MAX, NULL);
     buffer_sprintf(buffer, DYN_CONF_DIR "/%s/%s/%s" DYN_CONF_CFG_EXT, plugin_name, module_name, job_name);
-    unlink(buffer_tostring(buffer));
+    if (unlink(buffer_tostring(buffer)))
+        netdata_log_error("Cannot remove file %s", buffer_tostring(buffer));
+
     buffer_free(buffer);
 }
 
@@ -615,6 +617,7 @@ void freez_dyncfg(void *ptr) {
     freez(ptr);
 }
 
+#ifdef NETDATA_TEST_DYNCFG
 static void handle_dyncfg_root(DICTIONARY *plugins_dict, struct uni_http_response *resp, int method)
 {
     if (method != HTTP_METHOD_GET) {
@@ -679,6 +682,7 @@ static void handle_plugin_root(struct uni_http_response *resp, int method, struc
             return;
     }
 }
+#endif
 
 void handle_module_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, const char *module, void *post_payload, size_t post_payload_size)
 {
@@ -897,7 +901,14 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
     dictionary_acquired_item_release(mod->jobs, job_item);
 }
 
-struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict, int method, const char *plugin, const char *module, const char *job_id, void *post_payload, size_t post_payload_size)
+struct uni_http_response dyn_conf_process_http_request(
+    DICTIONARY *plugins_dict __maybe_unused,
+    int method __maybe_unused,
+    const char *plugin __maybe_unused,
+    const char *module __maybe_unused,
+    const char *job_id __maybe_unused,
+    void *post_payload __maybe_unused,
+    size_t post_payload_size __maybe_unused)
 {
     struct uni_http_response resp = {
         .status = HTTP_RESP_INTERNAL_SERVER_ERROR,
@@ -911,7 +922,7 @@ struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict,
     resp.content_length = strlen(resp.content);
     resp.status = HTTP_RESP_PRECOND_FAIL;
     return resp;
-#endif
+#else
     if (plugin == NULL) {
         handle_dyncfg_root(plugins_dict, &resp, method);
         return resp;
@@ -951,6 +962,7 @@ struct uni_http_response dyn_conf_process_http_request(DICTIONARY *plugins_dict,
 EXIT_PLUGIN:
     dictionary_acquired_item_release(plugins_dict, plugin_item);
     return resp;
+#endif
 }
 
 void plugin_del_cb(const DICTIONARY_ITEM *item, void *value, void *data)

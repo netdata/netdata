@@ -291,7 +291,7 @@ while true; do
 
 	echo "WORKTIME ${LOOPSLEEPMS_LASTWORK}" || exit
 
-	loopsleepms ${update_every}
+	loopsleepms "${update_every}"
 
 	[ ${gc} -gt ${exit_after} ] && exit 0
 done

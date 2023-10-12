@@ -471,7 +471,6 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
 // TODO enable this macro before release
 #define bail_if_no_cap(cap) \
     if(unlikely(!stream_has_capability(host->sender, cap))) { \
-        netdata_log_error("STREAM %s [send]: cannot send job status update - parent does not support it.", rrdhost_hostname(host)); \
         return; \
     }
 

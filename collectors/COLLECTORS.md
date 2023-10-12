@@ -125,7 +125,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Sia](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/sia.md)
 
-### CI/CD Platforms
+### CICD Platforms
 
 - [Concourse](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/concourse.md)
 
@@ -209,8 +209,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Docker](https://github.com/netdata/go.d.plugin/blob/master/modules/docker/integrations/docker.md)
 
-- [Kubernetes Containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/kubernetes_containers.md)
-
 - [LXC Containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/lxc_containers.md)
 
 - [Libvirt Containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/libvirt_containers.md)
@@ -222,8 +220,6 @@ If you don't see the app/service you'd like to monitor in this list:
 - [Proxmox Containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/proxmox_containers.md)
 
 - [Proxmox VE](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/proxmox_ve.md)
-
-- [VMWare](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/vmware.md)
 
 - [VMware vCenter Server](https://github.com/netdata/go.d.plugin/blob/master/modules/vsphere/integrations/vmware_vcenter_server.md)
 
@@ -1099,8 +1095,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Task Queues
 
-- [Beanstalk](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/beanstalk/integrations/beanstalk.md)
-
 - [Celery](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/celery.md)
 
 - [Mesos](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/mesos.md)
@@ -1123,7 +1117,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Network UPS Tools (NUT)](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/nut/integrations/network_ups_tools_nut.md)
 
-- [Network UPS Tools](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/network_ups_tools.md)
+- [UPS (NUT)](https://github.com/netdata/go.d.plugin/blob/master/modules/upsd/integrations/ups_nut.md)
 
 ### VPNs
 

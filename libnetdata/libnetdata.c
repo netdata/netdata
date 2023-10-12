@@ -1969,18 +1969,13 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
 }
 #endif
 
-// Returns 1 if an absolute period was requested or 0 if it was a relative period
-bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running) {
-    time_t now = now_realtime_sec() - 1;
 
-    if(now_ptr)
-        *now_ptr = now;
+bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now) {
+    if(!now) now = now_realtime_sec();
 
     int absolute_period_requested = -1;
-    long long after_requested, before_requested;
-
-    before_requested = *before;
-    after_requested = *after;
+    time_t before_requested = *before;
+    time_t after_requested = *after;
 
     // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
     if(ABS(before_requested) <= API_RELATIVE_TIME_MAX) {
@@ -2025,10 +2020,28 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t *now
     // shift the query back to be in the present time
     // (this may also happen because of the rules above)
     if(before_requested > now) {
-        long long delta = before_requested - now;
+        time_t delta = before_requested - now;
         before_requested -= delta;
         after_requested  -= delta;
     }
+
+    *before = before_requested;
+    *after = after_requested;
+
+    return (absolute_period_requested != 1);
+}
+
+// Returns 1 if an absolute period was requested or 0 if it was a relative period
+bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running) {
+    time_t now = now_realtime_sec() - 1;
+
+    if(now_ptr)
+        *now_ptr = now;
+
+    time_t before_requested = *before;
+    time_t after_requested = *after;
+
+    int absolute_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested, now);
 
     time_t absolute_minimum_time = now - (10 * 365 * 86400);
     time_t absolute_maximum_time = now + (1 * 365 * 86400);

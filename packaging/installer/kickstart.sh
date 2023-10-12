@@ -815,7 +815,7 @@ uninstall() {
     FLAGS="--yes"
   fi
 
-  if [ -x "${uninstaller}" ]; then
+  if run_as_root test -x "${uninstaller}"; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would attempt to uninstall existing install with uninstaller script found at: ${uninstaller}"
       return 0

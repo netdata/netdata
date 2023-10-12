@@ -3140,29 +3140,29 @@ modules:
         os: "linux"
       - name: tcp_connections
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf
-        metric: ipv4.tcpsock
-        info: IPv4 TCP connections utilization
+        metric: ip.tcpsock
+        info: TCP connections utilization
         os: "linux"
-      - name: 1m_ipv4_tcp_resets_sent
+      - name: 1m_ip_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
+        metric: ip.tcphandshake
         info: average number of sent TCP RESETS over the last minute
         os: "linux"
-      - name: 10s_ipv4_tcp_resets_sent
+      - name: 10s_ip_tcp_resets_sent
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
+        metric: ip.tcphandshake
         info:
           average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has
           crashed. Netdata will not send a clear notification for this alarm.
         os: "linux"
-      - name: 1m_ipv4_tcp_resets_received
+      - name: 1m_ip_tcp_resets_received
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
+        metric: ip.tcphandshake
         info: average number of received TCP RESETS over the last minute
         os: "linux freebsd"
-      - name: 10s_ipv4_tcp_resets_received
+      - name: 10s_ip_tcp_resets_received
         link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
+        metric: ip.tcphandshake
         info:
           average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed.
           Netdata will not send a clear notification for this alarm.
@@ -3189,57 +3189,12 @@ modules:
           labels: []
           metrics:
             - name: system.ip
-              description: IP Bandwidth
+              description: IPv4 Bandwidth
               unit: "kilobits/s"
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
-            - name: ip.inerrors
-              description: IP Input Errors
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: noroutes
-                - name: truncated
-                - name: checksum
-            - name: ip.mcast
-              description: IP Multicast Bandwidth
-              unit: "kilobits/s"
-              chart_type: area
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ip.bcast
-              description: IP Broadcast Bandwidth
-              unit: "kilobits/s"
-              chart_type: area
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ip.mcastpkts
-              description: IP Multicast Packets
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ip.bcastpkts
-              description: IP Broadcast Packets
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ip.ecnpkts
-              description: IP ECN Statistics
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: CEP
-                - name: NoECTP
-                - name: ECTP0
-                - name: ECTP1
             - name: ip.tcpmemorypressures
               description: TCP Memory Pressures
               unit: "events/s"
@@ -3297,6 +3252,43 @@ modules:
               dimensions:
                 - name: overflows
                 - name: drops
+            - name: ip.tcpsock
+              description: IPv4 TCP Connections
+              unit: "active connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: ip.tcppackets
+              description: IPv4 TCP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.tcperrors
+              description: IPv4 TCP Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InErrs
+                - name: InCsumErrors
+                - name: RetransSegs
+            - name: ip.tcpopens
+              description: IPv4 TCP Opens
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: passive
+            - name: ip.tcphandshake
+              description: IPv4 TCP Handshake Issues
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: EstabResets
+                - name: OutRsts
+                - name: AttemptFails
+                - name: SynRetrans
             - name: ipv4.packets
               description: IPv4 Packets
               unit: "packets/s"
@@ -3306,22 +3298,6 @@ modules:
                 - name: sent
                 - name: forwarded
                 - name: delivered
-            - name: ipv4.fragsout
-              description: IPv4 Fragments Sent
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: created
-            - name: ipv4.fragsin
-              description: IPv4 Fragments Reassembly
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: all
             - name: ipv4.errors
               description: IPv4 Errors
               unit: "packets/s"
@@ -3329,10 +3305,40 @@ modules:
               dimensions:
                 - name: InDiscards
                 - name: OutDiscards
-                - name: InHdrErrors
+                - name: InNoRoutes
                 - name: OutNoRoutes
+                - name: InHdrErrors
                 - name: InAddrErrors
-                - name: InUnknownProtos
+                - name: InTruncatedPkts
+                - name: InCsumErrors
+            - name: ipc4.bcast
+              description: IP Broadcast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.bcastpkts
+              description: IP Broadcast Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.mcast
+              description: IPv4 Multicast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.mcastpkts
+              description: IP Multicast Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
             - name: ipv4.icmp
               description: IPv4 ICMP Packets
               unit: "packets/s"
@@ -3340,14 +3346,6 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
-            - name: ipv4.icmp_errors
-              description: IPv4 ICMP Errors
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: InErrors
-                - name: OutErrors
-                - name: InCsumErrors
             - name: ipv4.icmpmsg
               description: IPv4 ICMP Messages
               unit: "packets/s"
@@ -3373,43 +3371,14 @@ modules:
                 - name: OutTimestamps
                 - name: InTimestampReps
                 - name: OutTimestampReps
-            - name: ipv4.tcpsock
-              description: IPv4 TCP Connections
-              unit: "active connections"
-              chart_type: line
-              dimensions:
-                - name: connections
-            - name: ipv4.tcppackets
-              description: IPv4 TCP Packets
+            - name: ipv4.icmp_errors
+              description: IPv4 ICMP Errors
               unit: "packets/s"
               chart_type: line
               dimensions:
-                - name: received
-                - name: sent
-            - name: ipv4.tcperrors
-              description: IPv4 TCP Errors
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: InErrs
+                - name: InErrors
+                - name: OutErrors
                 - name: InCsumErrors
-                - name: RetransSegs
-            - name: ipv4.tcpopens
-              description: IPv4 TCP Opens
-              unit: "connections/s"
-              chart_type: line
-              dimensions:
-                - name: active
-                - name: passive
-            - name: ipv4.tcphandshake
-              description: IPv4 TCP Handshake Issues
-              unit: "events/s"
-              chart_type: line
-              dimensions:
-                - name: EstabResets
-                - name: OutRsts
-                - name: AttemptFails
-                - name: SynRetrans
             - name: ipv4.udppackets
               description: IPv4 UDP Packets
               unit: "packets/s"
@@ -3446,6 +3415,31 @@ modules:
                 - name: NoPorts
                 - name: InCsumErrors
                 - name: IgnoredMulti
+            - name: ipv4.ecnpkts
+              description: IP ECN Statistics
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: CEP
+                - name: NoECTP
+                - name: ECTP0
+                - name: ECTP1
+            - name: ipv4.fragsin
+              description: IPv4 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
+            - name: ipv4.fragsout
+              description: IPv4 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: created
             - name: system.ipv6
               description: IPv6 Bandwidth
               unit: "kilobits/s"
@@ -3453,7 +3447,7 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
-            - name: system.ipv6
+            - name: ipv6.packets
               description: IPv6 Packets
               unit: "packets/s"
               chart_type: line
@@ -3462,23 +3456,6 @@ modules:
                 - name: sent
                 - name: forwarded
                 - name: delivers
-            - name: ipv6.fragsout
-              description: IPv6 Fragments Sent
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: all
-            - name: ipv6.fragsin
-              description: IPv6 Fragments Reassembly
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: ok
-                - name: failed
-                - name: timeout
-                - name: all
             - name: ipv6.errors
               description: IPv6 Errors
               unit: "packets/s"
@@ -3493,6 +3470,27 @@ modules:
                 - name: InTruncatedPkts
                 - name: InNoRoutes
                 - name: OutNoRoutes
+            - name: ipv6.bcast
+              description: IPv6 Broadcast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.mcast
+              description: IPv6 Multicast Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.mcastpkts
+              description: IPv6 Multicast Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
             - name: ipv6.udppackets
               description: IPv6 UDP Packets
               unit: "packets/s"
@@ -3528,27 +3526,6 @@ modules:
                 - name: InErrors
                 - name: NoPorts
                 - name: InCsumErrors
-            - name: ipv6.mcast
-              description: IPv6 Multicast Bandwidth
-              unit: "kilobits/s"
-              chart_type: area
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ipv6.bcast
-              description: IPv6 Broadcast Bandwidth
-              unit: "kilobits/s"
-              chart_type: area
-              dimensions:
-                - name: received
-                - name: sent
-            - name: ipv6.mcastpkts
-              description: IPv6 Multicast Packets
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
             - name: ipv6.icmp
               description: IPv6 ICMP Messages
               unit: "messages/s"
@@ -3657,6 +3634,23 @@ modules:
                 - name: InECT1Pkts
                 - name: InECT0Pkts
                 - name: InCEPkts
+            - name: ipv6.fragsin
+              description: IPv6 Fragments Reassembly
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: timeout
+                - name: all
+            - name: ipv6.fragsout
+              description: IPv6 Fragments Sent
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: failed
+                - name: all
   - meta:
       plugin_name: proc.plugin
       module_name: /proc/net/sockstat
@@ -3734,8 +3728,8 @@ modules:
           description: ""
           labels: []
           metrics:
-            - name: ipv4.sockstat_sockets
-              description: IPv4 Sockets Used
+            - name: ip.sockstat_sockets
+              description: Sockets used for all address families
               unit: "sockets"
               chart_type: line
               dimensions:

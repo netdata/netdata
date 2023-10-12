@@ -812,7 +812,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     return false;
 }
 
-void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
+void delete_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug, const char *fnc_sig, int code) {
     if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
@@ -838,7 +838,7 @@ void delete_job_finalize(struct parser *parser, struct configurable_plugin *plug
     freez(params_local);
 }
 
-void set_job_finalize(struct parser *parser, struct configurable_plugin *plug, const char *fnc_sig, int code) {
+void set_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug __maybe_unused, const char *fnc_sig, int code) {
     if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
@@ -888,7 +888,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
 
     string_freez(pf->function);
-    freez(pf->payload);
+    freez((void *)pf->payload);
 }
 
 void inflight_functions_init(PARSER *parser) {
@@ -1277,7 +1277,7 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
     const char *value = get_word(words, num_words, 2);
     const char *label_source = get_word(words, num_words, 3);
 
-    if (!name || !value || !*label_source) {
+    if (!name || !value || !label_source) {
         netdata_log_error("Ignoring malformed or empty CHART LABEL command.");
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }

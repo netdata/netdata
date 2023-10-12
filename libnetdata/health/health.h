@@ -11,7 +11,6 @@
 #define HEALTH_CHART_KEY "chart"
 #define HEALTH_HOST_KEY "hosts"
 #define HEALTH_OS_KEY "os"
-#define HEALTH_FAMILIES_KEY "families"
 #define HEALTH_LOOKUP_KEY "lookup"
 #define HEALTH_CALC_KEY "calc"
 
@@ -27,9 +26,6 @@ typedef struct silencer {
 
     char *charts;
     SIMPLE_PATTERN *charts_pattern;
-
-    char *families;
-    SIMPLE_PATTERN *families_pattern;
 
     struct silencer *next;
 } SILENCER;

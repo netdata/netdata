@@ -38,7 +38,7 @@ The command line options of the Netdata 1.10.0 version are the following:
  Support    : https://github.com/netdata/netdata/issues
  License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
 
- Twitter    : https://twitter.com/linuxnetdata
+ Twitter    : https://twitter.com/netdatahq
  LinkedIn   : https://linkedin.com/company/netdata-cloud/
  Facebook   : https://facebook.com/linuxnetdata/
 
@@ -142,6 +142,8 @@ For most Netdata programs (including standard external plugins shipped by netdat
 | `INFO`  | Something important the user should know.                                                                                 |
 | `ERROR` | Something that might disable a part of netdata.<br/>The log line includes `errno` (if it is not zero).                    |
 | `FATAL` | Something prevented a program from running.<br/>The log line includes `errno` (if it is not zero) and the program exited. |
+
+The `FATAL` and `ERROR` messages will always appear in the logs, and `INFO`can be filtered using [severity level](https://github.com/netdata/netdata/tree/master/daemon/config#logs-section-options) option.
 
 So, when auto-detection of data collection fail, `ERROR` lines are logged and the relevant modules are disabled, but the
 program continues to run.

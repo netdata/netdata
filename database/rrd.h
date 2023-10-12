@@ -992,7 +992,6 @@ struct alarm_entry {
     STRING *chart;
     STRING *chart_context;
     STRING *chart_name;
-    STRING *family;
 
     STRING *classification;
     STRING *component;
@@ -1037,7 +1036,6 @@ struct alarm_entry {
 #define ae_chart_id(ae) string2str((ae)->chart)
 #define ae_chart_name(ae) string2str((ae)->chart_name)
 #define ae_chart_context(ae) string2str((ae)->chart_context)
-#define ae_family(ae) string2str((ae)->family)
 #define ae_classification(ae) string2str((ae)->classification)
 #define ae_exec(ae) string2str((ae)->exec)
 #define ae_recipient(ae) string2str((ae)->recipient)

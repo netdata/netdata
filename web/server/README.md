@@ -1,13 +1,3 @@
-<!--
-title: "Web server"
-description: "The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection."
-type: reference
-custom_edit_url: https://github.com/netdata/netdata/edit/master/web/server/README.md
-sidebar_label: "Web server"
-learn_status: "Published"
-learn_rel_path: "Configuration"
--->
-
 # Web server
 
 The Netdata web server is `static-threaded`, with a fixed, configurable number of threads. 
