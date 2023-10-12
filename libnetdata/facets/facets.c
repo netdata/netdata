@@ -374,7 +374,7 @@ static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH 
 static void FACET_VALUES_HASHTABLE_DOUBLE(FACET_KEY *k) {
     // increase the hashtable size
     freez(k->values.hashtable);
-    k->values.size *= 4;
+    k->values.size *= 2;
     k->values.hashtable = callocz(k->values.size, sizeof(FACET_VALUE *));
     for(FACET_VALUE *v = k->values.ll ; v ;v = v->next) {
         FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, v->hash);
@@ -518,7 +518,7 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 }
 
 static inline FACET_KEY **facets_keys_hashtable_slot(FACETS *facets, FACETS_HASH hash) {
-    size_t slot = hash % FACETS_KEYS_HASHTABLE_ENTRIES;
+    size_t slot = hash % facets->keys.size;
     FACET_KEY **k = &facets->keys.hashtable[slot];
 
     while(*k && (*k)->hash != hash)
@@ -530,7 +530,7 @@ static inline FACET_KEY **facets_keys_hashtable_slot(FACETS *facets, FACETS_HASH
 static void FACET_KEYS_HASHTABLE_DOUBLE(FACETS *facets) {
     // increase the hashtable size
     freez(facets->keys.hashtable);
-    facets->keys.size *= 4;
+    facets->keys.size *= 2;
     facets->keys.hashtable = callocz(facets->keys.size, sizeof(FACET_KEY *));
     for(FACET_KEY *k = facets->keys.ll ; k ; k = k->next) {
         FACET_KEY **k_ptr = facets_keys_hashtable_slot(facets, k->hash);
@@ -619,9 +619,6 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(facets->keys.ll, k, prev, next);
     facets->keys.count++;
 
-    if(facets->keys.count > facets->keys.size / 2)
-        FACET_KEYS_HASHTABLE_DOUBLE(facets);
-
     return k;
 }
 
@@ -632,8 +629,12 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
 
     if(unlikely(!(*k_ptr))) {
         // we have to add it
-        *k_ptr = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
-        return (*k_ptr);
+        FACET_KEY *k = *k_ptr = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
+
+        if(facets->keys.count > facets->keys.size / 2)
+            FACET_KEYS_HASHTABLE_DOUBLE(facets);
+
+        return k;
     }
 
     // already in the index
