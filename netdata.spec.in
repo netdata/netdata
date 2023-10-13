@@ -21,15 +21,11 @@ AutoReqProv: yes
 
 # Disable go.d.plugin build on outdated golang distros
 %if 0%{?centos_ver:1}
-%if 0%{?centos_ver} >= 8 && 0%{!?almalinux_ver:1} && 0%{!?rocky_ver:1}
-%global _golang_build 1
-%else
-%if 0%{?centos_ver} >= 10
+%if 0%{?centos_ver} >= 10 && 0%{?almalinux_ver:1} && 0%{?rocky_ver:1}
 %global _golang_build 1
 %else
 %global _golang_build 0
 %global _missing_build_ids_terminate_build 0
-%endif
 %endif
 %endif
 
