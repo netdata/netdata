@@ -129,6 +129,9 @@ int fstat64(int fd, struct stat64 *buf) {
 #define JOURNAL_PARAMETER_DELTA                 "delta"
 #define JOURNAL_PARAMETER_TAIL                  "tail"
 
+#define JOURNAL_KEY_ND_JOURNAL_FILE             "ND_JOURNAL_FILE"
+#define JOURNAL_KEY_ND_JOURNAL_PROCESS          "ND_JOURNAL_PROCESS"
+
 #define JOURNAL_DEFAULT_SLICE_MODE              true
 #define JOURNAL_DEFAULT_DIRECTION               FACETS_ANCHOR_DIRECTION_BACKWARD
 
@@ -313,6 +316,8 @@ typedef struct function_query_status {
 } FUNCTION_QUERY_STATUS;
 
 struct journal_file {
+    const char *filename;
+    size_t filename_len;
     STRING *source;
     SD_JOURNAL_FILE_SOURCE_TYPE source_type;
     usec_t file_last_modified_ut;
@@ -376,6 +381,8 @@ static inline bool parse_journal_field(const char *data, size_t data_length, con
 static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, struct journal_file *jf, usec_t *msg_ut) {
     const void *data;
     size_t length, bytes = 0;
+
+    facets_add_key_value_length(facets, JOURNAL_KEY_ND_JOURNAL_FILE, sizeof(JOURNAL_KEY_ND_JOURNAL_FILE) - 1, jf->filename, jf->filename_len);
 
     SD_JOURNAL_FOREACH_DATA(j, data, length) {
         const char *key, *value;
@@ -455,6 +462,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
+    usec_t last_usec_from = 0;
+    usec_t last_usec_to = 0;
+
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
     facets_rows_begin(facets);
@@ -475,6 +485,13 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
             break;
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+
+        // make sure each line gets a unique timestamp
+        if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+            msg_ut = --last_usec_from;
+        else
+            last_usec_from = last_usec_to = msg_ut;
+
         if(facets_row_finished(facets, msg_ut))
             rows_useful++;
 
@@ -531,6 +548,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
+    usec_t last_usec_from = 0;
+    usec_t last_usec_to = 0;
+
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
     facets_rows_begin(facets);
@@ -551,6 +571,13 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
             break;
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+
+        // make sure each line gets a unique timestamp
+        if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+            msg_ut = ++last_usec_to;
+        else
+            last_usec_from = last_usec_to = msg_ut;
+
         if(facets_row_finished(facets, msg_ut))
             rows_useful++;
 
@@ -826,20 +853,21 @@ static STRING *string_strdupz_source(const char *s, const char *e, size_t max_le
 
 static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
     struct journal_file *jf = value;
-    const char *filename = dictionary_acquired_item_name(item);
+    jf->filename = dictionary_acquired_item_name(item);
+    jf->filename_len = strlen(jf->filename);
 
     // based on the filename
     // decide the source to show to the user
-    const char *s = strrchr(filename, '/');
+    const char *s = strrchr(jf->filename, '/');
     if(s) {
-        if(strstr(filename, "/remote/"))
+        if(strstr(jf->filename, "/remote/"))
             jf->source_type = SDJF_REMOTE;
         else {
             const char *t = s - 1;
-            while(t >= filename && *t != '.' && *t != '/')
+            while(t >= jf->filename && *t != '.' && *t != '/')
                 t--;
 
-            if(t >= filename && *t == '.') {
+            if(t >= jf->filename && *t == '.') {
                 jf->source_type = SDJF_NAMESPACE;
                 jf->source = string_strdupz_source(t + 1, s, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
             }
@@ -890,13 +918,13 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
     else
         jf->source_type = SDJF_LOCAL | SDJF_OTHER;
 
-    journal_file_update_msg_ut(filename, jf);
+    journal_file_update_msg_ut(jf->filename, jf);
 
     internal_error(true,
                    "found journal file '%s', type %d, source '%s', "
                    "file modified: %"PRIu64", "
                    "msg {first: %"PRIu64", last: %"PRIu64"}",
-                   filename, jf->source_type, jf->source ? string2str(jf->source) : "<unset>",
+                   jf->filename, jf->source_type, jf->source ? string2str(jf->source) : "<unset>",
                    jf->file_last_modified_ut,
                    jf->msg_first_ut, jf->msg_last_ut);
 }
@@ -2165,7 +2193,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_register_key_name(facets, "_HOSTNAME",
                              FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
-    facets_register_dynamic_key_name(facets, "ND_JOURNAL_PROCESS",
+    facets_register_dynamic_key_name(facets, JOURNAL_KEY_ND_JOURNAL_PROCESS,
                                      FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS,
                                      netdata_systemd_journal_dynamic_row_id, NULL);
 
@@ -2189,6 +2217,9 @@ static void function_systemd_journal(const char *transaction, char *function, in
     facets_register_key_name_transformation(facets, "ERRNO",
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_TRANSFORM_VIEW,
                                             netdata_systemd_journal_transform_errno, NULL);
+
+    facets_register_key_name(facets, JOURNAL_KEY_ND_JOURNAL_FILE,
+                             FACET_KEY_OPTION_NEVER_FACET);
 
     facets_register_key_name(facets, "SYSLOG_IDENTIFIER",
                              FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS);
