@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- facets: do not corrupt the index when doubling the hashtable [\#16171](https://github.com/netdata/netdata/pull/16171) ([ktsaou](https://github.com/ktsaou))
+- Fix netdata-uninstaller; blindly deletes NETDATA\_PREFIX env var [\#16167](https://github.com/netdata/netdata/pull/16167) ([tkatsoulas](https://github.com/tkatsoulas))
+- apps: remove mem\_private on FreeBSD [\#16166](https://github.com/netdata/netdata/pull/16166) ([ilyam8](https://github.com/ilyam8))
 - fix repo path for openSUSE 15.5 packages [\#16161](https://github.com/netdata/netdata/pull/16161) ([tkatsoulas](https://github.com/tkatsoulas))
+- Modify eBPF exit [\#16159](https://github.com/netdata/netdata/pull/16159) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix compilation warnings [\#16158](https://github.com/netdata/netdata/pull/16158) ([stelfrag](https://github.com/stelfrag))
 - Don't queue removed when there is a newer alert [\#16157](https://github.com/netdata/netdata/pull/16157) ([MrZammler](https://github.com/MrZammler))
 - docker: make chmod o+rX /  non fatal [\#16156](https://github.com/netdata/netdata/pull/16156) ([ilyam8](https://github.com/ilyam8))
@@ -423,12 +427,6 @@
 - Update metadata.yaml for charts.d collectors [\#15559](https://github.com/netdata/netdata/pull/15559) ([MrZammler](https://github.com/MrZammler))
 - Perf yaml [\#15558](https://github.com/netdata/netdata/pull/15558) ([thiagoftsm](https://github.com/thiagoftsm))
 - detect the path the netdata-claim.sh script is in [\#15556](https://github.com/netdata/netdata/pull/15556) ([ktsaou](https://github.com/ktsaou))
-- Fixed typos in code blocks and added missing icons [\#15555](https://github.com/netdata/netdata/pull/15555) ([sashwathn](https://github.com/sashwathn))
-- Remove temporarily from the CI Tumbleweed support [\#15554](https://github.com/netdata/netdata/pull/15554) ([tkatsoulas](https://github.com/tkatsoulas))
-- fix ebpf.plugin system swapcalls [\#15553](https://github.com/netdata/netdata/pull/15553) ([ilyam8](https://github.com/ilyam8))
-- Fixes for `deploy.yaml`. [\#15551](https://github.com/netdata/netdata/pull/15551) ([Ferroin](https://github.com/Ferroin))
-- bump ui to v6.22.1 [\#15550](https://github.com/netdata/netdata/pull/15550) ([ilyam8](https://github.com/ilyam8))
-- Add schema and examples for notification method metadata. [\#15549](https://github.com/netdata/netdata/pull/15549) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
