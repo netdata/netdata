@@ -135,6 +135,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
 
             if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
+                lbl_value = NULL;
                 rrdlabels_get_value_strdup_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
