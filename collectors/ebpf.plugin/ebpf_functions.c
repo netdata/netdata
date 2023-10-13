@@ -1147,8 +1147,13 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
  * @param pid         the process PID
  * @param values      data read from hash table
  * @param name        the process name
+ * @param apps_group  the apps group name
  */
-static void ebpf_fill_cachestat_function_buffer(BUFFER *wb, uint32_t pid, netdata_publish_cachestat_t *values, char *name)
+static void ebpf_fill_cachestat_function_buffer(BUFFER *wb,
+                                                uint32_t pid,
+                                                netdata_publish_cachestat_t *values,
+                                                char *name,
+                                                char *apps_group)
 {
     buffer_json_add_array_item_array(wb);
 
@@ -1161,23 +1166,20 @@ static void ebpf_fill_cachestat_function_buffer(BUFFER *wb, uint32_t pid, netdat
     // NAME
     buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
 
-    // Ratio
+    // APPS Group
+    buffer_json_add_array_item_string(wb, (apps_group != NULL) ? apps_group : EBPF_APPS_GROUP_OTHER);
+
+    // HitRatio
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->ratio);
 
-    // Dirty
+    // Dirties
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->plot.dirty);
 
-    // Hit
+    // Hits
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->hit);
 
-    // Miss
+    // Misses
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->miss);
-
-    // Total page access
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->plot.misses);
-
-    // Pages modified since start
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->plot.dirty);
 
     buffer_json_array_close(wb);
 }
@@ -1207,7 +1209,11 @@ static void ebpf_cachestat_fill_function_buffer_unsafe(BUFFER *buf)
         if (pid_ptr->cachestat_stats.JudyLArray) {
             while ((cache_value = JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
                 netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                ebpf_fill_cachestat_function_buffer(buf, local_pid, values, pid_ptr->name);
+                ebpf_fill_cachestat_function_buffer(buf,
+                                                    local_pid,
+                                                    values,
+                                                    pid_ptr->name,
+                                                    (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             }
             counter++;
         }
@@ -1217,7 +1223,7 @@ static void ebpf_cachestat_fill_function_buffer_unsafe(BUFFER *buf)
     if (!counter) {
         netdata_publish_cachestat_t fake_cachestat = { };
 
-        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED);
+        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED, NULL);
     }
 }
 
@@ -1239,7 +1245,7 @@ static void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         netdata_publish_cachestat_t fake_cachestat = { };
 
-        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED);
+        ebpf_fill_cachestat_function_buffer(buf, getpid(), &fake_cachestat, EBPF_NOT_IDENFIED, NULL);
         return;
     }
 
@@ -1338,149 +1344,125 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "PID",
-            "Process ID",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "PID",
+                                    "Process ID",
+                                    RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Process Name",
-            "Process Name",
-            RRDF_FIELD_TYPE_STRING,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NONE,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "Process Name",
+                                    "Process Name",
+                                    RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NONE,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Ratio",
-            "Access Ratio",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_MEAN,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "Apps Group",
+                                    "Apps Group",
+                                    RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NONE,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Dirty",
-            "Dirty pages since last reload.",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Hit",
-            "Page Access since last reload.",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "HitRatio",
+                                    "Hit Ratio",
+                                    RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_MEAN,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Miss",
-            "Page outside memory",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "Dirties",
+                                    "Dirty pages since last reload.",
+                                    RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Page Access",
-            "Number of times pages was accessed since start.",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "Hits",
+                                    "Page Access since last reload.",
+                                    RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Modified Page",
-            "Number of modified page since start.",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "Misses",
+                                    "Page outside memory",
+                                    RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
     }
     buffer_json_object_close(wb); // columns
 
@@ -1564,6 +1546,18 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "Apps Group");
+        {
+            buffer_json_member_add_string(wb, "name", "Apps Group");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Apps Group");
             }
             buffer_json_array_close(wb);
         }

@@ -19,6 +19,7 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define NETDATA_EBPF_FUNCTIONS_COMMON_HELP "help"
 #define EBPF_FUNCTION_OPTION_PERIOD "period:"
 #define EBPF_NOT_IDENFIED "not identified"
+#define EBPF_APPS_GROUP_OTHER "other"
 
 // function list
 #define EBPF_FUNCTION_THREAD "ebpf_thread"
