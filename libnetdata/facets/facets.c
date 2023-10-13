@@ -2246,7 +2246,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 NULL,
                 RRDF_FIELD_SUMMARY_COUNT,
                 RRDF_FIELD_FILTER_RANGE,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
                 NULL);
 
         buffer_rrdf_table_add_field(
@@ -2264,7 +2264,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
 
         FACET_KEY *k;
         foreach_key_in_facets(facets, k) {
-                    RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_NONE;
+                    RRDF_FIELD_OPTIONS options = RRDF_FIELD_OPTS_WRAP;
                     bool visible = k->options & (FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_STICKY);
 
                     if ((facets->options & FACETS_OPTION_ALL_FACETS_VISIBLE && k->values.enabled))
