@@ -644,7 +644,7 @@ To collect data related to Linux multi-device (MD) flushing, the following kprob
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled.
 
-Before to enable this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
+Before enabling this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
 
 #### Disk Latency
 
