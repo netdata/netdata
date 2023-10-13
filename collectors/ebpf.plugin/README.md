@@ -644,6 +644,8 @@ To collect data related to Linux multi-device (MD) flushing, the following kprob
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled.
 
+Before to enable this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
+
 #### Disk Latency
 
 This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
@@ -662,6 +664,8 @@ The dimensions refer to time intervals.
 
 This group has charts demonstrating how applications interact with the Linux kernel to open and close file descriptors.
 It also brings latency charts for several different filesystems.
+
+Before to enable this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
 
 #### Latency Algorithm
 
@@ -913,7 +917,7 @@ for eBPF, this is not a bug present in plugin.
 To monitor latency it is necessary to append two tracers for the same function, the first is attached when the function
 is called and the second when function returns. The plugin also needs to store and delete data inside a temporary hash
 table before doing math and store the final result. This will impact your system performance, so we strongly suggest you
-only enable [Filesystem](#Filesystem) and [Disk](#Disk) threads when it is necessary to debug events on your filesystem
+only enable [Filesystem](#filesystem) and [Disk](#disk) threads when it is necessary to debug events on your filesystem
 or storage device.
 
 ### SELinux
