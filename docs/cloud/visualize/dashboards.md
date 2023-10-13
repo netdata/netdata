@@ -9,7 +9,7 @@ Click on the **Dashboards** tab in any War Room to get started.
 
 From the Dashboards tab, click on the **+** button.
 
-<img width="98" alt=" Green plus button " src="https://github.com/netdata/netdata/assets/73346910/511e2b38-e751-4a88-bc7d-bcd49764b7f6">
+<img width="98" alt=" Green plus button " src="https://github.com/netdata/netdata/assets/73346910/511e2b38-e751-4a88-bc7d-bcd49764b7f6"/>
 
 
 In the modal, give your new dashboard a name, and click **+ Add**.
