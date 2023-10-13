@@ -160,7 +160,7 @@ include:
 
   - &fedora
     distro: fedora
-    version: "38"
+    version: "39"
     support_type: Core
     notes: ''
     eol_check: true
@@ -168,10 +168,17 @@ include:
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/38
+      repo_distro: fedora/39
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "38"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/38
     test:
       ebpf-core: true
   - <<: *fedora
