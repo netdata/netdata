@@ -9,6 +9,10 @@ endmeta-->
 
 # Access Points
 
+
+<img src="https://netdata.cloud/img/network-wired.svg" width="150"/>
+
+
 Plugin: charts.d.plugin
 Module: ap
 

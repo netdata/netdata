@@ -9,6 +9,10 @@ endmeta-->
 
 # Go applications (EXPVAR)
 
+
+<img src="https://netdata.cloud/img/go.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: go_expvar
 

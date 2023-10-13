@@ -9,6 +9,10 @@ endmeta-->
 
 # Proxmox Containers
 
+
+<img src="https://netdata.cloud/img/proxmox.png" width="150"/>
+
+
 Plugin: cgroups.plugin
 Module: /sys/fs/cgroup
 

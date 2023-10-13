@@ -9,6 +9,10 @@ endmeta-->
 
 # Monit
 
+
+<img src="https://netdata.cloud/img/monit.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: monit
 

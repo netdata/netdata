@@ -9,6 +9,10 @@ endmeta-->
 
 # CUPS
 
+
+<img src="https://netdata.cloud/img/cups.png" width="150"/>
+
+
 Plugin: cups.plugin
 Module: cups.plugin
 

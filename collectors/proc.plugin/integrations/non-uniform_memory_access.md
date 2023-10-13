@@ -9,6 +9,10 @@ endmeta-->
 
 # Non-Uniform Memory Access
 
+
+<img src="https://netdata.cloud/img/linuxserver.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /sys/devices/system/node
 

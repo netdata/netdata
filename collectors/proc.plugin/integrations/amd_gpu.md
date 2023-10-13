@@ -9,6 +9,10 @@ endmeta-->
 
 # AMD GPU
 
+
+<img src="https://netdata.cloud/img/amd.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /sys/class/drm
 

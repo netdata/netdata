@@ -9,6 +9,10 @@ endmeta-->
 
 # 1-Wire Sensors
 
+
+<img src="https://netdata.cloud/img/1-wire.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: w1sensor
 

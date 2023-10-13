@@ -9,6 +9,10 @@ endmeta-->
 
 # Pressure Stall Information
 
+
+<img src="https://netdata.cloud/img/linuxserver.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/pressure
 

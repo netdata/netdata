@@ -9,6 +9,10 @@ endmeta-->
 
 # Linux ZSwap
 
+
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
+
+
 Plugin: debugfs.plugin
 Module: /sys/kernel/debug/zswap
 

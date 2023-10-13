@@ -9,6 +9,10 @@ endmeta-->
 
 # hw.intrcnt
 
+
+<img src="https://netdata.cloud/img/freebsd.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: hw.intrcnt
 

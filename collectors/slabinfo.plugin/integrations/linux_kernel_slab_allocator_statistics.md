@@ -9,6 +9,10 @@ endmeta-->
 
 # Linux kernel SLAB allocator statistics
 
+
+<img src="https://netdata.cloud/img/linuxserver.svg" width="150"/>
+
+
 Plugin: slabinfo.plugin
 Module: slabinfo.plugin
 

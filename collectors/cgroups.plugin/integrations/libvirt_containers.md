@@ -9,6 +9,10 @@ endmeta-->
 
 # Libvirt Containers
 
+
+<img src="https://netdata.cloud/img/libvirt.png" width="150"/>
+
+
 Plugin: cgroups.plugin
 Module: /sys/fs/cgroup
 

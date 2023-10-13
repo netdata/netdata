@@ -9,6 +9,10 @@ endmeta-->
 
 # Microsoft Teams
 
+
+<img src="https://netdata.cloud/img/msteams.svg" width="150"/>
+
+
 You can send Netdata alerts to Microsoft Teams using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Kernel Same-Page Merging
 
+
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /sys/kernel/mm/ksm
 

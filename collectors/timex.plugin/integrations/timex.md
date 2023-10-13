@@ -9,6 +9,10 @@ endmeta-->
 
 # Timex
 
+
+<img src="https://netdata.cloud/img/syslog.png" width="150"/>
+
+
 Plugin: timex.plugin
 Module: timex.plugin
 

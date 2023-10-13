@@ -9,6 +9,10 @@ endmeta-->
 
 # OpsGenie
 
+
+<img src="https://netdata.cloud/img/opsgenie.png" width="150"/>
+
+
 Opsgenie is an alerting and incident response tool. It is designed to group and filter alarms, build custom routing rules for on-call teams, and correlate deployments and commits to incidents.
 You can send notifications to Opsgenie using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Squid
 
+
+<img src="https://netdata.cloud/img/squid.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: squid
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Slack
 
+
+<img src="https://netdata.cloud/img/slack.png" width="150"/>
+
+
 Send notifications to a Slack workspace using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # RocketChat
 
+
+<img src="https://netdata.cloud/img/rocketchat.png" width="150"/>
+
+
 Send notifications to Rocket.Chat using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

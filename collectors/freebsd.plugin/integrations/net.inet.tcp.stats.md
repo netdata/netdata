@@ -9,6 +9,10 @@ endmeta-->
 
 # net.inet.tcp.stats
 
+
+<img src="https://netdata.cloud/img/network.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: net.inet.tcp.stats
 

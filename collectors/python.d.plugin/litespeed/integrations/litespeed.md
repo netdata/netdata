@@ -9,6 +9,10 @@ endmeta-->
 
 # Litespeed
 
+
+<img src="https://netdata.cloud/img/litespeed.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: litespeed
 

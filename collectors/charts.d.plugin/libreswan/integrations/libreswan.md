@@ -9,6 +9,10 @@ endmeta-->
 
 # Libreswan
 
+
+<img src="https://netdata.cloud/img/libreswan.png" width="150"/>
+
+
 Plugin: charts.d.plugin
 Module: libreswan
 

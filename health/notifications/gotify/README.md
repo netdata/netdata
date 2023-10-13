@@ -9,6 +9,10 @@ endmeta-->
 
 # Gotify
 
+
+<img src="https://netdata.cloud/img/gotify.png" width="150"/>
+
+
 [Gotify](https://gotify.net/) is a self-hosted push notification service created for sending and receiving messages in real time.
 You can send alerts to your Gotify instance using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 

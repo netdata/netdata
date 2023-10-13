@@ -9,6 +9,10 @@ endmeta-->
 
 # Puppet
 
+
+<img src="https://netdata.cloud/img/puppet.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: puppet
 

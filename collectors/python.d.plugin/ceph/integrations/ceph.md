@@ -9,6 +9,10 @@ endmeta-->
 
 # Ceph
 
+
+<img src="https://netdata.cloud/img/ceph.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: ceph
 

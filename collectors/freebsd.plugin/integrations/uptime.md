@@ -9,6 +9,10 @@ endmeta-->
 
 # uptime
 
+
+<img src="https://netdata.cloud/img/freebsd.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: uptime
 

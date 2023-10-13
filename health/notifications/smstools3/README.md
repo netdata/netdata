@@ -9,6 +9,10 @@ endmeta-->
 
 # SMS
 
+
+<img src="https://netdata.cloud/img/sms.svg" width="150"/>
+
+
 Send notifications to `smstools3` using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 The SMS Server Tools 3 is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.
 

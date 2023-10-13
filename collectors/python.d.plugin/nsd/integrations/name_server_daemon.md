@@ -9,6 +9,10 @@ endmeta-->
 
 # Name Server Daemon
 
+
+<img src="https://netdata.cloud/img/nsd.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: nsd
 

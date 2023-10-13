@@ -9,6 +9,10 @@ endmeta-->
 
 # Varnish
 
+
+<img src="https://netdata.cloud/img/varnish.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: varnish
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Prowl
 
+
+<img src="https://netdata.cloud/img/prowl.png" width="150"/>
+
+
 Send notifications to Prowl using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Linux Sensors (lm-sensors)
 
+
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: sensors
 

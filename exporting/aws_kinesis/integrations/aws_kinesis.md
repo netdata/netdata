@@ -9,6 +9,10 @@ endmeta-->
 
 # AWS Kinesis
 
+
+<img src="https://netdata.cloud/img/aws-kinesis.svg" width="150"/>
+
+
 Export metrics to AWS Kinesis Data Streams
 
 

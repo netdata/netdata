@@ -9,6 +9,10 @@ endmeta-->
 
 # Beanstalk
 
+
+<img src="https://netdata.cloud/img/beanstalk.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: beanstalk
 

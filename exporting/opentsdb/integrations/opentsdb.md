@@ -9,6 +9,10 @@ endmeta-->
 
 # OpenTSDB
 
+
+<img src="https://netdata.cloud/img/opentsdb.png" width="150"/>
+
+
 Use the OpenTSDB connector for the exporting engine to archive your Netdata metrics to OpenTSDB databases for long-term storage,
 further analysis, or correlation with data from other sources.
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # HP Smart Storage Arrays
 
+
+<img src="https://netdata.cloud/img/hp.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: hpssa
 

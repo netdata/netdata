@@ -9,6 +9,10 @@ endmeta-->
 
 # AWS SNS
 
+
+<img src="https://netdata.cloud/img/aws.svg" width="150"/>
+
+
 As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. Among other things, SNS supports sending notifications to:
 - Email addresses
 - Mobile Phones via SMS

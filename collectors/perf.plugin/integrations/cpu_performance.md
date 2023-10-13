@@ -9,6 +9,10 @@ endmeta-->
 
 # CPU performance
 
+
+<img src="https://netdata.cloud/img/bolt.svg" width="150"/>
+
+
 Plugin: perf.plugin
 Module: perf.plugin
 

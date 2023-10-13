@@ -9,6 +9,10 @@ endmeta-->
 
 # syslog
 
+
+<img src="https://netdata.cloud/img/syslog.png" width="150"/>
+
+
 Send notifications to Syslog using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

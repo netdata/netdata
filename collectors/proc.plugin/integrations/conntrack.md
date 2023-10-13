@@ -9,6 +9,10 @@ endmeta-->
 
 # Conntrack
 
+
+<img src="https://netdata.cloud/img/firewall.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/net/stat/nf_conntrack
 

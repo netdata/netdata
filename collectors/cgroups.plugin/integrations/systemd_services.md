@@ -9,6 +9,10 @@ endmeta-->
 
 # Systemd Services
 
+
+<img src="https://netdata.cloud/img/systemd.svg" width="150"/>
+
+
 Plugin: cgroups.plugin
 Module: /sys/fs/cgroup
 

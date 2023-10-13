@@ -9,6 +9,10 @@ endmeta-->
 
 # Netfilter
 
+
+<img src="https://netdata.cloud/img/netfilter.png" width="150"/>
+
+
 Plugin: nfacct.plugin
 Module: nfacct.plugin
 

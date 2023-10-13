@@ -9,6 +9,10 @@ endmeta-->
 
 # kern.ipc.shm
 
+
+<img src="https://netdata.cloud/img/memory.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: kern.ipc.shm
 

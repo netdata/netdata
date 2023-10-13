@@ -9,6 +9,10 @@ endmeta-->
 
 # Kubernetes Containers
 
+
+<img src="https://netdata.cloud/img/kubernetes.svg" width="150"/>
+
+
 Plugin: cgroups.plugin
 Module: /sys/fs/cgroup
 
