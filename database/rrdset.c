@@ -773,6 +773,8 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
+    rrdset_pluginsd_receive_dims_slots_free(st);
+
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);

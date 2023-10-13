@@ -697,10 +697,8 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
     if (likely(st)) {
         if (options && *options) {
-            if (strstr(options, "obsolete")) {
-                rrdset_pluginsd_receive_dims_slots_free(st);
+            if (strstr(options, "obsolete"))
                 rrdset_is_obsolete(st);
-            }
             else
                 rrdset_isnot_obsolete(st);
 
