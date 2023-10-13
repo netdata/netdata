@@ -908,6 +908,14 @@ in `ebpf.conf`.
 The total memory usage is a well known [issue](https://lore.kernel.org/all/167821082315.1693.6957546778534183486.git-patchwork-notify@kernel.org/) 
 for eBPF, this is not a bug present in plugin.
 
+### Latency monitoring
+
+To monitor latency it is necessary to append two tracers for the same function, the first is attached when the function
+is called and the second when function returns. The plugin also needs to store and delete data inside a temporary hash
+table before doing math and store the final result. This will impact your system performance, so we strongly suggest you 
+only enable [Filesystem](#Filesystem) and [Disk](#Disk) threads when it is necessary to debug events on your filesystem
+or storage device.
+
 ### SELinux
 
 When [SELinux](https://www.redhat.com/en/topics/linux/what-is-selinux) is enabled, it may prevent `ebpf.plugin` from
