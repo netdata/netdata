@@ -1897,6 +1897,7 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         open_all_log_files();
+        netdata_log_info("Netdata agent version \""VERSION"\" is starting");
 
         ieee754_doubles = is_system_ieee754_double();
 
