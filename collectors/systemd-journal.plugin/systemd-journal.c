@@ -462,6 +462,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
+    usec_t last_usec_from = 0;
+    usec_t last_usec_to = 0;
+
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
     facets_rows_begin(facets);
@@ -482,6 +485,13 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
             break;
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+
+        // make sure each line gets a unique timestamp
+        if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+            msg_ut = --last_usec_from;
+        else
+            last_usec_from = last_usec_to = msg_ut;
+
         if(facets_row_finished(facets, msg_ut))
             rows_useful++;
 
@@ -538,6 +548,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
+    usec_t last_usec_from = 0;
+    usec_t last_usec_to = 0;
+
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
     facets_rows_begin(facets);
@@ -558,6 +571,13 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
             break;
 
         bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+
+        // make sure each line gets a unique timestamp
+        if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
+            msg_ut = ++last_usec_to;
+        else
+            last_usec_from = last_usec_to = msg_ut;
+
         if(facets_row_finished(facets, msg_ut))
             rows_useful++;
 
