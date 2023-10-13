@@ -414,7 +414,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
             sqlite3_free(err_msg);
         }
         else {
-            db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
             (void) sqlite3_close(db_meta);
         }
         return 1;
