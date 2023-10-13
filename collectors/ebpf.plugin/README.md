@@ -914,11 +914,10 @@ for eBPF, this is not a bug present in plugin.
 
 ### Latency monitoring
 
-To monitor latency it is necessary to append two tracers for the same function, the first is attached when the function
-is called and the second when function returns. The plugin also needs to store and delete data inside a temporary hash
-table before doing math and store the final result. This will impact your system performance, so we strongly suggest you
-only enable [Filesystem](#filesystem) and [Disk](#disk) threads when it is necessary to debug events on your filesystem
-or storage device.
+To effectively measure latency, it's crucial to attach two tracers to the same function: one when the function is called and another when it returns.
+Additionally, the plugin must manage data within a temporary hash table, performing necessary calculations and storing the final result.
+It's important to note that this process will impact your system's performance. Therefore, we highly recommend enabling [Filesystem](#filesystem) and
+[Disk](#disk) only when debugging events related to your filesystem or storage device is necessary.
 
 ### SELinux
 
