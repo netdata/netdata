@@ -665,7 +665,7 @@ The dimensions refer to time intervals.
 This group has charts demonstrating how applications interact with the Linux kernel to open and close file descriptors.
 It also brings latency charts for several different filesystems.
 
-Before to enable this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
+Before enabling this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
 
 #### Latency Algorithm
 
