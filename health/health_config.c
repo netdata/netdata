@@ -1314,7 +1314,8 @@ static int health_readfile(const char *filename, void *data) {
                                                                 SIMPLE_PATTERN_EXACT, true);
             }
             else {
-                netdata_log_error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",
+                if (strcmp(key, "families") != 0)
+                    netdata_log_error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",
                                   line, filename, rrdcalctemplate_name(rt), key);
             }
         }
