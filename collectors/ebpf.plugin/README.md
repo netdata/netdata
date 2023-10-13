@@ -885,7 +885,7 @@ These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memo
 
 ## Known issues
 
-### Performance opimization
+### Performance optimization
 
 eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin
 significantly increases kernel memory usage by several hundred MB.
