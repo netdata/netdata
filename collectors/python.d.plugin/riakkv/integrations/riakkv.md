@@ -9,6 +9,10 @@ endmeta-->
 
 # RiakKV
 
+
+<img src="https://netdata.cloud/img/riak.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: riakkv
 

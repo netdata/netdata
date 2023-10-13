@@ -9,6 +9,10 @@ endmeta-->
 
 # OpenSIPS
 
+
+<img src="https://netdata.cloud/img/opensips.png" width="150"/>
+
+
 Plugin: charts.d.plugin
 Module: opensips
 

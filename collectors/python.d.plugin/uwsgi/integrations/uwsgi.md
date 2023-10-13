@@ -9,6 +9,10 @@ endmeta-->
 
 # uWSGI
 
+
+<img src="https://netdata.cloud/img/uwsgi.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: uwsgi
 

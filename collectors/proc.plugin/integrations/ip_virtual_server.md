@@ -9,6 +9,10 @@ endmeta-->
 
 # IP Virtual Server
 
+
+<img src="https://netdata.cloud/img/network-wired.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/net/ip_vs_stats
 

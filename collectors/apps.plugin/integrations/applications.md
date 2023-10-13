@@ -9,6 +9,10 @@ endmeta-->
 
 # Applications
 
+
+<img src="https://netdata.cloud/img/applications.svg" width="150"/>
+
+
 Plugin: apps.plugin
 Module: apps
 

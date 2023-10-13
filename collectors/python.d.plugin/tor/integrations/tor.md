@@ -9,6 +9,10 @@ endmeta-->
 
 # Tor
 
+
+<img src="https://netdata.cloud/img/tor.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: tor
 

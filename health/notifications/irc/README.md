@@ -9,6 +9,10 @@ endmeta-->
 
 # IRC
 
+
+<img src="https://netdata.cloud/img/irc.png" width="150"/>
+
+
 Send notifications to IRC using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

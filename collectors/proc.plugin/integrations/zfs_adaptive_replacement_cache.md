@@ -9,6 +9,10 @@ endmeta-->
 
 # ZFS Adaptive Replacement Cache
 
+
+<img src="https://netdata.cloud/img/filesystem.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/spl/kstat/zfs/arcstats
 

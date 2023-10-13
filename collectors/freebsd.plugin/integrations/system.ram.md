@@ -9,6 +9,10 @@ endmeta-->
 
 # system.ram
 
+
+<img src="https://netdata.cloud/img/memory.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: system.ram
 

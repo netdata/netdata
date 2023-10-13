@@ -9,6 +9,10 @@ endmeta-->
 
 # Tomcat
 
+
+<img src="https://netdata.cloud/img/tomcat.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: tomcat
 

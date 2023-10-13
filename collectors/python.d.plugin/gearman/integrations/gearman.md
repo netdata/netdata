@@ -9,6 +9,10 @@ endmeta-->
 
 # Gearman
 
+
+<img src="https://netdata.cloud/img/gearman.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: gearman
 

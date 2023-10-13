@@ -9,6 +9,10 @@ endmeta-->
 
 # devstat
 
+
+<img src="https://netdata.cloud/img/hard-drive.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: devstat
 

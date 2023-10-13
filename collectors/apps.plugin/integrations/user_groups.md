@@ -9,6 +9,10 @@ endmeta-->
 
 # User Groups
 
+
+<img src="https://netdata.cloud/img/user.svg" width="150"/>
+
+
 Plugin: apps.plugin
 Module: groups
 

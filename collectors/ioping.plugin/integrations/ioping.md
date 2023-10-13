@@ -9,6 +9,10 @@ endmeta-->
 
 # IOPing
 
+
+<img src="https://netdata.cloud/img/syslog.png" width="150"/>
+
+
 Plugin: ioping.plugin
 Module: ioping.plugin
 

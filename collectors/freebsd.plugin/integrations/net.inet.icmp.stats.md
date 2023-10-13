@@ -9,6 +9,10 @@ endmeta-->
 
 # net.inet.icmp.stats
 
+
+<img src="https://netdata.cloud/img/network.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: net.inet.icmp.stats
 

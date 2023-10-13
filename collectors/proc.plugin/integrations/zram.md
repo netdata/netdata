@@ -9,6 +9,10 @@ endmeta-->
 
 # ZRAM
 
+
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /sys/block/zram
 

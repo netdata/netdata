@@ -9,6 +9,10 @@ endmeta-->
 
 # Page types
 
+
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /proc/pagetypeinfo
 

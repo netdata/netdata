@@ -9,6 +9,10 @@ endmeta-->
 
 # Icecast
 
+
+<img src="https://netdata.cloud/img/icecast.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: icecast
 

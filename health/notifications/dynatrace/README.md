@@ -9,6 +9,10 @@ endmeta-->
 
 # Dynatrace
 
+
+<img src="https://netdata.cloud/img/dynatrace.svg" width="150"/>
+
+
 Dynatrace allows you to receive notifications using their Events REST API. See the [Dynatrace documentation](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event) about POSTing an event in the Events API for more details.
 You can send notifications to Dynatrace using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 

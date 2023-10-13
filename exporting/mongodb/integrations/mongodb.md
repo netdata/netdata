@@ -9,6 +9,10 @@ endmeta-->
 
 # MongoDB
 
+
+<img src="https://netdata.cloud/img/mongodb.svg" width="150"/>
+
+
 Use the MongoDB connector for the exporting engine to archive your agent's metrics to a MongoDB database
 for long-term storage, further analysis, or correlation with data from other sources.
 

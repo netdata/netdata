@@ -9,6 +9,10 @@ endmeta-->
 
 # Telegram
 
+
+<img src="https://netdata.cloud/img/telegram.svg" width="150"/>
+
+
 Send notifications to Telegram using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 

@@ -9,6 +9,10 @@ endmeta-->
 
 # Postfix
 
+
+<img src="https://netdata.cloud/img/postfix.svg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: postfix
 

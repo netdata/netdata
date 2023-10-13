@@ -9,6 +9,10 @@ endmeta-->
 
 # RetroShare
 
+
+<img src="https://netdata.cloud/img/retroshare.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: retroshare
 

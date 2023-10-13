@@ -9,6 +9,10 @@ endmeta-->
 
 # Alerta
 
+
+<img src="https://netdata.cloud/img/alerta.png" width="150"/>
+
+
 The [Alerta](https://alerta.io/) monitoring system is a tool used to consolidate and de-duplicate alerts from multiple sources for quick ‘at-a-glance’ visualization. With just one system you can monitor alerts from many other monitoring tools on a single screen.
 You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host Netdata configuration.
 

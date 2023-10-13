@@ -9,6 +9,10 @@ endmeta-->
 
 # ipfw
 
+
+<img src="https://netdata.cloud/img/firewall.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: ipfw
 

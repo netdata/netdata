@@ -9,6 +9,10 @@ endmeta-->
 
 # oVirt Containers
 
+
+<img src="https://netdata.cloud/img/ovirt.svg" width="150"/>
+
+
 Plugin: cgroups.plugin
 Module: /sys/fs/cgroup
 

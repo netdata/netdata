@@ -9,6 +9,10 @@ endmeta-->
 
 # Network UPS Tools (NUT)
 
+
+<img src="https://netdata.cloud/img/plug-circle-bolt.svg" width="150"/>
+
+
 Plugin: charts.d.plugin
 Module: nut
 

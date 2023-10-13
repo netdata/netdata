@@ -9,6 +9,10 @@ endmeta-->
 
 # vm.stats.sys.v_soft
 
+
+<img src="https://netdata.cloud/img/freebsd.svg" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: vm.stats.sys.v_soft
 

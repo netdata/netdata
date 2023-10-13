@@ -9,6 +9,10 @@ endmeta-->
 
 # PushOver
 
+
+<img src="https://netdata.cloud/img/pushover.png" width="150"/>
+
+
 Send notification to Pushover using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 - Netdata will send warning messages with priority 0 and critical messages with priority 1.
 - Pushover allows you to select do-not-disturb hours. The way this is configured, critical notifications will ring and vibrate your phone, even during the do-not-disturb-hours.

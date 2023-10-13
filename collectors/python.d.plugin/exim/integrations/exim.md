@@ -9,6 +9,10 @@ endmeta-->
 
 # Exim
 
+
+<img src="https://netdata.cloud/img/exim.jpg" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: exim
 

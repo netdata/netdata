@@ -9,6 +9,10 @@ endmeta-->
 
 # ISC Bind (RNDC)
 
+
+<img src="https://netdata.cloud/img/isc.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: bind_rndc
 

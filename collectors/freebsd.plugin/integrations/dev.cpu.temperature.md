@@ -9,6 +9,10 @@ endmeta-->
 
 # dev.cpu.temperature
 
+
+<img src="https://netdata.cloud/img/freebsd.org" width="150"/>
+
+
 Plugin: freebsd.plugin
 Module: dev.cpu.temperature
 

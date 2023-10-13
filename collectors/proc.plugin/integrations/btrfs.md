@@ -9,6 +9,10 @@ endmeta-->
 
 # BTRFS
 
+
+<img src="https://netdata.cloud/img/filesystem.svg" width="150"/>
+
+
 Plugin: proc.plugin
 Module: /sys/fs/btrfs
 

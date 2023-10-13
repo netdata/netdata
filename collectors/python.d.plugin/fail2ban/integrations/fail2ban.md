@@ -9,6 +9,10 @@ endmeta-->
 
 # Fail2ban
 
+
+<img src="https://netdata.cloud/img/fail2ban.png" width="150"/>
+
+
 Plugin: python.d.plugin
 Module: fail2ban
 

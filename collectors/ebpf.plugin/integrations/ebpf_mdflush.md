@@ -9,6 +9,10 @@ endmeta-->
 
 # eBPF MDflush
 
+
+<img src="https://netdata.cloud/img/ebpf.jpg" width="150"/>
+
+
 Plugin: ebpf.plugin
 Module: mdflush
 
