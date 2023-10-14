@@ -965,7 +965,7 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
 
     struct inflight_function tmp = {
         .started_ut = now,
-        .timeout_ut = now + timeout * USEC_PER_SEC,
+        .timeout_ut = now + timeout * USEC_PER_SEC + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT,
         .result_body_wb = result_body_wb,
         .timeout = timeout,
         .function = string_strdupz(function),
