@@ -2434,6 +2434,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 buffer_json_add_array_item_object(wb);
                 buffer_json_member_add_string(wb, "id", hash_to_static_string(k->hash));
                 buffer_json_member_add_string(wb, "name", k->name);
+                buffer_json_member_add_uint64(wb, "order", k->order);
                 buffer_json_object_close(wb);
             }
             foreach_key_in_facets_done(k);
