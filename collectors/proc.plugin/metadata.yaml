@@ -2643,22 +2643,22 @@ modules:
         os: "linux"
       - name: inbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
+        metric: net.drops
         info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: outbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
+        metric: net.drops
         info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: wifi_inbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
+        metric: net.drops
         info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: wifi_outbound_packets_dropped_ratio
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.packets
+        metric: net.drops
         info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: 1m_received_packets_rate
@@ -2669,20 +2669,8 @@ modules:
       - name: 10s_received_packets_storm
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.packets
-        info:
-          ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
-          the last minute
+        info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
         os: "linux freebsd"
-      - name: inbound_packets_dropped
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.drops
-        info: number of inbound dropped packets for the network interface ${label:device} in the last 10 minutes
-        os: "linux"
-      - name: outbound_packets_dropped
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
-        metric: net.drops
-        info: number of outbound dropped packets for the network interface ${label:device} in the last 10 minutes
-        os: "linux"
       - name: 10min_fifo_errors
         link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
         metric: net.fifo
