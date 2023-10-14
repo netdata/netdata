@@ -6,9 +6,6 @@
 # Source of truth for all the packages we bundle in static builds
 . "$(dirname "${0}")/../bundled-packages"
 
-echo ${CURL_VERSION}
-echo ${CURL_SOURCE}
-
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
 
