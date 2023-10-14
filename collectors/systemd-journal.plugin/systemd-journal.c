@@ -1328,10 +1328,14 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
                 break;
 
             case ND_SD_JOURNAL_CANCELLED:
+                stop = true;
+                status = tmp_status;
+                break;
+
             case ND_SD_JOURNAL_TIMED_OUT:
                 partial = true;
                 stop = true;
-                status = tmp_status;
+                status = ND_SD_JOURNAL_OK;
                 break;
 
             case ND_SD_JOURNAL_NOT_MODIFIED:
