@@ -1328,14 +1328,10 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
                 break;
 
             case ND_SD_JOURNAL_CANCELLED:
-                stop = true;
-                status = tmp_status;
-                break;
-
             case ND_SD_JOURNAL_TIMED_OUT:
                 partial = true;
                 stop = true;
-                status = ND_SD_JOURNAL_OK;
+                status = tmp_status;
                 break;
 
             case ND_SD_JOURNAL_NOT_MODIFIED:
@@ -2159,7 +2155,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     FUNCTION_QUERY_STATUS tmp_fqs = {
             .cancelled = cancelled,
             .started_monotonic_ut = now_monotonic_ut,
-            .stop_monotonic_ut = now_monotonic_ut + (timeout * USEC_PER_SEC) - (250 * USEC_PER_MS),
+            .stop_monotonic_ut = now_monotonic_ut + (timeout * USEC_PER_SEC) - (500 * USEC_PER_MS),
     };
     FUNCTION_QUERY_STATUS *fqs = NULL;
     const DICTIONARY_ITEM *fqs_item = NULL;
