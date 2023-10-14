@@ -833,7 +833,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     struct timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
     usec_t now_ut = tp.tv_sec * USEC_PER_SEC + tp.tv_nsec / NSEC_PER_USEC;
-    usec_t end_ut = now_ut + r->timeout * USEC_PER_SEC;
+    usec_t end_ut = now_ut + r->timeout * USEC_PER_SEC + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
 
     struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
     tmp->free_with_signal = false;
