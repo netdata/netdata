@@ -101,6 +101,7 @@ static inline bool is_valid_string_hash(const char *s) {
 // ----------------------------------------------------------------------------
 
 typedef uint64_t SIMPLE_HASHTABLE_HASH;
+#define SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS 32
 
 typedef struct simple_hashtable_slot {
     SIMPLE_HASHTABLE_HASH hash;
@@ -110,9 +111,6 @@ typedef struct simple_hashtable_slot {
 typedef struct simple_hashtable {
     size_t size;
     SIMPLE_HASHTABLE_SLOT *hashtable;
-
-    size_t searches;
-    size_t collisions[5];
 } SIMPLE_HASHTABLE;
 
 static void simple_hashtable_init(SIMPLE_HASHTABLE *ht, size_t size) {
@@ -127,39 +125,19 @@ static void simple_hashtable_free(SIMPLE_HASHTABLE *ht) {
 }
 
 static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_HASH hash) {
-    ht->searches++;
+    // IMPORTANT:
+    // If the hashtable supported deletions, we would need to have a special slot.data value
+    // to mark deleted values and assume they are occupied during lookup, but empty during insert.
+    // But for our case, we don't need it, since we never delete items from the hashtable.
 
-    size_t slot = ((hash & 0xFFFFFFFF) + (hash >> 32)) % ht->size;
-
+    size_t slot = hash % ht->size;
     if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
         return &ht->hashtable[slot];
 
-    ht->collisions[0]++;
-    slot = ((hash & 0xFFFFFFFF) ^ (hash >> 32)) % ht->size;
-
-    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
-        return &ht->hashtable[slot];
-
-    ht->collisions[1]++;
-    slot = ((hash & 0xFFFFFFFF) & (hash >> 32)) % ht->size;
-
-    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
-        return &ht->hashtable[slot];
-
-    ht->collisions[2]++;
-    slot = (slot + 1) % ht->size;
-
-    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
-        return &ht->hashtable[slot];
-
-    ht->collisions[3]++;
-    slot = (slot + 1) % ht->size;
-
-    // Linear probing
-    while (ht->hashtable[slot].data && ht->hashtable[slot].hash != hash) {
+    slot = ((hash >> SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS) + 1) % ht->size;
+    // Linear probing until we find it
+    while (ht->hashtable[slot].data && ht->hashtable[slot].hash != hash)
         slot = (slot + 1) % ht->size;  // Wrap around if necessary
-        ht->collisions[4]++;
-    }
 
     return &ht->hashtable[slot];
 }
