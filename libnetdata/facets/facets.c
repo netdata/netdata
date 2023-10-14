@@ -180,6 +180,16 @@ typedef struct facet_value {
     struct facet_value *prev, *next;
 } FACET_VALUE;
 
+typedef enum {
+    FACET_KEY_VALUE_NONE    = 0,
+    FACET_KEY_VALUE_UPDATED = (1 << 0),
+    FACET_KEY_VALUE_EMPTY   = (1 << 1),
+    FACET_KEY_VALUE_COPIED  = (1 << 2),
+} FACET_KEY_VALUE_FLAGS;
+
+#define facet_key_value_updated(k) ((k)->current_value.flags & FACET_KEY_VALUE_UPDATED)
+#define facet_key_value_empty(k) ((k)->current_value.flags & FACET_KEY_VALUE_EMPTY)
+#define facet_key_value_copied(k) ((k)->current_value.flags & FACET_KEY_VALUE_COPIED)
 
 struct facet_key {
     FACETS *facets;
@@ -205,9 +215,7 @@ struct facet_key {
 
     struct {
         FACETS_HASH hash;
-        bool updated;
-        bool empty;
-        bool copied;
+        FACET_KEY_VALUE_FLAGS flags;
         const char *raw;
         uint32_t raw_len;
         BUFFER *b;
@@ -397,17 +405,17 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
 }
 
 static inline const char *facets_key_get_value(FACET_KEY *k) {
-    return k->current_value.copied ? buffer_tostring(k->current_value.b) : k->current_value.raw;
+    return facet_key_value_copied(k) ? buffer_tostring(k->current_value.b) : k->current_value.raw;
 }
 
 static inline uint32_t facets_key_get_value_length(FACET_KEY *k) {
-    return k->current_value.copied ? buffer_strlen(k->current_value.b) : k->current_value.raw_len;
+    return facet_key_value_copied(k) ? buffer_strlen(k->current_value.b) : k->current_value.raw_len;
 }
 
 static inline void facets_key_value_copy_to_buffer(FACET_KEY *k) {
-    if(!k->current_value.copied) {
+    if(!facet_key_value_copied(k)) {
         buffer_contents_replace(k->current_value.b, k->current_value.raw, k->current_value.raw_len);
-        k->current_value.copied = true;
+        k->current_value.flags |= FACET_KEY_VALUE_COPIED;
     }
 }
 
@@ -523,13 +531,6 @@ static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, FACETS_HASH 
             .selected = true,
     };
     FACET_VALUE_ADD_TO_INDEX(k, &tv);
-}
-
-static inline FACET_VALUE *FACET_VALUE_GET_CURRENT_VALUE(FACET_KEY *k) {
-    if(unlikely(!k->current_value.v))
-        FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(k);
-
-    return k->current_value.v;
 }
 
 // ----------------------------------------------------------------------------
@@ -782,7 +783,7 @@ static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
     if(!facets->histogram.enabled ||
             !facets->histogram.key ||
             !facets->histogram.key->values.enabled ||
-            !facets->histogram.key->current_value.v ||
+            !facet_key_value_updated(facets->histogram.key) ||
             usec < facets->histogram.after_ut ||
             usec > facets->histogram.before_ut)
         return;
@@ -1516,11 +1517,10 @@ void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
 // ----------------------------------------------------------------------------
 
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!k->current_value.updated && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
 
-    k->current_value.updated = true;
-    k->current_value.empty = true;
+    k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_EMPTY;
 
     facets->operations.values.registered++;
     facets->operations.values.empty++;
@@ -1530,7 +1530,7 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
     k->current_value.raw = NULL;
     k->current_value.raw_len = 0;
     k->current_value.b->len = 0;
-    k->current_value.copied = false;
+    k->current_value.flags &= ~FACET_KEY_VALUE_COPIED;
 
     if(unlikely(k->values.enabled))
         FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(k);
@@ -1541,11 +1541,11 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
 }
 
 static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!k->current_value.updated && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
 
-    k->current_value.updated = true;
-    k->current_value.empty = false;
+    k->current_value.flags |= FACET_KEY_VALUE_UPDATED;
+    k->current_value.flags &= ~FACET_KEY_VALUE_EMPTY;
 
     facets->operations.values.registered++;
 
@@ -1559,7 +1559,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 //    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
 //        found = true;
 
-    if(facets->query && !k->current_value.empty && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
+    if(facets->query && !facet_key_value_empty(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         facets->operations.fts.searches++;
         facets_key_value_copy_to_buffer(k);
         if(simple_pattern_matches(facets->query, buffer_tostring(k->current_value.b)))
@@ -1660,7 +1660,7 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
                 .empty = true,
         };
 
-        if(k->current_value.updated && !k->current_value.empty) {
+        if(facet_key_value_updated(k) && !facet_key_value_empty(k)) {
             t.tmp = facets_key_get_value(k);
             t.tmp_len = facets_key_get_value_length(k);
             t.empty = false;
@@ -1810,13 +1810,8 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
 static inline void facets_reset_key(FACET_KEY *k) {
     k->key_found_in_row = 0;
     k->key_values_selected_in_row = 0;
-    k->current_value.updated = false;
-    k->current_value.empty = false;
-    k->current_value.copied = false;
-    k->current_value.raw = NULL;
-    k->current_value.raw_len = 0;
+    k->current_value.flags = FACET_KEY_VALUE_NONE;
     k->current_value.hash = FACETS_HASH_ZERO;
-    k->current_value.v = NULL;
 }
 
 static void facets_reset_keys_with_value_and_row(FACETS *facets) {
@@ -1869,13 +1864,9 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
     for(size_t p = 0; p < entries ;p++) {
         FACET_KEY *k = facets->keys_with_values.array[p];
 
-        if(!k->key_found_in_row) {
+        if(!facet_key_value_updated(k))
             // put the FACET_VALUE_UNSET value into it
             facets_key_set_empty_value(facets, k);
-        }
-
-        internal_fatal(k->key_found_in_row != 1, "all keys should be matched exactly once at this point");
-        internal_fatal(k->key_values_selected_in_row > 1, "key values are selected in row more than once");
 
         total_keys++;
 
@@ -1899,9 +1890,7 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
                 counted_by++;
 
             if(counted_by == total_keys) {
-                FACET_VALUE *v = FACET_VALUE_GET_CURRENT_VALUE(k);
-                v->final_facet_value_counter++;
-
+                k->current_value.v->final_facet_value_counter++;
                 found++;
             }
         }
