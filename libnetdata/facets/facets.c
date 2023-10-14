@@ -5,8 +5,8 @@
 #define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
-#define FACETS_KEYS_HASHTABLE_ENTRIES 128
-#define FACETS_VALUES_HASHTABLE_ENTRIES 32
+#define FACETS_KEYS_HASHTABLE_ENTRIES 127
+#define FACETS_VALUES_HASHTABLE_ENTRIES 31
 
 // ----------------------------------------------------------------------------
 
@@ -115,10 +115,6 @@ typedef struct facet_value {
     uint32_t *histogram;
     uint32_t min, max, sum;
 
-    struct {
-        struct facet_value *next;
-    } parent_hashtable;
-
     struct facet_value *prev, *next;
 } FACET_VALUE;
 
@@ -171,10 +167,6 @@ struct facet_key {
         facets_key_transformer_t cb;
         void *data;
     } transform;
-
-    struct {
-        struct facet_key *next;
-    } parent_hashtable;
 
     struct facet_key *prev, *next;
 };
@@ -390,12 +382,12 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const 
 
 static inline FACET_VALUE **facets_values_hashtable_slot(FACET_KEY *k, FACETS_HASH hash) {
     size_t slot = hash % k->values.size;
-    FACET_VALUE **v = &k->values.hashtable[slot];
 
-    while(*v && (*v)->hash != hash)
-        v = &((*v)->parent_hashtable.next);
+    // Linear probing
+    while (k->values.hashtable[slot] && k->values.hashtable[slot]->hash != hash)
+        slot = (slot + 1) % k->values.size;  // Wrap around if necessary
 
-    return v;
+    return &k->values.hashtable[slot];
 }
 
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
@@ -411,7 +403,6 @@ static void FACET_VALUES_HASHTABLE_DOUBLE(FACET_KEY *k) {
     for(FACET_VALUE *v = k->values.ll ; v ;v = v->next) {
         FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, v->hash);
         *v_ptr = v;
-        v->parent_hashtable.next = NULL;
     }
     k->facets->operations.values.hashtable_increases++;
 }
@@ -433,8 +424,6 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     *v_ptr = v;
 
     memcpy(v, tv, sizeof(*v));
-
-    v->parent_hashtable.next = NULL; // make sure this is NULL
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(k->values.ll, v, prev, next);
     k->values.used++;
@@ -553,12 +542,12 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 
 static inline FACET_KEY **facets_keys_hashtable_slot(FACETS *facets, FACETS_HASH hash) {
     size_t slot = hash % facets->keys.size;
-    FACET_KEY **k = &facets->keys.hashtable[slot];
 
-    while(*k && (*k)->hash != hash)
-        k = &((*k)->parent_hashtable.next);
+    // Linear probing
+    while (facets->keys.hashtable[slot] && facets->keys.hashtable[slot]->hash != hash)
+        slot = (slot + 1) % facets->keys.size;  // Wrap around if necessary
 
-    return k;
+    return &facets->keys.hashtable[slot];
 }
 
 static void FACET_KEYS_HASHTABLE_DOUBLE(FACETS *facets) {
@@ -569,7 +558,6 @@ static void FACET_KEYS_HASHTABLE_DOUBLE(FACETS *facets) {
     for(FACET_KEY *k = facets->keys.ll ; k ; k = k->next) {
         FACET_KEY **k_ptr = facets_keys_hashtable_slot(facets, k->hash);
         *k_ptr = k;
-        k->parent_hashtable.next = NULL;
     }
     facets->operations.keys.hashtable_increases++;
 }
@@ -612,7 +600,7 @@ static void facet_key_set_name(FACET_KEY *k, const char *name, size_t name_lengt
             "key hash conflict: '%s' and '%s' have the same hash",
             k->name, name);
 
-    if(k->name || !name || !name_length)
+    if(likely(k->name || !name || !name_length))
         return;
 
     // an actual value, not a filter
