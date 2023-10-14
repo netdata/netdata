@@ -3,13 +3,13 @@
 
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
-. ../bundled-packages
-
+# Source of truth for all the packages we bundle in static builds
+. "$(dirname "${0}")/../bundled-packages" || exit 1
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
 
-fetch "bash-${BASH_VERSION}" ${BASH_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
+fetch "bash-${BASH_VERSION}" "${BASH_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
     5bac17218d3911834520dad13cd1f85ab944e1c09ae1aba55906be1f8192f558 bash
 
 export CFLAGS="-pipe"

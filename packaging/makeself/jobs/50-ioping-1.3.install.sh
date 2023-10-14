@@ -4,9 +4,7 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
-. ../bundled-packages
-
-IOPING_VERSION='1.3'
+. "$(dirname "${0}")/../bundled-packages" || exit 1
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building ioping" || true
