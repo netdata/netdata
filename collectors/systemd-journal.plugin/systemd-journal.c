@@ -101,7 +101,7 @@ int fstat64(int fd, struct stat64 *buf) {
 
 #define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
 #define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
-#define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
+#define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         55
 #define SYSTEMD_JOURNAL_MAX_PARAMS              100
 #define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (1 * 3600)
 #define SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY 200
