@@ -43,8 +43,9 @@ typedef enum __attribute__((packed)) {
 
 typedef struct facet_row_key_value {
     const char *tmp;
-    BUFFER *wb;
+    uint32_t tmp_len;
     bool empty;
+    BUFFER *wb;
 } FACET_ROW_KEY_VALUE;
 
 typedef struct facet_row {

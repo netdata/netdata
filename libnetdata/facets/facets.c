@@ -5,8 +5,8 @@
 #define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
-#define FACETS_KEYS_HASHTABLE_ENTRIES 128
-#define FACETS_VALUES_HASHTABLE_ENTRIES 32
+#define FACETS_KEYS_HASHTABLE_ENTRIES 127
+#define FACETS_VALUES_HASHTABLE_ENTRIES 31
 
 // ----------------------------------------------------------------------------
 
@@ -100,9 +100,72 @@ static inline bool is_valid_string_hash(const char *s) {
 
 // ----------------------------------------------------------------------------
 
+typedef uint64_t SIMPLE_HASHTABLE_HASH;
+#define SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS 32
+
+typedef struct simple_hashtable_slot {
+    SIMPLE_HASHTABLE_HASH hash;
+    void *data;
+} SIMPLE_HASHTABLE_SLOT;
+
+typedef struct simple_hashtable {
+    size_t size;
+    SIMPLE_HASHTABLE_SLOT *hashtable;
+} SIMPLE_HASHTABLE;
+
+static void simple_hashtable_init(SIMPLE_HASHTABLE *ht, size_t size) {
+    ht->size = size;
+    ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
+}
+
+static void simple_hashtable_free(SIMPLE_HASHTABLE *ht) {
+    freez(ht->hashtable);
+    ht->hashtable = NULL;
+    ht->size = 0;
+}
+
+static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_HASH hash) {
+    // IMPORTANT:
+    // If the hashtable supported deletions, we would need to have a special slot.data value
+    // to mark deleted values and assume they are occupied during lookup, but empty during insert.
+    // But for our case, we don't need it, since we never delete items from the hashtable.
+
+    size_t slot = hash % ht->size;
+    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
+        return &ht->hashtable[slot];
+
+    slot = ((hash >> SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS) + 1) % ht->size;
+    // Linear probing until we find it
+    while (ht->hashtable[slot].data && ht->hashtable[slot].hash != hash)
+        slot = (slot + 1) % ht->size;  // Wrap around if necessary
+
+    return &ht->hashtable[slot];
+}
+
+static void simple_hashtable_resize_double(SIMPLE_HASHTABLE *ht) {
+    SIMPLE_HASHTABLE_SLOT *old = ht->hashtable;
+    size_t old_size = ht->size;
+
+    ht->size = (ht->size * 2) + 1;
+    ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
+    for(size_t i = 0 ; i < old_size ; i++) {
+        if(!old[i].data)
+            continue;
+
+        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(ht, old[i].hash);
+        *slot = old[i];
+    }
+
+    freez(old);
+}
+
+
+// ----------------------------------------------------------------------------
+
 typedef struct facet_value {
     FACETS_HASH hash;
     const char *name;
+    uint32_t name_len;
 
     bool selected;
     bool empty;
@@ -114,13 +177,19 @@ typedef struct facet_value {
     uint32_t *histogram;
     uint32_t min, max, sum;
 
-    struct {
-        struct facet_value *next;
-    } parent_hashtable;
-
     struct facet_value *prev, *next;
 } FACET_VALUE;
 
+typedef enum {
+    FACET_KEY_VALUE_NONE    = 0,
+    FACET_KEY_VALUE_UPDATED = (1 << 0),
+    FACET_KEY_VALUE_EMPTY   = (1 << 1),
+    FACET_KEY_VALUE_COPIED  = (1 << 2),
+} FACET_KEY_VALUE_FLAGS;
+
+#define facet_key_value_updated(k) ((k)->current_value.flags & FACET_KEY_VALUE_UPDATED)
+#define facet_key_value_empty(k) ((k)->current_value.flags & FACET_KEY_VALUE_EMPTY)
+#define facet_key_value_copied(k) ((k)->current_value.flags & FACET_KEY_VALUE_COPIED)
 
 struct facet_key {
     FACETS *facets;
@@ -139,16 +208,16 @@ struct facet_key {
 
     struct {
         bool enabled;
-        uint32_t size;
         uint32_t used;
-        FACET_VALUE **hashtable;
         FACET_VALUE *ll;
+        SIMPLE_HASHTABLE ht;
     } values;
 
     struct {
         FACETS_HASH hash;
-        bool updated;
-        bool empty;
+        FACET_KEY_VALUE_FLAGS flags;
+        const char *raw;
+        uint32_t raw_len;
         BUFFER *b;
         FACET_VALUE *v;
     } current_value;
@@ -167,10 +236,6 @@ struct facet_key {
         facets_key_transformer_t cb;
         void *data;
     } transform;
-
-    struct {
-        struct facet_key *next;
-    } parent_hashtable;
 
     struct facet_key *prev, *next;
 };
@@ -195,9 +260,8 @@ struct facets {
 
     struct {
         size_t count;
-        size_t size;
-        FACET_KEY **hashtable;
         FACET_KEY *ll;
+        SIMPLE_HASHTABLE ht;
     } keys;
 
     struct {
@@ -321,8 +385,7 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k);
 static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
     k->values.ll = NULL;
     k->values.used = 0;
-    k->values.size = FACETS_VALUES_HASHTABLE_ENTRIES;
-    k->values.hashtable = callocz(k->values.size, sizeof(FACET_VALUE *));
+    simple_hashtable_init(&k->values.ht, FACETS_VALUES_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
@@ -335,62 +398,67 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
         v = next;
     }
     k->values.ll = NULL;
-    k->values.size = 0;
     k->values.used = 0;
-    freez(k->values.hashtable);
     k->values.enabled = false;
+
+    simple_hashtable_free(&k->values.ht);
+}
+
+static inline const char *facets_key_get_value(FACET_KEY *k) {
+    return facet_key_value_copied(k) ? buffer_tostring(k->current_value.b) : k->current_value.raw;
+}
+
+static inline uint32_t facets_key_get_value_length(FACET_KEY *k) {
+    return facet_key_value_copied(k) ? buffer_strlen(k->current_value.b) : k->current_value.raw_len;
+}
+
+static inline void facets_key_value_copy_to_buffer(FACET_KEY *k) {
+    if(!facet_key_value_copied(k)) {
+        buffer_contents_replace(k->current_value.b, k->current_value.raw, k->current_value.raw_len);
+        k->current_value.flags |= FACET_KEY_VALUE_COPIED;
+    }
+}
+
+static const char *facets_value_dup(const char *v, uint32_t len) {
+    char *s = mallocz(len + 1);
+
+    if(len)
+        memcpy(s, v, len);
+
+    s[len] = '\0';
+
+    return s;
 }
 
 static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const FACET_VALUE * const nv) {
-    if(!v->name && nv->name)
+    if(!v->name && nv->name && nv->name_len) {
         // an actual value, not a filter
-        v->name = strdupz(nv->name);
+        v->name = facets_value_dup(nv->name, nv->name_len);
+        v->name_len = nv->name_len;
+    }
 
-    if(v->name)
+    if(v->name && v->name_len)
         facet_value_is_used(k, v);
 
-    internal_fatal(v->name && nv->name && strcmp(v->name, nv->name) != 0,
+    internal_fatal(v->name && nv->name && v->name_len == nv->name_len && memcmp(v->name, nv->name, v->name_len) != 0,
                    "value hash conflict: '%s' and '%s' have the same hash '%s'",
                    v->name, nv->name, hash_to_static_string(v->hash));
 
     k->facets->operations.values.conflicts++;
 }
 
-static inline FACET_VALUE **facets_values_hashtable_slot(FACET_KEY *k, FACETS_HASH hash) {
-    size_t slot = hash % k->values.size;
-    FACET_VALUE **v = &k->values.hashtable[slot];
-
-    while(*v && (*v)->hash != hash)
-        v = &((*v)->parent_hashtable.next);
-
-    return v;
-}
-
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
-    FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, hash);
-    return *v_ptr;
-}
-
-static void FACET_VALUES_HASHTABLE_DOUBLE(FACET_KEY *k) {
-    // increase the hashtable size
-    freez(k->values.hashtable);
-    k->values.size *= 2;
-    k->values.hashtable = callocz(k->values.size, sizeof(FACET_VALUE *));
-    for(FACET_VALUE *v = k->values.ll ; v ;v = v->next) {
-        FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, v->hash);
-        *v_ptr = v;
-        v->parent_hashtable.next = NULL;
-    }
-    k->facets->operations.values.hashtable_increases++;
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, hash);
+    return slot->data;
 }
 
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VALUE * const tv) {
-    FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, tv->hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, tv->hash);
 
-    if(*v_ptr) {
+    if(slot->data) {
         // already exists
 
-        FACET_VALUE *v = *v_ptr;
+        FACET_VALUE *v = slot->data;
         FACET_VALUE_ADD_CONFLICT(k, v, tv);
         return v;
     }
@@ -398,11 +466,10 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     // we have to add it
 
     FACET_VALUE *v = mallocz(sizeof(*v));
-    *v_ptr = v;
+    slot->hash = tv->hash;
+    slot->data = v;
 
     memcpy(v, tv, sizeof(*v));
-
-    v->parent_hashtable.next = NULL; // make sure this is NULL
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(k->values.ll, v, prev, next);
     k->values.used++;
@@ -410,16 +477,18 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     if(!v->selected)
         v->selected = k->default_selected_for_values;
 
-    if(v->name) {
+    if(v->name && v->name_len) {
         // an actual value, not a filter
-        v->name = strdupz(v->name);
+        v->name = facets_value_dup(v->name, v->name_len);
         facet_value_is_used(k, v);
     }
 
     k->facets->operations.values.inserts++;
 
-    if(unlikely(k->values.used > k->values.size / 2))
-        FACET_VALUES_HASHTABLE_DOUBLE(k);
+    if(unlikely(k->values.used > k->values.ht.size / 2)) {
+        simple_hashtable_resize_double(&k->values.ht);
+        k->facets->operations.values.hashtable_increases++;
+    }
 
     return v;
 }
@@ -428,6 +497,7 @@ static inline void FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(FACET_KEY *k) {
     static const FACET_VALUE tv = {
             .hash = FACETS_HASH_ZERO,
             .name = FACET_VALUE_UNSET,
+            .name_len = sizeof(FACET_VALUE_UNSET) - 1,
     };
 
     k->current_value.hash = FACETS_HASH_ZERO;
@@ -447,8 +517,9 @@ static inline void FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(FACET_KEY *k) {
 static inline void FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(FACET_KEY *k) {
     static __thread FACET_VALUE tv = { 0 };
 
-    tv.hash = FACETS_HASH_FUNCTION(buffer_tostring(k->current_value.b), buffer_strlen(k->current_value.b));
-    tv.name = buffer_tostring(k->current_value.b);
+    tv.name = facets_key_get_value(k);
+    tv.name_len = facets_key_get_value_length(k);
+    tv.hash = FACETS_HASH_FUNCTION(tv.name, tv.name_len);
 
     k->current_value.v = FACET_VALUE_ADD_TO_INDEX(k, &tv);
     k->facets->operations.values.indexed++;
@@ -460,13 +531,6 @@ static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, FACETS_HASH 
             .selected = true,
     };
     FACET_VALUE_ADD_TO_INDEX(k, &tv);
-}
-
-static inline FACET_VALUE *FACET_VALUE_GET_CURRENT_VALUE(FACET_KEY *k) {
-    if(unlikely(!k->current_value.v))
-        FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(k);
-
-    return k->current_value.v;
 }
 
 // ----------------------------------------------------------------------------
@@ -491,10 +555,10 @@ static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
 
 static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.ll = NULL;
-    facets->keys.size = FACETS_KEYS_HASHTABLE_ENTRIES;
-    facets->keys.hashtable = callocz(facets->keys.size, sizeof(FACET_KEY *));
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+
+    simple_hashtable_init(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
@@ -509,40 +573,16 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 
         k = next;
     }
-    freez(facets->keys.hashtable);
-    facets->keys.hashtable = NULL;
-    facets->keys.size = 0;
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
-}
 
-static inline FACET_KEY **facets_keys_hashtable_slot(FACETS *facets, FACETS_HASH hash) {
-    size_t slot = hash % facets->keys.size;
-    FACET_KEY **k = &facets->keys.hashtable[slot];
-
-    while(*k && (*k)->hash != hash)
-        k = &((*k)->parent_hashtable.next);
-
-    return k;
-}
-
-static void FACET_KEYS_HASHTABLE_DOUBLE(FACETS *facets) {
-    // increase the hashtable size
-    freez(facets->keys.hashtable);
-    facets->keys.size *= 2;
-    facets->keys.hashtable = callocz(facets->keys.size, sizeof(FACET_KEY *));
-    for(FACET_KEY *k = facets->keys.ll ; k ; k = k->next) {
-        FACET_KEY **k_ptr = facets_keys_hashtable_slot(facets, k->hash);
-        *k_ptr = k;
-        k->parent_hashtable.next = NULL;
-    }
-    facets->operations.keys.hashtable_increases++;
+    simple_hashtable_free(&facets->keys.ht);
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
-    FACET_KEY **k = facets_keys_hashtable_slot(facets, hash);
-    return *k;
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash);
+    return slot->data;
 }
 
 bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length) {
@@ -565,16 +605,12 @@ void facets_add_possible_value_name_to_key(FACETS *facets, const char *key, size
     FACET_VALUE *v = FACET_VALUE_GET_FROM_INDEX(k, hash);
     if(v && v->name) return;
 
-    BUFFER *wb = buffer_create(0, NULL);
-    buffer_contents_replace(wb, value, value_length);
-
     FACET_VALUE tv = {
             .hash = hash,
-            .name = buffer_tostring(wb),
+            .name = value,
+            .name_len = value_length,
     };
     FACET_VALUE_ADD_TO_INDEX(k, &tv);
-
-    buffer_free(wb);
 }
 
 static void facet_key_set_name(FACET_KEY *k, const char *name, size_t name_length) {
@@ -582,7 +618,7 @@ static void facet_key_set_name(FACET_KEY *k, const char *name, size_t name_lengt
             "key hash conflict: '%s' and '%s' have the same hash",
             k->name, name);
 
-    if(k->name || !name || !name_length)
+    if(likely(k->name || !name || !name_length))
         return;
 
     // an actual value, not a filter
@@ -625,21 +661,26 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
 static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH hash, const char *name, size_t name_length, FACET_KEY_OPTIONS options) {
     facets->operations.keys.registered++;
 
-    FACET_KEY **k_ptr = facets_keys_hashtable_slot(facets, hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash);
 
-    if(unlikely(!(*k_ptr))) {
+    if(unlikely(!slot->data)) {
         // we have to add it
-        FACET_KEY *k = *k_ptr = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
+        FACET_KEY *k = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
 
-        if(facets->keys.count > facets->keys.size / 2)
-            FACET_KEYS_HASHTABLE_DOUBLE(facets);
+        slot->hash = hash;
+        slot->data = k;
+
+        if(facets->keys.count > facets->keys.ht.size / 2) {
+            simple_hashtable_resize_double(&facets->keys.ht);
+            facets->operations.keys.hashtable_increases++;
+        }
 
         return k;
     }
 
     // already in the index
 
-    FACET_KEY *k = *k_ptr;
+    FACET_KEY *k = slot->data;
 
     facet_key_set_name(k, name, name_length);
 
@@ -742,7 +783,7 @@ static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
     if(!facets->histogram.enabled ||
             !facets->histogram.key ||
             !facets->histogram.key->values.enabled ||
-            !facets->histogram.key->current_value.v ||
+            !facet_key_value_updated(facets->histogram.key) ||
             usec < facets->histogram.after_ut ||
             usec > facets->histogram.before_ut)
         return;
@@ -786,8 +827,7 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
                     if(!tb)
                         tb = buffer_create(0, NULL);
 
-                    buffer_flush(tb);
-                    buffer_strcat(tb, v->name);
+                    buffer_contents_replace(tb, v->name, v->name_len);
                     k->transform.cb(facets, tb, FACETS_TRANSFORM_HISTOGRAM, k->transform.data);
                     buffer_json_add_array_item_string(wb, buffer_tostring(tb));
                 }
@@ -1477,19 +1517,20 @@ void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
 // ----------------------------------------------------------------------------
 
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!k->current_value.updated && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
 
-    k->current_value.updated = true;
-    k->current_value.empty = true;
+    k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_EMPTY;
 
     facets->operations.values.registered++;
     facets->operations.values.empty++;
 
     // no need to copy the UNSET value
     // empty values are exported as empty
+    k->current_value.raw = NULL;
+    k->current_value.raw_len = 0;
     k->current_value.b->len = 0;
-    // buffer_contents_replace(k->current_value.b, FACET_VALUE_UNSET, sizeof(FACET_VALUE_UNSET) - 1);
+    k->current_value.flags &= ~FACET_KEY_VALUE_COPIED;
 
     if(unlikely(k->values.enabled))
         FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(k);
@@ -1500,16 +1541,17 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
 }
 
 static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!k->current_value.updated && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
 
-    k->current_value.updated = true;
-    k->current_value.empty = false;
+    k->current_value.flags |= FACET_KEY_VALUE_UPDATED;
+    k->current_value.flags &= ~FACET_KEY_VALUE_EMPTY;
 
     facets->operations.values.registered++;
 
     if(k->transform.cb && !k->transform.view_only) {
         facets->operations.values.transformed++;
+        facets_key_value_copy_to_buffer(k);
         k->transform.cb(facets, k->current_value.b, FACETS_TRANSFORM_VALUE, k->transform.data);
     }
 
@@ -1517,8 +1559,9 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 //    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
 //        found = true;
 
-    if(facets->query && !k->current_value.empty && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
+    if(facets->query && !facet_key_value_empty(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         facets->operations.fts.searches++;
+        facets_key_value_copy_to_buffer(k);
         if(simple_pattern_matches(facets->query, buffer_tostring(k->current_value.b)))
             facets->current_row.keys_matched_by_query++;
     }
@@ -1533,15 +1576,16 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 
 void facets_add_key_value(FACETS *facets, const char *key, const char *value) {
     FACET_KEY *k = facets_register_key_name(facets, key, 0);
-    buffer_flush(k->current_value.b);
-    buffer_strcat(k->current_value.b, value);
+    k->current_value.raw = value;
+    k->current_value.raw_len = strlen(value);
 
     facets_key_check_value(facets, k);
 }
 
 void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len, const char *value, size_t value_len) {
     FACET_KEY *k = facets_register_key_name_length(facets, key, key_len, 0);
-    buffer_contents_replace(k->current_value.b, value, value_len);
+    k->current_value.raw = value;
+    k->current_value.raw_len = value_len;
 
     facets_key_check_value(facets, k);
 }
@@ -1555,7 +1599,7 @@ static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item __ma
 
     rkv->wb = buffer_create(0, NULL);
     if(!rkv->empty)
-        buffer_strcat(rkv->wb, rkv->tmp);
+        buffer_contents_replace(rkv->wb, rkv->tmp, rkv->tmp_len);
 }
 
 static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
@@ -1565,9 +1609,10 @@ static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __
 
     rkv->empty = n_rkv->empty;
 
-    buffer_flush(rkv->wb);
     if(!rkv->empty)
-        buffer_strcat(rkv->wb, n_rkv->tmp);
+        buffer_contents_replace(rkv->wb, n_rkv->tmp, n_rkv->tmp_len);
+    else
+        buffer_flush(rkv->wb);
 
     return false;
 }
@@ -1609,10 +1654,18 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
     FACET_KEY *k;
     foreach_key_in_facets(facets, k) {
         FACET_ROW_KEY_VALUE t = {
-                .tmp = (k->current_value.updated && !k->current_value.empty) ? buffer_tostring(k->current_value.b) : NULL,
+                .tmp = NULL,
+                .tmp_len = 0,
                 .wb = NULL,
-                .empty = !k->current_value.updated || k->current_value.empty,
+                .empty = true,
         };
+
+        if(facet_key_value_updated(k) && !facet_key_value_empty(k)) {
+            t.tmp = facets_key_get_value(k);
+            t.tmp_len = facets_key_get_value_length(k);
+            t.empty = false;
+        }
+
         dictionary_set(row->dict, k->name, &t, sizeof(t));
     }
     foreach_key_in_facets_done(k);
@@ -1757,10 +1810,8 @@ static void facets_row_keep(FACETS *facets, usec_t usec) {
 static inline void facets_reset_key(FACET_KEY *k) {
     k->key_found_in_row = 0;
     k->key_values_selected_in_row = 0;
-    k->current_value.updated = false;
-    k->current_value.empty = false;
+    k->current_value.flags = FACET_KEY_VALUE_NONE;
     k->current_value.hash = FACETS_HASH_ZERO;
-    k->current_value.v = NULL;
 }
 
 static void facets_reset_keys_with_value_and_row(FACETS *facets) {
@@ -1813,13 +1864,9 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
     for(size_t p = 0; p < entries ;p++) {
         FACET_KEY *k = facets->keys_with_values.array[p];
 
-        if(!k->key_found_in_row) {
+        if(!facet_key_value_updated(k))
             // put the FACET_VALUE_UNSET value into it
             facets_key_set_empty_value(facets, k);
-        }
-
-        internal_fatal(k->key_found_in_row != 1, "all keys should be matched exactly once at this point");
-        internal_fatal(k->key_values_selected_in_row > 1, "key values are selected in row more than once");
 
         total_keys++;
 
@@ -1843,9 +1890,7 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
                 counted_by++;
 
             if(counted_by == total_keys) {
-                FACET_VALUE *v = FACET_VALUE_GET_CURRENT_VALUE(k);
-                v->final_facet_value_counter++;
-
+                k->current_value.v->final_facet_value_counter++;
                 found++;
             }
         }
@@ -2013,7 +2058,7 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
 
         values[used++] = v;
 
-        if(all_values_numeric && !v->empty && v->name) {
+        if(all_values_numeric && !v->empty && v->name && v->name_len) {
             const char *s = v->name;
             while(isdigit(*s)) s++;
             if(*s != '\0')
@@ -2053,7 +2098,10 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     uint32_t ret = 0;
 
     size_t entries = k->values.used;
-    const char *values[entries];
+    struct {
+        const char *name;
+        uint32_t name_len;
+    } values[entries];
     FACET_VALUE *v;
     uint32_t used = 0;
 
@@ -2061,12 +2109,14 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
         if(used >= entries)
             break;
 
-        values[used++] = v->name;
+        values[used].name = v->name;
+        values[used].name_len = v->name_len;
+        used++;
 
-        buffer_flush(tb);
-        buffer_strcat(tb, v->name);
+        buffer_contents_replace(tb, v->name, v->name_len);
         k->transform.cb(k->facets, tb, FACETS_TRANSFORM_FACET_SORT, k->transform.data);
         v->name = strdupz(buffer_tostring(tb));
+        v->name_len = buffer_strlen(tb);
     }
     foreach_value_in_key_done(v);
 
@@ -2078,7 +2128,9 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
             break;
 
         freez((void *)v->name);
-        v->name = values[used++];
+        v->name = values[used].name;
+        v->name_len = values[used].name_len;
+        used++;
     }
     foreach_value_in_key_done(v);
 
@@ -2125,11 +2177,11 @@ static const char *facets_json_key_name_string(FACET_KEY *k, DICTIONARY *used_ha
 }
 
 static const char *facets_json_key_value_string(FACET_KEY *k, FACET_VALUE *v, DICTIONARY *used_hashes_registry) {
-    if(v->name) {
+    if(v->name && v->name_len) {
         if(used_hashes_registry && !k->default_selected_for_values && v->selected) {
             char hash_str[FACET_STRING_HASH_SIZE];
             facets_hash_to_str(v->hash, hash_str);
-            dictionary_set(used_hashes_registry, hash_str, (void *)v->name, strlen(v->name) + 1);
+            dictionary_set(used_hashes_registry, hash_str, (void *)v->name, v->name_len + 1);
         }
 
         return v->name;
@@ -2205,8 +2257,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                                     if(!tb)
                                         tb = buffer_create(0, NULL);
 
-                                    buffer_flush(tb);
-                                    buffer_strcat(tb, v->name);
+                                    buffer_contents_replace(tb, v->name, v->name_len);
                                     k->transform.cb(facets, tb, FACETS_TRANSFORM_FACET, k->transform.data);
                                     buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
                                 }
