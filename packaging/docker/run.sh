@@ -46,6 +46,16 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
+# Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
+HOST_WWW_DATA_GID=$(stat -c %g /host/etc/pve 2>/dev/null || true)
+
+if [ -n "${HOST_WWW_DATA_GID}" ]; then
+  echo "Creating host-www-data group ${HOST_WWW_DATA_GID}"
+  addgroup -g "${HOST_WWW_DATA_GID}" "host-www-data" || echo >&2 "Could not add group with ID ${HOST_WWW_DATA_GID}, its already there probably"
+  echo "Assign netdata user to host-www-data group ${HOST_WWW_DATA_GID}"
+  usermod -a -G "${HOST_WWW_DATA_GID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group with ID ${HOST_WWW_DATA_GID}"
+fi
+
 if mountpoint -q /etc/netdata; then
   echo "Copying stock configuration to /etc/netdata"
   cp -an /etc/netdata.stock/* /etc/netdata
