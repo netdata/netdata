@@ -269,6 +269,8 @@ struct target {
     uid_t uid;
     gid_t gid;
 
+    bool is_other;
+
     kernel_uint_t minflt;
     kernel_uint_t cminflt;
     kernel_uint_t majflt;
@@ -1007,6 +1009,7 @@ static int read_apps_groups_conf(const char *path, const char *file)
     apps_groups_default_target = get_apps_groups_target("p+!o@w#e$i^r&7*5(-i)l-o_", NULL, "other"); // match nothing
     if(!apps_groups_default_target)
         fatal("Cannot create default target");
+    apps_groups_default_target->is_other = true;
 
     // allow the user to override group 'other'
     if(apps_groups_default_target->target)
@@ -3747,7 +3750,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     struct target *w;
 
     for (w = root; w ; w = w->next) {
-        if(unlikely(!w->exposed))
+        if (unlikely(!w->exposed && !w->is_other))
             continue;
 
         send_BEGIN(type, w->clean_name, "processes", dt);
@@ -3758,7 +3761,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_SET("threads", w->num_threads);
         send_END();
 
-        if(unlikely(!w->processes))
+        if (unlikely(!w->processes && !w->is_other))
             continue;
 
         send_BEGIN(type, w->clean_name, "cpu_utilization", dt);
@@ -3869,7 +3872,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed || !w->processes))
+        if (likely(w->exposed || (!w->processes && !w->is_other)))
             continue;
 
         w->exposed = 1;
