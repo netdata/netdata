@@ -4,7 +4,10 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
-. "$(dirname "${0}")/../bundled-packages" || exit 1
+. "$(dirname "${0}")/../bundled-packages"
+
+echo ${CURL_VERSION}
+echo ${CURL_SOURCE}
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
@@ -21,7 +24,7 @@ if [ -d "${cache}" ]; then
   CACHE_HIT=1
 else
   echo "No cached copy of build directory for curl found, fetching sources instead."
-  run git clone --branch "${version}" --single-branch --depth 1 "CURL_SOURCE" "${NETDATA_MAKESELF_PATH}/tmp/curl"
+  run git clone --branch "${CURL_VERSION}" --single-branch --depth 1 "${CURL_SOURCE}" "${NETDATA_MAKESELF_PATH}/tmp/curl"
   CACHE_HIT=0
 fi
 

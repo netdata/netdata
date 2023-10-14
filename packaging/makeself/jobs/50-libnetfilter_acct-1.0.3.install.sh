@@ -18,7 +18,7 @@ export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
 
 fetch "libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}" "${LIBNETFILTER_ACT_SOURCE}/libnetfilter_acct-${LIBNETFILTER_ACT_VERSION}.tar.bz2" \
-    4250ceef3efe2034f4ac05906c3ee427db31b9b0a2df41b2744f4bf79a959a1a libnetfilter_acct
+    "${LIBNETFILTER_ACT_ARTIFACT_SHA256}" libnetfilter_acct
 
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then

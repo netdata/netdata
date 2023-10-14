@@ -4,13 +4,13 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
-. "$(dirname "${0}")/../bundled-packages" || exit 1
+. "$(dirname "${0}")/../bundled-packages"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building bash" || true
 
-fetch "bash-${BASH_VERSION}" "${BASH_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
-    5bac17218d3911834520dad13cd1f85ab944e1c09ae1aba55906be1f8192f558 bash
+fetch "bash-${BASH_VERSION}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
+    "${BASH_ARTIFACT_SHA256}" bash
 
 export CFLAGS="-pipe"
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
