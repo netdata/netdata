@@ -2050,7 +2050,6 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
     bool all_values_numeric = true;
     size_t entries = k->values.used;
     FACET_VALUE *values[entries], *v;
-    memset(values, 0, sizeof(FACET_VALUE *) * entries);
     uint32_t used = 0;
     foreach_value_in_key(k, v) {
         if((k->facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
