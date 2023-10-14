@@ -419,19 +419,19 @@ static inline void facets_key_value_copy_to_buffer(FACET_KEY *k) {
     }
 }
 
-static const char *facets_value_dup(const char *v, uint32_t len) {
-    char *s = mallocz(len + 1);
+static const char *facets_value_dup(const char *s, uint32_t len) {
+    char *d = mallocz(len + 1);
 
     if(len)
-        memcpy(s, v, len);
+        memcpy(d, s, len);
 
-    s[len] = '\0';
+    d[len] = '\0';
 
-    return s;
+    return d;
 }
 
 static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const FACET_VALUE * const nv) {
-    if(!v->name && nv->name && nv->name_len) {
+    if(!v->name && !v->name_len && nv->name && nv->name_len) {
         // an actual value, not a filter
         v->name = facets_value_dup(nv->name, nv->name_len);
         v->name_len = nv->name_len;
@@ -517,6 +517,8 @@ static inline void FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(FACET_KEY *k) {
 static inline void FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(FACET_KEY *k) {
     static __thread FACET_VALUE tv = { 0 };
 
+    internal_fatal(!facet_key_value_updated(k), "trying to add a non-updated value to the index");
+
     tv.name = facets_key_get_value(k);
     tv.name_len = facets_key_get_value_length(k);
     tv.hash = FACETS_HASH_FUNCTION(tv.name, tv.name_len);
@@ -529,6 +531,8 @@ static inline void FACET_VALUE_ADD_OR_UPDATE_SELECTED(FACET_KEY *k, FACETS_HASH 
     FACET_VALUE tv = {
             .hash = hash,
             .selected = true,
+            .name = NULL,
+            .name_len = 0,
     };
     FACET_VALUE_ADD_TO_INDEX(k, &tv);
 }
@@ -603,7 +607,7 @@ void facets_add_possible_value_name_to_key(FACETS *facets, const char *key, size
 
     hash = FACETS_HASH_FUNCTION(value, value_length);
     FACET_VALUE *v = FACET_VALUE_GET_FROM_INDEX(k, hash);
-    if(v && v->name) return;
+    if(v && v->name && v->name_len) return;
 
     FACET_VALUE tv = {
             .hash = hash,
@@ -1993,11 +1997,8 @@ static int facets_key_values_reorder_by_name_compar(const void *a, const void *b
     const FACET_VALUE *av = *((const FACET_VALUE **)a);
     const FACET_VALUE *bv = *((const FACET_VALUE **)b);
 
-    const char *an = av->name;
-    const char *bn = bv->name;
-
-    if(!an) an = "0";
-    if(!bn) bn = "0";
+    const char *an = (av->name && av->name_len) ? av->name : "0";
+    const char *bn = (bv->name && bv->name_len) ? bv->name : "0";
 
     while(*an && ispunct(*an)) an++;
     while(*bn && ispunct(*bn)) bn++;
@@ -2023,11 +2024,8 @@ static int facets_key_values_reorder_by_name_numeric_compar(const void *a, const
     const FACET_VALUE *av = *((const FACET_VALUE **)a);
     const FACET_VALUE *bv = *((const FACET_VALUE **)b);
 
-    const char *an = av->name;
-    const char *bn = bv->name;
-
-    if(!an) an = "0";
-    if(!bn) bn = "0";
+    const char *an = (av->name && av->name_len) ? av->name : "0";
+    const char *bn = (bv->name && bv->name_len) ? bv->name : "0";
 
     if(strcmp(an, FACET_VALUE_UNSET) == 0) an = "0";
     if(strcmp(bn, FACET_VALUE_UNSET) == 0) bn = "0";
@@ -2048,15 +2046,11 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
     bool all_values_numeric = true;
     size_t entries = k->values.used;
     FACET_VALUE *values[entries], *v;
+    memset(values, 0, sizeof(FACET_VALUE *) * entries);
     uint32_t used = 0;
     foreach_value_in_key(k, v) {
         if((k->facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
             continue;
-
-        if(used >= entries)
-            break;
-
-        values[used++] = v;
 
         if(all_values_numeric && !v->empty && v->name && v->name_len) {
             const char *s = v->name;
@@ -2064,6 +2058,11 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
             if(*s != '\0')
                 all_values_numeric = false;
         }
+
+        values[used++] = v;
+
+        if(used >= entries)
+            break;
     }
     foreach_value_in_key_done(v);
 
