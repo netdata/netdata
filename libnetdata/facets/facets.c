@@ -100,6 +100,90 @@ static inline bool is_valid_string_hash(const char *s) {
 
 // ----------------------------------------------------------------------------
 
+typedef uint64_t SIMPLE_HASHTABLE_HASH;
+
+typedef struct simple_hashtable_slot {
+    SIMPLE_HASHTABLE_HASH hash;
+    void *data;
+} SIMPLE_HASHTABLE_SLOT;
+
+typedef struct simple_hashtable {
+    size_t size;
+    SIMPLE_HASHTABLE_SLOT *hashtable;
+
+    size_t searches;
+    size_t collisions[5];
+} SIMPLE_HASHTABLE;
+
+static void simple_hashtable_init(SIMPLE_HASHTABLE *ht, size_t size) {
+    ht->size = size;
+    ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
+}
+
+static void simple_hashtable_free(SIMPLE_HASHTABLE *ht) {
+    freez(ht->hashtable);
+    ht->hashtable = NULL;
+    ht->size = 0;
+}
+
+static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_HASH hash) {
+    ht->searches++;
+
+    size_t slot = ((hash & 0xFFFFFFFF) + (hash >> 32)) % ht->size;
+
+    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
+        return &ht->hashtable[slot];
+
+    ht->collisions[0]++;
+    slot = ((hash & 0xFFFFFFFF) ^ (hash >> 32)) % ht->size;
+
+    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
+        return &ht->hashtable[slot];
+
+    ht->collisions[1]++;
+    slot = ((hash & 0xFFFFFFFF) & (hash >> 32)) % ht->size;
+
+    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
+        return &ht->hashtable[slot];
+
+    ht->collisions[2]++;
+    slot = (slot + 1) % ht->size;
+
+    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
+        return &ht->hashtable[slot];
+
+    ht->collisions[3]++;
+    slot = (slot + 1) % ht->size;
+
+    // Linear probing
+    while (ht->hashtable[slot].data && ht->hashtable[slot].hash != hash) {
+        slot = (slot + 1) % ht->size;  // Wrap around if necessary
+        ht->collisions[4]++;
+    }
+
+    return &ht->hashtable[slot];
+}
+
+static void simple_hashtable_resize_double(SIMPLE_HASHTABLE *ht) {
+    SIMPLE_HASHTABLE_SLOT *old = ht->hashtable;
+    size_t old_size = ht->size;
+
+    ht->size = (ht->size * 2) + 1;
+    ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
+    for(size_t i = 0 ; i < old_size ; i++) {
+        if(!old[i].data)
+            continue;
+
+        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(ht, old[i].hash);
+        *slot = old[i];
+    }
+
+    freez(old);
+}
+
+
+// ----------------------------------------------------------------------------
+
 typedef struct facet_value {
     FACETS_HASH hash;
     const char *name;
@@ -136,10 +220,9 @@ struct facet_key {
 
     struct {
         bool enabled;
-        uint32_t size;
         uint32_t used;
-        FACET_VALUE **hashtable;
         FACET_VALUE *ll;
+        SIMPLE_HASHTABLE ht;
     } values;
 
     struct {
@@ -191,9 +274,8 @@ struct facets {
 
     struct {
         size_t count;
-        size_t size;
-        FACET_KEY **hashtable;
         FACET_KEY *ll;
+        SIMPLE_HASHTABLE ht;
     } keys;
 
     struct {
@@ -317,8 +399,7 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k);
 static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
     k->values.ll = NULL;
     k->values.used = 0;
-    k->values.size = FACETS_VALUES_HASHTABLE_ENTRIES;
-    k->values.hashtable = callocz(k->values.size, sizeof(FACET_VALUE *));
+    simple_hashtable_init(&k->values.ht, FACETS_VALUES_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
@@ -331,10 +412,10 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
         v = next;
     }
     k->values.ll = NULL;
-    k->values.size = 0;
     k->values.used = 0;
-    freez(k->values.hashtable);
     k->values.enabled = false;
+
+    simple_hashtable_free(&k->values.ht);
 }
 
 static inline const char *facets_key_get_value(FACET_KEY *k) {
@@ -380,40 +461,18 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const 
     k->facets->operations.values.conflicts++;
 }
 
-static inline FACET_VALUE **facets_values_hashtable_slot(FACET_KEY *k, FACETS_HASH hash) {
-    size_t slot = hash % k->values.size;
-
-    // Linear probing
-    while (k->values.hashtable[slot] && k->values.hashtable[slot]->hash != hash)
-        slot = (slot + 1) % k->values.size;  // Wrap around if necessary
-
-    return &k->values.hashtable[slot];
-}
-
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
-    FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, hash);
-    return *v_ptr;
-}
-
-static void FACET_VALUES_HASHTABLE_DOUBLE(FACET_KEY *k) {
-    // increase the hashtable size
-    freez(k->values.hashtable);
-    k->values.size *= 2;
-    k->values.hashtable = callocz(k->values.size, sizeof(FACET_VALUE *));
-    for(FACET_VALUE *v = k->values.ll ; v ;v = v->next) {
-        FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, v->hash);
-        *v_ptr = v;
-    }
-    k->facets->operations.values.hashtable_increases++;
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, hash);
+    return slot->data;
 }
 
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VALUE * const tv) {
-    FACET_VALUE **v_ptr = facets_values_hashtable_slot(k, tv->hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, tv->hash);
 
-    if(*v_ptr) {
+    if(slot->data) {
         // already exists
 
-        FACET_VALUE *v = *v_ptr;
+        FACET_VALUE *v = slot->data;
         FACET_VALUE_ADD_CONFLICT(k, v, tv);
         return v;
     }
@@ -421,7 +480,8 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     // we have to add it
 
     FACET_VALUE *v = mallocz(sizeof(*v));
-    *v_ptr = v;
+    slot->hash = tv->hash;
+    slot->data = v;
 
     memcpy(v, tv, sizeof(*v));
 
@@ -439,8 +499,10 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
 
     k->facets->operations.values.inserts++;
 
-    if(unlikely(k->values.used > k->values.size / 2))
-        FACET_VALUES_HASHTABLE_DOUBLE(k);
+    if(unlikely(k->values.used > k->values.ht.size / 2)) {
+        simple_hashtable_resize_double(&k->values.ht);
+        k->facets->operations.values.hashtable_increases++;
+    }
 
     return v;
 }
@@ -514,10 +576,10 @@ static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
 
 static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.ll = NULL;
-    facets->keys.size = FACETS_KEYS_HASHTABLE_ENTRIES;
-    facets->keys.hashtable = callocz(facets->keys.size, sizeof(FACET_KEY *));
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+
+    simple_hashtable_init(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
@@ -532,39 +594,16 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 
         k = next;
     }
-    freez(facets->keys.hashtable);
-    facets->keys.hashtable = NULL;
-    facets->keys.size = 0;
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
-}
 
-static inline FACET_KEY **facets_keys_hashtable_slot(FACETS *facets, FACETS_HASH hash) {
-    size_t slot = hash % facets->keys.size;
-
-    // Linear probing
-    while (facets->keys.hashtable[slot] && facets->keys.hashtable[slot]->hash != hash)
-        slot = (slot + 1) % facets->keys.size;  // Wrap around if necessary
-
-    return &facets->keys.hashtable[slot];
-}
-
-static void FACET_KEYS_HASHTABLE_DOUBLE(FACETS *facets) {
-    // increase the hashtable size
-    freez(facets->keys.hashtable);
-    facets->keys.size *= 2;
-    facets->keys.hashtable = callocz(facets->keys.size, sizeof(FACET_KEY *));
-    for(FACET_KEY *k = facets->keys.ll ; k ; k = k->next) {
-        FACET_KEY **k_ptr = facets_keys_hashtable_slot(facets, k->hash);
-        *k_ptr = k;
-    }
-    facets->operations.keys.hashtable_increases++;
+    simple_hashtable_free(&facets->keys.ht);
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
-    FACET_KEY **k = facets_keys_hashtable_slot(facets, hash);
-    return *k;
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash);
+    return slot->data;
 }
 
 bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length) {
@@ -643,21 +682,26 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
 static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH hash, const char *name, size_t name_length, FACET_KEY_OPTIONS options) {
     facets->operations.keys.registered++;
 
-    FACET_KEY **k_ptr = facets_keys_hashtable_slot(facets, hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash);
 
-    if(unlikely(!(*k_ptr))) {
+    if(unlikely(!slot->data)) {
         // we have to add it
-        FACET_KEY *k = *k_ptr = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
+        FACET_KEY *k = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
 
-        if(facets->keys.count > facets->keys.size / 2)
-            FACET_KEYS_HASHTABLE_DOUBLE(facets);
+        slot->hash = hash;
+        slot->data = k;
+
+        if(facets->keys.count > facets->keys.ht.size / 2) {
+            simple_hashtable_resize_double(&facets->keys.ht);
+            facets->operations.keys.hashtable_increases++;
+        }
 
         return k;
     }
 
     // already in the index
 
-    FACET_KEY *k = *k_ptr;
+    FACET_KEY *k = slot->data;
 
     facet_key_set_name(k, name, name_length);
 
