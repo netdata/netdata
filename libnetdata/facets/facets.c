@@ -482,6 +482,10 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
         v->name = facets_value_dup(v->name, v->name_len);
         facet_value_is_used(k, v);
     }
+    else {
+        v->name = NULL;
+        v->name_len = 0;
+    }
 
     k->facets->operations.values.inserts++;
 
