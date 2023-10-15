@@ -354,7 +354,7 @@ fields. But journald does exactly the opposite. Each log entry is unique and may
 So, Loki and `systemd-journal` are good for different use cases.
 
 `systemd-journal` already runs in your systems. You use it today. It is there inside all your systems
-collecting the system and app~~~~lications logs. And for its use case, it has advantages over other
+collecting the system and applications logs. And for its use case, it has advantages over other
 centralization solutions. So, why not use it?
 
 ### Is it worth to build a `systemd` logs centralization server?
