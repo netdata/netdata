@@ -28,7 +28,7 @@
         webpackPublicPath: "https://app.netdata.cloud",
         agentApiUrl: searchParams.get("agent") || getBasename(),
         posthogToken: "phc_hnhlqe6D2Q4IcQNrFItaqdXJAxQ8RcHkPAFAp74pubv",
-        version: "6.50.2",
+        version: "6.51.0",
         tracking: false,
         cookieDomain: ".netdata.cloud",
         onprem: false,
@@ -221,4 +221,4 @@
               window.envSettings.visitor = event.data.person_guid
             }
           });
-        })</script></body></html>
+        }).catch(() => {})</script></body></html>
