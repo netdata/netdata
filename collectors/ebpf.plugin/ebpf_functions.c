@@ -466,8 +466,9 @@ static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_valu
  * @param wb          buffer where we store data.
  * @param values      data read from hash table
  * @param name        the process name
+ * @param apps_group  the apps group name
  */
-static void ebpf_fill_socket_function_buffer(BUFFER *wb, netdata_socket_plus_t *values, char *name)
+static void ebpf_fill_socket_function_buffer(BUFFER *wb, netdata_socket_plus_t *values, char *name, char *apps_group)
 {
     buffer_json_add_array_item_array(wb);
 
@@ -479,6 +480,9 @@ static void ebpf_fill_socket_function_buffer(BUFFER *wb, netdata_socket_plus_t *
 
     // NAME
     buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // APPS Group
+    buffer_json_add_array_item_string(wb, (apps_group != NULL) ? apps_group : EBPF_APPS_GROUP_OTHER);
 
     // Origin
     buffer_json_add_array_item_string(wb, (values->data.external_origin) ? "incoming" : "outgoing");
@@ -600,7 +604,10 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
         if (pid_ptr->socket_stats.JudyLArray) {
             while ((socket_value = JudyLFirstThenNext(pid_ptr->socket_stats.JudyLArray, &local_timestamp, &first_socket))) {
                 netdata_socket_plus_t *values = (netdata_socket_plus_t *)*socket_value;
-                ebpf_fill_socket_function_buffer(buf, values, pid_ptr->name);
+                ebpf_fill_socket_function_buffer(buf,
+                                                 values,
+                                                 pid_ptr->name,
+                                                 (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             }
             counter++;
         }
@@ -610,7 +617,7 @@ static void ebpf_socket_fill_function_buffer_unsafe(BUFFER *buf)
     if (!counter) {
         netdata_socket_plus_t fake_values = { };
         ebpf_socket_fill_fake_socket(&fake_values);
-        ebpf_fill_socket_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED);
+        ebpf_fill_socket_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED, NULL);
     }
 }
 
@@ -635,7 +642,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 
         ebpf_socket_fill_fake_socket(&fake_values);
 
-        ebpf_fill_socket_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED);
+        ebpf_fill_socket_function_buffer(buf, &fake_values, EBPF_NOT_IDENFIED, NULL);
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         return;
     }
@@ -820,6 +827,23 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "Apps Group",
+                                    "Apps Group",
+                                    RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NONE,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
         buffer_rrdf_table_add_field(wb, fields_id++, "Origin", "The connection origin.", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
