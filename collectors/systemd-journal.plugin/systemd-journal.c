@@ -179,7 +179,7 @@ int fstat64(int fd, struct stat64 *buf) {
     "|_UID"                                     \
     "|_GID"                                     \
     "|_COMM"                                    \
-    /* "|_EXE" */                               \
+    "|_EXE"                                     \
     /* "|_CMDLINE" */                           \
     "|_CAP_EFFECTIVE"                           \
     /* "|_AUDIT_SESSION" */                     \
@@ -218,7 +218,7 @@ int fstat64(int fd, struct stat64 *buf) {
     "|OBJECT_UID"                               \
     "|OBJECT_GID"                               \
     "|OBJECT_COMM"                              \
-    /* "|OBJECT_EXE" */                         \
+    "|OBJECT_EXE"                               \
     /* "|OBJECT_CMDLINE" */                     \
     /* "|OBJECT_AUDIT_SESSION" */               \
     "|OBJECT_AUDIT_LOGINUID"                    \

@@ -1458,7 +1458,7 @@ void facets_set_query(FACETS *facets, const char *query) {
     if(!query)
         return;
 
-    facets->query = simple_pattern_create(query, " \t", SIMPLE_PATTERN_SUBSTRING, false);
+    facets->query = simple_pattern_create(query, "|", SIMPLE_PATTERN_SUBSTRING, false);
 }
 
 void facets_set_items(FACETS *facets, uint32_t items) {
