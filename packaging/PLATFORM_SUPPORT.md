@@ -98,7 +98,6 @@ with minimal user effort.
 | Alpine Linux  | Edge       | No                       |                                                                                                      |
 | Alpine Linux  | 3.17       | No                       |                                                                                                      |
 | Alpine Linux  | 3.16       | No                       |                                                                                                      |
-| Alpine Linux  | 3.15       | No                       |                                                                                                      |
 | Arch Linux    | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | openSUSE      | Tumbleweed | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.41.0 of the Netdata Agent |
