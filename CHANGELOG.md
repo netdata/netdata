@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- add order in available histograms [\#16204](https://github.com/netdata/netdata/pull/16204) ([ktsaou](https://github.com/ktsaou))
+- update ui to 6.50.2 again [\#16202](https://github.com/netdata/netdata/pull/16202) ([ktsaou](https://github.com/ktsaou))
+- update ui to 6.50.2 [\#16201](https://github.com/netdata/netdata/pull/16201) ([ktsaou](https://github.com/ktsaou))
+- health: attach drops ratio alarms to net.drops [\#16199](https://github.com/netdata/netdata/pull/16199) ([ilyam8](https://github.com/ilyam8))
+- apps: always expose "other" group [\#16198](https://github.com/netdata/netdata/pull/16198) ([ilyam8](https://github.com/ilyam8))
+- journal timeout [\#16195](https://github.com/netdata/netdata/pull/16195) ([ktsaou](https://github.com/ktsaou))
+- systemd-journal timeout to 55 secs [\#16194](https://github.com/netdata/netdata/pull/16194) ([ktsaou](https://github.com/ktsaou))
+- update bundled UI to v6.49.0 [\#16192](https://github.com/netdata/netdata/pull/16192) ([ilyam8](https://github.com/ilyam8))
+- Faster facets [\#16190](https://github.com/netdata/netdata/pull/16190) ([ktsaou](https://github.com/ktsaou))
 - Journal updates [\#16189](https://github.com/netdata/netdata/pull/16189) ([ktsaou](https://github.com/ktsaou))
 - Add agent version on startup [\#16188](https://github.com/netdata/netdata/pull/16188) ([stelfrag](https://github.com/stelfrag))
 - Suppress "families" log [\#16186](https://github.com/netdata/netdata/pull/16186) ([stelfrag](https://github.com/stelfrag))
@@ -417,17 +426,6 @@
 - fix cpu MHz from /proc/cpuinfo [\#15584](https://github.com/netdata/netdata/pull/15584) ([ilyam8](https://github.com/ilyam8))
 - small readme icon fix [\#15583](https://github.com/netdata/netdata/pull/15583) ([andrewm4894](https://github.com/andrewm4894))
 - update pandas collector metadata [\#15582](https://github.com/netdata/netdata/pull/15582) ([andrewm4894](https://github.com/andrewm4894))
-- Update zscores metadata yaml [\#15581](https://github.com/netdata/netdata/pull/15581) ([andrewm4894](https://github.com/andrewm4894))
-- Create metadata.yaml for MongoDB exporter [\#15580](https://github.com/netdata/netdata/pull/15580) ([shyamvalsan](https://github.com/shyamvalsan))
-- Create metadata.yaml for JSON exporter [\#15579](https://github.com/netdata/netdata/pull/15579) ([shyamvalsan](https://github.com/shyamvalsan))
-- Create metadata.yaml for Google PubSub exporter [\#15578](https://github.com/netdata/netdata/pull/15578) ([shyamvalsan](https://github.com/shyamvalsan))
-- Create metadata.yaml for AWS kinesis exporter [\#15577](https://github.com/netdata/netdata/pull/15577) ([shyamvalsan](https://github.com/shyamvalsan))
-- Create multi\_metadata.yaml for graphite exporters [\#15576](https://github.com/netdata/netdata/pull/15576) ([shyamvalsan](https://github.com/shyamvalsan))
-- Create multi\_metadata.yaml [\#15575](https://github.com/netdata/netdata/pull/15575) ([shyamvalsan](https://github.com/shyamvalsan))
-- Add missing file in CMakeLists.txt [\#15574](https://github.com/netdata/netdata/pull/15574) ([stelfrag](https://github.com/stelfrag))
-- comment out anomalies metadata and add note [\#15573](https://github.com/netdata/netdata/pull/15573) ([andrewm4894](https://github.com/andrewm4894))
-- Fixed deployment commands for Docker, Kubernetes and Linux [\#15572](https://github.com/netdata/netdata/pull/15572) ([sashwathn](https://github.com/sashwathn))
-- filter out systemd-udevd.service/udevd [\#15571](https://github.com/netdata/netdata/pull/15571) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
