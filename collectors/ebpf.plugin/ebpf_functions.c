@@ -3203,13 +3203,13 @@ static void ebpf_swap_clean_judy_array_unsafe()
  * @param pid         the process PID
  * @param values      data read from hash table
  * @param name        the process name
- * @param pname       parent name
+ * @param apps_group  the apps group name
  */
 static void ebpf_fill_swap_function_buffer(BUFFER *wb,
                                           uint32_t pid,
                                           netdata_publish_swap_kernel_t *values,
                                           char *name,
-                                          char *pname)
+                                          char *apps_group)
 {
     buffer_json_add_array_item_array(wb);
 
@@ -3222,8 +3222,8 @@ static void ebpf_fill_swap_function_buffer(BUFFER *wb,
     // NAME
     buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
 
-    // PNAME
-    buffer_json_add_array_item_string(wb, (pname[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+    // APPS Group
+    buffer_json_add_array_item_string(wb, (apps_group != NULL) ? apps_group : EBPF_APPS_GROUP_OTHER);
 
     // Read
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->read);
@@ -3259,7 +3259,11 @@ static void ebpf_fill_swap_function_buffer_unsafe(BUFFER *buf)
         if (pid_ptr->swap_stats.JudyLArray) {
             while ((swap_value = JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_timestamp, &first_swap))) {
                 netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
-                ebpf_fill_swap_function_buffer(buf, local_pid, &values->data, pid_ptr->name, pid_ptr->pname);
+                ebpf_fill_swap_function_buffer(buf,
+                                               local_pid,
+                                               &values->data,
+                                               pid_ptr->name,
+                                               (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             }
             counter++;
         }
@@ -3269,7 +3273,7 @@ static void ebpf_fill_swap_function_buffer_unsafe(BUFFER *buf)
     if (!counter) {
         netdata_publish_swap_t fake_swap = { };
 
-        ebpf_fill_swap_function_buffer(buf, getpid(), &fake_swap.data, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
+        ebpf_fill_swap_function_buffer(buf, getpid(), &fake_swap.data, EBPF_NOT_IDENFIED, NULL);
     }
 }
 
@@ -3291,7 +3295,7 @@ static void ebpf_swap_read_judy(BUFFER *buf, struct ebpf_module *em)
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
         netdata_publish_swap_t fake_swap = { };
 
-        ebpf_fill_swap_function_buffer(buf, getpid(), &fake_swap.data, EBPF_NOT_IDENFIED, EBPF_NOT_IDENFIED);
+        ebpf_fill_swap_function_buffer(buf, getpid(), &fake_swap.data, EBPF_NOT_IDENFIED, NULL);
         return;
     }
 
@@ -3424,23 +3428,22 @@ void ebpf_function_swap_manipulation(const char *transaction,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
 
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Parent Name",
-            "Parent Name",
-            RRDF_FIELD_TYPE_STRING,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NONE,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
+        buffer_rrdf_table_add_field(wb,
+                                    fields_id++,
+                                    "Apps Group",
+                                    "Apps Group",
+                                    RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TRANSFORM_NONE,
+                                    0,
+                                    NULL,
+                                    NAN,
+                                    RRDF_FIELD_SORT_ASCENDING,
+                                    NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
         buffer_rrdf_table_add_field(
             wb,
@@ -3543,13 +3546,13 @@ void ebpf_function_swap_manipulation(const char *transaction,
         }
         buffer_json_object_close(wb);
 
-        // group by Parent Name
-        buffer_json_member_add_object(wb, "Parent Name");
+        // group by Apps Group
+        buffer_json_member_add_object(wb, "Apps Group");
         {
-            buffer_json_member_add_string(wb, "name", "Parent Name");
+            buffer_json_member_add_string(wb, "name", "Apps Group");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Parent Name");
+                buffer_json_add_array_item_string(wb, "Apps Group");
             }
             buffer_json_array_close(wb);
         }
