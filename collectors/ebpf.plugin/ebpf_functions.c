@@ -1085,6 +1085,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+
+        // group by Apps Group
+        buffer_json_member_add_object(wb, "Apps Group");
+        {
+            buffer_json_member_add_string(wb, "name", "Apps Group");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Apps Group");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // group_by
 
@@ -1575,7 +1587,7 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
         }
         buffer_json_object_close(wb);
 
-        // group by Process Name
+        // group by Apps Group Name
         buffer_json_member_add_object(wb, "Apps Group");
         {
             buffer_json_member_add_string(wb, "name", "Apps Group");
@@ -2076,6 +2088,18 @@ void ebpf_function_fd_manipulation(const char *transaction,
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Process Name");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Apps Group Name
+        buffer_json_member_add_object(wb, "Apps Group");
+        {
+            buffer_json_member_add_string(wb, "name", "Apps Group");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Apps Group");
             }
             buffer_json_array_close(wb);
         }
