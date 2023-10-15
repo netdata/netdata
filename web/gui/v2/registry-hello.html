@@ -39,7 +39,7 @@
             })
           }
           doAccess(data.machine_guid, data.hostname)
-        })
+        }).catch(() => {})
       }
 
       try {
