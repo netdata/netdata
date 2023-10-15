@@ -578,15 +578,21 @@ chmod 755 systemd-journal-self-signed-certs.sh
 Edit the script and at its top, set your settings:
 
 ```sh
-# set the server name
+# The directory to save the generated certificates (and everything about this certificate authority).
+# This is only used on the node generating the certificates (usually on the journals server).
+DIR="/etc/ssl/systemd-journal-remote"
+
+# The journals centralization server name (the CN of the server certificate).
 SERVER="server-hostname"
 
-# Define all the names or IPs this server is reachable
-# journal clients can use any of them to connect to this server
+# All the DNS names or IPs this server is reachable at (the certificate will include them).
+# Journal clients can use any of them to connect to this server.
+# systemd-journal-upload validates its URL= hostname, against this list.
 SERVER_ALIASES=("DNS:server-hostname1" "DNS:server-hostname2" "IP:1.2.3.4" "IP:10.1.1.1" "IP:172.16.1.1")
 
-# Define all the names of the clients who will be sending data to the server
-# These names are used by journal-remote to name the files in /var/log/journal/remote/
+# All the names of the journal clients that will be sending logs to the server (the CNs of their certificates).
+# These names are used by systemd-journal-remote to name the journal files in /var/log/journal/remote/.
+# Also the remote hosts will be presented using these names on Netdata dashboards.
 CLIENTS=("vm1" "vm2" "vm3" "add_as_may_as_needed")
 ```
 
