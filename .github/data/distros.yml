@@ -44,11 +44,6 @@ include:
     support_type: Intermediate
     notes: ''
     eol_check: true
-  - <<: *alpine
-    version: "3.15"
-    support_type: Intermediate
-    notes: ''
-    eol_check: true
 
   - distro: archlinux
     version: latest
