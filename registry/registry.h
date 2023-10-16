@@ -66,7 +66,7 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
 int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
 int registry_request_search_json(RRDHOST *host, struct web_client *w, char *person_guid, char *request_machine);
 int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *person_guid, char *machine_guid, char *url, char *new_person_guid, time_t when);
-int registry_request_hello_json(RRDHOST *host, struct web_client *w);
+int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not_track);
 
 // update the registry config
 void registry_update_cloud_base_url();
