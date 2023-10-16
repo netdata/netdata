@@ -1401,8 +1401,6 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    time_t expires = now_realtime_sec() + em->update_every;
-
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -1643,6 +1641,8 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
         buffer_json_array_close(wb);
     }
     buffer_json_array_close(wb);
+
+    time_t expires = now_realtime_sec() + em->update_every;
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
@@ -2399,8 +2399,6 @@ void ebpf_function_process_manipulation(const char *transaction,
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    time_t expires = now_realtime_sec() + em->update_every;
-
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -2683,6 +2681,8 @@ void ebpf_function_process_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // group by
 
+    time_t expires = now_realtime_sec() + em->update_every;
+
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
@@ -2941,8 +2941,6 @@ void ebpf_function_shm_manipulation(const char *transaction,
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    time_t expires = now_realtime_sec() + em->update_every;
-
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -3148,6 +3146,8 @@ void ebpf_function_shm_manipulation(const char *transaction,
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // group by
+
+    time_t expires = now_realtime_sec() + em->update_every;
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
@@ -3402,8 +3402,6 @@ void ebpf_function_swap_manipulation(const char *transaction,
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    time_t expires = now_realtime_sec() + em->update_every;
-
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -3589,6 +3587,8 @@ void ebpf_function_swap_manipulation(const char *transaction,
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // group by
+
+    time_t expires = now_realtime_sec() + em->update_every;
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
