@@ -1440,7 +1440,7 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
 
         buffer_rrdf_table_add_field(wb,
                                     fields_id++,
-                                    "Process Name",
+                                    "PName",
                                     "Process Name",
                                     RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE,
@@ -1485,8 +1485,8 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     NAN,
                                     RRDF_FIELD_SORT_ASCENDING,
                                     NULL,
-                                    RRDF_FIELD_SUMMARY_MEAN,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_MAX,
+                                    RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
@@ -1503,7 +1503,7 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     RRDF_FIELD_SORT_ASCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
@@ -1520,7 +1520,7 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     RRDF_FIELD_SORT_ASCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
@@ -1537,35 +1537,23 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     RRDF_FIELD_SORT_ASCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
     }
     buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "HitRatio");
 
     buffer_json_member_add_object(wb, "charts");
     {
         // Cachestat Ratio
         buffer_json_member_add_object(wb, "CachestatRatio");
         {
-            buffer_json_member_add_string(wb, "name", "Hit Ratio");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "name", "HitRatio");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "ratio");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Cachestat Dirty
-        buffer_json_member_add_object(wb, "CachestatDirties");
-        {
-            buffer_json_member_add_string(wb, "name", "Dirties");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "dirty");
+                buffer_json_add_array_item_string(wb, "HitRatio");
             }
             buffer_json_array_close(wb);
         }
@@ -1578,20 +1566,20 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
             buffer_json_member_add_string(wb, "type", "line");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "hit");
+                buffer_json_add_array_item_string(wb, "Hits");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // Cachestat Hits
+        // Cachestat Misses
         buffer_json_member_add_object(wb, "CachestatMisses");
         {
-            buffer_json_member_add_string(wb, "name", "Miss");
+            buffer_json_member_add_string(wb, "name", "Misses");
             buffer_json_member_add_string(wb, "type", "line");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "miss");
+                buffer_json_add_array_item_string(wb, "Misses");
             }
             buffer_json_array_close(wb);
         }
@@ -1617,12 +1605,12 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "Process Name");
+        buffer_json_member_add_object(wb, "PName");
         {
-            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_string(wb, "name", "PName");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Process Name");
+                buffer_json_add_array_item_string(wb, "PName");
             }
             buffer_json_array_close(wb);
         }
@@ -1641,6 +1629,20 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "CachestatRatio");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "CachestatMisses");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
 
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
