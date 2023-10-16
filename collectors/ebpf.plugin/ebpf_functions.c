@@ -2950,7 +2950,7 @@ void ebpf_function_shm_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Process Name",
+            "PName",
             "Process Name",
             RRDF_FIELD_TYPE_STRING,
             RRDF_FIELD_VISUAL_VALUE,
@@ -3065,18 +3065,18 @@ void ebpf_function_shm_manipulation(const char *transaction,
             buffer_json_member_add_string(wb, "type", "line");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "get");
-                buffer_json_add_array_item_string(wb, "dt");
-                buffer_json_add_array_item_string(wb, "at");
-                buffer_json_add_array_item_string(wb, "ctl");
+                buffer_json_add_array_item_string(wb, "GET");
+                buffer_json_add_array_item_string(wb, "DT");
+                buffer_json_add_array_item_string(wb, "AT");
+                buffer_json_add_array_item_string(wb, "CTL");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
+    buffer_json_member_add_string(wb, "default_sort_column", "PID");
 
-    // Do we use only on fields that can be groupped?
     buffer_json_member_add_object(wb, "group_by");
     {
         // group by PID
@@ -3092,9 +3092,9 @@ void ebpf_function_shm_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "Process Name");
+        buffer_json_member_add_object(wb, "PName");
         {
-            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_string(wb, "name", "PName");
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Process Name");
@@ -3116,6 +3116,15 @@ void ebpf_function_shm_manipulation(const char *transaction,
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // group by
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "SharedMemoryCalls");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
 
     time_t expires = now_realtime_sec() + em->update_every;
 
