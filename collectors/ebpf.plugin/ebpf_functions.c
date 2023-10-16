@@ -1628,7 +1628,7 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
         }
         buffer_json_object_close(wb);
     }
-    buffer_json_object_close(wb); // charts
+    buffer_json_object_close(wb); // group by
 
     buffer_json_member_add_array(wb, "default_charts");
     {
@@ -1902,8 +1902,6 @@ void ebpf_function_fd_manipulation(const char *transaction,
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    time_t expires = now_realtime_sec() + em->update_every;
-
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -1943,7 +1941,7 @@ void ebpf_function_fd_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Process Name",
+            "PName",
             "Process Name",
             RRDF_FIELD_TYPE_STRING,
             RRDF_FIELD_VISUAL_VALUE,
@@ -1996,7 +1994,7 @@ void ebpf_function_fd_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Open Error",
+            "OpenError",
             "Errors when files were open.",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
@@ -2032,7 +2030,7 @@ void ebpf_function_fd_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Close Error",
+            "CloseError",
             "Errors when files were closed",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
@@ -2051,55 +2049,29 @@ void ebpf_function_fd_manipulation(const char *transaction,
 
     buffer_json_member_add_object(wb, "charts");
     {
-        // File Descriptor
-        buffer_json_member_add_object(wb, "FileDescriptor");
+        // File Open
+        buffer_json_member_add_object(wb, "FileOpen");
         {
-            buffer_json_member_add_string(wb, "name", "File Descriptor");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "name", "Files opened during last period of time.");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "open");
-                buffer_json_add_array_item_string(wb, "close");
+                buffer_json_add_array_item_string(wb, "Open");
+                buffer_json_add_array_item_string(wb, "OpenError");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // File Error
-        buffer_json_member_add_object(wb, "FileError");
+        // File Close
+        buffer_json_member_add_object(wb, "FileClose");
         {
-            buffer_json_member_add_string(wb, "name", "File Descriptor Error");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "name", "Files closed during last period of time.");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "open");
-                buffer_json_add_array_item_string(wb, "close");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Cachestat Hits
-        buffer_json_member_add_object(wb, "CachestatHits");
-        {
-            buffer_json_member_add_string(wb, "name", "Hits");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "hit");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Cachestat Hits
-        buffer_json_member_add_object(wb, "CachestatMisses");
-        {
-            buffer_json_member_add_string(wb, "name", "Miss");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "miss");
+                buffer_json_add_array_item_string(wb, "Close");
+                buffer_json_add_array_item_string(wb, "CloseError");
             }
             buffer_json_array_close(wb);
         }
@@ -2107,7 +2079,7 @@ void ebpf_function_fd_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // charts
 
-    buffer_json_member_add_string(wb, "default_sort_column", "PID");
+    buffer_json_member_add_string(wb, "default_sort_column", "Open");
 
     // Do we use only on fields that can be groupped?
     buffer_json_member_add_object(wb, "group_by");
@@ -2125,12 +2097,12 @@ void ebpf_function_fd_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "Process Name");
+        buffer_json_member_add_object(wb, "PName");
         {
-            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_string(wb, "name", "PName");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Process Name");
+                buffer_json_add_array_item_string(wb, "PName");
             }
             buffer_json_array_close(wb);
         }
@@ -2150,6 +2122,21 @@ void ebpf_function_fd_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // group by
 
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "FileOpen");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "FileClose");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    time_t expires = now_realtime_sec() + em->update_every;
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
