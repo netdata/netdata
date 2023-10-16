@@ -83,12 +83,11 @@ int fstat64(int fd, struct stat64 *buf) {
 
     int ret = real_fstat(fd, buf);
 
-    if(fd >= 0 && fd < FSTAT_CACHE_MAX && fstat64_cache[fd].enabled) {
+    if(fd >= 0 && fd < FSTAT_CACHE_MAX && fstat64_cache[fd].enabled && fstat64_cache[fd].session == fstat_caching_thread_session) {
         fstat64_cache[fd].ret = ret;
         fstat64_cache[fd].updated = true;
         fstat64_cache[fd].err_no = errno;
         fstat64_cache[fd].stat = *buf;
-        fstat64_cache[fd].session = fstat_caching_thread_session;
     }
 
     return ret;
@@ -718,6 +717,7 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
     };
 
     if(sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+        netdata_log_error("JOURNAL: cannot open file '%s' for query", filename);
         fstat_cache_disable_on_thread();
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
     }
@@ -787,6 +787,7 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
 
     sd_journal *j = NULL;
     if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+        netdata_log_error("JOURNAL: cannot open file '%s' to update msg_ut", filename);
         fstat_cache_disable_on_thread();
 
         if(!jf->logged_failure) {
@@ -1878,16 +1879,35 @@ static void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unu
                 };
 
                 sd_journal *j = NULL;
-                if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j)
+                if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+                    internal_error(true, "JOURNAL: cannot open file '%s' to get boot_id", jf_dfe.name);
                     continue;
+                }
 
                 char m[100];
                 size_t len = snprintfz(m, sizeof(m), "_BOOT_ID=%s", boot_id);
+
+                if(sd_journal_add_match(j, m, len) < 0) {
+                    internal_error(true, "JOURNAL: cannot add match '%s' to file '%s'", m, jf_dfe.name);
+                    sd_journal_close(j);
+                    continue;
+                }
+
+                if(sd_journal_seek_head(j) < 0) {
+                    internal_error(true, "JOURNAL: cannot seek head to file '%s'", jf_dfe.name);
+                    sd_journal_close(j);
+                    continue;
+                }
+
+                if(sd_journal_next(j) < 0) {
+                    internal_error(true, "JOURNAL: cannot get next of file '%s'", jf_dfe.name);
+                    sd_journal_close(j);
+                    continue;
+                }
+
                 usec_t t_ut = 0;
-                if(sd_journal_add_match(j, m, len) < 0 ||
-                   sd_journal_seek_head(j) < 0 ||
-                   sd_journal_next(j) < 0 ||
-                   sd_journal_get_realtime_usec(j, &t_ut) < 0 || !t_ut) {
+                if(sd_journal_get_realtime_usec(j, &t_ut) < 0 || !t_ut) {
+                    internal_error(true, "JOURNAL: cannot get realtime_usec of file '%s'", jf_dfe.name);
                     sd_journal_close(j);
                     continue;
                 }
