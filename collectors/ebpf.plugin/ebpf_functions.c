@@ -3420,7 +3420,7 @@ void ebpf_function_swap_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Process Name",
+            "PName",
             "Process Name",
             RRDF_FIELD_TYPE_STRING,
             RRDF_FIELD_VISUAL_VALUE,
@@ -3487,38 +3487,21 @@ void ebpf_function_swap_manipulation(const char *transaction,
             RRDF_FIELD_FILTER_MULTISELECT,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
-
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Write",
-            "Events writing data on swap",
-            RRDF_FIELD_TYPE_INTEGER,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NUMBER,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_SUM,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
     }
     buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "PID");
 
     buffer_json_member_add_object(wb, "charts");
     {
         // Process and Thread
         buffer_json_member_add_object(wb, "SWAPCalls");
         {
-            buffer_json_member_add_string(wb, "name", "SWAP calls");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "name", "SWAPCalls");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "read");
-                buffer_json_add_array_item_string(wb, "write");
+                buffer_json_add_array_item_string(wb, "Read");
+                buffer_json_add_array_item_string(wb, "Write");
             }
             buffer_json_array_close(wb);
         }
@@ -3542,12 +3525,12 @@ void ebpf_function_swap_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "Process Name");
+        buffer_json_member_add_object(wb, "PName");
         {
-            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_string(wb, "name", "PName");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Process Name");
+                buffer_json_add_array_item_string(wb, "PName");
             }
             buffer_json_array_close(wb);
         }
@@ -3566,6 +3549,17 @@ void ebpf_function_swap_manipulation(const char *transaction,
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // group by
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "SWAPCalls");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_string(wb, "default_sort_column", "PID");
 
     time_t expires = now_realtime_sec() + em->update_every;
 
