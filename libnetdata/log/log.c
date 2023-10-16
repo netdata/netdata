@@ -12,11 +12,11 @@ int web_server_is_multithreaded = 1;
 const char *program_name = "";
 uint64_t debug_flags = 0;
 
-int access_log_syslog = 1;
-int error_log_syslog = 1;
-int collector_log_syslog = 1;
-int output_log_syslog = 1;  // debug log
-int health_log_syslog = 1;
+int access_log_syslog = 0;
+int error_log_syslog = 0;
+int collector_log_syslog = 0;
+int output_log_syslog = 0;  // debug log
+int health_log_syslog = 0;
 
 int stdaccess_fd = -1;
 FILE *stdaccess = NULL;

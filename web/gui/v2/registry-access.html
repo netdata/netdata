@@ -14,7 +14,7 @@
           var nodes = helloData.nodes || []
 
           var doAccess = function(mg, nm, token) {
-            fetch(helloData.registry + '/api/v1/registry?action=access&machine=' + (mg || helloData.machine_guid) + '&name=' + encodeURIComponent(nm || helloData.hostname) + '&url=' + encodeURIComponent(originUrl) + '&agent=' + (helloData.agent ? helloData.agent.machine_guid : ""), { cache: "no-cache", credentials: "include", headers: { Authorization: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
+            fetch(helloData.registry + '/api/v1/registry?action=access&machine=' + (mg || helloData.machine_guid) + '&name=' + encodeURIComponent(nm || helloData.hostname) + '&url=' + encodeURIComponent(originUrl) + '&agent=' + (helloData.agent ? helloData.agent.machine_guid : ""), { cache: "no-cache", credentials: "include", headers: { ["X-Netdata-Auth"]: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
             .then(function(response) { return response.json() })
             .then(function(data) {
               var token = data.person_guid

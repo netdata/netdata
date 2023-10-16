@@ -3813,7 +3813,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         if (enable_detailed_uptime_charts) {
             send_BEGIN(type, w->clean_name, "uptime_summary", dt);
             send_SET("min", w->uptime_min);
-            send_SET("avg", w->uptime_sum / w->processes);
+            send_SET("avg", w->processes > 0 ? w->uptime_sum / w->processes : 0);
             send_SET("max", w->uptime_max);
             send_END();
         }
