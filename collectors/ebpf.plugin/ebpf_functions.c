@@ -2438,26 +2438,8 @@ void ebpf_function_process_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
+            "PName",
             "Process Name",
-            "Process Name",
-            RRDF_FIELD_TYPE_STRING,
-            RRDF_FIELD_VISUAL_VALUE,
-            RRDF_FIELD_TRANSFORM_NONE,
-            0,
-            NULL,
-            NAN,
-            RRDF_FIELD_SORT_ASCENDING,
-            NULL,
-            RRDF_FIELD_SUMMARY_COUNT,
-            RRDF_FIELD_FILTER_MULTISELECT,
-            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
-            NULL);
-
-        buffer_rrdf_table_add_field(
-            wb,
-            fields_id++,
-            "Parent Name",
-            "Parent Name",
             RRDF_FIELD_TYPE_STRING,
             RRDF_FIELD_VISUAL_VALUE,
             RRDF_FIELD_TRANSFORM_NONE,
@@ -2491,7 +2473,7 @@ void ebpf_function_process_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Create Task",
+            "CTask",
             "Calls to create a new task (process/thread).",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
@@ -2509,7 +2491,7 @@ void ebpf_function_process_manipulation(const char *transaction,
         buffer_rrdf_table_add_field(
             wb,
             fields_id++,
-            "Create Thread.",
+            "CThread.",
             "Calls to create a new thread.",
             RRDF_FIELD_TYPE_INTEGER,
             RRDF_FIELD_VISUAL_VALUE,
@@ -2583,62 +2565,36 @@ void ebpf_function_process_manipulation(const char *transaction,
     buffer_json_member_add_object(wb, "charts");
     {
         // Process and Thread
-        buffer_json_member_add_object(wb, "ProcessThreead");
+        buffer_json_member_add_object(wb, "ProcessThread");
         {
             buffer_json_member_add_string(wb, "name", "Process and Threads");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "process");
-                buffer_json_add_array_item_string(wb, "thread");
+                buffer_json_add_array_item_string(wb, "CTask");
+                buffer_json_add_array_item_string(wb, "CThread");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
         // Exit
-        buffer_json_member_add_object(wb, "Exit");
+        buffer_json_member_add_object(wb, "ExitRelease");
         {
-            buffer_json_member_add_string(wb, "name", "Exit");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "name", "ExitRelease");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "process");
-                buffer_json_add_array_item_string(wb, "task");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Process Status
-        buffer_json_member_add_object(wb, "ProcessStatus");
-        {
-            buffer_json_member_add_string(wb, "name", "Process Status");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "process");
-                buffer_json_add_array_item_string(wb, "zombie");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Task Error
-        buffer_json_member_add_object(wb, "TaskError");
-        {
-            buffer_json_member_add_string(wb, "name", "Task error");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "process");
-                buffer_json_add_array_item_string(wb, "thread");
+                buffer_json_add_array_item_string(wb, "Exit");
+                buffer_json_add_array_item_string(wb, "Release");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_string(wb, "default_sort_column", "CTask");
 
     // Do we use only on fields that can be groupped?
     buffer_json_member_add_object(wb, "group_by");
@@ -2656,12 +2612,12 @@ void ebpf_function_process_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "Process Name");
+        buffer_json_member_add_object(wb, "PName");
         {
-            buffer_json_member_add_string(wb, "name", "Process Name");
+            buffer_json_member_add_string(wb, "name", "PName");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Process Name");
+                buffer_json_add_array_item_string(wb, "PName");
             }
             buffer_json_array_close(wb);
         }
@@ -2680,6 +2636,20 @@ void ebpf_function_process_manipulation(const char *transaction,
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // group by
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "ProcessThread");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "ExitRelease");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
 
     time_t expires = now_realtime_sec() + em->update_every;
 
