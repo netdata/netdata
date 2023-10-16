@@ -1065,6 +1065,17 @@ static void metadata_init_cmd_queue(struct metadata_wc *wc)
     fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
 }
 
+static void metadata_free_cmd_queue(struct metadata_wc *wc)
+{
+    uv_mutex_lock(&wc->cmd_mutex);
+    while(wc->cmd_queue.cmd_base) {
+        struct metadata_cmd *t = wc->cmd_queue.cmd_base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_queue.cmd_base, t, prev, next);
+        freez(t);
+    }
+    uv_mutex_unlock(&wc->cmd_mutex);
+}
+
 static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
 {
     if (cmd->opcode == METADATA_SYNC_SHUTDOWN) {
@@ -1748,6 +1759,7 @@ static void metadata_event_loop(void *arg)
     completion_mark_complete(&wc->init_complete);
     completion_destroy(wc->scan_complete);
     freez(wc->scan_complete);
+    metadata_free_cmd_queue(wc);
     return;
 
 error_after_timer_init:
