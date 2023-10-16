@@ -1,11 +1,19 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.43.0](https://github.com/netdata/netdata/tree/v1.43.0) (2023-10-16)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.4...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.42.4...v1.43.0)
 
 **Merged pull requests:**
 
+- update bundled UI to v6.52.2 [\#16219](https://github.com/netdata/netdata/pull/16219) ([ilyam8](https://github.com/ilyam8))
+- dynamic meta queue size [\#16218](https://github.com/netdata/netdata/pull/16218) ([ktsaou](https://github.com/ktsaou))
+- update bundled UI to v6.52.1 [\#16217](https://github.com/netdata/netdata/pull/16217) ([ilyam8](https://github.com/ilyam8))
+- update bundled UI to v6.52.0 [\#16216](https://github.com/netdata/netdata/pull/16216) ([ilyam8](https://github.com/ilyam8))
+- disable logging to syslog by default [\#16214](https://github.com/netdata/netdata/pull/16214) ([ilyam8](https://github.com/ilyam8))
+- add summary to /alerts [\#16213](https://github.com/netdata/netdata/pull/16213) ([MrZammler](https://github.com/MrZammler))
+- registry action hello should always work [\#16212](https://github.com/netdata/netdata/pull/16212) ([ktsaou](https://github.com/ktsaou))
+- apps: fix divide by zero when calc avg uptime [\#16211](https://github.com/netdata/netdata/pull/16211) ([ilyam8](https://github.com/ilyam8))
 - allow patterns in journal queries [\#16210](https://github.com/netdata/netdata/pull/16210) ([ktsaou](https://github.com/ktsaou))
 - ui-6.51.0 [\#16208](https://github.com/netdata/netdata/pull/16208) ([ktsaou](https://github.com/ktsaou))
 - add order in available histograms [\#16204](https://github.com/netdata/netdata/pull/16204) ([ktsaou](https://github.com/ktsaou))
@@ -413,19 +421,6 @@
 - FreeBSD yaml update [\#15603](https://github.com/netdata/netdata/pull/15603) ([thiagoftsm](https://github.com/thiagoftsm))
 - Macos yaml update [\#15602](https://github.com/netdata/netdata/pull/15602) ([thiagoftsm](https://github.com/thiagoftsm))
 - minor changes in README.md [\#15601](https://github.com/netdata/netdata/pull/15601) ([tkatsoulas](https://github.com/tkatsoulas))
-- reviewed icos for a bunch of integrations [\#15599](https://github.com/netdata/netdata/pull/15599) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Sample Cloud Notifications metadata for Discord [\#15597](https://github.com/netdata/netdata/pull/15597) ([sashwathn](https://github.com/sashwathn))
-- Updated icons in deploy section [\#15596](https://github.com/netdata/netdata/pull/15596) ([shyamvalsan](https://github.com/shyamvalsan))
-- 10 points per query min [\#15595](https://github.com/netdata/netdata/pull/15595) ([ktsaou](https://github.com/ktsaou))
-- CUPS yaml update [\#15594](https://github.com/netdata/netdata/pull/15594) ([thiagoftsm](https://github.com/thiagoftsm))
-- remove metrics.csv files [\#15593](https://github.com/netdata/netdata/pull/15593) ([ilyam8](https://github.com/ilyam8))
-- fix tomcat meta [\#15592](https://github.com/netdata/netdata/pull/15592) ([ilyam8](https://github.com/ilyam8))
-- Added a sample metadata.yaml for Alerta [\#15591](https://github.com/netdata/netdata/pull/15591) ([sashwathn](https://github.com/sashwathn))
-- remove the noise by silencing alerts that dont need to wake up people [\#15590](https://github.com/netdata/netdata/pull/15590) ([ktsaou](https://github.com/ktsaou))
-- Fix health query [\#15589](https://github.com/netdata/netdata/pull/15589) ([stelfrag](https://github.com/stelfrag))
-- Fix typo in notification schema. [\#15588](https://github.com/netdata/netdata/pull/15588) ([Ferroin](https://github.com/Ferroin))
-- Update icons for relevant integrations in proc.plugin [\#15587](https://github.com/netdata/netdata/pull/15587) ([sashwathn](https://github.com/sashwathn))
-- Update icon for power supply [\#15586](https://github.com/netdata/netdata/pull/15586) ([sashwathn](https://github.com/sashwathn))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
