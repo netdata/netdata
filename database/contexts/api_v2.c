@@ -184,6 +184,7 @@ struct alert_v2_entry {
     RRDCALC *tmp;
 
     STRING *name;
+    STRING *summary;
 
     size_t ati;
 
@@ -315,6 +316,7 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
     t->name = rc->name;
+    t->summary = rc->summary;
     t->ati = ctl->alerts.ati++;
 
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);
@@ -1400,6 +1402,7 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                         {
                             buffer_json_member_add_uint64(wb, "ati", t->ati);
                             buffer_json_member_add_string(wb, "nm", string2str(t->name));
+                            buffer_json_member_add_string(wb, "sum", string2str(t->summary));
 
                             buffer_json_member_add_uint64(wb, "cr", t->critical);
                             buffer_json_member_add_uint64(wb, "wr", t->warning);
