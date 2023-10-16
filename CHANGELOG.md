@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- allow patterns in journal queries [\#16210](https://github.com/netdata/netdata/pull/16210) ([ktsaou](https://github.com/ktsaou))
+- ui-6.51.0 [\#16208](https://github.com/netdata/netdata/pull/16208) ([ktsaou](https://github.com/ktsaou))
 - add order in available histograms [\#16204](https://github.com/netdata/netdata/pull/16204) ([ktsaou](https://github.com/ktsaou))
 - update ui to 6.50.2 again [\#16202](https://github.com/netdata/netdata/pull/16202) ([ktsaou](https://github.com/ktsaou))
 - update ui to 6.50.2 [\#16201](https://github.com/netdata/netdata/pull/16201) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16200](https://github.com/netdata/netdata/pull/16200) ([netdatabot](https://github.com/netdatabot))
 - health: attach drops ratio alarms to net.drops [\#16199](https://github.com/netdata/netdata/pull/16199) ([ilyam8](https://github.com/ilyam8))
 - apps: always expose "other" group [\#16198](https://github.com/netdata/netdata/pull/16198) ([ilyam8](https://github.com/ilyam8))
 - journal timeout [\#16195](https://github.com/netdata/netdata/pull/16195) ([ktsaou](https://github.com/ktsaou))
@@ -38,6 +41,7 @@
 - docker: make chmod o+rX /  non fatal [\#16156](https://github.com/netdata/netdata/pull/16156) ([ilyam8](https://github.com/ilyam8))
 - Batch ML model load commands [\#16155](https://github.com/netdata/netdata/pull/16155) ([stelfrag](https://github.com/stelfrag))
 - \[BUGFIX\] MQTT ARM fix [\#16154](https://github.com/netdata/netdata/pull/16154) ([underhood](https://github.com/underhood))
+- Rework guide, add SSL with self-signed certs [\#16153](https://github.com/netdata/netdata/pull/16153) ([tkatsoulas](https://github.com/tkatsoulas))
 - make io charts "write" negative in apps and cgroups \(systemd\) [\#16152](https://github.com/netdata/netdata/pull/16152) ([ilyam8](https://github.com/ilyam8))
 - journal: updates [\#16150](https://github.com/netdata/netdata/pull/16150) ([ktsaou](https://github.com/ktsaou))
 - uninstaller: remove ND systemd preset and tmp dir [\#16148](https://github.com/netdata/netdata/pull/16148) ([ilyam8](https://github.com/ilyam8))
@@ -422,10 +426,6 @@
 - Fix typo in notification schema. [\#15588](https://github.com/netdata/netdata/pull/15588) ([Ferroin](https://github.com/Ferroin))
 - Update icons for relevant integrations in proc.plugin [\#15587](https://github.com/netdata/netdata/pull/15587) ([sashwathn](https://github.com/sashwathn))
 - Update icon for power supply [\#15586](https://github.com/netdata/netdata/pull/15586) ([sashwathn](https://github.com/sashwathn))
-- Update Slabinfo Logo [\#15585](https://github.com/netdata/netdata/pull/15585) ([sashwathn](https://github.com/sashwathn))
-- fix cpu MHz from /proc/cpuinfo [\#15584](https://github.com/netdata/netdata/pull/15584) ([ilyam8](https://github.com/ilyam8))
-- small readme icon fix [\#15583](https://github.com/netdata/netdata/pull/15583) ([andrewm4894](https://github.com/andrewm4894))
-- update pandas collector metadata [\#15582](https://github.com/netdata/netdata/pull/15582) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
