@@ -5,8 +5,8 @@
 #define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
-#define FACETS_KEYS_HASHTABLE_ENTRIES 127
-#define FACETS_VALUES_HASHTABLE_ENTRIES 31
+#define FACETS_KEYS_HASHTABLE_ENTRIES 15
+#define FACETS_VALUES_HASHTABLE_ENTRIES 15
 
 // ----------------------------------------------------------------------------
 
@@ -29,10 +29,6 @@ static const uint8_t id_encoding_characters_reverse[256] = {
         ['2'] = 56, ['3'] = 57, ['4'] = 58, ['5'] = 59,
         ['6'] = 60, ['7'] = 61, ['8'] = 62, ['9'] = 63
 };
-
-__attribute__((constructor)) void initialize_facets_id_encoding_characters_reverse(void) {
-
-}
 
 #define FACET_STRING_HASH_SIZE 12
 #define FACETS_HASH XXH64_hash_t
@@ -109,11 +105,17 @@ typedef struct simple_hashtable_slot {
 } SIMPLE_HASHTABLE_SLOT;
 
 typedef struct simple_hashtable {
+    size_t resizes;
+    size_t searches;
+    size_t collisions;
+    size_t used;
     size_t size;
     SIMPLE_HASHTABLE_SLOT *hashtable;
 } SIMPLE_HASHTABLE;
 
 static void simple_hashtable_init(SIMPLE_HASHTABLE *ht, size_t size) {
+    ht->resizes = 0;
+    ht->used = 0;
     ht->size = size;
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
 }
@@ -122,22 +124,42 @@ static void simple_hashtable_free(SIMPLE_HASHTABLE *ht) {
     freez(ht->hashtable);
     ht->hashtable = NULL;
     ht->size = 0;
+    ht->used = 0;
+    ht->resizes = 0;
 }
 
-static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_HASH hash) {
+static void simple_hashtable_resize_double(SIMPLE_HASHTABLE *ht);
+
+static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_HASH hash, bool resize) {
     // IMPORTANT:
     // If the hashtable supported deletions, we would need to have a special slot.data value
     // to mark deleted values and assume they are occupied during lookup, but empty during insert.
     // But for our case, we don't need it, since we never delete items from the hashtable.
 
+    ht->searches++;
+
     size_t slot = hash % ht->size;
-    if(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash)
+    if(likely(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash))
         return &ht->hashtable[slot];
+
+    ht->collisions++;
+
+    if(unlikely(resize && ht->size <= (ht->used << 4))) {
+        simple_hashtable_resize_double(ht);
+
+        slot = hash % ht->size;
+        if(likely(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash))
+            return &ht->hashtable[slot];
+
+        ht->collisions++;
+    }
 
     slot = ((hash >> SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS) + 1) % ht->size;
     // Linear probing until we find it
-    while (ht->hashtable[slot].data && ht->hashtable[slot].hash != hash)
+    while (ht->hashtable[slot].data && ht->hashtable[slot].hash != hash) {
         slot = (slot + 1) % ht->size;  // Wrap around if necessary
+        ht->collisions++;
+    }
 
     return &ht->hashtable[slot];
 }
@@ -146,13 +168,14 @@ static void simple_hashtable_resize_double(SIMPLE_HASHTABLE *ht) {
     SIMPLE_HASHTABLE_SLOT *old = ht->hashtable;
     size_t old_size = ht->size;
 
-    ht->size = (ht->size * 2) + 1;
+    ht->resizes++;
+    ht->size = (ht->size << 3) - 1;
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
     for(size_t i = 0 ; i < old_size ; i++) {
         if(!old[i].data)
             continue;
 
-        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(ht, old[i].hash);
+        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(ht, old[i].hash, false);
         *slot = old[i];
     }
 
@@ -330,7 +353,6 @@ struct facets {
         struct {
             size_t registered;
             size_t unique;
-            size_t hashtable_increases;
         } keys;
 
         struct {
@@ -341,7 +363,6 @@ struct facets {
             size_t indexed;
             size_t inserts;
             size_t conflicts;
-            size_t hashtable_increases;
         } values;
 
         struct {
@@ -448,12 +469,12 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const 
 }
 
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, hash, true);
     return slot->data;
 }
 
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VALUE * const tv) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, tv->hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, tv->hash, true);
 
     if(slot->data) {
         // already exists
@@ -468,6 +489,7 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     FACET_VALUE *v = mallocz(sizeof(*v));
     slot->hash = tv->hash;
     slot->data = v;
+    k->values.ht.used++;
 
     memcpy(v, tv, sizeof(*v));
 
@@ -488,11 +510,6 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     }
 
     k->facets->operations.values.inserts++;
-
-    if(unlikely(k->values.used > k->values.ht.size / 2)) {
-        simple_hashtable_resize_double(&k->values.ht);
-        k->facets->operations.values.hashtable_increases++;
-    }
 
     return v;
 }
@@ -589,7 +606,7 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
     return slot->data;
 }
 
@@ -669,7 +686,7 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
 static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH hash, const char *name, size_t name_length, FACET_KEY_OPTIONS options) {
     facets->operations.keys.registered++;
 
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash);
+    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
 
     if(unlikely(!slot->data)) {
         // we have to add it
@@ -677,11 +694,7 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
 
         slot->hash = hash;
         slot->data = k;
-
-        if(facets->keys.count > facets->keys.ht.size / 2) {
-            simple_hashtable_resize_double(&facets->keys.ht);
-            facets->operations.keys.hashtable_increases++;
-        }
+        facets->keys.ht.used++;
 
         return k;
     }
@@ -2520,13 +2533,36 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         buffer_json_object_close(wb); // rows
         buffer_json_member_add_object(wb, "keys");
         {
+            size_t resizes = 0, searches = 0, collisions = 0, used = 0, size = 0, count = 0;
+            count++;
+            used += facets->keys.ht.used;
+            size += facets->keys.ht.size;
+            resizes += facets->keys.ht.resizes;
+            searches += facets->keys.ht.searches;
+            collisions += facets->keys.ht.collisions;
+
             buffer_json_member_add_uint64(wb, "registered", facets->operations.keys.registered);
             buffer_json_member_add_uint64(wb, "unique", facets->operations.keys.unique);
-            buffer_json_member_add_uint64(wb, "hashtable_increases", facets->operations.keys.hashtable_increases);
+            buffer_json_member_add_uint64(wb, "hashtables", count);
+            buffer_json_member_add_uint64(wb, "hashtable_used", used);
+            buffer_json_member_add_uint64(wb, "hashtable_size", size);
+            buffer_json_member_add_uint64(wb, "hashtable_searches", searches);
+            buffer_json_member_add_uint64(wb, "hashtable_collisions", collisions);
+            buffer_json_member_add_uint64(wb, "hashtable_resizes", resizes);
         }
         buffer_json_object_close(wb); // keys
         buffer_json_member_add_object(wb, "values");
         {
+            size_t resizes = 0, searches = 0, collisions = 0, used = 0, size = 0, count = 0;
+            for(FACET_KEY *k = facets->keys.ll; k ; k = k->next) {
+                count++;
+                used += k->values.ht.used;
+                size += k->values.ht.size;
+                resizes += k->values.ht.resizes;
+                searches += k->values.ht.searches;
+                collisions += k->values.ht.collisions;
+            }
+
             buffer_json_member_add_uint64(wb, "registered", facets->operations.values.registered);
             buffer_json_member_add_uint64(wb, "transformed", facets->operations.values.transformed);
             buffer_json_member_add_uint64(wb, "dynamic", facets->operations.values.dynamic);
@@ -2534,7 +2570,12 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             buffer_json_member_add_uint64(wb, "indexed", facets->operations.values.indexed);
             buffer_json_member_add_uint64(wb, "inserts", facets->operations.values.inserts);
             buffer_json_member_add_uint64(wb, "conflicts", facets->operations.values.conflicts);
-            buffer_json_member_add_uint64(wb, "hashtable_increases", facets->operations.values.hashtable_increases);
+            buffer_json_member_add_uint64(wb, "hashtables", count);
+            buffer_json_member_add_uint64(wb, "hashtable_used", used);
+            buffer_json_member_add_uint64(wb, "hashtable_size", size);
+            buffer_json_member_add_uint64(wb, "hashtable_searches", searches);
+            buffer_json_member_add_uint64(wb, "hashtable_collisions", collisions);
+            buffer_json_member_add_uint64(wb, "hashtable_resizes", resizes);
         }
         buffer_json_object_close(wb); // values
         buffer_json_member_add_object(wb, "fts");
