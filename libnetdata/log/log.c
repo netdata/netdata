@@ -13,7 +13,7 @@ const char *program_name = "";
 uint64_t debug_flags = 0;
 
 int access_log_syslog = 1;
-int error_log_syslog = 1;
+int error_log_syslog = 0;
 int collector_log_syslog = 1;
 int output_log_syslog = 1;  // debug log
 int health_log_syslog = 1;
