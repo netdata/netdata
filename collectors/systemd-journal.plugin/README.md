@@ -62,7 +62,7 @@ The following are limitations related to the features of `systemd` journal:
 - This plugin does not support multiple values per field for any given log entry. `systemd` journal has the ability to
   accept the same field key, multiple times, with multiple values on a single log entry. This plugin will present the
   last value and ignore the others for this log entry.
-- This plugin will only read journal files located in `/var/log/journal` or `/run/log/journal`. `systemd-remote` has the
+- This plugin will only read journal files located in `/var/log/journal` or `/run/log/journal`. `systemd-journal-remote` has the
   ability to store journal files anywhere (user configured). If journal files are not located in `/var/log/journal`
   or `/run/log/journal` (and any of their subdirectories), the plugin will not find them.
 
