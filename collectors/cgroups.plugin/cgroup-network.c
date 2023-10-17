@@ -288,7 +288,8 @@ int switch_namespace(const char *prefix, pid_t pid) {
 pid_t read_pid_from_cgroup_file(const char *filename) {
     int fd = open(filename, procfile_open_flags);
     if(fd == -1) {
-        collector_error("Cannot open pid_from_cgroup() file '%s'.", filename);
+        if (errno != ENOENT)
+            collector_error("Cannot open pid_from_cgroup() file '%s'.", filename);
         return 0;
     }
 
