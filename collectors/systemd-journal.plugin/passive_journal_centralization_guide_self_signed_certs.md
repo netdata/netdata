@@ -16,13 +16,17 @@ Keep in mind that the authorization involved works like this:
 
 1. The server (`systemd-journal-remote`) validates that the sender (`systemd-journal-upload`) uses a trusted certificate (a certificate issued by the same certificate authority as its own).
    So, **the server will accept logs from any client having a trusted certificate**.
-2. The client (`systemd-journal-upload`) validates that the receiver (`systemd-journal-remote`) uses a trusted certificate (like the server does) and it also checks that the hostname of the URL specified to its configuration, matches one of the names of the server it gets connected to. So, the client does a validation that it connected to the right server, using the URL hostname against the names of the server on its certificate.
+2. The client (`systemd-journal-upload`) validates that the receiver (`systemd-journal-remote`) uses a trusted certificate (like the server does) and it also checks that the hostname of the URL specified to its configuration, matches one of the names of the server it gets connected to. So, **the client does a validation that it connected to the right server**, using the URL hostname against the names of the server on its certificate.
 
 This means, that if both certificates are issued by the same certificate authority, only the client can potentially reject the server.
 
 ## Self-signed certificates
 
-Use [this script](https://gist.github.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7) to create a self-signed certificates authority and certificates for all your servers.
+To simplify the process of creating the self-signed certificates, we have created [this script](https://gist.github.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7). It also automates the process of distributing them to your servers (it generates a script to copy to each of your servers, which includes everything required for `systemd-journal-remote` to work).
+
+We suggest to keep this script and all the involved certificates at the journals centralization server, in the directory `/etc/ssl/systemd-journal-remote`, so that you can make future changes as required.
+
+The script can be edited and re-run to create new certificates as clients are added to your network. The existing certificates will not be altered, allowing existing to connections to work uninterrupted while new journal clients are added to your network.
 
 ```bash
 wget -O systemd-journal-self-signed-certs.sh "https://gist.githubusercontent.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7/raw/c346e61e0a66f45dc4095d254bd23917f0a01bd0/systemd-journal-self-signed-certs.sh"
@@ -58,9 +62,9 @@ sudo ./systemd-journal-self-signed-certs.sh
 
 The script will create the directory `/etc/ssl/systemd-journal-remote` and in it you will find all the certificates needed.
 
-There will also be files named `runme-on-XXX.sh`. There will be 1 script for the server and 1 script for each of the clients.
+In this directory you will find shell scripts names `runme-on-XXX.sh`, where `XXX` are the names of your server and clients.
 
-These `runme-on-XXX.sh` scripts install the needed certificates, fix their file permissions to be accessible by systemd-journal-remote/upload, change `/etc/systemd/journal-remote.conf` (on the server) or `/etc/systemd/journal-upload.conf` (on the clients) and restart the relevant services.
+These `runme-on-XXX.sh` include everything to install the certificates, fix their file permissions to be accessible by systemd-journal-remote/upload, change `/etc/systemd/journal-remote.conf` (on the server) or `/etc/systemd/journal-upload.conf` (on the clients) and restart the relevant services.
 
 You can copy and paste (or `scp`) these scripts on your server and each of your clients:
 
