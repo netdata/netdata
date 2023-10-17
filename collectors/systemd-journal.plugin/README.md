@@ -376,11 +376,11 @@ For more options and reference to documentation, check `man systemd-journal-remo
 
 #### _passive_ journal centralization without encryption
 
-If you want to setup your own passive journal centralization setup without encryption, [check out guide on it](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin/passive_journal_centralization_guide_no_encryption.md).
+If you want to setup your own passive journal centralization setup without encryption, [check out guide on it](https://github.com/netdata/netdata/blob/master/collectors/systemd-journal.plugin/passive_journal_centralization_guide_no_encryption.md).
 
 #### _passive_ journal centralization with encryption using self-signed certificates
 
-If you want to setup your own passive journal centralization setup using self-signed certificates for encryption, [check out guide on it](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin/passive_journal_centralization_guide_self_signed_certs.md).
+If you want to setup your own passive journal centralization setup using self-signed certificates for encryption, [check out guide on it](https://github.com/netdata/netdata/blob/master/collectors/systemd-journal.plugin/passive_journal_centralization_guide_self_signed_certs.md).
 
 #### Limitations when using a logs centralization server
 
