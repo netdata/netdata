@@ -392,7 +392,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em)
                               NETDATA_APPS_FILE_CGROUP_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NETDATA_CGROUP_FD_OPEN_CONTEXT,
-                              20061,
+                              20270,
                               em->update_every);
 
     if (em->mode < MODE_ENTRY) {
@@ -404,7 +404,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em)
                                   NETDATA_APPS_FILE_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   NETDATA_CGROUP_FD_OPEN_ERR_CONTEXT,
-                                  20062,
+                                  20271,
                                   em->update_every);
     }
 
@@ -416,7 +416,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em)
                               NETDATA_APPS_FILE_CGROUP_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NETDATA_CGROUP_FD_CLOSE_CONTEXT,
-                              20063,
+                              20272,
                               em->update_every);
 
     if (em->mode < MODE_ENTRY) {
@@ -428,7 +428,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em)
                                   NETDATA_APPS_FILE_CGROUP_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   NETDATA_CGROUP_FD_CLOSE_ERR_CONTEXT,
-                                  20064,
+                                  20273,
                                   em->update_every);
     }
 }
@@ -1214,7 +1214,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_APPS_FILE_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_file_open",
-                             20061,
+                             20270,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_FD);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -1230,7 +1230,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  NETDATA_APPS_FILE_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
                                  "app.ebpf_file_open_error",
-                                 20062,
+                                 20271,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_FD);
             ebpf_create_chart_labels("app_group", w->name, 0);
@@ -1246,7 +1246,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_APPS_FILE_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_file_closed",
-                             20063,
+                             20272,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_FD);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -1262,7 +1262,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  NETDATA_APPS_FILE_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
                                  "app.ebpf_file_close_error",
-                                 20064,
+                                 20273,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_FD);
             ebpf_create_chart_labels("app_group", w->name, 0);
