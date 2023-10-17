@@ -555,8 +555,8 @@ def render_deploy(distros, categories, deploy, ids):
 
         for method in clean_item['methods']:
             for command in method['commands']:
-                command['command'] = CUSTOM_TAG_PATTERN.sub(command['command'], '')
-                command['command'] = FIXUP_BLANK_PATTERN.sub(command['command'], '')
+                command['command'] = CUSTOM_TAG_PATTERN.sub('', command['command'])
+                command['command'] = FIXUP_BLANK_PATTERN.sub('', command['command'])
 
         item['platform_info'] = data
         clean_item['platform_info'] = clean_data
