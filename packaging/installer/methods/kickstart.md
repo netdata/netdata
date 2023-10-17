@@ -17,10 +17,9 @@ import TabItem from '@theme/TabItem';
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_by_url_pattern&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=kickstart%20downloads&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_by_url_pattern&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=kickstart%20downloads&precision=0)
 
-This page covers detailed instructions on using and configuring the automatic one-line installation script named
-`kickstart.sh`.
+`kickstart.sh` is the recommended way of installing Netdata. This script works on all Linux distributions and macOS environments, by detecting the optimal method of installing Netdata directly to the operating system (it will never install a docker image of Netdata - to run Netdata is a container [check this](https://learn.netdata.cloud/docs/installing/docker)).
 
-The kickstart script works on all Linux distributions and macOS environments. By default, automatic nightly updates are enabled. If you are installing on macOS, make sure to check the [install documentation for macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md) before continuing.
+If you are installing on macOS, make sure to check the [install documentation for macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md) before continuing.
 
 
 > :bulb: Tip
