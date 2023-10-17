@@ -62,7 +62,7 @@ sudo ./systemd-journal-self-signed-certs.sh
 
 The script will create the directory `/etc/ssl/systemd-journal-remote` and in it you will find all the certificates needed.
 
-In this directory you will find shell scripts names `runme-on-XXX.sh`, where `XXX` are the names of your server and clients.
+In this directory you will find shell scripts named `runme-on-XXX.sh`, where `XXX` are the names of your server and clients.
 
 These `runme-on-XXX.sh` include everything to install the certificates, fix their file permissions to be accessible by systemd-journal-remote/upload, change `/etc/systemd/journal-remote.conf` (on the server) or `/etc/systemd/journal-upload.conf` (on the clients) and restart the relevant services.
 
