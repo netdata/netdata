@@ -1,5 +1,13 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.0...HEAD)
+
+**Merged pull requests:**
+
+- facets: minimize hashtable collisions [\#16215](https://github.com/netdata/netdata/pull/16215) ([ktsaou](https://github.com/ktsaou))
+
 ## [v1.43.0](https://github.com/netdata/netdata/tree/v1.43.0) (2023-10-16)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.42.4...v1.43.0)
