@@ -26,8 +26,6 @@ If you are installing on macOS, make sure to check the [install documentation fo
 >
 > If you are unsure whether you want nightly or stable releases, read the [installation guide](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases).  
 
-> If you want to turn off [automatic updates](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-updates), use the `--no-updates` option. You can find more installation options below.
-
 To install Netdata, run the following as your normal user:
 
 <Tabs>
@@ -48,6 +46,17 @@ To install Netdata, run the following as your normal user:
 > If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
 > and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
 
+## Verify script integrity
+
+To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
+run the following:
+
+```bash
+[ "<checksum-will-be-added-in-documentation-processing>" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+```
+
+If the script is valid, this command will return `OK, VALID`.
+
 ## What does `kickstart.sh` do?
 
 The `kickstart.sh` script does the following after being downloaded and run using `sh`:
@@ -67,48 +76,116 @@ The `kickstart.sh` script does the following after being downloaded and run usin
 
 The `kickstart.sh` script accepts a number of optional parameters to control how the installation process works:
 
-- `--non-interactive`: Don’t prompt for anything and assume yes whenever possible, overriding any automatic detection of an interactive run.
-- `--interactive`: Act as if running interactively, even if automatic detection indicates a run is non-interactive.
-- `--dont-wait`: Synonym for `--non-interactive`
-- `--dry-run`: Show what the installer would do, but don’t actually do any of it.
-- `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
-- `--release-channel`: Specify a particular release channel to install from. Currently supported release channels are:
+### destination directory
+
+- `--install-prefix`
+  Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
+- `--old-install-prefix`
+  Specify the custom local build's installation prefix that should be removed.
+
+### interactivity
+
+The script automatically detects if it is running interactively, on a user's terminal, or headless in a CI/CD environment. These are options related to overriding this behavior.
+
+- `--non-interactive` or `--dont-wait`
+  Don’t prompt for anything and assume yes whenever possible, overriding any automatic detection of an interactive run. Use this option when installing Netdata agent with a provisioning tool or in CI/CD.
+- `--interactive`
+   Act as if running interactively, even if automatic detection indicates a run is non-interactive.
+
+### release channel
+
+By default, the script installs the nightly channel of Netdata, providing you with the most recent Netdata. For production systems where stability is more important than new features, we recommend using the stable channel.
+
+- `--release-channel`
+  Specify a particular release channel to install from. Currently supported release channels are:
   - `nightly`: Installs a nightly build (this is currently the default).
   - `stable`: Installs a stable release.
   - `default`: Explicitly request whatever the current default is.
-- `--nightly-channel`: Synonym for `--release-channel nightly`.
-- `--stable-channel`: Synonym for `--release-channel stable`.
-- `--auto-update`: Enable automatic updates (this is the default).
-- `--no-updates`: Disable automatic updates.
-- `--disable-telemetry`: Disable anonymous statistics.
-- `--native-only`: Only install if native binary packages are available.
-- `--static-only`: Only install if a static build is available.
-- `--build-only`: Only install using a local build.
-- `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds,
-    use runtime configuration to disable cloud support.
-- `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
-- `--install-prefix`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
-- `--install-version`: Specify the version of Netdata to install.
-- `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.
-- `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
-- `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
-- `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
-  after the install.
-- `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
-- `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
-  See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
-- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`.
-- `--override-distro`: Override the distro detection logic and assume the system is using a specific Linux distribution and release. Takes a single argument consisting of the values of the `ID`, `VERSION_ID`, and `VERSION_CODENAME` fields from `/etc/os-release` for the desired distribution.
+- `--nightly-channel`
+  Synonym for `--release-channel nightly`.
+- `--stable-channel`
+  Synonym for `--release-channel stable`.
+- `--install-version`
+  Specify the exact version of Netdata to install.
 
-The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
+### install type
 
-- `--reinstall`: If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
-- `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what type of installation it is). If there is not an existing install, install Netdata normally.
-- `--reinstall-clean`: If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
-- `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
-- `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
-- `--repositories-only`: Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
-- `--prepare-offline-install-source`: Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md) for more info.
+By default the script will prefer native builds when they are available, and then static builds. It will fallback to build from source when all others are not available.
+
+- `--native-only`
+   Only install if native binary packages are available. It fails otherwise.
+- `--static-only`
+  Only install if a static build is available. It fails otherwise.
+   When installing a static build, the parameter `--static-install-options` can provide additional options to pass to the static installer code.
+- `--build-only`
+  Only install using a local build. It fails otherwise.
+  When it builds from source, the parameter `--local-build-options` can be used to give additional build options.
+
+### automatic updates
+
+By default the script installs a cron job to automatically update Netdata to the latest version of the release channel used.
+
+- `--auto-update`
+  Enable automatic updates (this is the default).
+- `--no-updates`
+  Disable automatic updates (not recommended).
+
+### Netdata Cloud related options
+
+By default, the kickstart script will provide a Netdata agent installation that can potentially communicate with Netdata Cloud, if of course the Netdata agent is further configured to do so.
+
+- `--claim-token`
+  Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node after the install. This will enable, connect and claim the Netdata agent, to Netdata Cloud.
+- `--claim-url`
+  Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
+- `--claim-rooms`
+  Specify a comma-separated list of tokens for each War Room this node should appear in.
+- `--claim-proxy`
+  Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
+- `--claim-only`
+  If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
+- `--require-cloud`
+  Only install if Netdata Cloud can be enabled.
+- `--disable-cloud`
+  For local builds, don’t build any of the Netdata Cloud code at all. For native packages and static builds, use runtime configuration to disable Netdata Cloud support.
+
+### anonymous telemetry
+
+By default, the agent is sending anonymous telemetry data to help us take identify the most common operating systems and the configurations Netdata agents run. We use this information to prioritize our efforts towards what is most commonly used by our community.
+
+- `--disable-telemetry`
+  Disable anonymous statistics.
+
+### reinstalling
+
+- `--reinstall`
+  If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
+- `--reinstall-even-if-unsafe`
+  If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what type of installation it is). If there is not an existing install, install Netdata normally.
+- `--reinstall-clean`
+  If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
+
+### uninstall
+
+- `--uninstall`
+  Uninstall an existing installation of Netdata. Fails if there is no existing install.
+
+### other options
+- `--dry-run`
+  Show what the installer would do, but don’t actually do any of it.
+- `--dont-start-it`
+  Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
+- `--override-distro`
+  Override the distro detection logic and assume the system is using a specific Linux distribution and release. Takes a single argument consisting of the values of the `ID`, `VERSION_ID`, and `VERSION_CODENAME` fields from `/etc/os-release` for the desired distribution.
+
+The following options are mutually exclusive and specify special operations other than trying to install Netdata normally or update an existing install:
+
+- `--repositories-only`
+  Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
+- `--prepare-offline-install-source`
+  Instead of insallling the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md) for more info.
+
+### environment variables
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):
@@ -122,7 +199,7 @@ should not need to use special values for any of these):
 - `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
 
 
-### Native packages
+## Native packages
 
 We publish official DEB/RPM packages for a number of common Linux distributions as part of our releases and nightly
 builds. These packages are available for 64-bit x86 systems. Depending on the distribution and release they may
@@ -132,7 +209,7 @@ default installation method. This allows you to handle Netdata updates as part o
 If you want to enforce the usage of native packages and have the installer return a failure if they are not available,
 you can do so by adding `--native-only` to the options you pass to the installer.
 
-### Static builds
+## Static builds
 
 We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
 AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only
@@ -143,7 +220,7 @@ will be used by default for installation.
 If you want to enforce the usage of a static build and have the installer return a failure if one is not available,
 you can do so by adding `--static-only` to the options you pass to the installer.
 
-### Local builds
+## Local builds
 
 For systems which do not have available native packages or static builds, we support building Netdata locally on
 the system it will be installed on. When using this approach, the installer will attempt to install any required
@@ -152,14 +229,3 @@ dependencies for building Netdata, though this may not always work correctly.
 If you want to enforce the usage of a local build (perhaps because you require a custom installation prefix,
 which is not supported with native packages or static builds), you can do so by adding `--build-only` to the
 options you pass to the installer.
-
-## Verify script integrity
-
-To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
-run the following:
-
-```bash
-[ "<checksum-will-be-added-in-documentation-processing>" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
-```
-
-If the script is valid, this command will return `OK, VALID`.
