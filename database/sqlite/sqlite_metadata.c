@@ -55,7 +55,6 @@
 #define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id;"
 #define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
 
-#define METADATA_CMD_Q_MAX_SIZE (2048)              // Max queue size; callers will block until there is room
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
 #define METADATA_HEALTH_LOG_INTERVAL (3600)         // Repeat maintenance for health
@@ -1593,7 +1592,7 @@ static void metadata_event_loop(void *arg)
     wc->timer_req.data = wc;
     fatal_assert(0 == uv_timer_start(&wc->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
-    netdata_log_info("Starting metadata sync thread with %d entries command queue", METADATA_CMD_Q_MAX_SIZE);
+    netdata_log_info("Starting metadata sync thread");
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -1757,8 +1756,10 @@ static void metadata_event_loop(void *arg)
 
     netdata_log_info("METADATA: Shutting down event loop");
     completion_mark_complete(&wc->init_complete);
-    completion_destroy(wc->scan_complete);
-    freez(wc->scan_complete);
+    if (wc->scan_complete) {
+        completion_destroy(wc->scan_complete);
+        freez(wc->scan_complete);
+    }
     metadata_free_cmd_queue(wc);
     return;
 
