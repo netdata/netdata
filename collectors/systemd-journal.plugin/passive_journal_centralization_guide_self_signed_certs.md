@@ -164,7 +164,7 @@ To verify the central server is receiving logs, run this on the central server:
 sudo ls -l /var/log/journal/remote/
 ```
 
-You should see new files from the client's IP.
+You should see new files from the client's canonical names (CN). These are names on the clients' certificates.
 
 Also, `systemctl status systemd-journal-remote` should show something like this:
 
@@ -181,7 +181,7 @@ TriggeredBy: ● systemd-journal-remote.socket
      Memory: 2.2M
         CPU: 71ms
      CGroup: /system.slice/systemd-journal-remote.service
-             └─2118153 /usr/lib/systemd/systemd-journal-remote --listen-http=-3 --output=/var/log/journal/remote/
+             └─2118153 /usr/lib/systemd/systemd-journal-remote --listen-https=-3 --output=/var/log/journal/remote/
 ```
 
 Note the `status: "Processing requests..."` and the PID under `CGroup`.
