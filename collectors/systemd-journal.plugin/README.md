@@ -125,7 +125,7 @@ Usually `remote` journals are named by the IP of the server sending these logs. 
 extracts these IPs and performs a reverse DNS lookup to find their hostnames. When this is successful,
 `remote` journals are named by the hostnames of the origin servers.
 
-For information about configuring a journals' centralization server,
+For information about configuring a journal centralization server,
 check [this FAQ item](#how-do-i-configure-a-journal-centralization-server).
 
 ## Journal Fields
@@ -296,7 +296,7 @@ This Netdata plugin does not require any configuration or maintenance.
 
 ## FAQ
 
-### Can I use this plugin on journals' centralization servers?
+### Can I use this plugin on journal centralization servers?
 
 Yes. You can centralize your logs using `systemd-journal-remote`, and then install Netdata
 on this logs centralization server to explore the logs of all your infrastructure.
