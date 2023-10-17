@@ -196,7 +196,9 @@ modules:
                 - name: close
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.ebpf_file_open
               description: Number of open files
@@ -379,7 +381,9 @@ modules:
                 - name: task
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.process_create
               description: Process started
@@ -841,7 +845,9 @@ modules:
                 - name: miss
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.ebpf_cachestat_hit_ratio
               description: Hit ratio
@@ -1358,7 +1364,9 @@ modules:
                 - name: a dimension per systemd service
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.ebpf_call_swap_readpage
               description: Calls to function swap_readpage.
@@ -1501,7 +1509,9 @@ modules:
                 - name: a dimension per systemd service
         - name: apps
           description: "These metrics show cgroup/service that reached OOM."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.oomkill
               description: OOM kills
@@ -1713,7 +1723,9 @@ modules:
                 - name: send
         - name: apps
           description: "These metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.ebpf_call_tcp_v4_connection
               description: Calls to tcp_v4_connection
@@ -1999,7 +2011,9 @@ modules:
       scopes:
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.ebpf_dc_ratio
               description: Percentage of files inside directory cache
@@ -2452,7 +2466,9 @@ modules:
                 - name: a dimension per systemd service
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.ebpf_shmget_call
               description: Calls to syscall shmget(2).
@@ -3074,7 +3090,9 @@ modules:
                 - name: create
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
             - name: app_group.ebpf_call_vfs_unlink
               description: Files deleted
