@@ -22,11 +22,11 @@ This means, that if both certificates are issued by the same certificate authori
 
 ## Self-signed certificates
 
-To simplify the process of creating the self-signed certificates, we have created [this script](https://gist.github.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7). It also automates the process of distributing them to your servers (it generates a script to copy to each of your servers, which includes everything required for `systemd-journal-remote` to work).
+To simplify the process of creating the self-signed certificates, we have created [this script](https://gist.github.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7). It also automates the process of distributing them to your servers (it generates a script for each of your servers, which includes everything required for `systemd-journal-remote` to work, including the certificates required by that server).
 
-We suggest to keep this script and all the involved certificates at the journals centralization server, in the directory `/etc/ssl/systemd-journal-remote`, so that you can make future changes as required.
+We suggest to keep this script and all the involved certificates at the journals centralization server, in the directory `/etc/ssl/systemd-journal-remote`, so that you can make future changes as required. If you prefer to keep the certificate authority and all the certificates at a more secure location, just use the script on that location.
 
-The script can be edited and re-run to create new certificates as clients are added to your network. The existing certificates will not be altered, allowing existing to connections to work uninterrupted while new journal clients are added to your network.
+The script can be edited and re-run to create new certificates as clients are added to your network. The existing certificates will not be altered, allowing existing connections to work uninterrupted while new journal clients are added to your network.
 
 ```bash
 wget -O systemd-journal-self-signed-certs.sh "https://gist.githubusercontent.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7/raw/c346e61e0a66f45dc4095d254bd23917f0a01bd0/systemd-journal-self-signed-certs.sh"
