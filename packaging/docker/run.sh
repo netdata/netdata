@@ -21,7 +21,7 @@ if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
 
-chmod o+rX / # Needed to fix permissions issues in some cases.
+chmod o+rX / 2>/dev/null || echo "Unable to change permissions without errors."
 
 BALENA_PGID=$(stat -c %g /var/run/balena.sock 2>/dev/null || true)
 DOCKER_PGID=$(stat -c %g /var/run/docker.sock 2>/dev/null || true)

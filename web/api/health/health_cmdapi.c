@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Created by Christopher on 11/12/18.
 //
@@ -14,18 +15,16 @@
 void free_silencers(SILENCER *t) {
     if (!t) return;
     if (t->next) free_silencers(t->next);
-    netdata_log_debug(D_HEALTH, "HEALTH command API: Freeing silencer %s:%s:%s:%s:%s", t->alarms,
-          t->charts, t->contexts, t->hosts, t->families);
+    netdata_log_debug(D_HEALTH, "HEALTH command API: Freeing silencer %s:%s:%s:%s", t->alarms,
+          t->charts, t->contexts, t->hosts);
     simple_pattern_free(t->alarms_pattern);
     simple_pattern_free(t->charts_pattern);
     simple_pattern_free(t->contexts_pattern);
     simple_pattern_free(t->hosts_pattern);
-    simple_pattern_free(t->families_pattern);
     freez(t->alarms);
     freez(t->charts);
     freez(t->contexts);
     freez(t->hosts);
-    freez(t->families);
     freez(t);
     return;
 }
@@ -74,7 +73,6 @@ void health_silencers2json(BUFFER *wb) {
         j=health_silencers2json_entry(wb, HEALTH_CHART_KEY, silencer->charts, j);
         j=health_silencers2json_entry(wb, HEALTH_CONTEXT_KEY, silencer->contexts, j);
         j=health_silencers2json_entry(wb, HEALTH_HOST_KEY, silencer->hosts, j);
-        health_silencers2json_entry(wb, HEALTH_FAMILIES_KEY, silencer->families, j);
         j=0;
         buffer_strcat(wb, "\n\t\t}");
         i++;

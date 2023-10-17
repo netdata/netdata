@@ -2,9 +2,9 @@
 
 #include "plugin_proc.h"
 
-#define RRD_TYPE_NET_NETSTAT "ip"
-#define RRD_TYPE_NET_SNMP    "ipv4"
-#define RRD_TYPE_NET_SNMP6   "ipv6"
+#define RRD_TYPE_NET_IP "ip"
+#define RRD_TYPE_NET_IP4 "ipv4"
+#define RRD_TYPE_NET_IP6 "ipv6"
 #define PLUGIN_PROC_MODULE_NETSTAT_NAME "/proc/net/netstat"
 #define CONFIG_SECTION_PLUGIN_PROC_NETSTAT "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETSTAT_NAME
 
@@ -424,7 +424,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "packets"
                     , NULL
                     , "packets"
@@ -464,7 +464,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "fragsout"
                     , NULL
                     , "fragments6"
@@ -506,7 +506,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "fragsin"
                     , NULL
                     , "fragments6"
@@ -557,7 +557,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "errors"
                     , NULL
                     , "errors"
@@ -605,7 +605,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "udppackets"
                     , NULL
                     , "udp6"
@@ -647,7 +647,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "udperrors"
                     , NULL
                     , "udp6"
@@ -689,7 +689,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "udplitepackets"
                     , NULL
                     , "udplite6"
@@ -730,7 +730,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "udpliteerrors"
                     , NULL
                     , "udplite6"
@@ -771,7 +771,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "mcast"
                     , NULL
                     , "multicast6"
@@ -806,7 +806,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "bcast"
                     , NULL
                     , "broadcast6"
@@ -841,7 +841,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "mcastpkts"
                     , NULL
                     , "multicast6"
@@ -876,7 +876,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmp"
                     , NULL
                     , "icmp6"
@@ -910,7 +910,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmpredir"
                     , NULL
                     , "icmp6"
@@ -962,7 +962,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmperrors"
                     , NULL
                     , "icmp6"
@@ -1018,7 +1018,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmpechos"
                     , NULL
                     , "icmp6"
@@ -1064,7 +1064,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "groupmemb"
                     , NULL
                     , "icmp6"
@@ -1109,7 +1109,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmprouter"
                     , NULL
                     , "icmp6"
@@ -1151,7 +1151,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmpneighbor"
                     , NULL
                     , "icmp6"
@@ -1189,7 +1189,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmpmldv2"
                     , NULL
                     , "icmp6"
@@ -1239,7 +1239,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP6
+                    RRD_TYPE_NET_IP6
                     , "icmptypes"
                     , NULL
                     , "icmp6"
@@ -1287,7 +1287,7 @@ static void do_proc_net_snmp6(int update_every) {
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
-                RRD_TYPE_NET_SNMP6,
+                RRD_TYPE_NET_IP6,
                 "ect",
                 NULL,
                 "packets",
@@ -1852,11 +1852,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         if(unlikely(!st_system_ip)) {
             st_system_ip = rrdset_create_localhost(
                     "system"
-                    , RRD_TYPE_NET_NETSTAT
+                    , "ip" // FIXME: this is ipv4. Not changing it because it will require to do changes in cloud-frontend too
                     , NULL
                     , "network"
                     , NULL
-                    , "IP Bandwidth"
+                    , "IPv4 Bandwidth"
                     , "kilobits/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
@@ -1874,43 +1874,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         rrdset_done(st_system_ip);
     }
 
-    if(do_inerrors == CONFIG_BOOLEAN_YES || (do_inerrors == CONFIG_BOOLEAN_AUTO &&
-                                                (ipext_InNoRoutes ||
-                                                ipext_InTruncatedPkts ||
-                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        do_inerrors = CONFIG_BOOLEAN_YES;
-        static RRDSET *st_ip_inerrors = NULL;
-        static RRDDIM *rd_noroutes = NULL, *rd_truncated = NULL, *rd_checksum = NULL;
-
-        if(unlikely(!st_ip_inerrors)) {
-            st_ip_inerrors = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
-                    , "inerrors"
-                    , NULL
-                    , "errors"
-                    , NULL
-                    , "IP Input Errors"
-                    , "packets/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_ERRORS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rrdset_flag_set(st_ip_inerrors, RRDSET_FLAG_DETAIL);
-
-            rd_noroutes  = rrddim_add(st_ip_inerrors, "InNoRoutes",      "noroutes",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_truncated = rrddim_add(st_ip_inerrors, "InTruncatedPkts", "truncated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_checksum  = rrddim_add(st_ip_inerrors, "InCsumErrors",    "checksum",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_ip_inerrors, rd_noroutes,  ipext_InNoRoutes);
-        rrddim_set_by_pointer(st_ip_inerrors, rd_truncated, ipext_InTruncatedPkts);
-        rrddim_set_by_pointer(st_ip_inerrors, rd_checksum,  ipext_InCsumErrors);
-        rrdset_done(st_ip_inerrors);
-    }
-
     if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO &&
                                             (ipext_InMcastOctets ||
                                             ipext_OutMcastOctets ||
@@ -1921,7 +1884,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_ip_mcast)) {
             st_ip_mcast = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP4
                     , "mcast"
                     , NULL
                     , "multicast"
@@ -1930,7 +1893,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "kilobits/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_MCAST
+                    , NETDATA_CHART_PRIO_IPV4_MCAST
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -1960,16 +1923,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_ip_bcast)) {
             st_ip_bcast = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP4
                     , "bcast"
                     , NULL
                     , "broadcast"
                     , NULL
-                    , "IP Broadcast Bandwidth"
+                    , "IPv4 Broadcast Bandwidth"
                     , "kilobits/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_BCAST
+                    , NETDATA_CHART_PRIO_IPV4_BCAST
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -1999,16 +1962,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_ip_mcastpkts)) {
             st_ip_mcastpkts = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP4
                     , "mcastpkts"
                     , NULL
                     , "multicast"
                     , NULL
-                    , "IP Multicast Packets"
+                    , "IPv4 Multicast Packets"
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_MCAST_PACKETS
+                    , NETDATA_CHART_PRIO_IPV4_MCAST_PACKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2035,16 +1998,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_ip_bcastpkts)) {
             st_ip_bcastpkts = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP4
                     , "bcastpkts"
                     , NULL
                     , "broadcast"
                     , NULL
-                    , "IP Broadcast Packets"
+                    , "IPv4 Broadcast Packets"
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_BCAST_PACKETS
+                    , NETDATA_CHART_PRIO_IPV4_BCAST_PACKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2073,16 +2036,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_ecnpkts)) {
             st_ecnpkts = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP4
                     , "ecnpkts"
                     , NULL
                     , "ecn"
                     , NULL
-                    , "IP ECN Statistics"
+                    , "IPv4 ECN Statistics"
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_ECN
+                    , NETDATA_CHART_PRIO_IPV4_ECN
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2114,7 +2077,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_tcpmemorypressures)) {
             st_tcpmemorypressures = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP
                     , "tcpmemorypressures"
                     , NULL
                     , "tcp"
@@ -2123,7 +2086,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "events/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IP_TCP_MEM
+                    , NETDATA_CHART_PRIO_IP_TCP_MEM_PRESSURE
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2150,7 +2113,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_tcpconnaborts)) {
             st_tcpconnaborts = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP
                     , "tcpconnaborts"
                     , NULL
                     , "tcp"
@@ -2194,7 +2157,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st_tcpreorders)) {
             st_tcpreorders = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP
                     , "tcpreorders"
                     , NULL
                     , "tcp"
@@ -2236,7 +2199,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         if(unlikely(!st_ip_tcpofo)) {
 
             st_ip_tcpofo = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP
                     , "tcpofo"
                     , NULL
                     , "tcp"
@@ -2276,7 +2239,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         if(unlikely(!st_syncookies)) {
 
             st_syncookies = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP
                     , "tcpsyncookies"
                     , NULL
                     , "tcp"
@@ -2315,7 +2278,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         if(unlikely(!st_syn_queue)) {
 
             st_syn_queue = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP
                     , "tcp_syn_queue"
                     , NULL
                     , "tcp"
@@ -2351,7 +2314,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         if(unlikely(!st_accept_queue)) {
 
             st_accept_queue = rrdset_create_localhost(
-                    RRD_TYPE_NET_NETSTAT
+                    RRD_TYPE_NET_IP
                     , "tcp_accept_queue"
                     , NULL
                     , "tcp"
@@ -2392,7 +2355,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP4
                     , "packets"
                     , NULL
                     , "packets"
@@ -2433,7 +2396,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP4
                     , "fragsout"
                     , NULL
                     , "fragments"
@@ -2442,7 +2405,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_OUT
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2473,7 +2436,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP4
                     , "fragsin"
                     , NULL
                     , "fragments"
@@ -2482,7 +2445,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS + 1
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_IN
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2513,13 +2476,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         static RRDDIM *rd_InDiscards = NULL,
                         *rd_OutDiscards = NULL,
                         *rd_InHdrErrors = NULL,
+                        *rd_InNoRoutes = NULL,
                         *rd_OutNoRoutes = NULL,
                         *rd_InAddrErrors = NULL,
+                        *rd_InTruncatedPkts = NULL,
+                        *rd_InCsumErrors = NULL,
                         *rd_InUnknownProtos = NULL;
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP4
                     , "errors"
                     , NULL
                     , "errors"
@@ -2537,11 +2503,14 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             rd_InDiscards      = rrddim_add(st, "InDiscards",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_OutDiscards     = rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rd_InHdrErrors     = rrddim_add(st, "InHdrErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InNoRoutes      = rrddim_add(st, "InNoRoutes",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_OutNoRoutes     = rrddim_add(st, "OutNoRoutes",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
+            rd_InHdrErrors     = rrddim_add(st, "InHdrErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_InAddrErrors    = rrddim_add(st, "InAddrErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_InUnknownProtos = rrddim_add(st, "InUnknownProtos", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InTruncatedPkts = rrddim_add(st, "InTruncatedPkts", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InCsumErrors    = rrddim_add(st, "InCsumErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_InDiscards,      (collected_number)snmp_root.ip_InDiscards);
@@ -2549,7 +2518,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_InHdrErrors,     (collected_number)snmp_root.ip_InHdrErrors);
         rrddim_set_by_pointer(st, rd_InAddrErrors,    (collected_number)snmp_root.ip_InAddrErrors);
         rrddim_set_by_pointer(st, rd_InUnknownProtos, (collected_number)snmp_root.ip_InUnknownProtos);
+        rrddim_set_by_pointer(st, rd_InNoRoutes,      (collected_number)ipext_InNoRoutes);
         rrddim_set_by_pointer(st, rd_OutNoRoutes,     (collected_number)snmp_root.ip_OutNoRoutes);
+        rrddim_set_by_pointer(st, rd_InTruncatedPkts, (collected_number)ipext_InTruncatedPkts);
+        rrddim_set_by_pointer(st, rd_InCsumErrors,    (collected_number)ipext_InCsumErrors);
         rrdset_done(st);
     }
 
@@ -2571,7 +2543,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(unlikely(!st_packets)) {
                 st_packets = rrdset_create_localhost(
-                        RRD_TYPE_NET_SNMP
+                        RRD_TYPE_NET_IP4
                         , "icmp"
                         , NULL
                         , "icmp"
@@ -2580,7 +2552,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         , "packets/s"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                        , NETDATA_CHART_PRIO_IPV4_ICMP
+                        , NETDATA_CHART_PRIO_IPV4_ICMP_PACKETS
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2602,7 +2574,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(unlikely(!st_errors)) {
                 st_errors = rrdset_create_localhost(
-                        RRD_TYPE_NET_SNMP
+                        RRD_TYPE_NET_IP4
                         , "icmp_errors"
                         , NULL
                         , "icmp"
@@ -2611,7 +2583,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         , "packets/s"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                        , NETDATA_CHART_PRIO_IPV4_ICMP + 1
+                        , NETDATA_CHART_PRIO_IPV4_ICMP_ERRORS
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2678,7 +2650,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP4
                     , "icmpmsg"
                     , NULL
                     , "icmp"
@@ -2687,7 +2659,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_ICMP + 2
+                    , NETDATA_CHART_PRIO_IPV4_ICMP_MESSAGES
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2754,16 +2726,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP
                     , "tcpsock"
                     , NULL
                     , "tcp"
                     , NULL
-                    , "IPv4 TCP Connections"
+                    , "TCP Connections"
                     , "active connections"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_TCP
+                    , NETDATA_CHART_PRIO_IP_TCP_ESTABLISHED_CONNS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2787,7 +2759,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP
                     , "tcppackets"
                     , NULL
                     , "tcp"
@@ -2796,7 +2768,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_TCP + 4
+                    , NETDATA_CHART_PRIO_IP_TCP_PACKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2826,7 +2798,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP
                     , "tcperrors"
                     , NULL
                     , "tcp"
@@ -2835,7 +2807,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_TCP + 20
+                    , NETDATA_CHART_PRIO_IP_TCP_ERRORS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2864,7 +2836,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP
                     , "tcpopens"
                     , NULL
                     , "tcp"
@@ -2873,7 +2845,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "connections/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_TCP + 5
+                    , NETDATA_CHART_PRIO_IP_TCP_OPENS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2903,7 +2875,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP
                     , "tcphandshake"
                     , NULL
                     , "tcp"
@@ -2912,7 +2884,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "events/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_TCP + 30
+                    , NETDATA_CHART_PRIO_IP_TCP_HANDSHAKE
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2946,7 +2918,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP4
                     , "udppackets"
                     , NULL
                     , "udp"
@@ -2955,7 +2927,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_UDP
+                    , NETDATA_CHART_PRIO_IPV4_UDP_PACKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -2991,7 +2963,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
-                    RRD_TYPE_NET_SNMP
+                    RRD_TYPE_NET_IP4
                     , "udperrors"
                     , NULL
                     , "udp"
@@ -3000,7 +2972,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , "events/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                    , NETDATA_CHART_PRIO_IPV4_UDP + 10
+                    , NETDATA_CHART_PRIO_IPV4_UDP_ERRORS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -3044,7 +3016,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(unlikely(!st)) {
                 st = rrdset_create_localhost(
-                        RRD_TYPE_NET_SNMP
+                        RRD_TYPE_NET_IP4
                         , "udplite"
                         , NULL
                         , "udplite"
@@ -3053,7 +3025,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         , "packets/s"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                        , NETDATA_CHART_PRIO_IPV4_UDPLITE
+                        , NETDATA_CHART_PRIO_IPV4_UDPLITE_PACKETS
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -3078,7 +3050,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(unlikely(!st)) {
                 st = rrdset_create_localhost(
-                        RRD_TYPE_NET_SNMP
+                        RRD_TYPE_NET_IP4
                         , "udplite_errors"
                         , NULL
                         , "udplite"
@@ -3087,7 +3059,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         , "packets/s"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_NETSTAT_NAME
-                        , NETDATA_CHART_PRIO_IPV4_UDPLITE + 10
+                        , NETDATA_CHART_PRIO_IPV4_UDPLITE_ERRORS
                         , update_every
                         , RRDSET_TYPE_LINE);
 

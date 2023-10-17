@@ -29,8 +29,8 @@ void health_silencers_add(SILENCER *silencer) {
     // Add the created instance to the linked list in silencers
     silencer->next = silencers->silencers;
     silencers->silencers = silencer;
-    netdata_log_debug(D_HEALTH, "HEALTH command API: Added silencer %s:%s:%s:%s:%s", silencer->alarms,
-          silencer->charts, silencer->contexts, silencer->hosts, silencer->families
+    netdata_log_debug(D_HEALTH, "HEALTH command API: Added silencer %s:%s:%s:%s", silencer->alarms,
+          silencer->charts, silencer->contexts, silencer->hosts
     );
 }
 
@@ -51,8 +51,7 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
             hash_template = 0,
             hash_chart = 0,
             hash_context = 0,
-            hash_host = 0,
-            hash_families = 0;
+            hash_host = 0;
 
     if (unlikely(!hash_alarm)) {
         hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
@@ -60,7 +59,6 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
         hash_chart = simple_uhash(HEALTH_CHART_KEY);
         hash_context = simple_uhash(HEALTH_CONTEXT_KEY);
         hash_host = simple_uhash(HEALTH_HOST_KEY);
-        hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
     }
 
     uint32_t hash = simple_uhash(key);
@@ -70,8 +68,7 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
                 (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) ||
                 (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) ||
                 (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) ||
-                (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) ||
-                (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY))
+                (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY))
                 ) {
             silencer = create_silencer();
             if(!silencer) {
@@ -93,9 +90,6 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
     } else if (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
         silencer->hosts = strdupz(value);
         silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT, true);
-    } else if (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
-        silencer->families = strdupz(value);
-        silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT, true);
     }
 
     return silencer;

@@ -24,7 +24,7 @@ else
     exit 1
 fi
 
-DOCKER_IMAGE_NAME="netdata/static-builder"
+DOCKER_IMAGE_NAME="netdata/static-builder:v1"
 
 if [ "${BUILDARCH}" != "$(uname -m)" ] && [ "$(uname -m)" = 'x86_64' ] && [ -z "${SKIP_EMULATION}" ]; then
     ${docker} run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1

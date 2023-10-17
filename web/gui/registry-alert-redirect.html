@@ -56,7 +56,7 @@
           return s;
         }
 
-        fetch("/api/v1/registry?action=search&for=" + mg, { cache: "no-cache", credentials: "include", headers: { Authorization: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
+        fetch("/api/v1/registry?action=search&for=" + mg, { cache: "no-cache", credentials: "include", headers: { ["X-Netdata-Auth"]: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
         .then(function(response) { return response.json() })
         .then(function(data) {
           let table = document.getElementById("mynodes");

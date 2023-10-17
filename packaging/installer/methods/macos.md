@@ -56,6 +56,8 @@ The Netdata Agent is installed under `/usr/local/netdata` on your machine. Your 
 If you experience issues while claiming your node, follow the steps in our [Troubleshooting](https://github.com/netdata/netdata/blob/master/claim/README.md#troubleshooting) documentation.
 ## Install Netdata via Homebrew
 
+### For macOS Intel
+
 To install Netdata and all its dependencies, run Homebrew using the following command: 
 
 ```sh
@@ -64,6 +66,20 @@ brew install netdata
 Homebrew will place your Netdata configuration directory at `/usr/local/etc/netdata/`. 
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/usr/local/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
+
+### For Apple Silicon
+
+To install Netdata and all its dependencies, run Homebrew using the following command: 
+
+```sh
+brew install netdata
+```
+
+Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/netdata/`. 
+
+Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
+
+
 
 Skip on ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
 

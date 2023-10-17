@@ -75,8 +75,6 @@
               | `${url_name}`               | Same as ${name} but URL encoded                                                  |
               | `${chart}`                  | The name of the chart (type.id)                                                  |
               | `${url_chart}`              | Same as ${chart} but URL encoded                                                 |
-              | `${family}`                 | The family of the chart                                                          |
-              | `${url_family}`             | Same as ${family} but URL encoded                                                |
               | `${status}`                 | The current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
               | `${old_status}`             | The previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
               | `${value}`                  | The current value of the alarm                                                   |

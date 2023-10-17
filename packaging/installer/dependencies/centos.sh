@@ -14,6 +14,7 @@ declare -a package_tree=(
   curl
   elfutils-libelf-devel
   flex
+  findutils
   gcc
   gcc-c++
   git

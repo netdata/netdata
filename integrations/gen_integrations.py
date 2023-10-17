@@ -140,7 +140,17 @@ def get_jinja_env():
             lstrip_blocks=True,
         )
 
+        _jinja_env.globals.update(strfy=strfy)
+
     return _jinja_env
+
+
+def strfy(value):
+    if not isinstance(value, str):
+        return value
+
+    return ' '.join([v.strip() for v in value.strip().split("\n") if v]).replace('|', '/')
+
 
 
 def get_category_sets(categories):
@@ -462,7 +472,7 @@ def render_collectors(categories, collectors, ids):
             item['meta']['monitored_instance']['categories'] = list(default_cats)
             warn(f'{ item["id"] } does not list any caregories, adding it to: { default_cats }', item["_src_path"])
         else:
-            item['meta']['monitored_instance']['categories'] = list(actual_cats)
+            item['meta']['monitored_instance']['categories'] =  [x for x in item['meta']['monitored_instance']['categories'] if x in list(actual_cats)]
 
         for scope in item['metrics']['scopes']:
             if scope['name'] == 'global':

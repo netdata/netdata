@@ -1806,7 +1806,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             }
     };
 
-    if(!rrdr_relative_window_to_absolute(&qwr->after, &qwr->before, NULL, false))
+    if(!rrdr_relative_window_to_absolute_query(&qwr->after, &qwr->before, NULL, false))
         buffer_no_cacheable(wb);
     else
         buffer_cacheable(wb);
@@ -1823,7 +1823,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         if(qwr->baseline_before <= API_RELATIVE_TIME_MAX)
             qwr->baseline_before += qwr->after;
 
-        rrdr_relative_window_to_absolute(&qwr->baseline_after, &qwr->baseline_before, NULL, false);
+        rrdr_relative_window_to_absolute_query(&qwr->baseline_after, &qwr->baseline_before, NULL, false);
 
         if (qwr->baseline_before <= qwr->baseline_after) {
             resp = HTTP_RESP_BAD_REQUEST;

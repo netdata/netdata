@@ -1016,11 +1016,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
-    if(unlikely(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w))) {
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
-        return HTTP_RESP_BAD_REQUEST;
-    }
+    bool do_not_track = respect_web_browser_do_not_track_policy && web_client_has_donottrack(w);
 
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
@@ -1032,6 +1028,12 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         // everything else, registry ACL
         if(unlikely(!web_client_can_access_registry(w)))
             return web_client_permission_denied(w);
+
+        if(unlikely(do_not_track)) {
+            buffer_flush(w->response.data);
+            buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
+            return HTTP_RESP_BAD_REQUEST;
+        }
     }
 
     buffer_no_cacheable(w->response.data);
@@ -1082,7 +1084,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             return registry_request_switch_json(host, w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
         case 'H':
-            return registry_request_hello_json(host, w);
+            return registry_request_hello_json(host, w, do_not_track);
 
         default:
             buffer_flush(w->response.data);
@@ -1417,7 +1419,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
     return rrd_function_run(host, wb, timeout, function, true, NULL,
                             NULL, NULL,
-                            web_client_interrupt_callback, w);
+                            web_client_interrupt_callback, w, NULL);
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {

@@ -24,11 +24,11 @@
         apiUrl: "https://app.netdata.cloud",
         cloudUrl: "https://app.netdata.cloud",
         demoSlug: "netdata-demo",
-        demoFavourites: {"postgresql":["postgres"],"redis":["redis"],"dns-query":["dns_query"],"http-endpoints":["httpcheck"],"nginx":["web_log","nginx"],"apache":["apache"],"host-reachability":["ping"],"cassandra":["cassandra"],"coredns":["coredns"],"logind":["logind"],"iis":["iis"],"active-directory":["ad"],"windows":["windows","ad","iis","mssql","exchange","netframework"],"docker":["cgroup","docker"]},
+        demoFavourites: {"postgresql":["postgres"],"redis":["redis"],"dns-query":["dns_query"],"http-endpoints":["httpcheck"],"nginx":["web_log","nginx"],"apache":["apache"],"host-reachability":["ping"],"cassandra":["cassandra"],"coredns":["coredns"],"logind":["logind"],"iis":["iis"],"active-directory":["ad"],"windows":["windows","ad","iis","mssql","exchange","netframework"],"docker":["cgroup","docker"],"ups":["upsd"]},
         webpackPublicPath: "https://app.netdata.cloud",
         agentApiUrl: searchParams.get("agent") || getBasename(),
         posthogToken: "phc_hnhlqe6D2Q4IcQNrFItaqdXJAxQ8RcHkPAFAp74pubv",
-        version: "6.39.0",
+        version: "6.52.2",
         tracking: false,
         cookieDomain: ".netdata.cloud",
         onprem: false,
@@ -207,12 +207,18 @@
 
             if (event.data.status === "disabled") console.error("Your netdata registry is disabled! Check your configuration.")
 
-            if (event.data && event.data.person_guid) {
+            if (event.data) {
               if (!window.localNetdataRegistry) {
                 window.localNetdataRegistry = {}
               }
 
               window.localNetdataRegistry.pg = event.data.person_guid
+
+              if (!window.envSettings) {
+                window.envSettings = {}
+              }
+
+              window.envSettings.visitor = event.data.person_guid
             }
           });
-        })</script></body></html>
+        }).catch(() => {})</script></body></html>

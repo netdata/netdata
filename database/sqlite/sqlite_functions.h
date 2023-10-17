@@ -50,6 +50,7 @@ SQLITE_API int sqlite3_exec_monitored(
 int init_database_batch(sqlite3 *database, const char *batch[]);
 int sql_init_database(db_check_action_type_t rebuild, int memory);
 void sql_close_database(void);
+int configure_sqlite_database(sqlite3 *database, int target_version);
 
 // Helpers
 int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);
@@ -61,10 +62,8 @@ void initialize_thread_key_pool(void);
 
 // Look up functions
 int get_node_id(uuid_t *host_id, uuid_t *node_id);
-int get_host_id(uuid_t *node_id, uuid_t *host_id);
 struct node_instance_list *get_node_list(void);
 void sql_load_node_id(RRDHOST *host);
-char *get_hostname_by_node_id(char *node_id);
 
 // Help build archived hosts in memory when agent starts
 void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);

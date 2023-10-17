@@ -6,6 +6,8 @@
 
 #include "rrd.h"
 
+#define RRDFUNCTIONS_TIMEOUT_EXTENSION_UT (1 * USEC_PER_SEC)
+
 typedef void (*rrd_function_result_callback_t)(BUFFER *wb, int code, void *result_cb_data);
 typedef bool (*rrd_function_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 typedef void (*rrd_function_canceller_cb_t)(void *data);
@@ -30,7 +32,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data);
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload);
 
 // cancel a running function, to be run from anywhere
 void rrd_function_cancel(const char *transaction);

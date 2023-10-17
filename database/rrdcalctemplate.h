@@ -22,9 +22,6 @@ struct rrdcalctemplate {
 
     STRING *context;
 
-    STRING *family_match;
-    SIMPLE_PATTERN *family_pattern;
-
     STRING *plugin_match;
     SIMPLE_PATTERN *plugin_pattern;
 
@@ -101,7 +98,6 @@ struct rrdcalctemplate {
 #define rrdcalctemplate_classification(rt) string2str((rt)->classification)
 #define rrdcalctemplate_component(rt) string2str((rt)->component)
 #define rrdcalctemplate_type(rt) string2str((rt)->type)
-#define rrdcalctemplate_family_match(rt) string2str((rt)->family_match)
 #define rrdcalctemplate_plugin_match(rt) string2str((rt)->plugin_match)
 #define rrdcalctemplate_module_match(rt) string2str((rt)->module_match)
 #define rrdcalctemplate_charts_match(rt) string2str((rt)->charts_match)

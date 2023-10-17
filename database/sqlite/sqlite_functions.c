@@ -4,7 +4,7 @@
 #include "sqlite3recover.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 12
+#define DB_METADATA_VERSION 14
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -14,7 +14,7 @@ const char *database_config[] = {
     "memory_mode INT DEFAULT 0, abbrev_timezone TEXT DEFAULT '', utc_offset INT NOT NULL DEFAULT 0,"
     "program_name TEXT NOT NULL DEFAULT 'unknown', program_version TEXT NOT NULL DEFAULT 'unknown', "
     "entries INT NOT NULL DEFAULT 0,"
-    "health_enabled INT NOT NULL DEFAULT 0);",
+    "health_enabled INT NOT NULL DEFAULT 0, last_connected INT NOT NULL DEFAULT 0);",
 
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
@@ -154,7 +154,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     netdata_log_info("     to %s", new_sqlite_database);
 
     // This will remove the -shm and -wal files when we close the database
-    db_execute(database, "select count(*) from sqlite_master limit 0");
+    (void) db_execute(database, "select count(*) from sqlite_master limit 0");
 
     sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
     if (recover) {
@@ -185,20 +185,61 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
 int execute_insert(sqlite3_stmt *res)
 {
     int rc;
-    int cnt = 0;
-    while ((rc = sqlite3_step_monitored(res)) != SQLITE_DONE && ++cnt < SQL_MAX_RETRY && likely(!netdata_exit)) {
-        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
-            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
-            error_report("Failed to insert/update, rc = %d -- attempt %d", rc, cnt);
-        }
-        else {
-            if (rc == SQLITE_CORRUPT)
-                (void) mark_database_to_recover(res, NULL);
-            error_report("SQLite error %d", rc);
-            break;
-        }
+    rc =  sqlite3_step_monitored(res);
+    if (rc == SQLITE_CORRUPT) {
+        (void)mark_database_to_recover(res, NULL);
+        error_report("SQLite error %d", rc);
     }
     return rc;
+}
+
+int configure_sqlite_database(sqlite3 *database, int target_version)
+{
+    char buf[1024 + 1] = "";
+    const char *list[2] = { buf, NULL };
+
+    // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
+    // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
+    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_synchronous
+    // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
+    snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_journal_mode
+    // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
+    snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_temp_store
+    // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
+    snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
+    // PRAGMA schema.journal_size_limit = N ;
+    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
+    if (init_database_batch(database, list))
+        return 1;
+
+    // https://www.sqlite.org/pragma.html#pragma_cache_size
+    // PRAGMA schema.cache_size = pages;
+    // PRAGMA schema.cache_size = -kibibytes;
+    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    if (init_database_batch(database, list))
+        return 1;
+
+    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
+    if (init_database_batch(database, list))
+        return 1;
+
+    return 0;
 }
 
 #define MAX_OPEN_STATEMENTS (512)
@@ -271,12 +312,11 @@ int init_database_batch(sqlite3 *database, const char *batch[])
     int rc;
     char *err_msg = NULL;
     for (int i = 0; batch[i]; i++) {
-        netdata_log_debug(D_METADATALOG, "Executing %s", batch[i]);
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
-            analytics_set_data_str(&analytics_data.netdata_fail_reason, err_msg);
+            analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(sqlite3_extended_errcode(database)));
             sqlite3_free(err_msg);
             if (SQLITE_CORRUPT == rc) {
                 if (mark_database_to_recover(NULL, database))
@@ -360,7 +400,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
-        analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(rc));
+        analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(sqlite3_extended_errcode(db_meta)));
         sqlite3_close(db_meta);
         db_meta = NULL;
         return 1;
@@ -374,16 +414,13 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
             sqlite3_free(err_msg);
         }
         else {
-            db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
             (void) sqlite3_close(db_meta);
         }
         return 1;
     }
 
     netdata_log_info("SQLite database %s initialization", sqlite_database);
-
-    char buf[1024 + 1] = "";
-    const char *list[2] = { buf, NULL };
 
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
     if (unlikely(rc != SQLITE_OK))
@@ -402,39 +439,8 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (likely(!memory))
         target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
-    // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
-    // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
-    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_synchronous
-    // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
-    snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_journal_mode
-    // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
-    snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_temp_store
-    // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
-    snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
-    // PRAGMA schema.journal_size_limit = N ;
-    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_cache_size
-    // PRAGMA schema.cache_size = pages;
-    // PRAGMA schema.cache_size = -kibibytes;
-    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if(init_database_batch(db_meta, list)) return 1;
-
-    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
-    if(init_database_batch(db_meta, list)) return 1;
+   if (configure_sqlite_database(db_meta, target_version))
+        return 1;
 
     if (init_database_batch(db_meta, &database_config[0]))
         return 1;
@@ -481,7 +487,7 @@ int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
 
     rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host parameter to %s, rc = %d", sql, rc);
+        error_report("Failed to bind UUID parameter to %s, rc = %d", sql, rc);
         goto skip;
     }
 
@@ -601,44 +607,6 @@ failed:
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
     return rc - 1;
-}
-
-#define SQL_SELECT_HOST_BY_NODE_ID  "select host_id from node_instance where node_id = @node_id;"
-
-int get_host_id(uuid_t *node_id, uuid_t *host_id)
-{
-    static __thread sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return 1;
-    }
-
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_SELECT_HOST_BY_NODE_ID, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to select node instance information for a node");
-            return 1;
-        }
-    }
-
-    rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to select node instance information");
-        goto failed;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW && host_id))
-        uuid_copy(*host_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
-
-failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset the prepared statement when selecting node instance information");
-
-    return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
 #define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL;"
@@ -796,7 +764,7 @@ failed:
 
 void sql_load_node_id(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -805,13 +773,11 @@ void sql_load_node_id(RRDHOST *host)
         return;
     }
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_GET_HOST_NODE_ID, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to prepare statement to fetch node id");
-            return;
-        };
-    }
+    rc = sqlite3_prepare_v2(db_meta, SQL_GET_HOST_NODE_ID, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to fetch node id");
+        return;
+    };
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
@@ -828,8 +794,8 @@ void sql_load_node_id(RRDHOST *host)
     }
 
 failed:
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset the prepared statement when loading node instance information");
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize the prepared statement when loading node instance information");
 };
 
 

@@ -16,6 +16,7 @@ declare -a package_tree=(
   cmake
   curl
   elfutils-libelf-devel
+  findutils
   flex
   gcc
   gcc-c++

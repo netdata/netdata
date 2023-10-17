@@ -327,7 +327,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                     "anomaly_detection", // family
                     "anomaly_detection.detector_events", // ctx
                     "Anomaly detection events", // title
-                    "percentage", // units
+                    "status", // units
                     NETDATA_ML_PLUGIN, // plugin
                     NETDATA_ML_MODULE_DETECTION, // module
                     ML_CHART_PRIO_DETECTOR_EVENTS, // priority

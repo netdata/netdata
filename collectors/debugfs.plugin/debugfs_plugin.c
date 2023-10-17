@@ -168,6 +168,8 @@ int main(int argc, char **argv)
     // disable syslog for debugfs.plugin
     error_log_syslog = 0;
 
+    log_set_global_severity_for_external_plugins();
+
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if (verify_netdata_host_prefix() == -1)
         exit(1);

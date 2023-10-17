@@ -38,17 +38,17 @@ static unsigned char functions_allowed_chars[256] = {
     [30] = '_', //
     [31] = '_', //
     [32] = ' ', // SPACE keep
-    [33] = '_', // !
-    [34] = '_', // "
-    [35] = '_', // #
-    [36] = '_', // $
-    [37] = '_', // %
-    [38] = '_', // &
-    [39] = '_', // '
-    [40] = '_', // (
-    [41] = '_', // )
-    [42] = '_', // *
-    [43] = '_', // +
+    [33] = '!', // ! keep
+    [34] = '"', // " keep
+    [35] = '#', // # keep
+    [36] = '$', // $ keep
+    [37] = '%', // % keep
+    [38] = '&', // & keep
+    [39] = '\'', // ' keep
+    [40] = '(', // ( keep
+    [41] = ')', // ) keep
+    [42] = '*', // * keep
+    [43] = '+', // + keep
     [44] = ',', // , keep
     [45] = '-', // - keep
     [46] = '.', // . keep
@@ -64,12 +64,12 @@ static unsigned char functions_allowed_chars[256] = {
     [56] = '8', // 8 keep
     [57] = '9', // 9 keep
     [58] = ':', // : keep
-    [59] = ':', // ; convert ; to :
-    [60] = '_', // <
-    [61] = ':', // = convert = to :
-    [62] = '_', // >
-    [63] = '_', // ?
-    [64] = '_', // @
+    [59] = ';', // ; keep
+    [60] = '<', // < keep
+    [61] = '=', // = keep
+    [62] = '>', // > keep
+    [63] = '?', // ? keep
+    [64] = '@', // @ keep
     [65] = 'A', // A keep
     [66] = 'B', // B keep
     [67] = 'C', // C keep
@@ -96,12 +96,12 @@ static unsigned char functions_allowed_chars[256] = {
     [88] = 'X', // X keep
     [89] = 'Y', // Y keep
     [90] = 'Z', // Z keep
-    [91] = '_', // [
-    [92] = '/', // backslash convert \ to /
-    [93] = '_', // ]
-    [94] = '_', // ^
+    [91] = '[', // [ keep
+    [92] = '\\', // backslash keep
+    [93] = ']', // ] keep
+    [94] = '^', // ^ keep
     [95] = '_', // _ keep
-    [96] = '_', // `
+    [96] = '`', // ` keep
     [97] = 'a', // a keep
     [98] = 'b', // b keep
     [99] = 'c', // c keep
@@ -128,10 +128,10 @@ static unsigned char functions_allowed_chars[256] = {
     [120] = 'x', // x keep
     [121] = 'y', // y keep
     [122] = 'z', // z keep
-    [123] = '_', // {
-    [124] = '_', // |
-    [125] = '_', // }
-    [126] = '_', // ~
+    [123] = '{', // { keep
+    [124] = '|', // | keep
+    [125] = '}', // } keep
+    [126] = '~', // ~ keep
     [127] = '_', //
     [128] = '_', //
     [129] = '_', //
@@ -833,7 +833,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     struct timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
     usec_t now_ut = tp.tv_sec * USEC_PER_SEC + tp.tv_nsec / NSEC_PER_USEC;
-    usec_t end_ut = now_ut + r->timeout * USEC_PER_SEC;
+    usec_t end_ut = now_ut + r->timeout * USEC_PER_SEC + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
 
     struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
     tmp->free_with_signal = false;
@@ -951,12 +951,14 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
         return rrd_call_function_async_and_dont_wait(r);
 }
 
+
+void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, const char *payload, rrd_function_result_callback_t callback, void *callback_data);
 // ----------------------------------------------------------------------------
 
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data) {
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
@@ -966,6 +968,12 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
     // find the function
 
     size_t sanitized_cmd_length = sanitize_function_text(sanitized_cmd, cmd, PLUGINSD_LINE_MAX);
+
+    if (is_dyncfg_function(sanitized_cmd, DYNCFG_FUNCTION_TYPE_ALL)) {
+        call_virtual_function_async(result_wb, host, sanitized_cmd, payload, result_cb, result_cb_data);
+        return HTTP_RESP_OK;
+    }
+
     code = rrd_call_function_find(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
     if(code != HTTP_RESP_OK)
         return code;

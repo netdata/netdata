@@ -21,7 +21,7 @@ Labels:
 | Label      | Description     |
 |:-----------|:----------------|
 [% for label in scope.labels %]
-| [[ label.name ]] | [[ label.description ]] |
+| [[ strfy(label.name) ]] | [[ strfy(label.description) ]] |
 [% endfor %]
 [% else %]
 This scope has no labels.
@@ -34,7 +34,7 @@ Metrics:
 |:------|:----------|:----|[% for a in entry.metrics.availability %]:---:|[% endfor %]
 
 [% for metric in scope.metrics %]
-| [[ metric.name ]] | [% for d in metric.dimensions %][[ d.name ]][% if not loop.last %], [% endif %][% endfor %] | [[ metric.unit ]] |[% for a in entry.metrics.availability %] [% if not metric.availability|length or a in metric.availability %]•[% else %] [% endif %] |[% endfor %]
+| [[ strfy(metric.name) ]] | [% for d in metric.dimensions %][[ strfy(d.name) ]][% if not loop.last %], [% endif %][% endfor %] | [[ strfy(metric.unit) ]] |[% for a in entry.metrics.availability %] [% if not metric.availability|length or a in metric.availability %]•[% else %] [% endif %] |[% endfor %]
 
 [% endfor %]
 

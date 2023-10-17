@@ -184,6 +184,7 @@ struct alert_v2_entry {
     RRDCALC *tmp;
 
     STRING *name;
+    STRING *summary;
 
     size_t ati;
 
@@ -315,6 +316,7 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
     t->name = rc->name;
+    t->summary = rc->summary;
     t->ati = ctl->alerts.ati++;
 
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);
@@ -355,6 +357,7 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->status = rc->status;
     t->flags = rc->run_flags;
     t->info = rc->info;
+    t->summary = rc->summary;
     t->value = rc->value;
     t->last_updated = rc->last_updated;
     t->last_status_change = rc->last_status_change;
@@ -1009,8 +1012,8 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             STORAGE_ENGINE *eng = localhost->db[tier].eng;
             if (!eng) continue;
 
-            size_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
-            size_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
+            uint64_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
+            uint64_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
             time_t first_time_s = storage_engine_global_first_time_s(eng->backend, localhost->db[tier].instance);
             size_t currently_collected_metrics = storage_engine_collected_metrics(eng->backend, localhost->db[tier].instance);
 
@@ -1280,6 +1283,7 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
         buffer_json_member_add_string(wb, "component", t->component);
         buffer_json_member_add_string(wb, "type", t->type);
         buffer_json_member_add_string(wb, "info", t->info);
+        buffer_json_member_add_string(wb, "summary", t->summary);
         // buffer_json_member_add_string(wb, "source", t->source); // moved to alert instance
     }
     
@@ -1343,6 +1347,7 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             buffer_json_member_add_string(wb, "units", string2str(t->units));
             buffer_json_member_add_string(wb, "fami", string2str(t->family));
             buffer_json_member_add_string(wb, "info", string2str(t->info));
+            buffer_json_member_add_string(wb, "sum", string2str(t->summary));
             buffer_json_member_add_string(wb, "ctx", string2str(t->context));
             buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
             buffer_json_member_add_uuid(wb, "tr_i", &t->last_transition_id);
@@ -1397,6 +1402,7 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                         {
                             buffer_json_member_add_uint64(wb, "ati", t->ati);
                             buffer_json_member_add_string(wb, "nm", string2str(t->name));
+                            buffer_json_member_add_string(wb, "sum", string2str(t->summary));
 
                             buffer_json_member_add_uint64(wb, "cr", t->critical);
                             buffer_json_member_add_uint64(wb, "wr", t->warning);
@@ -1438,6 +1444,7 @@ struct sql_alert_transition_fixed_size {
     char units[SQL_TRANSITION_DATA_SMALL_STRING];
     char exec[SQL_TRANSITION_DATA_BIG_STRING];
     char info[SQL_TRANSITION_DATA_BIG_STRING];
+    char summary[SQL_TRANSITION_DATA_BIG_STRING];
     char classification[SQL_TRANSITION_DATA_SMALL_STRING];
     char type[SQL_TRANSITION_DATA_SMALL_STRING];
     char component[SQL_TRANSITION_DATA_SMALL_STRING];
@@ -1477,6 +1484,7 @@ static struct sql_alert_transition_fixed_size *contexts_v2_alert_transition_dup(
     strncpyz(n->units, t->units ? t->units : "", sizeof(n->units) - 1);
     strncpyz(n->exec, t->exec ? t->exec : "", sizeof(n->exec) - 1);
     strncpyz(n->info, t->info ? t->info : "", sizeof(n->info) - 1);
+    strncpyz(n->summary, t->summary ? t->summary : "", sizeof(n->summary) - 1);
     strncpyz(n->classification, t->classification ? t->classification : "", sizeof(n->classification) - 1);
     strncpyz(n->type, t->type ? t->type : "", sizeof(n->type) - 1);
     strncpyz(n->component, t->component ? t->component : "", sizeof(n->component) - 1);
@@ -1734,6 +1742,7 @@ static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_
 
             buffer_json_member_add_time_t(wb, "when", t->when_key);
             buffer_json_member_add_string(wb, "info", *t->info ? t->info : "");
+            buffer_json_member_add_string(wb, "summary", *t->summary ? t->summary : "");
             buffer_json_member_add_string(wb, "units", *t->units ? t->units : NULL);
             buffer_json_member_add_object(wb, "new");
             {
@@ -1934,7 +1943,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     if(req->after || req->before) {
-        ctl.window.relative = rrdr_relative_window_to_absolute(&ctl.window.after, &ctl.window.before, &ctl.now, false);
+        ctl.window.relative = rrdr_relative_window_to_absolute_query(&ctl.window.after, &ctl.window.before, &ctl.now
+                                                                     , false
+                                                                    );
         ctl.window.enabled = !(mode & CONTEXTS_V2_ALERT_TRANSITIONS);
     }
     else
