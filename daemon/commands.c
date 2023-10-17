@@ -48,6 +48,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
+static cmd_status_t cmd_add_event_entry(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -61,6 +62,7 @@ static command_info_t command_info_array[] = {
         {"read-config", cmd_read_config_execute, CMD_TYPE_CONCURRENT},
         {"write-config", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL},
         {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
+        {"add-event", cmd_add_event_entry, CMD_TYPE_ORTHOGONAL},
         {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
         {"version", cmd_version, CMD_TYPE_ORTHOGONAL},
         {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL}
@@ -129,6 +131,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Return with 'pong' if agent is alive.\n"
              "aclk-state [json]\n"
              "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
+             "add-event [category] [event information]\n"
+             "    Adds an event to Netdata's event log. First word before space is the category, the rest is the info field.\n"
              "dumpconfig\n"
              "    Returns the current netdata.conf on stdout.\n"
              "version\n"
@@ -316,6 +320,25 @@ static cmd_status_t cmd_aclk_state(char *args, char **message)
         *message = aclk_state_json();
     else
         *message = aclk_state();
+
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_add_event_entry(char *args, char **message)
+{
+    (void)message;
+    netdata_log_info("COMMAND: Adding event log entry %s", args);
+    size_t n = strlen(args);
+    char *separator = strchr(args,' ');
+    if (separator == NULL)
+        return CMD_STATUS_FAILURE;
+    char *temp = callocz(n + 1, 1);
+    strcpy(temp, args);
+    size_t offset = separator - args;
+    temp[offset] = 0;
+    EVENT_LOG_ENTRY *ee = event_log_create_entry(temp, temp + offset + 1);
+    if (ee)
+        event_log_add_entry(localhost, ee);
 
     return CMD_STATUS_SUCCESS;
 }
