@@ -1074,10 +1074,12 @@ typedef struct health {
 struct event_log_entry {
     uint32_t unique_id;
     time_t when;
-    STRING *name;
+    STRING *category;
     STRING *info;
     STRING *collector;
     STRING *plugin;
+
+    uuid_t transition_id;
 
     struct event_log_entry *next;
     struct event_log_entry *next_in_progress;

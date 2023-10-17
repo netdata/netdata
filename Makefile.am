@@ -170,8 +170,6 @@ LIBNETDATA_FILES = \
     libnetdata/locks/locks.h \
     libnetdata/log/log.c \
     libnetdata/log/log.h \
-    libnetdata/log/event_log.c \
-    libnetdata/log/event_log.h \
     libnetdata/onewayalloc/onewayalloc.c \
     libnetdata/onewayalloc/onewayalloc.h \
     libnetdata/popen/popen.c \
@@ -972,6 +970,8 @@ DAEMON_FILES = \
     daemon/pipename.h \
     daemon/unit_test.c \
     daemon/unit_test.h \
+    daemon/event_log.c \
+    daemon/event_log.h \
     $(NULL)
 
 H2O_FILES = \

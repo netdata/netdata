@@ -18,6 +18,7 @@ void metaqueue_ml_load_models(RRDDIM *rd);
 void migrate_localhost(uuid_t *host_uuid);
 void metadata_queue_load_host_context(RRDHOST *host);
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc);
+void metaqueue_store_event_log_entry(RRDHOST *host, EVENT_LOG_ENTRY *ee);
 
 // UNIT TEST
 int metadata_unittest(void);

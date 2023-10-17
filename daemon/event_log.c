@@ -3,12 +3,14 @@
 #include "event_log.h"
 
 inline EVENT_LOG_ENTRY* event_log_create_entry(
-    char *name,
+    char *category,
     char *info
 ) {
     EVENT_LOG_ENTRY *ee = callocz(1, sizeof(EVENT_LOG_ENTRY));
-    ee->name = string_strdupz(name);
+    ee->category = string_strdupz(category);
     ee->info = string_strdupz(info);
+    ee->collector = NULL;
+    ee->plugin = NULL;
     ee->when = (uint32_t)now_realtime_sec();
 
     return ee;
@@ -20,6 +22,7 @@ inline void event_log_add_entry(RRDHOST *host, EVENT_LOG_ENTRY *ee) {
     ee->next = host->event_log.events;
     host->event_log.events = ee;
     netdata_rwlock_unlock(&host->event_log.event_log_rwlock);
+    metaqueue_store_event_log_entry(host, ee);
 }
 
 void event_log_init(RRDHOST *host)
@@ -44,11 +47,11 @@ void event_log_entry2json_nolock(BUFFER *wb, EVENT_LOG_ENTRY *ee, RRDHOST *host)
             "\n\t{\n"
                     "\t\t\"hostname\": \"%s\",\n"
                     "\t\t\"unique_id\": %u,\n"
-                    "\t\t\"name\": \"%s\",\n"
+                    "\t\t\"category\": \"%s\",\n"
                     "\t\t\"when\": %lu,\n"
                    , rrdhost_hostname(host)
                    , ee->unique_id
-                   , string2str(ee->name)
+                   , string2str(ee->category)
                    , (unsigned long)ee->when
     );
 

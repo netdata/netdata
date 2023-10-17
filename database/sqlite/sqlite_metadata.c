@@ -85,6 +85,7 @@ enum metadata_opcode {
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
     METADATA_ML_LOAD_MODELS,
+    METADATA_STORE_EVENT_LOG_ENTRY,
     // leave this last
     // we need it to check for worker utilization
     METADATA_MAX_ENUMERATIONS_DEFINED
@@ -825,6 +826,63 @@ skip:
         error_report("Failed to %s statement that deletes a chart uuid rc = %d", action_res ? "reset" : "finalize", rc);
 }
 
+#define SQL_STORE_EVENT_LOG_ENTRY  "INSERT INTO event_log (host_id, unique_id, category, info, collector, plugin, transition_id) " \
+    "VALUES (@host_id, @unique_id, @category, @info, @collector, @plugin, @transition_id); "
+
+static int store_event_log_entry(RRDHOST *host, EVENT_LOG_ENTRY *ee)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc, param = 0;
+
+    if (unlikely((!res))) {
+        rc = prepare_statement(db_meta, SQL_STORE_EVENT_LOG_ENTRY, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store event log entry, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, ee->unique_id);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, ++param, string2str(ee->category), 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, ++param, string2str(ee->info), 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, ++param, string2str(ee->collector), 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = bind_text_null(res, ++param, string2str(ee->plugin), 1);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    int store_rc = sqlite3_step_monitored(res);
+    if (unlikely(store_rc != SQLITE_DONE))
+        error_report("Failed to store event log entry %u, rc = %d", ee->unique_id, rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to store event log entry %u, rc = %d", ee->unique_id, rc);
+
+    return store_rc != SQLITE_DONE;
+bind_fail:
+    error_report("Failed to bind %d parameter to store event log entry %u, rc = %d", param, ee->unique_id, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement to store event log entry %u, rc = %d", ee->unique_id, rc);
+    return 1;
+}
+
 static void check_dimension_metadata(struct metadata_wc *wc)
 {
     static time_t next_execution_t = 0;
@@ -1562,6 +1620,7 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_ADD_HOST_INFO,        "add host info");
     worker_register_job_name(METADATA_MAINTENANCE,          "maintenance");
     worker_register_job_name(METADATA_ML_LOAD_MODELS,       "ml load models");
+    worker_register_job_name(METADATA_STORE_EVENT_LOG_ENTRY,"store event log entry");
 
     int ret;
     uv_loop_t *loop;
@@ -1733,6 +1792,9 @@ static void metadata_event_loop(void *arg)
                     sleep_usec(1000); // processing takes 1ms
                     __atomic_fetch_add(&tu->processed, 1, __ATOMIC_SEQ_CST);
                     break;
+                case METADATA_STORE_EVENT_LOG_ENTRY:
+                    store_event_log_entry((RRDHOST *) cmd.param[0], (EVENT_LOG_ENTRY *) cmd.param[1]);
+                    break;
                 default:
                     break;
             }
@@ -1897,6 +1959,13 @@ void metadata_queue_load_host_context(RRDHOST *host)
     if (unlikely(!metasync_worker.loop))
         return;
     queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
+}
+
+void metaqueue_store_event_log_entry(RRDHOST *host, EVENT_LOG_ENTRY *ee)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+    queue_metadata_cmd(METADATA_STORE_EVENT_LOG_ENTRY, host, ee);
 }
 
 //

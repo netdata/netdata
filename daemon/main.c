@@ -2136,6 +2136,12 @@ int main(int argc, char **argv) {
         }
     }
 
+    char info[1024];
+    snprintfz(info, 1023, "Netdata %s started.", VERSION);
+    EVENT_LOG_ENTRY *ee = event_log_create_entry("Netdata", info);
+    if (ee)
+        event_log_add_entry(localhost, ee);
+
     // ------------------------------------------------------------------------
     // Report ACLK build failure
 #ifndef ENABLE_ACLK
