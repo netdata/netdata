@@ -53,7 +53,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
-- 📖 **systemd Journal Logs Explorer** (beta, in the nightly release channel)<br/>
+- 📖 **systemd Journal Logs Explorer**<br/>
   Provides a `systemd` journal logs explorer, to view, filter and analyze system and applications logs by directly accessing `systemd` journal files on individual hosts and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
@@ -67,7 +67,6 @@ It scales nicely from just a single server to thousands of servers, even in comp
 NEW: **Netdata and LOGS !** 🥳</br>
 
 Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query `systemd` journal logs!
-The plugin is available from Oct 3, 2023 to nightly channel users.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
@@ -121,10 +120,10 @@ The plugin is available from Oct 3, 2023 to nightly channel users.
 |   Advanced Troubleshooting    | Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor, and many more. |    later     |                                               interrupted                                               |
 |  Easy Custom<br/>Dashboards   |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     soon     |                                                 planned                                                 |
 |     More Customizability      |                           Set default settings for all charts and views!                            |     soon     |                                                 planned                                                 |
-|        `systemd` journal      |                     View the `systemd` journal logs of your systems on the dashboard.                      |     now     |                                               in nightly                                               |
 |          UCUM Units           |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon     |                                               in progress                                               |
 | **Netdata Cloud<br/>On-Prem** |                        **Netdata Cloud available for On-Prem installation!**                        |   **soon**   |                                             **in progress**                                             |
 |       Click to Activate       |                          Configure Alerts and Data Collectors from the UI!                          |     soon     |                                               in progress                                               |
+|        `systemd` journal      |                     View the `systemd` journal logs of your systems on the dashboard.               | Oct<br/>2023 |   [v1.43](https://github.com/netdata/netdata/releases/tag/v1.43.0) |
 |         Integrations          |                                  Netdata Integrations Marketplace!                                  | Aug<br/>2023 |           [v1.42](https://github.com/netdata/netdata/releases#v1420-integrations-marketplace)           |
 |         New Agent UI          |                    Now Netdata Cloud and Netdata Agent share the same dashboard!                    | Jul<br/>2023 |          [v1.41](https://github.com/netdata/netdata/releases/tag/v1.41.0#v1410-one-dashboard)           |
 |      Summary Dashboards       |                                    High level tiles everywhere!                                     | Jun<br/>2023 | [v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0#v1400-visualization-summary-dashboards) |
