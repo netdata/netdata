@@ -28,6 +28,14 @@ We suggest to keep this script and all the involved certificates at the journals
 
 The script can be edited and re-run to create new certificates as clients are added to your network. The existing certificates will not be altered, allowing existing connections to work uninterrupted while new journal clients are added to your network.
 
+On the server you will generate the certificates (usually the journals centralization server, but it can be any other), make sure you have `openssl` installed:
+
+```bash
+apt-get install openssl
+```
+
+Download the script to generate the certificates:
+
 ```bash
 wget -O systemd-journal-self-signed-certs.sh "https://gist.githubusercontent.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7/raw/c346e61e0a66f45dc4095d254bd23917f0a01bd0/systemd-journal-self-signed-certs.sh"
 chmod 755 systemd-journal-self-signed-certs.sh
