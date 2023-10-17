@@ -297,10 +297,10 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
                                   "_ebpf_call_swap_readpage",
                                   "Calls to function swap_readpage.",
                                   EBPF_COMMON_DIMENSION_CALL,
-                                  NETDATA_SWAP_SUBMENU,
+                                  NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_swap_readpage",
-                                  20191,
+                                  20070,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -308,10 +308,10 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
                                   "_ebpf_call_swap_writepage",
                                   "Calls to function swap_writepage.",
                                   EBPF_COMMON_DIMENSION_CALL,
-                                  NETDATA_SWAP_SUBMENU,
+                                  NETDATA_EBPF_MEMORY_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_call_swap_writepage",
-                                  20192,
+                                  20071,
                                   update_every);
         w->charts_created &= ~(1<<EBPF_MODULE_SWAP_IDX);
     }
@@ -868,10 +868,10 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              "_ebpf_call_swap_readpage",
                              "Calls to function swap_readpage.",
                              EBPF_COMMON_DIMENSION_CALL,
-                             NETDATA_SWAP_SUBMENU,
+                             NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_swap_readpage",
-                             20191,
+                             20070,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SWAP);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -883,10 +883,10 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              "_ebpf_call_swap_writepage",
                              "Calls to function swap_writepage.",
                              EBPF_COMMON_DIMENSION_CALL,
-                             NETDATA_SWAP_SUBMENU,
+                             NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_call_swap_writepage",
-                             20192,
+                             20071,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SWAP);
         ebpf_create_chart_labels("app_group", w->name, 0);
