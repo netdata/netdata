@@ -495,7 +495,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   "app.ebpf_cachestat_hit_ratio",
-                                  20090,
+                                  20260,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -506,7 +506,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_cachestat_dirty_pages",
-                                  20091,
+                                  20261,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -517,7 +517,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_cachestat_access",
-                                  20092,
+                                  20262,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -528,7 +528,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   NETDATA_CACHESTAT_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_cachestat_misses",
-                                  20093,
+                                  20263,
                                   update_every);
         w->charts_created &= ~(1<<EBPF_MODULE_CACHESTAT_IDX);
     }
@@ -839,7 +839,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
                              "app.ebpf_cachestat_hit_ratio",
-                             20090,
+                             20260,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -855,7 +855,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
                              "app.ebpf_cachestat_dirty_pages",
-                             20091,
+                             20261,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -870,7 +870,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_cachestat_access",
-                             20092,
+                             20262,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -885,7 +885,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_CACHESTAT_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_cachestat_misses",
-                             20093,
+                             20263,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);

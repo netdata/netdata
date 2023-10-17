@@ -434,7 +434,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_process_start",
-                             20065,
+                             20161,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -449,7 +449,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_thread_start",
-                             20066,
+                             20162,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -464,7 +464,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_task_exit",
-                             20067,
+                             20163,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -479,7 +479,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_PROCESS_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_task_released",
-                             20068,
+                             20164,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -495,7 +495,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  NETDATA_PROCESS_GROUP,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
                                  "app.ebpf_task_error",
-                                 20069,
+                                 20165,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_PROCESS);
             ebpf_create_chart_labels("app_group", w->name, 0);
@@ -628,7 +628,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_process_start",
-                                  20065,
+                                  20161,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -639,7 +639,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_thread_start",
-                                  20066,
+                                  20162,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -650,7 +650,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_task_exit",
-                                  20067,
+                                  20163,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -661,7 +661,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                   NETDATA_PROCESS_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_task_released",
-                                  20068,
+                                  20164,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
@@ -673,7 +673,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
                                       NETDATA_PROCESS_GROUP,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
                                       "app.ebpf_task_error",
-                                      20069,
+                                      20165,
                                       update_every);
         }
 
