@@ -2,24 +2,27 @@
 
 This page will guide you through creating a passive journal centralization setup without the use of encryption.
 
-> A _passive_ journal server waits for clients to push their metrics to it.
+A _passive_ journal server waits for clients to push their metrics to it, so in this setup we will:
 
-> ⚠️ **IMPORTANT**
-> These instructions will copy your logs to a central server, without any encryption or authorization.
+1. configure `systemd-journal-remote` on the server, to listen for incoming connections.
+2. configure `systemd-journal-upload` on the clients, to push their logs to the server.
+
+> ⚠️ **IMPORTANT**<br/>
+> These instructions will copy your logs to a central server, without any encryption or authorization.<br/>
 > DO NOT USE THIS ON NON-TRUSTED NETWORKS.
 
 ## Server configuration
 
 On the centralization server install `systemd-journal-remote`:
 
-```sh
+```bash
 # change this according to your distro
 sudo apt-get install systemd-journal-remote
 ```
 
 Make sure the journal transfer protocol is `http`:
 
-```sh
+```bash
 sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
 
 # edit it to make sure it says:
@@ -34,14 +37,14 @@ sudo systemctl daemon-reload
 
 Optionally, if you want to change the port (the default is `19532`), edit `systemd-journal-remote.socket`
 
-```sh
+```bash
 # edit the socket file
 sudo systemctl edit systemd-journal-remote.socket
 ```
 
 and add the following lines into the instructed place, and choose your desired port; save and exit.
 
-```sh
+```bash
 [Socket]
 ListenStream=<DESIRED_PORT>
 ```
@@ -58,9 +61,9 @@ sudo systemctl enable systemd-journal-remote.service
 
 ## Client configuration
 
-On the clients, install `systemd-journal-remote`:
+On the clients, install `systemd-journal-remote` (it includes `systemd-journal-upload`):
 
-```sh
+```bash
 # change this according to your distro
 sudo apt-get install systemd-journal-remote
 ```
@@ -74,7 +77,7 @@ URL=http://centralization.server.ip:19532
 
 Edit `systemd-journal-upload`, and add `Restart=always` to make sure the client will keep trying to push logs, even if the server is temporarily not there, like this:
 
-```sh
+```bash
 sudo systemctl edit systemd-journal-upload
 ```
 
@@ -87,7 +90,7 @@ Restart=always
 
 Enable and start `systemd-journal-upload`, like this:
 
-```sh
+```bash
 sudo systemctl enable systemd-journal-upload
 sudo systemctl start systemd-journal-upload
 ```
@@ -96,7 +99,7 @@ sudo systemctl start systemd-journal-upload
 
 To verify the central server is receiving logs, run this on the central server:
 
-```sh
+```bash
 sudo ls -l /var/log/journal/remote/
 ```
 
