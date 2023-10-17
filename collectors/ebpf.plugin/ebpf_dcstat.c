@@ -390,7 +390,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_LINE,
                                   "app.ebpf_dc_hit",
-                                  20100,
+                                  20265,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -401,7 +401,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_dc_reference",
-                                  20101,
+                                  20266,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -412,7 +412,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_dc_not_cache",
-                                  20102,
+                                  20267,
                                   update_every);
 
         ebpf_write_chart_obsolete(NETDATA_APP_FAMILY,
@@ -423,7 +423,7 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
                                   NETDATA_DIRECTORY_CACHE_SUBMENU,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_dc_not_found",
-                                  20103,
+                                  20268,
                                   update_every);
 
         w->charts_created &= ~(1<<EBPF_MODULE_DCSTAT_IDX);
@@ -546,7 +546,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_LINE,
                              "app.ebpf_dc_hit",
-                             20100,
+                             20265,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -561,7 +561,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_dc_reference",
-                             20101,
+                             20266,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -576,7 +576,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_dc_not_cache",
-                             20102,
+                             20267,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -591,7 +591,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_DIRECTORY_CACHE_SUBMENU,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_dc_not_found",
-                             20103,
+                             20268,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
         ebpf_create_chart_labels("app_group", w->name, 0);
