@@ -2,6 +2,10 @@
 
 This page will guide you through creating a passive journal centralization setup using self-signed certificates for encryption and authorization.
 
+Once you centralize your infrastructure logs to a server, Netdata will automatically detects all the logs from all servers and organize them in sources.
+With the setup described in this document, Netdata will automatically name all remote sources using the names of the clients, as they are described
+at their certificates.
+
 A _passive_ journal server waits for clients to push their metrics to it, so in this setup we will:
 
 1. configure a certificates authority and issue self-signed certificates for your servers.
