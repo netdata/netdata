@@ -82,11 +82,11 @@ scp /etc/ssl/systemd-journal-remote/runme-on-XXX.sh XXX:/tmp/
 
 ## Server configuration
 
-On the centralization server install `systemd-journal-remote` and `openssl`:
+On the centralization server install `systemd-journal-remote`:
 
 ```bash
 # change this according to your distro
-sudo apt-get install systemd-journal-remote openssl
+sudo apt-get install systemd-journal-remote
 ```
 
 Make sure the journal transfer protocol is `https`:
@@ -136,7 +136,7 @@ sudo bash /tmp/runme-on-XXX.sh
 
 ## Client configuration
 
-On the clients, install `systemd-journal-remote`:
+On the clients, install `systemd-journal-remote` (it includes `systemd-journal-upload`):
 
 ```bash
 # change this according to your distro
