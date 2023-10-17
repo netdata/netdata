@@ -125,8 +125,8 @@ Usually `remote` journals are named by the IP of the server sending these logs. 
 extracts these IPs and performs a reverse DNS lookup to find their hostnames. When this is successful,
 `remote` journals are named by the hostnames of the origin servers.
 
-For information about configuring a journals' centralization server,
-check [this FAQ item](#how-do-i-configure-a-journals-centralization-server).
+For information about configuring a journal centralization server,
+check [this FAQ item](#how-do-i-configure-a-journal-centralization-server).
 
 ## Journal Fields
 
@@ -278,9 +278,9 @@ multiple journal files, over long time-frames.
 During the development of this plugin, we submitted, to `systemd`, a number of patches to improve `journalctl`
 performance by a factor of 14:
 
-- https://github.com/systemd/systemd/pull/29365
-- https://github.com/systemd/systemd/pull/29366
-- https://github.com/systemd/systemd/pull/29261
+- <https://github.com/systemd/systemd/pull/29365>
+- <https://github.com/systemd/systemd/pull/29366>
+- <https://github.com/systemd/systemd/pull/29261>
 
 However, even after these patches are merged, `journalctl` will still be 2x slower than this Netdata plugin,
 on multi-journal queries.
@@ -296,7 +296,7 @@ This Netdata plugin does not require any configuration or maintenance.
 
 ## FAQ
 
-### Can I use this plugin on journals' centralization servers?
+### Can I use this plugin on journal centralization servers?
 
 Yes. You can centralize your logs using `systemd-journal-remote`, and then install Netdata
 on this logs centralization server to explore the logs of all your infrastructure.
@@ -304,7 +304,7 @@ on this logs centralization server to explore the logs of all your infrastructur
 This plugin will automatically provide multi-node views of your logs and also give you the ability to combine the logs
 of multiple servers, as you see fit.
 
-Check [configuring a logs centralization server](#configuring-a-journals-centralization-server).
+Check [configuring a logs centralization server](#how-do-i-configure-a-journal-centralization-server).
 
 ### Can I use this plugin from a parent Netdata?
 
@@ -364,7 +364,7 @@ Yes. It is simple, fast and the software to do it is already in your systems.
 For application and system logs, `systemd` journal is ideal and the visibility you can get
 by centralizing your system logs and the use of this Netdata plugin, is unparalleled.
 
-### How do I configure a journals' centralization server?
+### How do I configure a journal centralization server?
 
 A short summary to get journal server running can be found below.
 There are two strategies you can apply, when it comes down to a centralized server for `systemd` journal logs.
@@ -374,294 +374,13 @@ There are two strategies you can apply, when it comes down to a centralized serv
 
 For more options and reference to documentation, check `man systemd-journal-remote` and `man systemd-journal-upload`.
 
-#### _passive_ journals' centralization without encryption
+#### _passive_ journal centralization without encryption
 
-> ℹ️ _passive_ is a journal server that waits for clients to push their metrics to it.
+If you want to setup your own passive journal centralization setup without encryption, [check out guide on it](https://github.com/netdata/netdata/blob/master/collectors/systemd-journal.plugin/passive_journal_centralization_guide_no_encryption.md).
 
-> ⚠️ **IMPORTANT**
-> These instructions will copy your logs to a central server, without any encryption or authorization.
-> DO NOT USE THIS ON NON-TRUSTED NETWORKS.
+#### _passive_ journal centralization with encryption using self-signed certificates
 
-##### _passive_ server, without encryption
-
-On the centralization server install `systemd-journal-remote`:
-
-```sh
-# change this according to your distro
-sudo apt-get install systemd-journal-remote
-```
-
-Make sure the journal transfer protocol is `http`:
-
-```sh
-sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
-
-# edit it to make sure it says:
-# --listen-http=-3
-# not:
-# --listen-https=-3
-sudo nano /etc/systemd/system/systemd-journal-remote.service
-
-# reload systemd
-sudo systemctl daemon-reload
-```
-
-Optionally, if you want to change the port (the default is `19532`), edit `systemd-journal-remote.socket`
-
-```sh
-# edit the socket file
-sudo systemctl edit systemd-journal-remote.socket
-```
-
-and add the following lines into the instructed place, and choose your desired port; save and exit.
-
-```sh
-[Socket]
-ListenStream=<DESIRED_PORT>
-```
-
-Finally, enable it, so that it will start automatically upon receiving a connection:
-
-```
-# enable systemd-journal-remote
-sudo systemctl enable --now systemd-journal-remote.socket
-sudo systemctl enable systemd-journal-remote.service
-```
-
-`systemd-journal-remote` is now listening for incoming journals from remote hosts.
-
-##### _passive_ client, without encryption
-
-On the clients, install `systemd-journal-remote`:
-
-```sh
-# change this according to your distro
-sudo apt-get install systemd-journal-remote
-```
-
-Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like so:
-
-```
-[Upload]
-URL=http://centralization.server.ip:19532
-```
-
-Edit `systemd-journal-upload`, and add `Restart=always` to make sure the client will keep trying to push logs, even if the server is temporarily not there, like this:
-
-```sh
-sudo systemctl edit systemd-journal-upload
-```
-
-At the top, add:
-
-```
-[Service]
-Restart=always
-```
-
-Enable and start `systemd-journal-upload`, like this:
-
-```sh
-sudo systemctl enable systemd-journal-upload
-sudo systemctl start systemd-journal-upload
-```
-
-##### verify it works
-
-To verify the central server is receiving logs, run this on the central server:
-
-```sh
-sudo ls -l /var/log/journal/remote/
-```
-
-You should see new files from the client's IP.
-
-Also, `systemctl status systemd-journal-remote` should show something like this:
-
-```
-systemd-journal-remote.service - Journal Remote Sink Service
-     Loaded: loaded (/etc/systemd/system/systemd-journal-remote.service; indirect; preset: disabled)
-     Active: active (running) since Sun 2023-10-15 14:29:46 EEST; 2h 24min ago
-TriggeredBy: ● systemd-journal-remote.socket
-       Docs: man:systemd-journal-remote(8)
-             man:journal-remote.conf(5)
-   Main PID: 2118153 (systemd-journal)
-     Status: "Processing requests..."
-      Tasks: 1 (limit: 154152)
-     Memory: 2.2M
-        CPU: 71ms
-     CGroup: /system.slice/systemd-journal-remote.service
-             └─2118153 /usr/lib/systemd/systemd-journal-remote --listen-http=-3 --output=/var/log/journal/remote/
-```
-
-Note the `status: "Processing requests..."` and the PID under `CGroup`.
-
-On the client `systemctl status systemd-journal-upload` should show something like this:
-
-```
-● systemd-journal-upload.service - Journal Remote Upload Service
-     Loaded: loaded (/lib/systemd/system/systemd-journal-upload.service; enabled; vendor preset: disabled)
-    Drop-In: /etc/systemd/system/systemd-journal-upload.service.d
-             └─override.conf
-     Active: active (running) since Sun 2023-10-15 10:39:04 UTC; 3h 17min ago
-       Docs: man:systemd-journal-upload(8)
-   Main PID: 4169 (systemd-journal)
-     Status: "Processing input..."
-      Tasks: 1 (limit: 13868)
-     Memory: 3.5M
-        CPU: 1.081s
-     CGroup: /system.slice/systemd-journal-upload.service
-             └─4169 /lib/systemd/systemd-journal-upload --save-state
-```
-
-Note the `Status: "Processing input..."` and the PID under `CGroup`.
-
-#### _passive_ journals' centralization with encryption using self-signed certificates
-
-> ℹ️ _passive_ is a journal server that waits for clients to push their metrics to it.
-
-##### _passive_ server, with encryption and self-singed certificates
-
-On the centralization server install `systemd-journal-remote` and `openssl`:
-
-```sh
-# change this according to your distro
-sudo apt-get install systemd-journal-remote openssl
-```
-
-Make sure the journal transfer protocol is `https`:
-
-```sh
-sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
-
-# edit it to make sure it says:
-# --listen-https=-3
-# not:
-# --listen-http=-3
-sudo nano /etc/systemd/system/systemd-journal-remote.service
-
-# reload systemd
-sudo systemctl daemon-reload
-```
-
-Optionally, if you want to change the port (the default is `19532`), edit `systemd-journal-remote.socket`
-
-```sh
-# edit the socket file
-sudo systemctl edit systemd-journal-remote.socket
-```
-
-and add the following lines into the instructed place, and choose your desired port; save and exit.
-
-```sh
-[Socket]
-ListenStream=<DESIRED_PORT>
-```
-
-Finally, enable it, so that it will start automatically upon receiving a connection:
-
-```sh
-# enable systemd-journal-remote
-sudo systemctl enable --now systemd-journal-remote.socket
-sudo systemctl enable systemd-journal-remote.service
-```
-
-`systemd-journal-remote` is now listening for incoming journals from remote hosts.
-
-Use [this script](https://gist.github.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7) to create a self-signed certificates authority and certificates for all your servers.
-
-```sh
-wget -O systemd-journal-self-signed-certs.sh "https://gist.githubusercontent.com/ktsaou/d62b8a6501cf9a0da94f03cbbb71c5c7/raw/c346e61e0a66f45dc4095d254bd23917f0a01bd0/systemd-journal-self-signed-certs.sh"
-chmod 755 systemd-journal-self-signed-certs.sh
-```
-
-Edit the script and at its top, set your settings:
-
-```sh
-# The directory to save the generated certificates (and everything about this certificate authority).
-# This is only used on the node generating the certificates (usually on the journals server).
-DIR="/etc/ssl/systemd-journal-remote"
-
-# The journals centralization server name (the CN of the server certificate).
-SERVER="server-hostname"
-
-# All the DNS names or IPs this server is reachable at (the certificate will include them).
-# Journal clients can use any of them to connect to this server.
-# systemd-journal-upload validates its URL= hostname, against this list.
-SERVER_ALIASES=("DNS:server-hostname1" "DNS:server-hostname2" "IP:1.2.3.4" "IP:10.1.1.1" "IP:172.16.1.1")
-
-# All the names of the journal clients that will be sending logs to the server (the CNs of their certificates).
-# These names are used by systemd-journal-remote to name the journal files in /var/log/journal/remote/.
-# Also the remote hosts will be presented using these names on Netdata dashboards.
-CLIENTS=("vm1" "vm2" "vm3" "add_as_may_as_needed")
-```
-
-Then run the script:
-
-```sh
-sudo ./systemd-journal-self-signed-certs.sh
-```
-
-The script will create the directory `/etc/ssl/systemd-journal-remote` and in it you will find all the certificates needed.
-
-There will also be files named `runme-on-XXX.sh`. There will be 1 script for the server and 1 script for each of the clients. You can copy and paste (or `scp`) these scripts on your server and each of your clients and run them as root:
-
-```sh
-scp /etc/ssl/systemd-journal-remote/runme-on-XXX.sh XXX:/tmp/
-```
-
-Once the above is done, `ssh` to each server/client and do:
-
-```sh
-sudo bash /tmp/runme-on-XXX.sh
-```
-
-The scripts install the needed certificates, fix their file permissions to be accessible by systemd-journal-remote/upload, change `/etc/systemd/journal-remote.conf` (on the server) or `/etc/systemd/journal-upload.conf` on the clients and restart the relevant services.
-
-
-##### _passive_ client, with encryption and self-singed certificates
-
-On the clients, install `systemd-journal-remote`:
-
-```sh
-# change this according to your distro
-sudo apt-get install systemd-journal-remote
-```
-
-Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like so:
-
-```
-[Upload]
-URL=https://centralization.server.ip:19532
-```
-
-Make sure that `centralization.server.ip` is one of the `SERVER_ALIASES` when you created the certificates.
-
-Edit `systemd-journal-upload`, and add `Restart=always` to make sure the client will keep trying to push logs, even if the server is temporarily not there, like this:
-
-```sh
-sudo systemctl edit systemd-journal-upload
-```
-
-At the top, add:
-
-```
-[Service]
-Restart=always
-```
-
-Enable and start `systemd-journal-upload`, like this:
-
-```sh
-sudo systemctl enable systemd-journal-upload
-```
-
-Copy the relevant `runme-on-XXX.sh` script as described on server setup and run it:
-
-```sh
-sudo bash /tmp/runme-on-XXX.sh
-```
-
+If you want to setup your own passive journal centralization setup using self-signed certificates for encryption, [check out guide on it](https://github.com/netdata/netdata/blob/master/collectors/systemd-journal.plugin/passive_journal_centralization_guide_self_signed_certs.md).
 
 #### Limitations when using a logs centralization server
 
@@ -670,4 +389,3 @@ As of this writing `namespaces` support by `systemd` is limited:
 - Docker containers cannot log to namespaces. Check [this issue](https://github.com/moby/moby/issues/41879).
 - `systemd-journal-upload` automatically uploads `system` and `user` journals, but not `namespaces` journals. For this
   you need to spawn a `systemd-journal-upload` per namespace.
-
