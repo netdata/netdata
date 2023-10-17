@@ -1,12 +1,20 @@
 # Passive journal centralization with encryption using self-signed certificates
 
-This page will guide you through creating a passive journal centralization setup using self-signed certificates for encryption.
+This page will guide you through creating a passive journal centralization setup using self-signed certificates for encryption and authorization.
 
 A _passive_ journal server waits for clients to push their metrics to it, so in this setup we will:
 
 1. configure a certificates authority and issue self-signed certificates for your servers.
 2. configure `systemd-journal-remote` on the server, to listen for incoming connections.
 3. configure `systemd-journal-upload` on the clients, to push their logs to the server.
+
+Keep in mind that the authorization involved works like this:
+
+1. The server (`systemd-journal-remote`) validates that the sender (`systemd-journal-upload`) uses a trusted certificate (a certificate issued by the same certificate authority as its own).
+   So, **the server will accept logs from any client having a trusted certificate**.
+2. The client (`systemd-journal-upload`) validates that the receiver (`systemd-journal-remote`) uses a trusted certificate (like the server does) and it also checks that the hostname of the URL specified to its configuration, matches one of the names of the server it gets connected to. So, the client does a validation that it connected to the right server, using the URL hostname against the names of the server on its certificate.
+
+This means, that if both certificates are issued by the same certificate authority, only the client can potentially reject the server.
 
 ## Self-signed certificates
 
