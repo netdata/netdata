@@ -92,7 +92,7 @@ void sql_close_context_database(void)
 // Fetching data
 //
 #define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, " \
-        "c.update_every, c.chart_type, c.family FROM meta.chart c WHERE c.host_id = @host_id and c.chart_id is not null; "
+        "c.update_every, c.chart_type, c.family FROM chart c WHERE c.host_id = @host_id and c.chart_id is not null; "
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
@@ -105,7 +105,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db_context_meta, CTX_GET_CHART_LIST, &res);
+        rc = prepare_statement(db_meta, CTX_GET_CHART_LIST, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to fetch chart list");
             return;
@@ -141,14 +141,14 @@ skip_load:
 
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END " \
-        "FROM meta.dimension d WHERE d.chart_id = @id and d.dim_id is not null ORDER BY d.rowid ASC;"
+        "FROM dimension d WHERE d.chart_id = @id and d.dim_id is not null ORDER BY d.rowid ASC;"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
     static __thread sqlite3_stmt *res = NULL;
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db_context_meta, CTX_GET_DIMENSION_LIST, &res);
+        rc = prepare_statement(db_meta, CTX_GET_DIMENSION_LIST, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to fetch chart dimension data");
             return;

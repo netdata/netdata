@@ -1270,7 +1270,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     register_libuv_worker_jobs();
 
     struct scan_metadata_payload *data = req->data;
-    UNUSED(data);
+    struct metadata_wc *wc = data->wc;
 
     worker_is_busy(UV_EVENT_HOST_CONTEXT_LOAD);
     usec_t started_ut = now_monotonic_usec(); (void)started_ut;
@@ -1278,6 +1278,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     RRDHOST *host;
 
     size_t max_threads = MIN(get_netdata_cpus() / 2, 6);
+    netdata_log_info("METADATA: Using %zu threads for context loading", max_threads);
     struct host_context_load_thread *hclt = callocz(max_threads, sizeof(*hclt));
 
     size_t thread_index;
@@ -1289,25 +1290,28 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
        rrdhost_flag_set(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
        internal_error(true, "METADATA: 'host:%s' loading context", rrdhost_hostname(host));
 
-       cleanup_finished_threads(hclt, max_threads, false);
-       bool found_slot = find_available_thread_slot(hclt, max_threads, &thread_index);
+       bool found_slot = false;
+       do {
+           if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))
+                break;
 
-       if (unlikely(!found_slot)) {
-           struct host_context_load_thread hclt_sync = {.host = host};
-           restore_host_context(&hclt_sync);
-       }
-       else {
-           __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
-           hclt[thread_index].host = host;
-           assert(0 == uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]));
-       }
+           cleanup_finished_threads(hclt, max_threads, false);
+           found_slot = find_available_thread_slot(hclt, max_threads, &thread_index);
+       } while (!found_slot);
+
+       if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))
+           break;
+
+       __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
+       hclt[thread_index].host = host;
+       assert(0 == uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]));
     }
     dfe_done(host);
 
     cleanup_finished_threads(hclt, max_threads, true);
     freez(hclt);
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
-    internal_error(true, "METADATA: 'host:ALL' contexts loaded in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
+    netdata_log_info("METADATA: host contexts loaded in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
 
     worker_is_idle();
 }
@@ -1905,6 +1909,7 @@ void metadata_queue_load_host_context(RRDHOST *host)
     if (unlikely(!metasync_worker.loop))
         return;
     queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
+    netdata_log_info("Queued command to load host contexts");
 }
 
 //

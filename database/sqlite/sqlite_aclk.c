@@ -84,6 +84,7 @@ enum {
     IDX_PROGRAM_VERSION,
     IDX_ENTRIES,
     IDX_HEALTH_ENABLED,
+    IDX_LAST_CONNECTED,
 };
 
 static int create_host_callback(void *data, int argc, char **argv, char **column)
@@ -127,8 +128,10 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , system_info
         , 1
     );
-    if (likely(host))
+    if (likely(host)) {
         host->rrdlabels = sql_load_host_labels((uuid_t *)argv[IDX_HOST_ID]);
+        host->last_connected = (time_t) (argv[IDX_LAST_CONNECTED] ? str2uint64_t(argv[IDX_LAST_CONNECTED], NULL) : 0);
+    }
 
     (*number_of_chidren)++;
 
@@ -524,7 +527,7 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 
 #define SQL_FETCH_ALL_HOSTS "SELECT host_id, hostname, registry_hostname, update_every, os, " \
     "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, " \
-    "program_version, entries, health_enabled FROM host WHERE hops >0;"
+    "program_version, entries, health_enabled, last_connected FROM host WHERE hops >0;"
 
 #define SQL_FETCH_ALL_INSTANCES "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni " \
                                 "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL; "
