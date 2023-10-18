@@ -39,6 +39,7 @@ ATTR171 = '171'
 ATTR172 = '172'
 ATTR173 = '173'
 ATTR174 = '174'
+ATTR177 = '177'
 ATTR180 = '180'
 ATTR183 = '183'
 ATTR190 = '190'
@@ -333,7 +334,7 @@ CHARTS = {
     'media_wearout_indicator': {
         'options': [None, 'Media Wearout Indicator', 'percentage', 'wear', 'smartd_log.media_wearout_indicator', 'line'],
         'lines': [],
-        'attrs': [ATTR233],
+        'attrs': [ATTR233, ATTR177],
         'algo': ABSOLUTE,
     },
     'nand_writes_1gib': {
@@ -535,6 +536,7 @@ def ata_attribute_factory(value):
     elif name in [
         ATTR1,
         ATTR7,
+        ATTR177,
         ATTR202,
         ATTR206,
         ATTR233,
