@@ -2,7 +2,7 @@
 
 This page will guide you through creating a **passive** journal centralization setup using **self-signed certificates** for encryption and authorization.
 
-Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources. With the setup described in this document, Netdata will automatically name all remote sources using the names of the clients, as they are described at their certificates.
+Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources. With the setup described in this document, on recent systemd versions, Netdata will automatically name all remote sources using the names of the clients, as they are described at their certificates (on older versions, the names will be IPs or reverse DNS lookups of the IPs).
 
 A **passive** journal server waits for clients to push their metrics to it, so in this setup we will:
 
@@ -46,9 +46,9 @@ sudo ./systemd-journal-self-signed-certs.sh "server1" "DNS:hostname1" "IP:10.0.0
 
 Where:
 
-   - `server1` is the canonical name of the server. This is how this server will be identified by `systemd-journal-remote` and Netdata when you view the logs on the dashboard.
+   - `server1` is the canonical name of the server. On newer systemd version, this name will be used by `systemd-journal-remote` and Netdata when you view the logs on the dashboard.
    - `DNS:hostname1` is a DNS name that the server is reachable at. Add `"DNS:xyz"` multiple times to define multiple DNS names for the server.
-   - `IP:1.2.3.4` is an IP that the server is reachable at. Add `"IP:xyz"` multiple times to define multiple IPs for the server.
+   - `IP:10.0.0.1` is an IP that the server is reachable at. Add `"IP:xyz"` multiple times to define multiple IPs for the server.
 
 Repeat this process to create the certificates for all your servers. You can add servers as required, at any time in the future.
 
@@ -112,9 +112,14 @@ and add the following lines into the instructed place, and choose your desired p
 ListenStream=<DESIRED_PORT>
 ```
 
-Assuming that you have already copied the `runme-on-XXX.sh` script on the server, run this:
+Next, run the `runme-on-XXX.sh` script on the server:
 
 ```bash
+# if you run the certificate authority on the server:
+sudo /etc/ssl/systemd-journal/runme-on-XXX.sh
+
+# if you run the certificate authority elsewhere,
+# assuming you have coped the runme-on-XXX.sh script (as described above):
 sudo bash /tmp/runme-on-XXX.sh
 ```
 
@@ -129,6 +134,8 @@ sudo systemctl enable systemd-journal-remote.service
 ```
 
 `systemd-journal-remote` is now listening for incoming journals from remote hosts.
+
+> Remember to delete `/tmp/runme-on-XXX.sh` to make sure your certificates are secure.
 
 ## Client configuration
 
@@ -182,6 +189,8 @@ sudo systemctl restart systemd-journal-upload.service
 ```
 
 The client should now be pushing logs to the central server.
+
+> Remember to delete `/tmp/runme-on-XXX.sh` to make sure your certificates are secure.
 
 Here it is in action, in Netdata:
 
