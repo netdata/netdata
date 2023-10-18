@@ -731,6 +731,7 @@ rm_file /etc/init.d/netdata
 rm_file /etc/periodic/daily/netdata-updater
 rm_file /etc/cron.daily/netdata-updater
 rm_file /etc/cron.d/netdata-updater
+rm_file /etc/cron.d/netdata-updater-daily
 
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ] && [ "netdata" = "$(basename "$NETDATA_PREFIX")" ] ; then
