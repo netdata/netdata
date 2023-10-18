@@ -872,7 +872,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_DIM_CHECK_INTERVAL;
     }
 
-    netdata_log_info(
+    internal_error(true,
         "METADATA: Dimensions checked %u, deleted %u. Checks will %s in %lld seconds",
         total_checked,
         total_deleted,
@@ -939,7 +939,7 @@ static void check_chart_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_CHART_CHECK_INTERVAL;
     }
 
-    netdata_log_info(
+    internal_error(true,
         "METADATA: Charts checked %u, deleted %u. Checks will %s in %lld seconds",
         total_checked,
         total_deleted,
@@ -1008,7 +1008,7 @@ static void check_label_metadata(struct metadata_wc *wc)
         next_execution_t = now + METADATA_LABEL_CHECK_INTERVAL;
     }
 
-    netdata_log_info(
+    internal_error(true,
         "METADATA: Chart labels checked %u, deleted %u. Checks will %s in %lld seconds",
         total_checked,
         total_deleted,
