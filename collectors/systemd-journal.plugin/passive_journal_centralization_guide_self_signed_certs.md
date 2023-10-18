@@ -74,6 +74,8 @@ Both the user `systemd-journal-remote` and the group `systemd-journal` are autom
 
 So, by having the certificates owned by `systemd-journal-remote:systemd-journal`, satisfies both `systemd-journal-remote` which is not in the `systemd-journal` group, and `systemd-journal-upload` (and `systemd-journal-gatewayd`) which use dynamic users.
 
+You don't need to do anything about it (the scripts take care of everything), but it worth noting how this works.
+
 ## Server configuration
 
 On the centralization server install `systemd-journal-remote`:
