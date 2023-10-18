@@ -35,6 +35,8 @@
             --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
   additional_info: &ref_containers >
     Did you know you can also deploy Netdata on your OS using {% goToCategory navigateToSettings=$navigateToSettings categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
+  clean_additional_info: &ref_clean_containers >
+    Did you know you can also deploy Netdata on your OS using Kubernetes or Docker?
   related_resources: {}
   platform_info:
     group: ''
@@ -85,7 +87,7 @@
     icon_filename: 'rhel.png'
   most_popular: false
   platform_info:
-    group: 'include'
+    group: 'no_include'
     distro: 'rhel'
   quick_start: -1
 - <<: *linux
@@ -149,6 +151,18 @@
     distro: 'centos'
   quick_start: -1
 - <<: *linux
+  id: deploy-centos-stream
+  meta:
+    <<: *linux_meta
+    name: CentOS Stream
+    link: https://www.centos.org/centos-stream
+    icon_filename: 'centos.png'
+  most_popular: false
+  platform_info:
+    group: 'include'
+    distro: 'centos-stream'
+  quick_start: -1
+- <<: *linux
   id: deploy-manjarolinux
   meta:
     <<: *linux_meta
@@ -200,9 +214,10 @@
   methods:
     - *ks_curl
   additional_info: *ref_containers
+  clean_additional_info: *ref_clean_containers
   related_resources: {}
   platform_info:
-    group: 'include'
+    group: 'no_include'
     distro: 'macos'
   quick_start: 5
 - id: deploy-docker
@@ -573,6 +588,6 @@
     Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).
   related_resources: {}
   platform_info:
-    group: 'include'
+    group: 'no_include'
     distro: 'freebsd'
   quick_start: 6

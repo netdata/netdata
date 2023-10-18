@@ -2,8 +2,10 @@
 
 import json
 import os
+import re
 import sys
 
+from copy import deepcopy
 from pathlib import Path
 
 from jsonschema import Draft7Validator, ValidationError
@@ -17,6 +19,7 @@ GO_REPO = 'netdata/go.d.plugin'
 INTEGRATIONS_PATH = Path(__file__).parent
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
+JSON_PATH = INTEGRATIONS_PATH / 'integrations.json'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
 REPO_PATH = INTEGRATIONS_PATH.parent
 SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
@@ -64,6 +67,9 @@ NOTIFICATION_RENDER_KEYS = [
     'setup',
     'troubleshooting',
 ]
+
+CUSTOM_TAG_PATTERN = re.compile('\\{% if .*?%\\}.*?\\{% /if %\\}|\\{%.*?%\\}', flags=re.DOTALL)
+FIXUP_BLANK_PATTERN = re.compile('\\\\\\n *\\n')
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
 DEBUG = os.environ.get('DEBUG', False)
@@ -438,11 +444,16 @@ def render_collectors(categories, collectors, ids):
     debug('Removing duplicate collectors.')
 
     collectors, ids = dedupe_integrations(collectors, ids)
+    clean_collectors = []
 
     idmap = {i['id']: i for i in collectors}
 
     for item in collectors:
         debug(f'Processing { item["id"] }.')
+
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
 
         related = []
 
@@ -487,23 +498,27 @@ def render_collectors(categories, collectors, ids):
         for key in COLLECTOR_RENDER_KEYS:
             if key in item.keys():
                 template = get_jinja_env().get_template(f'{ key }.md')
-                data = template.render(entry=item, related=related)
+                data = template.render(entry=item, related=related, clean=False)
+                clean_data = template.render(entry=item, related=related, clean=True)
 
                 if 'variables' in item['meta']['monitored_instance']:
                     template = get_jinja_env().from_string(data)
                     data = template.render(variables=item['meta']['monitored_instance']['variables'])
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['monitored_instance']['variables'])
             else:
                 data = ''
+                clean_data = ''
 
             item[key] = data
+            clean_item[key] = clean_data
 
-        item['edit_link'] = make_edit_link(item)
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
 
-        del item['_src_path']
-        del item['_repo']
-        del item['_index']
+        clean_collectors.append(clean_item)
 
-    return collectors, ids
+    return collectors, clean_collectors, ids
 
 
 def render_deploy(distros, categories, deploy, ids):
@@ -514,11 +529,14 @@ def render_deploy(distros, categories, deploy, ids):
     debug('Checking deployment ids.')
 
     deploy, ids = dedupe_integrations(deploy, ids)
+    clean_deploy = []
 
     template = get_jinja_env().get_template('platform_info.md')
 
     for item in deploy:
         debug(f'Processing { item["id"] }.')
+        item['edit_link'] = make_edit_link(item)
+        clean_item = deepcopy(item)
 
         if item['platform_info']['group']:
             entries = [
@@ -532,16 +550,27 @@ def render_deploy(distros, categories, deploy, ids):
         else:
             entries = []
 
-        data = template.render(entries=entries)
+        data = template.render(entries=entries, clean=False)
+        clean_data = template.render(entries=entries, clean=True)
+
+        for method in clean_item['methods']:
+            for command in method['commands']:
+                command['command'] = CUSTOM_TAG_PATTERN.sub('', command['command'])
+                command['command'] = FIXUP_BLANK_PATTERN.sub('', command['command'])
 
         item['platform_info'] = data
-        item['edit_link'] = make_edit_link(item)
+        clean_item['platform_info'] = clean_data
 
-        del item['_src_path']
-        del item['_repo']
-        del item['_index']
+        if 'clean_additional_info' in item:
+            clean_item['additional_info'] = item['clean_additional_info']
+            del item['clean_additional_info'], clean_item['clean_additional_info']
 
-    return deploy, ids
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_deploy.append(clean_item)
+
+    return deploy, clean_deploy, ids
 
 
 def render_exporters(categories, exporters, ids):
@@ -553,27 +582,37 @@ def render_exporters(categories, exporters, ids):
 
     exporters, ids = dedupe_integrations(exporters, ids)
 
+    clean_exporters = []
+
     for item in exporters:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
         for key in EXPORTER_RENDER_KEYS:
             if key in item.keys():
                 template = get_jinja_env().get_template(f'{ key }.md')
-                data = template.render(entry=item)
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
 
                 if 'variables' in item['meta']:
                     template = get_jinja_env().from_string(data)
-                    data = template.render(variables=item['meta']['variables'])
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
             else:
                 data = ''
+                clean_data = ''
 
             item[key] = data
+            clean_item[key] = clean_data
 
-        item['edit_link'] = make_edit_link(item)
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
 
-        del item['_src_path']
-        del item['_repo']
-        del item['_index']
+        clean_exporters.append(clean_item)
 
-    return exporters, ids
+    return exporters, clean_exporters, ids
 
 
 def render_notifications(categories, notifications, ids):
@@ -585,27 +624,37 @@ def render_notifications(categories, notifications, ids):
 
     notifications, ids = dedupe_integrations(notifications, ids)
 
+    clean_notifications = []
+
     for item in notifications:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
         for key in NOTIFICATION_RENDER_KEYS:
             if key in item.keys():
                 template = get_jinja_env().get_template(f'{ key }.md')
-                data = template.render(entry=item)
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
 
                 if 'variables' in item['meta']:
                     template = get_jinja_env().from_string(data)
-                    data = template.render(variables=item['meta']['variables'])
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
             else:
                 data = ''
+                clean_data = ''
 
             item[key] = data
+            clean_item[key] = clean_data
 
-        item['edit_link'] = make_edit_link(item)
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
 
-        del item['_src_path']
-        del item['_repo']
-        del item['_index']
+        clean_notifications.append(clean_item)
 
-    return notifications, ids
+    return notifications, clean_notifications, ids
 
 
 def render_integrations(categories, integrations):
@@ -617,6 +666,13 @@ def render_integrations(categories, integrations):
     OUTPUT_PATH.write_text(data)
 
 
+def render_json(categories, integrations):
+    JSON_PATH.write_text(json.dumps({
+        'categories': categories,
+        'integrations': integrations,
+    }))
+
+
 def main():
     categories = load_categories()
     distros = load_yaml(DISTROS_FILE)
@@ -625,13 +681,16 @@ def main():
     exporters = load_exporters()
     notifications = load_notifications()
 
-    collectors, ids = render_collectors(categories, collectors, dict())
-    deploy, ids = render_deploy(distros, categories, deploy, ids)
-    exporters, ids = render_exporters(categories, exporters, ids)
-    notifications, ids = render_notifications(categories, notifications, ids)
+    collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
+    deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
+    exporters, clean_exporters, ids = render_exporters(categories, exporters, ids)
+    notifications, clean_notifications, ids = render_notifications(categories, notifications, ids)
 
     integrations = collectors + deploy + exporters + notifications
     render_integrations(categories, integrations)
+
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_notifications
+    render_json(categories, clean_integrations)
 
 
 if __name__ == '__main__':
