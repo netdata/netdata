@@ -61,7 +61,7 @@ These `runme-on-XXX.sh` include everything to install the certificates, fix thei
 You can copy and paste (or `scp`) these scripts on your server and each of your clients:
 
 ```bash
-scp /etc/ssl/systemd-journal-remote/runme-on-XXX.sh XXX:/tmp/
+sudo scp /etc/ssl/systemd-journal-remote/runme-on-XXX.sh XXX:/tmp/
 ```
 
 So, for the moment make sure that you have the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you created certificates.
