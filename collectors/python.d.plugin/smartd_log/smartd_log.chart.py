@@ -50,6 +50,8 @@ ATTR199 = '199'
 ATTR202 = '202'
 ATTR206 = '206'
 ATTR233 = '233'
+ATTR241 = '241'
+ATTR242 = '242'
 ATTR249 = '249'
 ATTR_READ_ERR_COR = 'read-total-err-corrected'
 ATTR_READ_ERR_UNC = 'read-total-unc-errors'
@@ -114,6 +116,8 @@ ORDER = [
     'offline_uncorrectable_sector_count',
     'percent_lifetime_used',
     'media_wearout_indicator',
+    'total_lbas_written',
+    'total_lbas_read',
 ]
 
 CHARTS = {
@@ -336,6 +340,18 @@ CHARTS = {
         'options': [None, 'NAND Writes', 'GiB', 'wear', 'smartd_log.nand_writes_1gib', 'line'],
         'lines': [],
         'attrs': [ATTR249],
+        'algo': ABSOLUTE,
+    },
+    'total_lbas_written': {
+        'options': [None, 'Total LBAs Written', 'sectors', 'wear', 'smartd_log.total_lbas_written', 'line'],
+        'lines': [],
+        'attrs': [ATTR241],
+        'algo': ABSOLUTE,
+    },
+    'total_lbas_read': {
+        'options': [None, 'Total LBAs Read', 'sectors', 'wear', 'smartd_log.total_lbas_read', 'line'],
+        'lines': [],
+        'attrs': [ATTR242],
         'algo': ABSOLUTE,
     },
 }
