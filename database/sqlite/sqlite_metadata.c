@@ -1302,15 +1302,9 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
        if (metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))
            break;
 
-       if (unlikely(!found_slot)) {
-           struct host_context_load_thread hclt_sync = {.host = host};
-           restore_host_context(&hclt_sync);
-       }
-       else {
-           __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
-           hclt[thread_index].host = host;
-           assert(0 == uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]));
-       }
+       __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
+       hclt[thread_index].host = host;
+       assert(0 == uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]));
     }
     dfe_done(host);
 
