@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- Add Erlang to Apps configuration [\#16231](https://github.com/netdata/netdata/pull/16231) ([andyundso](https://github.com/andyundso))
+- update go.d plugin version to v0.56.3 [\#16228](https://github.com/netdata/netdata/pull/16228) ([ilyam8](https://github.com/ilyam8))
+- Changes to `systemd-journal` docs [\#16225](https://github.com/netdata/netdata/pull/16225) ([Ancairon](https://github.com/Ancairon))
+- Fix meta unittest [\#16221](https://github.com/netdata/netdata/pull/16221) ([stelfrag](https://github.com/stelfrag))
 - facets: minimize hashtable collisions [\#16215](https://github.com/netdata/netdata/pull/16215) ([ktsaou](https://github.com/ktsaou))
+- cgroup-network: don't log an error opening pid file if doesn't exist [\#16196](https://github.com/netdata/netdata/pull/16196) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.43.0](https://github.com/netdata/netdata/tree/v1.43.0) (2023-10-16)
 
@@ -422,13 +427,6 @@
 - ci disable yamllint line-length check [\#15612](https://github.com/netdata/netdata/pull/15612) ([ilyam8](https://github.com/ilyam8))
 - Fix descriptions in config objects, make them single line [\#15610](https://github.com/netdata/netdata/pull/15610) ([Ancairon](https://github.com/Ancairon))
 - Update icons [\#15609](https://github.com/netdata/netdata/pull/15609) ([shyamvalsan](https://github.com/shyamvalsan))
-- Update icon [\#15608](https://github.com/netdata/netdata/pull/15608) ([shyamvalsan](https://github.com/shyamvalsan))
-- Update icon [\#15607](https://github.com/netdata/netdata/pull/15607) ([shyamvalsan](https://github.com/shyamvalsan))
-- Update documentation [\#15606](https://github.com/netdata/netdata/pull/15606) ([kiela](https://github.com/kiela))
-- fix potential crash bug.  [\#15605](https://github.com/netdata/netdata/pull/15605) ([icy17](https://github.com/icy17))
-- FreeBSD yaml update [\#15603](https://github.com/netdata/netdata/pull/15603) ([thiagoftsm](https://github.com/thiagoftsm))
-- Macos yaml update [\#15602](https://github.com/netdata/netdata/pull/15602) ([thiagoftsm](https://github.com/thiagoftsm))
-- minor changes in README.md [\#15601](https://github.com/netdata/netdata/pull/15601) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
