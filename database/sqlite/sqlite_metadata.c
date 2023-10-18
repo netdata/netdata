@@ -1539,12 +1539,19 @@ static void start_ml_model_load(uv_work_t *req __maybe_unused)
     RRDDIM *rd;
     RRDDIM_ACQUIRED *rda;
     internal_error(true, "Batch ML load loader, %zu items", ml_data->count);
+
+    sqlite3_stmt *ml_load_stmt = NULL;
     while((PValue = JudyLFirstThenNext(ml_data->JudyL, &Index, &first))) {
         UNUSED(PValue);
         rda = (RRDDIM_ACQUIRED *) Index;
         rd = rrddim_acquired_to_rrddim(rda);
-        ml_dimension_load_models(rd);
+        ml_dimension_load_models(rd, &ml_load_stmt);
         rrddim_acquired_release(rda);
+    }
+
+    if (ml_load_stmt) {
+        sqlite3_finalize(ml_load_stmt);
+        ml_load_stmt = NULL;
     }
     worker_is_idle();
 }

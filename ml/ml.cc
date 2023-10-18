@@ -621,7 +621,7 @@ bind_fail:
     return rc;
 }
 
-int ml_dimension_load_models(RRDDIM *rd) {
+int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
     if (!dim)
         return 0;
@@ -635,7 +635,7 @@ int ml_dimension_load_models(RRDDIM *rd) {
 
     std::vector<ml_kmeans_t> V;
 
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = active_stmt ? *active_stmt : NULL;
     int rc = 0;
     int param = 0;
 
@@ -645,18 +645,20 @@ int ml_dimension_load_models(RRDDIM *rd) {
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db, db_models_load, &res);
+        rc = sqlite3_prepare_v2(db, db_models_load, -1, &res, NULL);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to load models, rc = %d", rc);
             return 1;
         }
+        if (active_stmt)
+            *active_stmt = res;
     }
 
     rc = sqlite3_bind_blob(res, ++param, &dim->rd->metric_uuid, sizeof(dim->rd->metric_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, now_realtime_usec() - (Cfg.num_models_to_use * Cfg.max_train_samples));
+    rc = sqlite3_bind_int64(res, ++param, now_realtime_sec() - (Cfg.num_models_to_use * Cfg.max_train_samples));
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -702,9 +704,12 @@ int ml_dimension_load_models(RRDDIM *rd) {
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to load models, rc = %d", rc);
 
-    rc = sqlite3_reset(res);
+    if (active_stmt)
+        rc = sqlite3_reset(res);
+    else
+        rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement when loading models, rc = %d", rc);
+        error_report("Failed to %s statement when loading models, rc = %d", active_stmt ? "reset" : "finalize", rc);
 
     return 0;
 
