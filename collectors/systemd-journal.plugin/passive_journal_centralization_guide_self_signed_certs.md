@@ -183,6 +183,10 @@ sudo systemctl restart systemd-journal-upload.service
 
 The client should now be pushing logs to the central server.
 
+Here it is in action, in Netdata:
+
+![2023-10-18 16-23-05](https://github.com/netdata/netdata/assets/2662304/83bec232-4770-455b-8f1c-46b5de5f93a2)
+
 
 ## Verify it works
 
