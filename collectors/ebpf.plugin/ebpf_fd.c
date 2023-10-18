@@ -475,10 +475,10 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
                                   "_ebpf_file_open",
                                   "Number of open files",
                                   EBPF_COMMON_DIMENSION_CALL,
-                                  NETDATA_APPS_FILE_GROUP,
+                                  NETDATA_APPS_FILE_FDS,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_file_open",
-                                  20061,
+                                  20220,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
@@ -487,10 +487,10 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
                                       "_ebpf_file_open_error",
                                       "Fails to open files.",
                                       EBPF_COMMON_DIMENSION_CALL,
-                                      NETDATA_APPS_FILE_GROUP,
+                                      NETDATA_APPS_FILE_FDS,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
                                       "app.ebpf_file_open_error",
-                                      20062,
+                                      20221,
                                       update_every);
         }
 
@@ -499,10 +499,10 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
                                   "_ebpf_file_closed",
                                   "Files closed.",
                                   EBPF_COMMON_DIMENSION_CALL,
-                                  NETDATA_APPS_FILE_GROUP,
+                                  NETDATA_APPS_FILE_FDS,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   "app.ebpf_file_closed",
-                                  20063,
+                                  20222,
                                   update_every);
 
         if (em->mode < MODE_ENTRY) {
@@ -511,10 +511,10 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
                                       "_ebpf_file_close_error",
                                       "Fails to close files.",
                                       EBPF_COMMON_DIMENSION_CALL,
-                                      NETDATA_APPS_FILE_GROUP,
+                                      NETDATA_APPS_FILE_FDS,
                                       NETDATA_EBPF_CHART_TYPE_STACKED,
                                       "app.ebpf_fd_close_error",
-                                      20064,
+                                      20223,
                                       update_every);
         }
         w->charts_created &= ~(1<<EBPF_MODULE_FD_IDX);
@@ -1211,10 +1211,10 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                              "_ebpf_file_open",
                              "Number of open files",
                              EBPF_COMMON_DIMENSION_CALL,
-                             NETDATA_APPS_FILE_GROUP,
+                             NETDATA_APPS_FILE_FDS,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_file_open",
-                             20270,
+                             20220,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_FD);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -1227,10 +1227,10 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  "_ebpf_file_open_error",
                                  "Fails to open files.",
                                  EBPF_COMMON_DIMENSION_CALL,
-                                 NETDATA_APPS_FILE_GROUP,
+                                 NETDATA_APPS_FILE_FDS,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
                                  "app.ebpf_file_open_error",
-                                 20271,
+                                 20221,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_FD);
             ebpf_create_chart_labels("app_group", w->name, 0);
@@ -1243,10 +1243,10 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                              "_ebpf_file_closed",
                              "Files closed.",
                              EBPF_COMMON_DIMENSION_CALL,
-                             NETDATA_APPS_FILE_GROUP,
+                             NETDATA_APPS_FILE_FDS,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_file_closed",
-                             20272,
+                             20222,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_FD);
         ebpf_create_chart_labels("app_group", w->name, 0);
@@ -1259,10 +1259,10 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  "_ebpf_file_close_error",
                                  "Fails to close files.",
                                  EBPF_COMMON_DIMENSION_CALL,
-                                 NETDATA_APPS_FILE_GROUP,
+                                 NETDATA_APPS_FILE_FDS,
                                  NETDATA_EBPF_CHART_TYPE_STACKED,
                                  "app.ebpf_file_close_error",
-                                 20273,
+                                 20223,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_FD);
             ebpf_create_chart_labels("app_group", w->name, 0);
