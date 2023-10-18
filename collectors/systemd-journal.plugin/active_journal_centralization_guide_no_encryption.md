@@ -5,8 +5,6 @@ This page will guide you through creating an active journal centralization setup
 Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all
 servers and organize them in sources.
 With the setup described in this document, journal files are identified by the hostnames of the clients you pull logs.
-Netdata will automatically do
-reverse DNS lookups to find the names of the server and name the sources on the dashboard accordingly.
 
 An _active_ journal server fetch logs from clients, so in this setup we will:
 
