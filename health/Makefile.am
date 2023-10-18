@@ -68,7 +68,6 @@ dist_healthconfig_DATA = \
     health.d/net.conf \
     health.d/netfilter.conf \
     health.d/nvme.conf \
-    health.d/nut.conf \
     health.d/pihole.conf \
     health.d/plugin.conf \
     health.d/ping.conf \
