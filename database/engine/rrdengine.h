@@ -476,7 +476,7 @@ void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details
 void pdc_acquire(PDC *pdc);
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router);
 
-unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx);
+uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx);
 
 struct page_descr_with_data *page_descriptor_get(void);
 
