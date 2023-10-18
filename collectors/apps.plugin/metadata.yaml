@@ -73,90 +73,90 @@ modules:
             - name: app_group
               description: The name of the group defined in the configuration.
           metrics:
-            - name: app_group.cpu_utilization
+            - name: app.cpu_utilization
               description: Apps CPU utilization (100% = 1 core)
               unit: percentage
               chart_type: stacked
               dimensions:
                 - name: user
                 - name: system
-            - name: app_group.cpu_guest_utilization
+            - name: app.cpu_guest_utilization
               description: Apps CPU guest utilization (100% = 1 core)
               unit: percentage
               chart_type: line
               dimensions:
                 - name: guest
-            - name: app_group.cpu_context_switches
+            - name: app.cpu_context_switches
               description: Apps CPU context switches
               unit: switches/s
               chart_type: stacked
               dimensions:
                 - name: voluntary
                 - name: involuntary
-            - name: app_group.mem_usage
+            - name: app.mem_usage
               description: Apps memory RSS usage
               unit: MiB
               chart_type: line
               dimensions:
                 - name: rss
-            - name: app_group.mem_private_usage
+            - name: app.mem_private_usage
               description: Apps memory usage without shared
               unit: MiB
               chart_type: stacked
               dimensions:
                 - name: mem
-            - name: app_group.vmem_usage
+            - name: app.vmem_usage
               description: Apps virtual memory size
               unit: MiB
               chart_type: line
               dimensions:
                 - name: vmem
-            - name: app_group.mem_page_faults
+            - name: app.mem_page_faults
               description: Apps memory page faults
               unit: pgfaults/s
               chart_type: stacked
               dimensions:
                 - name: minor
                 - name: major
-            - name: app_group.swap_usage
+            - name: app.swap_usage
               description: Apps swap usage
               unit: MiB
               chart_type: area
               dimensions:
                 - name: swap
-            - name: app_group.disk_physical_io
+            - name: app.disk_physical_io
               description: Apps disk physical IO
               unit: KiB/s
               chart_type: area
               dimensions:
                 - name: reads
                 - name: writes
-            - name: app_group.disk_logical_io
+            - name: app.disk_logical_io
               description: Apps disk logical IO
               unit: KiB/s
               chart_type: area
               dimensions:
                 - name: reads
                 - name: writes
-            - name: app_group.processes
+            - name: app.processes
               description: Apps processes
               unit: processes
               chart_type: line
               dimensions:
                 - name: processes
-            - name: app_group.threads
+            - name: app.threads
               description: Apps threads
               unit: threads
               chart_type: line
               dimensions:
                 - name: threads
-            - name: app_group.fds_open_limit
+            - name: app.fds_open_limit
               description: Apps open file descriptors limit
               unit: percentage
               chart_type: line
               dimensions:
                 - name: limit
-            - name: app_group.fds_open
+            - name: app.fds_open
               description: Apps open file descriptors
               unit: fds
               chart_type: stacked
@@ -170,13 +170,13 @@ modules:
                 - name: signal
                 - name: eventpolls
                 - name: other
-            - name: app_group.uptime
+            - name: app.uptime
               description: Apps uptime
               unit: seconds
               chart_type: line
               dimensions:
                 - name: uptime
-            - name: app_group.uptime_summary
+            - name: app.uptime_summary
               description: Apps uptime summary
               unit: seconds
               chart_type: area
