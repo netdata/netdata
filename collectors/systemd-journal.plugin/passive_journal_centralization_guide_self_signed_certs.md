@@ -66,7 +66,7 @@ scp /etc/ssl/systemd-journal-remote/runme-on-XXX.sh XXX:/tmp/
 
 So, for the moment make sure that you have the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you created certificates.
 
-### note about certificates permission
+### note about certificates file permissions
 
 It is worth noting that `systemd-journal` certificates need to be owned by `systemd-journal-remote:systemd-journal`.
 
