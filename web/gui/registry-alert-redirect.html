@@ -30,8 +30,8 @@
         });
       }
 
-      loadStyle("/v2/static/splash.css")
-      loadStyle("/v2/favicon.ico", {rel: "icon", type: "image/x-icon"})</script></head><body><div id="agent-splash-screen" class="loading"><div class="hero"><div class="logo-container"><svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-blur"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="rgba(0,171,68,0.1)"/></svg> <svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="#DDFFEB"/></svg></div><div class="headings"><h1 class="title">Netdata Alert Notifications</h1><div class="flex-center flex-column" id="main-message">Trying to find a Netdata Agent for this alert...</div><table id="mynodes"></table></div></div></div><script>let searchParams = new URLSearchParams(location.search)
+      loadStyle("v2/static/splash.css")
+      loadStyle("v2/favicon.ico", {rel: "icon", type: "image/x-icon"})</script></head><body><div id="agent-splash-screen" class="loading"><div class="hero"><div class="logo-container"><svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-blur"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="rgba(0,171,68,0.1)"/></svg> <svg width="133" height="105" viewBox="0 0 133 105" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo"><path fill-rule="evenodd" clip-rule="evenodd" d="M81.697 105H55.0693L0.5 0.5H77.9598C108.079 0.554913 132.484 24.7711 132.5 54.6451C132.452 82.485 109.73 105 81.697 105Z" fill="#DDFFEB"/></svg></div><div class="headings"><h1 class="title">Netdata Alert Notifications</h1><div class="flex-center flex-column" id="main-message">Trying to find a Netdata Agent for this alert...</div><table id="mynodes"></table></div></div></div><script>let searchParams = new URLSearchParams(location.search)
         let mg = searchParams.get("agent_machine_guid")
         let tr_i = searchParams.get("transition_id")
         let token = location.hash.substring(1)
@@ -56,13 +56,13 @@
           return s;
         }
 
-        fetch("/api/v1/registry?action=search&for=" + mg, { cache: "no-cache", credentials: "include", headers: { ["X-Netdata-Auth"]: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
+        fetch("api/v1/registry?action=search&for=" + mg, { cache: "no-cache", credentials: "include", headers: { ["X-Netdata-Auth"]: 'Bearer ' + (token || localStorage.getItem("registry-netdata-token")) } })
         .then(function(response) { return response.json() })
         .then(function(data) {
           let table = document.getElementById("mynodes");
 
           if (data.status === "ok") {
-            if (location.protocol === "https:" && data.urls.some(function(u) {
+            if (!token && location.protocol === "https:" && data.urls.some(function(u) {
               return (/http:/).test(u)
             })) {
               return location.replace('http://' + location.href.substring(8) + "#" + localStorage.getItem("registry-netdata-token"))
@@ -81,7 +81,7 @@
               let cell1 = document.createElement("td");
               let link = document.createElement("a");
 
-              link.href = urlHostname ? (url + "/spaces/" + urlHostname + "/rooms/local/alerts/" + (tr_i || "") + location.search) : url + location.search;
+              link.href = (urlHostname ? (url + "/spaces/" + urlHostname + "/rooms/local/alerts/" + (tr_i || "") + location.search) : url + location.search).replace(/\/+/g, "/");
               link.textContent = url;
               link.target = "_blank";
               link.classList.add("button", "ghost");
