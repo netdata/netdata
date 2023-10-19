@@ -2830,9 +2830,10 @@ void cgroup_discovery_worker(void *ptr)
 
         discovery_find_all_cgroups();
     }
-    discovery_thread.exited = 1;
+    collector_info("discovery thread stopped");
     worker_unregister();
     service_exits();
+    __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
@@ -4559,18 +4560,15 @@ static void cgroup_main_cleanup(void *ptr) {
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
-    if (!discovery_thread.exited) {
-        collector_info("stopping discovery thread worker");
-        uv_mutex_lock(&discovery_thread.mutex);
-        uv_cond_signal(&discovery_thread.cond_var);
-        uv_mutex_unlock(&discovery_thread.mutex);
-    }
-
-    collector_info("waiting for discovery thread to finish...");
-    
-    while (!discovery_thread.exited && max > 0) {
-        max -= step;
-        sleep_usec(step);
+    if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED)) {
+        collector_info("waiting for discovery thread to finish...");
+        while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED) && max > 0) {
+            uv_mutex_lock(&discovery_thread.mutex);
+            uv_cond_signal(&discovery_thread.cond_var);
+            uv_mutex_unlock(&discovery_thread.mutex);
+            max -= step;
+            sleep_usec(step);
+        }
     }
 
     if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
