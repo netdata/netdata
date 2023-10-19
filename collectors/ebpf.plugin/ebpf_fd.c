@@ -1198,7 +1198,7 @@ static void fd_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_update_apps_data(apps_groups_root_target);
+            ebpf_update_apps_data(ebpf_apps_groups_root_target);
 
         if (cgroups)
             ebpf_update_fd_cgroup();
@@ -1214,7 +1214,7 @@ static void fd_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_fd_send_apps_data(em, apps_groups_root_target);
+            ebpf_fd_send_apps_data(em, ebpf_apps_groups_root_target);
 
         if (cgroups)
             ebpf_fd_send_cgroup_data(em);

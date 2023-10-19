@@ -2655,7 +2655,7 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_send_data(em);
 
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_socket_send_apps_data(em, apps_groups_root_target);
+            ebpf_socket_send_apps_data(em, ebpf_apps_groups_root_target);
 
 #ifdef NETDATA_DEV_MODE
         if (aral_socket_table)

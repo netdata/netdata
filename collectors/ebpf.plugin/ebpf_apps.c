@@ -641,8 +641,8 @@ struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes 
 size_t ebpf_all_pids_count = 0; // the number of processes running
 
 struct ebpf_target
-    *apps_groups_default_target = NULL, // the default target
-    *apps_groups_root_target = NULL,    // apps_groups.conf defined
+    *ebpf_apps_groups_default_target = NULL, // the default target
+    *ebpf_apps_groups_root_target = NULL,    // apps_groups.conf defined
     *users_root_target = NULL,          // users
     *groups_root_target = NULL;         // user groups
 
@@ -793,7 +793,7 @@ struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t has
     targets_assignment_counter++;
 
     struct ebpf_target *w;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(
                 ((!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, name)) ||
                  (w->starts_with && !w->ends_with && !strncmp(w->compare, name, w->comparelen)) ||
@@ -819,7 +819,7 @@ static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
     size_t pclen = strlen(p->comm);
 
     struct ebpf_target *w;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
 
         // find it - 4 cases:
@@ -1123,11 +1123,11 @@ static void apply_apps_groups_targets_inheritance(void)
 
     // init goes always to default target
     if (ebpf_all_pids[INIT_PID])
-        ebpf_all_pids[INIT_PID]->target = apps_groups_default_target;
+        ebpf_all_pids[INIT_PID]->target = ebpf_apps_groups_default_target;
 
     // pid 0 goes always to default target
     if (ebpf_all_pids[0])
-        ebpf_all_pids[0]->target = apps_groups_default_target;
+        ebpf_all_pids[0]->target = ebpf_apps_groups_default_target;
 
     // give a default target on all top level processes
     if (unlikely(debug_enabled))
@@ -1136,7 +1136,7 @@ static void apply_apps_groups_targets_inheritance(void)
         // if the process is not merged itself
         // then is is a top level process
         if (unlikely(!p->merged && !p->target))
-            p->target = apps_groups_default_target;
+            p->target = ebpf_apps_groups_default_target;
 
         // make sure all processes have a sortlist
         if (unlikely(!p->sortlist))
@@ -1392,12 +1392,12 @@ void ebpf_collect_data_for_all_processes()
 
     apply_apps_groups_targets_inheritance();
 
-    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
+    apps_groups_targets_count = zero_all_targets(ebpf_apps_groups_root_target);
 
     // this has to be done, before the cleanup
     // // concentrate everything on the targets
     for (pids = ebpf_root_of_pids; pids; pids = pids->next)
         aggregate_pid_on_target(pids->target, pids, NULL);
 
-    post_aggregate_targets(apps_groups_root_target);
+    post_aggregate_targets(ebpf_apps_groups_root_target);
 }

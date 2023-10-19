@@ -1951,7 +1951,7 @@ static void vfs_collector(ebpf_module_t *em)
         fflush(stdout);
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_vfs_send_apps_data(em, apps_groups_root_target);
+            ebpf_vfs_send_apps_data(em, ebpf_apps_groups_root_target);
 
         if (cgroups)
             ebpf_vfs_send_cgroup_data(em);

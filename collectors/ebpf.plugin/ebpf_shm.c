@@ -1118,7 +1118,7 @@ static void shm_collector(ebpf_module_t *em)
         ebpf_shm_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps) {
-            ebpf_shm_update_apps_data(apps_groups_root_target);
+            ebpf_shm_update_apps_data(ebpf_apps_groups_root_target);
         }
 
         if (cgroups) {
@@ -1137,7 +1137,7 @@ static void shm_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_shm_send_apps_data(apps_groups_root_target);
+            ebpf_shm_send_apps_data(ebpf_apps_groups_root_target);
         }
 
         if (cgroups) {

@@ -129,8 +129,8 @@ struct ebpf_target {
     struct ebpf_target *next;
 };
 
-extern struct ebpf_target *apps_groups_default_target;
-extern struct ebpf_target *apps_groups_root_target;
+extern struct ebpf_target *ebpf_apps_groups_default_target;
+extern struct ebpf_target *ebpf_apps_groups_root_target;
 extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 

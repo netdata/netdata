@@ -3428,11 +3428,11 @@ unittest:
 
     // Load apps_groups.conf
     if (ebpf_read_apps_groups_conf(
-            &apps_groups_default_target, &apps_groups_root_target, ebpf_user_config_dir, "groups")) {
+            &ebpf_apps_groups_default_target, &ebpf_apps_groups_root_target, ebpf_user_config_dir, "groups")) {
         netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'",
              ebpf_user_config_dir, ebpf_stock_config_dir);
         if (ebpf_read_apps_groups_conf(
-                &apps_groups_default_target, &apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
+                &ebpf_apps_groups_default_target, &ebpf_apps_groups_root_target, ebpf_stock_config_dir, "groups")) {
             netdata_log_error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.",
                   ebpf_stock_config_dir);
             ebpf_exit();
@@ -4173,7 +4173,7 @@ int main(int argc, char **argv)
             ebpf_collect_data_for_all_processes();
 
             pthread_mutex_lock(&lock);
-            ebpf_create_apps_charts(apps_groups_root_target);
+            ebpf_create_apps_charts(ebpf_apps_groups_root_target);
             pthread_mutex_unlock(&lock);
         }
         pthread_mutex_unlock(&collect_data_mutex);

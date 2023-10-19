@@ -858,7 +858,7 @@ static void swap_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_swap_update_apps_data(apps_groups_root_target);
+            ebpf_swap_update_apps_data(ebpf_apps_groups_root_target);
 
         if (cgroup)
             ebpf_update_swap_cgroup();
@@ -871,7 +871,7 @@ static void swap_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_swap_send_apps_data(apps_groups_root_target);
+            ebpf_swap_send_apps_data(ebpf_apps_groups_root_target);
 
         if (cgroup)
             ebpf_swap_send_cgroup_data(update_every);

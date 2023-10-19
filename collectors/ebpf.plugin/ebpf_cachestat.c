@@ -1361,7 +1361,7 @@ static void cachestat_collector(ebpf_module_t *em)
             ebpf_update_cachestat_cgroup();
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_cache_update_apps_data(apps_groups_root_target);
+            ebpf_cache_update_apps_data(ebpf_apps_groups_root_target);
 
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -1376,7 +1376,7 @@ static void cachestat_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_cache_send_apps_data(apps_groups_root_target);
+            ebpf_cache_send_apps_data(ebpf_apps_groups_root_target);
 
         if (cgroups)
             ebpf_cachestat_send_cgroup_data(update_every);

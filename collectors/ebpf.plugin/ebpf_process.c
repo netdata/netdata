@@ -1355,7 +1355,7 @@ static void process_collector(ebpf_module_t *em)
         }
 
         if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_process_sum_values_for_pids(apps_groups_root_target);
+            ebpf_process_sum_values_for_pids(ebpf_apps_groups_root_target);
         }
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -1372,7 +1372,7 @@ static void process_collector(ebpf_module_t *em)
 
         pthread_mutex_unlock(&collect_data_mutex);
         if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_process_send_apps_data(apps_groups_root_target, em);
+            ebpf_process_send_apps_data(ebpf_apps_groups_root_target, em);
         }
 
         if (cgroups && shm_ebpf_cgroup.header) {

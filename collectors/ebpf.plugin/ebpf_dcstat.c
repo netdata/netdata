@@ -1207,7 +1207,7 @@ static void dcstat_collector(ebpf_module_t *em)
         dcstat_send_global(&publish);
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_dcache_send_apps_data(apps_groups_root_target);
+            ebpf_dcache_send_apps_data(ebpf_apps_groups_root_target);
 
 #ifdef NETDATA_DEV_MODE
         if (ebpf_aral_dcstat_pid)
