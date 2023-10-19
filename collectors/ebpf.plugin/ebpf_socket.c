@@ -1030,31 +1030,6 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
 }
 
 /**
- * Sum values for pid
- *
- * @param root the structure with all available PIDs
- *
- * @param offset the address that we are reading
- *
- * @return it returns the sum of all PIDs
- */
-long long ebpf_socket_sum_values_for_pids(struct ebpf_pid_on_target *root, size_t offset)
-{
-    long long ret = 0;
-    while (root) {
-        int32_t pid = root->pid;
-        ebpf_socket_publish_apps_t *w = socket_bandwidth_curr[pid];
-        if (w) {
-            ret += get_value_from_structure((char *)w, offset);
-        }
-
-        root = root->next;
-    }
-
-    return ret;
-}
-
-/**
  * Send data to Netdata calling auxiliary functions.
  *
  * @param em   the structure with thread information
@@ -1072,25 +1047,26 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
 
-        values[0] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          call_tcp_v4_connection));
-        values[1] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          call_tcp_v6_connection));
-        values[2] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          bytes_sent));
-        values[3] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          bytes_received));
+        struct ebpf_pid_on_target *move = w->root_pid;
+        // Simplify algorithm, but others will appear only in https://github.com/netdata/netdata/pull/16030
+        memset(values, 0, sizeof(values));
+        while (move) {
+            int32_t pid = move->pid;
+            ebpf_socket_publish_apps_t *ws = socket_bandwidth_curr[pid];
+            if (ws) {
+                values[0] += (collected_number) ws->call_tcp_v4_connection;
+                values[1] += (collected_number) ws->call_tcp_v6_connection;
+                values[2] += (collected_number) ws->bytes_sent;
+                values[3] += (collected_number) ws->bytes_received;
+                values[4] += (collected_number) ws->call_tcp_sent;
+                values[5] += (collected_number) ws->call_tcp_received;
+                values[6] += (collected_number) ws->retransmit;
+                values[7] += (collected_number) ws->call_udp_sent;
+                values[8] += (collected_number) ws->call_udp_received;
+            }
 
-        values[4] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          call_tcp_sent));
-        values[5] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          call_tcp_received));
-        values[6] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          retransmit));
-        values[7] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          call_udp_sent));
-        values[8] = ebpf_socket_sum_values_for_pids(w->root_pid, offsetof(ebpf_socket_publish_apps_t,
-                                                                          call_udp_received));
+            move = move->next;
+        }
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_v4_connection");
         write_chart_dimension("connections", values[0]);
