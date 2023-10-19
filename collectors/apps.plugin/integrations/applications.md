@@ -66,22 +66,22 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| app_group.cpu_utilization | user, system | percentage |
-| app_group.cpu_guest_utilization | guest | percentage |
-| app_group.cpu_context_switches | voluntary, involuntary | switches/s |
-| app_group.mem_usage | rss | MiB |
-| app_group.mem_private_usage | mem | MiB |
-| app_group.vmem_usage | vmem | MiB |
-| app_group.mem_page_faults | minor, major | pgfaults/s |
-| app_group.swap_usage | swap | MiB |
-| app_group.disk_physical_io | reads, writes | KiB/s |
-| app_group.disk_logical_io | reads, writes | KiB/s |
-| app_group.processes | processes | processes |
-| app_group.threads | threads | threads |
-| app_group.fds_open_limit | limit | percentage |
-| app_group.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
-| app_group.uptime | uptime | seconds |
-| app_group.uptime_summary | min, avg, max | seconds |
+| app.cpu_utilization | user, system | percentage |
+| app.cpu_guest_utilization | guest | percentage |
+| app.cpu_context_switches | voluntary, involuntary | switches/s |
+| app.mem_usage | rss | MiB |
+| app.mem_private_usage | mem | MiB |
+| app.vmem_usage | vmem | MiB |
+| app.mem_page_faults | minor, major | pgfaults/s |
+| app.swap_usage | swap | MiB |
+| app.disk_physical_io | reads, writes | KiB/s |
+| app.disk_logical_io | reads, writes | KiB/s |
+| app.processes | processes | processes |
+| app.threads | threads | threads |
+| app.fds_open_limit | limit | percentage |
+| app.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| app.uptime | uptime | seconds |
+| app.uptime_summary | min, avg, max | seconds |
 
 
 
