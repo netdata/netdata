@@ -336,6 +336,7 @@ int is_legacy = 1;
 
     if (likely(!archived)) {
         rrdfunctions_host_init(host);
+        host->last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
@@ -561,6 +562,9 @@ int is_legacy = 1;
          , string2str(host->health.health_default_recipient)
     );
 
+    host->configurable_plugins = dyncfg_dictionary_create();
+    dictionary_register_delete_callback(host->configurable_plugins, plugin_del_cb, NULL);
+
     if(!archived) {
         metaqueue_host_update_info(host);
         rrdhost_load_rrdcontext_data(host);
@@ -661,6 +665,8 @@ static void rrdhost_update(RRDHOST *host
 
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
+
+    host->last_connected = now_realtime_sec();
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);

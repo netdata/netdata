@@ -59,13 +59,13 @@ There is no configuration file.
 [[ entry.setup.configuration.options.description ]]
 
 [% if entry.setup.configuration.options.list %]
-[% if entry.setup.configuration.options.folding.enabled %]
+[% if entry.setup.configuration.options.folding.enabled and not clean %]
 {% details summary="[[ entry.setup.configuration.options.folding.title ]]" %}
 [% endif %]
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 [% for item in entry.setup.configuration.options.list %]
-| [[ item.name ]] | [[ item.description ]] | [[ item.default ]] | [[ item.required ]] |
+| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
 [% endfor %]
 
 [% for item in entry.setup.configuration.options.list %]
@@ -76,7 +76,7 @@ There is no configuration file.
 
 [% endif %]
 [% endfor %]
-[% if entry.setup.configuration.options.folding.enabled %]
+[% if entry.setup.configuration.options.folding.enabled and not clean %]
 {% /details %}
 [% endif %]
 [% elif not entry.setup.configuration.options.description %]
@@ -91,13 +91,13 @@ There are no configuration options.
 
 [[ example.description ]]
 
-[% if example.folding.enabled %]
+[% if example.folding.enabled and not clean %]
 {% details summary="[[ entry.setup.configuration.examples.folding.title ]]" %}
 [% endif %]
 ```yaml
 [[ example.config ]]
 ```
-[% if example.folding.enabled %]
+[% if example.folding.enabled and not clean %]
 {% /details %}
 [% endif %]
 [% endfor %]

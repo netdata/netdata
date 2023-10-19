@@ -126,7 +126,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(rrdset_number_of_dimensions(st) != 0) {
         RRDDIM *td;
         dfe_start_write(st->rrddim_root_index, td) {
-            if(!td) break;
+            if(td) break;
         }
         dfe_done(td);
 

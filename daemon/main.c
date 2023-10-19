@@ -761,7 +761,7 @@ int help(int exitcode) {
             " Support    : https://github.com/netdata/netdata/issues\n"
             " License    : https://github.com/netdata/netdata/blob/master/LICENSE.md\n"
             "\n"
-            " Twitter    : https://twitter.com/linuxnetdata\n"
+            " Twitter    : https://twitter.com/netdatahq\n"
             " LinkedIn   : https://linkedin.com/company/netdata-cloud/\n"
             " Facebook   : https://facebook.com/linuxnetdata/\n"
             "\n"
@@ -874,6 +874,10 @@ static void log_init(void) {
 
     setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
     setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
+
+    char *selected_level = config_get(CONFIG_SECTION_LOGS, "severity level", NETDATA_LOG_LEVEL_INFO_STR);
+    global_log_severity_level = log_severity_string_to_severity_level(selected_level);
+    setenv("NETDATA_LOG_SEVERITY_LEVEL", selected_level , 1);
 }
 
 char *initialize_lock_directory_path(char *prefix)
@@ -1893,6 +1897,7 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         open_all_log_files();
+        netdata_log_info("Netdata agent version \""VERSION"\" is starting");
 
         ieee754_doubles = is_system_ieee754_double();
 
@@ -1934,8 +1939,6 @@ int main(int argc, char **argv) {
         delta_startup_time("initialize signals");
         signals_block();
         signals_init(); // setup the signals we want to use
-
-        dyn_conf_init();
 
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
@@ -2001,6 +2004,8 @@ int main(int argc, char **argv) {
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
+
+    dyn_conf_init();
 
     netdata_log_info("netdata started on pid %d.", getpid());
 

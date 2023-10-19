@@ -52,39 +52,8 @@ int sql_init_context_database(int memory)
     if (likely(!memory))
         target_version = perform_context_database_migration(db_context_meta, DB_CONTEXT_METADATA_VERSION);
 
-    // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
-    // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
-    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if(init_database_batch(db_context_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_synchronous
-    // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
-    snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if(init_database_batch(db_context_meta, list))  return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_journal_mode
-    // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
-    snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if(init_database_batch(db_context_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_temp_store
-    // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
-    snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if(init_database_batch(db_context_meta, list)) return 1;
-    
-    // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
-    // PRAGMA schema.journal_size_limit = N ;
-    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if(init_database_batch(db_context_meta, list)) return 1;
-
-    // https://www.sqlite.org/pragma.html#pragma_cache_size
-    // PRAGMA schema.cache_size = pages;
-    // PRAGMA schema.cache_size = -kibibytes;
-    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if(init_database_batch(db_context_meta, list)) return 1;
-
-    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
-    if(init_database_batch(db_context_meta, list)) return 1;
+    if (configure_sqlite_database(db_context_meta, target_version))
+        return 1;
 
     if (likely(!memory))
         snprintfz(buf, 1024, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta;", netdata_configured_cache_dir);
@@ -123,7 +92,7 @@ void sql_close_context_database(void)
 // Fetching data
 //
 #define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, " \
-        "c.update_every, c.chart_type, c.family FROM meta.chart c WHERE c.host_id = @host_id and c.chart_id is not null; "
+        "c.update_every, c.chart_type, c.family FROM chart c WHERE c.host_id = @host_id and c.chart_id is not null; "
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
@@ -136,7 +105,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db_context_meta, CTX_GET_CHART_LIST, &res);
+        rc = prepare_statement(db_meta, CTX_GET_CHART_LIST, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to fetch chart list");
             return;
@@ -172,14 +141,14 @@ skip_load:
 
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END " \
-        "FROM meta.dimension d WHERE d.chart_id = @id and d.dim_id is not null ORDER BY d.rowid ASC;"
+        "FROM dimension d WHERE d.chart_id = @id and d.dim_id is not null ORDER BY d.rowid ASC;"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
     static __thread sqlite3_stmt *res = NULL;
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db_context_meta, CTX_GET_DIMENSION_LIST, &res);
+        rc = prepare_statement(db_meta, CTX_GET_DIMENSION_LIST, &res);
         if (rc != SQLITE_OK) {
             error_report("Failed to prepare statement to fetch chart dimension data");
             return;

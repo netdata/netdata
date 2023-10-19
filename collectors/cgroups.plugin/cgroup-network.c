@@ -11,9 +11,11 @@
 #endif
 
 char environment_variable2[FILENAME_MAX + 50] = "";
+char environment_variable3[FILENAME_MAX + 50] = "";
 char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
         environment_variable2,
+        environment_variable3,
         NULL
 };
 
@@ -286,7 +288,8 @@ int switch_namespace(const char *prefix, pid_t pid) {
 pid_t read_pid_from_cgroup_file(const char *filename) {
     int fd = open(filename, procfile_open_flags);
     if(fd == -1) {
-        collector_error("Cannot open pid_from_cgroup() file '%s'.", filename);
+        if (errno != ENOENT)
+            collector_error("Cannot open pid_from_cgroup() file '%s'.", filename);
         return 0;
     }
 
@@ -671,6 +674,10 @@ int main(int argc, char **argv) {
     // the first environment variable is a fixed PATH=
     snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
 
+    char *s = getenv("NETDATA_LOG_SEVERITY_LEVEL");
+    if (s)
+        snprintfz(environment_variable3, sizeof(environment_variable3) - 1, "NETDATA_LOG_SEVERITY_LEVEL=%s", s);
+
     // ------------------------------------------------------------------------
 
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
@@ -680,6 +687,8 @@ int main(int argc, char **argv) {
 
     if(argc != 3)
         usage();
+    
+    log_set_global_severity_for_external_plugins();
 
     int arg = 1;
     int helper = 1;

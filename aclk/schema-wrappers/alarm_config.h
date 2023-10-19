@@ -24,7 +24,6 @@ struct aclk_alarm_configuration {
     char *plugin;
     char *module;
     char *charts;
-    char *families;
     char *lookup;
     char *every;
     char *units;
@@ -52,6 +51,7 @@ struct aclk_alarm_configuration {
     int32_t p_update_every;
 
     char *chart_labels;
+    char *summary;
 };
 
 void destroy_aclk_alarm_configuration(struct aclk_alarm_configuration *cfg);

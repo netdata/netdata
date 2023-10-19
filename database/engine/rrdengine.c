@@ -1427,8 +1427,8 @@ static void *query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused,
     return data;
 }
 
-unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
-    unsigned target_size = ctx->config.max_disk_space / TARGET_DATAFILES;
+uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
+    uint64_t target_size = ctx->config.max_disk_space / TARGET_DATAFILES;
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
     target_size = MAX(target_size, MIN_DATAFILE_SIZE);
     return target_size;

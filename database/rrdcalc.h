@@ -196,7 +196,6 @@ struct alert_config {
     STRING *os;
     STRING *host;
     STRING *on;
-    STRING *families;
     STRING *plugin;
     STRING *module;
     STRING *charts;
