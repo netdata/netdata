@@ -112,6 +112,12 @@ struct ebpf_target {
     ebpf_socket_publish_apps_t socket;
     ebpf_process_stat_t process;
 
+    // Index for associated PIDs
+    struct {                            // support for multiple indexing engines
+        Pvoid_t JudyLArray;            // the hash table
+        RW_SPINLOCK rw_spinlock;        // protect the index
+    } pid_list;
+
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
 

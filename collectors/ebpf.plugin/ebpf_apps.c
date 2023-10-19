@@ -450,7 +450,7 @@ void clean_apps_groups_target(struct ebpf_target *agrt)
  *
  * @return It returns the target on success and NULL otherwise
  */
-struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char *id, struct ebpf_target *target, const char *name)
+struct ebpf_target *ebpf_get_apps_groups_target(struct ebpf_target **agrt, const char *id, struct ebpf_target *target, const char *name)
 {
     int tdebug = 0, thidden = target ? target->hidden : 0, ends_with = 0;
     const char *nid = id;
@@ -542,6 +542,9 @@ struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char
     else
         *agrt = w;
 
+    w->pid_list.JudyLArray = NULL;
+    rw_spinlock_init(&w->pid_list.rw_spinlock);
+
     return w;
 }
 
@@ -599,7 +602,7 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
                 continue;
 
             // add this target
-            struct ebpf_target *n = get_apps_groups_target(agrt, s, w, name);
+            struct ebpf_target *n = ebpf_get_apps_groups_target(agrt, s, w, name);
             if (!n) {
                 netdata_log_error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
@@ -614,7 +617,7 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 
     procfile_close(ff);
 
-    *agdt = get_apps_groups_target(agrt, "p+!o@w#e$i^r&7*5(-i)l-o_", NULL, "other"); // match nothing
+    *agdt = ebpf_get_apps_groups_target(agrt, "p+!o@w#e$i^r&7*5(-i)l-o_", NULL, "other"); // match nothing
     if (!*agdt)
         fatal("Cannot create default target");
 
