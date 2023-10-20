@@ -46,6 +46,33 @@ if [ -n "${PGID}" ]; then
   usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
+# Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
+function add_netdata_to_proxmox_conf_files_group() {
+  group_guid="$(stat -c %g /host/etc/pve 2>/dev/null || true)"
+  [ -z "${group_guid}" ] && return
+
+  if ! getent group "${group_guid}" >/dev/null; then
+    echo "Creating proxmox-etc-pve group with GID ${group_guid}"
+    if ! addgroup -g "${group_guid}" "proxmox-etc-pve"; then
+      echo >&2 "Failed to add group proxmox-etc-pve with GID ${group_guid}."
+      return
+    fi
+  fi
+
+  if ! getent group "${group_guid}" | grep -q netdata; then
+    echo "Assign netdata user to group ${group_guid}"
+    if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
+      echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
+      return
+    fi
+  fi
+}
+
+if [ -d "/host/etc/pve" ]; then
+  add_netdata_to_proxmox_conf_files_group || true
+fi
+
+
 if mountpoint -q /etc/netdata; then
   echo "Copying stock configuration to /etc/netdata"
   cp -an /etc/netdata.stock/* /etc/netdata
