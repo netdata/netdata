@@ -7,8 +7,10 @@
 **Merged pull requests:**
 
 - added systemd-journal forward\_secure\_sealing [\#16247](https://github.com/netdata/netdata/pull/16247) ([ktsaou](https://github.com/ktsaou))
+- fix apps plugin metric names in meta [\#16243](https://github.com/netdata/netdata/pull/16243) ([ilyam8](https://github.com/ilyam8))
 - Reuse ML load prepared statement [\#16240](https://github.com/netdata/netdata/pull/16240) ([stelfrag](https://github.com/stelfrag))
 - update bundled UI to v6.53.0 [\#16239](https://github.com/netdata/netdata/pull/16239) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16237](https://github.com/netdata/netdata/pull/16237) ([netdatabot](https://github.com/netdatabot))
 - Active journal centralization guide no encryption [\#16236](https://github.com/netdata/netdata/pull/16236) ([tkatsoulas](https://github.com/tkatsoulas))
 - journal: script to generate self-signed-certificates [\#16235](https://github.com/netdata/netdata/pull/16235) ([ktsaou](https://github.com/ktsaou))
 - Fix dimension HETEROGENEOUS check [\#16234](https://github.com/netdata/netdata/pull/16234) ([stelfrag](https://github.com/stelfrag))
@@ -423,7 +425,6 @@
 - Update graphite metadata.yaml [\#15634](https://github.com/netdata/netdata/pull/15634) ([shyamvalsan](https://github.com/shyamvalsan))
 - Debugfs yaml update [\#15633](https://github.com/netdata/netdata/pull/15633) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update metadata.yaml [\#15632](https://github.com/netdata/netdata/pull/15632) ([shyamvalsan](https://github.com/shyamvalsan))
-- review images for integrations from security to windows systems [\#15630](https://github.com/netdata/netdata/pull/15630) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
