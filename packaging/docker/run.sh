@@ -68,7 +68,9 @@ function add_netdata_to_proxmox_conf_files_group() {
   fi
 }
 
-[ -d "/host/etc/pve" ] && add_netdata_to_proxmox_conf_files_group
+if [ -d "/host/etc/pve" ]; then
+  add_netdata_to_proxmox_conf_files_group || true
+fi
 
 
 if mountpoint -q /etc/netdata; then
