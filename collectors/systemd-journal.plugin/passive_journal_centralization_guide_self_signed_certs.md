@@ -54,17 +54,17 @@ Repeat this process to create the certificates for all your servers. You can add
 
 Existing certificates are never re-generated. Typically certificates need to be revoked and new ones to be issued. But `systemd-journal-remote` tools do not support handling revocations. So, the only option you have to re-issue a certificate is to delete its files in `/etc/ssl/systemd-journal` and run the script again to create a new one.
 
-In `/etc/ssl/systemd-journal` you will find shell scripts named `runme-on-XXX.sh`, where `XXX` are the canonical names of your servers.
+Once you run the script of each of your servers, in `/etc/ssl/systemd-journal` you will find shell scripts named `runme-on-XXX.sh`, where `XXX` are the canonical names of your servers.
 
 These `runme-on-XXX.sh` include everything to install the certificates, fix their file permissions to be accessible by `systemd-journal-remote` and `systemd-journal-upload`, and update `/etc/systemd/journal-remote.conf` and `/etc/systemd/journal-upload.conf`.
 
 You can copy and paste (or `scp`) these scripts on your server and each of your clients:
 
 ```bash
-sudo scp /etc/ssl/systemd-journal-remote/runme-on-XXX.sh XXX:/tmp/
+sudo scp /etc/ssl/systemd-journal/runme-on-XXX.sh XXX:/tmp/
 ```
 
-So, for the moment make sure that you have the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you created certificates.
+For the rest of this guide, we assume that you have copied the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you issued certificates.
 
 ### note about certificates file permissions
 
@@ -137,7 +137,7 @@ sudo systemctl enable systemd-journal-remote.service
 
 `systemd-journal-remote` is now listening for incoming journals from remote hosts.
 
-> Remember to delete `/tmp/runme-on-XXX.sh` to make sure your certificates are secure.
+> When done, remember to `rm /tmp/runme-on-*.sh` to make sure your certificates are secure.
 
 ## Client configuration
 
@@ -155,9 +155,9 @@ Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of t
 URL=https://centralization.server.ip:19532
 ```
 
-Make sure that `centralization.server.ip` is one of the `DNS:` or `IP:` parameters you defined when you created the centralization server certificates.
+Make sure that `centralization.server.ip` is one of the `DNS:` or `IP:` parameters you defined when you created the centralization server certificates. If it is not, the client may reject to connect.
 
-Edit `systemd-journal-upload.service`, and add `Restart=always` to make sure the client will keep trying to push logs, even if the server is temporarily not there, like this:
+Next, edit `systemd-journal-upload.service`, and add `Restart=always` to make sure the client will keep trying to push logs, even if the server is temporarily not there, like this:
 
 ```bash
 sudo systemctl edit systemd-journal-upload.service
@@ -170,7 +170,7 @@ At the top, add:
 Restart=always
 ```
 
-Enable and start `systemd-journal-upload.service`, like this:
+Enable `systemd-journal-upload.service`, like this:
 
 ```bash
 sudo systemctl enable systemd-journal-upload.service
@@ -192,7 +192,7 @@ sudo systemctl restart systemd-journal-upload.service
 
 The client should now be pushing logs to the central server.
 
-> Remember to delete `/tmp/runme-on-XXX.sh` to make sure your certificates are secure.
+> When done, remember to `rm /tmp/runme-on-*.sh` to make sure your certificates are secure.
 
 Here it is in action, in Netdata:
 
@@ -207,7 +207,7 @@ To verify the central server is receiving logs, run this on the central server:
 sudo ls -l /var/log/journal/remote/
 ```
 
-You should see new files from the client's canonical names (CN). These are names on the clients' certificates.
+Depending on the `systemd` version you use, you should see new files from the clients' canonical names (as defined at their certificates) or IPs.
 
 Also, `systemctl status systemd-journal-remote` should show something like this:
 
