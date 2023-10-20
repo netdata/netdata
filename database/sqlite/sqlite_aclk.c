@@ -486,11 +486,6 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     if (unlikely(rc))
         error_report("Failed to create ACLK alert table for host %s", host ? rrdhost_hostname(host) : host_guid);
     else {
-        snprintfz(sql, ACLK_SYNC_QUERY_SIZE -1, INDEX_ACLK_ALERT, uuid_str, uuid_str);
-        rc = db_execute(db_meta, sql);
-        if (unlikely(rc))
-            error_report("Failed to create ACLK alert table index for host %s", host ? string2str(host->hostname) : host_guid);
-
         snprintfz(sql, ACLK_SYNC_QUERY_SIZE -1, INDEX_ACLK_ALERT1, uuid_str, uuid_str);
         rc = db_execute(db_meta, sql);
         if (unlikely(rc))

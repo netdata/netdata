@@ -292,13 +292,6 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         rc = db_execute(db_meta, buffer_tostring(sql_fix));
         if (unlikely(rc))
             error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
-
-        else {
-            buffer_flush(sql_fix);
-            buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
-            if (unlikely(db_execute(db_meta, buffer_tostring(sql_fix))))
-                error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
-        }
         buffer_free(sql_fix);
 
         // Try again
