@@ -39,6 +39,7 @@ ATTR171 = '171'
 ATTR172 = '172'
 ATTR173 = '173'
 ATTR174 = '174'
+ATTR177 = '177'
 ATTR180 = '180'
 ATTR183 = '183'
 ATTR190 = '190'
@@ -50,6 +51,8 @@ ATTR199 = '199'
 ATTR202 = '202'
 ATTR206 = '206'
 ATTR233 = '233'
+ATTR241 = '241'
+ATTR242 = '242'
 ATTR249 = '249'
 ATTR_READ_ERR_COR = 'read-total-err-corrected'
 ATTR_READ_ERR_UNC = 'read-total-unc-errors'
@@ -114,6 +117,8 @@ ORDER = [
     'offline_uncorrectable_sector_count',
     'percent_lifetime_used',
     'media_wearout_indicator',
+    'total_lbas_written',
+    'total_lbas_read',
 ]
 
 CHARTS = {
@@ -329,13 +334,25 @@ CHARTS = {
     'media_wearout_indicator': {
         'options': [None, 'Media Wearout Indicator', 'percentage', 'wear', 'smartd_log.media_wearout_indicator', 'line'],
         'lines': [],
-        'attrs': [ATTR233],
+        'attrs': [ATTR233, ATTR177],
         'algo': ABSOLUTE,
     },
     'nand_writes_1gib': {
         'options': [None, 'NAND Writes', 'GiB', 'wear', 'smartd_log.nand_writes_1gib', 'line'],
         'lines': [],
         'attrs': [ATTR249],
+        'algo': ABSOLUTE,
+    },
+    'total_lbas_written': {
+        'options': [None, 'Total LBAs Written', 'sectors', 'wear', 'smartd_log.total_lbas_written', 'line'],
+        'lines': [],
+        'attrs': [ATTR241],
+        'algo': ABSOLUTE,
+    },
+    'total_lbas_read': {
+        'options': [None, 'Total LBAs Read', 'sectors', 'wear', 'smartd_log.total_lbas_read', 'line'],
+        'lines': [],
+        'attrs': [ATTR242],
         'algo': ABSOLUTE,
     },
 }
@@ -519,6 +536,7 @@ def ata_attribute_factory(value):
     elif name in [
         ATTR1,
         ATTR7,
+        ATTR177,
         ATTR202,
         ATTR206,
         ATTR233,
