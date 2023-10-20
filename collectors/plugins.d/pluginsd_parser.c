@@ -2485,6 +2485,25 @@ static inline PARSER_RC pluginsd_register_job(char **words __maybe_unused, size_
     return pluginsd_register_job_common(&words[2], num_words - 2, parser, words[1]);
 }
 
+static inline PARSER_RC pluginsd_dyncfg_reset(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+    if (unlikely(num_words != (SERVING_PLUGINSD(parser) ? 1 : 2)))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_RESET, SERVING_PLUGINSD(parser) ? "expected 0 parameters" : "expected 1 parameter: plugin_name");
+
+    if (SERVING_PLUGINSD(parser)) {
+        unregister_plugin(parser->user.host->configurable_plugins, parser->user.cd->cfg_dict_item);
+        rrdpush_send_dyncfg_reset(parser->user.host, parser->user.cd->configuration->name);
+        parser->user.cd->configuration = NULL;
+    } else {
+        const DICTIONARY_ITEM *di = dictionary_get_and_acquire_item(parser->user.host->configurable_plugins, words[1]);
+        if (unlikely(di == NULL))
+            return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_RESET, "plugin not found");
+        unregister_plugin(parser->user.host->configurable_plugins, di);
+        rrdpush_send_dyncfg_reset(parser->user.host, words[1]);
+    }
+
+    return PARSER_RC_OK;
+}
+
 static inline PARSER_RC pluginsd_job_status_common(char **words, size_t num_words, PARSER *parser, const char *plugin_name) {
     int state = str2i(words[3]);
 
@@ -2865,6 +2884,9 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
 
         case 103:
             return pluginsd_register_job(words, num_words, parser);
+
+        case 104:
+            return pluginsd_dyncfg_reset(words, num_words, parser);
 
         case 110:
             return pluginsd_job_status(words, num_words, parser);
