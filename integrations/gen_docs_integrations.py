@@ -147,7 +147,7 @@ def build_readme_from_integration(integration, mode=''):
             learn_rel_path = generate_category_from_name(
                 integration['meta']['monitored_instance']['categories'][0].split("."), categories)
             most_popular = integration['meta']['most_popular']
-            
+
             # build the markdown string
             md = \
                 f"""<!--startmeta
