@@ -15,8 +15,16 @@ From the Dashboards tab, click on the **+** button.
 In the modal, give your new dashboard a name, and click **+ Add**.
 
 - The **Add Chart** button on the top right of the interface adds your first chart card. From the dropdown, select either **All Nodes** or a specific
-node. If you select **All Nodes**, you will add a [composite chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) to
-your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it. In this modal you can also [interact with the chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md).
+node. Next, select the context. You'll see a preview of the chart before you finish adding it. In this modal you can also [interact with the chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md), meaning you can configure all the aspects of the [NIDL framework](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#nidl-framework) of the chart and more in detail, you can:
+  - define which `group by` method to use
+  - select the aggregation function over the data source
+  - select nodes
+  - select instances
+  - select dimensions
+  - select labels
+  - select the aggregation function over time
+  
+  After you are done configuring the chart, you can also change the type of the chart from the right hand side of the [Title bar](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#title-bar), and select which of the final dimensions you want to be visible and in what order, from the [Dimensions bar](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#dimensions-bar).
 
 - The **Add Text** button on the top right of the interface creates a new card with user-defined text, which you can use to describe or document a
 particular dashboard's meaning and purpose.
