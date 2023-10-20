@@ -953,13 +953,45 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
  * Sum values for all PIDs associated to a group
  *
  * @param publish  output structure.
- * @param root     structure with listed IPs
  */
-void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyLArray, RW_SPINLOCK rw_spinlock)
 {
-    if (!root)
+    rw_spinlock_read_lock(&rw_spinlock);
+    if (!JudyLArray) {
+        rw_spinlock_read_unlock(&rw_spinlock);
         return;
+    }
 
+    memset(&publish->plot, 0, sizeof(struct netdata_publish_cachestat_pid));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, local_pid, NULL);
+        if (pid_ptr) {
+            rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
+            if (pid_ptr->cachestat_stats.JudyLArray) {
+                Word_t local_timestamp = 0;
+                bool first_cache = true;
+                Pvoid_t *cache_value;
+                while (
+                    (cache_value =
+                         JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
+                    netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
+                    publish->plot.misses += values->plot.misses;
+                    publish->plot.total += values->plot.total;
+                    publish->plot.dirty += values->plot.dirty;
+                }
+            }
+            rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+        }
+    }
+    rw_spinlock_read_unlock(&rw_spinlock);
+    /*
     memset(&publish->plot, 0, sizeof(struct netdata_publish_cachestat_pid));
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
@@ -987,6 +1019,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
         root = root->next;
     }
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+     */
 }
 
 /**
@@ -999,8 +1032,8 @@ void ebpf_cache_update_apps_data(struct ebpf_target *root)
     struct ebpf_target *w;
 
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
+        if (unlikely(w->exposed)) {
+            ebpf_cachestat_sum_pids(&w->cachestat, w->pid_list.JudyLArray, w->pid_list.rw_spinlock);
             cachestat_update_publish(&w->cachestat);
         }
     }

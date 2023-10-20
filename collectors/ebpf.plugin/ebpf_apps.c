@@ -806,7 +806,7 @@ struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t has
         }
     }
 
-    return NULL;
+    return ebpf_apps_groups_default_target;
 }
 
 /**

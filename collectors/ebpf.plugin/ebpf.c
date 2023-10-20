@@ -714,6 +714,48 @@ void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key)
 }
 
 /**
+ * Add PID to APPs group
+ *
+ * This function adds a new PID for specific apps group.
+ *
+ * @param target    the apps group to associate data
+ * @param pid_ptr   the pointer to be stored
+ * @param pid       the current pid.
+ */
+static inline void ebpf_add_pid_to_apps_group(struct ebpf_target *target,
+                                              netdata_ebpf_judy_pid_stats_t *pid_ptr,
+                                              uint32_t pid)
+{
+    netdata_ebpf_judy_pid_stats_t **group_pptr;
+    netdata_ebpf_judy_pid_stats_t *group_ptr;
+    rw_spinlock_write_lock(&target->pid_list.rw_spinlock);
+    group_pptr = (netdata_ebpf_judy_pid_stats_t **)ebpf_judy_insert_unsafe(
+        &target->pid_list.JudyLArray, pid);
+    group_ptr = *group_pptr;
+    if (likely(*group_pptr == NULL)) {
+        *group_pptr = pid_ptr;
+    }
+    pid_ptr->apps_target->exposed = 1;
+    rw_spinlock_write_unlock(&target->pid_list.rw_spinlock);
+}
+
+/**
+ * Add PID to APPs group
+ *
+ * This function adds a new PID for specific apps group.
+ *
+ * @param target    the apps group to associate data
+ * @param pid       the current pid.
+ */
+static inline void ebpf_remove_pid_from_other(struct ebpf_target *target,
+                                              uint32_t pid)
+{
+    rw_spinlock_write_lock(&target->pid_list.rw_spinlock);
+    JudyLDel(&target->pid_list.JudyLArray, pid, PJE0);
+    rw_spinlock_write_unlock(&target->pid_list.rw_spinlock);
+}
+
+/**
  * Get PID from judy
  *
  * Get a pointer for the `pid` from judy_array;
@@ -734,13 +776,17 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
         pid_ptr = *pid_pptr;
 
         pid_ptr->pname[0] = '\0';
-        if (!name)
+        if (!name) {
             pid_ptr->name[0] = '\0';
-        else {
+            pid_ptr->apps_target = ebpf_apps_groups_default_target;
+            ebpf_add_pid_to_apps_group(ebpf_apps_groups_default_target, pid_ptr, pid);
+        } else {
             strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
             pid_ptr->hash_name = simple_hash(pid_ptr->name);
             pid_ptr->name_len = strlen(pid_ptr->name);
             pid_ptr->apps_target = ebpf_select_target(pid_ptr->name, pid_ptr->name_len, pid_ptr->hash_name);
+
+            ebpf_add_pid_to_apps_group(pid_ptr->apps_target, pid_ptr, pid);
         }
 
         pid_ptr->socket_stats.JudyLArray = NULL;
@@ -761,8 +807,14 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
         pid_ptr->swap_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->swap_stats.rw_spinlock);
     } else {
-        if (pid_ptr->name[0] == '\0' && name)
+        if (pid_ptr->name[0] == '\0' && name) {
             strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
+
+            if (pid_ptr->apps_target != ebpf_apps_groups_default_target) {
+                ebpf_add_pid_to_apps_group(pid_ptr->apps_target, pid_ptr, pid);
+                ebpf_remove_pid_from_other(ebpf_apps_groups_default_target, pid);
+            }
+        }
     }
 
     return pid_ptr;
@@ -4166,17 +4218,17 @@ int main(int argc, char **argv)
         }
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
-        pthread_mutex_lock(&collect_data_mutex);
         if (++update_apps_list == update_apps_every) {
             update_apps_list = 0;
-            cleanup_exited_pids();
-            ebpf_collect_data_for_all_processes();
+            pthread_mutex_lock(&collect_data_mutex);
+            //cleanup_exited_pids();
+            //ebpf_collect_data_for_all_processes();
 
             pthread_mutex_lock(&lock);
             ebpf_create_apps_charts(ebpf_apps_groups_root_target);
             pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&collect_data_mutex);
         }
-        pthread_mutex_unlock(&collect_data_mutex);
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
