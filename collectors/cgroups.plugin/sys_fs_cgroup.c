@@ -895,7 +895,6 @@ struct discovery_thread {
     uv_thread_t thread;
     uv_mutex_t mutex;
     uv_cond_t cond_var;
-    int start_discovery;
     int exited;
 } discovery_thread;
 
@@ -2781,14 +2780,6 @@ static inline void discovery_find_all_cgroups() {
     netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
 
-static void cgroup_discovery_cleanup(void *ptr) {
-    UNUSED(ptr);
-
-    discovery_thread.exited = 1;
-    worker_unregister();
-    service_exits();
-}
-
 static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
     if(buffer[0]) return buffer;
 
@@ -2805,8 +2796,6 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
-
-    netdata_thread_cleanup_push(cgroup_discovery_cleanup, ptr);
 
     worker_register("CGROUPSDISC");
     worker_register_job_name(WORKER_DISCOVERY_INIT,               "init");
@@ -2827,13 +2816,13 @@ void cgroup_discovery_worker(void *ptr)
             NULL,
             SIMPLE_PATTERN_EXACT, true);
 
+    service_register(SERVICE_THREAD_TYPE_LIBUV, NULL, NULL, NULL, false);
+
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         uv_mutex_lock(&discovery_thread.mutex);
-        while (!discovery_thread.start_discovery && service_running(SERVICE_COLLECTORS))
-            uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
-        discovery_thread.start_discovery = 0;
+        uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
         uv_mutex_unlock(&discovery_thread.mutex);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
@@ -2841,8 +2830,10 @@ void cgroup_discovery_worker(void *ptr)
 
         discovery_find_all_cgroups();
     }
-
-    netdata_thread_cleanup_pop(1);
+    collector_info("discovery thread stopped");
+    worker_unregister();
+    service_exits();
+    __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
@@ -4569,19 +4560,15 @@ static void cgroup_main_cleanup(void *ptr) {
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
-    if (!discovery_thread.exited) {
-        collector_info("stopping discovery thread worker");
-        uv_mutex_lock(&discovery_thread.mutex);
-        discovery_thread.start_discovery = 1;
-        uv_cond_signal(&discovery_thread.cond_var);
-        uv_mutex_unlock(&discovery_thread.mutex);
-    }
-
-    collector_info("waiting for discovery thread to finish...");
-    
-    while (!discovery_thread.exited && max > 0) {
-        max -= step;
-        sleep_usec(step);
+    if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED)) {
+        collector_info("waiting for discovery thread to finish...");
+        while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED) && max > 0) {
+            uv_mutex_lock(&discovery_thread.mutex);
+            uv_cond_signal(&discovery_thread.cond_var);
+            uv_mutex_unlock(&discovery_thread.mutex);
+            max -= step;
+            sleep_usec(step);
+        }
     }
 
     if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
@@ -4621,8 +4608,6 @@ void *cgroups_main(void *ptr) {
         goto exit;
     }
 
-    // dispatch a discovery worker thread
-    discovery_thread.start_discovery = 0;
     discovery_thread.exited = 0;
 
     if (uv_mutex_init(&discovery_thread.mutex)) {
@@ -4646,6 +4631,7 @@ void *cgroups_main(void *ptr) {
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
+    netdata_thread_disable_cancelability();
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
@@ -4654,8 +4640,9 @@ void *cgroups_main(void *ptr) {
 
         find_dt += hb_dt;
         if (unlikely(find_dt >= find_every || (!is_inside_k8s && cgroups_check))) {
+            uv_mutex_lock(&discovery_thread.mutex);
             uv_cond_signal(&discovery_thread.cond_var);
-            discovery_thread.start_discovery = 1;
+            uv_mutex_unlock(&discovery_thread.mutex);
             find_dt = 0;
             cgroups_check = 0;
         }
@@ -4665,18 +4652,22 @@ void *cgroups_main(void *ptr) {
 
         worker_is_busy(WORKER_CGROUPS_READ);
         read_all_discovered_cgroups(cgroup_root);
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
-
+        if (unlikely(!service_running(SERVICE_COLLECTORS))) {
+            uv_mutex_unlock(&cgroup_root_mutex);
+            break;
+        }
         worker_is_busy(WORKER_CGROUPS_CHART);
         update_cgroup_charts(cgroup_update_every);
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if (unlikely(!service_running(SERVICE_COLLECTORS))) {
+           uv_mutex_unlock(&cgroup_root_mutex);
+           break;
+        }
 
         worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);
     }
 
 exit:
-    worker_unregister();
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
