@@ -2438,24 +2438,35 @@ static inline PARSER_RC pluginsd_register_module(char **words __maybe_unused, si
 }
 
 static inline PARSER_RC pluginsd_register_job_common(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused, const char *plugin_name) {
-    if (atol(words[3]) < 0)
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "invalid flags");
-    dyncfg_job_flg_t flags = atol(words[3]);
+    const char *module_name = words[0];
+    const char *job_name = words[1];
+    const char *job_type_str = words[2];
+    const char *flags_str = words[3];
+
+    long f = str2l(flags_str);
+
+    if (f < 0)
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "invalid flags received");
+
+    dyncfg_job_flg_t flags = f;
+
     if (SERVING_PLUGINSD(parser))
         flags |= JOB_FLG_PLUGIN_PUSHED;
     else
         flags |= JOB_FLG_STREAMING_PUSHED;
 
-    enum job_type job_type = str2job_type(words[2]);
+    enum job_type job_type = dyncfg_str2job_type(job_type_str);
     if (job_type == JOB_TYPE_UNKNOWN)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "unknown job type");
+
     if (SERVING_PLUGINSD(parser) && job_type == JOB_TYPE_USER)
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "plugins cannot push jobs of type \"user\" (this is allowed only in streaming)");
 
-    if (register_job(parser->user.host->configurable_plugins, plugin_name, words[0], words[1], job_type, flags, 0)) // ignore existing is off as this is explicitly called register job
+    if (register_job(parser->user.host->configurable_plugins, plugin_name, module_name, job_name, job_type, flags, 0)) // ignore existing is off as this is explicitly called register job
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB, "error registering job");
 
-    rrdpush_send_dyncfg_reg_job(parser->user.host, plugin_name, words[0], words[1], job_type, flags);
+    rrdpush_send_dyncfg_reg_job(parser->user.host, plugin_name, module_name, job_name, job_type, flags);
+
     return PARSER_RC_OK;
 }
 
