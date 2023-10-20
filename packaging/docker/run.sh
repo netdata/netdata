@@ -47,14 +47,29 @@ if [ -n "${PGID}" ]; then
 fi
 
 # Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
-HOST_WWW_DATA_GID=$(stat -c %g /host/etc/pve 2>/dev/null || true)
+function add_netdata_to_proxmox_conf_files_group() {
+  group_guid="$(stat -c %g /host/etc/pve 2>/dev/null || true)"
+  [ -z "${group_guid}" ] && return
 
-if [ -n "${HOST_WWW_DATA_GID}" ]; then
-  echo "Creating host-www-data group ${HOST_WWW_DATA_GID}"
-  addgroup -g "${HOST_WWW_DATA_GID}" "host-www-data" || echo >&2 "Could not add group with ID ${HOST_WWW_DATA_GID}, its already there probably"
-  echo "Assign netdata user to host-www-data group ${HOST_WWW_DATA_GID}"
-  usermod -a -G "${HOST_WWW_DATA_GID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group with ID ${HOST_WWW_DATA_GID}"
-fi
+  if ! getent group "${group_guid}" >/dev/null; then
+    echo "Creating proxmox-etc-pve group with GID ${group_guid}"
+    if ! addgroup -g "${group_guid}" "proxmox-etc-pve"; then
+      echo >&2 "Failed to add group proxmox-etc-pve with GID ${group_guid}."
+      return
+    fi
+  fi
+
+  if ! getent group "${group_guid}" | grep -q netdata; then
+    echo "Assign netdata user to group ${group_guid}"
+    if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
+      echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
+      return
+    fi
+  fi
+}
+
+[ -d "/host/etc/pve" ] && add_netdata_to_proxmox_conf_files_group
+
 
 if mountpoint -q /etc/netdata; then
   echo "Copying stock configuration to /etc/netdata"
