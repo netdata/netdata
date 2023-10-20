@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
+#include "libnetdata/http/http_defs.h"
 
 static void rcv_free(RRDCALC *rcv) {
     if(unlikely(!rcv)) return;
@@ -39,7 +40,7 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
                                       &value_is_null, NULL, 0, 0,
                                       QUERY_SOURCE_HEALTH, STORAGE_PRIORITY_LOW);
 
-        if (unlikely(ret != 200)) {
+        if (unlikely(ret != HTTP_RESP_OK)) {
             // database lookup failed
             rcv->value = NAN;
             //rcv->run_flags |= RRDCALC_FLAG_DB_ERROR;
@@ -136,14 +137,14 @@ void health_virtual_run(RRDHOST *host, BUFFER *wb, RRDCALC *rcv, time_t at) {
 }
 
 void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv, int min_run_every) {
-
-    buffer_json_member_add_object(wb, "configuration"                  );
-
     DICTIONARY *dict_rcvs = NULL;
     dict_rcvs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
-    health_config_setup_rc_from_api(wb, host, dict_rcvs, hv);
-    buffer_json_object_close(wb);
+    {
+        buffer_json_member_add_object(wb, "configuration");
+        health_config_setup_rc_from_api(wb, host, dict_rcvs, hv);
+        buffer_json_object_close(wb);
+    }
 
     RRDCALC *rcv;
     dfe_start_read(dict_rcvs, rcv) {
@@ -152,9 +153,9 @@ void health_virtual(RRDHOST *host, BUFFER *wb, struct health_virtual *hv, int mi
         //small adjustment to match health's results
         time_t now      = now_realtime_sec();
         time_t at       = hv->after  ? hv->after - 1  : now;
-        time_t before_t = hv->before ? hv->before - 1 : now;
+        time_t before   = hv->before ? hv->before - 1 : now;
 
-        while (at <= before_t) {
+        while (at <= before) {
             health_virtual_run(host, wb, rcv, at);
             at += min_run_every;
         }

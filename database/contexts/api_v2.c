@@ -1664,10 +1664,7 @@ static void contexts_v2_alert_eval_to_json(BUFFER *wb, struct rrdcontext_to_json
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
-    buffer_json_member_add_array(wb, "alert_eval"                     );
-    /* buffer_json_member_add_int64 (wb, "health_run_every", min_run_every); */
-    /* buffer_json_member_add_time_t(wb, "after",            hv.after    ); */
-    /* buffer_json_member_add_time_t(wb, "before",           hv.before   ); */
+    buffer_json_member_add_array(wb, "alert_eval");
 
     struct contexts_v2_node *t;
     dfe_start_read(ctl->nodes.dict, t) {
