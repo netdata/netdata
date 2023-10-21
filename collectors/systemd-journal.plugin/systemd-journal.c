@@ -264,13 +264,14 @@ typedef enum {
 } ND_SD_JOURNAL_STATUS;
 
 typedef enum {
-    SDJF_ALL            = 0,
-    SDJF_LOCAL          = (1 << 0),
-    SDJF_REMOTE         = (1 << 1),
-    SDJF_SYSTEM         = (1 << 2),
-    SDJF_USER           = (1 << 3),
-    SDJF_NAMESPACE      = (1 << 4),
-    SDJF_OTHER          = (1 << 5),
+    SDJF_NONE               = 0,
+    SDJF_ALL                = (1 << 0),
+    SDJF_LOCAL_ALL          = (1 << 1),
+    SDJF_REMOTE_ALL         = (1 << 2),
+    SDJF_LOCAL_SYSTEM       = (1 << 3),
+    SDJF_LOCAL_USER         = (1 << 4),
+    SDJF_LOCAL_NAMESPACE    = (1 << 5),
+    SDJF_LOCAL_OTHER        = (1 << 6),
 } SD_JOURNAL_FILE_SOURCE_TYPE;
 
 typedef struct function_query_status {
@@ -281,7 +282,7 @@ typedef struct function_query_status {
 
     // request
     SD_JOURNAL_FILE_SOURCE_TYPE source_type;
-    STRING *source;
+    SIMPLE_PATTERN *sources;
     usec_t after_ut;
     usec_t before_ut;
 
@@ -856,68 +857,66 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
     struct journal_file *jf = value;
     jf->filename = dictionary_acquired_item_name(item);
     jf->filename_len = strlen(jf->filename);
+    jf->source_type = SDJF_ALL;
 
     // based on the filename
     // decide the source to show to the user
     const char *s = strrchr(jf->filename, '/');
     if(s) {
-        if(strstr(jf->filename, "/remote/"))
-            jf->source_type = SDJF_REMOTE;
+        if(strstr(jf->filename, "/remote/")) {
+            jf->source_type |= SDJF_REMOTE_ALL;
+
+            if(strncmp(s, "/remote-", 8) == 0) {
+                s = &s[8]; // skip "/remote-"
+
+                char *e = strchr(s, '@');
+                if(!e)
+                    e = strstr(s, ".journal");
+
+                if(e) {
+                    const char *d = s;
+                    for(; d < e && (isdigit(*d) || *d == '.' || *d == ':') ; d++) ;
+                    if(d == e) {
+                        // a valid IP address
+                        char ip[e - s + 1];
+                        memcpy(ip, s, e - s);
+                        ip[e - s] = '\0';
+                        char buf[SYSTEMD_JOURNAL_MAX_SOURCE_LEN];
+                        if(ip_to_hostname(ip, buf, sizeof(buf)))
+                            jf->source = string_strdupz_source(buf, &buf[strlen(buf)], SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                        else {
+                            internal_error(true, "Cannot find the hostname for IP '%s'", ip);
+                            jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                        }
+                    }
+                    else
+                        jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
+                }
+            }
+        }
         else {
+            jf->source_type |= SDJF_LOCAL_ALL;
+
             const char *t = s - 1;
             while(t >= jf->filename && *t != '.' && *t != '/')
                 t--;
 
             if(t >= jf->filename && *t == '.') {
-                jf->source_type = SDJF_NAMESPACE;
+                jf->source_type |= SDJF_LOCAL_NAMESPACE;
                 jf->source = string_strdupz_source(t + 1, s, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "namespace-");
             }
+            else if(strncmp(s, "/system", 7) == 0)
+                jf->source_type |= SDJF_LOCAL_SYSTEM;
+
+            else if(strncmp(s, "/user", 5) == 0)
+                jf->source_type |= SDJF_LOCAL_USER;
+
             else
-                jf->source_type = SDJF_LOCAL;
+                jf->source_type |= SDJF_LOCAL_OTHER;
         }
-
-        if(strncmp(s, "/system", 7) == 0)
-            jf->source_type |= SDJF_SYSTEM;
-
-        else if(strncmp(s, "/user", 5) == 0)
-            jf->source_type |= SDJF_USER;
-
-        else if(strncmp(s, "/remote-", 8) == 0) {
-            jf->source_type |= SDJF_REMOTE;
-
-            s = &s[8]; // skip "/remote-"
-
-            char *e = strchr(s, '@');
-            if(!e)
-                e = strstr(s, ".journal");
-
-            if(e) {
-                const char *d = s;
-                for(; d < e && (isdigit(*d) || *d == '.' || *d == ':') ; d++) ;
-                if(d == e) {
-                    // a valid IP address
-                    char ip[e - s + 1];
-                    memcpy(ip, s, e - s);
-                    ip[e - s] = '\0';
-                    char buf[SYSTEMD_JOURNAL_MAX_SOURCE_LEN];
-                    if(ip_to_hostname(ip, buf, sizeof(buf)))
-                        jf->source = string_strdupz_source(buf, &buf[strlen(buf)], SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
-                    else {
-                        internal_error(true, "Cannot find the hostname for IP '%s'", ip);
-                        jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
-                    }
-                }
-                else
-                    jf->source = string_strdupz_source(s, e, SYSTEMD_JOURNAL_MAX_SOURCE_LEN, "remote-");
-            }
-            else
-                jf->source_type |= SDJF_OTHER;
-        }
-        else
-            jf->source_type |= SDJF_OTHER;
     }
     else
-        jf->source_type = SDJF_LOCAL | SDJF_OTHER;
+        jf->source_type |= SDJF_LOCAL_ALL | SDJF_LOCAL_OTHER;
 
     journal_file_update_msg_ut(jf->filename, jf);
 
@@ -1068,17 +1067,17 @@ static void available_journal_file_sources_to_json_array(BUFFER *wb) {
 
         dictionary_set(dict, SDJF_SOURCE_ALL_NAME, &t, sizeof(t));
 
-        if((jf->source_type & (SDJF_LOCAL)) == (SDJF_LOCAL))
+        if(jf->source_type & SDJF_LOCAL_ALL)
             dictionary_set(dict, SDJF_SOURCE_LOCAL_NAME, &t, sizeof(t));
-        if((jf->source_type & (SDJF_LOCAL | SDJF_SYSTEM)) == (SDJF_LOCAL | SDJF_SYSTEM))
+        if(jf->source_type & SDJF_LOCAL_SYSTEM)
             dictionary_set(dict, SDJF_SOURCE_LOCAL_SYSTEM_NAME, &t, sizeof(t));
-        if((jf->source_type & (SDJF_LOCAL | SDJF_USER)) == (SDJF_LOCAL | SDJF_USER))
+        if(jf->source_type & SDJF_LOCAL_USER)
             dictionary_set(dict, SDJF_SOURCE_LOCAL_USERS_NAME, &t, sizeof(t));
-        if((jf->source_type & (SDJF_LOCAL | SDJF_OTHER)) == (SDJF_LOCAL | SDJF_OTHER))
+        if(jf->source_type & SDJF_LOCAL_OTHER)
             dictionary_set(dict, SDJF_SOURCE_LOCAL_OTHER_NAME, &t, sizeof(t));
-        if((jf->source_type & (SDJF_NAMESPACE)) == (SDJF_NAMESPACE))
+        if(jf->source_type & SDJF_LOCAL_NAMESPACE)
             dictionary_set(dict, SDJF_SOURCE_NAMESPACES_NAME, &t, sizeof(t));
-        if((jf->source_type & (SDJF_REMOTE)) == (SDJF_REMOTE))
+        if(jf->source_type & SDJF_REMOTE_ALL)
             dictionary_set(dict, SDJF_SOURCE_REMOTES_NAME, &t, sizeof(t));
         if(jf->source)
             dictionary_set(dict, string2str(jf->source), &t, sizeof(t));
@@ -1173,8 +1172,8 @@ static void journal_files_registry_update() {
 
 static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
-    if((fqs->source_type == SDJF_ALL || (jf->source_type & fqs->source_type) == fqs->source_type) &&
-        (!fqs->source || fqs->source == jf->source)) {
+    if((fqs->source_type == SDJF_NONE || (jf->source_type & fqs->source_type)) &&
+        (!fqs->sources || simple_pattern_matches(fqs->sources, string2str(jf->source)))) {
 
         usec_t anchor_delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
         usec_t first_ut = jf->msg_first_ut;
@@ -2305,7 +2304,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     FACETS_ANCHOR_DIRECTION direction = JOURNAL_DEFAULT_DIRECTION;
     const char *query = NULL;
     const char *chart = NULL;
-    const char *source = NULL;
+    SIMPLE_PATTERN *sources = NULL;
     const char *progress_id = NULL;
     SD_JOURNAL_FILE_SOURCE_TYPE source_type = SDJF_ALL;
     size_t filters = 0;
@@ -2367,40 +2366,65 @@ static void function_systemd_journal(const char *transaction, char *function, in
                 progress_id = id;
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_SOURCE ":", sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1) == 0) {
-            source = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
+            const char *value = &keyword[sizeof(JOURNAL_PARAMETER_SOURCE ":") - 1];
 
-            if(strcmp(source, SDJF_SOURCE_ALL_NAME) == 0) {
-                source_type = SDJF_ALL;
-                source = NULL;
+            buffer_json_member_add_array(wb, JOURNAL_PARAMETER_SOURCE);
+
+            BUFFER *sources_list = buffer_create(0, NULL);
+
+            source_type = SDJF_NONE;
+            while(value) {
+                char *sep = strchr(value, ',');
+                if(sep)
+                    *sep++ = '\0';
+
+                buffer_json_add_array_item_string(wb, value);
+
+                if(strcmp(value, SDJF_SOURCE_ALL_NAME) == 0) {
+                    source_type |= SDJF_ALL;
+                    value = NULL;
+                }
+                else if(strcmp(value, SDJF_SOURCE_LOCAL_NAME) == 0) {
+                    source_type |= SDJF_LOCAL_ALL;
+                    value = NULL;
+                }
+                else if(strcmp(value, SDJF_SOURCE_REMOTES_NAME) == 0) {
+                    source_type |= SDJF_REMOTE_ALL;
+                    value = NULL;
+                }
+                else if(strcmp(value, SDJF_SOURCE_NAMESPACES_NAME) == 0) {
+                    source_type |= SDJF_LOCAL_NAMESPACE;
+                    value = NULL;
+                }
+                else if(strcmp(value, SDJF_SOURCE_LOCAL_SYSTEM_NAME) == 0) {
+                    source_type |= SDJF_LOCAL_SYSTEM;
+                    value = NULL;
+                }
+                else if(strcmp(value, SDJF_SOURCE_LOCAL_USERS_NAME) == 0) {
+                    source_type |= SDJF_LOCAL_USER;
+                    value = NULL;
+                }
+                else if(strcmp(value, SDJF_SOURCE_LOCAL_OTHER_NAME) == 0) {
+                    source_type |= SDJF_LOCAL_OTHER;
+                    value = NULL;
+                }
+                else {
+                    // else, match the source, whatever it is
+                    if(buffer_strlen(sources_list))
+                        buffer_strcat(sources_list, ",");
+
+                    buffer_strcat(sources_list, value);
+                }
+
+                value = sep;
             }
-            else if(strcmp(source, SDJF_SOURCE_LOCAL_NAME) == 0) {
-                source_type = SDJF_LOCAL;
-                source = NULL;
-            }
-            else if(strcmp(source, SDJF_SOURCE_REMOTES_NAME) == 0) {
-                source_type = SDJF_REMOTE;
-                source = NULL;
-            }
-            else if(strcmp(source, SDJF_SOURCE_NAMESPACES_NAME) == 0) {
-                source_type = SDJF_NAMESPACE;
-                source = NULL;
-            }
-            else if(strcmp(source, SDJF_SOURCE_LOCAL_SYSTEM_NAME) == 0) {
-                source_type = SDJF_LOCAL | SDJF_SYSTEM;
-                source = NULL;
-            }
-            else if(strcmp(source, SDJF_SOURCE_LOCAL_USERS_NAME) == 0) {
-                source_type = SDJF_LOCAL | SDJF_USER;
-                source = NULL;
-            }
-            else if(strcmp(source, SDJF_SOURCE_LOCAL_OTHER_NAME) == 0) {
-                source_type = SDJF_LOCAL | SDJF_OTHER;
-                source = NULL;
-            }
-            else {
-                source_type = SDJF_ALL;
-                // else, match the source, whatever it is
-            }
+
+            if(buffer_strlen(sources_list))
+                sources = simple_pattern_create(buffer_tostring(sources_list), ",", SIMPLE_PATTERN_EXACT, false);
+
+            buffer_free(sources_list);
+
+            buffer_json_array_close(wb); // source
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_AFTER ":", sizeof(JOURNAL_PARAMETER_AFTER ":") - 1) == 0) {
             after_s = str2l(&keyword[sizeof(JOURNAL_PARAMETER_AFTER ":") - 1]);
@@ -2517,7 +2541,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
     fqs->data_only = data_only;
     fqs->delta = (fqs->data_only) ? delta : false;
     fqs->tail = (fqs->data_only && fqs->if_modified_since) ? tail : false;
-    fqs->source = string_strdupz(source);
+    fqs->sources = sources;
     fqs->source_type = source_type;
     fqs->entries = last;
     fqs->last_modified = 0;
@@ -2590,7 +2614,6 @@ static void function_systemd_journal(const char *transaction, char *function, in
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_DELTA, fqs->delta);
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_TAIL, fqs->tail);
     buffer_json_member_add_string(wb, JOURNAL_PARAMETER_ID, progress_id);
-    buffer_json_member_add_string(wb, JOURNAL_PARAMETER_SOURCE, string2str(fqs->source));
     buffer_json_member_add_uint64(wb, "source_type", fqs->source_type);
     buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_AFTER, fqs->after_ut / USEC_PER_SEC);
     buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_BEFORE, fqs->before_ut / USEC_PER_SEC);
@@ -2618,7 +2641,7 @@ static void function_systemd_journal(const char *transaction, char *function, in
                 buffer_json_member_add_string(wb, "id", "source");
                 buffer_json_member_add_string(wb, "name", "source");
                 buffer_json_member_add_string(wb, "help", "Select the SystemD Journal source to query");
-                buffer_json_member_add_string(wb, "type", "select");
+                buffer_json_member_add_string(wb, "type", "multiselect");
                 buffer_json_member_add_array(wb, "options");
                 {
                     available_journal_file_sources_to_json_array(wb);
@@ -2647,12 +2670,6 @@ static void function_systemd_journal(const char *transaction, char *function, in
     response = netdata_systemd_journal_query(wb, facets, fqs);
 
     // ------------------------------------------------------------------------
-    // cleanup query params
-
-    string_freez(fqs->source);
-    fqs->source = NULL;
-
-    // ------------------------------------------------------------------------
     // handle error response
 
     if(response != HTTP_RESP_OK) {
@@ -2668,6 +2685,7 @@ output:
     netdata_mutex_unlock(&stdout_mutex);
 
 cleanup:
+    simple_pattern_free(sources);
     facets_destroy(facets);
     buffer_free(wb);
 
