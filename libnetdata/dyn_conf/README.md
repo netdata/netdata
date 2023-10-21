@@ -1,6 +1,6 @@
 # Netdata Dynamic Configuration
 
-Purpose of Netdata Dynamic Configuration is to allow configuration of select Netdata plugins and options through the
+Purpose of Netdata Dynamic Configuration is to allow configuration of select Netdata plugins and options through the  
 Netdata API and by extension by UI.
 
 ## HTTP API documentation
@@ -9,159 +9,178 @@ Netdata API and by extension by UI.
 
 For summary of all jobs and their statuses (for all children that stream to parent) use the following URL:
 
-| Method  | Endpoint                      | Description                                                |
-|:-------:|-------------------------------|------------------------------------------------------------|
-| **GET** | `api/v2/job_statuses`         | list of Jobs                                               |
-| **GET** | `api/v2/job_statuses?grouped` | list of Jobs (hierarchical, grouped by host/plugin/module) |
+| Method  | Endpoint                      | Description                                                |  
+|:-------:|-------------------------------|------------------------------------------------------------|  
+| **GET** | `api/v2/job_statuses`         | list of Jobs                                               |  
+| **GET** | `api/v2/job_statuses?grouped` | list of Jobs (hierarchical, grouped by host/plugin/module) |  
 
 ### Dyncfg API
 
 ### Top level
 
-| Method  | Endpoint         | Description                             |
-|:-------:|------------------|-----------------------------------------|
-| **GET** | `/api/v2/config` | registered Plugins (sent DYNCFG_ENABLE) |
+| Method  | Endpoint         | Description                             |  
+|:-------:|------------------|-----------------------------------------|  
+| **GET** | `/api/v2/config` | registered Plugins (sent DYNCFG_ENABLE) |  
 
 ### Plugin level
 
-| Method  | Endpoint                          | Description                  |
-|:-------:|-----------------------------------|------------------------------|
-| **GET** | `/api/v2/config/[plugin]`         | Plugin config                |
-| **PUT** | `/api/v2/config/[plugin]`         | update Plugin config         |
-| **GET** | `/api/v2/config/[plugin]/modules` | Modules registered by Plugin |
-| **GET** | `/api/v2/config/[plugin]/schema`  | Plugin config schema         |
+| Method  | Endpoint                          | Description                  |  
+|:-------:|-----------------------------------|------------------------------|  
+| **GET** | `/api/v2/config/[plugin]`         | Plugin config                |  
+| **PUT** | `/api/v2/config/[plugin]`         | update Plugin config         |  
+| **GET** | `/api/v2/config/[plugin]/modules` | Modules registered by Plugin |  
+| **GET** | `/api/v2/config/[plugin]/schema`  | Plugin config schema         |  
 
 ### Module level
 
-| Method  | Endpoint                                      | Description               |
-|:-------:|-----------------------------------------------|---------------------------|
-| **GET** | `/api/v2/config/<plugin>/[module]`            | Module config             |
-| **PUT** | `/api/v2/config/[plugin]/[module]`            | update Module config      |
-| **GET** | `/api/v2/config/[plugin]/[module]/jobs`       | Jobs registered by Module |
-| **GET** | `/api/v2/config/[plugin]/[module]/job_schema` | Job config schema         |
-| **GET** | `/api/v2/config/[plugin]/[module]/schema`     | Module config schema      |
+| Method  | Endpoint                                      | Description               |  
+|:-------:|-----------------------------------------------|---------------------------|  
+| **GET** | `/api/v2/config/<plugin>/[module]`            | Module config             |  
+| **PUT** | `/api/v2/config/[plugin]/[module]`            | update Module config      |  
+| **GET** | `/api/v2/config/[plugin]/[module]/jobs`       | Jobs registered by Module |  
+| **GET** | `/api/v2/config/[plugin]/[module]/job_schema` | Job config schema         |  
+| **GET** | `/api/v2/config/[plugin]/[module]/schema`     | Module config schema      |  
 
 ### Job level - only for modules where `module_type == job_array`
 
-|   Method   | Endpoint                                 | Description                    |
-|:----------:|------------------------------------------|--------------------------------|
-|  **GET**   | `/api/v2/config/[plugin]/[module]/[job]` | Job config                     |
-|  **PUT**   | `/api/v2/config/[plugin]/[module]/[job]` | update Job config              |
-|  **POST**  | `/api/v2/config/[plugin]/[module]/[job]` | create Job                     |
-| **DELETE** | `/api/v2/config/[plugin]/[module]/[job]` | delete Job (created by Dyncfg) |
+|   Method   | Endpoint                                 | Description                    |  
+|:----------:|------------------------------------------|--------------------------------|  
+|  **GET**   | `/api/v2/config/[plugin]/[module]/[job]` | Job config                     |  
+|  **PUT**   | `/api/v2/config/[plugin]/[module]/[job]` | update Job config              |  
+|  **POST**  | `/api/v2/config/[plugin]/[module]/[job]` | create Job                     |  
+| **DELETE** | `/api/v2/config/[plugin]/[module]/[job]` | delete Job (created by Dyncfg) |  
 
-## AGENT<->PLUGIN interface documentation
+## Internal Plugins API
 
-### 1. DYNCFG_ENABLE
+TBD
+
+## External Plugins API
+
+### Commands plugins can use
+
+#### DYNCFG_ENABLE
 
 Plugin signifies to agent its ability to use new dynamic config and the name it wishes to use by sending
 
-```
-plugin->agent:
-=============
-DYNCFG_ENABLE [plugin_url_name]
-```
+```  
+DYNCFG_ENABLE [{PLUGIN_NAME}]
+```  
 
-This can be sent only once per lifetime of the plugin (at startup or later) sending it multiple times is considered a
+This can be sent only once per lifetime of the plugin (at startup or later) sending it multiple times is considered a  
 protocol violation and plugin might get terminated.
-After this command is sent the plugin has to be ready to accept all the new commands/keywords related to dynamic
+
+After this command is sent the plugin has to be ready to accept all the new commands/keywords related to dynamic  
 configuration (this command lets agent know this plugin is dyncfg capable and wishes to use dyncfg functionality).
 
-After this command agent can call
+#### DYNCFG_RESET
+
+Sending this, will reset the internal state of the agent, considering this a `DYNCFG_ENABLE`.
+
+```  
+DYNCFG_RESET
+```  
+
+
+#### DYNCFG_REGISTER_MODULE
 
 ```
-agent->plugin:
-=============
-FUNCTION_PAYLOAD [UUID] 1 "set_plugin_config"
-the new configuration
-blah blah blah
-FUNCTION_PAYLOAD_END
-
-plugin->agent:
-=============
-FUNCTION_RESULT_BEGIN [UUID] [(1/0)(accept/reject)] [text/plain] 5
-FUNCTION_RESULT_END
+DYNCFG_REGISTER_MODULE {MODULE_NAME} {MODULE_TYPE}
 ```
-
-to set the new config which can be accepted/rejected by plugin by sending answer for this FUNCTION as it would with any
-other regular function.
-
-The new `FUNCTION_PAYLOAD` command differs from regular `FUNCTION` command exclusively in its ability to send bigger
-payloads (configuration file contents) to the plugin (not just parameters list).
-
-Agent can also call (after `DYNCFG_ENABLE`)
-
-```
-Agent->plugin:
-=============
-FUNCTION [UID] 1 "get_plugin_config"
-
-Plugin->agent:
-=============
-FUNCTION_RESULT_BEGIN [UID] 1 text/plain 5
-{
-	"the currently used config from plugin" : "nice"
-}
-FUNCTION_RESULT_END
-```
-
-and
-
-```
-Agent->plugin:
-=============
-FUNCTION [UID] 1 "get_plugin_config_schema"
-
-Plugin->agent:
-=============
-FUNCTION_RESULT_BEGIN [UID] 1 text/plain 5
-{
-	"the schema of plugin configuration" : "splendid"
-}
-FUNCTION_RESULT_END
-```
-
-Plugin can also register zero, one or more configurable modules using:
-
-```
-plugin->agent:
-=============
-DYNCFG_REGISTER_MODULE [module_url_name] (job_array|single)
-```
-
-modules can be added any time during plugins lifetime (you are not required to add them all at startup).
-
-### 2. DYNCFG_REGISTER_MODULE
 
 Module has to choose one of following types at registration:
 
-- `single` - module itself has configuration but does not accept any jobs *(this is useful mainly for internal netdata
+- `single` - module itself has configuration but does not accept any jobs *(this is useful mainly for internal netdata  
   configurable things like webserver etc.)*
-- `job_array`  - module itself **can** *(not must)* have configuration and it has an array of jobs which can be added,
+
+- `job_array` - module itself **can** *(not must)* have configuration and it has an array of jobs which can be added,  
   modified and deleted. **this is what plugin developer needs in most cases**
 
-After module has been registered agent can call
+After a module has been registered agent can call `set_module_config`, `get_module_config` and `get_module_config_schema`.
 
-- `set_module_config [module]` FUNCTION_PAYLOAD
-- `get_module_config [module]` FUNCTION
-- `get_module_config_schema [module]` FUNCTION
+When `MODULE_TYPE` is `job_array` the agent may also send  `set_job_config`, `get_job_config` and `get_job_config_schema`.
 
-with same syntax as `set_plugin_config` and `get_plugin_config`. In case of `set` command the plugin has ability to
-reject the new configuration pushed to it.
+#### DYNCFG_REGISTER_JOB
 
-In a case the module was registered as `job_array` type following commands can be used to manage jobs:
+The plugin can use `DYNCFG_REGISTER_JOB` to register its own configuration jobs. It should not register jobs configured
+via DYNCFG (doing so, the agent will shutdown the plugin).
 
-### 3. Job interface for job_array modules
 
-- `get_job_config_schema [module]` - FUNCTION
-- `get_job_config [module] [job]` - FUNCTION
-- `set_job_config [module] [job]` - FUNCTION_PAYLOAD
-- `delete_job_name [module] [job]` - FUNCTION
+```
+DYNCFG_REGISTER_JOB {MODULE_NAME} {JOB_NAME} {JOB_TYPE} {FLAGS}
+```
 
-### 4. Streaming
+Where:
 
-When above commands are transferred trough streaming additionally `plugin_name` is prefixed as first parameter. This is
+- `MODULE_NAME` is the name of the module.
+- `JOB_NAME` is the name of the job.
+- `JOB_TYPE` is either `stock` or `autodiscovered`.
+- `FLAGS`, just send zero.
+
+#### REPORT_JOB_STATUS
+
+```
+REPORT_JOB_STATUS {MODULE_NAME} {JOB_NAME} {STATUS} {STATE} "{REASON}"
+```
+
+Where:
+
+- `MODULE_NAME` is the name of the module.
+- `JOB_NAME` is the name of the job.
+- `STATUS` is one of `stopped`, `running`, or `error`.
+- `STATE`, just send zero.
+- `REASON` is a message describing the status.
+
+
+### Commands plugins must serve
+
+Once a plugin calls `DYNCFG_ENABLE`, the must be able to handle these calls.
+
+function|parameters|prerequisites|request payload|response payload|
+:---:|:---:|:---:|:---:|:---:|
+`set_plugin_config`|none|`DYNCFG_ENABLE`|plugin configuration|none|
+`get_plugin_config`|none|`DYNCFG_ENABLE`|none|plugin configuration|
+`get_plugin_config_schema`|none|`DYNCFG_ENABLE`|none|plugin configuration schema|
+`set_module_config`|`module_name`|`DYNCFG_REGISTER_MODULE`|module configuration|none|
+`get_module_config`|`module_name`|`DYNCFG_REGISTER_MODULE`|none|module configuration|
+`get_module_config_schema`|`module_name`|`DYNCFG_REGISTER_MODULE`|none|module configuration schema|
+`set_job_config`|`module_name`, `job_name`|`DYNCFG_REGISTER_MODULE`|job configuration|none|
+`get_job_config`|`module_name`, `job_name`|`DYNCFG_REGISTER_MODULE`|none|job configuration|
+`get_job_config_schema`|`module_name`, `job_name`|`DYNCFG_REGISTER_MODULE`|none|job configuration schema|
+
+All of them work like this:
+
+If the request payload is `none`, then the request looks like this:
+
+```bash
+FUNCTION {TRANSACTION_UUID} {TIMEOUT_SECONDS} "{function} {parameters}"  
+```
+
+When there is payload, the request looks like this:
+
+```bash
+FUNCTION_PAYLOAD {TRANSACTION_UUID} {TIMEOUT_SECONDS} "{function} {parameters}" 
+<payload>
+FUNCTION_PAYLOAD_END  
+```
+
+In all cases, the response is like this:
+
+```bash
+FUNCTION_RESULT_BEGIN {TRANSACTION_UUID} {HTTP_RESPONSE_CODE} "{CONTENT_TYPE}" {EXPIRATION_TIMESTAMP}
+<payload>
+FUNCTION_RESULT_END  
+```
+Where:
+- `TRANSACTION_UUID` is the same UUID received with the request.
+- `HTTP_RESPONSE_CODE` is either `0` (rejected) or `1` (accepted).
+- `CONTENT_TYPE` should reflect the `payload` returned.
+- `EXPIRATION_TIMESTAMP` can be zero.
+
+
+## DYNCFG with streaming
+
+When above commands are transferred trough streaming additionally `plugin_name` is prefixed as first parameter. This is  
 done to allow routing to appropriate plugin @child.
 
-As a plugin developer you don't need to concern yourself with this detail as that parameter is stripped when sent to the
+As a plugin developer you don't need to concern yourself with this detail as that parameter is stripped when sent to the  
 plugin *(and added when sent trough streaming)* automagically.

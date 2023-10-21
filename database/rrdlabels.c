@@ -1038,23 +1038,34 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     spinlock_lock(&dst->spinlock);
     spinlock_lock(&src->spinlock);
 
+    size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
+    bool update_statistics = false;
     lfe_start_nolock(src, label, ls)
     {
-        size_t mem_before_judyl = JudyLMemUsed(dst->JudyL);
+        RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label);
+        if (old_label_with_key && old_label_with_key == label)
+                continue;
+
         Pvoid_t *PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS: corrupted labels array");
 
         if (!*PValue) {
             dup_label(label);
-            size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
-            STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
             *((RRDLABEL_SRC *)PValue) = ls;
+            dst->version++;
+            update_statistics = true;
+            if (old_label_with_key) {
+                (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
+                delete_label((RRDLABEL *)old_label_with_key);
+            }
         }
     }
     lfe_done_nolock();
-
-    dst->version = src->version;
+    if (update_statistics) {
+        size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
+        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
+    }
 
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
@@ -1503,7 +1514,39 @@ int rrdlabels_unittest_migrate_check() {
     rrdlabels_destroy(labels1);
     rrdlabels_destroy(labels2);
 
-    return entries != 3;
+    if (entries != 3)
+        return 1;
+
+    // Copy test
+    labels1 = rrdlabels_create();
+    labels2 = rrdlabels_create();
+
+    rrdlabels_add(labels1, "key1", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels1, "key2", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels1, "key3", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels1, "key4", "value1", RRDLABEL_SRC_CONFIG);  // 4 keys
+
+    rrdlabels_add(labels2, "key1", "value10", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels2, "key2", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels2, "key0", "value1", RRDLABEL_SRC_CONFIG);
+
+    rrdlabels_copy(labels1, labels2); // labels1 should have 5 keys
+
+    entries = rrdlabels_entries(labels1);
+    fprintf(stderr, "labels1 (copied) entries found %zu (should be 5)\n",  rrdlabels_entries(labels1));
+    if (entries != 5)
+        return 1;
+
+    rrdlabels_add(labels1, "key100", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_copy(labels2, labels1); // labels2 should have 6 keys
+    entries = rrdlabels_entries(labels1);
+
+    fprintf(stderr, "labels2 (copied) entries found %zu (should be 6)\n",  rrdlabels_entries(labels1));
+
+    rrdlabels_destroy(labels1);
+    rrdlabels_destroy(labels2);
+
+    return entries != 6;
 }
 
 int rrdlabels_unittest_check_simple_pattern(RRDLABELS *labels, const char *pattern, bool expected) {

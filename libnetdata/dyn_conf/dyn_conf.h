@@ -112,7 +112,7 @@ static inline const char* job_type2str(enum job_type type)
     }
 }
 
-static inline enum job_type str2job_type(const char *type_name)
+static inline enum job_type dyncfg_str2job_type(const char *type_name)
 {
     if (strcmp(type_name, "stock") == 0)
         return JOB_TYPE_STOCK;

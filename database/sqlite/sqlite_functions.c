@@ -4,7 +4,7 @@
 #include "sqlite3recover.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 14
+#define DB_METADATA_VERSION 15
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "

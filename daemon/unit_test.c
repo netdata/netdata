@@ -1681,13 +1681,6 @@ int test_sqlite(void) {
     rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
-    if (rc != SQLITE_OK)
-        goto error;
-    buffer_flush(sql);
 
     buffer_free(sql);
     fprintf(stderr,"SQLite is OK\n");
