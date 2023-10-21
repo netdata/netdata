@@ -6,8 +6,15 @@
 
 **Merged pull requests:**
 
+- `most_popular` on markdown metadata for integrations [\#16251](https://github.com/netdata/netdata/pull/16251) ([Ancairon](https://github.com/Ancairon))
+- Dyncfg improvements [\#16250](https://github.com/netdata/netdata/pull/16250) ([ktsaou](https://github.com/ktsaou))
+- Fix label copy to correctly handle duplicate keys [\#16249](https://github.com/netdata/netdata/pull/16249) ([stelfrag](https://github.com/stelfrag))
 - added systemd-journal forward\_secure\_sealing [\#16247](https://github.com/netdata/netdata/pull/16247) ([ktsaou](https://github.com/ktsaou))
+- Terminate cgroups discovery thread faster during shutdown [\#16246](https://github.com/netdata/netdata/pull/16246) ([stelfrag](https://github.com/stelfrag))
+- python.d\(smartd\_log\): collect Total LBAs written/read [\#16245](https://github.com/netdata/netdata/pull/16245) ([watsonbox](https://github.com/watsonbox))
 - fix apps plugin metric names in meta [\#16243](https://github.com/netdata/netdata/pull/16243) ([ilyam8](https://github.com/ilyam8))
+- Drop an unused index from aclk\_alert table [\#16242](https://github.com/netdata/netdata/pull/16242) ([stelfrag](https://github.com/stelfrag))
+- add DYNCFG\_RESET  [\#16241](https://github.com/netdata/netdata/pull/16241) ([underhood](https://github.com/underhood))
 - Reuse ML load prepared statement [\#16240](https://github.com/netdata/netdata/pull/16240) ([stelfrag](https://github.com/stelfrag))
 - update bundled UI to v6.53.0 [\#16239](https://github.com/netdata/netdata/pull/16239) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16237](https://github.com/netdata/netdata/pull/16237) ([netdatabot](https://github.com/netdatabot))
@@ -25,6 +32,8 @@
 - facets: minimize hashtable collisions [\#16215](https://github.com/netdata/netdata/pull/16215) ([ktsaou](https://github.com/ktsaou))
 - Improve context load on startup [\#16203](https://github.com/netdata/netdata/pull/16203) ([stelfrag](https://github.com/stelfrag))
 - cgroup-network: don't log an error opening pid file if doesn't exist [\#16196](https://github.com/netdata/netdata/pull/16196) ([ilyam8](https://github.com/ilyam8))
+- docker install: support for Proxmox vms/containers name resolution [\#16193](https://github.com/netdata/netdata/pull/16193) ([ilyam8](https://github.com/ilyam8))
+- Introduce workflow to always update bundled packages \(static builds\) into their latest release \(part1\) [\#16191](https://github.com/netdata/netdata/pull/16191) ([tkatsoulas](https://github.com/tkatsoulas))
 - Improvements for labels handling [\#16172](https://github.com/netdata/netdata/pull/16172) ([stelfrag](https://github.com/stelfrag))
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
@@ -300,7 +309,6 @@
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
 - Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
 - Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
-- Documentation for Dynamic Configuration [\#15643](https://github.com/netdata/netdata/pull/15643) ([underhood](https://github.com/underhood))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
@@ -417,14 +425,6 @@
 - Fixing icons in netdata/netdata repo [\#15647](https://github.com/netdata/netdata/pull/15647) ([shyamvalsan](https://github.com/shyamvalsan))
 - Fix name in the yaml of example python collector [\#15646](https://github.com/netdata/netdata/pull/15646) ([Ancairon](https://github.com/Ancairon))
 - Fix icons [\#15645](https://github.com/netdata/netdata/pull/15645) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Fix icons for notifications [\#15644](https://github.com/netdata/netdata/pull/15644) ([shyamvalsan](https://github.com/shyamvalsan))
-- convert collectors meta files from single to multi [\#15642](https://github.com/netdata/netdata/pull/15642) ([ilyam8](https://github.com/ilyam8))
-- fix edit-config for containerized Netdata when running from host [\#15641](https://github.com/netdata/netdata/pull/15641) ([ilyam8](https://github.com/ilyam8))
-- fix: 🐛 docker bind-mount stock files creation [\#15639](https://github.com/netdata/netdata/pull/15639) ([Leny1996](https://github.com/Leny1996))
-- The icon\_filename value was not in quotes - Fixed [\#15635](https://github.com/netdata/netdata/pull/15635) ([sashwathn](https://github.com/sashwathn))
-- Update graphite metadata.yaml [\#15634](https://github.com/netdata/netdata/pull/15634) ([shyamvalsan](https://github.com/shyamvalsan))
-- Debugfs yaml update [\#15633](https://github.com/netdata/netdata/pull/15633) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update metadata.yaml [\#15632](https://github.com/netdata/netdata/pull/15632) ([shyamvalsan](https://github.com/shyamvalsan))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
