@@ -1045,6 +1045,8 @@ set(DAEMON_FILES
         daemon/commands.h
         daemon/unit_test.c
         daemon/unit_test.h
+        daemon/event_log.c
+        daemon/event_log.h
         )
 
 set(ML_FILES

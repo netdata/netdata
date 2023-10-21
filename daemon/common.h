@@ -83,6 +83,9 @@
 // netdata agent spawn server
 #include "spawn/spawn.h"
 
+// event log
+#include "event_log.h"
+
 // the netdata daemon
 #include "daemon.h"
 #include "main.h"

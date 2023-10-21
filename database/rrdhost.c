@@ -369,6 +369,8 @@ int is_legacy = 1;
 
     rrdset_index_init(host);
 
+    event_log_init(host);
+
     if(config_get_boolean(CONFIG_SECTION_DB, "delete obsolete charts files", 1))
         rrdhost_option_set(host, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS);
 

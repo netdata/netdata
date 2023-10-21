@@ -970,6 +970,8 @@ DAEMON_FILES = \
     daemon/pipename.h \
     daemon/unit_test.c \
     daemon/unit_test.h \
+    daemon/event_log.c \
+    daemon/event_log.h \
     $(NULL)
 
 H2O_FILES = \

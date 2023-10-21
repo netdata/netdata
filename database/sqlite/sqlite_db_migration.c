@@ -153,6 +153,11 @@ const char *database_migrate_v13_v14[] = {
     NULL
 };
 
+const char *database_migrate_v14_v15[] = {
+    "CREATE TABLE IF NOT EXISTS event_log (host_id blob, unique_id int, category text, info text, collector text, plugin text, transition_id blob);",
+    NULL
+};
+
 static int do_migration_v1_v2(sqlite3 *database)
 {
     if (table_exists_in_database(database, "host") && !column_exists_in_table(database, "host", "hops"))
@@ -418,6 +423,12 @@ static int do_migration_v13_v14(sqlite3 *database)
     return 0;
 }
 
+static int do_migration_v14_v15(sqlite3 *database)
+{
+    if (!table_exists_in_database(database, "event_log"))
+        return init_database_batch(database, &database_migrate_v14_v15[0]);
+    return 0;
+}
 
 // Actions for ML migration
 const char *database_ml_migrate_v1_v2[] = {

@@ -465,6 +465,13 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     return HTTP_RESP_OK;
 }
 
+inline int web_client_api_request_v1_events(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+    buffer_flush(w->response.data);
+    w->response.data->content_type = CT_APPLICATION_JSON;
+    event_log2json(host, w->response.data);
+    return HTTP_RESP_OK;
+}
+
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
     int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
@@ -1582,6 +1589,8 @@ static struct web_api_command api_commands_v1[] = {
         {"functions",            0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
 
         { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
+
+        { "events", 0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_events },
 
         // terminator
         { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL, 0 },
