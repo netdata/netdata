@@ -857,13 +857,14 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
     struct journal_file *jf = value;
     jf->filename = dictionary_acquired_item_name(item);
     jf->filename_len = strlen(jf->filename);
+    jf->source_type = SDJF_ALL;
 
     // based on the filename
     // decide the source to show to the user
     const char *s = strrchr(jf->filename, '/');
     if(s) {
         if(strstr(jf->filename, "/remote/")) {
-            jf->source_type = SDJF_REMOTE_ALL;
+            jf->source_type |= SDJF_REMOTE_ALL;
 
             if(strncmp(s, "/remote-", 8) == 0) {
                 s = &s[8]; // skip "/remote-"
@@ -894,7 +895,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
             }
         }
         else {
-            jf->source_type = SDJF_LOCAL_ALL;
+            jf->source_type |= SDJF_LOCAL_ALL;
 
             const char *t = s - 1;
             while(t >= jf->filename && *t != '.' && *t != '/')
@@ -915,7 +916,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
         }
     }
     else
-        jf->source_type = SDJF_LOCAL_ALL | SDJF_LOCAL_OTHER;
+        jf->source_type |= SDJF_LOCAL_ALL | SDJF_LOCAL_OTHER;
 
     journal_file_update_msg_ut(jf->filename, jf);
 
@@ -1171,7 +1172,7 @@ static void journal_files_registry_update() {
 
 static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
-    if(fqs->source_type == SDJF_ALL || (jf->source_type & fqs->source_type) ||
+    if(fqs->source_type == SDJF_NONE || (jf->source_type & fqs->source_type) ||
         (fqs->sources && simple_pattern_matches(fqs->sources, string2str(jf->source)))) {
 
         usec_t anchor_delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
