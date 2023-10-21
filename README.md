@@ -53,11 +53,24 @@ It scales nicely from just a single server to thousands of servers, even in comp
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
+- 📖 **systemd Journal Logs Explorer**<br/>
+  Provides a `systemd` journal logs explorer, to view, filter and analyze system and applications logs by directly accessing `systemd` journal files on individual hosts and infrastructure-wide logs centralization servers.
+
 - :sunglasses: **Low Maintenance**<br/>
   Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
 
 - :star: **Open and Extensible**<br/>
   Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
+
+---
+
+NEW: **Netdata and LOGS !** 🥳</br>
+
+Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query `systemd` journal logs!
+
+![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
+
+---
 
 &nbsp;<br/>
 <p align="center">
@@ -66,7 +79,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
   <br />
   Netdata actively supports and is a member of the Cloud Native Computing Foundation (CNCF)<br />
   &nbsp;<br/>
-  ...and due to your love :heart:, it is one of the most :star:'d projects in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>!
+  ...and due to your love :heart: and :star:, <b>Netdata is leading the Observability category</b> at the <a href="https://landscape.cncf.io/card-mode?category=observability-and-analysis&grouping=no&sort=stars">CNCF landscape</a>!
 </p>
 &nbsp;<br/>
 
@@ -105,12 +118,12 @@ It scales nicely from just a single server to thousands of servers, even in comp
 |:-----------------------------:|:---------------------------------------------------------------------------------------------------:|:------------:|:-------------------------------------------------------------------------------------------------------:|
 |            WebRTC             |                             Browser to Agent communication via WebRTC.                              |    later     |                                                   POC                                                   |
 |   Advanced Troubleshooting    | Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor, and many more. |    later     |                                               interrupted                                               |
-|  Easy Custom<br/>Dashboards   |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     next     |                                                 planned                                                 |
-|     More Customizability      |                           Set default settings for all charts and views!                            |     next     |                                                 planned                                                 |
-|        SystemD Journal        |                     View the SystemD Journal of your systems on the dashboard.                      |     soon     |                                               in progress                                               |
+|  Easy Custom<br/>Dashboards   |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     soon     |                                                 planned                                                 |
+|     More Customizability      |                           Set default settings for all charts and views!                            |     soon     |                                                 planned                                                 |
 |          UCUM Units           |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon     |                                               in progress                                               |
-| **Netdata Cloud<br/>On-Prem** |                        **Netdata Cloud available for On-Prem installation!**                        |   **soon**   |                                             **in progress**                                             |
 |       Click to Activate       |                          Configure Alerts and Data Collectors from the UI!                          |     soon     |                                               in progress                                               |
+| **Netdata Cloud<br/>On-Prem** |                        **Netdata Cloud available for On-Prem installation!**                        |   **available**   |   [fill this form](https://www.netdata.cloud/contact-us/?subject=on-prem)                                            |
+|        `systemd` journal      |                     View the `systemd` journal logs of your systems on the dashboard.               | Oct<br/>2023 |   [v1.43](https://github.com/netdata/netdata/releases/tag/v1.43.0) |
 |         Integrations          |                                  Netdata Integrations Marketplace!                                  | Aug<br/>2023 |           [v1.42](https://github.com/netdata/netdata/releases#v1420-integrations-marketplace)           |
 |         New Agent UI          |                    Now Netdata Cloud and Netdata Agent share the same dashboard!                    | Jul<br/>2023 |          [v1.41](https://github.com/netdata/netdata/releases/tag/v1.41.0#v1410-one-dashboard)           |
 |      Summary Dashboards       |                                    High level tiles everywhere!                                     | Jun<br/>2023 | [v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0#v1400-visualization-summary-dashboards) |
@@ -217,11 +230,12 @@ navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostnam
    
    When your Netdata nodes are connected to Netdata Cloud, you can (on top of the above):
 
+   - Access your Netdata agents from anywhere
+   - Access sensitive Netdata agent features (like "Netdata Functions": processes, systemd-journal)
    - Organize your infra in spaces and rooms
    - Create, manage, and share **custom dashboards**
    - Invite your team and assign roles to them (Role Based Access Control - RBAC)
-   - Access Netdata Functions (processes top from the UI and more)
-   - Get infinite horizontal scalability (multiple independent parents are viewed as one infra)
+   - Get infinite horizontal scalability (multiple independent Netdata Agents are viewed as one infra)
    - Configure alerts from the UI (coming soon)
    - Configure data collection from the UI (coming soon)
    - Netdata Mobile App notifications (coming soon)
@@ -248,7 +262,7 @@ Each Netdata Agent can perform the following functions:
 1. **`COLLECT` metrics from their sources**<br/>
    Uses [internal](https://github.com/netdata/netdata/tree/master/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources.
 
-   Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, SystemD Units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
+   Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, `systemd` units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
 
    It collects application metrics from applications: PostgreSQL, MySQL/MariaDB, Redis, MongoDB, Nginx, Apache, and hundreds more.
 
@@ -547,12 +561,14 @@ Subscribing to Netdata Cloud is optional but many users find it enhances their e
 
 The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still, Netdata Cloud provides additional features, that the Netdata Agent is not capable of. These include:
 
-  1. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
-  2. Configuration of Alerts and Data Collection from the UI (coming soon)
-  3. Security (role-based access control - RBAC).
-  4. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
-  5. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
-  6. Mobile App for Alert Notifications (coming soon)
+  1. Access your infrastructure from anywhere.
+  2. Have SSO to protect sensitive features. 
+  3. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
+  4. Configuration of Alerts and Data Collection from the UI (coming soon)
+  5. Security (role-based access control - RBAC).
+  6. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
+  7. Central Dispatch of Alert Notifications (even when multiple independent parents are involved)
+  8. Mobile App for Alert Notifications (coming soon)
 
 So, although it is not required, you can get the most out of your Netdata setup by using Netdata Cloud.
 
@@ -597,9 +613,9 @@ Netdata is a widely adopted project...
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Browse the [Netdata stargazers on GitHub](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
+Browse the [Netdata stargazers on GitHub](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as ABN AMRO Bank, AMD, Amazon, Baidu, Booking.com, Cisco, Delta, Facebook, Google, IBM, Intel, Logitech, Netflix, Nokia, Qualcomm, Realtek Semiconductor Corp, Redhat, Riot Games, SAP, Samsung, Unity, Valve, and many others.
 
-Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, among several others.
+Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, Seoul National University, University College London, among several others.
 
 And, Netdata is also used by numerous governmental organizations worldwide.
 
@@ -710,7 +726,7 @@ Join the Netdata community:
 > [Click here for the schedule](https://www.meetup.com/netdata/events/).
 
 You can also find Netdata on:<br/>
-[Twitter](https://twitter.com/linuxnetdata) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
+[Twitter](https://twitter.com/netdatahq) | [YouTube](https://www.youtube.com/c/Netdata) | [Reddit](https://www.reddit.com/r/netdata/) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/) | [StackShare](https://stackshare.io/netdata) | [Product Hunt](https://www.producthunt.com/posts/netdata-monitoring-agent/) | [Repology](https://repology.org/metapackage/netdata/versions) | [Facebook](https://www.facebook.com/linuxnetdata/)
 
 ## :pray: Contribute
 

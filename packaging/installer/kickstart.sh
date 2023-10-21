@@ -815,7 +815,7 @@ uninstall() {
     FLAGS="--yes"
   fi
 
-  if [ -x "${uninstaller}" ]; then
+  if run_as_root test -x "${uninstaller}"; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would attempt to uninstall existing install with uninstaller script found at: ${uninstaller}"
       return 0
@@ -2134,7 +2134,7 @@ parse_args() {
       "--claim-only") set_action 'claim' ;;
       "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
       "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
-      "--auto-update-method")
+      "--auto-update-type"|"--auto-update-method")
         NETDATA_AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         case "${NETDATA_AUTO_UPDATE_TYPE}" in
           systemd|interval|crontab) shift 1 ;;

@@ -1756,9 +1756,9 @@ void *ebpf_read_socket_thread(void *ptr)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     usec_t period = update_every * USEC_PER_SEC;
-    while (!ebpf_exit_plugin && running_time < lifetime) {
+    while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
-        if (ebpf_exit_plugin || ++counter != update_every)
+        if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
         ebpf_update_array_vectors(em);
@@ -2490,9 +2490,9 @@ static void socket_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
-    while (!ebpf_exit_plugin && running_time < lifetime) {
+    while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_exit_plugin || ++counter != update_every)
+        if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
         counter = 0;

@@ -1141,6 +1141,16 @@ fi
 AC_MSG_RESULT([${enable_plugin_systemd_journal}])
 AM_CONDITIONAL([ENABLE_PLUGIN_SYSTEMD_JOURNAL], [test "${enable_plugin_systemd_journal}" = "yes"])
 
+AC_CHECK_LIB([systemd], [sd_journal_open_files_fd], [have_sd_journal_open_files_fd=yes], [have_sd_journal_open_files_fd=no])
+if test "${have_sd_journal_open_files_fd}" = "yes"; then
+    AC_DEFINE([HAVE_SD_JOURNAL_OPEN_FILES_FD], [1], [sd_journal_open_files_fd usability])
+fi
+
+AC_CHECK_LIB([systemd], [sd_journal_restart_fields], [have_sd_journal_restart_fields=yes], [have_sd_journal_restart_fields=no])
+if test "${have_sd_journal_restart_fields}" = "yes"; then
+    AC_DEFINE([HAVE_SD_JOURNAL_RESTART_FIELDS], [1], [sd_journal_restart_fields usability])
+fi
+
 AC_MSG_NOTICE([OPTIONAL_SYSTEMD_LIBS is set to: ${OPTIONAL_SYSTEMD_LIBS}])
 
 if test "${enable_plugin_systemd_journal}" = "yes"; then

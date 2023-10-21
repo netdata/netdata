@@ -41,7 +41,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Composite Charts**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view): Charts used by the **Overview** tab which aggregate metrics from all the nodes (or a filtered selection) in a given War Room.
 
-- [**Context**](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md#context): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
+- [**Context**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
 - [**Custom dashboards**](https://github.com/netdata/netdata/blob/master/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
 
@@ -51,7 +51,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Definition Bar**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
 
-- [**Dimension**](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md#dimension): A dimension is a value that gets shown on a chart.
+- [**Dimension**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#dimensions): A dimension is a value that gets shown on a chart.
 
 - [**Distributed Architecture**](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md): The data architecture mindset with which Netdata was built, where all data are collected and stored on the edge, whenever it's possible, creating countless benefits.
 
@@ -61,7 +61,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## F
 
-- [**Family**](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md#family): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
+- [**Family**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
 
 - [**Flood Protection**](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
 

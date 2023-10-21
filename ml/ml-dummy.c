@@ -100,7 +100,7 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     return false;
 }
 
-int ml_dimension_load_models(RRDDIM *rd) {
+int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **stmp) {
     UNUSED(rd);
     return 0;
 }

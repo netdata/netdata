@@ -68,6 +68,10 @@
         "type": "string",
         "description": "Any additional information about this platform."
       },
+      "clean_additional_info": {
+        "type": "string",
+        "description": "Any additional information about this platform, without any embedded custom tags."
+      },
       "related_resources": {
         "type": "object",
         "description": "TBD"

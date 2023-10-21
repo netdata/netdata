@@ -465,7 +465,7 @@ static inline uint64_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND back
 }
 
 uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
-static inline size_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+static inline uint64_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_disk_space_used(db_instance);
@@ -992,7 +992,6 @@ struct alarm_entry {
     STRING *chart;
     STRING *chart_context;
     STRING *chart_name;
-    STRING *family;
 
     STRING *classification;
     STRING *component;
@@ -1037,7 +1036,6 @@ struct alarm_entry {
 #define ae_chart_id(ae) string2str((ae)->chart)
 #define ae_chart_name(ae) string2str((ae)->chart_name)
 #define ae_chart_context(ae) string2str((ae)->chart_context)
-#define ae_family(ae) string2str((ae)->family)
 #define ae_classification(ae) string2str((ae)->classification)
 #define ae_exec(ae) string2str((ae)->exec)
 #define ae_recipient(ae) string2str((ae)->recipient)
@@ -1178,6 +1176,7 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
 
+    time_t last_connected;                          // last time child connected (stored in db)
     time_t child_connect_time;                      // the time the last sender was connected
     time_t child_last_chart_command;                // the time of the last CHART streaming command
     time_t child_disconnected_time;                 // the time the last sender was disconnected
@@ -1252,6 +1251,8 @@ struct rrdhost {
 
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;
+
+    DICTIONARY *configurable_plugins;               // configurable plugins for this host
 
     struct rrdhost *next;
     struct rrdhost *prev;

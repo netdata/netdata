@@ -1645,14 +1645,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "families",
-            "in": "query",
-            "description": "The alarm families.",
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {

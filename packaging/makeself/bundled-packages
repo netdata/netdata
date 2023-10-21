@@ -1,0 +1,16 @@
+# Source of truth for all the packages we bundle in static builds
+PACKAGES=("OPENSSL" "CURL" "BASH" "IOPING" "LIBNETFILTER_ACT")
+SOURCE_TYPES=("GH_REPO_CLONE" "GH_REPO_CLONE" "DW_TARBALL" "GH_REPO_SOURCE" "DW_TARBALL")
+OPENSSL_VERSION="openssl-3.1.3"
+OPENSSL_SOURCE="https://github.com/openssl/openssl"
+CURL_VERSION="curl-8_4_0"
+CURL_SOURCE="https://github.com/curl/curl"
+BASH_VERSION="5.1.16"
+BASH_ARTIFACT_SOURCE="http://ftp.gnu.org/gnu/bash"
+BASH_ARTIFACT_SHA256="5bac17218d3911834520dad13cd1f85ab944e1c09ae1aba55906be1f8192f558"
+IOPING_VERSION="1.3"
+IOPING_SOURCE="https://github.com/koct9i/ioping"
+IOPING_ARTIFACT_SHA256="7aa48e70aaa766bc112dea57ebbe56700626871052380709df3a26f46766e8c8"
+LIBNETFILTER_ACT_VERSION="1.0.3"
+LIBNETFILTER_ACT_SOURCE="https://www.netfilter.org/projects/libnetfilter_acct/files"
+LIBNETFILTER_ACT_ARTIFACT_SHA256="4250ceef3efe2034f4ac05906c3ee427db31b9b0a2df41b2744f4bf79a959a1a"

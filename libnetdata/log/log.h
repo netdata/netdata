@@ -43,9 +43,6 @@ extern "C" {
 #define D_ANALYTICS         0x0000000080000000
 #define D_RRDENGINE         0x0000000100000000
 #define D_ACLK              0x0000000200000000
-#define D_METADATALOG       0x0000000400000000
-#define D_ACLK_SYNC         0x0000000800000000
-#define D_META_SYNC         0x0000001000000000
 #define D_REPLICATION       0x0000002000000000
 #define D_SYSTEM            0x8000000000000000
 
@@ -104,6 +101,23 @@ typedef struct error_with_limit {
     time_t last_logged;
     usec_t sleep_ut;
 } ERROR_LIMIT;
+
+typedef enum netdata_log_level {
+    NETDATA_LOG_LEVEL_ERROR,
+    NETDATA_LOG_LEVEL_INFO,
+
+    NETDATA_LOG_LEVEL_END
+} netdata_log_level_t;
+
+#define NETDATA_LOG_LEVEL_INFO_STR "info"
+#define NETDATA_LOG_LEVEL_ERROR_STR "error"
+#define NETDATA_LOG_LEVEL_ERROR_SHORT_STR "err"
+
+extern netdata_log_level_t global_log_severity_level;
+netdata_log_level_t log_severity_string_to_severity_level(char *level);
+char *log_severity_level_to_severity_string(netdata_log_level_t level);
+void log_set_global_severity_level(netdata_log_level_t value);
+void log_set_global_severity_for_external_plugins();
 
 #define error_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 #define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }

@@ -1,4 +1,4 @@
-# Interact with charts
+# Netdata Charts
 
 Learn how to use Netdata's powerful charts to troubleshoot with real-time, per-second metric data.
 
@@ -36,6 +36,65 @@ With a quick glance you have immediate information available at your disposal:
 - [Tool bar](#tool-bar)
 - [Chart area](#hover-over-the-chart)
 - [Legend with dimensions](#dimensions-bar)
+
+## Fundemental elements
+
+While Netdata's charts require no configuration and are easy to interact with, they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in your nodes, Netdata uses the concepts of [dimensions](#dimensions), [contexts](#contexts), and [families](#families).
+
+Understanding how these work will help you more easily navigate the dashboard,
+[write new alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md), or play around
+with the [API](https://github.com/netdata/netdata/blob/master/web/api/README.md).
+
+### Dimensions
+
+A **dimension** is a value that gets shown on a chart. The value can be raw data or calculated values, such as the
+average (the default), minimum, or maximum. These values can then be given any type of unit. For example, CPU
+utilization is represented as a percentage, disk I/O as `MiB/s`, and available RAM as an absolute value in `MiB` or
+`GiB`.
+
+Beneath every chart (or on the right-side if you configure the dashboard) is a legend of dimensions. When there are
+multiple dimensions, you'll see a different entry in the legend for each dimension.
+
+The **Apps CPU Time** chart (with the [context](#contexts) `apps.cpu`), which visualizes CPU utilization of
+different types of processes/services/applications on your node, always provides a vibrant example of a chart with
+multiple dimensions.
+
+Dimensions can be [hidden](#show-and-hide-dimensions) to help you focus your attention.
+
+### Contexts
+
+A **context** is a way of grouping charts by the types of metrics collected and dimensions displayed. It's like a machine-readable naming and organization scheme.
+
+For example, the **Apps CPU Time** has the context `apps.cpu`. A little further down on the dashboard is a similar
+chart, **Apps Real Memory (w/o shared)** with the context `apps.mem`. The `apps` portion of the context is the **type**,
+whereas anything after the `.` is specified either by the chart's developer or by the [family](#families).
+
+By default, a chart's type affects where it fits in the menu, while its family creates submenus.
+
+Netdata also relies on contexts for [alert configuration](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) (the [`on` line](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-on)).
+
+### Families
+
+**Families** are a _single instance_ of a hardware or software resource that needs to be displayed separately from
+similar instances.
+
+For example, let's look at the **Disks** section, which contains a number of charts with contexts like `disk.io`,
+`disk.ops`, `disk.backlog`, and `disk.util`.  If your node has multiple disk drives at `sda` and `sdb`, Netdata creates
+a separate family for each.
+
+Netdata now merges the contexts and families to create charts that are grouped by family, following a
+`[context].[family]` naming scheme, so that you can see the `disk.io` and `disk.ops` charts for `sda` right next to each
+other.
+
+Given the four example contexts, and two families of `sda` and `sdb`, Netdata will create the following charts and their
+names:
+
+| Context        | `sda` family       | `sdb` family       |
+|:---------------|--------------------|--------------------|
+| `disk.io`      | `disk_io.sda`      | `disk_io.sdb`      |
+| `disk.ops`     | `disk_ops.sda`     | `disk_ops.sdb`     |
+| `disk.backlog` | `disk_backlog.sda` | `disk_backlog.sdb` |
+| `disk.util`    | `disk_util.sda`    | `disk_util.sdb`    |
 
 ## Title bar
 
@@ -77,14 +136,12 @@ Each composite chart has a definition bar to provide information and options abo
 
 To help users instantly understand and validate the data they see on charts, we developed the NIDL (Nodes, Instances, Dimensions, Labels) framework. This information is visualized on all charts.
 
-
 > You can explore the in-depth infographic, by clicking on this image and opening it in a new tab,
 > allowing you to zoom in to the different parts of it.
 >
 > <a href="https://user-images.githubusercontent.com/2662304/235475061-44628011-3b1f-4c44-9528-34452018eb89.png" target="_blank">
 >  <img src="https://user-images.githubusercontent.com/2662304/235475061-44628011-3b1f-4c44-9528-34452018eb89.png" width="400" border="0" align="center"/>
 > </a>
-
 
 You can rapidly access condensed information for collected metrics, grouped by node, monitored instances, dimension, or any key/value label pair.
 
@@ -175,7 +232,6 @@ In this dropdown, you can view or filter the original dimensions contributing ti
 This menu also presents the contribution of each original dimensions on the chart, and a break down of the anomaly rate of the data per dimension.
 
 <img src="https://user-images.githubusercontent.com/70198089/236138796-08dc6ac6-9a50-4913-a46d-d9bbcedd48f6.png" width="900"/>
-
 
 ### Labels dropdown
 
@@ -293,7 +349,6 @@ The available manipulation tools you can select are:
 - Chart zoom
 - Reset zoom
 
-
 ### Pan
 
 Drag your mouse/finger to the right to pan backward through time, or drag to the left to pan forward in time. Think of
@@ -340,9 +395,7 @@ Zooming out lets you see metrics within the larger context, such as the last hou
 
 The bottom legend where you can see the dimensions of the chart can be ordered by:
 
-
 <img src="https://user-images.githubusercontent.com/70198089/236144658-6c3d0e31-9bcb-45f3-bb95-4eafdcbb0a58.png" width="300" />
-
 
 - Dimension name (Ascending or Descending)
 - Dimension value (Ascending or Descending)

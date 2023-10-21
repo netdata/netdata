@@ -75,8 +75,8 @@ modules:
             enabled: true
           list:
             - name: instance_name
-              description: the name of the varnishd instance to get logs from. If not specified, the host name is used.
-              default_value: '<host name>'
+              description: the name of the varnishd instance to get logs from. If not specified, the local host name is used.
+              default_value: ""
               required: true
             - name: update_every
               description: Sets the default data collection frequency.
