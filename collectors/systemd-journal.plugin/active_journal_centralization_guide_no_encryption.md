@@ -1,23 +1,16 @@
-# Active journal centralization without encryption
+# Active journal source without encryption
 
-This page will guide you through creating an active journal centralization setup without the use of encryption.
+This page will guide you through creating an active journal source without the use of encryption.
 
-Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all
-servers and organize them in sources.
-With the setup described in this document, journal files are identified by the hostnames of the clients you pull logs.
-
-An _active_ journal server fetch logs from clients, so in this setup we will:
-
-1. configure `systemd-journal-remote` on the server, to pull journal logs.
-2. configure `systemd-journal-gatewayd` on the clients, to serve their logs to the micro http server.
+Once you enable an active journal source on a server, `systemd-journal-gatewayd` will expose an REST API on TCP port 19531. This API can be used for querying the logs, exporting the logs, or monitoring new log entries, remotely.
 
 > ⚠️ **IMPORTANT**<br/>
-> These instructions will copy your logs to a central server, without any encryption or authorization.<br/>
+> These instructions will expose your logs to the network, without any encryption or authorization.<br/>
 > DO NOT USE THIS ON NON-TRUSTED NETWORKS.
 
-## Client configuration
+## Configuring an active journal source
 
-On the clients, install `systemd-journal-gateway`.
+On the server you want to expose their logs, install `systemd-journal-gateway`.
 
 ```bash
 # change this according to your distro
@@ -44,11 +37,35 @@ Finally, enable it, so that it will start automatically upon receiving a connect
 # enable systemd-journal-remote
 sudo systemctl daemon-reload 
 sudo systemctl enable --now systemd-journal-gatewayd.socket
-sudo systemctl enable systemd-journal-gatewayd.service
-sudo systemctl start systemd-journal-gatewayd.service
 ```
 
-## Server configuration
+## Using the active journal source
+
+### Simple Logs Explorer
+
+`systemd-journal-gateway` provides a simple HTML5 application to browse the logs.
+
+To use it, open your web browser and navigate to:
+
+```
+http://server.ip:19531/browse
+```
+
+A simple page like this will be presented:
+
+![image](https://github.com/netdata/netdata/assets/2662304/4da88bf8-6398-468b-a359-68db0c9ad419)
+
+### Use it with `curl`
+
+`man systemd-journal-gatewayd` documents the supported API methods and provides examples to query the API using `curl` commands.
+
+### Copying the logs to a central journals server
+
+`systemd-journal-remote` has the ability to query instances of `systemd-journal-gatewayd` to fetch their logs, so that the central server fetches the logs, instead of waiting for the individual servers to push their logs to it.
+
+However, this kind of logs centralization has a key problem: **there is no guarantee that there will be no gaps in the logs replicated**. Theoretically, the REST API of `systemd-journal-gatewayd` supports querying past data, and `systemd-journal-remote` could keep track of the state of replication and automatically continue from the point it stopped last time. But it does not. So, currently the best logs centralization option is to use a **passive** centralization, where the clients push their logs to the server.
+
+Given these limitations, if you still want to configure an **active** journals centralization, this is what you need to do:
 
 On the centralization server install `systemd-journal-remote`:
 
@@ -57,77 +74,26 @@ On the centralization server install `systemd-journal-remote`:
 sudo apt-get install systemd-journal-remote
 ```
 
-Start it once to make sure than the `systemd-journal-remote` created any necessary requirement to work as centralization
-server. To do that, you need to spin up a temporarily _passive_ server with http, then close it, if you won't use it 
-also as a passive server.
+Then, copy `systemd-journal-remote.service` to configure it for querying the active source:
 
 ```bash
-sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/
+# replace "clientX" with the name of the active client node
+sudo cp /lib/systemd/system/systemd-journal-remote.service /etc/systemd/system/systemd-journal-remote-clientX.service
 
-# edit it to make sure it says:
-# --listen-http=-3
-# not:
-# --listen-https=-3
-sudo nano /etc/systemd/system/systemd-journal-remote.service
+# edit it to make sure it the ExecStart line is like this:
+# ExecStart=/usr/lib/systemd/systemd-journal-remote --url http://clientX:19531/entries?follow
+sudo nano /etc/systemd/system/systemd-journal-remote-clientX.service
 
 # reload systemd
 sudo systemctl daemon-reload
 ```
 
-Optionally, if you want to change the port (the default is `19532`), edit `systemd-journal-remote.socket`
-
-```bash
-# edit the socket file
-sudo systemctl edit systemd-journal-remote.socket
-```
-
-and add the following lines into the instructed place, and choose your desired port; save and exit.
-
-```bash
-[Socket]
-ListenStream=<DESIRED_PORT>
-```
-
-Start and (stop it, if you won't use it also as _passive_).
-
 ```bash
 # enable systemd-journal-remote
-sudo systemctl start systemd-journal-remote.service
-sudo systemctl stop systemd-journal-remote.service
+sudo systemctl enable --now systemd-journal-remote-clientX.service
 ```
 
-For each of your clients (endpoints that you want to fetch journal logs from) create a service that will use
-`systemd-journal-remote` will always fetch the logs.
-
-
-```bash
-sudo nano /etc/systemd/system/systemd-journal-endpoint-X.service 
-```
-
-Copy the service file above, replace the Description and `TARGET_HOST`, save and exit
-
-```
-[Unit]
-Description=Fetching systemd journal logs from my endpoint X
-
-[Service]
-ExecStart=/usr/lib/systemd/systemd-journal-remote --url http://<TARGET_HOST>:19531/entries?follow
-Type=simple
-Restart=always
-User=systemd-journal-remote
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Repeat the same for every host that you want to fetch journal logs.
-Reload the systemd daemon config, enable each service and start, like this:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable systemd-journal-endpoint-X 
-sudo systemctl start systemd-journal-endpoint-X
-```
+You can repeat this process to create as many `systemd-journal-remote` services, as the active source you have.
 
 ## Verify it works
 
@@ -137,13 +103,13 @@ To verify the central server is receiving logs, run this on the central server:
 sudo ls -l /var/log/journal/remote/
 ```
 
-You should see new files from the client's hostname.
+You should see new files from the client's hostname or IP.
 
-Also, any of the new service files (`systemctl status systemd-journal-endpoint-X`) should show something like this:
+Also, any of the new service files (`systemctl status systemd-journal-clientX`) should show something like this:
 
 ```bash
-● systemd-journal-client1.service - Fetching systemd journal logs from 192.168.2.146
-     Loaded: loaded (/etc/systemd/system/systemd-journal-client1.service; enabled; preset: disabled)
+● systemd-journal-clientX.service - Fetching systemd journal logs from 192.168.2.146
+     Loaded: loaded (/etc/systemd/system/systemd-journal-clientX.service; enabled; preset: disabled)
     Drop-In: /usr/lib/systemd/system/service.d
              └─10-timeout-abort.conf
      Active: active (running) since Wed 2023-10-18 07:35:52 EEST; 23min ago
@@ -151,10 +117,10 @@ Also, any of the new service files (`systemctl status systemd-journal-endpoint-X
       Tasks: 2 (limit: 6928)
      Memory: 7.7M
         CPU: 518ms
-     CGroup: /system.slice/systemd-journal-client1.service
+     CGroup: /system.slice/systemd-journal-clientX.service
              ├─77959 /usr/lib/systemd/systemd-journal-remote --url "http://192.168.2.146:19531/entries?follow"
              └─77962 curl "-HAccept: application/vnd.fdo.journal" --silent --show-error "http://192.168.2.146:19531/entries?follow"
 
-Oct 18 07:35:52 systemd-journal-server systemd[1]: Started systemd-journal-client1.service - Fetching systemd journal logs from 192.168.2.146.
+Oct 18 07:35:52 systemd-journal-server systemd[1]: Started systemd-journal-clientX.service - Fetching systemd journal logs from 192.168.2.146.
 Oct 18 07:35:52 systemd-journal-server systemd-journal-remote[77959]: Spawning curl http://192.168.2.146:19531/entries?follow...
 ```

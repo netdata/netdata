@@ -674,6 +674,19 @@ void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const c
     sender_thread_buffer_free();
 }
 
+void rrdpush_send_dyncfg_reset(RRDHOST *host, const char *plugin_name)
+{
+    dyncfg_check_can_push(host);
+
+    BUFFER *wb = sender_start(host->sender);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_RESET " %s\n", plugin_name);
+
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_thread_buffer_free();
+}
+
 void rrdpush_send_claimed_id(RRDHOST *host) {
     if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
         return;

@@ -613,9 +613,9 @@ Netdata is a widely adopted project...
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Browse the [Netdata stargazers on GitHub](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
+Browse the [Netdata stargazers on GitHub](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as ABN AMRO Bank, AMD, Amazon, Baidu, Booking.com, Cisco, Delta, Facebook, Google, IBM, Intel, Logitech, Netflix, Nokia, Qualcomm, Realtek Semiconductor Corp, Redhat, Riot Games, SAP, Samsung, Unity, Valve, and many others.
 
-Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, among several others.
+Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, Seoul National University, University College London, among several others.
 
 And, Netdata is also used by numerous governmental organizations worldwide.
 
