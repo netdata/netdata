@@ -789,17 +789,16 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 
         pid_ptr = *pid_pptr;
 
-        // TODO: OPEN PID FILE AND VERIFY PATH BEFORE APPENDING TO APPS GROUP
         pid_ptr->pname[0] = '\0';
         if (!name) {
             pid_ptr->name[0] = '\0';
-            pid_ptr->apps_target = ebpf_apps_groups_default_target;
+            pid_ptr->apps_target = ebpf_select_target(pid_ptr->name, pid_ptr->name_len, pid_ptr->hash_name, pid);
             ebpf_add_pid_to_apps_group(ebpf_apps_groups_default_target, pid_ptr, pid);
         } else {
             strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
             pid_ptr->hash_name = simple_hash(pid_ptr->name);
             pid_ptr->name_len = strlen(pid_ptr->name);
-            pid_ptr->apps_target = ebpf_select_target(pid_ptr->name, pid_ptr->name_len, pid_ptr->hash_name);
+            pid_ptr->apps_target = ebpf_select_target(pid_ptr->name, pid_ptr->name_len, pid_ptr->hash_name, pid);
 
             ebpf_add_pid_to_apps_group(pid_ptr->apps_target, pid_ptr, pid);
         }

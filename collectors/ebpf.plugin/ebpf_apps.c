@@ -788,10 +788,12 @@ static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
 /**
  * Select target
  *
- * @param name the process name from kernel ring.
- * @param hash the calculated hash for the name.
+ * @param name   the process name from kernel ring.
+ * @param length the name size.
+ * @param hash   the calculated hash for the name.
+ * @param pid    the pid value.
  */
-struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t hash)
+struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t hash, uint32_t pid)
 {
     targets_assignment_counter++;
 
@@ -806,6 +808,31 @@ struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t has
         }
     }
 
+    if (!proc_pid_cmdline_is_needed)
+        goto ret_default_target;
+
+    static char cmdline[MAX_CMDLINE + 1];
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%u/cmdline", netdata_configured_host_prefix, pid);
+    int fd = open(filename, procfile_open_flags, 0666);
+    if (unlikely(fd == -1))
+        goto ret_default_target;
+
+    ssize_t i, bytes = read(fd, cmdline, MAX_CMDLINE);
+    close(fd);
+
+    cmdline[bytes] = '\0';
+    for (i = 0; i < bytes; i++) {
+        if (unlikely(!cmdline[i]))
+            cmdline[i] = ' ';
+    }
+
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
+        if (w->starts_with && w->ends_with && strstr(cmdline, w->compare))
+            return w;
+    }
+
+ret_default_target:
     return ebpf_apps_groups_default_target;
 }
 
