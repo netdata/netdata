@@ -727,15 +727,29 @@ static inline void ebpf_add_pid_to_apps_group(struct ebpf_target *target,
                                               uint32_t pid)
 {
     netdata_ebpf_judy_pid_stats_t **group_pptr;
-    netdata_ebpf_judy_pid_stats_t *group_ptr;
     rw_spinlock_write_lock(&target->pid_list.rw_spinlock);
     group_pptr = (netdata_ebpf_judy_pid_stats_t **)ebpf_judy_insert_unsafe(
         &target->pid_list.JudyLArray, pid);
-    group_ptr = *group_pptr;
     if (likely(*group_pptr == NULL)) {
         *group_pptr = pid_ptr;
     }
-    pid_ptr->apps_target->exposed = 1;
+    target->processes += 1;
+    rw_spinlock_write_unlock(&target->pid_list.rw_spinlock);
+}
+
+/**
+ * Add PID to APPs group
+ *
+ * This function adds a new PID for specific apps group.
+ *
+ * @param target    the apps group to associate data
+ * @param pid       the current pid.
+ */
+void ebpf_remove_pid_from_apps_group(struct ebpf_target *target, uint32_t pid)
+{
+    rw_spinlock_write_lock(&target->pid_list.rw_spinlock);
+    JudyLDel(&target->pid_list.JudyLArray, pid, PJE0);
+    target->processes -= 1;
     rw_spinlock_write_unlock(&target->pid_list.rw_spinlock);
 }
 
@@ -775,6 +789,7 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 
         pid_ptr = *pid_pptr;
 
+        // TODO: OPEN PID FILE AND VERIFY PATH BEFORE APPENDING TO APPS GROUP
         pid_ptr->pname[0] = '\0';
         if (!name) {
             pid_ptr->name[0] = '\0';

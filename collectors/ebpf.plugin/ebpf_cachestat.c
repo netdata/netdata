@@ -708,6 +708,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
                 memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
                 cachestat_update_publish(cs_ptr);
             } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
+                ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
                 JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
                 ebpf_cachestat_release(cs_ptr);
                 bpf_map_delete_elem(fd, &key);
@@ -882,6 +883,13 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
         w->charts_created |= 1<<EBPF_MODULE_CACHESTAT_IDX;
     }
 
+    struct ebpf_target *w;
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
+        if (unlikely(w->exposed)) {
+            w->charts_created |= (1<<EBPF_MODULE_CACHESTAT_IDX);
+        }
+    }
+
     fflush(stdout);
 }
 
@@ -991,35 +999,6 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyL
         }
     }
     rw_spinlock_read_unlock(&rw_spinlock);
-    /*
-    memset(&publish->plot, 0, sizeof(struct netdata_publish_cachestat_pid));
-    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
-    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-    while (root) {
-        int32_t pid = root->pid;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
-        if (pid_ptr) {
-            rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
-            if (pid_ptr->cachestat_stats.JudyLArray) {
-                Word_t local_timestamp = 0;
-                bool first_cache = true;
-                Pvoid_t *cache_value;
-                while (
-                    (cache_value =
-                        JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
-                    netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                    publish->plot.misses += values->plot.misses;
-                    publish->plot.total += values->plot.total;
-                    publish->plot.dirty += values->plot.dirty;
-                }
-            }
-            rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
-        }
-
-        root = root->next;
-    }
-    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
-     */
 }
 
 /**

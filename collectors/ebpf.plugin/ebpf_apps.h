@@ -268,6 +268,7 @@ extern ARAL *ebpf_aral_swap_pid;
 void ebpf_swap_release(netdata_publish_swap_t *stat);
 netdata_publish_swap_t *ebpf_publish_swap_get(void);
 void ebpf_swap_aral_init();
+void ebpf_remove_pid_from_apps_group(struct ebpf_target *target, uint32_t pid);
 
 // ARAL Section end
 
