@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Journal multiple sources [\#16252](https://github.com/netdata/netdata/pull/16252) ([ktsaou](https://github.com/ktsaou))
 - `most_popular` on markdown metadata for integrations [\#16251](https://github.com/netdata/netdata/pull/16251) ([Ancairon](https://github.com/Ancairon))
 - Dyncfg improvements [\#16250](https://github.com/netdata/netdata/pull/16250) ([ktsaou](https://github.com/ktsaou))
 - Fix label copy to correctly handle duplicate keys [\#16249](https://github.com/netdata/netdata/pull/16249) ([stelfrag](https://github.com/stelfrag))
@@ -36,6 +37,7 @@
 - Introduce workflow to always update bundled packages \(static builds\) into their latest release \(part1\) [\#16191](https://github.com/netdata/netdata/pull/16191) ([tkatsoulas](https://github.com/tkatsoulas))
 - Improvements for labels handling [\#16172](https://github.com/netdata/netdata/pull/16172) ([stelfrag](https://github.com/stelfrag))
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
+- shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.43.0](https://github.com/netdata/netdata/tree/v1.43.0) (2023-10-16)
@@ -423,8 +425,6 @@
 - Fixing FreeBSD icons [\#15650](https://github.com/netdata/netdata/pull/15650) ([shyamvalsan](https://github.com/shyamvalsan))
 - Fix exporter schema to support multiple entries per file. [\#15649](https://github.com/netdata/netdata/pull/15649) ([Ferroin](https://github.com/Ferroin))
 - Fixing icons in netdata/netdata repo [\#15647](https://github.com/netdata/netdata/pull/15647) ([shyamvalsan](https://github.com/shyamvalsan))
-- Fix name in the yaml of example python collector [\#15646](https://github.com/netdata/netdata/pull/15646) ([Ancairon](https://github.com/Ancairon))
-- Fix icons [\#15645](https://github.com/netdata/netdata/pull/15645) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
