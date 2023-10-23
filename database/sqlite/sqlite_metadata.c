@@ -97,10 +97,6 @@ struct metadata_cmd {
     struct metadata_cmd *prev, *next;
 };
 
-struct metadata_database_cmdqueue {
-    struct metadata_cmd *cmd_base;
-};
-
 typedef enum {
     METADATA_FLAG_PROCESSING    = (1 << 0), // store or cleanup
     METADATA_FLAG_SHUTDOWN      = (1 << 1), // Shutting down
@@ -113,13 +109,12 @@ struct metadata_wc {
     uv_async_t async;
     uv_timer_t timer_req;
     time_t metadata_check_after;
-    volatile unsigned queue_size;
     METADATA_FLAG flags;
-    struct completion init_complete;
+    struct completion start_stop_complete;
     struct completion *scan_complete;
     /* FIFO command queue */
-    uv_mutex_t cmd_mutex;
-    struct metadata_database_cmdqueue cmd_queue;
+    SPINLOCK cmd_queue_lock;
+    struct metadata_cmd *cmd_base;
 };
 
 #define metadata_flag_check(target_flags, flag) (__atomic_load_n(&((target_flags)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -1058,21 +1053,15 @@ static void cleanup_health_log(struct metadata_wc *wc)
 // EVENT LOOP STARTS HERE
 //
 
-static void metadata_init_cmd_queue(struct metadata_wc *wc)
-{
-    wc->cmd_queue.cmd_base = NULL;
-    fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
-}
-
 static void metadata_free_cmd_queue(struct metadata_wc *wc)
 {
-    uv_mutex_lock(&wc->cmd_mutex);
-    while(wc->cmd_queue.cmd_base) {
-        struct metadata_cmd *t = wc->cmd_queue.cmd_base;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_queue.cmd_base, t, prev, next);
+    spinlock_lock(&wc->cmd_queue_lock);
+    while(wc->cmd_base) {
+        struct metadata_cmd *t = wc->cmd_base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
         freez(t);
     }
-    uv_mutex_unlock(&wc->cmd_mutex);
+    spinlock_unlock(&wc->cmd_queue_lock);
 }
 
 static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
@@ -1089,9 +1078,9 @@ static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
     *t = *cmd;
     t->prev = t->next = NULL;
 
-    uv_mutex_lock(&wc->cmd_mutex);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wc->cmd_queue.cmd_base, t, prev, next);
-    uv_mutex_unlock(&wc->cmd_mutex);
+    spinlock_lock(&wc->cmd_queue_lock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
+    spinlock_unlock(&wc->cmd_queue_lock);
 
 wakeup_event_loop:
     (void) uv_async_send(&wc->async);
@@ -1101,10 +1090,10 @@ static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc)
 {
     struct metadata_cmd ret;
 
-    uv_mutex_lock(&wc->cmd_mutex);
-    if(wc->cmd_queue.cmd_base) {
-        struct metadata_cmd *t = wc->cmd_queue.cmd_base;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_queue.cmd_base, t, prev, next);
+    spinlock_lock(&wc->cmd_queue_lock);
+    if(wc->cmd_base) {
+        struct metadata_cmd *t = wc->cmd_base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
         ret = *t;
         freez(t);
     }
@@ -1112,7 +1101,7 @@ static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc)
         ret.opcode = METADATA_DATABASE_NOOP;
         ret.completion = NULL;
     }
-    uv_mutex_unlock(&wc->cmd_mutex);
+    spinlock_unlock(&wc->cmd_queue_lock);
 
     return ret;
 }
@@ -1629,7 +1618,7 @@ static void metadata_event_loop(void *arg)
     wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
 
     int shutdown = 0;
-    completion_mark_complete(&wc->init_complete);
+    completion_mark_complete(&wc->start_stop_complete);
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
 
@@ -1782,8 +1771,8 @@ static void metadata_event_loop(void *arg)
     freez(loop);
     worker_unregister();
 
-    netdata_log_info("METADATA: Shutting down event loop");
-    completion_mark_complete(&wc->init_complete);
+    netdata_log_info("Shutting down event loop");
+    completion_mark_complete(&wc->start_stop_complete);
     if (wc->scan_complete) {
         completion_destroy(wc->scan_complete);
         freez(wc->scan_complete);
@@ -1804,7 +1793,7 @@ struct metadata_wc metasync_worker = {.loop = NULL};
 
 void metadata_sync_shutdown(void)
 {
-    completion_init(&metasync_worker.init_complete);
+    completion_init(&metasync_worker.start_stop_complete);
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -1814,8 +1803,8 @@ void metadata_sync_shutdown(void)
 
     /* wait for metadata thread to shut down */
     netdata_log_info("METADATA: Waiting for shutdown ACK");
-    completion_wait_for(&metasync_worker.init_complete);
-    completion_destroy(&metasync_worker.init_complete);
+    completion_wait_for(&metasync_worker.start_stop_complete);
+    completion_destroy(&metasync_worker.start_stop_complete);
     netdata_log_info("METADATA: Shutdown complete");
 }
 
@@ -1857,13 +1846,12 @@ void metadata_sync_init(void)
     struct metadata_wc *wc = &metasync_worker;
 
     memset(wc, 0, sizeof(*wc));
-    metadata_init_cmd_queue(wc);
-    completion_init(&wc->init_complete);
+    completion_init(&wc->start_stop_complete);
 
     fatal_assert(0 == uv_thread_create(&(wc->thread), metadata_event_loop, wc));
 
-    completion_wait_for(&wc->init_complete);
-    completion_destroy(&wc->init_complete);
+    completion_wait_for(&wc->start_stop_complete);
+    completion_destroy(&wc->start_stop_complete);
 
     netdata_log_info("SQLite metadata sync initialization complete");
 }
