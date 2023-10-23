@@ -41,7 +41,7 @@ static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE defaul
     // check what this one matches
 
     size_t len = strlen(s);
-    if(len >= 2 && *s == '*' && s[len - 1] == '*') {
+    if(len >= 2 && *s == '*' && (s[len - 1] == '*' || default_mode == SIMPLE_PATTERN_SUBSTRING)) {
         s[len - 1] = '\0';
         s++;
         mode = SIMPLE_PATTERN_SUBSTRING;
