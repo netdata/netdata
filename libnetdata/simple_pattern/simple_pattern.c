@@ -41,7 +41,7 @@ static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE defaul
     // check what this one matches
 
     size_t len = strlen(s);
-    if(len >= 2 && *s == '*' && (s[len - 1] == '*' || default_mode == SIMPLE_PATTERN_SUBSTRING)) {
+    if(len >= 2 && *s == '*' && s[len - 1] == '*') {
         s[len - 1] = '\0';
         s++;
         mode = SIMPLE_PATTERN_SUBSTRING;
@@ -143,6 +143,14 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         struct simple_pattern *m = parse_pattern(buf, default_mode, 0);
         m->negative = negative;
         m->case_sensitive = case_sensitive;
+
+        if(default_mode == SIMPLE_PATTERN_SUBSTRING) {
+            m->mode = SIMPLE_PATTERN_SUBSTRING;
+
+            struct simple_pattern *tm = m;
+            for(tm = m; tm->child ; tm = tm->child) ;
+            tm->mode = SIMPLE_PATTERN_SUBSTRING;
+        }
 
         // link it at the end
         if(unlikely(!root))
