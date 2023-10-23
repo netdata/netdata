@@ -6,7 +6,7 @@
 
 import urllib3
 
-from distutils.version import StrictVersion as version
+from packaging.version import parse as version
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
