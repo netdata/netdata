@@ -4624,7 +4624,7 @@ void *cgroups_main(void *ptr) {
         collector_error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
         goto exit;
     }
-    uv_thread_set_name_np(discovery_thread.thread, "PLUGIN[cgroups]");
+    uv_thread_set_name_np(discovery_thread.thread, "P[cgroups]");
 
     heartbeat_t hb;
     heartbeat_init(&hb);

@@ -220,8 +220,8 @@ static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
             continue;
 
         if(last_entry_t && last_entry_t < host->child_connect_time &&
-           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
-             < now)
+           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
+                   (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) < now)
 
             rrdset_is_obsolete___safe_from_collector_thread(st);
     }

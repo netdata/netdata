@@ -414,8 +414,11 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
-        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST))))
+        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST)))) {
+        netdata_log_info("Not-re-streaming obsolete flag on chart 'host:%s/chart:%s'",
+                rrdhost_hostname(st->rrdhost), rrdset_id(st));
         return false;
+    }
 
     BUFFER *wb = sender_start(host->sender);
     rrdpush_send_chart_definition(wb, st);
