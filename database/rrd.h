@@ -1490,8 +1490,8 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t microseconds);
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next);
 void rrdset_done(RRDSET *st);
 
-void rrdset_is_obsolete(RRDSET *st);
-void rrdset_isnot_obsolete(RRDSET *st);
+void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st);
+void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
 #define rrdset_is_available_for_viewers(st) (!rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && rrdset_number_of_dimensions(st) && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
@@ -1540,8 +1540,8 @@ RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
 int rrddim_hide(RRDSET *st, const char *id);
 int rrddim_unhide(RRDSET *st, const char *id);
 
-void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd);
-void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
+void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *rd);
+void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *rd);
 
 collected_number rrddim_timed_set_by_pointer(RRDSET *st, RRDDIM *rd, struct timeval collected_time, collected_number value);
 collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
@@ -1611,8 +1611,8 @@ static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, tim
 
 void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host);
 void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host);
-void rrdset_pluginsd_receive_dims_slots_free(RRDSET *st);
-void rrdset_pluginsd_receive_all_slots_reset(RRDSET *st);
+void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st);
+void rrdset_pluginsd_receive_unslot(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

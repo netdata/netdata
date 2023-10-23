@@ -176,7 +176,7 @@ static void svc_rrdset_check_obsoletion(RRDHOST *host) {
            host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
              < now)
 
-            rrdset_is_obsolete(st);
+            rrdset_is_obsolete___safe_from_collector_thread(st);
     }
     rrdset_foreach_done(st);
 }

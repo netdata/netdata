@@ -451,8 +451,8 @@ int do_ipc(int update_every, usec_t dt) {
                     msq->found = 0;
                 }
                 else {
-                    rrddim_is_obsolete(st_msq_messages, msq->rd_messages);
-                    rrddim_is_obsolete(st_msq_bytes, msq->rd_bytes);
+                    rrddim_is_obsolete___safe_from_collector_thread(st_msq_messages, msq->rd_messages);
+                    rrddim_is_obsolete___safe_from_collector_thread(st_msq_bytes, msq->rd_bytes);
 
                     // remove message queue from the linked list
                     if(!msq_prev)
@@ -480,19 +480,19 @@ int do_ipc(int update_every, usec_t dt) {
             if(unlikely(dimensions_num > dimensions_limit)) {
                 collector_info("Message queue statistics has been disabled");
                 collector_info("There are %lld dimensions in memory but limit was set to %lld", dimensions_num, dimensions_limit);
-                rrdset_is_obsolete(st_msq_messages);
-                rrdset_is_obsolete(st_msq_bytes);
+                rrdset_is_obsolete___safe_from_collector_thread(st_msq_messages);
+                rrdset_is_obsolete___safe_from_collector_thread(st_msq_bytes);
                 st_msq_messages = NULL;
                 st_msq_bytes = NULL;
                 do_msg = CONFIG_BOOLEAN_NO;
             }
             else if(unlikely(!message_queue_root)) {
                 collector_info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_messages), rrdset_id(st_msq_messages));
-                rrdset_is_obsolete(st_msq_messages);
+                rrdset_is_obsolete___safe_from_collector_thread(st_msq_messages);
                 st_msq_messages = NULL;
 
                 collector_info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_bytes), rrdset_id(st_msq_bytes));
-                rrdset_is_obsolete(st_msq_bytes);
+                rrdset_is_obsolete___safe_from_collector_thread(st_msq_bytes);
                 st_msq_bytes = NULL;
             }
         }

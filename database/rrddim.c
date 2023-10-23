@@ -534,8 +534,8 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     return 0;
 }
 
-inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
+inline void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *rd) {
+    netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))) {
         netdata_log_info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), rrdset_name(st));
@@ -547,8 +547,8 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrdcontext_updated_rrddim_flags(rd);
 }
 
-inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
+inline void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st __maybe_unused, RRDDIM *rd) {
+    netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
     rrdcontext_updated_rrddim_flags(rd);

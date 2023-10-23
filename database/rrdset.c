@@ -62,7 +62,7 @@ void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
     rrdset_foreach_done(st);
 }
 
-void rrdset_pluginsd_receive_all_slots_reset(RRDSET *st) {
+void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     for(size_t i = 0; i < st->pluginsd.size ;i++) {
         rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
         st->pluginsd.prd_array[i].rda = NULL;
@@ -82,13 +82,13 @@ void rrdset_pluginsd_receive_all_slots_reset(RRDSET *st) {
     st->pluginsd.with_slots = false;
 }
 
-void rrdset_pluginsd_receive_dims_slots_free(RRDSET *st) {
+void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     if(!st)
         return;
 
     spinlock_lock(&st->pluginsd.spinlock);
 
-    rrdset_pluginsd_receive_all_slots_reset(st);
+    rrdset_pluginsd_receive_unslot(st);
 
     freez(st->pluginsd.prd_array);
     st->pluginsd.prd_array = NULL;
@@ -112,7 +112,7 @@ void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
 
     if(host->rrdpush.receive.pluginsd_chart_slots.array) {
         for (size_t s = 0; s < host->rrdpush.receive.pluginsd_chart_slots.size; s++)
-            rrdset_pluginsd_receive_dims_slots_free(host->rrdpush.receive.pluginsd_chart_slots.array[s]);
+            rrdset_pluginsd_receive_unslot_and_cleanup(host->rrdpush.receive.pluginsd_chart_slots.array[s]);
 
         freez(host->rrdpush.receive.pluginsd_chart_slots.array);
         host->rrdpush.receive.pluginsd_chart_slots.array = NULL;
@@ -327,7 +327,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         }
     }
 
-    rrdset_pluginsd_receive_dims_slots_free(st);
+    rrdset_pluginsd_receive_unslot_and_cleanup(st);
 }
 
 // the destructor - the dictionary is write locked while this runs
@@ -409,7 +409,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     struct rrdset_constructor *ctr = constructor_data;
     RRDSET *st = rrdset;
 
-    rrdset_isnot_obsolete(st);
+    rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
     ctr->react_action = RRDSET_REACT_NONE;
 
@@ -772,8 +772,8 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     *last_time_s = db_last_entry_s;
 }
 
-inline void rrdset_is_obsolete(RRDSET *st) {
-    rrdset_pluginsd_receive_dims_slots_free(st);
+inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
+    rrdset_pluginsd_receive_unslot(st);
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
@@ -790,7 +790,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
     }
 }
 
-inline void rrdset_isnot_obsolete(RRDSET *st) {
+inline void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time_s = now_realtime_sec();
@@ -1650,7 +1650,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         netdata_log_error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
-        rrdset_isnot_obsolete(st);
+        rrdset_isnot_obsolete___safe_from_collector_thread(st);
     }
 
     // check if the chart has a long time to be updated
@@ -1797,7 +1797,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
                 netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
-                rrddim_isnot_obsolete(st, rd);
+                rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
             }
         }
     }

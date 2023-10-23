@@ -3,7 +3,7 @@
 #include "plugin_proc.h"
 
 #define PLUGIN_PROC_MODULE_ZRAM_NAME "/sys/block/zram"
-#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
 typedef struct mm_stat {
     unsigned long long orig_data_size;
