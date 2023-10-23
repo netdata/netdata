@@ -328,15 +328,20 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
 /**
  * Format host labels for the Prometheus exporter
  * We are using a structure instead a direct buffer to expand options quickly.
- *
- * @param data is the buffer used to add labels.
+ * @param instance an instance data structure.
+ * @param wb is the buffer used to add labels.
  */
 
-static int format_prometheus_chart_label_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
-    BUFFER *wb = data;
+struct format_prometheus_chart_label_callback {
+    struct instance *instance; 
+    BUFFER *wb;
+};
 
-    if (name[0] == '_' )
-        return 1;
+static int format_prometheus_chart_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    struct format_prometheus_chart_label_callback *d = data;
+
+    if (!should_send_label(d->instance, ls)) return 0;
+    if (name[0] == '_' && !sending_labels_internal(d->instance)) return 0;
 
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];
@@ -345,7 +350,7 @@ static int format_prometheus_chart_label_callback(const char *name, const char *
     prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
 
     if (*k && *v)
-        buffer_sprintf(wb, ",%s=\"%s\"", k, v);
+        buffer_sprintf(d->wb, ",%s=\"%s\"", k, v);
 
     return 1;
 }
@@ -483,18 +488,19 @@ static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p
 /**
  * Write an as-collected metric to a buffer.
  *
- * @param wb the buffer to write the metric to.
+ * @param d format_prometheus_chart_label_callback struct with write buffer and instance info.
  * @param p parameters for generating the metric string.
  * @param homogeneous a flag for homogeneous charts.
  * @param prometheus_collector a flag for metrics from prometheus collector.
  * @param chart_labels the dictionary with chart labels
  */
-static void generate_as_collected_prom_metric(BUFFER *wb,
+static void generate_as_collected_prom_metric(struct format_prometheus_chart_label_callback *d,
                                               struct gen_parameters *p,
                                               int homogeneous,
                                               int prometheus_collector,
                                               RRDLABELS *chart_labels)
 {
+    BUFFER *wb = d->wb;
     buffer_sprintf(wb, "%s_%s", p->prefix, p->context);
 
     if (!homogeneous)
@@ -507,7 +513,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
 
     buffer_sprintf(wb, ",%sfamily=\"%s\"", p->labels_prefix, p->family);
 
-    rrdlabels_walkthrough_read(chart_labels, format_prometheus_chart_label_callback, wb);
+    rrdlabels_walkthrough_read(chart_labels, format_prometheus_chart_label_callback, d);
 
     buffer_sprintf(wb, "%s} ", p->labels);
 
@@ -697,7 +703,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, p.type);
 
-                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
+                            struct format_prometheus_chart_label_callback data = {.instance = instance, .wb = wb};
+                            generate_as_collected_prom_metric(&data, &p, homogeneous, prometheus_collector, st->rrdlabels);
                         }
                         else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -715,7 +722,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 buffer_sprintf(
                                     wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, p.type);
 
-                            generate_as_collected_prom_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
+                            struct format_prometheus_chart_label_callback data = {.instance = instance, .wb = wb};
+                            generate_as_collected_prom_metric(&data, &p, homogeneous, prometheus_collector, st->rrdlabels);
                         }
                     }
                     else {
@@ -738,7 +746,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
                             buffer_flush(plabels_buffer);
                             buffer_sprintf(plabels_buffer, "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"", plabels_prefix, chart, dimension, family);
-                            rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabels_buffer);
+                            struct format_prometheus_chart_label_callback data = {.instance = instance, .wb = plabels_buffer};
+                            rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, &data);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
                                 buffer_sprintf(
