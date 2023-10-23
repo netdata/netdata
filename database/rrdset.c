@@ -776,6 +776,9 @@ inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
     rrdset_pluginsd_receive_unslot(st);
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
+        netdata_log_info("Setting obsolete flag on chart 'host:%s/chart:%s'",
+                rrdhost_hostname(st->rrdhost), rrdset_id(st));
+
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
@@ -792,6 +795,10 @@ inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
 
 inline void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
+
+        netdata_log_info("Clearing obsolete flag on chart 'host:%s/chart:%s'",
+                rrdhost_hostname(st->rrdhost), rrdset_id(st));
+
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time_s = now_realtime_sec();
 

@@ -147,7 +147,7 @@ static void svc_rrdset_obsolete_to_free(RRDSET *st) {
     rrdset_free(st);
 }
 
-static inline void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
+static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS))
         return;
 
@@ -198,17 +198,26 @@ static inline void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 }
 
-static void svc_rrdset_check_obsoletion(RRDHOST *host) {
+static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
     worker_is_busy(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK);
 
     time_t now = now_realtime_sec();
     time_t last_entry_t;
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        last_entry_t = rrdset_last_entry_s(st);
+
+        if(last_entry_t + st->update_every * 2 + 30 < now)
+            netdata_log_error("Possibly obsolete chart 'host:%s/chart:%s', last entry is %zu secs old "
+                              "(replicating: %s, obsolete: %s, obsolete dims: %s)",
+                              rrdhost_hostname(host), rrdset_id(st), now - last_entry_t,
+                              rrdset_is_replicating(st) ? "true" : "false",
+                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) ? "true" : "false",
+                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) ? "true" : "false"
+                              );
+
         if(rrdset_is_replicating(st))
             continue;
-
-        last_entry_t = rrdset_last_entry_s(st);
 
         if(last_entry_t && last_entry_t < host->child_connect_time &&
            host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
@@ -229,7 +238,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
             continue;
 
-        svc_rrdhost_cleanup_obsolete_charts(host);
+        svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
         if(host != localhost
             && host->trigger_chart_obsoletion_check
@@ -241,7 +250,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
                 || (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
                 )
             ) {
-            svc_rrdset_check_obsoletion(host);
+            svc_rrdhost_detect_obsolete_charts(host);
             host->trigger_chart_obsoletion_check = 0;
         }
     }
