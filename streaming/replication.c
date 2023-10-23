@@ -168,7 +168,7 @@ static struct replication_query *replication_query_prepare(
     size_t count = 0;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if (unlikely(!rd || !rd_dfe.item || !rrddim_check_exposed(rd)))
+        if (unlikely(!rd || !rd_dfe.item || !rrddim_check_upstream_exposed(rd)))
             continue;
 
         if (unlikely(rd_dfe.counter >= q->dimensions)) {
@@ -217,13 +217,13 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
     NUMBER_ENCODING integer_encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st){
-        if (!rrddim_check_exposed(rd)) continue;
+        if (!rrddim_check_upstream_exposed(rd)) continue;
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1);
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush_sender_dim_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -456,7 +456,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             if(with_slots) {
                 buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-                buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush_sender_chart_slot);
+                buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush.sender.chart_slot);
             }
 
             buffer_fast_strcat(wb, " '' ", 4);
@@ -481,7 +481,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
                     if(with_slots) {
                         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-                        buffer_print_uint64_encoded(wb, integer_encoding, d->rd->rrdpush_sender_dim_slot);
+                        buffer_print_uint64_encoded(wb, integer_encoding, d->rd->rrdpush.sender.dim_slot);
                     }
 
                     buffer_fast_strcat(wb, " \"", 2);
@@ -632,7 +632,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
 
     if(with_slots) {
         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-        buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush_sender_chart_slot);
+        buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush.sender.chart_slot);
     }
 
     buffer_fast_strcat(wb, " '", 2);
@@ -692,7 +692,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
                 if(!finished_with_gap)
-                    st->upstream_resync_time_s = 0;
+                    st->rrdpush.sender.resync_time_s = 0;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
                 internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",

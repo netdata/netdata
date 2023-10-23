@@ -166,7 +166,7 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
         if(rrdset_is_replicating(st))
             continue;
 
-        RRDSET_FLAGS flags = __atomic_load_n(&st->flags, __ATOMIC_RELAXED);
+        RRDSET_FLAGS flags = rrdset_flag_get(st);
         bool obsolete_chart = flags & RRDSET_FLAG_OBSOLETE;
         bool obsolete_dims = flags & RRDSET_FLAG_OBSOLETE_DIMENSIONS;
 

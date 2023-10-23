@@ -252,23 +252,22 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
     RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
 
-    RRDDIM_FLAG_EXPOSED                         = (1 << 1), // exposed flag for streaming
-
-    RRDDIM_FLAG_OBSOLETE                        = (1 << 2),  // this is marked by the collector/module as obsolete
+    RRDDIM_FLAG_OBSOLETE                        = (1 << 1),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 3),
-    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 4),  // Metadata needs to go to the database
+    RRDDIM_FLAG_ARCHIVED                        = (1 << 2),
+    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 3),  // Metadata needs to go to the database
 
-    RRDDIM_FLAG_META_HIDDEN                     = (1 << 6), // Status of hidden option in the metadata database
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 4), // Status of hidden option in the metadata database
 
 
     // this is 8 bit
 } RRDDIM_FLAGS;
 
-#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_RELAXED) & (flag))
-#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_RELAXED)
-#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_RELAXED)
+#define rrddim_flag_get(rd) __atomic_load_n(&((rd)->flags), __ATOMIC_ACQUIRE)
+#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_ACQUIRE) & (flag))
+#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_RELEASE)
+#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_RELEASE)
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -309,8 +308,6 @@ struct rrddim {
     int32_t multiplier;                             // the multiplier of the collected values
     int32_t divisor;                                // the divider of the collected values
 
-    uint32_t rrdpush_sender_dim_slot;
-
     // ------------------------------------------------------------------------
     // operational state members
 
@@ -338,6 +335,16 @@ struct rrddim {
         void *rd_on_file;                           // pointer to the header written on disk
         storage_number *data;                       // the array of values
     } db;
+
+    // ------------------------------------------------------------------------
+    // streaming
+
+    struct {
+        struct {
+            uint32_t sent_version;
+            uint32_t dim_slot;
+        } sender;
+    } rrdpush;
 
     // ------------------------------------------------------------------------
     // data collection members
@@ -374,15 +381,6 @@ size_t rrddim_size(void);
 #define rrddim_check_updated(rd) ((rd)->collector.options & RRDDIM_OPTION_UPDATED)
 #define rrddim_set_updated(rd) (rd)->collector.options |= RRDDIM_OPTION_UPDATED
 #define rrddim_clear_updated(rd) (rd)->collector.options &= ~RRDDIM_OPTION_UPDATED
-
-#define rrddim_check_exposed(rd) rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED)
-#define rrddim_set_exposed(rd) rrddim_flag_set(rd, RRDDIM_FLAG_EXPOSED)
-#define rrddim_clear_exposed(rd) rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED)
-
-// the collector sets the exposed flag, but anyone can remove it
-// still, it can be removed, after the collector has finished
-// so, it is safe to check it without atomics
-#define rrddim_check_exposed_collector(rd) ((rd)->flags & RRDDIM_FLAG_EXPOSED)
 
 // returns the RRDDIM cache filename, or NULL if it does not exist
 const char *rrddim_cache_filename(RRDDIM *rd);
@@ -698,37 +696,37 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 
     RRDSET_FLAG_UPSTREAM_SEND                    = (1 << 6),  // if set, this chart should be sent upstream (streaming)
     RRDSET_FLAG_UPSTREAM_IGNORE                  = (1 << 7),  // if set, this chart should not be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_EXPOSED                 = (1 << 8),  // if set, we have sent this chart definition to netdata parent (streaming)
 
-    RRDSET_FLAG_STORE_FIRST                      = (1 << 9),  // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS                    = (1 << 10), // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMOGENEOUS_CHECK                = (1 << 11), // if set, the chart should be checked to determine if the dimensions are homogeneous
-    RRDSET_FLAG_HIDDEN                           = (1 << 12), // if set, do not show this chart on the dashboard, but use it for exporting
-    RRDSET_FLAG_SYNC_CLOCK                       = (1 << 13), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
-    RRDSET_FLAG_OBSOLETE_DIMENSIONS              = (1 << 14), // this is marked by the collector/module when a chart has obsolete dimensions
+    RRDSET_FLAG_STORE_FIRST                      = (1 << 8),  // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS                    = (1 << 9),  // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMOGENEOUS_CHECK                = (1 << 10), // if set, the chart should be checked to determine if the dimensions are homogeneous
+    RRDSET_FLAG_HIDDEN                           = (1 << 11), // if set, do not show this chart on the dashboard, but use it for exporting
+    RRDSET_FLAG_SYNC_CLOCK                       = (1 << 12), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_OBSOLETE_DIMENSIONS              = (1 << 13), // this is marked by the collector/module when a chart has obsolete dimensions
 
-    RRDSET_FLAG_METADATA_UPDATE                  = (1 << 16), // Mark that metadata needs to be stored
-    RRDSET_FLAG_ANOMALY_DETECTION                = (1 << 18), // flag to identify anomaly detection charts.
-    RRDSET_FLAG_INDEXED_ID                       = (1 << 19), // the rrdset is indexed by its id
-    RRDSET_FLAG_INDEXED_NAME                     = (1 << 20), // the rrdset is indexed by its name
+    RRDSET_FLAG_METADATA_UPDATE                  = (1 << 14), // Mark that metadata needs to be stored
+    RRDSET_FLAG_ANOMALY_DETECTION                = (1 << 15), // flag to identify anomaly detection charts.
+    RRDSET_FLAG_INDEXED_ID                       = (1 << 16), // the rrdset is indexed by its id
+    RRDSET_FLAG_INDEXED_NAME                     = (1 << 17), // the rrdset is indexed by its name
 
-    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION    = (1 << 21),
+    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION    = (1 << 18),
 
-    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS   = (1 << 22), // the sending side has replication in progress
-    RRDSET_FLAG_SENDER_REPLICATION_FINISHED      = (1 << 23), // the sending side has completed replication
-    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 24), // the receiving side has replication in progress
-    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 25), // the receiving side has completed replication
+    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS   = (1 << 19), // the sending side has replication in progress
+    RRDSET_FLAG_SENDER_REPLICATION_FINISHED      = (1 << 20), // the sending side has completed replication
+    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 21), // the receiving side has replication in progress
+    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 22), // the receiving side has completed replication
 
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 26), // a custom variable has been updated and needs to be exposed to parent
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 23), // a custom variable has been updated and needs to be exposed to parent
 
-    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 27), // when set, data collection is not available for this chart
+    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 24), // when set, data collection is not available for this chart
 
-    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 28), // this chart has at least one rrdcal linked
+    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 25), // this chart has at least one rrdcal linked
 } RRDSET_FLAGS;
 
-#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define rrdset_flag_get(st) __atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE)
+#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE) & (flag))
+#define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_RELEASE)
+#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_RELEASE)
 
 #define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) \
     && !rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED|RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
@@ -768,10 +766,9 @@ struct rrdset {
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
 
-    RRDSET_TYPE chart_type;                         // line, area, stacked
+    uint32_t version;                               // the metadata version (auto-increment)
 
-    uint32_t rrdpush_sender_chart_slot;
-    uint32_t rrdpush_sender_dim_last_slot_used;
+    RRDSET_TYPE chart_type;                         // line, area, stacked
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -817,7 +814,15 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
 
-    time_t upstream_resync_time_s;                    // the timestamp up to which we should resync clock upstream
+    struct {
+        struct {
+            uint32_t sent_version;
+            uint32_t chart_slot;
+            uint32_t dim_last_slot_used;
+
+            time_t resync_time_s;                   // the timestamp up to which we should resync clock upstream
+        } sender;
+    } rrdpush;
 
     // ------------------------------------------------------------------------
     // db mode SAVE, MAP specifics
@@ -887,6 +892,54 @@ struct rrdset {
 #define rrdset_context(st) string2str((st)->context)
 #define rrdset_name(st) string2str((st)->name)
 #define rrdset_id(st) string2str((st)->id)
+
+static inline uint32_t rrdset_metadata_version(RRDSET *st) {
+    return __atomic_load_n(&st->version, __ATOMIC_RELAXED);
+}
+
+static inline uint32_t rrdset_metadata_upstream_version(RRDSET *st) {
+    return __atomic_load_n(&st->rrdpush.sender.sent_version, __ATOMIC_RELAXED);
+}
+
+static inline void rrdset_metadata_updated(RRDSET *st) {
+    __atomic_add_fetch(&st->version, 1, __ATOMIC_RELAXED);
+}
+
+static inline void rrdset_metadata_exposed_upstream(RRDSET *st, uint32_t version) {
+    __atomic_store_n(&st->rrdpush.sender.sent_version, version, __ATOMIC_RELAXED);
+}
+
+static inline bool rrdset_check_upstream_exposed(RRDSET *st) {
+    return rrdset_metadata_version(st) == rrdset_metadata_upstream_version(st);
+}
+
+static inline uint32_t rrddim_metadata_version(RRDDIM *rd) {
+    // the metadata version of the dimension, is the version of the chart
+    return rrdset_metadata_version(rd->rrdset);
+}
+
+static inline uint32_t rrddim_metadata_upstream_version(RRDDIM *rd) {
+    return __atomic_load_n(&rd->rrdpush.sender.sent_version, __ATOMIC_RELAXED);
+}
+
+static inline void rrddim_metadata_updated(RRDDIM *rd) {
+    rrdset_metadata_updated(rd->rrdset);
+}
+
+static inline void rrddim_metadata_exposed_upstream(RRDDIM *rd, uint32_t version) {
+    __atomic_store_n(&rd->rrdpush.sender.sent_version, version, __ATOMIC_RELAXED);
+}
+
+static inline bool rrddim_check_upstream_exposed(RRDDIM *rd) {
+    return rrddim_metadata_version(rd) == rrddim_metadata_upstream_version(rd);
+}
+
+// the collector sets the exposed flag, but anyone can remove it
+// still, it can be removed, after the collector has finished
+// so, it is safe to check it without atomics
+static inline bool rrddim_check_upstream_exposed_collector(RRDDIM *rd) {
+    return rd->rrdset->version == rd->rrdpush.sender.sent_version;
+}
 
 STRING *rrd_string_strdupz(const char *s);
 

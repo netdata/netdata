@@ -246,6 +246,8 @@ static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
 static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
+    uint32_t version = rrdset_metadata_version(st);
+
     RRDHOST *host = st->rrdhost;
     NUMBER_ENCODING integer_encoding = stream_has_capability(host->sender, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
     bool with_slots = stream_has_capability(host->sender, STREAM_CAP_SLOTS) ? true : false;
@@ -269,7 +271,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     if(with_slots) {
         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-        buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_sender_chart_slot);
+        buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush.sender.chart_slot);
     }
 
     // send the chart
@@ -304,7 +306,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush_sender_dim_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
         }
 
         buffer_sprintf(
@@ -358,12 +360,12 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // we can set the exposed flag, after we commit the buffer
     // because replication may pick it up prematurely
     rrddim_foreach_read(rd, st) {
-        rrddim_set_exposed(rd);
+        rrddim_metadata_exposed_upstream(rd, version);
     }
     rrddim_foreach_done(rd);
-    rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_metadata_exposed_upstream(st, version);
 
-    st->upstream_resync_time_s = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
+    st->rrdpush.sender.resync_time_s = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
     return replication_progress;
 }
 
@@ -373,7 +375,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
 
-    if(st->last_collected_time.tv_sec > st->upstream_resync_time_s)
+    if(st->last_collected_time.tv_sec > st->rrdpush.sender.resync_time_s)
         buffer_print_uint64(wb, st->usec_since_last_update);
     else
         buffer_fast_strcat(wb, "0", 1);
@@ -385,7 +387,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
         if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
-        if(likely(rrddim_check_exposed_collector(rd))) {
+        if(likely(rrddim_check_upstream_exposed_collector(rd))) {
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
@@ -396,7 +398,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             internal_error(true, "STREAM: 'host:%s/chart:%s/dim:%s' flag 'exposed' is updated but not exposed",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             // we will include it in the next iteration
-            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+            rrdset_metadata_updated(st);
         }
     }
     rrddim_foreach_done(rd);
@@ -414,7 +416,7 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
-        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST)))) {
+        || !should_send_chart_matching(st, rrdset_flag_get(st)))) {
         netdata_log_info("Not-re-streaming obsolete flag on chart 'host:%s/chart:%s'",
                 rrdhost_hostname(st->rrdhost), rrdset_id(st));
         return false;
@@ -450,7 +452,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush_sender_chart_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush.sender.chart_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -474,7 +476,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 
     if(with_slots) {
         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-        buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush_sender_dim_slot);
+        buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
     }
 
     buffer_fast_strcat(wb, " '", 2);
@@ -582,8 +584,8 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     }
 
-    RRDSET_FLAGS rrdset_flags = __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST);
-    bool exposed_upstream = (rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED);
+    bool exposed_upstream = rrdset_check_upstream_exposed(st);
+    RRDSET_FLAGS rrdset_flags = rrdset_flag_get(st);
     bool replication_in_progress = !(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
     if(unlikely((exposed_upstream && replication_in_progress) ||

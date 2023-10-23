@@ -48,7 +48,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrdset = st;
 
-    rd->rrdpush_sender_dim_slot = __atomic_add_fetch(&st->rrdpush_sender_dim_last_slot_used, 1, __ATOMIC_RELAXED);
+    rd->rrdpush.sender.dim_slot = __atomic_add_fetch(&st->rrdpush.sender.dim_last_slot_used, 1, __ATOMIC_RELAXED);
 
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collector.counter = 1;
@@ -157,7 +157,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_metadata_updated(st);
 
     ml_dimension_new(rd);
 
@@ -285,7 +285,7 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        rrdset_metadata_updated(st);
     }
 
     rrdcontext_updated_rrddim(rd);
@@ -371,8 +371,7 @@ inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
 
     rrddimvar_rename_all(rd);
 
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
 
     return 1;
 }
@@ -383,8 +382,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
 
     netdata_log_debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", rrdset_id(st), rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_algorithm(rd);
     return 1;
@@ -397,8 +395,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
     netdata_log_debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from %d to %d",
           rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
     rd->multiplier = multiplier;
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_multiplier(rd);
     return 1;
@@ -411,8 +408,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
     netdata_log_debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from %d to %d",
           rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
     rd->divisor = divisor;
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_divisor(rd);
     return 1;

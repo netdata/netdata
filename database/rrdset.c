@@ -13,16 +13,16 @@ static void rrdset_rrdpush_send_chart_slot_assign(RRDSET *st) {
     spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 
     if(host->rrdpush.send.pluginsd_chart_slots.available.used > 0)
-        st->rrdpush_sender_chart_slot =
+        st->rrdpush.sender.chart_slot =
                 host->rrdpush.send.pluginsd_chart_slots.available.array[--host->rrdpush.send.pluginsd_chart_slots.available.used];
     else
-        st->rrdpush_sender_chart_slot = ++host->rrdpush.send.pluginsd_chart_slots.last_used;
+        st->rrdpush.sender.chart_slot = ++host->rrdpush.send.pluginsd_chart_slots.last_used;
 
     spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 }
 
 static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
-    if(!st->rrdpush_sender_chart_slot || st->rrdhost->rrdpush.send.pluginsd_chart_slots.available.ignore)
+    if(!st->rrdpush.sender.chart_slot || st->rrdhost->rrdpush.send.pluginsd_chart_slots.available.ignore)
         return;
 
     RRDHOST *host = st->rrdhost;
@@ -39,9 +39,9 @@ static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
     }
 
     host->rrdpush.send.pluginsd_chart_slots.available.array[host->rrdpush.send.pluginsd_chart_slots.available.used++] =
-            st->rrdpush_sender_chart_slot;
+            st->rrdpush.sender.chart_slot;
 
-    st->rrdpush_sender_chart_slot = 0;
+    st->rrdpush.sender.chart_slot = 0;
     spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
 }
 
@@ -57,7 +57,7 @@ void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
     // zero all the slots on all charts, so that they will not attempt to access the array
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        st->rrdpush_sender_chart_slot = 0;
+        st->rrdpush.sender.chart_slot = 0;
     }
     rrdset_foreach_done(st);
 }
@@ -484,7 +484,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rrdset_update_permanent_labels(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_metadata_updated(st);
 
     return ctr->react_action != RRDSET_REACT_NONE;
 }
@@ -663,7 +663,7 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_metadata_updated(st);
 
     rrdcontext_updated_rrdset_name(st);
     return 2;
@@ -784,7 +784,7 @@ inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
 
         st->last_accessed_time_s = now_realtime_sec();
 
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        rrdset_metadata_updated(st);
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
@@ -802,7 +802,7 @@ inline void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time_s = now_realtime_sec();
 
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        rrdset_metadata_updated(st);
 
         // the chart will be pushed upstream automatically
         // due to data collection

@@ -1942,7 +1942,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush_sender_chart_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush.sender.chart_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -2083,7 +2083,7 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush_sender_dim_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
