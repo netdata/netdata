@@ -371,6 +371,10 @@ void netdata_cleanup_and_exit(int ret) {
             SERVICE_REPLICATION // replication has to be stopped after STREAMING, because it cleans up ARAL
             , 3 * USEC_PER_SEC);
 
+    delta_shutdown_time("prepare metasync shutdown");
+
+    metadata_sync_shutdown_prepare();
+
     delta_shutdown_time("disable ML detection and training threads");
 
     ml_stop_threads();
@@ -395,10 +399,6 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("clean rrdhost database");
 
     rrdhost_cleanup_all();
-
-    delta_shutdown_time("prepare metasync shutdown");
-
-    metadata_sync_shutdown_prepare();
 
     delta_shutdown_time("stop aclk threads");
 
