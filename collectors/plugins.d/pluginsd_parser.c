@@ -358,15 +358,22 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
     parser->user.cleanup_slots = obsolete;
 }
 
-static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
+static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser, RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
     if(unlikely(slot < 1 || (size_t)slot > host->rrdpush.receive.pluginsd_chart_slots.size))
         return pluginsd_find_chart(host, id, keyword);
 
     RRDSET *st = host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1];
 
-    internal_fatal(st && string_strcmp(st->id, id) != 0,
-                   "wrong chart in slot %zd, expected '%s', found '%s'",
-                   slot - 1, id, string2str(st->id));
+    if(!st) {
+        st = pluginsd_find_chart(host, id, keyword);
+        if(st)
+            pluginsd_rrdset_cache_put_to_slot(parser, st, slot, rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE));
+    }
+    else {
+        internal_fatal(string_strcmp(st->id, id) != 0,
+                       "PLUGINSD: wrong chart in slot %zd, expected '%s', found '%s'",
+                       slot - 1, id, string2str(st->id));
+    }
 
     return st;
 }
@@ -422,7 +429,7 @@ static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *p
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_BEGIN);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(host, id, slot, PLUGINSD_KEYWORD_BEGIN);
+    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN))
@@ -1481,7 +1488,7 @@ static inline PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     if (likely(!id || !*id))
         st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     else
-        st = pluginsd_rrdset_cache_get_from_slot(host, id, slot, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+        st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
@@ -1876,7 +1883,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
     timing_step(TIMING_STEP_BEGIN2_PREPARE);
 
-    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(host, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
+    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
 
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 

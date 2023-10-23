@@ -417,8 +417,6 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
 
     if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
         || !should_send_chart_matching(st, rrdset_flag_get(st)))) {
-        netdata_log_info("Not-re-streaming obsolete flag on chart 'host:%s/chart:%s'",
-                rrdhost_hostname(st->rrdhost), rrdset_id(st));
         return false;
     }
 

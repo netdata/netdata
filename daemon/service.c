@@ -99,14 +99,14 @@ static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_d
             if(rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now) {
                 size_t references = dictionary_acquired_item_references(rd_dfe.item);
                 if(references == 1) {
-                    netdata_log_info("Removing obsolete dimension 'host:%s/chart:%s/dim:%s'",
-                                     rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+//                    netdata_log_info("Removing obsolete dimension 'host:%s/chart:%s/dim:%s'",
+//                                     rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
                     svc_rrddim_obsolete_to_archive(rd);
                     dim_archives++;
                 }
-                else
-                    netdata_log_info("Cannot remove obsolete dimension 'host:%s/chart:%s/dim:%s'",
-                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+//                else
+//                    netdata_log_info("Cannot remove obsolete dimension 'host:%s/chart:%s/dim:%s'",
+//                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             }
         }
     }
@@ -205,19 +205,20 @@ static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
     time_t last_entry_t;
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        last_entry_t = rrdset_last_entry_s(st);
-
-        if(last_entry_t + st->update_every * 2 + 30 < now)
-            netdata_log_error("Possibly obsolete chart 'host:%s/chart:%s', last entry is %zu secs old "
-                              "(replicating: %s, obsolete: %s, obsolete dims: %s)",
-                              rrdhost_hostname(host), rrdset_id(st), now - last_entry_t,
-                              rrdset_is_replicating(st) ? "true" : "false",
-                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) ? "true" : "false",
-                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) ? "true" : "false"
-                              );
-
         if(rrdset_is_replicating(st))
             continue;
+
+        last_entry_t = rrdset_last_entry_s(st);
+
+//        if(last_entry_t + st->update_every * 2 + 30 < now)
+//            netdata_log_error("Possibly obsolete chart 'host:%s/chart:%s', last entry is %zu secs old "
+//                              "(replicating: %s, obsolete: %s, obsolete dims: %s)",
+//                              rrdhost_hostname(host), rrdset_id(st), now - last_entry_t,
+//                              rrdset_is_replicating(st) ? "true" : "false",
+//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) ? "true" : "false",
+//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) ? "true" : "false"
+//                              );
+
 
         if(last_entry_t && last_entry_t < host->child_connect_time &&
            host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
