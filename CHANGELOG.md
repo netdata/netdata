@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix Discord webhook payload [\#16257](https://github.com/netdata/netdata/pull/16257) ([luchaos](https://github.com/luchaos))
 - Journal multiple sources [\#16252](https://github.com/netdata/netdata/pull/16252) ([ktsaou](https://github.com/ktsaou))
 - `most_popular` on markdown metadata for integrations [\#16251](https://github.com/netdata/netdata/pull/16251) ([Ancairon](https://github.com/Ancairon))
 - Dyncfg improvements [\#16250](https://github.com/netdata/netdata/pull/16250) ([ktsaou](https://github.com/ktsaou))
@@ -423,8 +424,6 @@
 - Fix exporter icons [\#15652](https://github.com/netdata/netdata/pull/15652) ([shyamvalsan](https://github.com/shyamvalsan))
 - disable freeipmi in docker by default [\#15651](https://github.com/netdata/netdata/pull/15651) ([ilyam8](https://github.com/ilyam8))
 - Fixing FreeBSD icons [\#15650](https://github.com/netdata/netdata/pull/15650) ([shyamvalsan](https://github.com/shyamvalsan))
-- Fix exporter schema to support multiple entries per file. [\#15649](https://github.com/netdata/netdata/pull/15649) ([Ferroin](https://github.com/Ferroin))
-- Fixing icons in netdata/netdata repo [\#15647](https://github.com/netdata/netdata/pull/15647) ([shyamvalsan](https://github.com/shyamvalsan))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
