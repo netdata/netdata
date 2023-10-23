@@ -1899,9 +1899,7 @@ void metaqueue_host_update_info(RRDHOST *host)
 
 void metaqueue_ml_load_models(RRDDIM *rd)
 {
-    if (unlikely(!metasync_worker.loop))
-        return;
-    queue_metadata_cmd(METADATA_ML_LOAD_MODELS, rd, NULL);
+    rrddim_flag_set(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
 }
 
 void metadata_queue_load_host_context(RRDHOST *host)
