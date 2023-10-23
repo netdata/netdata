@@ -43,6 +43,7 @@ typedef struct parser_keyword {
 } PARSER_KEYWORD;
 
 typedef struct parser_user_object {
+    bool cleanup_slots;
     RRDSET *st;
     RRDHOST *host;
     void    *opaque;

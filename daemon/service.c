@@ -90,7 +90,8 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
                 (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
                     )) {
 
-            if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
+            size_t references = dictionary_acquired_item_references(rd_dfe.item);
+            if(references == 1) {
                 netdata_log_info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
                 svc_rrddim_obsolete_to_archive(rd);
             }
