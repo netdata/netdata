@@ -1338,6 +1338,10 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     bool more_to_do = false;
     uint32_t scan_count = 1;
 
+    sqlite3_stmt *ml_load_stmt = NULL;
+
+    bool load_ml_models = max_count;
+
     if (use_transaction)
         (void)db_execute(db_meta, "BEGIN TRANSACTION");
 
@@ -1382,6 +1386,14 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
                                  rrdhost_hostname(host), rrdset_name(st),
                                  rrddim_name(rd));
             }
+
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_ML_MODEL_LOAD)) {
+                rrddim_flag_clear(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
+                if (likely(load_ml_models))
+                    (void) ml_dimension_load_models(rd, &ml_load_stmt);
+            }
+
+            worker_is_idle();
         }
         rrddim_foreach_done(rd);
     }
@@ -1389,6 +1401,11 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
 
     if (use_transaction)
         (void)db_execute(db_meta, "COMMIT TRANSACTION");
+
+    if (ml_load_stmt) {
+        sqlite3_finalize(ml_load_stmt);
+        ml_load_stmt = NULL;
+    }
 
     return more_to_do;
 }
