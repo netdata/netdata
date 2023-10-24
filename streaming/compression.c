@@ -144,6 +144,8 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
             .src = state->input.data,
     };
 
+    ZSTD_inBuffer inBuffer_copy = inBuffer;
+
     size_t wanted_size = MAX(ZSTD_compressBound(inBuffer.size - inBuffer.pos), ZSTD_CStreamOutSize());
     ring_buffer_make_room(&state->output, wanted_size);
 
@@ -152,6 +154,8 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
             .size = state->output.size,
             .dst = (void *)state->output.data,
     };
+
+    ZSTD_outBuffer outBuffer_copy = outBuffer;
 
     // compress
     size_t ret = ZSTD_compressStream(state->stream, &outBuffer, &inBuffer);
@@ -163,9 +167,24 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
     }
 
     if(outBuffer.pos == 0) {
+        char buf[inBuffer_copy.size - inBuffer_copy.pos + 1];
+        memcpy(buf, &inBuffer_copy.src[inBuffer_copy.pos], inBuffer_copy.size - inBuffer_copy.pos);
+        buf[sizeof(buf) - 1] = '\0';
+
         netdata_log_error("STREAM: ZSTD_compressStream() returned zero compressed bytes "
-                          "(source is %zu bytes, output buffer can fit %zu bytes)",
-                          size, outBuffer.size);
+                          "(source is %zu bytes, output buffer can fit %zu bytes) "
+                          "in_pre:[pos %zu, size %zu] "
+                          "in_post:[pos %zu, size %zu] "
+                          "out_pre:[pos %zu, size %zu] "
+                          "out_post:[pos %zu, size %zu] "
+                          "text: '%s'"
+                          , size, outBuffer.size
+                          , inBuffer_copy.pos, inBuffer_copy.size
+                          , inBuffer.pos, inBuffer.size
+                          , outBuffer_copy.pos, outBuffer_copy.size
+                          , outBuffer.pos, outBuffer.size
+                          , buf
+                          );
         return 0;
     }
 
