@@ -127,6 +127,10 @@ static inline size_t rrdpush_compress_lz4(struct compressor_state *state, const 
 
     state->input.read_pos = state->input.write_pos;
 
+    state->sender_locked.total_compressions++;
+    state->sender_locked.total_uncompressed += size;
+    state->sender_locked.total_compressed += compressed_data_size;
+
     *out = state->output.data;
     return compressed_data_size;
 }
@@ -201,6 +205,10 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
 
     if(state->input.read_pos >= state->input.write_pos)
         ring_buffer_reset(&state->input);
+
+    state->sender_locked.total_compressions++;
+    state->sender_locked.total_uncompressed += size;
+    state->sender_locked.total_compressed += outBuffer.pos;
 
     // return values
     *out = state->output.data;

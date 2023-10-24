@@ -37,6 +37,12 @@ struct compressor_state {
     struct compression_ring_buffer output;
 
     void *stream;
+
+    struct {
+        size_t total_compressed;
+        size_t total_uncompressed;
+        size_t total_compressions;
+    } sender_locked;
 };
 
 void rrdpush_compressor_init(struct compressor_state *state);
