@@ -2419,8 +2419,10 @@ static void function_systemd_journal(const char *transaction, char *function, in
                 value = sep;
             }
 
-            if(buffer_strlen(sources_list))
+            if(buffer_strlen(sources_list)) {
+                simple_pattern_free(sources);
                 sources = simple_pattern_create(buffer_tostring(sources_list), ",", SIMPLE_PATTERN_EXACT, false);
+            }
 
             buffer_free(sources_list);
 
