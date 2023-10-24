@@ -5,6 +5,10 @@
 #include "lz4.h"
 #include <zstd.h>
 
+#ifndef ZSTD_CLEVEL_DEFAULT
+#  define ZSTD_CLEVEL_DEFAULT 3
+#endif
+
 // ----------------------------------------------------------------------------
 // ring buffers
 
