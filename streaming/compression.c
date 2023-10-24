@@ -143,14 +143,13 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
     };
 
     // compress
-    size_t remaining = ZSTD_compressStream2(state->stream,
+    size_t ret = ZSTD_compressStream(state->stream,
                                             &outBuffer,
-                                            &inBuffer,
-                                            ZSTD_e_continue);
+                                            &inBuffer);
 
     // error handling
-    if(ZSTD_isError(remaining)) {
-        netdata_log_error("STREAM: ZSTD_compressStream2() return error: %s", ZSTD_getErrorName(remaining));
+    if(ZSTD_isError(ret)) {
+        netdata_log_error("STREAM: ZSTD_compressStream2() return error: %s", ZSTD_getErrorName(ret));
         return 0;
     }
 
