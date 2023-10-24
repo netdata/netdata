@@ -271,7 +271,7 @@ static inline void rrdpush_decompressor_init_lz4(struct decompressor_state *stat
     if(!state->initialized) {
         state->initialized = true;
         state->stream = LZ4_createStreamDecode();
-        ring_buffer_make_room(&state->output, LZ4_decoderRingBufferSize(COMPRESSION_MAX_MSG_SIZE) * 2);
+        ring_buffer_make_room(&state->output, COMPRESSION_MAX_MSG_SIZE * 2);
     }
 }
 
