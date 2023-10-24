@@ -149,7 +149,7 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
 
     // error handling
     if(ZSTD_isError(ret)) {
-        netdata_log_error("STREAM: ZSTD_compressStream2() return error: %s", ZSTD_getErrorName(ret));
+        netdata_log_error("STREAM: ZSTD_compressStream() return error: %s", ZSTD_getErrorName(ret));
         return 0;
     }
 

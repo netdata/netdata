@@ -11,8 +11,8 @@ typedef uint32_t rrdpush_signature_t;
 #define RRDPUSH_COMPRESSION_SIGNATURE_MASK ((rrdpush_signature_t)0xff | (0x80 << 8) | (0x80 << 16) | (0xff << 24))
 #define RRDPUSH_COMPRESSION_SIGNATURE_SIZE sizeof(rrdpush_signature_t)
 
-static inline uint32_t rrdpush_compress_encode_signature(size_t compressed_data_size) {
-    uint32_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;
+static inline rrdpush_signature_t rrdpush_compress_encode_signature(size_t compressed_data_size) {
+    rrdpush_signature_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;
     return len | RRDPUSH_COMPRESSION_SIGNATURE;
 }
 
@@ -67,7 +67,7 @@ static inline size_t rrdpush_decompress_decode_signature(const char *data, size_
     if (unlikely(data_size != RRDPUSH_COMPRESSION_SIGNATURE_SIZE))
         return 0;
 
-    uint32_t sign = *(uint32_t *)data;
+    rrdpush_signature_t sign = *(rrdpush_signature_t *)data;
     if (unlikely((sign & RRDPUSH_COMPRESSION_SIGNATURE_MASK) != RRDPUSH_COMPRESSION_SIGNATURE))
         return 0;
 

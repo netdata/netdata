@@ -162,6 +162,10 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
             }
 
             rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
+
+            if(rrdpush_decompress_decode_signature((const char *)&signature, sizeof(signature)) != dst_len)
+                fatal("RRDPUSH COMPRESSION: invalid signature");
+
             if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature)))
                 s->flags |= SENDER_FLAG_OVERFLOW;
             else {
