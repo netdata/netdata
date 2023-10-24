@@ -149,7 +149,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                       rrdhost_hostname(s->host), s->connected_to);
 
-                rrdpush_compressor_init(&s->compressor);
+                rrdpush_compression_initialize(s);
                 dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
                 if(!dst_len) {
                     netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",

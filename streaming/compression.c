@@ -224,10 +224,7 @@ static inline size_t rrdpush_decompress_zstd(struct decompressor_state *state, c
     if(unlikely(state->output.read_pos != state->output.write_pos))
         fatal("RRDPUSH_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
 
-    if (unlikely(state->output.write_pos >= state->output.size / 2)) {
-        state->output.write_pos = 0;
-        state->output.read_pos = 0;
-    }
+    ring_buffer_reset(&state->output);
 
     ZSTD_inBuffer inBuffer = {
             .pos = 0,
@@ -279,7 +276,7 @@ static inline void rrdpush_decompressor_init_zstd(struct decompressor_state *sta
     if(!state->initialized) {
         state->initialized = true;
         state->stream = ZSTD_createDStream();
-        ring_buffer_make_room(&state->output, COMPRESSION_MAX_MSG_SIZE * 2);
+        ring_buffer_make_room(&state->output, COMPRESSION_MAX_MSG_SIZE);
     }
 }
 #endif
