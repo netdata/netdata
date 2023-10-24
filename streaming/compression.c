@@ -1,4 +1,4 @@
-#include "rrdpush.h"
+#include "compression.h"
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
 #include "lz4.h"

@@ -666,6 +666,7 @@ API_PLUGIN_FILES = \
 STREAMING_PLUGIN_FILES = \
     streaming/rrdpush.c \
     streaming/compression.c \
+    streaming/compression.h \
     streaming/sender.c \
     streaming/receiver.c \
     streaming/replication.h \
