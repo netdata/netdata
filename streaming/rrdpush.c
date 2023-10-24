@@ -1492,6 +1492,9 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
         // DATA WITH ML requires INTERPOLATED
         common_caps &= ~STREAM_CAP_DATA_WITH_ML;
 
+    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_ZSTD)) == (STREAM_CAP_LZ4|STREAM_CAP_ZSTD))
+        common_caps &= ~STREAM_CAP_LZ4;
+
     return common_caps;
 }
 
