@@ -118,8 +118,10 @@ static inline size_t rrdpush_compress_lz4(struct compressor_state *state, const 
             (int)state->output.size,
             1);
 
-    if (compressed_data_size < 0) {
-        netdata_log_error("Data compression error: %ld", compressed_data_size);
+    if (compressed_data_size <= 0) {
+        netdata_log_error("STREAM: LZ4_compress_fast_continue() returned %ld "
+                          "(source is %zu bytes, output buffer can fit %zu bytes)",
+                          compressed_data_size, size, state->output.size);
         return 0;
     }
 
@@ -152,9 +154,7 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
     };
 
     // compress
-    size_t ret = ZSTD_compressStream(state->stream,
-                                            &outBuffer,
-                                            &inBuffer);
+    size_t ret = ZSTD_compressStream(state->stream, &outBuffer, &inBuffer);
 
     // error handling
     if(ZSTD_isError(ret)) {
@@ -162,12 +162,17 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
         return 0;
     }
 
+    if(outBuffer.pos == 0) {
+        netdata_log_error("STREAM: ZSTD_compressStream() returned zero compressed bytes "
+                          "(source is %zu bytes, output buffer can fit %zu bytes)",
+                          size, outBuffer.size);
+        return 0;
+    }
+
     state->input.read_pos = inBuffer.pos;
 
-    if(state->input.read_pos >= state->input.write_pos) {
-        state->input.read_pos = 0;
-        state->input.write_pos = 0;
-    }
+    if(state->input.read_pos >= state->input.write_pos)
+        ring_buffer_reset(&state->input);
 
     // return values
     *out = state->output.data;
