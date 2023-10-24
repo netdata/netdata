@@ -86,9 +86,9 @@ modules:
           description: ""
           labels:
             - name: container_name
-              description: TBD
+              description: The container name or group path if name resolution fails.
             - name: image
-              description: TBD
+              description: Docker/Podman container image name.
           metrics:
             - name: cgroup.cpu_limit
               description: CPU Usage within the limits
@@ -314,13 +314,15 @@ modules:
           description: ""
           labels:
             - name: container_name
-              description: TBD
+              description: The container name or group path if name resolution fails.
             - name: image
-              description: TBD
+              description: Docker/Podman container image name.
             - name: device
-              description: TBD
+              description: "The name of the host network interface linked to the container's network interface."
+            - name: container_device
+              description: Container network interface name.
             - name: interface_type
-              description: TBD
+              description: 'Network interface type. Always "virtual" for the containers.'
           metrics:
             - name: cgroup.net_net
               description: Bandwidth
@@ -445,30 +447,26 @@ modules:
       availability: []
       scopes:
         - name: k8s cgroup
-          description: ""
+          description: These metrics refer to the Pod container.
           labels:
-            - name: k8s_namespace
-              description: TBD
-            - name: k8s_pod_name
-              description: TBD
-            - name: k8s_pod_uid
-              description: TBD
-            - name: k8s_controller_kind
-              description: TBD
-            - name: k8s_controller_name
-              description: TBD
             - name: k8s_node_name
-              description: TBD
+              description: 'Node name. The value of _pod.spec.nodeName_.'
+            - name: k8s_namespace
+              description: 'Namespace name. The value of _pod.metadata.namespace_.'
+            - name: k8s_controller_kind
+              description: 'Controller kind (ReplicaSet, DaemonSet, StatefulSet, Job, etc.). The value of _pod.OwnerReferences.Controller.Kind_.'
+            - name: k8s_controller_name
+              description: 'Controller name.The value of _pod.OwnerReferences.Controller.Name_.'
+            - name: k8s_pod_name
+              description: 'Pod name. The value of _pod.metadata.name_.'
             - name: k8s_container_name
-              description: TBD
-            - name: k8s_container_id
-              description: TBD
+              description: 'Container name. The value of _pod.spec.containers.name_.'
             - name: k8s_kind
-              description: TBD
+              description: 'Instance kind: "pod" or "container".'
             - name: k8s_qos_class
-              description: TBD
+              description: 'QoS class (guaranteed, burstable, besteffort).'
             - name: k8s_cluster_id
-              description: TBD
+              description: 'Cluster ID. The value of kube-system namespace _namespace.metadata.uid_.'
           metrics:
             - name: k8s.cgroup.cpu_limit
               description: CPU Usage within the limits
@@ -691,34 +689,32 @@ modules:
               dimensions:
                 - name: time
         - name: k8s cgroup network device
-          description: ""
+          description: These metrics refer to the Pod container network interface.
           labels:
             - name: device
-              description: TBD
+              description: "The name of the host network interface linked to the container's network interface."
+            - name: container_device
+              description: Container network interface name.
             - name: interface_type
-              description: TBD
-            - name: k8s_namespace
-              description: TBD
-            - name: k8s_pod_name
-              description: TBD
-            - name: k8s_pod_uid
-              description: TBD
-            - name: k8s_controller_kind
-              description: TBD
-            - name: k8s_controller_name
-              description: TBD
+              description: 'Network interface type. Always "virtual" for the containers.'
             - name: k8s_node_name
-              description: TBD
+              description: 'Node name. The value of _pod.spec.nodeName_.'
+            - name: k8s_namespace
+              description: 'Namespace name. The value of _pod.metadata.namespace_.'
+            - name: k8s_controller_kind
+              description: 'Controller kind (ReplicaSet, DaemonSet, StatefulSet, Job, etc.). The value of _pod.OwnerReferences.Controller.Kind_.'
+            - name: k8s_controller_name
+              description: 'Controller name.The value of _pod.OwnerReferences.Controller.Name_.'
+            - name: k8s_pod_name
+              description: 'Pod name. The value of _pod.metadata.name_.'
             - name: k8s_container_name
-              description: TBD
-            - name: k8s_container_id
-              description: TBD
+              description: 'Container name. The value of _pod.spec.containers.name_.'
             - name: k8s_kind
-              description: TBD
+              description: 'Instance kind: "pod" or "container".'
             - name: k8s_qos_class
-              description: TBD
+              description: 'QoS class (guaranteed, burstable, besteffort).'
             - name: k8s_cluster_id
-              description: TBD
+              description: 'Cluster ID. The value of kube-system namespace _namespace.metadata.uid_.'
           metrics:
             - name: k8s.cgroup.net_net
               description: Bandwidth
