@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/** @file logsmanagement_conf.h
+/** @file defaults.h
  *  @brief Hard-coded configuration settings for the Logs Management engine
  */
 
-#ifndef LOGSMANAGEMENT_CONF_H_
-#define LOGSMANAGEMENT_CONF_H_
+#ifndef LOGSMANAG_DEFAULTS_H_
+#define LOGSMANAG_DEFAULTS_H_
 
 /* -------------------------------------------------------------------------- */
 /*                                  General                                   */
@@ -104,8 +104,16 @@ typedef enum {
 
 
 /* -------------------------------------------------------------------------- */
-/*                         Fluent Bit Forward config                          */
+/*                                Fluent Bit                                  */
 /* -------------------------------------------------------------------------- */
+
+#define FLB_FLUSH_DEFAULT "0.1"                          /**< Default Fluent Bit flush interval **/
+#define FLB_HTTP_LISTEN_DEFAULT "0.0.0.0"                /**< Default Fluent Bit server listening socket **/
+#define FLB_HTTP_PORT_DEFAULT "2020"                     /**< Default Fluent Bit server listening port **/
+#define FLB_HTTP_SERVER_DEFAULT "false"                  /**< Default Fluent Bit server enable status **/
+#define FLB_LOG_FILENAME_DEFAULT "fluentbit.log"         /**< Default Fluent Bit log filename **/
+#define FLB_LOG_LEVEL_DEFAULT "info"                     /**< Default Fluent Bit log level **/
+#define FLB_CORO_STACK_SIZE_DEFAULT "24576"              /**< Default Fluent Bit coro stack size - do not change this value unless there is a good reason **/
 
 #define FLB_FORWARD_UNIX_PATH_DEFAULT ""                 /**< Default path for Forward unix socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/
 #define FLB_FORWARD_UNIX_PERM_DEFAULT "0644"             /**< Default permissions for Forward unix socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/
@@ -129,4 +137,4 @@ typedef enum {
 /* -------------------------------------------------------------------------- */
 
 
-#endif  // LOGSMANAGEMENT_CONF_H_
+#endif  // LOGSMANAG_DEFAULTS_H_

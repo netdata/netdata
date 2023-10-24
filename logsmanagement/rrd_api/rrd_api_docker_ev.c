@@ -4,183 +4,134 @@
 
 void docker_ev_chart_init(struct File_info *p_file_info){
     p_file_info->chart_meta->chart_data_docker_ev = callocz(1, sizeof (struct Chart_data_docker_ev));
-    chart_data_docker_ev_t *chart_data = p_file_info->chart_meta->chart_data_docker_ev;
-    chart_data->tv.tv_sec = now_realtime_sec(); // initial value shouldn't be 0
+    p_file_info->chart_meta->chart_data_docker_ev->last_update = now_realtime_sec(); // initial value shouldn't be 0
     long chart_prio = p_file_info->chart_meta->base_prio;
 
-    /* Number of collected logs total - initialise */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){
-        chart_data->st_lines_total = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "collected_logs_total"
-                , NULL
-                , "collected_logs"
-                , "docker_events_logs.logs_total"
-                , CHART_TITLE_TOTAL_COLLECTED_LOGS
-                , "log records"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_AREA
-        );
-        chart_data->dim_lines_total = rrddim_add(chart_data->st_lines_total, "total records", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    }
-
-    /* Number of collected logs rate - initialise */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){
-        chart_data->st_lines_rate = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "collected_logs_rate"
-                , NULL
-                , "collected_logs"
-                , "docker_events_logs.logs_rate"
-                , CHART_TITLE_RATE_COLLECTED_LOGS
-                , "log records"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_LINE
-        );
-        chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines_rate, "records", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
+    do_num_of_logs_charts_init(p_file_info, chart_prio);
 
     /* Docker events type - initialise */
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_TYPE){
-        chart_data->st_dock_ev_type = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "events_type"
-                , NULL
-                , "event_type"
-                , "docker_events_logs.events_type"
-                , "Events type"
-                , "events types"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_AREA
-        );
-        for(int idx = 0; idx < NUM_OF_DOCKER_EV_TYPES; idx++){
-            chart_data->dim_dock_ev_type[idx] = rrddim_add( chart_data->st_dock_ev_type, 
-                                                            docker_ev_type_string[idx], NULL, 
-                                                            1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
+        create_chart(
+            (char *) p_file_info->chart_name    // type
+            , "events_type"                     // id
+            , "Events type"                     // title
+            , "events types"                    // units
+            , "event_type"                      // family
+            , "Docker Events Logs.events_type"  // context
+            , RRDSET_TYPE_AREA_NAME             // chart_type
+            , ++chart_prio                      // priority
+            , p_file_info->update_every         // update_every
+        );  
+        
+        for(int idx = 0; idx < NUM_OF_DOCKER_EV_TYPES; idx++)
+            add_dim(docker_ev_type_string[idx], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
     }
 
     /* Docker events actions - initialise */
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_ACTION){
-        chart_data->st_dock_ev_action = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "events_action"
-                , NULL
-                , "event_action"
-                , "docker_events_logs.events_actions"
-                , "Events action"
-                , "events actions"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_AREA
+        create_chart(
+            (char *) p_file_info->chart_name      // type
+            , "events_action"                     // id
+            , "Events action"                     // title
+            , "events actions"                    // units
+            , "event_action"                      // family
+            , "Docker Events Logs.events_actions" // context
+            , RRDSET_TYPE_AREA_NAME               // chart_type
+            , ++chart_prio                        // priority
+            , p_file_info->update_every           // update_every
         );
+
+        for(int ev_off = 0; ev_off < NUM_OF_DOCKER_EV_TYPES; ev_off++){
+            int act_off = -1;
+            while(docker_ev_action_string[ev_off][++act_off] != NULL){
+
+                char dim[50];
+                snprintfz(dim, 50, "%s %s", 
+                        docker_ev_type_string[ev_off], 
+                        docker_ev_action_string[ev_off][act_off]);
+                
+                add_dim(dim, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+            }
+        }
     }
 
-    do_custom_charts_init();
+    do_custom_charts_init(p_file_info);
 }
 
 void docker_ev_chart_update(struct File_info *p_file_info){
     chart_data_docker_ev_t *chart_data = p_file_info->chart_meta->chart_data_docker_ev;
 
-    if(chart_data->tv.tv_sec != p_file_info->parser_metrics->tv.tv_sec){
+    if(chart_data->last_update != p_file_info->parser_metrics->last_update){
 
-        time_t lag_in_sec = p_file_info->parser_metrics->tv.tv_sec - chart_data->tv.tv_sec - 1;
+        time_t lag_in_sec = p_file_info->parser_metrics->last_update - chart_data->last_update - 1;
 
-        chart_data->tv = p_file_info->parser_metrics->tv;
-
-        struct timeval tv = {
-            .tv_sec = chart_data->tv.tv_sec - lag_in_sec,
-            .tv_usec = chart_data->tv.tv_usec
-        };
-
-        do_num_of_logs_charts_update(p_file_info, chart_data, tv, lag_in_sec);
+        do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
 
         /* Docker events type - update */
         if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_TYPE){
-            if(likely(chart_data->st_dock_ev_type->counter_done)){
+            for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;
+                        sec < p_file_info->parser_metrics->last_update;
+                        sec++){
 
-                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;                
-                
-                while(tv.tv_sec < chart_data->tv.tv_sec){
-                    for(int j = 0; j < NUM_OF_DOCKER_EV_TYPES; j++)
-                        rrddim_set_by_pointer(  chart_data->st_dock_ev_type, 
-                                                chart_data->dim_dock_ev_type[j], 
-                                                chart_data->num_dock_ev_type[j]);
-                    rrdset_timed_done(  chart_data->st_dock_ev_type, tv, true);
-                    tv.tv_sec++;
-                }
+                update_chart_begin(p_file_info->chart_name, "events_type");
+                for(int idx = 0; idx < NUM_OF_DOCKER_EV_TYPES; idx++)
+                    update_chart_set(docker_ev_type_string[idx], chart_data->num_dock_ev_type[idx]);
+                update_chart_end(sec);
             }
 
-            for(int j = 0; j < NUM_OF_DOCKER_EV_TYPES; j++){
-                chart_data->num_dock_ev_type[j] += p_file_info->parser_metrics->docker_ev->ev_type[j];
-                p_file_info->parser_metrics->docker_ev->ev_type[j] = 0;
-
-                rrddim_set_by_pointer(  chart_data->st_dock_ev_type, 
-                                        chart_data->dim_dock_ev_type[j], 
-                                        chart_data->num_dock_ev_type[j]);
+            update_chart_begin(p_file_info->chart_name, "events_type");
+            for(int idx = 0; idx < NUM_OF_DOCKER_EV_TYPES; idx++){
+                chart_data->num_dock_ev_type[idx] = p_file_info->parser_metrics->docker_ev->ev_type[idx];
+                update_chart_set(docker_ev_type_string[idx], chart_data->num_dock_ev_type[idx]);
             }
-            rrdset_timed_done(  chart_data->st_dock_ev_type, chart_data->tv, 
-                                chart_data->st_dock_ev_type->counter_done != 0);
+            update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
         /* Docker events action - update */
         if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_ACTION){
-            if(likely(chart_data->st_dock_ev_action->counter_done)){
+            char dim[50];
 
-                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
+            for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;
+                        sec < p_file_info->parser_metrics->last_update;
+                        sec++){
 
-                while(tv.tv_sec < chart_data->tv.tv_sec){
-                    for(int ev_off = 0; ev_off < NUM_OF_DOCKER_EV_TYPES; ev_off++){
-                        int act_off = -1;
-                        while(docker_ev_action_string[ev_off][++act_off] != NULL){
-                            if(chart_data->dim_dock_ev_action[ev_off][act_off])
-                                rrddim_set_by_pointer(  chart_data->st_dock_ev_action, 
-                                                        chart_data->dim_dock_ev_action[ev_off][act_off], 
-                                                        chart_data->num_dock_ev_action[ev_off][act_off]);
+                update_chart_begin(p_file_info->chart_name, "events_action");
+                for(int ev_off = 0; ev_off < NUM_OF_DOCKER_EV_TYPES; ev_off++){
+                    int act_off = -1;
+                    while(docker_ev_action_string[ev_off][++act_off] != NULL){
+                        if(chart_data->num_dock_ev_action[ev_off][act_off]){
+                            snprintfz(dim, 50, "%s %s", 
+                                    docker_ev_type_string[ev_off], 
+                                    docker_ev_action_string[ev_off][act_off]);
+                            update_chart_set(dim, chart_data->num_dock_ev_action[ev_off][act_off]);
                         }
                     }
-                    rrdset_timed_done(  chart_data->st_dock_ev_action, tv, true);
-                    tv.tv_sec++;
                 }
+                update_chart_end(sec);
             }
 
+            update_chart_begin(p_file_info->chart_name, "events_action");
             for(int ev_off = 0; ev_off < NUM_OF_DOCKER_EV_TYPES; ev_off++){
                 int act_off = -1;
                 while(docker_ev_action_string[ev_off][++act_off] != NULL){
-                    chart_data->num_dock_ev_action[ev_off][act_off] += 
+                    chart_data->num_dock_ev_action[ev_off][act_off] = 
                         p_file_info->parser_metrics->docker_ev->ev_action[ev_off][act_off];
 
-                    p_file_info->parser_metrics->docker_ev->ev_action[ev_off][act_off] = 0;
-
-                    if(unlikely(!chart_data->dim_dock_ev_action[ev_off][act_off] && 
-                                chart_data->num_dock_ev_action[ev_off][act_off])){
-                        char dim_name[50];
-                        snprintfz(dim_name, 50, "%s %s", docker_ev_type_string[ev_off], docker_ev_action_string[ev_off][act_off]);
-                        chart_data->dim_dock_ev_action[ev_off][act_off] = rrddim_add(chart_data->st_dock_ev_action, 
-                                                                                    dim_name, NULL, 1, 1, 
-                                                                                    RRD_ALGORITHM_INCREMENTAL);
+                    if(chart_data->num_dock_ev_action[ev_off][act_off]){
+                        snprintfz(dim, 50, "%s %s", 
+                                docker_ev_type_string[ev_off], 
+                                docker_ev_action_string[ev_off][act_off]);
+                        update_chart_set(dim, chart_data->num_dock_ev_action[ev_off][act_off]);
                     }
-                    if(chart_data->dim_dock_ev_action[ev_off][act_off])
-                        rrddim_set_by_pointer(  chart_data->st_dock_ev_action, 
-                                            chart_data->dim_dock_ev_action[ev_off][act_off], 
-                                            chart_data->num_dock_ev_action[ev_off][act_off]);
                 }
             }
-            rrdset_timed_done(  chart_data->st_dock_ev_action, chart_data->tv, 
-                                chart_data->st_dock_ev_action->counter_done != 0);
+            update_chart_end(p_file_info->parser_metrics->last_update);
+
         }
 
-        do_custom_charts_update();
+        do_custom_charts_update(p_file_info, lag_in_sec);
+
+        chart_data->last_update = p_file_info->parser_metrics->last_update;
     }
+
 }

@@ -83,6 +83,9 @@ debugfs.plugin
 systemd-journal.plugin
 !systemd-journal.plugin/
 
+logs-management.plugin
+!logs-management.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h

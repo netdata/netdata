@@ -21,15 +21,13 @@ typedef struct Chart_data_mqtt chart_data_mqtt_t;
 
 struct Chart_data_mqtt {
 
-    struct timeval tv;
+    time_t last_update;
 
     /* Number of collected log records */
-    RRDSET *st_lines_total, *st_lines_rate;
-    RRDDIM *dim_lines_total, *dim_lines_rate;
     collected_number num_lines;
 
     /* MQTT metrics - Topic */
-    RRDSET *st_topic;
+    struct Chart_str cs_topic;
     // Special case: Topic dimension and number are part of Mqtt_metrics_t
 };
 

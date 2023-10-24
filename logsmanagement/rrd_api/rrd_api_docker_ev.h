@@ -21,21 +21,15 @@ typedef struct Chart_data_docker_ev chart_data_docker_ev_t;
 
 struct Chart_data_docker_ev {
 
-    struct timeval tv;
+    time_t last_update;
 
     /* Number of collected log records */
-    RRDSET *st_lines_total, *st_lines_rate;
-    RRDDIM *dim_lines_total, *dim_lines_rate;
     collected_number num_lines;
 
     /* Docker events metrics - event type */
-    RRDSET *st_dock_ev_type;
-    RRDDIM *dim_dock_ev_type[NUM_OF_DOCKER_EV_TYPES];
     collected_number num_dock_ev_type[NUM_OF_DOCKER_EV_TYPES];
 
     /* Docker events metrics - action type */
-    RRDSET *st_dock_ev_action;
-    RRDDIM *dim_dock_ev_action[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS];
     collected_number num_dock_ev_action[NUM_OF_DOCKER_EV_TYPES][NUM_OF_CONTAINER_ACTIONS];
 };
 

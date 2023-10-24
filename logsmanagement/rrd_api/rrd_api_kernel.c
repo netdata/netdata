@@ -5,219 +5,164 @@
 void kernel_chart_init(struct File_info *p_file_info){
     p_file_info->chart_meta->chart_data_kernel = callocz(1, sizeof (struct Chart_data_kernel));
     chart_data_kernel_t *chart_data = p_file_info->chart_meta->chart_data_kernel;
-    chart_data->tv.tv_sec = now_realtime_sec(); // initial value shouldn't be 0
+    chart_data->last_update = now_realtime_sec(); // initial value shouldn't be 0
     long chart_prio = p_file_info->chart_meta->base_prio;
 
-    /* Number of collected logs total - initialise */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){
-        chart_data->st_lines_total = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "collected_logs_total"
-                , NULL
-                , "collected_logs"
-                , NULL
-                , CHART_TITLE_TOTAL_COLLECTED_LOGS
-                , "log records"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_AREA
-        );
-        chart_data->dim_lines_total = rrddim_add(chart_data->st_lines_total, "total records", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    }
-
-    /* Number of collected logs rate - initialise */
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){
-        chart_data->st_lines_rate = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "collected_logs_rate"
-                , NULL
-                , "collected_logs"
-                , NULL
-                , CHART_TITLE_RATE_COLLECTED_LOGS
-                , "log records"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_LINE
-        );
-        chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines_rate, "records", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
+    do_num_of_logs_charts_init(p_file_info, chart_prio);
 
     /* Syslog severity level (== Systemd priority) - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-        chart_data->st_sever = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "severity_levels"
-                , NULL
-                , "severity"
-                , NULL
-                , "Severity Levels"
-                , "severity levels"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_AREA
-        );
-        chart_data->dim_sever[0] = rrddim_add(chart_data->st_sever, "0:Emergency", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        chart_data->dim_sever[1] = rrddim_add(chart_data->st_sever, "1:Alert",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        chart_data->dim_sever[2] = rrddim_add(chart_data->st_sever, "2:Critical",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        chart_data->dim_sever[3] = rrddim_add(chart_data->st_sever, "3:Error",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        chart_data->dim_sever[4] = rrddim_add(chart_data->st_sever, "4:Warning",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        chart_data->dim_sever[5] = rrddim_add(chart_data->st_sever, "5:Notice",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        chart_data->dim_sever[6] = rrddim_add(chart_data->st_sever, "6:Informational", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);                                                 
-        chart_data->dim_sever[7] = rrddim_add(chart_data->st_sever, "7:Debug",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);     
-        chart_data->dim_sever[8] = rrddim_add(chart_data->st_sever, "Unknown",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);  
+        create_chart(
+            (char *) p_file_info->chart_name    // type
+            , "severity_levels"                 // id
+            , "Severity Levels"                 // title
+            , "severity levels"                 // units
+            , "severity"                        // family
+            , NULL                              // context
+            , RRDSET_TYPE_AREA_NAME             // chart_type
+            , ++chart_prio                      // priority
+            , p_file_info->update_every         // update_every
+        ); 
+
+        for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++)
+            add_dim(dim_sever_str[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+  
     }
 
     /* Subsystem - initialise */
     if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
-        chart_data->st_subsys = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "subsystems"
-                , NULL
-                , "subsystem"
-                , NULL
-                , "Subsystems"
-                , "subsystems"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_AREA
-        ); 
+        chart_data->cs_subsys = create_chart(
+            (char *) p_file_info->chart_name            // type
+            , "subsystems"                              // id
+            , "Subsystems"                              // title
+            , "subsystems"                              // units
+            , "subsystem"                               // family
+            , NULL                                      // context
+            , RRDSET_TYPE_AREA_NAME                     // chart_type
+            , ++chart_prio                              // priority
+            , p_file_info->update_every                 // update_every
+        );
     }
 
     /* Device - initialise */
     if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
-        chart_data->st_device = rrdset_create_localhost(
-                (char *) p_file_info->chart_name
-                , "devices"
-                , NULL
-                , "device"
-                , NULL
-                , "Devices"
-                , "devices"
-                , "logsmanagement.plugin"
-                , NULL
-                , ++chart_prio
-                , p_file_info->update_every
-                , RRDSET_TYPE_AREA
+        chart_data->cs_device = create_chart(
+            (char *) p_file_info->chart_name            // type
+            , "devices"                                 // id
+            , "Devices"                                 // title
+            , "devices"                                 // units
+            , "device"                                  // family
+            , NULL                                      // context
+            , RRDSET_TYPE_AREA_NAME                     // chart_type
+            , ++chart_prio                              // priority
+            , p_file_info->update_every                 // update_every
         ); 
     }
 
-    do_custom_charts_init();
+    do_custom_charts_init(p_file_info);
 }
 
 void kernel_chart_update(struct File_info *p_file_info){
     chart_data_kernel_t *chart_data = p_file_info->chart_meta->chart_data_kernel;
 
-    if(chart_data->tv.tv_sec != p_file_info->parser_metrics->tv.tv_sec){
+    if(chart_data->last_update != p_file_info->parser_metrics->last_update){
 
-        time_t lag_in_sec = p_file_info->parser_metrics->tv.tv_sec - chart_data->tv.tv_sec - 1;
+        time_t lag_in_sec = p_file_info->parser_metrics->last_update - chart_data->last_update - 1;
 
-        chart_data->tv = p_file_info->parser_metrics->tv;
-
-        struct timeval tv = {
-            .tv_sec = chart_data->tv.tv_sec - lag_in_sec,
-            .tv_usec = chart_data->tv.tv_usec
-        };
-
-        do_num_of_logs_charts_update(p_file_info, chart_data, tv, lag_in_sec);
+        do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
 
         /* Syslog severity level (== Systemd priority) - update */
         if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-            if(likely(chart_data->st_sever->counter_done)){
-
-                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
-
-                while(tv.tv_sec < chart_data->tv.tv_sec){
-                    for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++)
-                        rrddim_set_by_pointer(  chart_data->st_sever, 
-                                                chart_data->dim_sever[j], 
-                                                chart_data->num_sever[j]);
-                    rrdset_timed_done(  chart_data->st_sever, tv, true);
-                    tv.tv_sec++;
-                }
+            for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;
+                        sec < p_file_info->parser_metrics->last_update;
+                        sec++){
+            
+                update_chart_begin(p_file_info->chart_name, "severity_levels");
+                for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++)
+                    update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
+                update_chart_end(sec);
             }
 
-            for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++){
-                chart_data->num_sever[j] += p_file_info->parser_metrics->kernel->sever[j];
-                p_file_info->parser_metrics->kernel->sever[j] = 0;
-
-                rrddim_set_by_pointer(  chart_data->st_sever, 
-                                        chart_data->dim_sever[j], 
-                                        chart_data->num_sever[j]);
+            update_chart_begin(p_file_info->chart_name, "severity_levels");
+            for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++){
+                chart_data->num_sever[idx] = p_file_info->parser_metrics->kernel->sever[idx];
+                update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
             }
-            rrdset_timed_done(  chart_data->st_sever, chart_data->tv, 
-                                chart_data->st_sever->counter_done != 0);
+            update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
         /* Subsystem - update */
         if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
             metrics_dict_item_t *it;
-            if(likely(chart_data->st_subsys->counter_done)){
 
-                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
-                
-                while(tv.tv_sec < chart_data->tv.tv_sec){
-                    dfe_start_read(p_file_info->parser_metrics->kernel->subsystem, it){
-                        if(it->dim)
-                            rrddim_set_by_pointer(  chart_data->st_subsys, 
-                                                    it->dim, 
-                                                    (collected_number) it->num);
-                    }
-                    dfe_done(it);
-                    rrdset_timed_done(chart_data->st_subsys, tv, true);
-                    tv.tv_sec++;
+            for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;
+                        sec < p_file_info->parser_metrics->last_update;
+                        sec++){
+
+                update_chart_begin(p_file_info->chart_name, "subsystems");
+                dfe_start_read(p_file_info->parser_metrics->kernel->subsystem, it){
+                    if(it->dim_initialized)
+                        update_chart_set(it_dfe.name, (collected_number) it->num);
+                } 
+                dfe_done(it);
+                update_chart_end(sec);
+            }
+
+            dfe_start_write(p_file_info->parser_metrics->kernel->subsystem, it){
+                if(!it->dim_initialized){
+                    it->dim_initialized = true;
+                    add_dim_post_init(  &chart_data->cs_subsys, it_dfe.name, 
+                                        RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
                 }
             }
+            dfe_done(it);
 
-            dfe_start_read(p_file_info->parser_metrics->kernel->subsystem, it){
-                if(!it->dim) it->dim = rrddim_add(  chart_data->st_subsys, 
-                                                    it_dfe.name, NULL, 1, 1, 
-                                                    RRD_ALGORITHM_ABSOLUTE);
-                rrddim_set_by_pointer(chart_data->st_subsys, it->dim, (collected_number) it->num);
+            update_chart_begin(p_file_info->chart_name, "subsystems");
+            dfe_start_write(p_file_info->parser_metrics->kernel->subsystem, it){
+                it->num = it->num_new;
+                update_chart_set(it_dfe.name, (collected_number) it->num);
             }
             dfe_done(it);
-            rrdset_timed_done(  chart_data->st_subsys, chart_data->tv, 
-                                chart_data->st_subsys->counter_done != 0);
+            update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
         /* Device - update */
         if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
             metrics_dict_item_t *it;
-            if(likely(chart_data->st_device->counter_done)){
 
-                tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;
-                
-                while(tv.tv_sec < chart_data->tv.tv_sec){
-                    dfe_start_read(p_file_info->parser_metrics->kernel->device, it){
-                        if(it->dim)
-                            rrddim_set_by_pointer(  chart_data->st_device, 
-                                                    it->dim, 
-                                                    (collected_number) it->num);
-                    }
-                    dfe_done(it);
-                    rrdset_timed_done(chart_data->st_device, tv, true);
-                    tv.tv_sec++;
+            for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;
+                        sec < p_file_info->parser_metrics->last_update;
+                        sec++){
+
+                update_chart_begin(p_file_info->chart_name, "devices");
+                dfe_start_read(p_file_info->parser_metrics->kernel->device, it){
+                    if(it->dim_initialized)
+                        update_chart_set(it_dfe.name, (collected_number) it->num);
+                } 
+                dfe_done(it);
+                update_chart_end(sec);
+            }
+
+            dfe_start_write(p_file_info->parser_metrics->kernel->device, it){
+                if(!it->dim_initialized){
+                    it->dim_initialized = true;
+                    add_dim_post_init(  &chart_data->cs_device, it_dfe.name,
+                                        RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
                 }
             }
+            dfe_done(it);
 
-            dfe_start_read(p_file_info->parser_metrics->kernel->device, it){
-                if(!it->dim) it->dim = rrddim_add(  chart_data->st_device, 
-                                                    it_dfe.name, NULL, 1, 1, 
-                                                    RRD_ALGORITHM_ABSOLUTE);
-                rrddim_set_by_pointer(chart_data->st_device, it->dim, (collected_number) it->num);
+            update_chart_begin(p_file_info->chart_name, "devices");
+            dfe_start_write(p_file_info->parser_metrics->kernel->device, it){
+                it->num = it->num_new;
+                update_chart_set(it_dfe.name, (collected_number) it->num);
             }
             dfe_done(it);
-            rrdset_timed_done(  chart_data->st_device, chart_data->tv, 
-                                chart_data->st_device->counter_done != 0);
+            update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
-        do_custom_charts_update();
+        do_custom_charts_update(p_file_info, lag_in_sec);
+
+        chart_data->last_update = p_file_info->parser_metrics->last_update;
     }
 }

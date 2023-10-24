@@ -9,7 +9,7 @@
 
 #include <lz4.h>
 #include "circular_buffer.h"
-#include "logsmanagement_conf.h"
+#include "defaults.h"
 
 int decompress_text(Circ_buff_item_t *const msg, char *const out_buf);
 

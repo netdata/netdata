@@ -166,8 +166,6 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "EXPORTERS ");
     if(service & SERVICE_HTTPD)
         buffer_strcat(wb, "HTTPD ");
-    if(service & SERVICE_LOGS_MANAGEMENT)
-        buffer_strcat(wb, "LOGS_MANAGEMENT");
 }
 
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
@@ -350,12 +348,6 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_ACLK
             | SERVICE_ACLKSYNC
             );
-
-    delta_shutdown_time("stop logs management threads");
-
-    timeout = !service_wait_exit(
-            SERVICE_LOGS_MANAGEMENT
-            , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("stop replication, exporters, health and web servers threads");
 
@@ -1494,10 +1486,6 @@ int main(int argc, char **argv) {
 #endif
                             if(test_sqlite()) return 1;
                             if(string_unittest(10000)) return 1;
-#if defined(ENABLE_LOGSMANAGEMENT) && defined(ENABLE_LOGSMANAGEMENT_TESTS)
-                            if(logs_management_unittest())
-                                return 1;
-#endif
                             if (dictionary_unittest(10000))
                                 return 1;
                             if(aral_unittest(10000))
@@ -1512,12 +1500,6 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
                         }
-#if defined(ENABLE_LOGSMANAGEMENT) && defined(ENABLE_LOGSMANAGEMENT_TESTS)
-                        else if(strcmp(optarg, "logsmantest") == 0) {
-                            unittest_running = true;
-                            return logs_management_unittest();
-                        }
-#endif
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
                             return dictionary_unittest(10000);

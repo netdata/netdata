@@ -19,26 +19,24 @@ typedef struct Chart_data_kernel chart_data_kernel_t;
 
 #include "rrd_api.h"
 
+#include "rrd_api_systemd.h" // required for dim_sever_str[]
+
 struct Chart_data_kernel {
 
-    struct timeval tv;
+    time_t last_update;
 
     /* Number of collected log records */
-    RRDSET *st_lines_total, *st_lines_rate;
-    RRDDIM *dim_lines_total, *dim_lines_rate;
     collected_number num_lines;
 
     /* Kernel metrics - Syslog Severity value */
-    RRDSET *st_sever;
-    RRDDIM *dim_sever[9];
-    collected_number num_sever[9];
+    collected_number num_sever[SYSLOG_SEVER_ARR_SIZE];
 
     /* Kernel metrics - Subsystem */
-    RRDSET *st_subsys;
+    struct Chart_str cs_subsys;
     // Special case: Subsystem dimension and number are part of Kernel_metrics_t
 
     /* Kernel metrics - Device */
-    RRDSET *st_device;
+    struct Chart_str cs_device;
     // Special case: Device dimension and number are part of Kernel_metrics_t
 };
 

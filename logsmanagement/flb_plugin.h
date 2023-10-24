@@ -20,7 +20,7 @@ typedef struct {
          *coro_stack_size;
 } flb_srvc_config_t ;
 
-int flb_init(flb_srvc_config_t flb_srvc_config);
+int flb_init(flb_srvc_config_t flb_srvc_config, const char *const stock_config_dir);
 int flb_run(void);
 void flb_terminate(void);
 void flb_complete_item_timer_timeout_cb(uv_timer_t *handle);

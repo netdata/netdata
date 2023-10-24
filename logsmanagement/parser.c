@@ -279,7 +279,7 @@ int search_keyword( char *src, size_t src_sz __maybe_unused,
 
         size_t match_len = (size_t) (groupArray[0].rm_eo - groupArray[0].rm_so);
 
-        // netdata_log_debug(D_LOGS_MANAG, "Match %d [%2d-%2d]:%.*s\n", matches, groupArray[0].rm_so, 
+        // debug_log( "Match %d [%2d-%2d]:%.*s\n", matches, groupArray[0].rm_so, 
         //         groupArray[0].rm_eo, (int) match_len, cursor + groupArray[0].rm_so);
 
         if(dest){
@@ -480,12 +480,12 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
         field_size = (size_t) (offset - field);
 
         #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-        netdata_log_debug(D_LOGS_MANAG, "Field[%d]:%.*s", i, (int)field_size, field);
+        debug_log( "Field[%d]:%.*s", i, (int)field_size, field);
         #endif
 
         if(fields_format[i] == CUSTOM){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: CUSTOM or UNKNOWN):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: CUSTOM or UNKNOWN):%.*s", i, (int)field_size, field);
             #endif
             goto next_item;
         }
@@ -497,7 +497,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == VHOST_WITH_PORT){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: VHOST_WITH_PORT):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: VHOST_WITH_PORT):%.*s", i, (int)field_size, field);
             #endif
 
             if(unlikely(field[0] ==  '-' && field_size == 1)){
@@ -525,7 +525,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == VHOST_WITH_PORT || fields_format[i] == VHOST){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: VHOST):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: VHOST):%.*s", i, (int)field_size, field);
             #endif
 
             if(unlikely(field[0] ==  '-' && field_size == 1)){
@@ -566,7 +566,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted VHOST:%s", log_line_parsed->vhost);
+            debug_log( "Extracted VHOST:%s", log_line_parsed->vhost);
             #endif
 
             if(fields_format[i] == VHOST) goto next_item;
@@ -580,7 +580,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: PORT):%.*s", i, (int) port_size, port);
+            debug_log( "Item %d (type: PORT):%.*s", i, (int) port_size, port);
             #endif
 
             if(unlikely(port[0] ==  '-' && port_size == 1)){
@@ -611,7 +611,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 log_line_parsed->parsing_errors++;
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted PORT:%d", log_line_parsed->port);
+            debug_log( "Extracted PORT:%d", log_line_parsed->port);
             #endif
 
             goto next_item;
@@ -619,7 +619,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == REQ_SCHEME){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ_SCHEME):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: REQ_SCHEME):%.*s", i, (int)field_size, field);
             #endif
 
             if(unlikely(field[0] ==  '-' && field_size == 1)){
@@ -641,14 +641,14 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 }
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_SCHEME:%s", log_line_parsed->req_scheme);
+            debug_log( "Extracted REQ_SCHEME:%s", log_line_parsed->req_scheme);
             #endif
             goto next_item;
         }
 
         if(fields_format[i] == REQ_CLIENT){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ_CLIENT):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: REQ_CLIENT):%.*s", i, (int)field_size, field);
             #endif
 
             if(unlikely(field[0] ==  '-' && field_size == 1)){
@@ -680,7 +680,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_CLIENT:%s", log_line_parsed->req_client);
+            debug_log( "Extracted REQ_CLIENT:%s", log_line_parsed->req_client);
             #endif
 
             goto next_item;
@@ -691,7 +691,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             /* If fields_format[i] == REQ, then field is filled in with request in the previous code */
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ or REQ_METHOD):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: REQ or REQ_METHOD):%.*s", i, (int)field_size, field);
             #endif
 
             snprintfz( log_line_parsed->req_method, REQ_METHOD_MAX_LEN, "%.*s", (int)field_size, field); 
@@ -748,7 +748,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 }
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_METHOD:%s", log_line_parsed->req_method);
+            debug_log( "Extracted REQ_METHOD:%s", log_line_parsed->req_method);
             #endif
             
             if(fields_format[i] == REQ && field[0] !=  '-') {
@@ -762,7 +762,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == REQ || fields_format[i] == REQ_URL){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ or REQ_URL):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: REQ or REQ_URL):%.*s", i, (int)field_size, field);
             #endif
 
             snprintfz( log_line_parsed->req_URL, REQ_URL_MAX_LEN, "%.*s", (int)field_size, field);
@@ -775,7 +775,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             //if(verify){} ??
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG            
-            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_URL:%s", log_line_parsed->req_URL ? log_line_parsed->req_URL : "NULL!");
+            debug_log( "Extracted REQ_URL:%s", log_line_parsed->req_URL ? log_line_parsed->req_URL : "NULL!");
             #endif
 
             if(fields_format[i] == REQ) {
@@ -790,7 +790,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
         if(fields_format[i] == REQ || fields_format[i] == REQ_PROTO){
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ or REQ_PROTO):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: REQ or REQ_PROTO):%.*s", i, (int)field_size, field);
             #endif
 
             if(unlikely(field[0] ==  '-' && field_size == 1)){
@@ -827,7 +827,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                             "%.*s", (int)req_proto_num_size, &field[REQ_PROTO_PREF_SIZE]); 
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_PROTO:%s", log_line_parsed->req_proto);
+            debug_log( "Extracted REQ_PROTO:%s", log_line_parsed->req_proto);
             #endif
 
             goto next_item;
@@ -837,7 +837,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             /* TODO: Differentiate between '-' or 0 and an invalid request size. 
              * right now, all these will set req_size == 0 */
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ_SIZE):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: REQ_SIZE):%.*s", i, (int)field_size, field);
             #endif
 
             char req_size_d[REQ_SIZE_MAX_LEN];
@@ -863,7 +863,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 log_line_parsed->parsing_errors++;
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_SIZE:%d", log_line_parsed->req_size);
+            debug_log( "Extracted REQ_SIZE:%d", log_line_parsed->req_size);
             #endif
 
             goto next_item;
@@ -871,7 +871,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == REQ_PROC_TIME){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: REQ_PROC_TIME):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: REQ_PROC_TIME):%.*s", i, (int)field_size, field);
             #endif
 
             if(unlikely(field[0] ==  '-' && field_size == 1)){
@@ -917,7 +917,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 }
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted REQ_PROC_TIME:%d", log_line_parsed->req_proc_time);
+            debug_log( "Extracted REQ_PROC_TIME:%d", log_line_parsed->req_proc_time);
             #endif
 
             goto next_item;
@@ -925,7 +925,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == RESP_CODE){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: RESP_CODE):%.*s\n", i, (int)field_size, field);
+            debug_log( "Item %d (type: RESP_CODE):%.*s\n", i, (int)field_size, field);
             #endif
 
             if(unlikely(field[0] ==  '-' && field_size == 1)){
@@ -962,7 +962,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 log_line_parsed->parsing_errors++;
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted RESP_CODE:%d", log_line_parsed->resp_code);
+            debug_log( "Extracted RESP_CODE:%d", log_line_parsed->resp_code);
             #endif
 
             goto next_item;
@@ -972,7 +972,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             /* TODO: Differentiate between '-' or 0 and an invalid response size. 
              * right now, all these will set resp_size == 0 */
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: RESP_SIZE):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: RESP_SIZE):%.*s", i, (int)field_size, field);
             #endif
 
             char resp_size_d[REQ_RESP_SIZE_MAX_LEN];
@@ -1000,7 +1000,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 log_line_parsed->parsing_errors++;
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted RESP_SIZE:%d", log_line_parsed->resp_size);
+            debug_log( "Extracted RESP_SIZE:%d", log_line_parsed->resp_size);
             #endif
 
             goto next_item;
@@ -1008,7 +1008,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == UPS_RESP_TIME){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: UPS_RESP_TIME):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: UPS_RESP_TIME):%.*s", i, (int)field_size, field);
             #endif
 
             if(field[0] ==  '-' && field_size == 1) { 
@@ -1057,7 +1057,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 }
             }
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted UPS_RESP_TIME:%d", log_line_parsed->ups_resp_time);
+            debug_log( "Extracted UPS_RESP_TIME:%d", log_line_parsed->ups_resp_time);
             #endif
 
             goto next_item;
@@ -1065,7 +1065,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == SSL_PROTO){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: SSL_PROTO):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: SSL_PROTO):%.*s", i, (int)field_size, field);
             #endif
 
             if(field[0] ==  '-' && field_size == 1) { 
@@ -1075,13 +1075,13 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "SSL_PROTO field size:%zu", field_size);
+            debug_log( "SSL_PROTO field size:%zu", field_size);
             #endif
 
             snprintfz( log_line_parsed->ssl_proto, SSL_PROTO_MAX_LEN, "%.*s", (int)field_size, field); 
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "log_line_parsed->ssl_proto:%s", log_line_parsed->ssl_proto);
+            debug_log( "log_line_parsed->ssl_proto:%s", log_line_parsed->ssl_proto);
             #endif
 
             if(verify){
@@ -1100,7 +1100,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted SSL_PROTO:%s", log_line_parsed->ssl_proto);
+            debug_log( "Extracted SSL_PROTO:%s", log_line_parsed->ssl_proto);
             #endif
 
             goto next_item;
@@ -1108,7 +1108,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
 
         if(fields_format[i] == SSL_CIPHER_SUITE){
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: SSL_CIPHER_SUITE):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: SSL_CIPHER_SUITE):%.*s", i, (int)field_size, field);
             #endif
 
             if(field[0] ==  '-' && field_size == 1) { 
@@ -1119,7 +1119,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             snprintfz( log_line_parsed->ssl_cipher, SSL_CIPHER_SUITE_MAX_LEN, "%.*s", (int)field_size, field);
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "before: SSL_CIPHER_SUITE:%s", log_line_parsed->ssl_cipher);
+            debug_log( "before: SSL_CIPHER_SUITE:%s", log_line_parsed->ssl_cipher);
             #endif
 
             if(verify){
@@ -1143,7 +1143,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Extracted SSL_CIPHER_SUITE:%s", log_line_parsed->ssl_cipher);
+            debug_log( "Extracted SSL_CIPHER_SUITE:%s", log_line_parsed->ssl_cipher);
             #endif
 
             goto next_item;
@@ -1159,7 +1159,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Item %d (type: TIME - 1st of 2 fields):%.*s", i, (int)field_size, field);
+            debug_log( "Item %d (type: TIME - 1st of 2 fields):%.*s", i, (int)field_size, field);
             #endif
 
             // TODO: What if TIME is invalid?
@@ -1187,7 +1187,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             }
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "strptime() result: year:%d mon:%d day:%d hour:%d min:%d sec:%d", 
+            debug_log( "strptime() result: year:%d mon:%d day:%d hour:%d min:%d sec:%d", 
                 ltm.tm_year, ltm.tm_mon, ltm.tm_mday, 
                 ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
             #endif
@@ -1208,7 +1208,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             memcpy(tz_num, tz_str, tz_str_end - tz_str);
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "TIME 2nd part: %.*s", (int)(tz_str_end - tz_str), tz_str);
+            debug_log( "TIME 2nd part: %.*s", (int)(tz_str_end - tz_str), tz_str);
             #endif
             
             long int tz = strtol(tz_str, NULL, 10);
@@ -1218,7 +1218,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             if(tz_sign == '+') tz_adj *= -1; // if timezone is positive, we need to subtract it to get GMT
 
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
-            netdata_log_debug(D_LOGS_MANAG, "Timezone: int:%ld, hrs:%ld, mins:%ld", tz, tz_h, tz_m);
+            debug_log( "Timezone: int:%ld, hrs:%ld, mins:%ld", tz, tz_h, tz_m);
             #endif
 
             if(-1 == (log_line_parsed->timestamp = timegm(&ltm) + tz_adj)){
@@ -1230,8 +1230,8 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
             char tb[80];
             strftime(tb, sizeof(tb), "%c", &ltm );
-            netdata_log_debug(D_LOGS_MANAG, "Extracted TIME:%ld", log_line_parsed->timestamp);
-            netdata_log_debug(D_LOGS_MANAG, "Extracted TIME string:%s", tb);
+            debug_log( "Extracted TIME:%ld", log_line_parsed->timestamp);
+            debug_log( "Extracted TIME string:%s", tb);
             #endif
 
             offset = tz_str_end + 1; // WARNING! this modifies the offset but it is required in the TIME case.
@@ -1277,7 +1277,7 @@ void extract_web_log_metrics(Log_parser_config_t *parser_config,
         if(metrics->vhost_arr.size == i){ // Vhost not found in array - need to append
             metrics->vhost_arr.size++;
             if(metrics->vhost_arr.size >= metrics->vhost_arr.size_max){
-                metrics->vhost_arr.size_max = metrics->vhost_arr.size * LOG_PARSER_METRICS_VHOST_BUFFS_SCALE_FACTOR + 1;
+                metrics->vhost_arr.size_max = metrics->vhost_arr.size * VHOST_BUFFS_SCALE_FACTOR + 1;
                 metrics->vhost_arr.vhosts = reallocz( metrics->vhost_arr.vhosts, 
                                                       metrics->vhost_arr.size_max * sizeof(struct log_parser_metrics_vhost));
             }
@@ -1299,10 +1299,14 @@ void extract_web_log_metrics(Log_parser_config_t *parser_config,
         if(metrics->port_arr.size == i){ // Port not found in array - need to append
             metrics->port_arr.size++;
             if(metrics->port_arr.size >= metrics->port_arr.size_max){
-                metrics->port_arr.size_max = metrics->port_arr.size * LOG_PARSER_METRICS_PORT_BUFFS_SCALE_FACTOR + 1;
+                metrics->port_arr.size_max = metrics->port_arr.size * PORT_BUFFS_SCALE_FACTOR + 1;
                 metrics->port_arr.ports = reallocz( metrics->port_arr.ports, 
                                                     metrics->port_arr.size_max * sizeof(struct log_parser_metrics_port));
             }
+            if(line_parsed->port == WEB_LOG_INVALID_PORT)
+                snprintfz(metrics->port_arr.ports[metrics->port_arr.size - 1].name, PORT_MAX_LEN, WEB_LOG_INVALID_PORT_STR);
+            else
+                snprintfz(metrics->port_arr.ports[metrics->port_arr.size - 1].name, PORT_MAX_LEN, "%d", line_parsed->port);
             metrics->port_arr.ports[metrics->port_arr.size - 1].port = line_parsed->port;
             metrics->port_arr.ports[metrics->port_arr.size - 1].count = 1;
         } 
@@ -1479,7 +1483,7 @@ void extract_web_log_metrics(Log_parser_config_t *parser_config,
     if((parser_config->chart_config & CHART_SSL_CIPHER) && *line_parsed->ssl_cipher){
         int i;
         for(i = 0; i < metrics->ssl_cipher_arr.size; i++){
-            if(!strcmp(metrics->ssl_cipher_arr.ssl_ciphers[i].string, line_parsed->ssl_cipher)){
+            if(!strcmp(metrics->ssl_cipher_arr.ssl_ciphers[i].name, line_parsed->ssl_cipher)){
                 metrics->ssl_cipher_arr.ssl_ciphers[i].count++;
                 break;
             }
@@ -1488,7 +1492,7 @@ void extract_web_log_metrics(Log_parser_config_t *parser_config,
             metrics->ssl_cipher_arr.size++;
             metrics->ssl_cipher_arr.ssl_ciphers = reallocz(metrics->ssl_cipher_arr.ssl_ciphers, 
                                         metrics->ssl_cipher_arr.size * sizeof(struct log_parser_metrics_ssl_cipher));
-            snprintf( metrics->ssl_cipher_arr.ssl_ciphers[metrics->ssl_cipher_arr.size - 1].string, 
+            snprintf( metrics->ssl_cipher_arr.ssl_ciphers[metrics->ssl_cipher_arr.size - 1].name, 
                       SSL_CIPHER_SUITE_MAX_LEN, "%s", line_parsed->ssl_cipher);
             metrics->ssl_cipher_arr.ssl_ciphers[metrics->ssl_cipher_arr.size - 1].count = 1;
         }

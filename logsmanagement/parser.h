@@ -90,14 +90,14 @@ typedef struct log_parser_config{
 
 #define WEB_LOG_INVALID_HOST_STR "invalid"
 #define WEB_LOG_INVALID_PORT -1
-#define WEB_LOG_INVALID_CLIENT_IP_STR "inv"
+#define WEB_LOG_INVALID_PORT_STR "inv"
+#define WEB_LOG_INVALID_CLIENT_IP_STR WEB_LOG_INVALID_PORT_STR
 
 /* Web log configuration */
 #define ENABLE_PARSE_WEB_LOG_LINE_DEBUG 0
 
-#define LOG_PARSER_METRICS_VHOST_BUFFS_SCALE_FACTOR 1.5
-#define LOG_PARSER_METRICS_PORT_BUFFS_SCALE_FACTOR 8 // Unlike Vhosts, ports are stored as integers, so scale factor can be much bigger without significant waste of memory
-#define LOG_PARSER_METRICS_SLL_CIPHER_BUFFS_SCALE_FACTOR 1.5
+#define VHOST_BUFFS_SCALE_FACTOR 1.5
+#define PORT_BUFFS_SCALE_FACTOR 8       // Unlike Vhosts, ports are stored as integers, so scale factor can be bigger
 
 
 typedef enum{
@@ -185,6 +185,7 @@ typedef struct web_log_metrics{
     } vhost_arr;
     struct log_parser_metrics_ports_array{
         struct log_parser_metrics_port{
+            char name[PORT_MAX_LEN];    /**< Number of port in str */
             int port;   				/**< Number of port **/
             int count;					/**< Occurences of the port **/
         } *ports;
@@ -212,7 +213,7 @@ typedef struct web_log_metrics{
         int http_1, http_1_1, http_2, other;
     } req_proto;
     struct log_parser_metrics_bandwidth{
-        long long int req_size, resp_size;
+        long long req_size, resp_size;
     } bandwidth;
     struct log_parser_metrics_req_proc_time{
         int min, max, sum, count;
@@ -232,11 +233,10 @@ typedef struct web_log_metrics{
     } ssl_proto;
     struct log_parser_metrics_ssl_cipher_array{
         struct log_parser_metrics_ssl_cipher{
-            char string[SSL_CIPHER_SUITE_MAX_LEN];    /**< SSL cipher suite string **/
+            char name[SSL_CIPHER_SUITE_MAX_LEN];    /**< SSL cipher suite string **/
             int count;								/**< Occurences of the SSL cipher **/
         } *ssl_ciphers;
         int size;									/**< Size of SSL ciphers array **/
-        int size_max;
     } ssl_cipher_arr;
     int64_t timestamp;
 } Web_log_metrics_t;
@@ -283,8 +283,9 @@ Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const cha
 #define SYSLOG_SEVER_ARR_SIZE 9         /**< Number of severity levels plus 1 for 'unknown' **/
 
 typedef struct metrics_dict_item{
-    RRDDIM *dim;
+    bool dim_initialized;
     int num;
+    int num_new;
 } metrics_dict_item_t;
 
 typedef struct kernel_metrics{
@@ -401,7 +402,7 @@ int search_keyword(	char *src, size_t src_sz,
 /* -------------------------------------------------------------------------- */
 
 typedef struct log_parser_cus_config{
-    char *chart_name;					/**< Chart name where the regex will be placed in **/
+    char *chart_name;					/**< Chart name where the regex metrics will appear in **/
     char *regex_str;					/**< String representation of the regex **/
     char *regex_name;					/**< If regex is named, this is where its name is stored **/
     regex_t regex;						/**< The compiled regex **/
@@ -420,7 +421,8 @@ typedef struct log_parser_cus_metrics{
 
 struct log_parser_metrics{
     unsigned long long num_lines;
-    struct timeval tv;
+    // struct timeval tv;
+    time_t last_update;
     union {
         Web_log_metrics_t *web_log;
         Kernel_metrics_t *kernel;

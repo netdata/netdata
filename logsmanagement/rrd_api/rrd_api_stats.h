@@ -14,7 +14,6 @@ struct File_info;
 
 #include "../file_info.h"
 
-void stats_charts_init(void);
-void stats_charts_update(uv_timer_t *handle);
+void stats_charts_init(void *arg);
 
 #endif // RRD_API_STATS_H_

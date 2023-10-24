@@ -78,10 +78,10 @@ typedef enum {
  * @param[in] file Source file where the error occurred (__FILE__)
  * @param[in] func Function where the error occurred    (__FUNCTION__)
  */
-static void throw_error( const char *const log_source, 
-                            const logs_manag_db_error_t error_type,
-                            const int rc, const int line, 
-                            const char *const file, const char *const func){
+static void throw_error(const char *const log_source, 
+                        const logs_manag_db_error_t error_type,
+                        const int rc, const int line, 
+                        const char *const file, const char *const func){
     collector_error("[%s]: %s database error: (%d) %s (%s:%s:%d))",
                         log_source ? log_source : "-", 
                         error_type == ERR_TYPE_OTHER ? "" : ERR_TYPE_SQLITE ? "SQLite" : "libuv",
@@ -1212,7 +1212,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             SQLITE_OK != (rc = sqlite3_prepare_v2(dbt,"ATTACH DATABASE ?  AS ? ;", -1, &stmt_attach_db, NULL))
         )){
             throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-            sqlite3_close(dbt);
+            sqlite3_close_v2(dbt);
             return;
         }
         for(pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
@@ -1223,7 +1223,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                 SQLITE_OK != (rc = sqlite3_reset(stmt_attach_db))
             )){
                 throw_error(p_file_infos[pfi_off]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-                sqlite3_close(dbt);
+                sqlite3_close_v2(dbt);
                 return;
             }
         }
@@ -1246,11 +1246,11 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                             sizeof(TMP_VIEW_QUERY_POSTFIX) + 50] = TMP_VIEW_QUERY_PREFIX; // +50 bytes - play it safe
         int n = sizeof(TMP_VIEW_QUERY_PREFIX) - 1;
         for(pfi_off = 1; p_file_infos[pfi_off]; pfi_off++){ // Skip p_file_infos[0]
-            n += snprintf(  &tmp_view_query[n], sizeof(tmp_view_query), "%s%d%s%d%s", 
+            n += snprintf(  &tmp_view_query[n], sizeof(tmp_view_query) - n, "%s%d%s%d%s", 
                             TMP_VIEW_QUERY_BODY_1, pfi_off, 
                             TMP_VIEW_QUERY_BODY_2, pfi_off, TMP_VIEW_QUERY_BODY_3);
         }
-        snprintf(&tmp_view_query[n], sizeof(tmp_view_query), "%s", TMP_VIEW_QUERY_POSTFIX);
+        snprintf(&tmp_view_query[n], sizeof(tmp_view_query) - n, "%s", TMP_VIEW_QUERY_POSTFIX);
 
         if(unlikely(
             SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt, tmp_view_query, -1, &stmt_create_tmp_view, NULL)) ||
@@ -1279,7 +1279,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             (SQLITE_ROW !=  (rc = sqlite3_step(stmt_get_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
             throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-            sqlite3_close(dbt);
+            sqlite3_close_v2(dbt);
             return;
         }
     }
@@ -1385,10 +1385,14 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         }
     }  
 
-    if(tmp_itm.text_compressed) freez(tmp_itm.text_compressed);
+    if(tmp_itm.text_compressed) 
+        freez(tmp_itm.text_compressed);
 
-    if(p_file_infos[1]) rc = sqlite3_close(dbt);
-    else rc = sqlite3_reset(stmt_get_log_msg_metadata);
+    if(p_file_infos[1]) 
+        rc = sqlite3_close_v2(dbt);
+    else 
+        rc = sqlite3_reset(stmt_get_log_msg_metadata);
+
     if (unlikely(SQLITE_OK != rc)) 
         throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
 }

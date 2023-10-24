@@ -76,6 +76,18 @@ AC_ARG_ENABLE(
     [enable_plugin_systemd_journal="detect"]
 )
 AC_ARG_ENABLE(
+    [logsmanagement],
+    [AS_HELP_STRING([--disable-logsmanagement], [Disable logsmanagement @<:@default autodetect@:>@])],
+    ,
+    [enable_logsmanagement="detect"]
+)
+AC_ARG_ENABLE(
+    [logsmanagement_tests],
+    [AS_HELP_STRING([--enable-logsmanagement-tests], [Enable logsmanagement tests @<:@default disabled@:>@])],
+    ,
+    [enable_logsmanagement_tests="no"]
+)
+AC_ARG_ENABLE(
     [plugin-cups],
     [AS_HELP_STRING([--enable-plugin-cups], [enable cups plugin @<:@default autodetect@:>@])],
     ,
@@ -218,18 +230,6 @@ AC_ARG_ENABLE(
     [AS_HELP_STRING([--disable-h2o], [Disable H2O webserver @<:@default autodetect@:>@])],
     ,
     [enable_h2o="detect"]
-)
-AC_ARG_ENABLE(
-    [logsmanagement],
-    [AS_HELP_STRING([--disable-logsmanagement], [Disable logsmanagement @<:@default autodetect@:>@])],
-    ,
-    [enable_logsmanagement="detect"]
-)
-AC_ARG_ENABLE(
-    [logsmanagement_tests],
-    [AS_HELP_STRING([--enable-logsmanagement-tests], [Enable logsmanagement tests @<:@default disabled@:>@])],
-    ,
-    [enable_logsmanagement_tests="no"]
 )
 
 # -----------------------------------------------------------------------------
@@ -1484,6 +1484,8 @@ fi
 # -----------------------------------------------------------------------------
 # logsmanagement
 
+LIBS_BAK="${LIBS}"
+
 # Check if submodules have not been fetched. Fail if Logs Management was explicitly requested.
 
 AC_MSG_CHECKING([if git submodules are present for logs management functionality])
@@ -1513,18 +1515,6 @@ fi
 AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT], [test "${build_logsmanagement}" = "yes"])
 if test "${build_logsmanagement}" = "yes"; then
     AC_DEFINE([ENABLE_LOGSMANAGEMENT], [1], [enable logs management functionality])
-    OPTIONAL_LOGSMANAGEMENT_CFLAGS=" \
-    -I \$(abs_top_srcdir)/fluent-bit/include/fluent-bit/ \
-    -I \$(abs_top_srcdir)/fluent-bit/build/lib/c-ares-809d5e84/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/c-ares-809d5e84/include/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/mbedtls-2.28.0/include/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/cmetrics/include/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/mpack-amalgamation-1.0/src/ \
-    -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/ \
-    -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/mk_core/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/monkey/include/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/msgpack/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/ "
 fi
 
 # Decide if we should build Logs Management tests.
@@ -1539,6 +1529,7 @@ if test "${build_logsmanagement_tests}" = "yes"; then
     AC_DEFINE([ENABLE_LOGSMANAGEMENT_TESTS], [1], [logs management tests])
 fi
 
+LIBS="${LIBS_BAK}"
 
 # -----------------------------------------------------------------------------
 # debugfs.plugin
@@ -1950,7 +1941,7 @@ CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${O
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
     ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_YAML_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${H2O_CFLAGS} ${HARDENING_CFLAGS} ${OPTIONAL_LOGSMANAGEMENT_CFLAGS}"
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS} ${H2O_CFLAGS} ${HARDENING_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${OPTIONAL_KINESIS_CXXFLAGS} ${CPP_STD_FLAG}"
 
@@ -2007,7 +1998,6 @@ AC_SUBST([OPTIONAL_GTEST_LIBS])
 AC_SUBST([OPTIONAL_ML_CFLAGS])
 AC_SUBST([OPTIONAL_ML_LIBS])
 AC_SUBST(OPTIONAL_SYSTEMD_LIBS)
-AC_SUBST([OPTIONAL_LOGSMANAGEMENT_CFLAGS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing

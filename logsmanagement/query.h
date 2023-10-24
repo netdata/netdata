@@ -10,18 +10,18 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include "libnetdata/libnetdata.h"
-#include "logsmanagement_conf.h"
+#include "defaults.h"
 
 #define LOGS_QRY_VERSION "1"
 
-#define LOGS_QRY_KW_START_TIME  "after"
-#define LOGS_QRY_KW_END_TIME    "before"
-#define LOGS_QRY_KW_QUOTA       "quota"
-#define LOGS_QRY_KW_CHARTNAME   "chart_name"
-#define LOGS_QRY_KW_FILENAME    "filename"
-#define LOGS_QRY_KW_KEYWORD     "keyword"
-#define LOGS_QRY_KW_IGNORE_CASE "ignore_case"
-#define LOGS_QRY_KW_SANITIZE_KW "sanitize_keyword"
+#define LOGS_MANAG_FUNC_PARAM_AFTER     "after"
+#define LOGS_MANAG_FUNC_PARAM_BEFORE    "before"
+#define LOGS_QRY_KW_QUOTA               "quota"
+#define LOGS_QRY_KW_CHARTNAME           "chart_name"
+#define LOGS_QRY_KW_FILENAME            "filename"
+#define LOGS_QRY_KW_KEYWORD             "keyword"
+#define LOGS_QRY_KW_IGNORE_CASE         "ignore_case"
+#define LOGS_QRY_KW_SANITIZE_KW         "sanitize_keyword"
 
 typedef struct {
     const enum {LOGS_QRY_RES_ERR_CODE_OK = 0, 

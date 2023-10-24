@@ -50,32 +50,68 @@ UNIT_STATIC char *sanitise_string(char *const s){
 const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
     if(unlikely(!p_file_infos_arr || !p_file_infos_arr->count)) 
         return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
+    
+    buffer_json_add_array_item_object(wb);
+    buffer_json_member_add_string(wb, "id", "all");
+    buffer_json_member_add_string(wb, "name", "all");
+    buffer_json_member_add_string(wb, "pill", "100"); // TODO
+
+    buffer_json_member_add_string(wb, "info", "All log sources");
+
+    buffer_json_member_add_string(wb, "basename", "");
+    buffer_json_member_add_string(wb, "filename", "");
+    buffer_json_member_add_string(wb, "log_type", "");
+    buffer_json_member_add_string(wb, "db_dir", "");
+    buffer_json_member_add_uint64(wb, "db_version", 0);
+    buffer_json_member_add_uint64(wb, "db_flush_freq", 0);
+    buffer_json_member_add_int64( wb, "db_disk_space_limit", 0);
+    buffer_json_object_close(wb); // options object
 
     for (int i = 0; i < p_file_infos_arr->count; i++) {
-        buffer_sprintf( wb, "       \"%s\": {\n"
-                            "         \"basename\": \"%s\",\n"
-                            "         \"filename\": \"%s\",\n"
-                            "         \"log type\": \"%s\",\n"
-                            "         \"DB dir\": \"%s\",\n"
-                            "         \"DB version\": %d,\n"
-                            "         \"DB flush interval\": %d,\n"
-                            "         \"DB disk space limit\": %" PRId64 "\n"
-                            "      },\n", 
-                        p_file_infos_arr->data[i]->chart_name,
-                        p_file_infos_arr->data[i]->file_basename,
-                        p_file_infos_arr->data[i]->filename,
-                        log_src_type_t_str[p_file_infos_arr->data[i]->log_type],
-                        p_file_infos_arr->data[i]->db_dir,
-                        db_user_version(p_file_infos_arr->data[i]->db, -1),
-                        p_file_infos_arr->data[i]->buff_flush_to_db_interval,
-                        p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES
-                        );
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_string(wb, "id", p_file_infos_arr->data[i]->chart_name);
+        buffer_json_member_add_string(wb, "name", p_file_infos_arr->data[i]->chart_name);
+        buffer_json_member_add_string(wb, "pill", "100"); // TODO
+
+        char info[1024];
+        snprintfz(info, sizeof(info), "Chart '%s' from log source '%s'",
+                    p_file_infos_arr->data[i]->chart_name,
+                    p_file_infos_arr->data[i]->file_basename);
+
+        buffer_json_member_add_string(wb, "info", info);
+
+        buffer_json_member_add_string(wb, "basename", p_file_infos_arr->data[i]->file_basename);
+        buffer_json_member_add_string(wb, "filename", p_file_infos_arr->data[i]->filename);
+        buffer_json_member_add_string(wb, "log_type", log_src_type_t_str[p_file_infos_arr->data[i]->log_type]);
+        buffer_json_member_add_string(wb, "db_dir", p_file_infos_arr->data[i]->db_dir);
+        buffer_json_member_add_uint64(wb, "db_version", db_user_version(p_file_infos_arr->data[i]->db, -1));
+        buffer_json_member_add_uint64(wb, "db_flush_freq", db_user_version(p_file_infos_arr->data[i]->db, -1));
+        buffer_json_member_add_int64( wb, "db_disk_space_limit", p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES);
+        // buffer_sprintf( wb, "       \"%s\": {\n"
+        //                     "         \"basename\": \"%s\",\n"
+        //                     "         \"filename\": \"%s\",\n"
+        //                     "         \"log type\": \"%s\",\n"
+        //                     "         \"DB dir\": \"%s\",\n"
+        //                     "         \"DB version\": %d,\n"
+        //                     "         \"DB flush interval\": %d,\n"
+        //                     "         \"DB disk space limit\": %" PRId64 "\n"
+        //                     "      },\n", 
+        //                 p_file_infos_arr->data[i]->chart_name,
+        //                 p_file_infos_arr->data[i]->file_basename,
+        //                 p_file_infos_arr->data[i]->filename,
+        //                 log_src_type_t_str[p_file_infos_arr->data[i]->log_type],
+        //                 p_file_infos_arr->data[i]->db_dir,
+        //                 db_user_version(p_file_infos_arr->data[i]->db, -1),
+        //                 p_file_infos_arr->data[i]->buff_flush_to_db_interval,
+        //                 p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES
+        //                 );
+        buffer_json_object_close(wb); // options object
     }
 
     /* Results are terminated as ",\n" but should actually be null-terminated, 
      * so replace those 2 characters with '\0' */
-    wb->len -= 2;
-    wb->buffer[wb->len] = '\0';
+    // wb->len -= 2;
+    // wb->buffer[wb->len] = '\0';
 
     return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_OK];
 }

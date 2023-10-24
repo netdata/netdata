@@ -70,7 +70,7 @@ then
 
 	if [ "$build_for_release" -eq 0 ]
 	then
-		c_flags="-O1 -ggdb -Wall -Wextra -fsanitize=address -static-libasan "
+		c_flags="-O1 -ggdb -Wall -Wextra "
 		c_flags+="-fno-omit-frame-pointer -Wformat-signedness -fstack-protector-all -Wformat-truncation=2 -Wunused-result "
 		c_flags+="-DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_DEV_MODE=1 -DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
 		# c_flags+="-Wl,--no-as-needed -ldl "
@@ -124,14 +124,17 @@ then
 	# Run Netdata
 	if [ "$build_for_release" -eq 0 ]
 	then
-		sudo -u netdata -g netdata -s gdb -ex="set confirm off" -ex=run --args $INSTALL_PATH/netdata/usr/sbin/netdata -D -W debug_flags=0x0000004000000000
+		sudo -u netdata -g netdata -s gdb -ex="set confirm off" -ex=run --args $INSTALL_PATH/netdata/usr/sbin/netdata -D
+	elif [ "$build_for_release" -eq 2 ]
+	then
+		sudo -u netdata -g netdata -s gdb -ex="set confirm off" -ex=run --args $INSTALL_PATH/netdata/usr/libexec/netdata/plugins.d/logs-management.plugin
 	else
 		sudo -u netdata -g netdata ASAN_OPTIONS=log_path=stdout $INSTALL_PATH/netdata/usr/sbin/netdata -D
 	fi
 else
 	if [[ $($INSTALL_PATH/netdata/usr/sbin/netdata -W buildinfo | grep -Fc DLOGS_MANAGEMENT_STRESS_TEST) -eq 1 ]]
 	then
-		sudo -u netdata -g netdata ASAN_OPTIONS=log_path=/dev/null $INSTALL_PATH/netdata/usr/sbin/netdata -W logsmantest
+		sudo -u netdata -g netdata ASAN_OPTIONS=log_path=/dev/null $INSTALL_PATH/netdata/usr/libexec/netdata/plugins.d/logs-management.plugin --unittest
 	else
 		echo "======================================================================="
 		echo "run_logs_management_tests_only=1 but logs management tests cannot run."

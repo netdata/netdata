@@ -15,10 +15,6 @@ void *statsd_main(void *ptr);
 void *timex_main(void *ptr);
 void *profile_main(void *ptr);
 void *replication_thread_main(void *ptr __maybe_unused);
-#ifdef ENABLE_LOGSMANAGEMENT
-// void *logsmanagement_plugin_main(void *ptr);
-void *logsmanagement_main(void *ptr);
-#endif
 
 extern bool global_statistics_enabled;
 
@@ -208,18 +204,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = dyncfg_main
     },
-
-#if defined(ENABLE_LOGSMANAGEMENT)
-    {
-        .name = "LOGSMANAG_MAIN",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = logsmanagement_main
-    },
-#endif
 
     // terminator
     {

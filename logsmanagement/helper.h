@@ -27,27 +27,7 @@
  */
 #define TEST_MS_TIMESTAMP_VALID(x) (((x) > 1649175852000 && (x) < 2532788652000)? 1:0)
 
-#define TIMESTAMP_MS_STR_SIZE sizeof(1649175852000)
-
-// Portable thread local, see https://stackoverflow.com/questions/18298280/how-to-declare-a-variable-as-thread-local-portably
-#ifndef thread_local
-#if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__
-#define thread_local _Thread_local
-#elif   defined _WIN32 && ( \
-        defined _MSC_VER || \
-        defined __ICL || \
-        defined __DMC__ || \
-        defined __BORLANDC__ )
-#define thread_local __declspec(thread) 
-/* note that ICC (linux) and Clang are covered by __GNUC__ */
-#elif   defined __GNUC__ || \
-        defined __SUNPRO_C || \
-        defined __xlC__
-#define thread_local __thread
-#else
-#error "Cannot define thread_local"
-#endif
-#endif // thread_local
+#define TIMESTAMP_MS_STR_SIZE sizeof("1649175852000")
 
 #ifdef ENABLE_LOGSMANAGEMENT_TESTS
 #define UNIT_STATIC
@@ -63,27 +43,11 @@
 #define COMPILE_TIME_ASSERT(X)    COMPILE_TIME_ASSERT2(X,__LINE__)
 #endif  // COMPILE_TIME_ASSERT
 
-#define measure_time_start()                            \
-    struct timespec begin, end;                         \
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &begin);     \
-    struct rusage begin_rusage, end_rusage;             \
-    getrusage(1, &begin_rusage);
-
-#define measure_time_end()                              \
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);       \
-    getrusage(1, &end_rusage);                          \
-    netdata_log_debug(D_LOGS_MANAG, "Ru:%.9lfs T:%.9lfs", (         \
-        end_rusage.ru_stime.tv_usec                     \
-        + end_rusage.ru_utime.tv_usec                   \
-        - begin_rusage.ru_stime.tv_usec                 \
-        - begin_rusage.ru_utime.tv_usec) / 1000000.0    \
-    + (double) (end_rusage.ru_stime.tv_sec              \
-        + end_rusage.ru_utime.tv_sec                    \
-        - begin_rusage.ru_stime.tv_sec                  \
-        - begin_rusage.ru_utime.tv_sec),                \
-    (end.tv_nsec - begin.tv_nsec) / 1000000000.0 +      \
-    (end.tv_sec - begin.tv_sec));
-
+#if defined(NETDATA_INTERNAL_CHECKS) && defined(LOGS_MANAGEMENT_STRESS_TEST)
+#define debug_log(args...) error_int(1, "DEBUG", __FILE__, __FUNCTION__, __LINE__, ##args)
+#else
+#define debug_log(fmt, args...) do {} while(0)
+#endif
 
 /**
  * @brief Extract file_basename from full file path
@@ -98,7 +62,6 @@ static inline char *get_basename(const char *const path) {
     else
         return strdupz(s + 1);
 }
-
 
 typedef enum {
     STR2XX_SUCCESS = 0,
@@ -126,7 +89,7 @@ typedef enum {
 static inline str2xx_errno str2int(int *out, char *s, int base) {
     char *end;
     if (unlikely(s[0] == '\0' || isspace(s[0]))){
-        // netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 1");
+        // debug_log( "str2int error: STR2XX_INCONVERTIBLE 1");
         // m_assert(0, "str2int error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }
@@ -134,17 +97,17 @@ static inline str2xx_errno str2int(int *out, char *s, int base) {
     long l = strtol(s, &end, base);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely(l > INT_MAX || (errno == ERANGE && l == LONG_MAX))){
-        netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_OVERFLOW");
+        debug_log( "str2int error: STR2XX_OVERFLOW");
         // m_assert(0, "str2int error: STR2XX_OVERFLOW");
         return STR2XX_OVERFLOW;
     }
     if (unlikely(l < INT_MIN || (errno == ERANGE && l == LONG_MIN))){
-        netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_UNDERFLOW");
+        debug_log( "str2int error: STR2XX_UNDERFLOW");
         // m_assert(0, "str2int error: STR2XX_UNDERFLOW");
         return STR2XX_UNDERFLOW;
     }
     if (unlikely(*end != '\0')){
-        netdata_log_debug(D_LOGS_MANAG, "str2int error: STR2XX_INCONVERTIBLE 2");
+        debug_log( "str2int error: STR2XX_INCONVERTIBLE 2");
         // m_assert(0, "str2int error: STR2XX_INCONVERTIBLE 2");
         return STR2XX_INCONVERTIBLE;
     }
@@ -155,7 +118,7 @@ static inline str2xx_errno str2int(int *out, char *s, int base) {
 static inline str2xx_errno str2float(float *out, char *s) {
     char *end;
     if (unlikely(s[0] == '\0' || isspace(s[0]))){ 
-        // netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 1\n");
+        // debug_log( "str2float error: STR2XX_INCONVERTIBLE 1\n");
         // m_assert(0, "str2float error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }
@@ -163,17 +126,17 @@ static inline str2xx_errno str2float(float *out, char *s) {
     float f = strtof(s, &end);
     /* Both checks are needed because INT_MAX == LONG_MAX is possible. */
     if (unlikely((errno == ERANGE && f == HUGE_VALF))){
-        netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_OVERFLOW\n");
+        debug_log( "str2float error: STR2XX_OVERFLOW\n");
         // m_assert(0, "str2float error: STR2XX_OVERFLOW");
         return STR2XX_OVERFLOW;
     }
     if (unlikely((errno == ERANGE && f == -HUGE_VALF))){
-        netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_UNDERFLOW\n");
+        debug_log( "str2float error: STR2XX_UNDERFLOW\n");
         // m_assert(0, "str2float error: STR2XX_UNDERFLOW");
         return STR2XX_UNDERFLOW;
     }
     if (unlikely((*end != '\0'))){
-        netdata_log_debug(D_LOGS_MANAG, "str2float error: STR2XX_INCONVERTIBLE 2\n");
+        debug_log( "str2float error: STR2XX_INCONVERTIBLE 2\n");
         // m_assert(0, "str2float error: STR2XX_INCONVERTIBLE");
         return STR2XX_INCONVERTIBLE;
     }

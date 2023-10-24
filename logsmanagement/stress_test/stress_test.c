@@ -13,7 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <uv.h>
-#include "../logsmanagement_conf.h"
+#include "../defaults.h"
 
 #include "stress_test.h"
 

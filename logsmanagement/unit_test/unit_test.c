@@ -9,9 +9,10 @@
 #include <stdio.h>
 #include "../circular_buffer.h"
 #include "../compression.h"
+#include "../helper.h"
+#include "../logsmanag_config.h"
 #include "../parser.h"
 #include "../query.h"
-#include "../helper.h"
 
 #define LOG_RECORDS_PARTIAL "\
 127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11192 \"-\" \"ApacheBench/2.3\"\n\
@@ -541,6 +542,82 @@ static int test_search_keyword(){
     return errors;
 }
 
+
+
+static int test_logsmanag_config_funcs(){
+    int errors = 0;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
+
+    fprintf(stderr, "Testing get_X_dir() functions...\n"); 
+    if(NULL == get_user_config_dir()){
+        fprintf(stderr, "- Error, get_user_config_dir() returns NULL.\n");
+        ++errors;
+    }
+
+    if(NULL == get_stock_config_dir()){
+        fprintf(stderr, "- Error, get_stock_config_dir() returns NULL.\n");
+        ++errors;
+    }
+    
+    if(NULL == get_log_dir()){
+        fprintf(stderr, "- Error, get_log_dir() returns NULL.\n");
+        ++errors;
+    }
+    
+    if(NULL == get_cache_dir()){
+        fprintf(stderr, "- Error, get_cache_dir() returns NULL.\n");
+        ++errors;
+    }
+
+    Flb_socket_config_t *p_forward_in_config = NULL;
+
+    flb_srvc_config_t flb_srvc_config = {
+        .flush           = FLB_FLUSH_DEFAULT,
+        .http_listen     = FLB_HTTP_LISTEN_DEFAULT,
+        .http_port       = FLB_HTTP_PORT_DEFAULT,
+        .http_server     = FLB_HTTP_SERVER_DEFAULT,
+        .log_path        = "NULL",
+        .log_level       = FLB_LOG_LEVEL_DEFAULT,
+        .coro_stack_size = FLB_CORO_STACK_SIZE_DEFAULT
+    };
+
+    flb_srvc_config_t *p_flb_srvc_config = &flb_srvc_config;
+
+    fprintf(stderr, "Testing logs_manag_config_load() can load stock config...\n"); 
+
+
+    int old_stderr = dup(STDERR_FILENO);
+    if(!freopen("/dev/null", "w", stderr)) exit(-1);
+    int rc = logs_manag_config_load(&flb_srvc_config, &p_forward_in_config, 1);
+    fclose(stderr);
+    stderr = fdopen(old_stderr, "w");
+
+    if( LOGS_MANAG_CONFIG_LOAD_ERROR_OK != rc && 
+        LOGS_MANAG_CONFIG_LOAD_ERROR_DISABLED != rc){
+        fprintf(stderr, "- Error, logs_manag_config_load() returns %d.\n", rc);
+        ++errors;
+    }
+
+    fprintf(stderr, "Testing logs_manag_config_load() when p_flb_srvc_config is NULL...\n"); 
+
+    p_flb_srvc_config = NULL;
+
+    old_stderr = dup(old_stderr);
+    if(!freopen("/dev/null", "w", stderr)) exit(-1);
+    rc = logs_manag_config_load(p_flb_srvc_config, &p_forward_in_config, 1);
+    fclose(stderr);
+    stderr = fdopen(old_stderr, "w");
+
+    if(LOGS_MANAG_CONFIG_LOAD_ERROR_P_FLB_SRVC_NULL != rc){
+        fprintf(stderr, "- Error, logs_manag_config_load() returns %d.\n", rc);
+        ++errors;
+    } 
+
+
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
+    return errors;
+}
+
 int logs_management_unittest(void){
     int errors = 0;
 
@@ -563,6 +640,8 @@ int logs_management_unittest(void){
     errors += test_sanitise_string();
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_search_keyword();
+    fprintf(stderr, "------------------------------------------------------\n");
+    errors += test_logsmanag_config_funcs();
     fprintf(stderr, "------------------------------------------------------\n");
     fprintf(stderr, "[%s] Total errors: %d\n", errors ? "FAILED" : "SUCCEEDED", errors);
     fprintf(stderr, "======================================================\n");

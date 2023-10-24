@@ -8,7 +8,7 @@
 #include "flb_plugin.h"
 #include <lz4.h>
 #include "helper.h"
-#include "logsmanagement_conf.h"
+#include "defaults.h"
 #include "circular_buffer.h"
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
@@ -118,11 +118,13 @@ static void *flb_lib_handle = NULL;
 
 static struct flb_lib_out_cb *fwd_input_out_cb = NULL;
 
-int flb_init(flb_srvc_config_t flb_srvc_config){
+extern netdata_mutex_t stdout_mut;
+
+int flb_init(flb_srvc_config_t flb_srvc_config, const char *const stock_config_dir){
     int rc = 0;
     char *dl_error;
 
-    char *flb_lib_path = strdupz_path_subpath(netdata_configured_stock_config_dir, "/../libfluent-bit.so");
+    char *flb_lib_path = strdupz_path_subpath(stock_config_dir, "/../libfluent-bit.so");
     if (unlikely(NULL == (flb_lib_handle = dlopen(flb_lib_path, RTLD_LAZY)))){
         if (NULL != (dl_error = dlerror())) 
             collector_error("dlopen() libfluent-bit.so error: %s", dl_error);
@@ -248,11 +250,8 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
                                                         p_file_info->compression_accel);
     m_assert(buff->in->text_compressed_size != 0, "Text_compressed_size should be != 0");
 
-    struct timeval tv;
-    tv.tv_sec = buff->in->timestamp / 1000;
-    tv.tv_usec = (buff->in->timestamp % 1000) * 1000; // TODO: Is tv_usec used by charts?
+    p_file_info->parser_metrics->last_update = buff->in->timestamp / MSEC_PER_SEC;
 
-    p_file_info->parser_metrics->tv = tv;
     p_file_info->parser_metrics->num_lines += buff->in->num_lines;
 
     /* Perform custom log chart parsing */
@@ -263,7 +262,10 @@ static void flb_complete_buff_item(struct File_info *p_file_info){
     }
 
     /* Update charts */
+    netdata_mutex_lock(&stdout_mut);
     p_file_info->chart_meta->update(p_file_info);
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mut);
 
     circ_buff_insert(buff);
 
@@ -277,10 +279,11 @@ void flb_complete_item_timer_timeout_cb(uv_timer_t *handle) {
     
     uv_mutex_lock(&p_file_info->flb_tmp_buff_mut);
     if(!buff->in->data || !*buff->in->data || !buff->in->text_size){
-        struct timeval now;
-        now_realtime_timeval(&now);
-        p_file_info->parser_metrics->tv = now;
+        p_file_info->parser_metrics->last_update = now_realtime_sec();
+        netdata_mutex_lock(&stdout_mut);
         p_file_info->chart_meta->update(p_file_info);
+        fflush(stdout);
+        netdata_mutex_unlock(&stdout_mut);
         uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
         return; 
     }
@@ -383,12 +386,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     if(!strncmp(p->key.via.str.ptr, "stream guid", (size_t) p->key.via.str.size)){
                         char *stream_guid = (char *) p->val.via.str.ptr;
                         size_t stream_guid_size = p->val.via.str.size;
-                        netdata_log_debug(D_LOGS_MANAG, "stream guid:%.*s", (int) stream_guid_size, stream_guid);
+                        debug_log( "stream guid:%.*s", (int) stream_guid_size, stream_guid);
 
                         for (int i = 0; i < p_file_infos_arr->count; i++) {
                             if(!strncmp(p_file_infos_arr->data[i]->stream_guid, stream_guid, stream_guid_size)){
                                 p_file_info = p_file_infos_arr->data[i];
-                                // netdata_log_debug(D_LOGS_MANAG, "p_file_info match found: %s type[%s]", 
+                                // debug_log( "p_file_info match found: %s type[%s]", 
                                 //                      p_file_info->stream_guid, 
                                 //                      log_src_type_t_str[p_file_info->log_type]);
                                 break;
@@ -416,13 +419,13 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
                 // if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
                 //    !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
-                //     netdata_log_debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
+                //     debug_log("msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
                 //     if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
                 //         msgpack_object_kv* ac = p->val.via.map.ptr;
                 //         msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
                 //         do{
                 //             if(!strncmp(ac->key.via.str.ptr, "Type", (size_t) ac->key.via.str.size)){
-                //                 netdata_log_debug(D_LOGS_MANAG,"msg key:[%.*s]val:[%.*s]", (int) ac->key.via.str.size, ac->key.via.str.ptr, (int) ac->val.via.str.size, ac->val.via.str.ptr);
+                //                 debug_log("msg key:[%.*s]val:[%.*s]", (int) ac->key.via.str.size, ac->key.via.str.ptr, (int) ac->val.via.str.size, ac->val.via.str.ptr);
                 //             }
                 //             ac++;
                 //             continue;
@@ -482,15 +485,23 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                             goto skip_collect_and_drop_logs;
                         else skip_kmsg_log_buffering = 0;
                     }
-                    /* NOTE/WARNING: kmsg timestamps will be **wrong** if system 
-                     *               has gone into hibernation since boot and 
-                     *               "p_file_info->use_log_timestamp" is set. */
-                    if( p_file_info->use_log_timestamp && 
-                        !strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
-                        timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
+
+                    /* NOTE/WARNING: 
+                     * kmsg timestamps are tricky. The timestamp will be 
+                     * *wrong** if the system has gone into hibernation since 
+                     * last boot and "p_file_info->use_log_timestamp" is set. 
+                     * Even if "p_file_info->use_log_timestamp" is NOT set, we 
+                     * need to use now_realtime_msec() as Fluent Bit timestamp
+                     * will also be wrong. */
+                    if( !strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
+                        if(p_file_info->use_log_timestamp){
+                            timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
+                        }
+                        else if(!timestamp)
+                            timestamp = now_realtime_msec();
                     }
-                    else if(p_file_info->use_log_timestamp && 
-                            !strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size)){
+                    else if(!strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size) && 
+                            p_file_info->use_log_timestamp){
                         timestamp += p->val.via.i64 / USEC_PER_MS;
                     }
                     else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
@@ -610,7 +621,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(docker_ev_type, "docker_ev_type is NULL");
                         m_assert(docker_ev_type_size, "docker_ev_type_size is 0");
 
-                        // netdata_log_debug(D_LOGS_MANAG,"docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
+                        // debug_log("docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "Action", (size_t) p->key.via.str.size)){
                         docker_ev_action = (char *) p->val.via.str.ptr;
@@ -619,7 +630,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(docker_ev_action, "docker_ev_action is NULL");
                         m_assert(docker_ev_action_size, "docker_ev_action_size is 0");
 
-                        // netdata_log_debug(D_LOGS_MANAG,"docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
+                        // debug_log("docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "id", (size_t) p->key.via.str.size)){
                         docker_ev_id = (char *) p->val.via.str.ptr;
@@ -628,10 +639,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         m_assert(docker_ev_id, "docker_ev_id is NULL");
                         m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
 
-                        // netdata_log_debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                        // debug_log("docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
                     }
                     else if(!strncmp(p->key.via.str.ptr, "Actor", (size_t) p->key.via.str.size)){
-                        // netdata_log_debug(D_LOGS_MANAG, "msg key:[%.*s]val:[%.*s]", (int)   p->key.via.str.size, 
+                        // debug_log( "msg key:[%.*s]val:[%.*s]", (int)   p->key.via.str.size, 
                         //                                                                     p->key.via.str.ptr, 
                         //                                                             (int)   p->val.via.str.size, 
                         //                                                                     p->val.via.str.ptr);
@@ -646,7 +657,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                                     m_assert(docker_ev_id, "docker_ev_id is NULL");
                                     m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
 
-                                    // netdata_log_debug(D_LOGS_MANAG,"docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                                    // debug_log("docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
                                 }
                                 else if(!strncmp(ac->key.via.str.ptr, "Attributes", (size_t) ac->key.via.str.size)){
                                     if(likely(ac->val.type == MSGPACK_OBJECT_MAP && ac->val.via.map.size != 0)){
@@ -711,7 +722,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         } 
     }
 
-    /* If no log timestamp was found, use collection timestamp instead. */
+    /* If no log timestamp was found, use Fluent Bit collection timestamp. */
     if(timestamp == 0) 
         timestamp = (msec_t) tmp_time.tm.tv_sec * MSEC_PER_SEC + (msec_t) tmp_time.tm.tv_nsec / (NSEC_PER_MSEC);
 
@@ -800,17 +811,19 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     char *const key = mallocz(str_len + 1);
                     memcpy(key, str, str_len);
                     key[str_len] = '\0';
-                    metrics_dict_item_t item = {.dim = NULL, .num = 1};
-                    dictionary_set_advanced(dict, key, str_len, &item, sizeof(item), NULL);
+                    metrics_dict_item_t item = {.dim_initialized = false, .num_new = 1};
+                    dictionary_set_advanced(dict, key, str_len + 1, &item, sizeof(item), NULL);
                 }
                 c = &c[sz];
             }
         }
 
-        if(likely(kmsg_sever >= 0)) p_file_info->parser_metrics->kernel->sever[kmsg_sever]++;
+        if(likely(kmsg_sever >= 0))
+            p_file_info->parser_metrics->kernel->sever[kmsg_sever]++;
 
         // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
-        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
+        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) 
+            goto skip_collect_and_drop_logs;
 
         size_t tmp_item_off = buff->in->text_size;
 
@@ -1015,7 +1028,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         }
 
         if(likely(docker_ev_id)){
-            // netdata_log_debug(D_LOGS_MANAG,"docker_ev_id: %.*s", (int) docker_ev_id_size, docker_ev_id);
+            // debug_log("docker_ev_id: %.*s", (int) docker_ev_id_size, docker_ev_id);
         //     int i;
         //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
         //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
@@ -1098,8 +1111,8 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             char *const key = mallocz(mqtt_topic_size + 1);
             memcpy(key, mqtt_topic, mqtt_topic_size);
             key[mqtt_topic_size] = '\0';
-            metrics_dict_item_t item = {.dim = NULL, .num = 1};
-            dictionary_set_advanced(p_file_info->parser_metrics->mqtt->topic, key, mqtt_topic_size, &item, sizeof(item), NULL);
+            metrics_dict_item_t item = {.dim_initialized = false, .num_new = 1};
+            dictionary_set_advanced(p_file_info->parser_metrics->mqtt->topic, key, mqtt_topic_size + 1, &item, sizeof(item), NULL);
 
             // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
             if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
@@ -1166,7 +1179,7 @@ int flb_add_input(struct File_info *const p_file_info){
             char update_every_str[10]; 
             snprintfz(update_every_str, 10, "%d", p_file_info->update_every);
 
-            netdata_log_debug(  D_LOGS_MANAG, "Setting up %s tail for %s (basename:%s)", 
+            debug_log("Setting up %s tail for %s (basename:%s)", 
                     p_file_info->log_type == FLB_TAIL ? "FLB_TAIL" : "FLB_WEB_LOG",
                     p_file_info->filename, p_file_info->file_basename);
 
@@ -1191,7 +1204,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_KMSG: {
-            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_KMSG collector");
+            debug_log( "Setting up FLB_KMSG collector");
         
             /* Set up kmsg input */
             p_file_info->flb_input = flb_input(ctx, "kmsg", NULL);
@@ -1203,7 +1216,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_SYSTEMD: {
-            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_SYSTEMD collector");
+            debug_log( "Setting up FLB_SYSTEMD collector");
         
             /* Set up systemd input */
             p_file_info->flb_input = flb_input(ctx, "systemd", NULL);
@@ -1226,7 +1239,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_DOCKER_EV: {
-            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_DOCKER_EV collector");
+            debug_log( "Setting up FLB_DOCKER_EV collector");
 
             /* Set up Docker Events parser */
             if(flb_parser_create(   "docker_events_parser", /* parser name */
@@ -1256,7 +1269,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_SYSLOG: {
-            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_SYSLOG collector");
+            debug_log( "Setting up FLB_SYSLOG collector");
 
             /* Set up syslog parser */
             const char syslog_parser_prfx[] = "syslog_parser_";
@@ -1314,7 +1327,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_SERIAL: {
-            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_SERIAL collector");
+            debug_log( "Setting up FLB_SERIAL collector");
 
             Flb_serial_config_t *serial_config = (Flb_serial_config_t *) p_file_info->flb_config;
             if(unlikely(!serial_config || !serial_config->bitrate || !*serial_config->bitrate ||
@@ -1334,7 +1347,7 @@ int flb_add_input(struct File_info *const p_file_info){
             break;
         }
         case FLB_MQTT: {
-            netdata_log_debug(D_LOGS_MANAG, "Setting up FLB_MQTT collector");
+            debug_log( "Setting up FLB_MQTT collector");
 
             Flb_socket_config_t *socket_config = (Flb_socket_config_t *) p_file_info->flb_config;
             if(unlikely(!socket_config || !socket_config->listen || !*socket_config->listen ||
@@ -1359,7 +1372,7 @@ int flb_add_input(struct File_info *const p_file_info){
 
     /* Set up user-configured outputs */
     for(Flb_output_config_t *output = p_file_info->flb_outputs; output; output = output->next){
-        netdata_log_debug(D_LOGS_MANAG, "setting up user output [%s]", output->plugin);
+        debug_log( "setting up user output [%s]", output->plugin);
 
         int out = flb_output(ctx, output->plugin, NULL);
         if(out < 0) return FLB_OUTPUT_ERROR;
@@ -1367,7 +1380,7 @@ int flb_add_input(struct File_info *const p_file_info){
             "Match", tag_s,
             NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
         for(struct flb_output_config_param *param = output->param; param; param = param->next){
-            netdata_log_debug(D_LOGS_MANAG, "setting up param [%s][%s] of output [%s]", param->key, param->val, output->plugin);
+            debug_log( "setting up param [%s][%s] of output [%s]", param->key, param->val, output->plugin);
             if(flb_output_set(ctx, out, 
                 param->key, param->val,
                 NULL) != 0) return FLB_OUTPUT_SET_ERROR; 
@@ -1399,13 +1412,13 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
     int input, output;
 
     if(forward_in_config == NULL){
-        netdata_log_debug(D_LOGS_MANAG, "forward: forward_in_config is NULL");
+        debug_log( "forward: forward_in_config is NULL");
         collector_info("forward_in_config is NULL");
         return 0;
     }
 
     do{
-        netdata_log_debug(D_LOGS_MANAG, "forward: Setting up flb_add_fwd_input()");
+        debug_log( "forward: Setting up flb_add_fwd_input()");
         
         if((input = flb_input(ctx, "forward", NULL)) < 0) break;
 
@@ -1435,7 +1448,7 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
             "Match", "fwd*",
             NULL) != 0) break; 
 
-        netdata_log_debug(D_LOGS_MANAG, "forward: Set up flb_add_fwd_input() with success");
+        debug_log( "forward: Set up flb_add_fwd_input() with success");
         return 0;
     } while(0);
 

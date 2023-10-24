@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uv.h>
-#include "logsmanagement_conf.h"
+#include "defaults.h"
 #include "query.h"
 #include "file_info.h"
 

@@ -19,28 +19,23 @@ typedef struct Chart_data_systemd chart_data_systemd_t;
 
 #include "rrd_api.h"
 
+extern const char *dim_sever_str[SYSLOG_SEVER_ARR_SIZE];
+
 struct Chart_data_systemd {
 
-    struct timeval tv;
+    time_t last_update;
 
     /* Number of collected log records */
-    RRDSET *st_lines_total, *st_lines_rate;
-    RRDDIM *dim_lines_total, *dim_lines_rate;
     collected_number num_lines;
     
     /* Systemd metrics - Syslog Priority value */
-    RRDSET *st_prior;
-    RRDDIM *dim_prior[193];
+    char *dim_prior[193];
     collected_number num_prior[193];
 
     /* Systemd metrics - Syslog Severity value */
-    RRDSET *st_sever;
-    RRDDIM *dim_sever[9];
     collected_number num_sever[9];
 
     /* Systemd metrics - Syslog Facility value */
-    RRDSET *st_facil;
-    RRDDIM *dim_facil[25];
     collected_number num_facil[25];
 };
 

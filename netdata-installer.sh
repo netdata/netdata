@@ -1343,6 +1343,21 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
+    capabilities=0
+    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
+      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
+      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"; then
+        capabilities=1 
+      fi
+    fi
+
+    if [ $capabilities -eq 0 ]; then
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
+    fi
+  fi
+
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
     capabilities=0
@@ -1739,6 +1754,10 @@ install_fluentbit() {
   run chmod 0644 fluent-bit/build/lib/libfluent-bit.so
 
   run cp -a -v fluent-bit/build/lib/libfluent-bit.so "${NETDATA_PREFIX}"/usr/lib/netdata
+
+  # Fix paths in logsmanagement.d.conf
+  run sed -i -e "s|# db dir =.*|db dir = ${NETDATA_CACHE_DIR}\/logs_management_db|g" "${NETDATA_STOCK_CONFIG_DIR}"/logsmanagement.d.conf
+  run sed -i -e "s|# log file =.*|log file = ${NETDATA_LOG_DIR}\/fluentbit.log|g" "${NETDATA_STOCK_CONFIG_DIR}"/logsmanagement.d.conf
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }

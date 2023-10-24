@@ -10,7 +10,7 @@
 
 #include <uv.h>
 #include "../database/sqlite/sqlite3.h"
-#include "logsmanagement_conf.h"
+#include "defaults.h"
 #include "parser.h"
 
 // Cool trick --> http://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/c_preprocessor_applications_en
@@ -141,8 +141,6 @@ struct File_infos_arr {
 };
 
 extern struct File_infos_arr *p_file_infos_arr;     /**< Array that contains all p_file_info structs for all log sources **/
-
-extern int g_logs_manag_update_every;               /**< Variable defining global "update every" value for logs management **/
 
 typedef struct {
     int update_every;

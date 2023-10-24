@@ -313,6 +313,52 @@ SYSTEMD_JOURNAL_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+LOGSMANAGEMENT_FILES = \
+    logsmanagement/circular_buffer.c \
+    logsmanagement/circular_buffer.h \
+    logsmanagement/compression.c \
+    logsmanagement/compression.h \
+    logsmanagement/db_api.c \
+    logsmanagement/db_api.h \
+    logsmanagement/defaults.h \
+    logsmanagement/file_info.h \
+    logsmanagement/flb_plugin.c \
+    logsmanagement/flb_plugin.h \
+    logsmanagement/functions.c \
+    logsmanagement/functions.h \
+    logsmanagement/helper.h \
+    logsmanagement/logsmanag_config.c \
+    logsmanagement/logsmanag_config.h \
+    logsmanagement/logsmanagement.c \
+    logsmanagement/parser.c \
+    logsmanagement/parser.h \
+    logsmanagement/query.c \
+    logsmanagement/query.h \
+    logsmanagement/rrd_api/rrd_api_docker_ev.c \
+    logsmanagement/rrd_api/rrd_api_docker_ev.h \
+    logsmanagement/rrd_api/rrd_api_generic.c \
+    logsmanagement/rrd_api/rrd_api_generic.h \
+    logsmanagement/rrd_api/rrd_api_kernel.c \
+    logsmanagement/rrd_api/rrd_api_kernel.h \
+    logsmanagement/rrd_api/rrd_api_mqtt.c \
+    logsmanagement/rrd_api/rrd_api_mqtt.h \
+    logsmanagement/rrd_api/rrd_api_stats.c \
+    logsmanagement/rrd_api/rrd_api_stats.h \
+    logsmanagement/rrd_api/rrd_api_systemd.c \
+    logsmanagement/rrd_api/rrd_api_systemd.h \
+    logsmanagement/rrd_api/rrd_api_web_log.c \
+    logsmanagement/rrd_api/rrd_api_web_log.h \
+    logsmanagement/rrd_api/rrd_api.h \
+    database/sqlite/sqlite3.c \
+    database/sqlite/sqlite3.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+LOGSMANAGEMENT_TESTS_FILES = \
+    logsmanagement/unit_test/unit_test.c \
+    logsmanagement/unit_test/unit_test.h \
+    $(NULL)
+
 CUPS_PLUGIN_FILES = \
     collectors/cups.plugin/cups_plugin.c \
     $(LIBNETDATA_FILES) \
@@ -945,51 +991,6 @@ MONGODB_EXPORTING_FILES = \
     exporting/mongodb/mongodb.h \
     $(NULL)
 
-if ENABLE_LOGSMANAGEMENT
-LOGSMANAGEMENT_FILES = \
-    logsmanagement/rrd_api/rrd_api_docker_ev.c \
-    logsmanagement/rrd_api/rrd_api_docker_ev.h \
-    logsmanagement/rrd_api/rrd_api_generic.c \
-    logsmanagement/rrd_api/rrd_api_generic.h \
-    logsmanagement/rrd_api/rrd_api_kernel.c \
-    logsmanagement/rrd_api/rrd_api_kernel.h \
-    logsmanagement/rrd_api/rrd_api_mqtt.c \
-    logsmanagement/rrd_api/rrd_api_mqtt.h \
-    logsmanagement/rrd_api/rrd_api_stats.c \
-    logsmanagement/rrd_api/rrd_api_stats.h \
-    logsmanagement/rrd_api/rrd_api_systemd.c \
-    logsmanagement/rrd_api/rrd_api_systemd.h \
-    logsmanagement/rrd_api/rrd_api_web_log.c \
-    logsmanagement/rrd_api/rrd_api_web_log.h \
-    logsmanagement/rrd_api/rrd_api.h \
-    logsmanagement/circular_buffer.c \
-    logsmanagement/circular_buffer.h \
-    logsmanagement/compression.c \
-    logsmanagement/compression.h \
-    logsmanagement/db_api.c \
-    logsmanagement/db_api.h \
-    logsmanagement/file_info.h \
-    logsmanagement/flb_plugin.c \
-    logsmanagement/flb_plugin.h \
-    logsmanagement/functions.c \
-    logsmanagement/functions.h \
-    logsmanagement/helper.h \
-    logsmanagement/logsmanagement_conf.h \
-    logsmanagement/logsmanagement.c \
-    logsmanagement/parser.c \
-    logsmanagement/parser.h \
-    logsmanagement/query.c \
-    logsmanagement/query.h \
-    $(NULL)
-endif
-
-if ENABLE_LOGSMANAGEMENT_TESTS
-LOGSMANAGEMENT_TESTS_FILES = \
-    logsmanagement/unit_test/unit_test.c \
-    logsmanagement/unit_test/unit_test.h \
-    $(NULL)
-endif
-
 DAEMON_FILES = \
     daemon/buildinfo.c \
     daemon/buildinfo.h \
@@ -1154,8 +1155,6 @@ NETDATA_FILES = \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \
     $(PROFILE_PLUGIN_FILES) \
-    $(LOGSMANAGEMENT_FILES) \
-    $(LOGSMANAGEMENT_TESTS_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -1303,6 +1302,17 @@ if ENABLE_PLUGIN_SYSTEMD_JOURNAL
     systemd_journal_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_SYSTEMD_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_LOGSMANAGEMENT
+    plugins_PROGRAMS += logs-management.plugin
+    logs_management_plugin_SOURCES = $(LOGSMANAGEMENT_FILES)
+if ENABLE_LOGSMANAGEMENT_TESTS
+    logs_management_plugin_SOURCES += $(LOGSMANAGEMENT_TESTS_FILES)
+endif
+    logs_management_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 

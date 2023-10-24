@@ -9,6 +9,17 @@
 #include "../circular_buffer.h"
 
 struct Chart_meta;
+struct Chart_str {
+    const char *type;
+    const char *id;    
+    const char *title;
+    const char *units; 
+    const char *family;  
+    const char *context;
+    const char *chart_type; 
+    long priority;
+    int update_every;
+};
 
 #include "rrd_api_generic.h"
 #include "rrd_api_web_log.h"
@@ -17,18 +28,25 @@ struct Chart_meta;
 #include "rrd_api_docker_ev.h"
 #include "rrd_api_mqtt.h"
 
-#define CHART_TITLE_TOTAL_COLLECTED_LOGS "Total collected log records"
-#define CHART_TITLE_RATE_COLLECTED_LOGS "Rate of collected log records"
+#define LOGS_MANAGEMENT_PLUGIN_STR          "logsmanagement.plugin"
 
-#define NETDATA_CHART_PRIO_LOGS_INCR            100  /**< PRIO increment step from one log source to another **/
+#define CHART_TITLE_TOTAL_COLLECTED_LOGS    "Total collected log records"
+#define CHART_TITLE_RATE_COLLECTED_LOGS     "Rate of collected log records"
+#define NETDATA_CHART_PRIO_LOGS_INCR        100     /**< PRIO increment step from one log source to another **/
 
 typedef struct Chart_data_cus {
-    /* See Log_parser_cus_metrics_t in parser.h for other 
-     * dimensions and collected numbers to add here */
-    RRDSET *st_cus;
-    int need_rrdset_done;
-    RRDDIM *dim_cus_count;
-    collected_number num_cus_count;
+    char *id;
+
+    struct chart_data_cus_dim {
+        char *name;
+        collected_number val;
+        unsigned long long *p_counter;
+    } *dims;
+
+    int dims_size;
+
+    struct Chart_data_cus *next;
+
 } Chart_data_cus_t ;
 
 struct Chart_meta {
@@ -44,122 +62,252 @@ struct Chart_meta {
         chart_data_mqtt_t       *chart_data_mqtt;
     };
 
-    Chart_data_cus_t **chart_data_cus_arr;
+    Chart_data_cus_t *chart_data_cus_arr;
 
     void (*init)(struct File_info *p_file_info);
     void (*update)(struct File_info *p_file_info);
 
 };
 
-#define do_num_of_logs_charts_update(p_file_info, chart_data, tv, lag_in_sec){\
-    /* Number of collected logs total - update previous values */\
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){\
-        if(likely(chart_data->st_lines_total->counter_done)){\
-            while(tv.tv_sec < chart_data->tv.tv_sec){\
-                rrddim_set_by_pointer(  chart_data->st_lines_total,\
-                                        chart_data->dim_lines_total,\
-                                        chart_data->num_lines);\
-                rrdset_timed_done(      chart_data->st_lines_total, tv, true);\
-                tv.tv_sec++;\
-            }\
-        }\
-    }\
-    /* Number of collected logs rate - update previous values */\
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){\
-        if(likely(chart_data->st_lines_rate->counter_done)){\
-            tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;\
-            while(tv.tv_sec < chart_data->tv.tv_sec){\
-                rrddim_set_by_pointer(  chart_data->st_lines_rate,\
-                                        chart_data->dim_lines_rate,\
-                                        chart_data->num_lines);\
-                rrdset_timed_done(      chart_data->st_lines_rate, tv, true);\
-                tv.tv_sec++;\
-            }\
-        }\
-    }\
-    chart_data->num_lines = p_file_info->parser_metrics->num_lines;\
-    /* Number of collected logs total - update current value */\
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){\
-        rrddim_set_by_pointer(  chart_data->st_lines_total,\
-                                chart_data->dim_lines_total,\
-                                chart_data->num_lines);\
-        rrdset_timed_done(      chart_data->st_lines_total, chart_data->tv,\
-                                chart_data->st_lines_total->counter_done != 0);\
-    }\
-    /* Number of collected logs rate - update current value */\
-    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){\
-        rrddim_set_by_pointer(  chart_data->st_lines_rate,\
-                                chart_data->dim_lines_rate,\
-                                chart_data->num_lines);\
-        rrdset_timed_done(      chart_data->st_lines_rate, chart_data->tv,\
-                                chart_data->st_lines_rate->counter_done != 0);\
-    }\
+static inline struct Chart_str create_chart(const char *type,  
+                                            const char *id,      
+                                            const char *title,
+                                            const char *units, 
+                                            const char *family,  
+                                            const char *context,
+                                            const char *chart_type, 
+                                            long priority,  
+                                            int update_every){
+
+    struct Chart_str cs = {
+        .type           = type,
+        .id             = id,
+        .title          = title,
+        .units          = units,
+        .family         = family ? family : "",
+        .context        = context ? context : "",
+        .chart_type     = chart_type ? chart_type : "",
+        .priority       = priority,
+        .update_every   = update_every
+    };
+
+    printf("CHART '%s.%s' '' '%s' '%s' '%s' '%s' '%s' %ld %d '' 'logsmanagement.plugin' ''\n",
+        cs.type, 
+        cs.id, 
+        cs.title, 
+        cs.units, 
+        cs.family,
+        cs.context,
+        cs.chart_type,
+        cs.priority, 
+        cs.update_every
+    );
+
+    return cs;
 }
 
-#define do_custom_charts_init() {\
-    for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){\
-        p_file_info->chart_meta->chart_data_cus_arr = reallocz( p_file_info->chart_meta->chart_data_cus_arr, \
-                                                                (cus_off + 1) * sizeof(Chart_data_cus_t *));\
-        p_file_info->chart_meta->chart_data_cus_arr[cus_off] =  callocz(1, sizeof(Chart_data_cus_t));\
-        RRDSET *st_cus = rrdset_find_active_bytype_localhost(   p_file_info->chart_name,\
-                                                                p_file_info->parser_cus_config[cus_off]->chart_name);\
-        if(st_cus) p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus = st_cus;\
-        else {\
-            p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus = rrdset_create_localhost(\
-                    (char *) p_file_info->chart_name\
-                    , p_file_info->parser_cus_config[cus_off]->chart_name\
-                    , NULL\
-                    , "custom_charts"\
-                    , NULL\
-                    , p_file_info->parser_cus_config[cus_off]->chart_name\
-                    , "matches"\
-                    , "logsmanagement.plugin"\
-                    , NULL\
-                    , p_file_info->chart_meta->base_prio + 1000 + cus_off\
-                    , p_file_info->update_every\
-                    , RRDSET_TYPE_AREA\
-            );\
-            /* rrdset_done() need to be run only once for each chart */\
-            p_file_info->chart_meta->chart_data_cus_arr[cus_off]->need_rrdset_done = 1; \
-        }\
-        p_file_info->chart_meta->chart_data_cus_arr[cus_off]->dim_cus_count = \
-            rrddim_add( p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus, \
-                        p_file_info->parser_cus_config[cus_off]->regex_name, NULL, \
-                        1, 1, RRD_ALGORITHM_INCREMENTAL);\
-    }\
+static inline void add_dim( const char *id, 
+                            const char *algorithm,
+                            collected_number multiplier, 
+                            collected_number divisor){
+
+    printf("DIMENSION '%s' '' '%s' %lld %lld\n", id, algorithm, multiplier, divisor);
 }
 
-#define do_custom_charts_update(){\
-    tv.tv_sec = chart_data->tv.tv_sec - lag_in_sec;\
-    while(tv.tv_sec && tv.tv_sec < chart_data->tv.tv_sec){\
-        for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){\
-            if(likely(p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus->counter_done)){\
-                rrddim_set_by_pointer(  p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus,\
-                                        p_file_info->chart_meta->chart_data_cus_arr[cus_off]->dim_cus_count,\
-                                        p_file_info->chart_meta->chart_data_cus_arr[cus_off]->num_cus_count);\
-            }\
-        }\
-        for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){\
-            if(likely(p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus->counter_done)){\
-                if(p_file_info->chart_meta->chart_data_cus_arr[cus_off]->need_rrdset_done)\
-                    rrdset_timed_done(p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus, tv, true);\
-            }\
-        }\
-        tv.tv_sec++;\
-    }\
-    for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){\
-        p_file_info->chart_meta->chart_data_cus_arr[cus_off]->num_cus_count += \
-                p_file_info->parser_metrics->parser_cus[cus_off]->count;\
-        p_file_info->parser_metrics->parser_cus[cus_off]->count = 0;\
-        rrddim_set_by_pointer(  p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus,\
-                                p_file_info->chart_meta->chart_data_cus_arr[cus_off]->dim_cus_count,\
-                                p_file_info->chart_meta->chart_data_cus_arr[cus_off]->num_cus_count);\
-    }\
-    for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){\
-        if(p_file_info->chart_meta->chart_data_cus_arr[cus_off]->need_rrdset_done)\
-            rrdset_timed_done(  p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus, chart_data->tv, \
-                                p_file_info->chart_meta->chart_data_cus_arr[cus_off]->st_cus->counter_done != 0);\
-    }\
+static inline void add_dim_post_init(   struct Chart_str *cs,
+                                        const char *dim_id, 
+                                        const char *algorithm,
+                                        collected_number multiplier, 
+                                        collected_number divisor){
+
+    printf("CHART '%s.%s' '' '%s' '%s' '%s' '%s' '%s' %ld %d '' 'logsmanagement.plugin' ''\n",
+        cs->type, 
+        cs->id, 
+        cs->title, 
+        cs->units, 
+        cs->family,
+        cs->context,
+        cs->chart_type,
+        cs->priority, 
+        cs->update_every
+    );
+    add_dim(dim_id, algorithm, multiplier, divisor);
+}
+
+static inline void update_chart_begin(const char *type, const char *id){
+
+    printf("BEGIN '%s.%s'\n", type, id);
+}
+
+static inline void update_chart_set(const char *id, collected_number val){
+    printf("SET '%s' = %lld\n", id, val);
+}
+
+static inline void update_chart_end(time_t sec){
+    printf("END %" PRId64 " 0 1\n", sec);
+}
+
+#define do_num_of_logs_charts_init(p_file_info, chart_prio){                                    \
+                                                                                                \
+    /* Number of collected logs total - initialise */                                           \
+    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
+        create_chart(                                                                           \
+            (char *) p_file_info->chart_name    /* type         */                              \
+            , "collected_logs_total"            /* id           */                              \
+            , CHART_TITLE_TOTAL_COLLECTED_LOGS  /* title        */                              \
+            , "log records"                     /* units        */                              \
+            , "collected_logs"                  /* family       */                              \
+            , NULL                              /* context      */                              \
+            , RRDSET_TYPE_AREA_NAME             /* chart_type   */                              \
+            , ++chart_prio                      /* priority     */                              \
+            , p_file_info->update_every         /* update_every */                              \
+        );                                                                                      \
+        add_dim("total records", RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);                            \
+    }                                                                                           \
+                                                                                                \
+    /* Number of collected logs rate - initialise */                                            \
+    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){                   \
+        create_chart(                                                                           \
+            (char *) p_file_info->chart_name    /* type         */                              \
+            , "collected_logs_rate"             /* id           */                              \
+            , CHART_TITLE_RATE_COLLECTED_LOGS   /* title        */                              \
+            , "log records"                     /* units        */                              \
+            , "collected_logs"                  /* family       */                              \
+            , NULL                              /* context      */                              \
+            , RRDSET_TYPE_LINE_NAME             /* chart_type   */                              \
+            , ++chart_prio                      /* priority     */                              \
+            , p_file_info->update_every         /* update_every */                              \
+        );                                                                                      \
+        add_dim("records", RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);                               \
+    }                                                                                           \
+                                                                                                \
+}                                                                                               \
+
+#define do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data){                      \
+                                                                                                \
+    /* Number of collected logs total - update previous values */                               \
+    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
+            for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;            \
+                        sec < p_file_info->parser_metrics->last_update;                         \
+                        sec++){                                                                 \
+                update_chart_begin(p_file_info->chart_name, "collected_logs_total");   \
+                update_chart_set("total records", chart_data->num_lines);                       \
+                update_chart_end(sec);                                                          \
+            }                                                                                   \
+    }                                                                                           \
+                                                                                                \
+    /* Number of collected logs rate - update previous values */                                \
+    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){                   \
+            for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;            \
+                        sec < p_file_info->parser_metrics->last_update;                         \
+                        sec++){                                                                 \
+                update_chart_begin(p_file_info->chart_name, "collected_logs_rate");    \
+                update_chart_set("records", chart_data->num_lines);                             \
+                update_chart_end(sec);                                                          \
+            }                                                                                   \
+    }                                                                                           \
+                                                                                                \
+    chart_data->num_lines = p_file_info->parser_metrics->num_lines;                             \
+                                                                                                \
+    /* Number of collected logs total - update */                                               \
+    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
+        update_chart_begin( (char *) p_file_info->chart_name, "collected_logs_total");          \
+        update_chart_set("total records", chart_data->num_lines);                               \
+        update_chart_end(p_file_info->parser_metrics->last_update);                             \
+    }                                                                                           \
+                                                                                                \
+    /* Number of collected logs rate - update */                                                \
+    if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){                   \
+        update_chart_begin( (char *) p_file_info->chart_name, "collected_logs_rate");           \
+        update_chart_set("records", chart_data->num_lines);                                     \
+        update_chart_end(p_file_info->parser_metrics->last_update);                             \
+    }                                                                                           \
+}
+
+#define do_custom_charts_init(p_file_info) {                                                    \
+                                                                                                \
+    for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){                   \
+                                                                                                \
+        Chart_data_cus_t *cus;                                                                  \
+        Chart_data_cus_t **p_cus = &p_file_info->chart_meta->chart_data_cus_arr;                \
+                                                                                                \
+        for(cus = p_file_info->chart_meta->chart_data_cus_arr;                                  \
+            cus;                                                                                \
+            cus = cus->next){                                                                   \
+                                                                                                \
+            if(!strcmp(cus->id, p_file_info->parser_cus_config[cus_off]->chart_name))           \
+                break;                                                                          \
+                                                                                                \
+            p_cus = &(cus->next);                                                               \
+        }                                                                                       \
+                                                                                                \
+        if(!cus){                                                                               \
+            cus = callocz(1, sizeof(Chart_data_cus_t));                                         \
+            *p_cus = cus;                                                                       \
+                                                                                                \
+            cus->id = p_file_info->parser_cus_config[cus_off]->chart_name;                      \
+                                                                                                \
+            create_chart(                                                                       \
+                (char *) p_file_info->chart_name                        /* type         */      \
+                , cus->id                                               /* id           */      \
+                , cus->id                                               /* title        */      \
+                , "matches"                                             /* units        */      \
+                , "custom_charts"                                       /* family       */      \
+                , NULL                                                  /* context      */      \
+                , RRDSET_TYPE_AREA_NAME                                 /* chart_type   */      \
+                , p_file_info->chart_meta->base_prio + 1000 + cus_off   /* priority     */      \
+                , p_file_info->update_every                             /* update_every */      \
+            );                                                                                  \
+        }                                                                                       \
+                                                                                                \
+        cus->dims = reallocz(cus->dims, ++cus->dims_size * sizeof(struct chart_data_cus_dim));  \
+        cus->dims[cus->dims_size - 1].name =                                                    \
+            p_file_info->parser_cus_config[cus_off]->regex_name;                                \
+        cus->dims[cus->dims_size - 1].val = 0;                                                  \
+        cus->dims[cus->dims_size - 1].p_counter =                                               \
+            &p_file_info->parser_metrics->parser_cus[cus_off]->count;                           \
+                                                                                                \
+        add_dim(cus->dims[cus->dims_size - 1].name, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);      \
+                                                                                                \
+    }                                                                                           \
+}
+
+#define do_custom_charts_update(p_file_info, lag_in_sec) {                                      \
+                                                                                                \
+    for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;                    \
+                sec < p_file_info->parser_metrics->last_update;                                 \
+                sec++){                                                                         \
+                                                                                                \
+        for(Chart_data_cus_t *cus = p_file_info->chart_meta->chart_data_cus_arr;                \
+                              cus;                                                              \
+                              cus = cus->next){                                                 \
+                                                                                                \
+            update_chart_begin(p_file_info->chart_name, cus->id);                      \
+                                                                                                \
+            for(int d_idx = 0; d_idx < cus->dims_size; d_idx++)                                 \
+                update_chart_set(cus->dims[d_idx].name, cus->dims[d_idx].val);                  \
+                                                                                                \
+            update_chart_end(sec);                                                              \
+        }                                                                                       \
+                                                                                                \
+    }                                                                                           \
+                                                                                                \
+    for(Chart_data_cus_t *cus = p_file_info->chart_meta->chart_data_cus_arr;                    \
+                          cus;                                                                  \
+                          cus = cus->next){                                                     \
+                                                                                                \
+        update_chart_begin(p_file_info->chart_name, cus->id);                          \
+                                                                                                \
+        for(int d_idx = 0; d_idx < cus->dims_size; d_idx++){                                    \
+                                                                                                \
+            cus->dims[d_idx].val += *(cus->dims[d_idx].p_counter);                              \
+            *(cus->dims[d_idx].p_counter) = 0;                                                  \
+                                                                                                \
+            update_chart_set(cus->dims[d_idx].name, cus->dims[d_idx].val);                      \
+        }                                                                                       \
+                                                                                                \
+        update_chart_end(p_file_info->parser_metrics->last_update);                             \
+    }                                                                                           \
 }
 
 #endif // RRD_API_H_

@@ -8255,7 +8255,7 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // Logs Management
 
-    'docker_events_logs.events_type': {
+    'Docker Events Logs.events_type': {
         info: 'The Docker object type of the event. See <a href="https://docs.docker.com/engine/reference/commandline/events/#description" target="_blank">here</a> for more information.'
     },
 
