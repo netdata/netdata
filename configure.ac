@@ -568,7 +568,7 @@ AC_CHECK_LIB(
 # -----------------------------------------------------------------------------
 # zstd
 
-AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_CCtx_reset, ZSTD_compressStream2, ZSTD_decompressStream, ZSTD_createDStream],
+AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_compressStream2, ZSTD_decompressStream, ZSTD_createDStream],
              [LIBZSTD_FOUND=yes],
              [LIBZSTD_FOUND=no])
 

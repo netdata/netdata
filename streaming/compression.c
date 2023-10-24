@@ -62,11 +62,6 @@ static inline void rrdpush_compressor_init_zstd(struct compressor_state *state) 
 
         // ZSTD_CCtx_setParameter(state->stream.zstd.ctx, ZSTD_c_compressionLevel, ZSTD_CLEVEL_DEFAULT);
     }
-
-    size_t r = ZSTD_CCtx_reset(state->stream, ZSTD_reset_session_only);
-
-    if(ZSTD_isError(r))
-        netdata_log_error("STREAM: ZSTD_CCtx_reset() failed with error: %s", ZSTD_getErrorName(r));
 }
 #endif
 
