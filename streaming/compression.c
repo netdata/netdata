@@ -58,7 +58,11 @@ static inline void rrdpush_compressor_init_zstd(struct compressor_state *state) 
         state->initialized = true;
         state->stream = ZSTD_createCStream();
 
-        ring_buffer_make_room(&state->input, COMPRESSION_MAX_MSG_SIZE);
+        size_t ret = ZSTD_initCStream(state->stream, ZSTD_CLEVEL_DEFAULT);
+        if(ZSTD_isError(ret))
+            netdata_log_error("STREAM: ZSTD_initCStream() returned error: %s", ZSTD_getErrorName(ret));
+
+        ring_buffer_make_room(&state->input, MAX(COMPRESSION_MAX_MSG_SIZE, ZSTD_CStreamInSize()));
 
         // ZSTD_CCtx_setParameter(state->stream.zstd.ctx, ZSTD_c_compressionLevel, ZSTD_CLEVEL_DEFAULT);
     }
@@ -134,7 +138,8 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
             .src = state->input.data,
     };
 
-    ring_buffer_make_room(&state->output, ZSTD_compressBound(inBuffer.size - inBuffer.pos));
+    size_t wanted_size = MAX(ZSTD_compressBound(inBuffer.size - inBuffer.pos), ZSTD_CStreamOutSize());
+    ring_buffer_make_room(&state->output, wanted_size);
 
     ZSTD_outBuffer outBuffer = {
             .pos = 0,
@@ -276,7 +281,12 @@ static inline void rrdpush_decompressor_init_zstd(struct decompressor_state *sta
     if(!state->initialized) {
         state->initialized = true;
         state->stream = ZSTD_createDStream();
-        ring_buffer_make_room(&state->output, COMPRESSION_MAX_MSG_SIZE);
+
+        size_t ret = ZSTD_initDStream(state->stream);
+        if(ZSTD_isError(ret))
+            netdata_log_error("STREAM: ZSTD_initDStream() returned error: %s", ZSTD_getErrorName(ret));
+
+        ring_buffer_make_room(&state->output, MAX(COMPRESSION_MAX_MSG_SIZE, ZSTD_DStreamOutSize()));
     }
 }
 #endif
