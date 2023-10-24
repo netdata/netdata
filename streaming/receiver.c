@@ -323,16 +323,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
-    bool compressed_connection = false;
-
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
-        compressed_connection = true;
-        rrdpush_decompressor_reset(&rpt->decompressor);
-    }
-    else
-        rrdpush_decompressor_destroy(&rpt->decompressor);
-#endif
+    bool compressed_connection = rrdpush_decompression_initialize(rpt);
 
     buffered_reader_init(&rpt->reader);
 
@@ -710,9 +701,9 @@ static void rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
-    if (stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
+    if (stream_has_capability(rpt, STREAM_CAP_LZ4) || stream_has_capability(rpt, STREAM_CAP_ZSTD)) {
         if (!rpt->config.rrdpush_compression)
-            rpt->capabilities &= ~STREAM_CAP_COMPRESSION;
+            rpt->capabilities &= ~(STREAM_CAP_LZ4|STREAM_CAP_ZSTD);
     }
 #endif // ENABLE_RRDPUSH_COMPRESSION
 

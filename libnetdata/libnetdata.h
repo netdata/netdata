@@ -11,7 +11,7 @@ extern "C" {
 #include <config.h>
 #endif
 
-#ifdef ENABLE_LZ4
+#if defined(ENABLE_LZ4) || defined(ENABLE_ZSTD)
 #define ENABLE_RRDPUSH_COMPRESSION 1
 #endif
 

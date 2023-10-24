@@ -1886,7 +1886,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
                 s->stream.status = RRDHOST_STREAM_STATUS_ONLINE;
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
-            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor.initialized);
+            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_LZ4) && host->sender->compressor.initialized);
 #endif
         }
         else {

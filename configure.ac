@@ -566,6 +566,18 @@ AC_CHECK_LIB(
 )
 
 # -----------------------------------------------------------------------------
+# zstd
+
+AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_CCtx_reset, ZSTD_compressStream2, ZSTD_decompressStream, ZSTD_createDStream],
+             [LIBZSTD_FOUND=yes],
+             [LIBZSTD_FOUND=no])
+
+if test "x$LIBZSTD_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_ZSTD], [1], [libzstd usability])
+    OPTIONAL_ZSTD_LIBS="-lzstd"
+fi
+
+# -----------------------------------------------------------------------------
 # zlib
 
 PKG_CHECK_MODULES(
@@ -1900,6 +1912,7 @@ AC_SUBST([OPTIONAL_MATH_LIBS])
 AC_SUBST([OPTIONAL_DATACHANNEL_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_YAML_LIBS])

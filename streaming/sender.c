@@ -118,7 +118,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     }
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
-    if (stream_has_capability(s, STREAM_CAP_COMPRESSION) && s->compressor.initialized) {
+    if (stream_has_capability(s, STREAM_CAP_LZ4) && s->compressor.initialized) {
         while(src_len) {
             size_t size_to_compress = src_len;
 
@@ -143,7 +143,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 }
             }
 
-            char *dst;
+            const char *dst;
             size_t dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
             if (!dst_len) {
                 netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
@@ -161,10 +161,15 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 }
             }
 
-            if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
+            rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
+            if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature)))
                 s->flags |= SENDER_FLAG_OVERFLOW;
-            else
-                s->sent_bytes_on_this_connection_per_type[type] += dst_len;
+            else {
+                if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
+                    s->flags |= SENDER_FLAG_OVERFLOW;
+                else
+                    s->sent_bytes_on_this_connection_per_type[type] += dst_len + sizeof(signature);
+            }
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
@@ -603,7 +608,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #ifdef  ENABLE_RRDPUSH_COMPRESSION
     // If we don't want compression, remove it from our capabilities
     if(!(s->flags & SENDER_FLAG_COMPRESSION))
-        s->capabilities &= ~STREAM_CAP_COMPRESSION;
+        s->capabilities &= ~STREAM_CAP_LZ4;
 #endif  // ENABLE_RRDPUSH_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
@@ -766,12 +771,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_validate_response(host, s, http, bytes))
         return false;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(stream_has_capability(s, STREAM_CAP_COMPRESSION))
-        rrdpush_compressor_reset(&s->compressor);
-    else
-        rrdpush_compressor_destroy(&s->compressor);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+    rrdpush_compression_initialize(s);
 
     log_sender_capabilities(s);
 

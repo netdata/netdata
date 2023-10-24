@@ -18,7 +18,7 @@
 
 #define STREAM_OLD_VERSION_CLAIM 3
 #define STREAM_OLD_VERSION_CLABELS 4
-#define STREAM_OLD_VERSION_COMPRESSION 5 // this is production
+#define STREAM_OLD_VERSION_LZ4 5 // this is production
 
 // ----------------------------------------------------------------------------
 // capabilities negotiation
@@ -38,7 +38,7 @@ typedef enum {
     STREAM_CAP_HLABELS          = (1 << 7), // host labels supported
     STREAM_CAP_CLAIM            = (1 << 8), // claiming supported
     STREAM_CAP_CLABELS          = (1 << 9), // chart labels supported
-    STREAM_CAP_COMPRESSION      = (1 << 10), // lz4 compression supported
+    STREAM_CAP_LZ4              = (1 << 10), // lz4 compression supported
     STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
     STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
     STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
@@ -46,17 +46,26 @@ typedef enum {
     STREAM_CAP_IEEE754          = (1 << 15), // streaming supports binary/hex transfer of double values
     STREAM_CAP_DATA_WITH_ML     = (1 << 16), // streaming supports transferring anomaly bit
     STREAM_CAP_DYNCFG           = (1 << 17), // dynamic configuration of plugins trough streaming
+    STREAM_CAP_ZSTD             = (1 << 18), // ZSTD compression supported
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
 
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
-#define STREAM_HAS_COMPRESSION STREAM_CAP_COMPRESSION
+#ifdef  ENABLE_LZ4
+#define STREAM_HAS_LZ4 STREAM_CAP_LZ4
 #else
-#define STREAM_HAS_COMPRESSION 0
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+#define STREAM_HAS_LZ4 0
+#endif  // ENABLE_LZ4
+
+#ifdef  ENABLE_ZSTD
+#define STREAM_HAS_ZSTD STREAM_CAP_ZSTD
+#else
+#define STREAM_HAS_ZSTD 0
+#endif  // ENABLE_ZSTD
+
+#define STREAM_HAS_COMPRESSION (STREAM_HAS_LZ4|STREAM_HAS_ZSTD)
 
 STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 
@@ -690,5 +699,8 @@ void rrdpush_send_dyncfg_enable(RRDHOST *host, const char *plugin_name);
 void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, const char *module_name, enum module_type type);
 void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name, enum job_type type, uint32_t flags);
 void rrdpush_send_dyncfg_reset(RRDHOST *host, const char *plugin_name);
+
+bool rrdpush_compression_initialize(struct sender_state *s);
+bool rrdpush_decompression_initialize(struct receiver_state *rpt);
 
 #endif //NETDATA_RRDPUSH_H

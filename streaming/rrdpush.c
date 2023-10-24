@@ -1405,22 +1405,22 @@ static struct {
     STREAM_CAPABILITIES cap;
     const char *str;
 } capability_names[] = {
-    { STREAM_CAP_V1, "V1" },
-    { STREAM_CAP_V2, "V2" },
-    { STREAM_CAP_VN, "VN" },
-    { STREAM_CAP_VCAPS, "VCAPS" },
-    { STREAM_CAP_HLABELS, "HLABELS" },
-    { STREAM_CAP_CLAIM, "CLAIM" },
-    { STREAM_CAP_CLABELS, "CLABELS" },
-    { STREAM_CAP_COMPRESSION, "COMPRESSION" },
-    { STREAM_CAP_FUNCTIONS, "FUNCTIONS" },
-    { STREAM_CAP_REPLICATION, "REPLICATION" },
-    { STREAM_CAP_BINARY, "BINARY" },
-    { STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
-    { STREAM_CAP_IEEE754, "IEEE754" },
-    { STREAM_CAP_DATA_WITH_ML, "ML" },
-    { STREAM_CAP_DYNCFG, "DYN_CFG" },
-    { 0 , NULL },
+    {STREAM_CAP_V1,           "V1" },
+    {STREAM_CAP_V2,           "V2" },
+    {STREAM_CAP_VN,           "VN" },
+    {STREAM_CAP_VCAPS,        "VCAPS" },
+    {STREAM_CAP_HLABELS,      "HLABELS" },
+    {STREAM_CAP_CLAIM,        "CLAIM" },
+    {STREAM_CAP_CLABELS,      "CLABELS" },
+    {STREAM_CAP_LZ4,          "COMPRESSION" },
+    {STREAM_CAP_FUNCTIONS,    "FUNCTIONS" },
+    {STREAM_CAP_REPLICATION,  "REPLICATION" },
+    {STREAM_CAP_BINARY,       "BINARY" },
+    {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
+    {STREAM_CAP_IEEE754,      "IEEE754" },
+    {STREAM_CAP_DATA_WITH_ML, "ML" },
+    {STREAM_CAP_DYNCFG,       "DYN_CFG" },
+    {0 , NULL },
 };
 
 static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {
@@ -1473,7 +1473,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
     else if(version < STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_V2 | STREAM_CAP_HLABELS;
     else if(version <= STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM;
     else if(version <= STREAM_OLD_VERSION_CLABELS) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
-    else if(version <= STREAM_OLD_VERSION_COMPRESSION) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION;
+    else if(version <= STREAM_OLD_VERSION_LZ4) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_LZ4;
     else caps = version;
 
     if(caps & STREAM_CAP_VCAPS)
@@ -1495,8 +1495,53 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
 }
 
 int32_t stream_capabilities_to_vn(uint32_t caps) {
-    if(caps & STREAM_CAP_COMPRESSION) return STREAM_OLD_VERSION_COMPRESSION;
+    if(caps & STREAM_CAP_LZ4) return STREAM_OLD_VERSION_LZ4;
     if(caps & STREAM_CAP_CLABELS) return STREAM_OLD_VERSION_CLABELS;
     return STREAM_OLD_VERSION_CLAIM; // if(caps & STREAM_CAP_CLAIM)
 }
 
+bool rrdpush_compression_initialize(struct sender_state *s) {
+#ifdef ENABLE_RRDPUSH_COMPRESSION
+    rrdpush_compressor_destroy(&s->compressor);
+
+    // IMPORTANT
+    // KEEP THE SAME ORDER IN DECOMPRESSION
+
+    if(stream_has_capability(s, STREAM_CAP_ZSTD))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+    else if(stream_has_capability(s, STREAM_CAP_LZ4))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+    else
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+
+    if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        rrdpush_compressor_reset(&s->compressor);
+        return true;
+    }
+#endif
+
+    return false;
+}
+
+bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
+#ifdef ENABLE_RRDPUSH_COMPRESSION
+    rrdpush_decompressor_destroy(&rpt->decompressor);
+
+    // IMPORTANT
+    // KEEP THE SAME ORDER IN COMPRESSION
+
+    if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+    else if(stream_has_capability(rpt, STREAM_CAP_LZ4))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+    else
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+
+    if(rpt->decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        rrdpush_decompressor_reset(&rpt->decompressor);
+        return true;
+    }
+#endif
+
+    return false;
+}

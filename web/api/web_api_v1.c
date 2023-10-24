@@ -1274,7 +1274,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 #ifdef  ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression",
-                                   host->sender && stream_has_capability(host->sender, STREAM_CAP_COMPRESSION));
+                                   host->sender && stream_has_capability(host->sender, STREAM_CAP_LZ4));
 #else // ! ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression", false);
 #endif  // ENABLE_RRDPUSH_COMPRESSION
