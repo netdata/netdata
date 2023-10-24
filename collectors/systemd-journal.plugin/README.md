@@ -237,6 +237,11 @@ Full text search is combined with the selected filters.
 The text box accepts asterisks `*` as wildcards. So, `a*b*c` means match anything that contains `a`, then `b` and
 then `c` with anything between them.
 
+Spaces are treated as OR expressions. So that `a*b c*d` means `a*b OR c*d`.
+
+Negative expressions are supported, by prefixing any string with `!`. Example: `!systemd *` means match anything that
+does not contain `systemd` on any of its fields.
+
 ## Query performance
 
 Journal files are designed to be accessed by multiple readers and one writer, concurrently.
