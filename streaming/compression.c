@@ -167,25 +167,34 @@ static inline size_t rrdpush_compress_zstd(struct compressor_state *state, const
     }
 
     if(outBuffer.pos == 0) {
-        char buf[inBuffer_copy.size - inBuffer_copy.pos + 1];
-        memcpy(buf, &inBuffer_copy.src[inBuffer_copy.pos], inBuffer_copy.size - inBuffer_copy.pos);
-        buf[sizeof(buf) - 1] = '\0';
+        ret = ZSTD_flushStream(state->stream, &outBuffer);
 
-        netdata_log_error("STREAM: ZSTD_compressStream() returned zero compressed bytes "
-                          "(source is %zu bytes, output buffer can fit %zu bytes) "
-                          "in_pre:[pos %zu, size %zu] "
-                          "in_post:[pos %zu, size %zu] "
-                          "out_pre:[pos %zu, size %zu] "
-                          "out_post:[pos %zu, size %zu] "
-                          "text: '%s'"
-                          , size, outBuffer.size
-                          , inBuffer_copy.pos, inBuffer_copy.size
-                          , inBuffer.pos, inBuffer.size
-                          , outBuffer_copy.pos, outBuffer_copy.size
-                          , outBuffer.pos, outBuffer.size
-                          , buf
-                          );
-        return 0;
+        if(ZSTD_isError(ret)) {
+            netdata_log_error("STREAM: ZSTD_flushStream() return error: %s", ZSTD_getErrorName(ret));
+            return 0;
+        }
+
+        if(outBuffer.pos == 0) {
+            char buf[inBuffer_copy.size - inBuffer_copy.pos + 1];
+            memcpy(buf, (const char *) inBuffer_copy.src + inBuffer_copy.pos, inBuffer_copy.size - inBuffer_copy.pos);
+            buf[sizeof(buf) - 1] = '\0';
+
+            netdata_log_error("STREAM: ZSTD_compressStream() returned zero compressed bytes "
+                              "(source is %zu bytes, output buffer can fit %zu bytes) "
+                              "in_pre:[pos %zu, size %zu] "
+                              "in_post:[pos %zu, size %zu] "
+                              "out_pre:[pos %zu, size %zu] "
+                              "out_post:[pos %zu, size %zu] "
+                              "text: '%s'"
+                              , size, outBuffer.size
+                              , inBuffer_copy.pos, inBuffer_copy.size
+                              , inBuffer.pos, inBuffer.size
+                              , outBuffer_copy.pos, outBuffer_copy.size
+                              , outBuffer.pos, outBuffer.size
+                              , buf
+                             );
+            return 0;
+        }
     }
 
     state->input.read_pos = inBuffer.pos;
