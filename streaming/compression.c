@@ -41,7 +41,7 @@ static inline void ring_buffer_destroy(struct compression_ring_buffer *b) {
 // ----------------------------------------------------------------------------
 // compressor functions
 
-static inline void rrdpush_compressor_reset_lz4(struct compressor_state *state) {
+static inline void rrdpush_compressor_init_lz4(struct compressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
         state->stream = LZ4_createStream();
@@ -50,12 +50,10 @@ static inline void rrdpush_compressor_reset_lz4(struct compressor_state *state) 
         // so, we keep twice the size of each message
         ring_buffer_make_room(&state->input, 65536 + COMPRESSION_MAX_MSG_SIZE * 2);
     }
-
-    LZ4_resetStream_fast(state->stream);
 }
 
 #ifdef ENABLE_ZSTD
-static inline void rrdpush_compressor_reset_zstd(struct compressor_state *state) {
+static inline void rrdpush_compressor_init_zstd(struct compressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
         state->stream = ZSTD_createCStream();
@@ -275,26 +273,21 @@ static inline size_t rrdpush_decompress_zstd(struct decompressor_state *state, c
 }
 #endif
 
-static inline void rrdpush_decompressor_reset_lz4(struct decompressor_state *state) {
+static inline void rrdpush_decompressor_init_lz4(struct decompressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
         state->stream = LZ4_createStreamDecode();
         ring_buffer_make_room(&state->output, LZ4_decoderRingBufferSize(COMPRESSION_MAX_MSG_SIZE) * 2);
     }
-
-    LZ4_setStreamDecode(state->stream, NULL, 0);
-
 }
 
 #ifdef ENABLE_ZSTD
-static inline void rrdpush_decompressor_reset_zstd(struct decompressor_state *state) {
+static inline void rrdpush_decompressor_init_zstd(struct decompressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
         state->stream = ZSTD_createDStream();
         ring_buffer_make_room(&state->output, COMPRESSION_MAX_MSG_SIZE * 2);
     }
-
-    ZSTD_DCtx_reset(state->stream, ZSTD_reset_session_only);
 }
 #endif
 
@@ -317,16 +310,16 @@ static inline void rrdpush_decompressor_destroy_zstd(struct decompressor_state *
 // ----------------------------------------------------------------------------
 // compressor public API
 
-void rrdpush_compressor_reset(struct compressor_state *state) {
+void rrdpush_compressor_init(struct compressor_state *state) {
     switch(state->algorithm) {
         default:
         case COMPRESSION_ALGORITHM_LZ4:
-            rrdpush_compressor_reset_lz4(state);
+            rrdpush_compressor_init_lz4(state);
             break;
 
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            rrdpush_compressor_reset_zstd(state);
+            rrdpush_compressor_init_zstd(state);
             break;
 #endif
     }
@@ -393,16 +386,16 @@ void rrdpush_decompressor_destroy(struct decompressor_state *state) {
     state->initialized = false;
 }
 
-void rrdpush_decompressor_reset(struct decompressor_state *state) {
+void rrdpush_decompressor_init(struct decompressor_state *state) {
     switch(state->algorithm) {
         default:
         case COMPRESSION_ALGORITHM_LZ4:
-            rrdpush_decompressor_reset_lz4(state);
+            rrdpush_decompressor_init_lz4(state);
             break;
 
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            rrdpush_decompressor_reset_zstd(state);
+            rrdpush_decompressor_init_zstd(state);
             break;
 #endif
     }

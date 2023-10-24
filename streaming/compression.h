@@ -39,7 +39,7 @@ struct compressor_state {
     void *stream;
 };
 
-void rrdpush_compressor_reset(struct compressor_state *state);
+void rrdpush_compressor_init(struct compressor_state *state);
 void rrdpush_compressor_destroy(struct compressor_state *state);
 size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t size, const char **out);
 
@@ -57,7 +57,7 @@ struct decompressor_state {
 };
 
 void rrdpush_decompressor_destroy(struct decompressor_state *state);
-void rrdpush_decompressor_reset(struct decompressor_state *state);
+void rrdpush_decompressor_init(struct decompressor_state *state);
 size_t rrdpush_decompress(struct decompressor_state *state, const char *compressed_data, size_t compressed_size);
 
 static inline size_t rrdpush_decompress_decode_signature(const char *data, size_t data_size) {

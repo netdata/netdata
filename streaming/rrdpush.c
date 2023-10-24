@@ -1516,7 +1516,7 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
         s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
     if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        rrdpush_compressor_reset(&s->compressor);
+        rrdpush_compressor_init(&s->compressor);
         return true;
     }
 #endif
@@ -1539,7 +1539,7 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
         rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
     if(rpt->decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        rrdpush_decompressor_reset(&rpt->decompressor);
+        rrdpush_decompressor_init(&rpt->decompressor);
         return true;
     }
 #endif
