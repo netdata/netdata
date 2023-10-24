@@ -98,7 +98,7 @@ static inline size_t rrdpush_compress_lz4(struct compressor_state *state, const 
 
     if(state->input.write_pos + size > state->input.size)
         // the input buffer cannot fit out data, restart from zero
-        state->input.read_pos = state->input.write_pos = 0;
+        ring_buffer_reset(&state->input);
 
     ring_buffer_append_data(&state->input, data, size);
 
@@ -180,10 +180,9 @@ static inline size_t rrdpush_decompress_lz4(struct decompressor_state *state, co
     if(unlikely(state->output.read_pos != state->output.write_pos))
         fatal("RRDPUSH_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
 
-    if (unlikely(state->output.write_pos >= state->output.size / 2)) {
-        state->output.write_pos = 0;
-        state->output.read_pos = 0;
-    }
+    if (unlikely(state->output.write_pos + COMPRESSION_MAX_MSG_SIZE > state->output.size))
+        // the input buffer cannot fit out data, restart from zero
+        ring_buffer_reset(&state->output);
 
     long int decompressed_size = LZ4_decompress_safe_continue(
             state->stream
@@ -271,7 +270,7 @@ static inline void rrdpush_decompressor_init_lz4(struct decompressor_state *stat
     if(!state->initialized) {
         state->initialized = true;
         state->stream = LZ4_createStreamDecode();
-        ring_buffer_make_room(&state->output, COMPRESSION_MAX_MSG_SIZE * 2);
+        ring_buffer_make_room(&state->output, 65536 + COMPRESSION_MAX_MSG_SIZE * 2);
     }
 }
 
