@@ -1,4 +1,4 @@
-# Netdata Agent Versioning Policy
+# Netdata Agent Versioning Policy (DRAFT)
 
 This document outlines how versions are handled for the Netdata Agent. This policy applies to version 2.0.0 of
 the Netdata Agent and newer versions.
@@ -34,8 +34,10 @@ will be as up-to-date as possible.
 ## Nightly Builds
 
 Versions for nightly builds of the Netdata Agent consist of four parts, a major version, a minor version, a revision
-number, and an optional commit ID, presented like `<major>.<minor>.0-<revision>-<commit>`. If the commit ID is
-not included, it may be replaced by the word ‘nightly’.
+number, and an optional commit ID, presented like `<major>.<minor>.0-<revision>-<commit>`. For example, a version
+of `1.43.0-11-gb15437502` has a major version of 1, a minor version of 43, a revision of 11, and a commit ID of
+`gb15437502`. A commit ID consists of a lowercaase letter `g`, followed by the short commit hash for the corresponding
+commit. If the commit ID is not included, it may be replaced by the word ‘nightly’.
 
 The major and minor version numbers for a nightly build correspond exactly to an associated stable release. A
 given major version of a nightly build has the same compatibility guarantees as it would for a stable release. A
@@ -102,8 +104,13 @@ The following special exceptions to the public API exist:
 - When an internal on-disk file format (such as the dbengine data file format) is changed, the old format is
   guaranteed to be supported for in-place updates for at least two minor versions after the change happens. The
   new format is not guaranteed to be backwards compatible.
-- The list of supported platforms is functionally a part of the public API, but handling of EOL platforms is done
-  as per our existing platform support policy.
+- The list of supported platforms is functionally a part of the public API, but our existing [platform support
+  policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md) dictates when and how
+  support for specific platforms is added or removed.
+- The list of components provided as separate packages in our official native packages is considered part of our
+  strictly defined public API, but changes to our packaging that do not alter the functionality of existing installs
+  are considered to be backwards compatible. This means that we may choose to split a plugin out to it’s own
+  package at any time, but it will remain as a mandatory dependency until at least the next major release.
 - Options and environment variables used by the `kickstart.sh` install script and the `netdata-updater.sh` script
   are handled separately from regular Netdata Agent versioning. Backwards compatible changes may happen at any
   time for these, while backwards incompatible changes will have a deprecation period during which the old behavior
@@ -114,6 +121,8 @@ The following special exceptions to the public API exist:
 Any components which are not explicitly listed above as being part of the public API are not part of the public
 API. This includes, but is not limited to:
 
+- Any mandatory build components which are vendored as part of the Netdata sources, such as SQLite3 or libJudy. This
+  extends to both the presence or abscence of such components, as well as the exact version being bundled.
 - The exact installation mechanism that will be used on any given system when using our `kickstart.sh` installation
   script.
 - The exact underlying implementation of any data collection plugin.
