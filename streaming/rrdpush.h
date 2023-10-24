@@ -46,7 +46,7 @@ typedef enum {
     STREAM_CAP_IEEE754          = (1 << 15), // streaming supports binary/hex transfer of double values
     STREAM_CAP_DATA_WITH_ML     = (1 << 16), // streaming supports transferring anomaly bit
     STREAM_CAP_DYNCFG           = (1 << 17), // dynamic configuration of plugins trough streaming
-    STREAM_CAP_ZSTD             = (1 << 18), // ZSTD compression supported
+    STREAM_CAP_ZSTD             = (1 << 19), // ZSTD compression supported
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit

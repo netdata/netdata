@@ -1412,7 +1412,7 @@ static struct {
     {STREAM_CAP_HLABELS,      "HLABELS" },
     {STREAM_CAP_CLAIM,        "CLAIM" },
     {STREAM_CAP_CLABELS,      "CLABELS" },
-    {STREAM_CAP_LZ4,          "COMPRESSION" },
+    {STREAM_CAP_LZ4,          "LZ4" },
     {STREAM_CAP_FUNCTIONS,    "FUNCTIONS" },
     {STREAM_CAP_REPLICATION,  "REPLICATION" },
     {STREAM_CAP_BINARY,       "BINARY" },
@@ -1420,6 +1420,7 @@ static struct {
     {STREAM_CAP_IEEE754,      "IEEE754" },
     {STREAM_CAP_DATA_WITH_ML, "ML" },
     {STREAM_CAP_DYNCFG,       "DYN_CFG" },
+    {STREAM_CAP_ZSTD,         "ZSTD" },
     {0 , NULL },
 };
 
