@@ -3,11 +3,15 @@
 #ifdef ENABLE_RRDPUSH_COMPRESSION
 
 #include "lz4.h"
+
+#ifdef ENABLE_ZSTD
 #include <zstd.h>
 
 #ifndef ZSTD_CLEVEL_DEFAULT
 #  define ZSTD_CLEVEL_DEFAULT 3
 #endif
+
+#endif // ENABLE_ZSTD
 
 // ----------------------------------------------------------------------------
 // ring buffers
