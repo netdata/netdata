@@ -92,15 +92,44 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
     return (int)bytes_read;
 }
 
-static inline bool receiver_read_uncompressed(struct receiver_state *r) {
+static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
+    if(code > 0)
+        return 0;
+
+    switch(code) {
+        case 0:
+            // asked to read zero bytes
+            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER;
+
+        case -1:
+            // EOF
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_EOF;
+
+        case -2:
+            // failed to read
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED;
+
+        case -3:
+            // timeout
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT;
+
+        default:
+            // anything else
+            return STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+    }
+}
+
+static inline bool receiver_read_uncompressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(r->reader.read_buffer[r->reader.read_len] != '\0')
         fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
 #endif
 
     int bytes_read = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
-    if(unlikely(bytes_read <= 0))
+    if(unlikely(bytes_read <= 0)) {
+        *reason = read_stream_error_to_reason(bytes_read);
         return false;
+    }
 
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_read);
@@ -112,7 +141,7 @@ static inline bool receiver_read_uncompressed(struct receiver_state *r) {
 }
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
-static inline bool receiver_read_compressed(struct receiver_state *r) {
+static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
@@ -150,8 +179,10 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     int bytes_read = 0;
     do {
         int ret = read_stream(r, r->reader.read_buffer + r->reader.read_len + bytes_read, r->decompressor.signature_size - bytes_read);
-        if (unlikely(ret <= 0))
+        if (unlikely(ret <= 0)) {
+            *reason = read_stream_error_to_reason(ret);
             return false;
+        }
 
         bytes_read += ret;
     } while(unlikely(bytes_read < (int)r->decompressor.signature_size));
@@ -187,7 +218,7 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 
         int last_read_bytes = read_stream(r, &compressed[start], remaining);
         if (unlikely(last_read_bytes <= 0)) {
-            internal_error(true, "read_stream() failed #2, with code %d", last_read_bytes);
+            *reason = read_stream_error_to_reason(last_read_bytes);
             return false;
         }
 
@@ -218,8 +249,8 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     return true;
 }
 #else // !ENABLE_RRDPUSH_COMPRESSION
-static inline bool receiver_read_compressed(struct receiver_state *r) {
-    return receiver_read_uncompressed(r);
+static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
+    return receiver_read_uncompressed(r, reason);
 }
 #endif // ENABLE_RRDPUSH_COMPRESSION
 
@@ -331,10 +362,12 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     while(!receiver_should_stop(rpt)) {
 
         if(!buffered_reader_next_line(&rpt->reader, buffer)) {
-            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt) : receiver_read_uncompressed(rpt);
+            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+
+            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason) : receiver_read_uncompressed(rpt, &reason);
 
             if(unlikely(!have_new_data)) {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, false);
+                receiver_set_exit_reason(rpt, reason, false);
                 break;
             }
 
