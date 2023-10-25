@@ -36,12 +36,10 @@ size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, s
     if(unlikely(!state || !size || !out))
         return 0;
 
-    simple_ring_buffer_append_data(&state->input, data, size);
-
     ZSTD_inBuffer inBuffer = {
-            .pos = state->input.read_pos,
-            .size = state->input.write_pos,
-            .src = state->input.data,
+            .pos = 0,
+            .size = size,
+            .src = data,
     };
 
     size_t wanted_size = MAX(ZSTD_compressBound(inBuffer.size - inBuffer.pos), ZSTD_CStreamOutSize());
@@ -59,6 +57,12 @@ size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, s
     // error handling
     if(ZSTD_isError(ret)) {
         netdata_log_error("STREAM: ZSTD_compressStream() return error: %s", ZSTD_getErrorName(ret));
+        return 0;
+    }
+
+    if(inBuffer.pos < inBuffer.size) {
+        netdata_log_error("STREAM: ZSTD_compressStream() left unprocessed input (source payload %zu bytes, consumed %zu bytes)",
+                          inBuffer.size, inBuffer.pos);
         return 0;
     }
 
