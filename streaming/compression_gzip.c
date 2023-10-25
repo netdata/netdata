@@ -13,8 +13,15 @@ void rrdpush_compressor_init_gzip(struct compressor_state *state) {
         strm->zfree = Z_NULL;
         strm->opaque = Z_NULL;
 
-        // deflateInit2(strm, Z_BEST_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
-        deflateInit2(strm, Z_BEST_SPEED, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
+        // int r = deflateInit2(strm, Z_BEST_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
+        int r = deflateInit2(strm, Z_BEST_SPEED, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
+        if (r != Z_OK) {
+            netdata_log_error("Failed to initialize deflate with error: %d", r);
+            freez(state->stream);
+            state->initialized = false;
+            return;
+        }
+
     }
 }
 
@@ -41,6 +48,19 @@ size_t rrdpush_compress_gzip(struct compressor_state *state, const char *data, s
     int ret = deflate(strm, Z_SYNC_FLUSH);
     if (ret != Z_OK && ret != Z_STREAM_END) {
         netdata_log_error("STREAM: deflate() failed with error %d", ret);
+        return 0;
+    }
+
+    if(strm->avail_in != 0) {
+        netdata_log_error("STREAM: deflate() did not use all the input buffer, %u bytes out of %zu remain",
+                          strm->avail_in, size);
+        return 0;
+    }
+
+    if(strm->avail_out == 0) {
+        netdata_log_error("STREAM: deflate() needs a bigger output buffer than the one we provided "
+                          "(output buffer %zu bytes, compressed payload %zu bytes)",
+                          state->output.size, size);
         return 0;
     }
 
@@ -94,6 +114,20 @@ size_t rrdpush_decompress_gzip(struct decompressor_state *state, const char *com
     int ret = inflate(strm, Z_NO_FLUSH);
     if (ret != Z_STREAM_END && ret != Z_OK) {
         netdata_log_error("RRDPUSH DECOMPRESS: inflate() failed with error %d", ret);
+        return 0;
+    }
+
+    if(strm->avail_in != 0) {
+        netdata_log_error("RRDPUSH DECOMPRESS: inflate() did not use all compressed data we provided "
+                          "(compressed payload %zu bytes, remaining to be uncompressed %u)"
+                          , compressed_size, strm->avail_in);
+        return 0;
+    }
+
+    if(strm->avail_out == 0) {
+        netdata_log_error("RRDPUSH DECOMPRESS: inflate() needs a bigger output buffer than the one we provided "
+                          "(compressed payload %zu bytes, output buffer size %zu bytes)"
+                          , compressed_size, state->output.size);
         return 0;
     }
 
