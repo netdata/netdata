@@ -700,12 +700,8 @@ static void rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if (stream_has_capability(rpt, STREAM_CAP_LZ4) || stream_has_capability(rpt, STREAM_CAP_ZSTD)) {
-        if (!rpt->config.rrdpush_compression)
-            rpt->capabilities &= ~(STREAM_CAP_LZ4|STREAM_CAP_ZSTD);
-    }
-#endif // ENABLE_RRDPUSH_COMPRESSION
+    if (!rpt->config.rrdpush_compression)
+        rpt->capabilities &= ~STREAM_CAP_COMPRESSIONS_AVAILABLE;
 
     {
         // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);

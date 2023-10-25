@@ -1145,12 +1145,11 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
     host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
     host->sender->rrdpush_sender_socket  = -1;
+    host->sender->disabled_capabilities = STREAM_CAP_NONE;
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(default_rrdpush_compression_enabled)
-        host->sender->flags |= SENDER_FLAG_COMPRESSION;
-    else
-        host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
+    if(!default_rrdpush_compression_enabled)
+        host->sender->disabled_capabilities |= STREAM_CAP_COMPRESSIONS_AVAILABLE;
 #endif
 
     spinlock_init(&host->sender->spinlock);

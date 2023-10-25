@@ -18,12 +18,14 @@
 
 #define STREAM_OLD_VERSION_CLAIM 3
 #define STREAM_OLD_VERSION_CLABELS 4
-#define STREAM_OLD_VERSION_LZ4 5 // this is production
+#define STREAM_OLD_VERSION_LZ4 5
 
 // ----------------------------------------------------------------------------
 // capabilities negotiation
 
 typedef enum {
+    STREAM_CAP_NONE             = 0,
+
     // do not use the first 3 bits
     // they used to be versions 1, 2 and 3
     // before we introduce capabilities
@@ -53,19 +55,21 @@ typedef enum {
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
 
-#ifdef  ENABLE_LZ4
-#define STREAM_HAS_LZ4 STREAM_CAP_LZ4
+#if defined(ENABLE_RRDPUSH_COMPRESSION) && defined(ENABLE_LZ4)
+#define STREAM_CAP_LZ4_AVAILABLE STREAM_CAP_LZ4
 #else
-#define STREAM_HAS_LZ4 0
+#define STREAM_CAP_LZ4_AVAILABLE 0
 #endif  // ENABLE_LZ4
 
-#ifdef  ENABLE_ZSTD
-#define STREAM_HAS_ZSTD STREAM_CAP_ZSTD
+#if defined(ENABLE_RRDPUSH_COMPRESSION) && defined(ENABLE_ZSTD)
+#define STREAM_CAP_ZSTD_AVAILABLE STREAM_CAP_ZSTD
 #else
-#define STREAM_HAS_ZSTD 0
+#define STREAM_CAP_ZSTD_AVAILABLE 0
 #endif  // ENABLE_ZSTD
 
-#define STREAM_HAS_COMPRESSION (STREAM_HAS_LZ4|STREAM_HAS_ZSTD)
+extern STREAM_CAPABILITIES globally_disabled_capabilities;
+
+#define STREAM_CAP_COMPRESSIONS_AVAILABLE (STREAM_CAP_LZ4_AVAILABLE|STREAM_CAP_ZSTD_AVAILABLE)
 
 STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 
@@ -146,7 +150,6 @@ typedef enum __attribute__((packed)) {
 
 typedef enum __attribute__((packed)) {
     SENDER_FLAG_OVERFLOW     = (1 << 0), // The buffer has been overflown
-    SENDER_FLAG_COMPRESSION  = (1 << 1), // The stream needs to have and has compression
 } SENDER_FLAGS;
 
 struct function_payload_state {
@@ -179,6 +182,7 @@ struct sender_state {
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     ssize_t read_len;
     STREAM_CAPABILITIES capabilities;
+    STREAM_CAPABILITIES disabled_capabilities;
 
     size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
 

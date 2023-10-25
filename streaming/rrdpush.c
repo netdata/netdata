@@ -39,6 +39,8 @@ struct config stream_config = {
 };
 
 unsigned int default_rrdpush_enabled = 0;
+STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_NONE;
+
 #ifdef ENABLE_RRDPUSH_COMPRESSION
 unsigned int default_rrdpush_compression_enabled = 1;
 #endif
@@ -65,43 +67,6 @@ static void load_stream_conf() {
             netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
-}
-
-STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
-
-    // we can have DATA_WITH_ML when INTERPOLATED is available
-    bool ml_capability = true;
-
-    if(host && sender) {
-        // we have DATA_WITH_ML capability
-        // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
-        // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
-        netdata_mutex_lock(&host->receiver_lock);
-
-        if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
-            ml_capability = false;
-
-        netdata_mutex_unlock(&host->receiver_lock);
-    }
-
-    return  STREAM_CAP_V1 |
-            STREAM_CAP_V2 |
-            STREAM_CAP_VN |
-            STREAM_CAP_VCAPS |
-            STREAM_CAP_HLABELS |
-            STREAM_CAP_CLAIM |
-            STREAM_CAP_CLABELS |
-            STREAM_CAP_FUNCTIONS |
-            STREAM_CAP_REPLICATION |
-            STREAM_CAP_BINARY |
-            STREAM_CAP_INTERPOLATED |
-            STREAM_HAS_COMPRESSION |
-#ifdef NETDATA_TEST_DYNCFG
-            STREAM_CAP_DYNCFG |
-#endif
-            (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
-            (ml_capability ? STREAM_CAP_DATA_WITH_ML : 0) |
-            0;
 }
 
 bool rrdpush_receiver_needs_dbengine() {
@@ -1467,6 +1432,44 @@ void log_sender_capabilities(struct sender_state *s) {
     buffer_free(wb);
 }
 
+STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
+    STREAM_CAPABILITIES disabled_capabilities = globally_disabled_capabilities;
+
+    if(host && sender) {
+        // we have DATA_WITH_ML capability
+        // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
+        // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
+        netdata_mutex_lock(&host->receiver_lock);
+
+        if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
+            disabled_capabilities |= STREAM_CAP_DATA_WITH_ML;
+
+        netdata_mutex_unlock(&host->receiver_lock);
+
+        if(host->sender)
+            disabled_capabilities |= host->sender->disabled_capabilities;
+    }
+
+    return (STREAM_CAP_V1 |
+            STREAM_CAP_V2 |
+            STREAM_CAP_VN |
+            STREAM_CAP_VCAPS |
+            STREAM_CAP_HLABELS |
+            STREAM_CAP_CLAIM |
+            STREAM_CAP_CLABELS |
+            STREAM_CAP_FUNCTIONS |
+            STREAM_CAP_REPLICATION |
+            STREAM_CAP_BINARY |
+            STREAM_CAP_INTERPOLATED |
+            STREAM_CAP_COMPRESSIONS_AVAILABLE |
+            #ifdef NETDATA_TEST_DYNCFG
+            STREAM_CAP_DYNCFG |
+            #endif
+            STREAM_CAP_IEEE754 |
+            STREAM_CAP_DATA_WITH_ML |
+            0) & ~disabled_capabilities;
+}
+
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDHOST *host, bool sender) {
     STREAM_CAPABILITIES caps = 0;
 
@@ -1474,7 +1477,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
     else if(version < STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_V2 | STREAM_CAP_HLABELS;
     else if(version <= STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM;
     else if(version <= STREAM_OLD_VERSION_CLABELS) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
-    else if(version <= STREAM_OLD_VERSION_LZ4) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_LZ4;
+    else if(version <= STREAM_OLD_VERSION_LZ4) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_CAP_LZ4_AVAILABLE;
     else caps = version;
 
     if(caps & STREAM_CAP_VCAPS)
@@ -1492,8 +1495,9 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
         // DATA WITH ML requires INTERPOLATED
         common_caps &= ~STREAM_CAP_DATA_WITH_ML;
 
-//    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_ZSTD)) == (STREAM_CAP_LZ4|STREAM_CAP_ZSTD))
-//        common_caps &= ~STREAM_CAP_LZ4;
+    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_ZSTD)) == (STREAM_CAP_LZ4|STREAM_CAP_ZSTD))
+        // keep only ZSTD
+        common_caps &= ~STREAM_CAP_LZ4;
 
     return common_caps;
 }

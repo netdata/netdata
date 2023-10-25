@@ -76,9 +76,26 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 */
 static inline void deactivate_compression(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
-    netdata_log_error("STREAM_COMPRESSION: Compression returned error, disabling it.");
-    s->flags &= ~SENDER_FLAG_COMPRESSION;
-    netdata_log_error("STREAM %s [send to %s]: Restarting connection without compression.", rrdhost_hostname(s->host), s->connected_to);
+
+    switch(s->compressor.algorithm) {
+        case COMPRESSION_ALGORITHM_NONE:
+            netdata_log_error("STREAM_COMPRESSION: compression error on 'host:%s' without any compression enabled. Ignoring error.",
+                    rrdhost_hostname(s->host));
+            break;
+
+        case COMPRESSION_ALGORITHM_LZ4:
+            netdata_log_error("STREAM_COMPRESSION: LZ4 compression error on 'host:%s'. Disabling ZSTD for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_LZ4;
+            break;
+
+        case COMPRESSION_ALGORITHM_ZSTD:
+            netdata_log_error("STREAM_COMPRESSION: ZSTD compression error on 'host:%s'. Disabling ZSTD for this node.",
+                              rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_ZSTD;
+            break;
+    }
+
     rrdpush_sender_thread_close_socket(s->host);
 }
 #endif
@@ -610,12 +627,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     // reset our capabilities to default
     s->capabilities = stream_our_capabilities(host, true);
-
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
-    // If we don't want compression, remove it from our capabilities
-    if(!(s->flags & SENDER_FLAG_COMPRESSION))
-        s->capabilities &= ~(STREAM_CAP_LZ4|STREAM_CAP_ZSTD);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
