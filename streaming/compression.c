@@ -215,7 +215,7 @@ static inline size_t rrdpush_decompress_lz4(struct decompressor_state *state, co
         return 0;
 
     if(unlikely(state->output.read_pos != state->output.write_pos))
-        fatal("RRDPUSH_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
+        fatal("RRDPUSH_DECOMPRESS: LZ4 asked to decompress new data, while there are unread data in the decompression buffer!");
 
     if (unlikely(state->output.write_pos + COMPRESSION_MAX_MSG_SIZE > state->output.size))
         // the input buffer cannot fit out data, restart from zero
@@ -230,13 +230,15 @@ static inline size_t rrdpush_decompress_lz4(struct decompressor_state *state, co
             );
 
     if (unlikely(decompressed_size < 0)) {
-        netdata_log_error("RRDPUSH DECOMPRESS: decompressor returned negative decompressed bytes: %ld", decompressed_size);
+        netdata_log_error("RRDPUSH DECOMPRESS: LZ4_decompress_safe_continue() returned negative value: %ld "
+                          "(compressed chunk is %zu bytes)"
+                          , decompressed_size, compressed_size);
         return 0;
     }
 
     if(unlikely(decompressed_size + state->output.write_pos > state->output.size))
-        fatal("RRDPUSH DECOMPRESS: decompressor overflown the stream_buffer. size: %zu, pos: %zu, added: %ld, "
-              "exceeding the buffer by %zu"
+        fatal("RRDPUSH DECOMPRESS: LZ4_decompress_safe_continue() overflown the stream_buffer "
+              "(size: %zu, pos: %zu, added: %ld, exceeding the buffer by %zu)"
               , state->output.size
               , state->output.write_pos
               , decompressed_size
@@ -259,7 +261,7 @@ static inline size_t rrdpush_decompress_zstd(struct decompressor_state *state, c
         return 0;
 
     if(unlikely(state->output.read_pos != state->output.write_pos))
-        fatal("RRDPUSH_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
+        fatal("RRDPUSH_DECOMPRESS: ZSTD asked to decompress new data, while there are unread data in the decompression buffer!");
 
     ring_buffer_reset(&state->output);
 
@@ -286,7 +288,9 @@ static inline size_t rrdpush_decompress_zstd(struct decompressor_state *state, c
     }
 
     if(inBuffer.pos < inBuffer.size)
-        fatal("RRDPUSH DECOMPRESS: we should have decompressed all of it, but compressed data remain");
+        fatal("RRDPUSH DECOMPRESS: ZSTD ZSTD_decompressStream() decompressed %zu bytes, "
+              "but %zu bytes of compressed data remain",
+              inBuffer.pos, inBuffer.size);
 
     size_t decompressed_size = outBuffer.pos - state->output.write_pos;
     state->output.write_pos = outBuffer.pos;
