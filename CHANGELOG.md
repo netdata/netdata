@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- journal minor updates [\#16267](https://github.com/netdata/netdata/pull/16267) ([ktsaou](https://github.com/ktsaou))
+- Fix coverity issue 403725 [\#16265](https://github.com/netdata/netdata/pull/16265) ([stelfrag](https://github.com/stelfrag))
 - SUBSTRING simple patterns fix [\#16264](https://github.com/netdata/netdata/pull/16264) ([ktsaou](https://github.com/ktsaou))
 - QUERIES: use tiers only when they have useful data [\#16263](https://github.com/netdata/netdata/pull/16263) ([ktsaou](https://github.com/ktsaou))
+- cgroup: add net container\_device label [\#16261](https://github.com/netdata/netdata/pull/16261) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16258](https://github.com/netdata/netdata/pull/16258) ([netdatabot](https://github.com/netdatabot))
 - Fix Discord webhook payload [\#16257](https://github.com/netdata/netdata/pull/16257) ([luchaos](https://github.com/luchaos))
+- Fix HAProxy server status parsing and add MAINT status chart [\#16253](https://github.com/netdata/netdata/pull/16253) ([seniorquico](https://github.com/seniorquico))
 - Journal multiple sources [\#16252](https://github.com/netdata/netdata/pull/16252) ([ktsaou](https://github.com/ktsaou))
 - `most_popular` on markdown metadata for integrations [\#16251](https://github.com/netdata/netdata/pull/16251) ([Ancairon](https://github.com/Ancairon))
 - Dyncfg improvements [\#16250](https://github.com/netdata/netdata/pull/16250) ([ktsaou](https://github.com/ktsaou))
@@ -422,8 +426,6 @@
 - fix proc.plugin meta filename [\#15659](https://github.com/netdata/netdata/pull/15659) ([ilyam8](https://github.com/ilyam8))
 - small improvements to README.md [\#15658](https://github.com/netdata/netdata/pull/15658) ([ilyam8](https://github.com/ilyam8))
 - Fix icon for solarwinds [\#15657](https://github.com/netdata/netdata/pull/15657) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Fix Apps plugin icons [\#15655](https://github.com/netdata/netdata/pull/15655) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- fix pandas category [\#15654](https://github.com/netdata/netdata/pull/15654) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
