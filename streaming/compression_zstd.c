@@ -18,8 +18,6 @@ void rrdpush_compressor_init_zstd(struct compressor_state *state) {
         if(ZSTD_isError(ret))
             netdata_log_error("STREAM: ZSTD_initCStream() returned error: %s", ZSTD_getErrorName(ret));
 
-        simple_ring_buffer_make_room(&state->input, MAX(COMPRESSION_MAX_CHUNK, ZSTD_CStreamInSize()));
-
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_compressionLevel, 1);
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_strategy, ZSTD_fast);
     }
@@ -82,11 +80,6 @@ size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, s
             return 0;
         }
     }
-
-    state->input.read_pos = inBuffer.pos;
-
-    if(state->input.read_pos >= state->input.write_pos)
-        simple_ring_buffer_reset(&state->input);
 
     state->sender_locked.total_compressions++;
     state->sender_locked.total_uncompressed += size;
