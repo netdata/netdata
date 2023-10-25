@@ -667,6 +667,10 @@ STREAMING_PLUGIN_FILES = \
     streaming/rrdpush.c \
     streaming/compression.c \
     streaming/compression.h \
+    streaming/compression_lz4.c \
+    streaming/compression_lz4.h \
+    streaming/compression_zstd.c \
+    streaming/compression_zstd.h \
     streaming/sender.c \
     streaming/receiver.c \
     streaming/replication.h \

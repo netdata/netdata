@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "rrdpush.h"
 
 #ifndef NETDATA_RRDPUSH_COMPRESSION_H
@@ -27,19 +29,53 @@ typedef enum {
     COMPRESSION_ALGORITHM_ZSTD,
 } compression_algorithm_t;
 
-struct compression_ring_buffer {
+// ----------------------------------------------------------------------------
+
+typedef struct simple_ring_buffer {
     const char *data;
     size_t size;
     size_t read_pos;
     size_t write_pos;
-};
+} SIMPLE_RING_BUFFER;
+
+static inline void simple_ring_buffer_reset(SIMPLE_RING_BUFFER *b) {
+    b->read_pos = b->write_pos = 0;
+}
+
+static inline void simple_ring_buffer_make_room(SIMPLE_RING_BUFFER *b, size_t size) {
+    if(b->write_pos + size > b->size) {
+        if(!b->size)
+            b->size = COMPRESSION_MAX_CHUNK;
+        else
+            b->size *= 2;
+
+        if(b->write_pos + size > b->size)
+            b->size += size;
+
+        b->data = (const char *)reallocz((void *)b->data, b->size);
+    }
+}
+
+static inline void simple_ring_buffer_append_data(SIMPLE_RING_BUFFER *b, const void *data, size_t size) {
+    simple_ring_buffer_make_room(b, size);
+    memcpy((void *)(b->data + b->write_pos), data, size);
+    b->write_pos += size;
+}
+
+static inline void simple_ring_buffer_destroy(SIMPLE_RING_BUFFER *b) {
+    freez((void *)b->data);
+    b->data = NULL;
+    b->read_pos = b->write_pos = b->size = 0;
+}
+
+// ----------------------------------------------------------------------------
 
 struct compressor_state {
     bool initialized;
     compression_algorithm_t algorithm;
 
-    struct compression_ring_buffer input;
-    struct compression_ring_buffer output;
+    SIMPLE_RING_BUFFER input;
+    SIMPLE_RING_BUFFER output;
 
     void *stream;
 
@@ -54,6 +90,8 @@ void rrdpush_compressor_init(struct compressor_state *state);
 void rrdpush_compressor_destroy(struct compressor_state *state);
 size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t size, const char **out);
 
+// ----------------------------------------------------------------------------
+
 struct decompressor_state {
     bool initialized;
     compression_algorithm_t algorithm;
@@ -62,7 +100,7 @@ struct decompressor_state {
     size_t total_uncompressed;
     size_t packet_count;
 
-    struct compression_ring_buffer output;
+    SIMPLE_RING_BUFFER output;
 
     void *stream;
 };
@@ -121,6 +159,8 @@ static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, 
 
     return bytes_to_return;
 }
+
+// ----------------------------------------------------------------------------
 
 #endif // ENABLE_RRDPUSH_COMPRESSION
 #endif // NETDATA_RRDPUSH_COMPRESSION_H 1
