@@ -22,9 +22,10 @@
 #define WORKER_SENDER_JOB_BYTES_SENT                17
 #define WORKER_SENDER_JOB_BYTES_COMPRESSED          18
 #define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED        19
-#define WORKER_SENDER_JOB_REPLAY_REQUEST            20
-#define WORKER_SENDER_JOB_FUNCTION_REQUEST          21
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE          22
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO   20
+#define WORKER_SENDER_JOB_REPLAY_REQUEST            21
+#define WORKER_SENDER_JOB_FUNCTION_REQUEST          22
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE          23
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 21
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 21
@@ -182,8 +183,11 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
             rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
 
-            if(rrdpush_decompress_decode_signature((const char *)&signature, sizeof(signature)) != dst_len)
-                fatal("RRDPUSH COMPRESSION: invalid signature");
+            size_t decoded_dst_len = rrdpush_decompress_decode_signature((const char *)&signature, sizeof(signature));
+            if(decoded_dst_len != dst_len)
+                fatal("RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
+                      "compressed payload length %zu bytes, but signature says payload is %zu bytes",
+                      size_to_compress, dst_len, decoded_dst_len);
 
             if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature)))
                 s->flags |= SENDER_FLAG_OVERFLOW;
@@ -1322,6 +1326,7 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, "bytes compressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
     struct sender_state *s = ptr;
@@ -1444,8 +1449,12 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         if(s->compressor.initialized) {
-            worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)s->compressor.sender_locked.total_uncompressed);
-            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)s->compressor.sender_locked.total_compressed);
+            size_t bytes_uncompressed = s->compressor.sender_locked.total_uncompressed;
+            size_t bytes_compressed = s->compressor.sender_locked.total_compressed + s->compressor.sender_locked.total_compressions * sizeof(rrdpush_signature_t);
+            NETDATA_DOUBLE ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, ratio);
         }
         sender_unlock(s);
 
