@@ -1172,8 +1172,8 @@ static void journal_files_registry_update() {
 
 static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
 
-    if((fqs->source_type == SDJF_NONE || (jf->source_type & fqs->source_type)) &&
-        (!fqs->sources || simple_pattern_matches(fqs->sources, string2str(jf->source)))) {
+    if((fqs->source_type == SDJF_NONE && !fqs->sources) || (jf->source_type & fqs->source_type) ||
+        (fqs->sources && simple_pattern_matches(fqs->sources, string2str(jf->source)))) {
 
         usec_t anchor_delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
         usec_t first_ut = jf->msg_first_ut;
