@@ -485,9 +485,12 @@ void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, cons
 
     BUFFER *wb = sender_start(host->sender);
 
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPORT_JOB_STATUS " %s %s %s %s %d\n", plugin_name, module_name, job->name, job_status2str(job->status), job->state);
-    if (job->reason)
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPORT_JOB_STATUS " %s %s %s %s %d", plugin_name, module_name, job->name, job_status2str(job->status), job->state);
+
+    if (job->reason && strlen(job->reason))
         buffer_sprintf(wb, " \"%s\"", job->reason);
+
+    buffer_strcat(wb, "\n");
 
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
