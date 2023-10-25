@@ -2512,7 +2512,7 @@ static inline PARSER_RC pluginsd_job_status_common(char **words, size_t num_word
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_REPORT_JOB_STATUS, "unknown job status");
 
     char *message = NULL;
-    if (num_words == 5)
+    if (num_words == 5 && strlen(words[4]) > 0)
         message = words[4];
 
     const DICTIONARY_ITEM *plugin_item;
