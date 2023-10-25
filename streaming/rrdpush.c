@@ -1500,12 +1500,12 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
         // DATA WITH ML requires INTERPOLATED
         common_caps &= ~STREAM_CAP_DATA_WITH_ML;
 
-    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_GZIP))
-        common_caps &= ~(STREAM_CAP_LZ4|STREAM_CAP_ZSTD); // keep only GZIP
-    else if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_ZSTD))
+    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_ZSTD))
         common_caps &= ~(STREAM_CAP_LZ4|STREAM_CAP_GZIP); // keep only ZSTD
     else if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_LZ4))
         common_caps &= ~(STREAM_CAP_GZIP|STREAM_CAP_ZSTD); // keep only LZ4
+    else if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_GZIP))
+        common_caps &= ~(STREAM_CAP_LZ4|STREAM_CAP_ZSTD); // keep only GZIP
 
     return common_caps;
 }

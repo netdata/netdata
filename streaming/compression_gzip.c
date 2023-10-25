@@ -66,6 +66,13 @@ size_t rrdpush_compress_gzip(struct compressor_state *state, const char *data, s
 
     size_t compressed_data_size = state->output.size - strm->avail_out;
 
+    if(compressed_data_size == 0) {
+        netdata_log_error("STREAM: deflate() did not produce any output "
+                          "(output buffer %zu bytes, compressed payload %zu bytes)",
+                          state->output.size, size);
+        return 0;
+    }
+
     state->sender_locked.total_compressions++;
     state->sender_locked.total_uncompressed += size;
     state->sender_locked.total_compressed += compressed_data_size;
@@ -111,7 +118,7 @@ size_t rrdpush_decompress_gzip(struct decompressor_state *state, const char *com
     strm->avail_out = (uInt)state->output.size;
     strm->next_out = (Bytef *)state->output.data;
 
-    int ret = inflate(strm, Z_NO_FLUSH);
+    int ret = inflate(strm, Z_SYNC_FLUSH);
     if (ret != Z_STREAM_END && ret != Z_OK) {
         netdata_log_error("RRDPUSH DECOMPRESS: inflate() failed with error %d", ret);
         return 0;
