@@ -56,7 +56,7 @@ static inline void rrdpush_compressor_init_lz4(struct compressor_state *state) {
 
         // LZ4 needs access to the last 64KB of source data
         // so, we keep twice the size of each message
-        ring_buffer_make_room(&state->input, 65536 + COMPRESSION_MAX_MSG_SIZE * 2);
+        ring_buffer_make_room(&state->input, 65536 + COMPRESSION_MAX_CHUNK * 2);
     }
 }
 
@@ -70,7 +70,7 @@ static inline void rrdpush_compressor_init_zstd(struct compressor_state *state) 
         if(ZSTD_isError(ret))
             netdata_log_error("STREAM: ZSTD_initCStream() returned error: %s", ZSTD_getErrorName(ret));
 
-        ring_buffer_make_room(&state->input, MAX(COMPRESSION_MAX_MSG_SIZE, ZSTD_CStreamInSize()));
+        ring_buffer_make_room(&state->input, MAX(COMPRESSION_MAX_CHUNK, ZSTD_CStreamInSize()));
 
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_compressionLevel, 1);
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_strategy, ZSTD_fast);
@@ -217,7 +217,7 @@ static inline size_t rrdpush_decompress_lz4(struct decompressor_state *state, co
     if(unlikely(state->output.read_pos != state->output.write_pos))
         fatal("RRDPUSH_DECOMPRESS: LZ4 asked to decompress new data, while there are unread data in the decompression buffer!");
 
-    if (unlikely(state->output.write_pos + COMPRESSION_MAX_MSG_SIZE > state->output.size))
+    if (unlikely(state->output.write_pos + COMPRESSION_MAX_CHUNK > state->output.size))
         // the input buffer cannot fit out data, restart from zero
         ring_buffer_reset(&state->output);
 
@@ -308,7 +308,7 @@ static inline void rrdpush_decompressor_init_lz4(struct decompressor_state *stat
     if(!state->initialized) {
         state->initialized = true;
         state->stream = LZ4_createStreamDecode();
-        ring_buffer_make_room(&state->output, 65536 + COMPRESSION_MAX_MSG_SIZE * 2);
+        ring_buffer_make_room(&state->output, 65536 + COMPRESSION_MAX_CHUNK * 2);
     }
 }
 
@@ -322,7 +322,7 @@ static inline void rrdpush_decompressor_init_zstd(struct decompressor_state *sta
         if(ZSTD_isError(ret))
             netdata_log_error("STREAM: ZSTD_initDStream() returned error: %s", ZSTD_getErrorName(ret));
 
-        ring_buffer_make_room(&state->output, MAX(COMPRESSION_MAX_MSG_SIZE, ZSTD_DStreamOutSize()));
+        ring_buffer_make_room(&state->output, MAX(COMPRESSION_MAX_CHUNK, ZSTD_DStreamOutSize()));
     }
 }
 #endif
