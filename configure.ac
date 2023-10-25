@@ -555,13 +555,13 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_initStream],
+    [LZ4_createStream],
     [LZ4_LIBS_FAST="-llz4"]
 )
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_compress_default],
+    [LZ4_compress_fast_continue],
     [LZ4_LIBS="-llz4"]
 )
 
@@ -714,7 +714,7 @@ if test "${enable_lz4}" != "no"; then
         AC_TRY_LINK(
             [ #include <lz4.h> ],
             [
-                LZ4_stream_t* stream = LZ4_initStream(NULL, 0);
+                LZ4_stream_t* stream = LZ4_createStream();
             ],
             [ enable_lz4="yes"],
             [ enable_lz4="no" ]
