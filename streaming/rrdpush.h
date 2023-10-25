@@ -49,6 +49,7 @@ typedef enum {
     STREAM_CAP_DATA_WITH_ML     = (1 << 16), // streaming supports transferring anomaly bit
     STREAM_CAP_DYNCFG           = (1 << 17), // dynamic configuration of plugins trough streaming
     STREAM_CAP_ZSTD             = (1 << 19), // ZSTD compression supported
+    STREAM_CAP_GZIP             = (1 << 20), // GZIP compression supported
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
@@ -67,9 +68,9 @@ typedef enum {
 #define STREAM_CAP_ZSTD_AVAILABLE 0
 #endif  // ENABLE_ZSTD
 
-extern STREAM_CAPABILITIES globally_disabled_capabilities;
+#define STREAM_CAP_COMPRESSIONS_AVAILABLE (STREAM_CAP_LZ4_AVAILABLE|STREAM_CAP_ZSTD_AVAILABLE|STREAM_CAP_GZIP)
 
-#define STREAM_CAP_COMPRESSIONS_AVAILABLE (STREAM_CAP_LZ4_AVAILABLE|STREAM_CAP_ZSTD_AVAILABLE)
+extern STREAM_CAPABILITIES globally_disabled_capabilities;
 
 STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 

@@ -1390,6 +1390,7 @@ static struct {
     {STREAM_CAP_DATA_WITH_ML, "ML" },
     {STREAM_CAP_DYNCFG,       "DYN_CFG" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
+    {STREAM_CAP_GZIP,         "GZIP" },
     {0 , NULL },
 };
 
@@ -1499,9 +1500,12 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
         // DATA WITH ML requires INTERPOLATED
         common_caps &= ~STREAM_CAP_DATA_WITH_ML;
 
-    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_ZSTD)) == (STREAM_CAP_LZ4|STREAM_CAP_ZSTD))
-        // keep only ZSTD
-        common_caps &= ~STREAM_CAP_LZ4;
+    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_GZIP))
+        common_caps &= ~(STREAM_CAP_LZ4|STREAM_CAP_ZSTD); // keep only GZIP
+    else if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_ZSTD))
+        common_caps &= ~(STREAM_CAP_LZ4|STREAM_CAP_GZIP); // keep only ZSTD
+    else if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_LZ4))
+        common_caps &= ~(STREAM_CAP_GZIP|STREAM_CAP_ZSTD); // keep only LZ4
 
     return common_caps;
 }
@@ -1523,6 +1527,8 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
         s->compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
     else if(stream_has_capability(s, STREAM_CAP_LZ4))
         s->compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+    else if(stream_has_capability(s, STREAM_CAP_GZIP))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
     else
         s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 

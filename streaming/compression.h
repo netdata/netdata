@@ -25,8 +25,9 @@ static inline rrdpush_signature_t rrdpush_compress_encode_signature(size_t compr
 
 typedef enum {
     COMPRESSION_ALGORITHM_NONE  = 0,
-    COMPRESSION_ALGORITHM_LZ4,
     COMPRESSION_ALGORITHM_ZSTD,
+    COMPRESSION_ALGORITHM_LZ4,
+    COMPRESSION_ALGORITHM_GZIP,
 } compression_algorithm_t;
 
 // ----------------------------------------------------------------------------
@@ -96,9 +97,10 @@ struct decompressor_state {
     bool initialized;
     compression_algorithm_t algorithm;
     size_t signature_size;
+
     size_t total_compressed;
     size_t total_uncompressed;
-    size_t packet_count;
+    size_t total_compressions;
 
     SIMPLE_RING_BUFFER output;
 

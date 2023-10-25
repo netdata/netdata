@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "compression_gzip.h"
+#include <zlib.h>
+
+void rrdpush_compressor_init_gzip(struct compressor_state *state) {
+    if (!state->initialized) {
+        state->initialized = true;
+
+        // Initialize deflate stream
+        z_stream *strm = state->stream = (z_stream *) mallocz(sizeof(z_stream));
+        strm->zalloc = Z_NULL;
+        strm->zfree = Z_NULL;
+        strm->opaque = Z_NULL;
+
+        // deflateInit2(strm, Z_BEST_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
+        deflateInit2(strm, Z_BEST_SPEED, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
+    }
+}
+
+void rrdpush_compressor_destroy_gzip(struct compressor_state *state) {
+    if (state->stream) {
+        deflateEnd(state->stream);
+        free(state->stream);
+        state->stream = NULL;
+    }
+}
+
+size_t rrdpush_compress_gzip(struct compressor_state *state, const char *data, size_t size, const char **out) {
+    if (unlikely(!state || !size || !out))
+        return 0;
+
+    simple_ring_buffer_make_room(&state->output, deflateBound(state->stream, size));
+
+    z_stream *strm = state->stream;
+    strm->avail_in = (uInt)size;
+    strm->next_in = (Bytef *)data;
+    strm->avail_out = (uInt)state->output.size;
+    strm->next_out = (Bytef *)state->output.data;
+
+    int ret = deflate(strm, Z_SYNC_FLUSH);
+    if (ret != Z_OK && ret != Z_STREAM_END) {
+        netdata_log_error("STREAM: deflate() failed with error %d", ret);
+        return 0;
+    }
+
+    size_t compressed_data_size = state->output.size - strm->avail_out;
+
+    state->sender_locked.total_compressions++;
+    state->sender_locked.total_uncompressed += size;
+    state->sender_locked.total_compressed += compressed_data_size;
+
+    *out = state->output.data;
+    return compressed_data_size;
+}
+
+void rrdpush_decompressor_init_gzip(struct decompressor_state *state) {
+    if (!state->initialized) {
+        state->initialized = true;
+
+        // Initialize inflate stream
+        z_stream *strm = state->stream = (z_stream *) malloc(sizeof(z_stream));
+        strm->zalloc = Z_NULL;
+        strm->zfree = Z_NULL;
+        strm->opaque = Z_NULL;
+
+        inflateInit2(strm, 15 + 16);
+
+        simple_ring_buffer_make_room(&state->output, COMPRESSION_MAX_CHUNK);
+    }
+}
+
+void rrdpush_decompressor_destroy_gzip(struct decompressor_state *state) {
+    if (state->stream) {
+        inflateEnd(state->stream);
+        free(state->stream);
+        state->stream = NULL;
+    }
+}
+
+size_t rrdpush_decompress_gzip(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
+    if (unlikely(!state || !compressed_data || !compressed_size))
+        return 0;
+
+    if (unlikely(state->output.read_pos != state->output.write_pos))
+        fatal("RRDPUSH_DECOMPRESS: gzip asked to decompress new data, while there are unread data in the decompression buffer!");
+
+    z_stream *strm = state->stream;
+    strm->avail_in = (uInt)compressed_size;
+    strm->next_in = (Bytef *)compressed_data;
+    strm->avail_out = (uInt)(state->output.size - state->output.write_pos);
+    strm->next_out = (Bytef *)(state->output.data + state->output.write_pos);
+
+    int ret = inflate(strm, Z_NO_FLUSH);
+    if (ret != Z_STREAM_END && ret != Z_OK) {
+        netdata_log_error("RRDPUSH DECOMPRESS: inflate() failed with error %d", ret);
+        return 0;
+    }
+
+    size_t decompressed_size = state->output.size - strm->avail_out - state->output.write_pos;
+
+    state->output.write_pos += decompressed_size;
+
+    state->total_compressed += compressed_size;
+    state->total_uncompressed += decompressed_size;
+    state->total_compressions++;
+
+    return decompressed_size;
+}

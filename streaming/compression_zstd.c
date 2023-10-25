@@ -134,9 +134,9 @@ size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *com
     state->output.write_pos = outBuffer.pos;
 
     // statistics
-    state->total_compressed += compressed_size + RRDPUSH_COMPRESSION_SIGNATURE_SIZE;
+    state->total_compressed += compressed_size;
     state->total_uncompressed += decompressed_size;
-    state->packet_count++;
+    state->total_compressions++;
 
     return decompressed_size;
 }

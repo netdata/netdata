@@ -1115,6 +1115,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
 #ifdef ENABLE_RRDPUSH_COMPRESSION
     build_info_set_status(BIB_FEATURE_STREAMING_COMPRESSION, true);
+
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "gzip");
+
 #ifdef ENABLE_LZ4
     build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "lz4");
 #endif

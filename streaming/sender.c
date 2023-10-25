@@ -84,6 +84,12 @@ static inline void deactivate_compression(struct sender_state *s) {
                     rrdhost_hostname(s->host));
             break;
 
+        case COMPRESSION_ALGORITHM_GZIP:
+            netdata_log_error("STREAM_COMPRESSION: GZIP compression error on 'host:%s'. Disabling GZIP for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_GZIP;
+            break;
+
         case COMPRESSION_ALGORITHM_LZ4:
             netdata_log_error("STREAM_COMPRESSION: LZ4 compression error on 'host:%s'. Disabling ZSTD for this node.",
                     rrdhost_hostname(s->host));
