@@ -105,13 +105,11 @@ size_t rrdpush_decompress_gzip(struct decompressor_state *state, const char *com
     if (unlikely(state->output.read_pos != state->output.write_pos))
         fatal("RRDPUSH_DECOMPRESS: gzip asked to decompress new data, while there are unread data in the decompression buffer!");
 
-    simple_ring_buffer_reset(&state->output);
-
     z_stream *strm = state->stream;
     strm->avail_in = (uInt)compressed_size;
     strm->next_in = (Bytef *)compressed_data;
-    strm->avail_out = (uInt)(state->output.size - state->output.write_pos);
-    strm->next_out = (Bytef *)(state->output.data + state->output.write_pos);
+    strm->avail_out = (uInt)state->output.size;
+    strm->next_out = (Bytef *)state->output.data;
 
     int ret = inflate(strm, Z_NO_FLUSH);
     if (ret != Z_STREAM_END && ret != Z_OK) {
@@ -133,9 +131,10 @@ size_t rrdpush_decompress_gzip(struct decompressor_state *state, const char *com
         return 0;
     }
 
-    size_t decompressed_size = state->output.size - strm->avail_out - state->output.write_pos;
+    size_t decompressed_size = state->output.size - strm->avail_out;
 
-    state->output.write_pos += decompressed_size;
+    state->output.read_pos = 0;
+    state->output.write_pos = decompressed_size;
 
     state->total_compressed += compressed_size;
     state->total_uncompressed += decompressed_size;

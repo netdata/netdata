@@ -90,6 +90,25 @@ size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, s
     return outBuffer.pos;
 }
 
+void rrdpush_decompressor_init_zstd(struct decompressor_state *state) {
+    if(!state->initialized) {
+        state->initialized = true;
+        state->stream = ZSTD_createDStream();
+
+        size_t ret = ZSTD_initDStream(state->stream);
+        if(ZSTD_isError(ret))
+            netdata_log_error("STREAM: ZSTD_initDStream() returned error: %s", ZSTD_getErrorName(ret));
+
+        simple_ring_buffer_make_room(&state->output, MAX(COMPRESSION_MAX_CHUNK, ZSTD_DStreamOutSize()));
+    }
+}
+
+void rrdpush_decompressor_destroy_zstd(struct decompressor_state *state) {
+    if (state->stream) {
+        ZSTD_freeDStream(state->stream);
+        state->stream = NULL;
+    }
+}
 
 size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
     if (unlikely(!state || !compressed_data || !compressed_size))
@@ -98,8 +117,6 @@ size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *com
     if(unlikely(state->output.read_pos != state->output.write_pos))
         fatal("RRDPUSH_DECOMPRESS: ZSTD asked to decompress new data, while there are unread data in the decompression buffer!");
 
-    simple_ring_buffer_reset(&state->output);
-
     ZSTD_inBuffer inBuffer = {
             .pos = 0,
             .size = compressed_size,
@@ -107,7 +124,7 @@ size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *com
     };
 
     ZSTD_outBuffer outBuffer = {
-            .pos = state->output.write_pos,
+            .pos = 0,
             .dst = (char *)state->output.data,
             .size = state->output.size,
     };
@@ -127,7 +144,9 @@ size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *com
               "but %zu bytes of compressed data remain",
               inBuffer.pos, inBuffer.size);
 
-    size_t decompressed_size = outBuffer.pos - state->output.write_pos;
+    size_t decompressed_size = outBuffer.pos;
+
+    state->output.read_pos = 0;
     state->output.write_pos = outBuffer.pos;
 
     // statistics
@@ -136,26 +155,6 @@ size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *com
     state->total_compressions++;
 
     return decompressed_size;
-}
-
-void rrdpush_decompressor_init_zstd(struct decompressor_state *state) {
-    if(!state->initialized) {
-        state->initialized = true;
-        state->stream = ZSTD_createDStream();
-
-        size_t ret = ZSTD_initDStream(state->stream);
-        if(ZSTD_isError(ret))
-            netdata_log_error("STREAM: ZSTD_initDStream() returned error: %s", ZSTD_getErrorName(ret));
-
-        simple_ring_buffer_make_room(&state->output, MAX(COMPRESSION_MAX_CHUNK, ZSTD_DStreamOutSize()));
-    }
-}
-
-void rrdpush_decompressor_destroy_zstd(struct decompressor_state *state) {
-    if (state->stream) {
-        ZSTD_freeDStream(state->stream);
-        state->stream = NULL;
-    }
 }
 
 #endif // ENABLE_ZSTD
