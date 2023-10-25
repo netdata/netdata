@@ -1448,6 +1448,7 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
         }
 
+#ifdef ENABLE_RRDPUSH_COMPRESSION
         if(s->compressor.initialized) {
             size_t bytes_uncompressed = s->compressor.sender_locked.total_uncompressed;
             size_t bytes_compressed = s->compressor.sender_locked.total_compressed + s->compressor.sender_locked.total_compressions * sizeof(rrdpush_signature_t);
@@ -1456,6 +1457,7 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
             worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, ratio);
         }
+#endif // ENABLE_RRDPUSH_COMPRESSION
         sender_unlock(s);
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size);
