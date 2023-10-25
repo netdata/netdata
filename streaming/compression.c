@@ -159,3 +159,98 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
 }
 
 #endif
+
+int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *name) {
+    fprintf(stderr, "\nTesting streaming compression with %s\n", name);
+
+    struct compressor_state cctx =  {
+            .initialized = false,
+            .algorithm = algorithm,
+    };
+    struct decompressor_state dctx = {
+            .initialized = false,
+            .algorithm = algorithm,
+    };
+
+    char txt[COMPRESSION_MAX_MSG_SIZE];
+
+    rrdpush_compressor_init(&cctx);
+    rrdpush_decompressor_init(&dctx);
+
+    int errors = 0;
+
+    memset(txt, '=', COMPRESSION_MAX_MSG_SIZE);
+
+    for(int i = 0; i < COMPRESSION_MAX_MSG_SIZE ;i++) {
+        txt[i] = 'A' + (i % 26);
+        size_t txt_len = i + 1;
+
+        const char *out;
+        size_t size = rrdpush_compress(&cctx, txt, txt_len, &out);
+
+        if(size >= COMPRESSION_MAX_CHUNK) {
+            fprintf(stderr, "iteration %d: compressed size %zu exceeds max allowed size\n",
+                    i, size);
+            errors++;
+            goto cleanup;
+        }
+        else {
+            size_t dtxt_len = rrdpush_decompress(&dctx, out, size);
+            char *dtxt = (char *) &dctx.output.data[dctx.output.read_pos];
+
+            if(rrdpush_decompressed_bytes_in_buffer(&dctx) != dtxt_len) {
+                fprintf(stderr, "iteration %d: decompressed size %zu does not rrdpush_decompressed_bytes_in_buffer() %zu\n",
+                        i, dtxt_len, rrdpush_decompressed_bytes_in_buffer(&dctx)
+                       );
+                errors++;
+                goto cleanup;
+            }
+
+            if(dtxt_len != txt_len) {
+                fprintf(stderr, "iteration %d: decompressed size %zu does not match original size %zu\n",
+                        i, dtxt_len, txt_len
+                       );
+                errors++;
+                goto cleanup;
+            }
+            else {
+                if(memcmp(txt, dtxt, txt_len) != 0) {
+                    txt[txt_len] = '\0';
+                    dtxt[txt_len + 5] = '\0';
+
+                    fprintf(stderr, "iteration %d: decompressed data '%s' do not match original data '%s' of length %zu\n",
+                            i, dtxt, txt, txt_len);
+                    errors++;
+                    goto cleanup;
+                }
+            }
+        }
+
+        // fill the compressed buffer with garbage
+        memset((void *)out, 'x', size);
+
+        // here we are supposed to copy the data and advance the position
+        dctx.output.read_pos += rrdpush_decompressed_bytes_in_buffer(&dctx);
+    }
+
+cleanup:
+    rrdpush_compressor_destroy(&cctx);
+    rrdpush_decompressor_destroy(&dctx);
+
+    if(errors)
+        fprintf(stderr, "Compression with %s: FAILED (%d errors)\n", name, errors);
+    else
+        fprintf(stderr, "Compression with %s: OK\n", name);
+
+    return errors;
+}
+
+int unittest_rrdpush_compressions(void) {
+    int ret = 0;
+
+    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_GZIP, "GZIP");
+    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_LZ4, "LZ4");
+    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");
+
+    return ret;
+}

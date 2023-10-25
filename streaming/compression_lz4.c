@@ -5,6 +5,9 @@
 #ifdef ENABLE_LZ4
 #include "lz4.h"
 
+// ----------------------------------------------------------------------------
+// compress
+
 void rrdpush_compressor_init_lz4(struct compressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
@@ -69,6 +72,24 @@ size_t rrdpush_compress_lz4(struct compressor_state *state, const char *data, si
     return compressed_data_size;
 }
 
+// ----------------------------------------------------------------------------
+// decompress
+
+void rrdpush_decompressor_init_lz4(struct decompressor_state *state) {
+    if(!state->initialized) {
+        state->initialized = true;
+        state->stream = LZ4_createStreamDecode();
+        simple_ring_buffer_make_room(&state->output, 65536 + COMPRESSION_MAX_CHUNK * 2);
+    }
+}
+
+void rrdpush_decompressor_destroy_lz4(struct decompressor_state *state) {
+    if (state->stream) {
+        LZ4_freeStreamDecode(state->stream);
+        state->stream = NULL;
+    }
+}
+
 /*
  * Decompress the compressed data in the internal buffer
  * Return the size of uncompressed data or 0 for error
@@ -90,7 +111,7 @@ size_t rrdpush_decompress_lz4(struct decompressor_state *state, const char *comp
             , (char *)(state->output.data + state->output.write_pos)
             , (int)compressed_size
             , (int)(state->output.size - state->output.write_pos)
-                                                             );
+            );
 
     if (unlikely(decompressed_size < 0)) {
         netdata_log_error("RRDPUSH DECOMPRESS: LZ4_decompress_safe_continue() returned negative value: %ld "
@@ -116,21 +137,6 @@ size_t rrdpush_decompress_lz4(struct decompressor_state *state, const char *comp
     state->total_compressions++;
 
     return decompressed_size;
-}
-
-void rrdpush_decompressor_init_lz4(struct decompressor_state *state) {
-    if(!state->initialized) {
-        state->initialized = true;
-        state->stream = LZ4_createStreamDecode();
-        simple_ring_buffer_make_room(&state->output, 65536 + COMPRESSION_MAX_CHUNK * 2);
-    }
-}
-
-void rrdpush_decompressor_destroy_lz4(struct decompressor_state *state) {
-    if (state->stream) {
-        LZ4_freeStreamDecode(state->stream);
-        state->stream = NULL;
-    }
 }
 
 #endif // ENABLE_LZ4
