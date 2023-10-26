@@ -68,15 +68,18 @@ The following log collectors are supported at the moment. The table will be upda
 
 </a>
 
-Since version `XXXXX`, Netdata is distributed with built-in logs management functionality, but it is disabled by default and must be explicitly enabled at runtime by setting the respective configuration option in `netdata.conf` to `yes` and restarting the agent:
+Since version `XXXXX`, Netdata is distributed with logs management functionality as an external plugin, but it is disabled by default and must be explicitly enabled at runtime by running `./edit-config logsmanagement.d.conf` and changing the respective configuration option:
+
 ```
-[logs management]
+[global]
 	enabled = yes
 ```
 
-There are some pre-configured log sources that Netdata will attempt to automatically discover and monitor that can be edited using `./edit-config logsmanagement.conf` in Netdata's configuration directory.
+There are some pre-configured log sources that Netdata will attempt to automatically discover and monitor that can be edited using `./edit-config logsmanagement.d/default.conf` in Netdata's configuration directory. More sources can be configured for monitoring by adding them in `logsmanagement.d/default.conf` or in other `.conf` files in the `logsmanagement.d` directory.
 
-To get familiar with the Logs Management functionality, the user is advised to read at least the [Summary](#summary) and the [General Configuration](#general-configuration) sections and also any [Collector-specific Configuration](#collector-configuration) subsections, according to each of their use cases.
+There are also some example configurations that can be listed using `./edit-config --list`.
+
+To get familiar with the Logs Management functionality, the user is advised to read at least the [Summary](#summary) and the [General Configuration](#general-configuration) sections and also any [Collector-specific Configuration](#collector-configuration) subsections, according to each use case.
 
 For any issues, please refer to [Troubleshooting](#troubleshooting) or open a new support ticket on [Github](https://github.com/netdata/netdata/issues) or one of Netdata's support channels.
 
@@ -99,32 +102,34 @@ However, there may be some exceptions to this rule as more collectors are added 
 
 </a>
 
-There are some fundamental configuration options that are common to all collector types. These options can be set globally in the `[logs management]` section of `netdata.conf` or customized per collector using `./edit-config logsmanagement.conf`:
+There are some fundamental configuration options that are common to all log collector types. These options can be set globally in `logsmanagement.d.conf` or they can be customized per log source:
 
 |  Configuration Option | Default 		| Description  |
 |      :------------:  	| :------------:  | ------------ |
 | `enabled` | `no` 		| Whether this log source will be monitored or not.
-| `update every` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | How often metrics in charts will be updated every (in seconds).
+| `update every` 		| Equivalent value in `logsmanagement.d.conf` (or in `netdata.conf` under `[plugin:logs-management]`, if higher). | How often metrics in charts will be updated every (in seconds).
 | `update timeout` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | Maximum timeout charts may be delayed by while waiting for new logs.
-| `use log timestamp` 	| Equivalent value in `[logs management]` section of `netdata.conf` (`auto` by default). | If set to `auto`, log timestamps (when available) will be used for precise metrics aggregation. Otherwise (if set to `no`), collection timestamps will be used instead (which may result in lagged metrics under heavy system load, but it will reduce CPU usage).
+| `use log timestamp` 	| Equivalent value in `logsmanagement.d.conf` (`auto` by default). | If set to `auto`, log timestamps (when available) will be used for precise metrics aggregation. Otherwise (if set to `no`), collection timestamps will be used instead (which may result in lagged metrics under heavy system load, but it will reduce CPU usage).
 | `log type` 			| `flb_tail`	| Type of this log collector, see [relevant table](#collector-types) for a complete list of supported collectors.
-| `circular buffer max size` | Equivalent value in `[logs management]` section of `netdata.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
-| `circular buffer drop logs if full` | Equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). | If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time).
-| `compression acceleration` | Equivalent value in `[logs management]` section of `netdata.conf` (`1` by default). | Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more details. 
-| `db mode` | Equivalent value in `[logs management]` section of `netdata.conf` (`none` by default). | Mode of logs management database per collector. If set to `none`, logs will be collected, buffered, parsed and then discarded. If set to `full`, buffered logs will be saved to the logs management database instead of being discarded. When mode is `none`, logs management queries cannot be executed.
-| `buffer flush to DB` | Equivalent value in `[logs management]` section of `netdata.conf` (`6` by default). | Interval in seconds at which logs will be transferred from RAM buffers to the database.
-| `disk space limit` | Equivalent value in `[logs management]` section of `netdata.conf` (`500 MiB` by default). | Maximum disk space that all compressed logs in database can occupy (per log source). Once exceeded, oldest BLOB of logs will be truncated for new logs to be written over. Each log source database can contain a maximum of 10 BLOBs at any point, so each truncation equates to a deletion of about 10% of the oldest logs. The number of BLOBS will be configurable in a future release.
-| `collected logs total chart enable` | Equivalent value in `[logs management]` section of `netdata.conf` (`no` by default). | Chart that shows the number of log records collected for this log source, since the last Netdata agent restart. Useful for debugging purposes.
-| `collected logs rate chart enable` | Equivalent value in `[logs management]` section of `netdata.conf` (`yes` by default). | Chart that shows the rate that log records are collected at for this log source, since the last Netdata agent restart.
+| `circular buffer max size` | Equivalent value in `logsmanagement.d.conf`. | Maximum RAM that can be used to buffer collected logs until they are saved to the disk database.
+| `circular buffer drop logs if full` | Equivalent value in `logsmanagement.d.conf` (`no` by default). | If there are new logs pending to be collected and the circular buffer is full, enabling this setting will allow old buffered logs to be dropped in favor of new ones. If disabled, collection of new logs will be blocked until there is free space again in the buffer (no logs will be lost in this case, but logs will not be ingested in real-time).
+| `compression acceleration` | Equivalent value in `logsmanagement.d.conf` (`1` by default). | Fine-tunes tradeoff between log compression speed and compression ratio, see [here](https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195) for more details. 
+| `db mode` | Equivalent value in `logsmanagement.d.conf` (`none` by default). | Mode of logs management database per collector. If set to `none`, logs will be collected, buffered, parsed and then discarded. If set to `full`, buffered logs will be saved to the logs management database instead of being discarded. When mode is `none`, logs management queries cannot be executed.
+| `buffer flush to DB` | Equivalent value in `logsmanagement.d.conf` (`6` by default). | Interval in seconds at which logs will be transferred from RAM buffers to the database.
+| `disk space limit` | Equivalent value in `logsmanagement.d.conf` (`500 MiB` by default). | Maximum disk space that all compressed logs in database can occupy (per log source). Once exceeded, oldest BLOB of logs will be truncated for new logs to be written over. Each log source database can contain a maximum of 10 BLOBs at any point, so each truncation equates to a deletion of about 10% of the oldest logs. The number of BLOBS will be configurable in a future release.
+| `collected logs total chart enable` | Equivalent value in `logsmanagement.d.conf` (`no` by default). | Chart that shows the number of log records collected for this log source, since the last Netdata agent restart. Useful for debugging purposes.
+| `collected logs rate chart enable` | Equivalent value in `logsmanagement.d.conf` (`yes` by default). | Chart that shows the rate that log records are collected at for this log source.
 
-There are also two settings that cannot be set per log source, but can only be defined in the `[logs management]` section of `netdata.conf`:
+There are also one setting that cannot be set per log source, but can only be defined in `logsmanagement.d.conf`:
 
 |  Configuration Option | Default 		| Description  |
 |      :------------:  	| :------------:  | ------------ |
-| `circular buffer spare items` | `2` 	| Spare items to be allocated for each circular buffer. This is required to ensure new log collection will not be blocked if operations such as parsing take longer than normal to complete in case of high load, so the circular buffers cannot be flushed to the database or discarded in time. It is recommended not to modify the default value.|
 | `db dir` 	| `/var/cache/netdata/logs_management_db` | Logs management database path, will be created if it does not exist.|
 
-Also, the `log path` configuration option must be defined per log source in `logsmanagement.conf` for nearly any type of collector (with the exception of `kmsg` and the collectors that listen to network sockets). Some default examples in `logsmanagement.conf` use `log path = auto`. In those cases, an autodetection of the path will be attempted by searching through common paths where each log source is typically encountered at.
+
+
+> **Note**
+> `log path` must be defined per log source for any collector type, except for `kmsg` and the collectors that listen to network sockets. Some default examples use `log path = auto`. In those cases, an autodetection of the path will be attempted by searching through common paths where each log source is typically expected to be found.
 
 <a name="collector-configuration"/>
 
@@ -177,7 +182,7 @@ This collector will use the Docker API to collect Docker events logs. See also d
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
-| `log path` | Docker socket UNIX path. If set to `auto`, the default path will be used. |
+| `log path` | Docker socket UNIX path. If set to `auto`, the default path (`/var/run/docker.sock`) will be used. |
 | `event type chart` | Enable chart showing the Docker object type of the collected logs. |
 | `event action chart` | Enable chart showing the Docker object action of the collected logs. |
 
@@ -376,20 +381,22 @@ For option 1, please refer to the [syslog collector](#collector-configuration-sy
 
 A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
 
-To enable this option, `forward in enable = no` must be uncommented and set to `yes`, under `[logs management]` section in `netdata.conf`:
+This setting can be enabled under the `[forward input]` section in `logsmanagement.d.conf`:
+
 ```
-forward in enable = yes
-# forward in unix path = 
-# forward in unix perm = 0644
-# forward in listen = 0.0.0.0
-# forward in port = 24224
+[forward input]
+    enable = no
+    unix path =
+    unix perm = 0644
+    listen = 0.0.0.0
+    port = 24224
 ```
 
-The default settings will listen for incoming `Forward` messages on TCP port 24224. If `forward in unix path` is set to a valid path, `forward in listen` and `forward in port` will be ignored and a unix socket will be created under that path. Make sure that `forward in unix perm` has the correct permissions set for that unix socket. Please also see Fluent Bit's [Forward input plugin documentation](https://docs.fluentbit.io/manual/pipeline/inputs/forward).
+The default settings will listen for incoming `Forward` messages on TCP port 24224. If `unix path` is set to a valid path, `listen` and `port` will be ignored and a unix socket will be created under that path. Make sure that `unix perm` has the correct permissions set for that unix socket. Please also see Fluent Bit's [Forward input plugin documentation](https://docs.fluentbit.io/manual/pipeline/inputs/forward).
 
-The Netdata agent will now listen for incoming `Forward` messages, but by default it won't process or store them. To do that, at least one log collection must be configured in `logsmanagement.conf`, to define how the incoming logs will be processed and stored. This is similar to configuring a local log source, with the difference that `log source = forward` must be set and also a `stream guid` must be defined, matching that of the children log sources. 
+The Netdata agent will now listen for incoming `Forward` messages, but by default it won't process or store them. To do that, there must exist at least one log collection, to define how the incoming logs will be processed and stored. This is similar to configuring a local log source, with the difference that `log source = forward` must be set and also a `stream guid` must be defined, matching that of the children log sources. 
 
-The rest of this section contains some examples on how to configure log collections of different types, using a Netdata parent and Fluent Bit children instances. Please use the recommended settings on children instances for parsing on parents to work correctly. Also, note that `Forward` output on children supports optional `gzip` compression, by using the `-p Compress=gzip` configuration parameter, as demonstrated in some examples.
+The rest of this section contains some examples on how to configure log collections of different types, using a Netdata parent and Fluent Bit children instances (see also `./edit-config logsmanagement.d/example_forward.conf`). Please use the recommended settings on children instances for parsing on parents to work correctly. Also, note that `Forward` output on children supports optional `gzip` compression, by using the `-p Compress=gzip` configuration parameter, as demonstrated in some of the examples.
 
 <a name="streaming-systemd"/>
 
@@ -588,52 +595,52 @@ For example, the following configuration will add 2 outputs to a `docker events`
 
 ```
 [Docker Events Logs]
-        ## Example: Log collector that will monitor the Docker daemon socket and
-        ## collect Docker event logs in a default format similar to executing 
-        ## the `sudo docker events` command.
+	## Example: Log collector that will monitor the Docker daemon socket and
+	## collect Docker event logs in a default format similar to executing 
+	## the `sudo docker events` command.
 
-        ## Required settings
-        enabled = yes
-        log type = flb_docker_events
+	## Required settings
+	enabled = yes
+	log type = flb_docker_events
 
-        ## Optional settings, common to all log source. 
-        ## Uncomment to override global equivalents in netdata.conf.
-        # update every = 1
-        # update timeout = 10
-        # use log timestamp = auto
-        # circular buffer max size MiB = 64
-        # circular buffer drop logs if full = no
-        # compression acceleration = 1
-        # db mode = none
-        # circular buffer flush to db = 6
-        # disk space limit MiB = 500
+	## Optional settings, common to all log source. 
+	## Uncomment to override global equivalents in netdata.conf.
+	# update every = 1
+	# update timeout = 10
+	# use log timestamp = auto
+	# circular buffer max size MiB = 64
+	# circular buffer drop logs if full = no
+	# compression acceleration = 1
+	# db mode = none
+	# circular buffer flush to db = 6
+	# disk space limit MiB = 500
 
-        ## Use default Docker socket UNIX path: /var/run/docker.sock
-        log path = auto
+	## Use default Docker socket UNIX path: /var/run/docker.sock
+	log path = auto
 
-        ## Charts to enable
-        # collected logs total chart enable = no
-        # collected logs rate chart enable = yes
-        event type chart = yes
-        event action chart = yes
+	## Charts to enable
+	# collected logs total chart enable = no
+	# collected logs rate chart enable = yes
+	event type chart = yes
+	event action chart = yes
 
-        ## Stream to https://cloud.openobserve.ai/
-        output 1 name             = http
-        output 1 URI              = YOUR_API_URI
-        output 1 Host             = api.openobserve.ai
-        output 1 Port             = 443
-        output 1 tls              = On
-        output 1 Format           = json
-        output 1 Json_date_key    = _timestamp
-        output 1 Json_date_format = iso8601
-        output 1 HTTP_User        = test@netdata.cloud
-        output 1 HTTP_Passwd      = YOUR_OPENOBSERVE_PASSWORD
-        output 1 compress         = gzip
+	## Stream to https://cloud.openobserve.ai/
+	output 1 name             = http
+	output 1 URI              = YOUR_API_URI
+	output 1 Host             = api.openobserve.ai
+	output 1 Port             = 443
+	output 1 tls              = On
+	output 1 Format           = json
+	output 1 Json_date_key    = _timestamp
+	output 1 Json_date_format = iso8601
+	output 1 HTTP_User        = test@netdata.cloud
+	output 1 HTTP_Passwd      = YOUR_OPENOBSERVE_PASSWORD
+	output 1 compress         = gzip
 
-        ## Real-time export to /tmp/docker_event_logs.csv
-        output 2 name             = file
-        output 2 Path             = /tmp
-        output 2 File             = docker_event_logs.csv
+	## Real-time export to /tmp/docker_event_logs.csv
+	output 2 name             = file
+	output 2 Path             = /tmp
+	output 2 File             = docker_event_logs.csv
 ```
 
 </a>

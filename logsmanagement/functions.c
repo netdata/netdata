@@ -565,7 +565,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     logs_query_params_t query_params = {0};
     unsigned long req_quota = 0;
 
-    unsigned int fn_off = 0, cn_off = 0;
+    // unsigned int fn_off = 0, cn_off = 0;
 
     char *words[LOGS_MANAG_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, LOGS_MANAG_MAX_PARAMS);
@@ -952,7 +952,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
 
     query_params.order_by_asc = query_params.req_from_ts <= query_params.req_to_ts ? 1 : 0;
 
-    fn_off = cn_off = 0;
+    // fn_off = cn_off = 0;
 
     if(!req_quota) query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
     else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;

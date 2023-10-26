@@ -384,7 +384,7 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
     const int fwd_enable = appconfig_get_boolean(
         &logsmanagement_d_conf, 
         section,
-        "enable", 
+        "enabled", 
         CONFIG_BOOLEAN_NO);
     
     *forward_in_config_p = (Flb_socket_config_t *) callocz(1, sizeof(Flb_socket_config_t));
