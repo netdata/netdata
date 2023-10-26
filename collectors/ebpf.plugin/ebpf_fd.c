@@ -686,7 +686,8 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint64_t update_every)
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    time_t update_time = time(NULL);
+    // To avoid call time() different times, we only difference between starts.
+    uint64_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, fv)) {
             goto end_fd_loop;
@@ -710,21 +711,21 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint64_t update_every)
             goto end_fd_loop;
         }
 
-        // Get Cachestat structure
+        // Get FD structure
         rw_spinlock_write_lock(&pid_ptr->fd_stats.rw_spinlock);
-        netdata_fd_stat_plus_t **fd_pptr = (netdata_fd_stat_plus_t **)ebpf_judy_insert_unsafe(
-            &pid_ptr->fd_stats.JudyLArray, fv[0].ct);
-        netdata_fd_stat_plus_t *fd_ptr = *fd_pptr;
+        netdata_fd_stat_t **fd_pptr = (netdata_fd_stat_t **)ebpf_judy_insert_unsafe(&pid_ptr->fd_stats.JudyLArray,
+                                                                                    fv[0].ct);
+        netdata_fd_stat_t *fd_ptr = *fd_pptr;
         if (likely(*fd_pptr == NULL)) {
             *fd_pptr = ebpf_fd_stat_get();
             fd_ptr = *fd_pptr;
 
             pid_ptr->current_timestamp = update_time;
-            memcpy(&fd_ptr->data, &fv[0], sizeof(netdata_fd_stat_t));
+            memcpy(fd_ptr, &fv[0], sizeof(netdata_fd_stat_t));
         }  else {
-            if (fv[0].open_call != fd_ptr->data.open_call || fv[0].close_call != fd_ptr->data.close_call) {
+            if ((fv[0].open_call + fv[0].close_call) != (fd_ptr->open_call + fd_ptr->close_call)) {
                 pid_ptr->current_timestamp = update_time;
-                memcpy(&fd_ptr->data, &fv[0], sizeof(netdata_fd_stat_t));
+                memcpy(fd_ptr, &fv[0], sizeof(netdata_fd_stat_t));
             } else if ((update_time - pid_ptr->current_timestamp) > (uint64_t )update_every) {
                 JudyLDel(&pid_ptr->fd_stats.JudyLArray, fv[0].ct, PJE0);
                 ebpf_fd_release(fd_ptr);
@@ -811,11 +812,11 @@ static void ebpf_update_fd_cgroup()
                     while (
                         (fd_value =
                              JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_timestamp, &first_fd))) {
-                        netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*fd_value;
-                        out->open_call += values->data.open_call;
-                        out->close_call += values->data.close_call;
-                        out->open_err += values->data.open_err;
-                        out->close_err += values->data.close_err;
+                        netdata_fd_stat_t *values = (netdata_fd_stat_t *)*fd_value;
+                        out->open_call += values->open_call;
+                        out->close_call += values->close_call;
+                        out->open_err += values->open_err;
+                        out->close_err += values->close_err;
                     }
                 }
                 rw_spinlock_read_unlock(&pid_ptr->fd_stats.rw_spinlock);
@@ -858,11 +859,11 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
                 while (
                     (cache_value =
                          JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_timestamp, &first_cache))) {
-                    netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*cache_value;
-                    fd->open_call += values->data.open_call;
-                    fd->close_call += values->data.close_call;
-                    fd->open_err += values->data.open_err;
-                    fd->close_err += values->data.close_err;
+                    netdata_fd_stat_t *values = (netdata_fd_stat_t *)*cache_value;
+                    fd->open_call += values->open_call;
+                    fd->close_call += values->close_call;
+                    fd->open_err += values->open_err;
+                    fd->close_err += values->close_err;
                 }
             }
             rw_spinlock_read_unlock(&pid_ptr->fd_stats.rw_spinlock);

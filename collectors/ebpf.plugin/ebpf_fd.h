@@ -52,10 +52,6 @@ typedef struct netdata_fd_stat {
     uint32_t close_err;
 } netdata_fd_stat_t;
 
-typedef struct netdata_fd_stat_plus {
-    netdata_fd_stat_t data;
-} netdata_fd_stat_plus_t;
-
 enum fd_tables {
     NETDATA_FD_PID_STATS,
     NETDATA_FD_GLOBAL_STATS,

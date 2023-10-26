@@ -1701,7 +1701,7 @@ static inline void ebpf_function_fd_help(const char *transaction) {
  */
 static void ebpf_fill_fd_function_buffer(BUFFER *wb,
                                          uint32_t pid,
-                                         netdata_fd_stat_plus_t *values,
+                                         netdata_fd_stat_t *values,
                                          char *name,
                                          char *apps_group)
 {
@@ -1720,16 +1720,16 @@ static void ebpf_fill_fd_function_buffer(BUFFER *wb,
     buffer_json_add_array_item_string(wb, (apps_group != NULL) ? apps_group : EBPF_APPS_GROUP_OTHER);
 
     // Open
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.open_call);
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->open_call);
 
     // Open Error
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.open_err);
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->open_err);
 
     // Close
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.close_call);
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->close_call);
 
     // Close Error
-    buffer_json_add_array_item_uint64(wb, (uint64_t)values->data.close_err);
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->close_err);
 
     buffer_json_array_close(wb);
 }
@@ -1758,7 +1758,7 @@ static void ebpf_fd_fill_function_buffer_unsafe(BUFFER *buf)
         rw_spinlock_read_lock(&pid_ptr->fd_stats.rw_spinlock);
         if (pid_ptr->fd_stats.JudyLArray) {
             while ((fd_value = JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_timestamp, &first_fd))) {
-                netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*fd_value;
+                netdata_fd_stat_t *values = (netdata_fd_stat_t *)*fd_value;
                 ebpf_fill_fd_function_buffer(buf,
                                              local_pid,
                                              values,
@@ -1771,7 +1771,7 @@ static void ebpf_fd_fill_function_buffer_unsafe(BUFFER *buf)
     }
 
     if (!counter) {
-        netdata_fd_stat_plus_t fake_fd = { };
+        netdata_fd_stat_t fake_fd = { };
 
         ebpf_fill_fd_function_buffer(buf, getpid(), &fake_fd, EBPF_NOT_IDENFIED, NULL);
     }
@@ -1793,7 +1793,7 @@ static void ebpf_fd_read_judy(BUFFER *buf, struct ebpf_module *em)
     if (!em->maps || (em->maps[NETDATA_CACHESTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
         !ebpf_judy_pid.index.JudyLArray) {
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
-        netdata_fd_stat_plus_t fake_fd = { };
+        netdata_fd_stat_t fake_fd = { };
 
         ebpf_fill_fd_function_buffer(buf, getpid(), &fake_fd, EBPF_NOT_IDENFIED, NULL);
         return;
@@ -1823,7 +1823,7 @@ static void ebpf_fd_clean_judy_array_unsafe()
         bool first_fd = true;
         if (pid_ptr->fd_stats.JudyLArray) {
             while ((fd_value = JudyLFirstThenNext(pid_ptr->fd_stats.JudyLArray, &local_fd, &first_fd))) {
-                netdata_fd_stat_plus_t *values = (netdata_fd_stat_plus_t *)*fd_value;
+                netdata_fd_stat_t *values = (netdata_fd_stat_t *)*fd_value;
                 ebpf_fd_release(values);
             }
             JudyLFreeArray(&pid_ptr->fd_stats.JudyLArray, PJE0);
