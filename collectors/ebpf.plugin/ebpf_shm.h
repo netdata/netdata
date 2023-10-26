@@ -42,8 +42,6 @@ typedef struct netdata_publish_shm_kernel {
 } netdata_publish_shm_kernel_t;
 
 typedef struct netdata_publish_shm {
-    uint64_t current_timestamp;
-
     netdata_publish_shm_kernel_t data;
 } netdata_publish_shm_t;
 

@@ -53,7 +53,6 @@ typedef struct netdata_fd_stat {
 } netdata_fd_stat_t;
 
 typedef struct netdata_fd_stat_plus {
-    uint64_t current_timestamp;
     netdata_fd_stat_t data;
 } netdata_fd_stat_plus_t;
 

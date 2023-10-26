@@ -496,13 +496,13 @@ static void read_swap_apps_table(int maps_per_core, uint64_t update_every)
             *swap_pptr = ebpf_publish_swap_get();
             swap_ptr = *swap_pptr;
 
-            swap_ptr->current_timestamp = update_time;
+            pid_ptr->current_timestamp = update_time;
             memcpy(&swap_ptr->data, &sv[0], sizeof(netdata_publish_swap_kernel_t));
         }  else {
             if (sv[0].write != swap_ptr->data.write && sv[0].read != swap_ptr->data.read) {
-                swap_ptr->current_timestamp = update_time;
+                pid_ptr->current_timestamp = update_time;
                 memcpy(&swap_ptr->data, &sv[0], sizeof(netdata_publish_swap_kernel_t));
-            } else if ((update_time - swap_ptr->current_timestamp) > update_every) {
+            } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
                 JudyLDel(&pid_ptr->swap_stats.JudyLArray, sv[0].ct, PJE0);
                 ebpf_swap_release(swap_ptr);
                 bpf_map_delete_elem(fd, &key);

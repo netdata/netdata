@@ -703,7 +703,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
             *cs_pptr = ebpf_publish_cachestat_get();
             cs_ptr = *cs_pptr;
 
-            cs_ptr->current_timestamp = update_time;
+            pid_ptr->current_timestamp = update_time;
             memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
             cachestat_update_publish(cs_ptr);
         }  else {

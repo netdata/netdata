@@ -81,7 +81,6 @@ typedef enum ebpf_process_publish_status {
 } ebpf_process_publish_status_t;
 
 typedef struct ebpf_process_stat_plus {
-    uint64_t current_timestamp;
     ebpf_process_publish_status_t publish;
 
     ebpf_process_stat_t data;

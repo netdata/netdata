@@ -431,15 +431,15 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
             *ps_pptr = ebpf_process_stat_get();
             ps_ptr = *ps_pptr;
 
-            ps_ptr->current_timestamp = update_time;
+            pid_ptr->current_timestamp = update_time;
             memcpy(&ps_ptr->data, &psv[0], sizeof(ebpf_process_stat_t));
         }  else {
             if (!psv[0].release_call) {
-                ps_ptr->current_timestamp = update_time;
+                pid_ptr->current_timestamp = update_time;
                 ps_ptr->publish = NETDATA_EBPF_PROCESS_NOT_PUBLISHED;
                 memcpy(&ps_ptr->data, &psv[0], sizeof(ebpf_process_stat_t));
             } else {
-                if ((update_time - ps_ptr->current_timestamp) > update_every &&
+                if ((update_time - pid_ptr->current_timestamp) > update_every &&
                      ps_ptr->publish & NETDATA_EBPF_PROCESS_PUBLISHED) {
                     JudyLDel(&pid_ptr->process_stats.JudyLArray, psv[0].ct, PJE0);
                     ebpf_process_stat_release(ps_ptr);

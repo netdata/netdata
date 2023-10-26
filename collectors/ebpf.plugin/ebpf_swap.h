@@ -40,8 +40,6 @@ typedef struct netdata_publish_swap_kernel {
 } netdata_publish_swap_kernel_t;
 
 typedef struct netdata_publish_swap {
-    uint64_t current_timestamp;
-
     netdata_publish_swap_kernel_t data;
 } netdata_publish_swap_t;
 

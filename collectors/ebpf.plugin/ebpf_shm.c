@@ -621,12 +621,18 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
             *shm_pptr = ebpf_shm_stat_get();
             shm_ptr = *shm_pptr;
 
-            shm_ptr->current_timestamp = update_time;
+            pid_ptr->current_timestamp = update_time;
             memcpy(&shm_ptr->data, &cv[0], sizeof(netdata_publish_shm_kernel_t));
-        } else if ((update_time - shm_ptr->current_timestamp) > update_every) {
-            JudyLDel(&pid_ptr->shm_stats.JudyLArray, cv[0].ct, PJE0);
-            ebpf_shm_release(shm_ptr);
-            bpf_map_delete_elem(fd, &key);
+        } else {
+            if ((cv[0].get + cv[0].at + cv[0].dt + cv[0].ctl) !=
+                (shm_ptr->data.get + shm_ptr->data.at + shm_ptr->data.dt + shm_ptr->data.ctl)) {
+                pid_ptr->current_timestamp = update_time;
+                memcpy(&shm_ptr->data, &cv[0], sizeof(netdata_publish_shm_kernel_t));
+            } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
+                JudyLDel(&pid_ptr->shm_stats.JudyLArray, cv[0].ct, PJE0);
+                ebpf_shm_release(shm_ptr);
+                bpf_map_delete_elem(fd, &key);
+            }
         }
 
         rw_spinlock_write_unlock(&pid_ptr->shm_stats.rw_spinlock);

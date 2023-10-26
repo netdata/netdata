@@ -89,8 +89,6 @@ typedef struct netdata_publish_cachestat_pid {
 } netdata_cachestat_pid_t;
 
 typedef struct netdata_publish_cachestat {
-    uint64_t current_timestamp;
-
     netdata_cachestat_pid_t plot;
     long long ratio;
     long long hit;

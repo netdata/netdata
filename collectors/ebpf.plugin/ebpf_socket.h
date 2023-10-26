@@ -308,7 +308,6 @@ typedef enum netdata_socket_src_ip_origin {
 typedef struct netata_socket_plus {
     netdata_socket_t data;           // Data read from database
     uint32_t pid;
-    time_t last_update;
     netdata_socket_flags_t flags;
 
     struct  {

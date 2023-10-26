@@ -1789,6 +1789,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // can have values from the previous one.
     memset(values, 0, length);
     time_t update_time = time(NULL);
+    uint64_t update_every = em->update_every;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -1852,15 +1853,15 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         else { // Check socket was updated
             if (prev_period) {
                 if (values[0].current_timestamp > prev_period) // Socket updated
-                    socket_ptr->last_update = update_time;
-                else if ((update_time - socket_ptr->last_update) > em->update_every) {
+                    pid_ptr->current_timestamp = update_time;
+                else if ((update_time - pid_ptr->current_timestamp) > update_every) {
                     // Socket was not updated since last read
                     JudyLDel(&pid_ptr->socket_stats.JudyLArray, values[0].first_timestamp, PJE0);
                     aral_freez(aral_socket_table, socket_ptr);
                     bpf_map_delete_elem(fd, &key);
                 }
             } else // First time
-                socket_ptr->last_update = update_time;
+                pid_ptr->current_timestamp = update_time;
         }
 
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
