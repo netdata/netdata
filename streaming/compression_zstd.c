@@ -116,8 +116,9 @@ size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *com
     if (unlikely(!state || !compressed_data || !compressed_size))
         return 0;
 
-    if(unlikely(state->output.read_pos != state->output.write_pos))
-        fatal("RRDPUSH_DECOMPRESS: ZSTD asked to decompress new data, while there are unread data in the decompression buffer!");
+    // The state.output ring buffer is always EMPTY at this point,
+    // meaning that (state->output.read_pos == state->output.write_pos)
+    // However, THEY ARE NOT ZERO.
 
     ZSTD_inBuffer inBuffer = {
             .pos = 0,

@@ -66,21 +66,34 @@ void rrdpush_compressor_destroy(struct compressor_state *state) {
 }
 
 size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t size, const char **out) {
+    size_t ret = 0;
+
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            return rrdpush_compress_zstd(state, data, size, out);
+            ret = rrdpush_compress_zstd(state, data, size, out);
+            break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            return rrdpush_compress_lz4(state, data, size, out);
+            ret = rrdpush_compress_lz4(state, data, size, out);
+            break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            return rrdpush_compress_gzip(state, data, size, out);
+            ret = rrdpush_compress_gzip(state, data, size, out);
+            break;
     }
+
+    if(unlikely(ret >= COMPRESSION_MAX_CHUNK)) {
+        netdata_log_error("RRDPUSH_COMPRESS: compressed data is %zu bytes, which is >= than the max chunk size %zu",
+                ret, COMPRESSION_MAX_CHUNK);
+        return 0;
+    }
+
+    return ret;
 }
 
 // ----------------------------------------------------------------------------
@@ -139,22 +152,41 @@ void rrdpush_decompressor_init(struct decompressor_state *state) {
 }
 
 size_t rrdpush_decompress(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
+    if (unlikely(state->output.read_pos != state->output.write_pos))
+        fatal("RRDPUSH_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
+
+    size_t ret = 0;
+
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            return rrdpush_decompress_zstd(state, compressed_data, compressed_size);
+            ret = rrdpush_decompress_zstd(state, compressed_data, compressed_size);
+            break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            return rrdpush_decompress_lz4(state, compressed_data, compressed_size);
+            ret = rrdpush_decompress_lz4(state, compressed_data, compressed_size);
+            break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            return rrdpush_decompress_gzip(state, compressed_data, compressed_size);
+            ret = rrdpush_decompress_gzip(state, compressed_data, compressed_size);
+            break;
     }
+
+    if(unlikely(ret > COMPRESSION_MAX_MSG_SIZE)) {
+        netdata_log_error("RRDPUSH_DECOMPRESS: decompressed data is %zu bytes, which is bigger than the max msg size %zu",
+                          ret, COMPRESSION_MAX_MSG_SIZE);
+        return 0;
+    }
+
+    return ret;
 }
+
+// ----------------------------------------------------------------------------
+// unit test
 
 int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *name) {
     fprintf(stderr, "\nTesting streaming compression with %s\n", name);

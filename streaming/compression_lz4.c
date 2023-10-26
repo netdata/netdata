@@ -98,8 +98,9 @@ size_t rrdpush_decompress_lz4(struct decompressor_state *state, const char *comp
     if (unlikely(!state || !compressed_data || !compressed_size))
         return 0;
 
-    if(unlikely(state->output.read_pos != state->output.write_pos))
-        fatal("RRDPUSH_DECOMPRESS: LZ4 asked to decompress new data, while there are unread data in the decompression buffer!");
+    // The state.output ring buffer is always EMPTY at this point,
+    // meaning that (state->output.read_pos == state->output.write_pos)
+    // However, THEY ARE NOT ZERO.
 
     if (unlikely(state->output.write_pos + COMPRESSION_MAX_CHUNK > state->output.size))
         // the input buffer cannot fit out data, restart from zero
