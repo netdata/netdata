@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- DYNCFG fix REPORT\_JOB\_STATUS streaming [\#16272](https://github.com/netdata/netdata/pull/16272) ([underhood](https://github.com/underhood))
+- fix sources match [\#16271](https://github.com/netdata/netdata/pull/16271) ([ktsaou](https://github.com/ktsaou))
 - journal minor updates [\#16267](https://github.com/netdata/netdata/pull/16267) ([ktsaou](https://github.com/ktsaou))
 - Fix coverity issue 403725 [\#16265](https://github.com/netdata/netdata/pull/16265) ([stelfrag](https://github.com/stelfrag))
 - SUBSTRING simple patterns fix [\#16264](https://github.com/netdata/netdata/pull/16264) ([ktsaou](https://github.com/ktsaou))
@@ -423,9 +425,6 @@
 - Fix table formatting \(custom exporter\) [\#15668](https://github.com/netdata/netdata/pull/15668) ([shyamvalsan](https://github.com/shyamvalsan))
 - Fix icon prometheus exporter icon [\#15666](https://github.com/netdata/netdata/pull/15666) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - freeipmi change restart message to info [\#15664](https://github.com/netdata/netdata/pull/15664) ([ilyam8](https://github.com/ilyam8))
-- fix proc.plugin meta filename [\#15659](https://github.com/netdata/netdata/pull/15659) ([ilyam8](https://github.com/ilyam8))
-- small improvements to README.md [\#15658](https://github.com/netdata/netdata/pull/15658) ([ilyam8](https://github.com/ilyam8))
-- Fix icon for solarwinds [\#15657](https://github.com/netdata/netdata/pull/15657) ([hugovalente-pm](https://github.com/hugovalente-pm))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
