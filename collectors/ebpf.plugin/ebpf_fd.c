@@ -727,6 +727,13 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint64_t update_every)
                 pid_ptr->current_timestamp = update_time;
                 memcpy(fd_ptr, &fv[0], sizeof(netdata_fd_stat_t));
             } else if ((update_time - pid_ptr->current_timestamp) > (uint64_t )update_every) {
+                ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
+#ifdef NETDATA_DEV_MODE
+                collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s", cv->name,
+                               key,
+                               NETDATA_EBPF_MODULE_NAME_CACHESTAT,
+                               pid_ptr->apps_target->name);
+#endif
                 JudyLDel(&pid_ptr->fd_stats.JudyLArray, fv[0].ct, PJE0);
                 ebpf_fd_release(fd_ptr);
                 bpf_map_delete_elem(fd, &key);

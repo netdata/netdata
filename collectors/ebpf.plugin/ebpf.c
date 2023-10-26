@@ -786,6 +786,9 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
     netdata_ebpf_judy_pid_stats_t **pid_pptr =
         (netdata_ebpf_judy_pid_stats_t **)ebpf_judy_insert_unsafe(judy_array, pid);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = *pid_pptr;
+#ifdef NETDATA_DEV_MODE
+    bool new_process = (likely(*pid_pptr == NULL)) ? true : false;
+#endif
     if (likely(*pid_pptr == NULL)) {
         // a new PID added to the index
         *pid_pptr = aral_mallocz(ebpf_judy_pid.pid_table);
@@ -823,12 +826,6 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
 
         pid_ptr->swap_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->swap_stats.rw_spinlock);
-#ifdef NETDATA_DEV_MODE
-        collector_info("Monitor APPS: Adding process %s with PID %u from module %s to target %s", name,
-                       pid,
-                       module,
-                       pid_ptr->apps_target->name);
-#endif
     } else {
         if (pid_ptr->name[0] == '\0' && name) {
             strncpyz(pid_ptr->name, name, TASK_COMM_LEN);
@@ -839,6 +836,14 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
             }
         }
     }
+#ifdef NETDATA_DEV_MODE
+    collector_info("%s EBPF_APPS: Process %s with PID %u from module %s to target %s",
+                   (new_process) ? "Adding" : "Updating",
+                   name,
+                   pid,
+                   module,
+                   pid_ptr->apps_target->name);
+#endif
 
     return pid_ptr;
 }
