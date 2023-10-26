@@ -28,9 +28,7 @@ void receiver_state_free(struct receiver_state *rpt) {
         close(rpt->fd);
     }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_decompressor_destroy(&rpt->decompressor);
-#endif
 
     if(rpt->system_info)
          rrdhost_system_info_free(rpt->system_info);
@@ -140,7 +138,6 @@ static inline bool receiver_read_uncompressed(struct receiver_state *r, STREAM_H
     return true;
 }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
 static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
@@ -248,11 +245,6 @@ static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HAN
 
     return true;
 }
-#else // !ENABLE_RRDPUSH_COMPRESSION
-static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
-    return receiver_read_uncompressed(r, reason);
-}
-#endif // ENABLE_RRDPUSH_COMPRESSION
 
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
@@ -658,7 +650,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "seconds per replication step", rpt->config.rrdpush_replication_step);
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rpt->config.rrdpush_replication_step);
 
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
     rpt->config.rrdpush_compression = default_rrdpush_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
@@ -668,7 +659,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
         order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithm preference", order);
         rrdpush_parse_compression_order(rpt, order);
     }
-#endif  // ENABLE_RRDPUSH_COMPRESSION
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 

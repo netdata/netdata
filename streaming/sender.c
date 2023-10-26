@@ -69,7 +69,6 @@ BUFFER *sender_start(struct sender_state *s) {
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
 /*
 * In case of stream compression buffer overflow
 * Inform the user through the error log file and 
@@ -106,7 +105,6 @@ static inline void deactivate_compression(struct sender_state *s) {
 
     rrdpush_sender_thread_close_socket(s->host);
 }
-#endif
 
 #define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
@@ -144,7 +142,6 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     if (s->compressor.initialized) {
         while(src_len) {
             size_t size_to_compress = src_len;
@@ -213,12 +210,6 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->flags |= SENDER_FLAG_OVERFLOW;
     else
         s->sent_bytes_on_this_connection_per_type[type] += src_len;
-#else
-    if(cbuffer_add_unsafe(s->buffer, src, src_len))
-        s->flags |= SENDER_FLAG_OVERFLOW;
-    else
-        s->sent_bytes_on_this_connection_per_type[type] += src_len;
-#endif
 
     replication_recalculate_buffer_used_ratio_unsafe(s);
 
@@ -1455,7 +1446,6 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
         }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
         if(s->compressor.initialized) {
             size_t bytes_uncompressed = s->compressor.sender_locked.total_uncompressed;
             size_t bytes_compressed = s->compressor.sender_locked.total_compressed + s->compressor.sender_locked.total_compressions * sizeof(rrdpush_signature_t);
@@ -1464,7 +1454,6 @@ void *rrdpush_sender_thread(void *ptr) {
             worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
             worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, ratio);
         }
-#endif // ENABLE_RRDPUSH_COMPRESSION
         sender_unlock(s);
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size);

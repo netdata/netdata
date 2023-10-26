@@ -5,8 +5,6 @@
 #ifndef NETDATA_RRDPUSH_COMPRESSION_H
 #define NETDATA_RRDPUSH_COMPRESSION_H 1
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-
 // signature MUST end with a newline
 
 #if COMPRESSION_MAX_MSG_SIZE >= (COMPRESSION_MAX_CHUNK - COMPRESSION_MAX_OVERHEAD)
@@ -170,5 +168,4 @@ static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, 
 
 // ----------------------------------------------------------------------------
 
-#endif // ENABLE_RRDPUSH_COMPRESSION
 #endif // NETDATA_RRDPUSH_COMPRESSION_H 1

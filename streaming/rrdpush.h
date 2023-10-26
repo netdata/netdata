@@ -56,13 +56,13 @@ typedef enum {
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
 
-#if defined(ENABLE_RRDPUSH_COMPRESSION) && defined(ENABLE_LZ4)
+#ifdef ENABLE_LZ4
 #define STREAM_CAP_LZ4_AVAILABLE STREAM_CAP_LZ4
 #else
 #define STREAM_CAP_LZ4_AVAILABLE 0
 #endif  // ENABLE_LZ4
 
-#if defined(ENABLE_RRDPUSH_COMPRESSION) && defined(ENABLE_ZSTD)
+#ifdef ENABLE_ZSTD
 #define STREAM_CAP_ZSTD_AVAILABLE STREAM_CAP_ZSTD
 #else
 #define STREAM_CAP_ZSTD_AVAILABLE 0
@@ -204,9 +204,7 @@ struct sender_state {
 
     uint16_t hops;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     struct compressor_state compressor;
-#endif // ENABLE_RRDPUSH_COMPRESSION
 
 #ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;                     // structure used to encrypt the connection
@@ -360,9 +358,7 @@ struct receiver_state {
 
     time_t replication_first_time_t;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     struct decompressor_state decompressor;
-#endif // ENABLE_RRDPUSH_COMPRESSION
 /*
     struct {
         uint32_t count;
@@ -384,9 +380,7 @@ struct rrdpush_destinations {
 };
 
 extern unsigned int default_rrdpush_enabled;
-#ifdef ENABLE_RRDPUSH_COMPRESSION
 extern unsigned int default_rrdpush_compression_enabled;
-#endif // ENABLE_RRDPUSH_COMPRESSION
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern char *default_rrdpush_send_charts_matching;
@@ -444,10 +438,6 @@ int connect_to_one_of_destinations(
     struct rrdpush_destinations **destination);
 
 void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
-
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-struct compressor_state *create_compressor();
-#endif // ENABLE_RRDPUSH_COMPRESSION
 
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host);
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error);

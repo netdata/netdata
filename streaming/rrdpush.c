@@ -41,9 +41,7 @@ struct config stream_config = {
 unsigned int default_rrdpush_enabled = 0;
 STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_NONE;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
 unsigned int default_rrdpush_compression_enabled = 1;
-#endif
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
@@ -110,7 +108,6 @@ int rrdpush_init() {
 
     rrdhost_free_orphan_time_s    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time_s);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
                                                                               "enable compression", default_rrdpush_compression_enabled);
 
@@ -125,7 +122,6 @@ int rrdpush_init() {
     rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP] = (int)appconfig_get_number(
             &stream_config, CONFIG_SECTION_STREAM, "gzip compression level",
             rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP]);
-#endif
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         netdata_log_error("STREAM [send]: cannot enable sending thread - information is missing.");
@@ -1530,7 +1526,6 @@ int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {
 };
 
 bool rrdpush_compression_initialize(struct sender_state *s) {
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_compressor_destroy(&s->compressor);
 
     // IMPORTANT
@@ -1550,13 +1545,11 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
         rrdpush_compressor_init(&s->compressor);
         return true;
     }
-#endif
 
     return false;
 }
 
 bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_decompressor_destroy(&rpt->decompressor);
 
     // IMPORTANT
@@ -1575,7 +1568,6 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
         rrdpush_decompressor_init(&rpt->decompressor);
         return true;
     }
-#endif
 
     return false;
 }

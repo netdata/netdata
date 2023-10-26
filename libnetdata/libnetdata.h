@@ -11,10 +11,6 @@ extern "C" {
 #include <config.h>
 #endif
 
-#if defined(ENABLE_LZ4) || defined(ENABLE_ZSTD)
-#define ENABLE_RRDPUSH_COMPRESSION 1
-#endif
-
 #ifdef ENABLE_OPENSSL
 #define ENABLE_HTTPS 1
 #endif

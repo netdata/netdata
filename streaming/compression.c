@@ -2,8 +2,6 @@
 
 #include "compression.h"
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-
 #include "compression_gzip.h"
 
 #ifdef ENABLE_LZ4
@@ -157,8 +155,6 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
             return rrdpush_decompress_gzip(state, compressed_data, compressed_size);
     }
 }
-
-#endif
 
 int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *name) {
     fprintf(stderr, "\nTesting streaming compression with %s\n", name);
