@@ -729,7 +729,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint64_t update_every)
             } else if ((update_time - pid_ptr->current_timestamp) > (uint64_t )update_every) {
                 ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
 #ifdef NETDATA_DEV_MODE
-                collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s", cv->name,
+                collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s", fv->name,
                                key,
                                NETDATA_EBPF_MODULE_NAME_CACHESTAT,
                                pid_ptr->apps_target->name);
@@ -842,19 +842,24 @@ static void ebpf_update_fd_cgroup()
  * @param fd   the output
  * @param root list of pids
  */
-static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *root)
+static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, Pvoid_t JudyLArray, RW_SPINLOCK rw_spinlock)
 {
-    if (!root)
+    rw_spinlock_read_lock(&rw_spinlock);
+    if (!JudyLArray) {
+        rw_spinlock_read_unlock(&rw_spinlock);
         return;
-
+    }
 
     memset(fd, 0, sizeof(netdata_fd_stat_t));
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-    while (root) {
-        int32_t pid = root->pid;
+
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
-                                                                               pid,
+                                                                               local_pid,
                                                                                NULL,
                                                                                NETDATA_EBPF_MODULE_NAME_FD);
         if (pid_ptr) {
@@ -875,10 +880,32 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
             }
             rw_spinlock_read_unlock(&pid_ptr->fd_stats.rw_spinlock);
         }
+    }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_read_unlock(&rw_spinlock);
+    /*
+    if (!root)
+        return;
+
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+    while (root) {
+        int32_t pid = root->pid;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               pid,
+                                                                               NULL,
+                                                                               NETDATA_EBPF_MODULE_NAME_FD);
+        if (pid_ptr) {
+            rw_spinlock_read_lock(&pid_ptr->fd_stats.rw_spinlock);
+            if (pid_ptr->fd_stats.JudyLArray) {
+            }
+            rw_spinlock_read_unlock(&pid_ptr->fd_stats.rw_spinlock);
+        }
 
         root = root->next;
     }
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+     */
 }
 
 /**
