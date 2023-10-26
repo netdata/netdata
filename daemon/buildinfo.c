@@ -1115,14 +1115,13 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
     build_info_set_status(BIB_FEATURE_STREAMING_COMPRESSION, true);
 
-    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "gzip");
-
-#ifdef ENABLE_LZ4
-    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "lz4");
-#endif
 #ifdef ENABLE_ZSTD
     build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "zstd");
 #endif
+#ifdef ENABLE_LZ4
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "lz4");
+#endif
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "gzip");
 
     build_info_set_status(BIB_FEATURE_CONTEXTS, true);
     build_info_set_status(BIB_FEATURE_TIERING, true);
