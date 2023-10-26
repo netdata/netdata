@@ -376,7 +376,7 @@ struct {
     bool dynamic;
     const char *error;
     int worker_job_id;
-    time_t postpone_reconnect_seconds;
+    int postpone_reconnect_seconds;
     bool prevent_log;
 } stream_responses[] = {
     {
@@ -505,7 +505,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     bool prevent_log = stream_responses[i].prevent_log;
     const char *error = stream_responses[i].error;
     int worker_job_id = stream_responses[i].worker_job_id;
-    time_t delay = stream_responses[i].postpone_reconnect_seconds;
+    int delay = stream_responses[i].postpone_reconnect_seconds;
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(host);
@@ -519,7 +519,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
         internal_error(true, "STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
                        rrdhost_hostname(host), s->connected_to, error, delay, buf);
     else
-        netdata_log_error("STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
+        netdata_log_error("STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
                           rrdhost_hostname(host), s->connected_to, error, delay, buf);
 
     return false;
