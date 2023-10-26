@@ -90,35 +90,6 @@ static void throw_error(const char *const log_source,
 }
 
 /**
- * @brief Get version of SQLite
- * @return String that contains the SQLite version, or NULL in case of error.
- *         Must be freed.
- */
-char *db_get_sqlite_version() {
-    int rc = 0;
-    sqlite3_stmt *stmt_get_sqlite_version;
-    rc = sqlite3_prepare_v2(main_db, "SELECT sqlite_version();", -1, &stmt_get_sqlite_version, NULL);
-    if (unlikely(SQLITE_OK != rc)){
-        throw_error(NULL, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        return NULL;
-    }
-    rc = sqlite3_step(stmt_get_sqlite_version);
-    if (unlikely(SQLITE_ROW != rc)) {
-        throw_error(NULL, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        return NULL;
-    }
-    char *text = mallocz(sqlite3_column_bytes(stmt_get_sqlite_version, 0) + 1);
-    strcpy(text, (char *)sqlite3_column_text(stmt_get_sqlite_version, 0));
-    rc = sqlite3_finalize(stmt_get_sqlite_version);
-    if (unlikely(SQLITE_OK != rc)) {
-        freez(text);
-        throw_error(NULL, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        return NULL;
-    }
-    return text;
-}
-
-/**
  * @brief Get or set user_version of database.
  * @param db SQLite database to act upon.
  * @param set_user_version If <= 0, just get user_version. Otherwise, set

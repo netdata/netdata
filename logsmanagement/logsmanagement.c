@@ -217,10 +217,8 @@ int main(int argc, char **argv) {
     debug_log( "__STDC_VERSION__ undefined");
 #endif // defined(__STDC_VERSION__)
     debug_log( "libuv version: %s", uv_version_string());
-    debug_log( "LZ4 version: %s\n", LZ4_versionString());
-    char *sqlite_version = db_get_sqlite_version();
-    debug_log("SQLITE version: %s\n", sqlite_version ? sqlite_version : "NULL");
-    freez(sqlite_version);
+    debug_log( "LZ4 version: %s", LZ4_versionString());
+    debug_log("SQLITE version: " SQLITE_VERSION);
 
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
     debug_log( "Running Netdata with logs_management stress test enabled!");
