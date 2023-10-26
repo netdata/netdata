@@ -9,7 +9,7 @@
 - [General Configuration](#general-configuration)
 - [Collector-specific Configuration](#collector-configuration)
 	- [Kernel logs (kmsg)](#collector-configuration-kmsg)
-    - [Systemd](#collector-configuration-systemd)
+	- [Systemd](#collector-configuration-systemd)
 	- [Docker events](#collector-configuration-docker-events)
 	- [Tail](#collector-configuration-tail)
 	- [Web log](#collector-configuration-web-log)
@@ -53,10 +53,10 @@ To configure Netdata's logs management engine properly, please make sure you are
 The following log collectors are supported at the moment. The table will be updated as more collectors are added:
 |  Collector    	| Log type      		| Description  |
 | ------------  	| ------------  		| ------------ |
-| kernel logs (kmsg)| `flb_kmsg`    		| Collection of new kernel ring buffer logs.|
+| kernel logs (kmsg)	| `flb_kmsg`    		| Collection of new kernel ring buffer logs.|
 | systemd       	| `flb_systemd` 		| Collection of journald logs.|
-| docker events 	| `flb_docker_events` 	| Collection of docker events logs, similar to executing the `docker events` command.|
-| tail				| `flb_tail` 			| Collection of new logs from files by "tailing" them, similar to `tail -f`.|
+| docker events 	| `flb_docker_events` 		| Collection of docker events logs, similar to executing the `docker events` command.|
+| tail			| `flb_tail` 			| Collection of new logs from files by "tailing" them, similar to `tail -f`.|
 | web log       	| `flb_web_log` 		| Collection of Apache or Nginx access logs.|
 | syslog socket   	| `flb_syslog`  		| Collection of RFC-3164 syslog logs by creating listening sockets.|
 | serial        	| `flb_serial`  		| Collection of logs from a serial interface.|
