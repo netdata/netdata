@@ -44,6 +44,7 @@ struct flb_time {
     struct timespec tm;
 };
 
+/* Library mode context data */
 struct flb_lib_ctx {
     int status;
     struct mk_event_loop *event_loop;
@@ -69,6 +70,7 @@ struct flb_parser {
     int time_offset;      /* fixed UTC offset */
     int time_keep;        /* keep time field */
     int time_strict;      /* parse time field strictly */
+    int logfmt_no_bare_keys; /* in logfmt parsers, require all keys to have values */
     char *time_frac_secs; /* time format have fractional seconds ? */
     struct flb_parser_types *types; /* type casting */
     int types_len;
@@ -523,10 +525,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 /* FLB_SYSTEMD or FLB_SYSLOG case */
                 if( p_file_info->log_type == FLB_SYSTEMD || 
                     p_file_info->log_type == FLB_SYSLOG){
-                    if( p_file_info->use_log_timestamp && 
-                        !strncmp(p->key.via.str.ptr, "_SOURCE_REALTIME_TIMESTAMP", (size_t) p->key.via.str.size)){
-                        strncpy(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                        timestamp_str[p->val.via.str.size] = '\0';
+                    if( p_file_info->use_log_timestamp && !strncmp( p->key.via.str.ptr, 
+                                                                    "_SOURCE_REALTIME_TIMESTAMP", 
+                                                                    (size_t) p->key.via.str.size)){
+                        m_assert(p->val.via.str.size <= TIMESTAMP_MS_STR_SIZE - 1, 
+                                "p->val.via.str.size >= TIMESTAMP_MS_STR_SIZE");
+                        strncpyz(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
 
                         /* TODO: Write dedicated function for timestamp conversion, with better error checking. */
                         errno = 0;
@@ -536,23 +540,20 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     }
                     else if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
                         m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
-                        strncpy(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                        syslog_prival[p->val.via.str.size] = '\0';
+                        strncpyz(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
                         syslog_prival_size = (size_t) p->val.via.str.size;
                         
                         m_assert(syslog_prival, "syslog_prival is NULL");
                     }
                     else if(!strncmp(p->key.via.str.ptr, "PRIORITY", (size_t) p->key.via.str.size)){
                         m_assert(p->val.via.str.size <= 1, "p->val.via.str.size > 1");
-                        strncpy(syslog_severity, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                        syslog_severity[p->val.via.str.size] = '\0';
+                        strncpyz(syslog_severity, p->val.via.str.ptr, (size_t) p->val.via.str.size);
                         
                         m_assert(syslog_severity, "syslog_severity is NULL");
                     }
                     else if(!strncmp(p->key.via.str.ptr, "SYSLOG_FACILITY", (size_t) p->key.via.str.size)){
                         m_assert(p->val.via.str.size <= 2, "p->val.via.str.size > 2");
-                        strncpy(syslog_facility, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                        syslog_facility[p->val.via.str.size] = '\0';
+                        strncpyz(syslog_facility, p->val.via.str.ptr, (size_t) p->val.via.str.size);
                         
                         m_assert(syslog_facility, "syslog_facility is NULL");
                     }
@@ -1409,8 +1410,7 @@ int flb_add_input(struct File_info *const p_file_info){
  * @return 0 on success, -1 on error.
  */
 int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
-    int input, output;
-
+    
     if(forward_in_config == NULL){
         debug_log( "forward: forward_in_config is NULL");
         collector_info("forward_in_config is NULL");
@@ -1419,6 +1419,8 @@ int flb_add_fwd_input(Flb_socket_config_t *forward_in_config){
 
     do{
         debug_log( "forward: Setting up flb_add_fwd_input()");
+
+        int input, output;
         
         if((input = flb_input(ctx, "forward", NULL)) < 0) break;
 

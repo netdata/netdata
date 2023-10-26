@@ -966,7 +966,7 @@ int db_init() {
                 rc = sqlite3_step(stmt_retrieve_metadata_from_id);
                 do_sqlite_error_check(p_file_info, rc, SQLITE_ROW);
 
-                char filename[FILENAME_MAX + 1];
+                char filename[FILENAME_MAX + 1] = {0};
                 snprintfz(filename, FILENAME_MAX, "%s%s", p_file_info->db_dir, 
                             sqlite3_column_text(stmt_retrieve_metadata_from_id, 0));
                 rc = uv_fs_open(NULL, &open_req, filename,  

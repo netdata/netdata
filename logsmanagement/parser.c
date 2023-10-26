@@ -87,7 +87,7 @@ UNIT_STATIC int count_fields(const char *line, const char delimiter){
  * number is provided, they will be counted.
  * @return A NULL-terminated array of strings with the delimited values in \p line,
  * or NULL in any other case.
- * @todo This function is not benchmarked or optimised.
+ * @todo This function has not been benchmarked or optimised.
  */
 static inline char **parse_csv( const char *line, const char delimiter, int num_fields) {
     char **buf, **bptr, *tmp, *tptr;
@@ -104,16 +104,7 @@ static inline char **parse_csv( const char *line, const char delimiter, int num_
 
     buf = mallocz( sizeof(char*) * (num_fields+1) );
 
-    // if ( !buf ) {
-    //     return NULL;
-    // }
-
     tmp = mallocz( strlen(line) + 1 );
-
-    // if ( !tmp ) {
-    //     freez( buf );
-    //     return NULL;
-    // }
 
     bptr = buf;
 
@@ -185,40 +176,6 @@ static inline char **parse_csv( const char *line, const char delimiter, int num_
             *tptr++ = *ptr;
             continue;
         }
-
-        /*switch( *ptr ) {
-            case '\"':
-                fQuote = 1;
-                continue;
-            case '\0':
-                fEnd = 1;
-            case delimiter:
-                *tptr = '\0';
-                *bptr = strdupz( tmp );
-
-                if ( !*bptr ) {
-                    for ( bptr--; bptr >= buf; bptr-- ) {
-                        freez( *bptr );
-                    }
-                    freez( buf );
-                    freez( tmp );
-
-                    return NULL;
-                }
-
-                bptr++;
-                tptr = tmp;
-
-                if ( fEnd ) {
-                  break;
-                } else {
-                  continue;
-                }
-
-            default:
-                *tptr++ = *ptr;
-                continue;
-        }*/
 
         if ( fEnd ) {
             break;

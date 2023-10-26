@@ -914,7 +914,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
         buffer_json_member_add_string(wb, "type", "table");
         buffer_json_member_add_string(wb, "help", FUNCTION_LOGSMANAGEMENT_HELP_SHORT);
         buffer_json_finalize(wb);
-        ret = HTTP_RESP_OK;
         goto output;
     }
     
