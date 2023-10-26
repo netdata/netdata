@@ -177,7 +177,10 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         while (pids) {
             int32_t pid = pids->pid;
-            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                   pid,
+                                                                                   NULL,
+                                                                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
             if (pid_ptr) {
                 rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
                 if (pid_ptr->process_stats.JudyLArray) {
@@ -334,7 +337,10 @@ static void ebpf_update_process_cgroup()
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                   pid,
+                                                                                   NULL,
+                                                                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
             if (pid_ptr) {
                 rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
                 if (pid_ptr->process_stats.JudyLArray) {
@@ -394,7 +400,10 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
         // Get PID structure
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, psv[0].name);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               key,
+                                                                               psv[0].name,
+                                                                               NETDATA_EBPF_MODULE_NAME_PROCESS);
         if (!pid_ptr) {
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_process_loop;
@@ -402,7 +411,10 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
         pid_ptr->tgid = psv[0].tgid;
 
         if (key != pid_ptr->tgid) {
-            netdata_ebpf_judy_pid_stats_t *tgid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid_ptr->tgid, NULL);
+            netdata_ebpf_judy_pid_stats_t *tgid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                    pid_ptr->tgid,
+                                                                                    NULL,
+                                                                                    NETDATA_EBPF_MODULE_NAME_PROCESS);
             if (tgid_ptr && tgid_ptr->name[0] && !pid_ptr->pname[0])
                 strncpyz(pid_ptr->pname, tgid_ptr->name, TASK_COMM_LEN);
         } else {

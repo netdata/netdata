@@ -797,6 +797,9 @@ struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t has
 {
     targets_assignment_counter++;
 
+    if (!length)
+        goto ret_default_target;
+
     struct ebpf_target *w;
     for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(
@@ -821,15 +824,26 @@ struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t has
     ssize_t i, bytes = read(fd, cmdline, MAX_CMDLINE);
     close(fd);
 
+    if (bytes < 0)
+        goto ret_default_target;
+
     cmdline[bytes] = '\0';
     for (i = 0; i < bytes; i++) {
         if (unlikely(!cmdline[i]))
             cmdline[i] = ' ';
     }
 
+    hash = simple_hash(cmdline);
+    size_t pclen = strlen(cmdline);
+
     for (w = ebpf_apps_groups_root_target; w; w = w->next) {
-        if (w->starts_with && w->ends_with && strstr(cmdline, w->compare))
+        if (unlikely(
+            ((!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, cmdline)) ||
+             (w->starts_with && !w->ends_with && !strncmp(w->compare, cmdline, w->comparelen)) ||
+             (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &cmdline[pclen - w->comparelen])) ||
+             (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(cmdline, w->compare))))) {
             return w;
+        }
     }
 
 ret_default_target:
@@ -925,7 +939,10 @@ cleanup:
 
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     // This code exists to create an entry while the PR is developed.
-    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray, p->pid, p->cmdline);
+    netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(&ebpf_judy_pid.index.JudyLArray,
+                                                                           p->pid,
+                                                                           p->cmdline,
+                                                                           NULL);
     (void)pid_ptr;
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 

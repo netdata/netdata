@@ -670,6 +670,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
     if (maps_per_core)
         length *= ebpf_nprocs;
 
+    // To avoid call time() different times, we only difference between starts.
     uint64_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
@@ -684,7 +685,10 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
         // Get PID structure
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, cv->name);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               key,
+                                                                               cv->name,
+                                                                               NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         if (!pid_ptr) {
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_cachestat_loop;
@@ -704,11 +708,17 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
             cachestat_update_publish(cs_ptr);
         }  else {
             if (cv[0].total != cs_ptr->plot.total) {
-                cs_ptr->current_timestamp = update_time;
+                pid_ptr->current_timestamp = update_time;
                 memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
                 cachestat_update_publish(cs_ptr);
-            } else if ((update_time - cs_ptr->current_timestamp) > update_every) {
+            } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
                 ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
+#ifdef NETDATA_DEV_MODE
+                collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s", cv->name,
+                               key,
+                               NETDATA_EBPF_MODULE_NAME_CACHESTAT,
+                               pid_ptr->apps_target->name);
+#endif
                 JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
                 ebpf_cachestat_release(cs_ptr);
                 bpf_map_delete_elem(fd, &key);
@@ -781,7 +791,10 @@ static void ebpf_update_cachestat_cgroup()
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                   pid,
+                                                                                   NULL,
+                                                                                   NETDATA_EBPF_MODULE_NAME_CACHESTAT);
             if (pid_ptr) {
                 rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
                 if (pid_ptr->cachestat_stats.JudyLArray) {
@@ -974,12 +987,14 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyL
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
 
-    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, local_pid, NULL);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               local_pid,
+                                                                               NULL,
+                                                                               NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         if (pid_ptr) {
             rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
             if (pid_ptr->cachestat_stats.JudyLArray) {
@@ -998,6 +1013,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyL
             rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
         }
     }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     rw_spinlock_read_unlock(&rw_spinlock);
 }
 

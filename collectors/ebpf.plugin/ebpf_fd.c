@@ -701,7 +701,10 @@ static void ebpf_read_fd_apps_table(int maps_per_core, uint64_t update_every)
         // Get PID structure
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key, fv->name);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               key,
+                                                                               fv->name,
+                                                                               NETDATA_EBPF_MODULE_NAME_FD);
         if (!pid_ptr) {
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_fd_loop;
@@ -795,7 +798,10 @@ static void ebpf_update_fd_cgroup()
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                   pid,
+                                                                                   NULL,
+                                                                                   NETDATA_EBPF_MODULE_NAME_FD);
             if (pid_ptr) {
                 rw_spinlock_read_lock(&pid_ptr->fd_stats.rw_spinlock);
                 if (pid_ptr->fd_stats.JudyLArray) {
@@ -839,7 +845,10 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
     while (root) {
         int32_t pid = root->pid;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               pid,
+                                                                               NULL,
+                                                                               NETDATA_EBPF_MODULE_NAME_FD);
         if (pid_ptr) {
             rw_spinlock_read_lock(&pid_ptr->fd_stats.rw_spinlock);
             if (pid_ptr->fd_stats.JudyLArray) {

@@ -1050,7 +1050,10 @@ void ebpf_socket_sum_pid_values_from_kernel(struct ebpf_target *root)
     while (root) {
         int32_t pid = w->pid;
 
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               pid,
+                                                                               NULL,
+                                                                               NETDATA_EBPF_MODULE_NAME_SOCKET);
         if (pid_ptr) {
             rw_spinlock_read_lock(&pid_ptr->socket_stats.rw_spinlock);
             if (pid_ptr->socket_stats.JudyLArray) {
@@ -1820,7 +1823,10 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         // Get PID structure
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, key.pid, values->name);
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               key.pid,
+                                                                               values->name,
+                                                                               NETDATA_EBPF_MODULE_NAME_SOCKET);
         if (!pid_ptr) {
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_socket_loop;
@@ -2059,7 +2065,10 @@ static void ebpf_update_socket_cgroup()
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array, pid, NULL);
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                   pid,
+                                                                                   NULL,
+                                                                                   NETDATA_EBPF_MODULE_NAME_SOCKET);
             if (pid_ptr) {
                 rw_spinlock_read_lock(&pid_ptr->socket_stats.rw_spinlock);
                 if (pid_ptr->socket_stats.JudyLArray) {
