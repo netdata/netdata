@@ -55,23 +55,21 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 ### Per k8s cgroup
 
-
+These metrics refer to the Pod container.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| k8s_namespace | TBD |
-| k8s_pod_name | TBD |
-| k8s_pod_uid | TBD |
-| k8s_controller_kind | TBD |
-| k8s_controller_name | TBD |
-| k8s_node_name | TBD |
-| k8s_container_name | TBD |
-| k8s_container_id | TBD |
-| k8s_kind | TBD |
-| k8s_qos_class | TBD |
-| k8s_cluster_id | TBD |
+| k8s_node_name | Node name. The value of _pod.spec.nodeName_. |
+| k8s_namespace | Namespace name. The value of _pod.metadata.namespace_. |
+| k8s_controller_kind | Controller kind (ReplicaSet, DaemonSet, StatefulSet, Job, etc.). The value of _pod.OwnerReferences.Controller.Kind_. |
+| k8s_controller_name | Controller name.The value of _pod.OwnerReferences.Controller.Name_. |
+| k8s_pod_name | Pod name. The value of _pod.metadata.name_. |
+| k8s_container_name | Container name. The value of _pod.spec.containers.name_. |
+| k8s_kind | Instance kind: "pod" or "container". |
+| k8s_qos_class | QoS class (guaranteed, burstable, besteffort). |
+| k8s_cluster_id | Cluster ID. The value of kube-system namespace _namespace.metadata.uid_. |
 
 Metrics:
 
@@ -112,25 +110,24 @@ Metrics:
 
 ### Per k8s cgroup network device
 
-
+These metrics refer to the Pod container network interface.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| device | TBD |
-| interface_type | TBD |
-| k8s_namespace | TBD |
-| k8s_pod_name | TBD |
-| k8s_pod_uid | TBD |
-| k8s_controller_kind | TBD |
-| k8s_controller_name | TBD |
-| k8s_node_name | TBD |
-| k8s_container_name | TBD |
-| k8s_container_id | TBD |
-| k8s_kind | TBD |
-| k8s_qos_class | TBD |
-| k8s_cluster_id | TBD |
+| device | The name of the host network interface linked to the container's network interface. |
+| container_device | Container network interface name. |
+| interface_type | Network interface type. Always "virtual" for the containers. |
+| k8s_node_name | Node name. The value of _pod.spec.nodeName_. |
+| k8s_namespace | Namespace name. The value of _pod.metadata.namespace_. |
+| k8s_controller_kind | Controller kind (ReplicaSet, DaemonSet, StatefulSet, Job, etc.). The value of _pod.OwnerReferences.Controller.Kind_. |
+| k8s_controller_name | Controller name.The value of _pod.OwnerReferences.Controller.Name_. |
+| k8s_pod_name | Pod name. The value of _pod.metadata.name_. |
+| k8s_container_name | Container name. The value of _pod.spec.containers.name_. |
+| k8s_kind | Instance kind: "pod" or "container". |
+| k8s_qos_class | QoS class (guaranteed, burstable, besteffort). |
+| k8s_cluster_id | Cluster ID. The value of kube-system namespace _namespace.metadata.uid_. |
 
 Metrics:
 
