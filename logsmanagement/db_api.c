@@ -189,7 +189,7 @@ static void db_writer_db_mode_full(void *arg){
                         ") VALUES (?,?,?,?,?,?) ;",
                         -1, &stmt_logs_insert, NULL);
     if (unlikely(SQLITE_OK != rc)) {
-        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
         p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
         freez((void *) p_file_info->db_dir);
         p_file_info->db_dir = strdupz("");
@@ -202,7 +202,7 @@ static void db_writer_db_mode_full(void *arg){
                             "SELECT SUM(Filesize) FROM " BLOBS_TABLE " ;",
                             -1, &stmt_blobs_get_total_filesize, NULL);
     if (unlikely(SQLITE_OK != rc)) {
-        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
         p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
         freez((void *) p_file_info->db_dir);
         p_file_info->db_dir = strdupz("");
@@ -217,7 +217,7 @@ static void db_writer_db_mode_full(void *arg){
                             " WHERE Id = ? ;",
                             -1, &stmt_blobs_update, NULL);
     if (unlikely(SQLITE_OK != rc)) {
-        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
         p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
         freez((void *) p_file_info->db_dir);
         p_file_info->db_dir = strdupz("");
@@ -232,7 +232,7 @@ static void db_writer_db_mode_full(void *arg){
                             " WHERE Id = ? ;",
                             -1, &stmt_blobs_set_zero_filesize, NULL);
     if (unlikely(SQLITE_OK != rc)) {
-        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
         p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
         freez((void *) p_file_info->db_dir);
         p_file_info->db_dir = strdupz("");
@@ -246,7 +246,7 @@ static void db_writer_db_mode_full(void *arg){
                             " WHERE FK_BLOB_Id = ? ;",
                             -1, &stmt_logs_delete, NULL);
     if (unlikely(SQLITE_OK != rc)) {
-        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
         p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
         freez((void *) p_file_info->db_dir);
         p_file_info->db_dir = strdupz("");
@@ -265,7 +265,7 @@ static void db_writer_db_mode_full(void *arg){
                                                 p_file_info->blob_write_handle_offset)) ||
         SQLITE_ROW != (rc = sqlite3_step(stmt_retrieve_filesize_from_id))
         )){
-            throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+            throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
             freez((void *) p_file_info->db_dir);
             p_file_info->db_dir = strdupz("");
@@ -274,7 +274,7 @@ static void db_writer_db_mode_full(void *arg){
     int64_t blob_filesize = (int64_t) sqlite3_column_int64(stmt_retrieve_filesize_from_id, 0);
     rc = sqlite3_finalize(stmt_retrieve_filesize_from_id);
     if (unlikely(SQLITE_OK != rc)) {
-        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
         p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
         freez((void *) p_file_info->db_dir);
         p_file_info->db_dir = strdupz("");
@@ -315,7 +315,7 @@ static void db_writer_db_mode_full(void *arg){
                                 &uv_buf, 1, blob_filesize, NULL); // Write synchronously at the end of the BLOB file
             uv_fs_req_cleanup(&write_req);
             if(unlikely(rc < 0)){
-                throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 circ_buff_read_done(p_file_info->circ_buff);
                 return_db_writer_db_mode_none(p_file_info);
             }
@@ -326,7 +326,7 @@ static void db_writer_db_mode_full(void *arg){
                                     p_file_info->blob_handles[p_file_info->blob_write_handle_offset], NULL);
             uv_fs_req_cleanup(&dsync_req);
             if (unlikely(rc)){
-                throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 circ_buff_read_done(p_file_info->circ_buff);
                 return_db_writer_db_mode_none(p_file_info);
             }
@@ -350,10 +350,10 @@ static void db_writer_db_mode_full(void *arg){
                 SQLITE_OK != (rc = sqlite3_reset(stmt_blobs_update)) ||
                 SQLITE_OK != (rc = sqlite3_exec(p_file_info->db, "END TRANSACTION;", NULL, NULL, NULL))
                 )) {
-                    throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                    throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                     rc = sqlite3_exec(p_file_info->db, "ROLLBACK;", NULL, NULL, NULL);
                     if (unlikely(SQLITE_OK != rc)) 
-                        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                     circ_buff_read_done(p_file_info->circ_buff);
                     return_db_writer_db_mode_none(p_file_info);
             }
@@ -386,7 +386,7 @@ static void db_writer_db_mode_full(void *arg){
                 if (unlikely(rc)){
                     //TODO: This error case needs better handling, as it will result in mismatch with sqlite metadata.
                     //      We probably require a WAL or something similar.
-                    throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                    throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                     return_db_writer_db_mode_none(p_file_info);
                 }
             }
@@ -399,7 +399,7 @@ static void db_writer_db_mode_full(void *arg){
             if (unlikely(rc)){
                 //TODO: This error case needs better handling, as it will result in mismatch with sqlite metadata.
                 //      We probably require a WAL or something similar.
-                throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 return_db_writer_db_mode_none(p_file_info);
             }
 
@@ -414,7 +414,7 @@ static void db_writer_db_mode_full(void *arg){
                         "     substr(Filename, -1) + 1 else 0 end);",
                         NULL, NULL, NULL);
             if (unlikely(rc != SQLITE_OK)) {
-                throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                 //TODO: Undo rotation if possible?
                 return_db_writer_db_mode_none(p_file_info);
             }
@@ -437,7 +437,7 @@ static void db_writer_db_mode_full(void *arg){
             if (unlikely(rc)){
                 //TODO: This error case needs better handling, as it will result in mismatch with sqlite metadata.
                 //      We probably require a WAL or something similar.
-                throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 return_db_writer_db_mode_none(p_file_info);
             }
             
@@ -454,10 +454,10 @@ static void db_writer_db_mode_full(void *arg){
                 SQLITE_OK != (rc = sqlite3_reset(stmt_logs_delete)) ||
                 SQLITE_OK != (rc = sqlite3_exec(p_file_info->db, "END TRANSACTION;", NULL, NULL, NULL))
                 )) {
-                    throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                    throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                     rc = sqlite3_exec(p_file_info->db, "ROLLBACK;", NULL, NULL, NULL);
                     if (unlikely(SQLITE_OK != rc)) 
-                        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                     return_db_writer_db_mode_none(p_file_info);
             }
 
@@ -479,13 +479,13 @@ static void db_writer_db_mode_full(void *arg){
         /* Update total disk usage of all BLOBs for this log source */
         rc = sqlite3_step(stmt_blobs_get_total_filesize);
         if (unlikely(SQLITE_ROW != rc)) {
-            throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+            throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             return_db_writer_db_mode_none(p_file_info);
         }
         __atomic_store_n(&p_file_info->blob_total_size, sqlite3_column_int64(stmt_blobs_get_total_filesize, 0), __ATOMIC_RELAXED);
         rc = sqlite3_reset(stmt_blobs_get_total_filesize);
         if (unlikely(SQLITE_OK != rc)) {
-            throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+            throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             return_db_writer_db_mode_none(p_file_info);
         }
 
@@ -614,7 +614,7 @@ int db_init() {
             uv_thread_t *db_writer_thread = mallocz(sizeof(uv_thread_t));
             rc = uv_thread_create(db_writer_thread, db_writer_db_mode_none, p_file_info);
             if (unlikely(rc)){
-                throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 goto return_error;
             }
         }
@@ -628,7 +628,7 @@ int db_init() {
             // This error check will be used a lot, so define it here. 
             #define do_sqlite_error_check(p_file_info, rc, rc_expctd) do {                                      \
                 if(unlikely(rc_expctd != rc)) {                                                                 \
-                    throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);\
+                    throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);\
                     uv_mutex_unlock(p_file_info->db_mut);                                                       \
                     goto return_error;                                                                          \
                 }                                                                                               \
@@ -640,7 +640,7 @@ int db_init() {
                     SQLITE_OK != (rc = sqlite3_bind_int(stmt_search_if_log_source_exists, 3, p_file_info->log_type)) ||
                     /* COUNT(*) query should always return SQLITE_ROW */
                     SQLITE_ROW != (rc = sqlite3_step(stmt_search_if_log_source_exists)))){
-                throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                 uv_mutex_unlock(p_file_info->db_mut);
                 goto return_error;
             }
@@ -664,7 +664,7 @@ int db_init() {
                     if (unlikely(rc)) {
                         if(errno == EEXIST) 
                             collector_error("DB directory %s exists but not found in %s.\n", p_file_info->db_dir, MAIN_DB);
-                        throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                        throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
                     }
@@ -676,7 +676,7 @@ int db_init() {
                             SQLITE_OK != (rc = sqlite3_bind_text(stmt_insert_log_collection_metadata, 4, p_file_info->db_dir, -1, NULL)) ||
                             SQLITE_DONE != (rc = sqlite3_step(stmt_insert_log_collection_metadata)) ||
                             SQLITE_OK != (rc = sqlite3_reset(stmt_insert_log_collection_metadata)))) {
-                        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
                     }
@@ -694,7 +694,7 @@ int db_init() {
                     m_assert(0, "Same file stored in DB more than once!");
                     collector_error("[%s]: Record encountered multiple times in DB " MAIN_COLLECTIONS_TABLE " table \n",
                                     p_file_info->filename);
-                    throw_error(p_file_info->chart_name, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
+                    throw_error(p_file_info->chartname, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
                 }
@@ -718,23 +718,23 @@ int db_init() {
                             0, 0, &err_msg);
             if (unlikely(rc != SQLITE_OK)) {
                 collector_error("[%s]: Failed to configure database, SQL error: %s", p_file_info->filename, err_msg);
-                throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                 uv_mutex_unlock(p_file_info->db_mut);
                 goto return_error;
             }
 
             /* Execute pending metadata database migrations */
-            collector_info("[%s]: About to execute " METADATA_DB_FILENAME " migrations", p_file_info->chart_name);
+            collector_info("[%s]: About to execute " METADATA_DB_FILENAME " migrations", p_file_info->chartname);
             int metadata_db_ver = db_user_version(p_file_info->db, -1);
             if (likely(LOGS_MANAG_DB_VERSION == metadata_db_ver)) {
                 collector_info( "[%s]: Logs management " METADATA_DB_FILENAME " database version is %d (no migration needed)", 
-                                p_file_info->chart_name, metadata_db_ver);
+                                p_file_info->chartname, metadata_db_ver);
             } else {
                 for(int ver = metadata_db_ver; ver < LOGS_MANAG_DB_VERSION && migration_list_metadata_db[ver].func; ver++){
                     rc = (migration_list_metadata_db[ver].func)(p_file_info->db, migration_list_metadata_db[ver].name);
                     if (unlikely(rc)){
                         collector_error("[%s]: Logs management " METADATA_DB_FILENAME " database migration from version %d to version %d failed", 
-                                        p_file_info->chart_name, ver, ver + 1);
+                                        p_file_info->chartname, ver, ver + 1);
                         throw_error(MAIN_DB, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
@@ -774,11 +774,11 @@ int db_init() {
                             ");",
                             0, 0, &err_msg);
                     if (unlikely(SQLITE_OK != rc)) {
-                        collector_error("[%s]: Failed to create " BLOBS_TABLE ", SQL error: %s", p_file_info->chart_name, err_msg);
-                        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                        collector_error("[%s]: Failed to create " BLOBS_TABLE ", SQL error: %s", p_file_info->chartname, err_msg);
+                        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
-                    } else collector_info("[%s]: Table " BLOBS_TABLE " created successfully", p_file_info->chart_name);
+                    } else collector_info("[%s]: Table " BLOBS_TABLE " created successfully", p_file_info->chartname);
                     
                     /* 2. Populate it */
                     sqlite3_stmt *stmt_init_BLOBS_table;
@@ -796,7 +796,7 @@ int db_init() {
                                 SQLITE_OK != (rc = sqlite3_bind_int64(stmt_init_BLOBS_table, 2, (sqlite3_int64) 0)) ||
                                 SQLITE_DONE != (rc = sqlite3_step(stmt_init_BLOBS_table)) ||
                                 SQLITE_OK != (rc = sqlite3_reset(stmt_init_BLOBS_table)))){
-                            throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                            throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                             uv_mutex_unlock(p_file_info->db_mut);
                             goto return_error;
                         }
@@ -821,11 +821,11 @@ int db_init() {
                             ");",
                             0, 0, &err_msg);
                 if (unlikely(SQLITE_OK != rc)) {
-                    collector_error("[%s]: Failed to create " LOGS_TABLE ", SQL error: %s", p_file_info->chart_name, err_msg);
-                    throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                    collector_error("[%s]: Failed to create " LOGS_TABLE ", SQL error: %s", p_file_info->chartname, err_msg);
+                    throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
-                } else collector_info("[%s]: Table " LOGS_TABLE " created successfully", p_file_info->chart_name);
+                } else collector_info("[%s]: Table " LOGS_TABLE " created successfully", p_file_info->chartname);
                 
                 /* Create index on LOGS_TABLE Timestamp
                  * TODO: If this doesn't speed up queries, check SQLITE R*tree 
@@ -835,11 +835,11 @@ int db_init() {
                                     "ON " LOGS_TABLE "(Timestamp);",
                                     0, 0, &err_msg);
                 if (unlikely(SQLITE_OK != rc)) {
-                    collector_error("[%s]: Failed to create logs_timestamps_idx, SQL error: %s", p_file_info->chart_name, err_msg);
-                    throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                    collector_error("[%s]: Failed to create logs_timestamps_idx, SQL error: %s", p_file_info->chartname, err_msg);
+                    throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
-                } else collector_info("[%s]: logs_timestamps_idx created successfully", p_file_info->chart_name);
+                } else collector_info("[%s]: logs_timestamps_idx created successfully", p_file_info->chartname);
 
                 rc = sqlite3_exec(p_file_info->db, "END TRANSACTION;", NULL, NULL, NULL);
                 do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
@@ -903,7 +903,7 @@ int db_init() {
                         uv_fs_req_cleanup(&unlink_req);
                         if (unlikely(rc)) {
                             // TODO: If there is an erro here, the entry won't be deleted from BLOBS_TABLE. What to do?
-                            throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                            throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                             uv_mutex_unlock(p_file_info->db_mut);
                             goto return_error;
                         }
@@ -959,7 +959,7 @@ int db_init() {
                             SQLITE_OK != (rc = sqlite3_bind_int(stmt_update_id, 2, old_blobs_table_ids[i])) ||
                             SQLITE_DONE != (rc = sqlite3_step(stmt_update_id)) ||
                             SQLITE_OK != (rc = sqlite3_reset(stmt_update_id)))) {
-                        throw_error(p_file_info->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                        throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
                     }
@@ -1003,7 +1003,7 @@ int db_init() {
                                 0644, NULL);
                 if (unlikely(rc < 0)){
                     uv_fs_req_cleanup(&open_req);
-                    throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                    throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
                 }
@@ -1029,7 +1029,7 @@ int db_init() {
                 if (SQLITE_ROW == rc){ 
                     const int64_t total_logs_filesize = (int64_t) sqlite3_column_int64(stmt_retrieve_total_logs_size, 0);
                     if(unlikely(total_logs_filesize != metadata_filesize)){
-                        throw_error(p_file_info->chart_name, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
+                        throw_error(p_file_info->chartname, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
                     }
@@ -1041,7 +1041,7 @@ int db_init() {
                 rc = uv_fs_stat(NULL, &stat_req, filename, NULL);
                 if (unlikely(rc)){
                     uv_fs_req_cleanup(&stat_req);
-                    throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                    throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
                 }
@@ -1059,8 +1059,8 @@ int db_init() {
                     // TODO: Can we avoid fatal()? 
                     if(unlikely(blob_filesize == 0 && metadata_filesize > 0)){
                         collector_error("[%s]: blob_filesize == 0 but metadata_filesize > 0 for '%s'\n", 
-                                        p_file_info->chart_name, filename);
-                        throw_error(p_file_info->chart_name, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
+                                        p_file_info->chartname, filename);
+                        throw_error(p_file_info->chartname, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
                     }
@@ -1069,12 +1069,12 @@ int db_init() {
                      * crashed or terminated after writing BLOBs to external file but before metadata was updated */
                     if(unlikely(blob_filesize > metadata_filesize)){
                         collector_info("[%s]: blob_filesize > metadata_filesize for '%s'. Will attempt to fix it.", 
-                                        p_file_info->chart_name, filename);
+                                        p_file_info->chartname, filename);
                         uv_fs_t trunc_req;
                         rc = uv_fs_ftruncate(NULL, &trunc_req, p_file_info->blob_handles[id], metadata_filesize, NULL);
                         uv_fs_req_cleanup(&trunc_req);
                         if(unlikely(rc)) {
-                            throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                            throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                             uv_mutex_unlock(p_file_info->db_mut);
                             goto return_error;
                         }
@@ -1087,15 +1087,15 @@ int db_init() {
                      *       start from clean state but the most recent logs. */
                     if(unlikely(blob_filesize < metadata_filesize)){
                         collector_info("[%s]: blob_filesize < metadata_filesize for '%s'.", 
-                                        p_file_info->chart_name, filename);
-                        throw_error(p_file_info->chart_name, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
+                                        p_file_info->chartname, filename);
+                        throw_error(p_file_info->chartname, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
                         uv_mutex_unlock(p_file_info->db_mut);
                         goto return_error;
                     }
 
                     /* Case 5: default if none of the above, should never reach here, fatal() */
                     m_assert(0, "Code should not reach here");
-                    throw_error(p_file_info->chart_name, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
+                    throw_error(p_file_info->chartname, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
                     uv_mutex_unlock(p_file_info->db_mut);
                     goto return_error;
                 } while(0);
@@ -1142,7 +1142,7 @@ int db_init() {
             p_file_info->db_writer_thread = mallocz(sizeof(uv_thread_t));
             rc = uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_full, p_file_info);
             if (unlikely(rc)){
-                throw_error(p_file_info->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 goto return_error;
             }
         }
@@ -1196,7 +1196,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             SQLITE_OK != (rc = sqlite3_bind_int64(stmt_get_log_msg_metadata, 2, p_query_params->req_to_ts)) ||
             (SQLITE_ROW != (rc = sqlite3_step(stmt_get_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
-            throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+            throw_error(p_file_infos[0]->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             // TODO: If there are errors here, should db_writer_db_mode_full() be terminated?
             sqlite3_reset(stmt_get_log_msg_metadata);
             return;
@@ -1211,7 +1211,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
             SQLITE_OK != (rc = sqlite3_open_v2(p_file_infos[0]->db_metadata, &dbt, SQLITE_OPEN_READONLY, NULL)) ||
             SQLITE_OK != (rc = sqlite3_prepare_v2(dbt,"ATTACH DATABASE ?  AS ? ;", -1, &stmt_attach_db, NULL))
         )){
-            throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+            throw_error(p_file_infos[0]->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             sqlite3_close_v2(dbt);
             return;
         }
@@ -1222,7 +1222,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                 SQLITE_DONE != (rc = sqlite3_step(stmt_attach_db)) ||
                 SQLITE_OK != (rc = sqlite3_reset(stmt_attach_db))
             )){
-                throw_error(p_file_infos[pfi_off]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_infos[pfi_off]->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                 sqlite3_close_v2(dbt);
                 return;
             }
@@ -1278,7 +1278,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                                                         (sqlite3_int64)p_query_params->req_to_ts)) ||
             (SQLITE_ROW !=  (rc = sqlite3_step(stmt_get_log_msg_metadata)) && (SQLITE_DONE != rc))
         )){
-            throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+            throw_error(p_file_infos[0]->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             sqlite3_close_v2(dbt);
             return;
         }
@@ -1323,7 +1323,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         snprintfz(res_hdr.log_type, sizeof(res_hdr.log_type), "%s", log_src_type_t_str[p_file_infos[db_off]->log_type]);
         snprintfz(res_hdr.basename, sizeof(res_hdr.basename), "%s", p_file_infos[db_off]->file_basename);
         snprintfz(res_hdr.filename, sizeof(res_hdr.filename), "%s", p_file_infos[db_off]->filename);
-        snprintfz(res_hdr.chartname, sizeof(res_hdr.chartname), "%s", p_file_infos[db_off]->chart_name);
+        snprintfz(res_hdr.chartname, sizeof(res_hdr.chartname), "%s", p_file_infos[db_off]->chartname);
 
         /* Retrieve compressed log messages from BLOB file */
         if(tmp_itm.text_compressed_size > text_compressed_size_max){
@@ -1363,7 +1363,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                         "res_hdr.matches and res_hdr.text_size must both be > 0 or == 0.");
 
             if(unlikely(res_hdr.matches < 0)){ /* res_hdr.matches < 0 - error during keyword search */
-                throw_error(p_file_infos[db_off]->chart_name, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
+                throw_error(p_file_infos[db_off]->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 break; 
             } 
         }
@@ -1379,7 +1379,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
 
         rc = sqlite3_step(stmt_get_log_msg_metadata);
         if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)){
-            throw_error(p_file_infos[db_off]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+            throw_error(p_file_infos[db_off]->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
             // TODO: If there are errors here, should db_writer_db_mode_full() be terminated?
             break;
         }
@@ -1394,5 +1394,5 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         rc = sqlite3_reset(stmt_get_log_msg_metadata);
 
     if (unlikely(SQLITE_OK != rc)) 
-        throw_error(p_file_infos[0]->chart_name, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
+        throw_error(p_file_infos[0]->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
 }

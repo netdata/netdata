@@ -100,11 +100,11 @@ void circ_buff_search(logs_query_params_t *const p_query_params, struct File_inf
 
         res_hdr.timestamp = items[i].cbi->timestamp;
         res_hdr.text_size = items[i].cbi->text_size;
-        snprintfz(res_hdr.log_source, sizeof(res_hdr.log_source), "%s", log_src_t_str[items[i].pfi->log_source]);
-        snprintfz(res_hdr.log_type, sizeof(res_hdr.log_type), "%s", log_src_type_t_str[items[i].pfi->log_type]);
-        snprintfz(res_hdr.basename, sizeof(res_hdr.basename), "%s", items[i].pfi->file_basename);
-        snprintfz(res_hdr.filename, sizeof(res_hdr.filename), "%s", items[i].pfi->filename);
-        snprintfz(res_hdr.chartname, sizeof(res_hdr.chartname), "%s", items[i].pfi->chart_name);
+        strncpyz(res_hdr.log_source, log_src_t_str[items[i].pfi->log_source], sizeof(res_hdr.log_source) - 1);
+        strncpyz(res_hdr.log_type, log_src_type_t_str[items[i].pfi->log_type], sizeof(res_hdr.log_type) - 1);
+        strncpyz(res_hdr.basename, items[i].pfi->file_basename, sizeof(res_hdr.basename) - 1);
+        strncpyz(res_hdr.filename, items[i].pfi->filename, sizeof(res_hdr.filename) - 1);
+        strncpyz(res_hdr.chartname, items[i].pfi->chartname, sizeof(res_hdr.chartname) - 1);
 
         if (p_query_params->order_by_asc ?
             ( res_hdr.timestamp >= p_query_params->req_from_ts  && res_hdr.timestamp <= p_query_params->req_to_ts  ) : 

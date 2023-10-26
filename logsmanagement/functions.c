@@ -29,7 +29,7 @@
     "      Chart name (or names if provided multiple times) to be queried for logs, max No. of sources: " \
             LOGS_MANAG_STR(LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) "\n\n" \
     "   "LOGS_QRY_KW_FILENAME":STRING\n" \
-    "      If no 'chart_name' is provided, file name (or names if provided multiple times) to be queried for logs, max No. of sources: " \
+    "      If no 'chartname' is provided, file name (or names if provided multiple times) to be queried for logs, max No. of sources: " \
             LOGS_MANAG_STR(LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) "\n\n" \
     "   "LOGS_QRY_KW_KEYWORD":STRING\n" \
     "      Keyword to be searched in the queried logs\n\n" \
@@ -137,7 +137,7 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
             query_params.filename[fn_off++] = value;
         }
         else if(!strcmp(key, LOGS_QRY_KW_CHARTNAME) && cn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
-            query_params.chart_name[cn_off++] = value;
+            query_params.chartname[cn_off++] = value;
         }
         else if(!strcmp(key, LOGS_QRY_KW_KEYWORD)){
             query_params.keyword = value;
@@ -284,12 +284,12 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
     if(query_params.filename[0])  dest_wb->len -= 2;
     buffer_strcat(  dest_wb, 
                     "\n      ],\n"
-                    "      \"requested_chart_name\": [\n"
+                    "      \"requested_chartname\": [\n"
     );
 
-    while(query_params.chart_name[cn_off]) 
-        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.chart_name[cn_off++]);
-    if(query_params.chart_name[0])  dest_wb->len -= 2;
+    while(query_params.chartname[cn_off]) 
+        buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.chartname[cn_off++]);
+    if(query_params.chartname[0])  dest_wb->len -= 2;
 
     buffer_sprintf( dest_wb, 
                     "\n      ],\n"
@@ -729,7 +729,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
         //     query_params.filename[fn_off++] = value;
         // }
         // else if(!strcmp(key, LOGS_QRY_KW_CHARTNAME) && cn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
-        //     query_params.chart_name[cn_off++] = value;
+        //     query_params.chartname[cn_off++] = value;
         // }
         // else if(!strcmp(key, LOGS_QRY_KW_IGNORE_CASE)){
         //     query_params.ignore_case = strtol(value, NULL, 10) ? 1 : 0;
@@ -949,7 +949,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     query_params.req_to_ts = after_s * MSEC_PER_SEC;
 
     if(fqs->source)
-        query_params.chart_name[0] = (char *) string2str(fqs->source);
+        query_params.chartname[0] = (char *) string2str(fqs->source);
 
     query_params.order_by_asc = query_params.req_from_ts <= query_params.req_to_ts ? 1 : 0;
 

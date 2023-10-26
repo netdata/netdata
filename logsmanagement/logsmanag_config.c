@@ -92,9 +92,9 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         return;
     }
 
-    char chart_name[100];
-    snprintfz(chart_name, 100, "%s", p_file_info->chart_name ? p_file_info->chart_name : "Unknown");
-    collector_info("[%s]: p_file_info_destroy() cleanup...", chart_name);
+    char chartname[100];
+    snprintfz(chartname, 100, "%s", p_file_info->chartname ? p_file_info->chartname : "Unknown");
+    collector_info("[%s]: p_file_info_destroy() cleanup...", chartname);
 
     __atomic_store_n(&p_file_info->state, LOG_SRC_EXITING, __ATOMIC_RELAXED);
 
@@ -116,7 +116,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         sqlite3_finalize(p_file_info->stmt_get_log_msg_metadata_desc);
     }
 
-    freez((void *) p_file_info->chart_name);
+    freez((void *) p_file_info->chartname);
     freez(p_file_info->filename);
     freez((void *) p_file_info->file_basename);
     freez((void *) p_file_info->stream_guid);
@@ -171,7 +171,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         for(int i = 0; p_file_info->parser_cus_config && 
                        p_file_info->parser_metrics->parser_cus && 
                        p_file_info->parser_cus_config[i]; i++){
-            freez(p_file_info->parser_cus_config[i]->chart_name);
+            freez(p_file_info->parser_cus_config[i]->chartname);
             freez(p_file_info->parser_cus_config[i]->regex_str);
             freez(p_file_info->parser_cus_config[i]->regex_name);
             regfree(&p_file_info->parser_cus_config[i]->regex);
@@ -209,7 +209,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     
     freez(p_file_info);
 
-    collector_info("[%s]: p_file_info_destroy() cleanup done", chart_name);
+    collector_info("[%s]: p_file_info_destroy() cleanup done", chartname);
 }
 
 void p_file_info_destroy_all(void){
@@ -545,12 +545,12 @@ static void config_section_init(uv_loop_t *main_loop,
     struct File_info *p_file_info = callocz(1, sizeof(struct File_info));
 
     /* -------------------------------------------------------------------------
-     * Check if config_section->name is valid and if so, use it as chart_name.
+     * Check if config_section->name is valid and if so, use it as chartname.
      * ------------------------------------------------------------------------- */
     if(config_section->name && *config_section->name){
-        p_file_info->chart_name = strdupz(config_section->name);
-        netdata_fix_chart_id((char *) p_file_info->chart_name);
-        collector_info("[%s]: Initializing config loading", p_file_info->chart_name);
+        p_file_info->chartname = strdupz(config_section->name);
+        netdata_fix_chart_id((char *) p_file_info->chartname);
+        collector_info("[%s]: Initializing config loading", p_file_info->chartname);
     } else {
         collector_error("Invalid logs management config section.");
         return p_file_info_destroy(p_file_info);
@@ -561,9 +561,9 @@ static void config_section_init(uv_loop_t *main_loop,
      * Check if this log source is enabled.
      * ------------------------------------------------------------------------- */
     if(appconfig_get_boolean(&log_management_config, config_section->name, "enabled", CONFIG_BOOLEAN_NO)){
-        collector_info("[%s]: enabled = yes", p_file_info->chart_name);
+        collector_info("[%s]: enabled = yes", p_file_info->chartname);
     } else {
-        collector_info("[%s]: enabled = no", p_file_info->chart_name);
+        collector_info("[%s]: enabled = no", p_file_info->chartname);
         return p_file_info_destroy(p_file_info);
     }
 
@@ -585,7 +585,7 @@ static void config_section_init(uv_loop_t *main_loop,
         else p_file_info->log_type = FLB_TAIL;
     }
     freez(type);
-    collector_info("[%s]: log type = %s", p_file_info->chart_name, log_src_type_t_str[p_file_info->log_type]);
+    collector_info("[%s]: log type = %s", p_file_info->chartname, log_src_type_t_str[p_file_info->log_type]);
 
 
     /* -------------------------------------------------------------------------
@@ -596,10 +596,10 @@ static void config_section_init(uv_loop_t *main_loop,
     else if(!strcasecmp(source, "forward")) p_file_info->log_source = LOG_SOURCE_FORWARD;
     else p_file_info->log_source = LOG_SOURCE_LOCAL;
     freez(source);
-    collector_info("[%s]: log source = %s", p_file_info->chart_name, log_src_t_str[p_file_info->log_source]);
+    collector_info("[%s]: log source = %s", p_file_info->chartname, log_src_t_str[p_file_info->log_source]);
 
     if(p_file_info->log_source == LOG_SOURCE_FORWARD && !forward_in_config){
-        collector_info("[%s]: forward_in_config == NULL - this log source will be disabled", p_file_info->chart_name);
+        collector_info("[%s]: forward_in_config == NULL - this log source will be disabled", p_file_info->chartname);
         return p_file_info_destroy(p_file_info);
     }
 
@@ -608,7 +608,7 @@ static void config_section_init(uv_loop_t *main_loop,
      * Read stream uuid.
      * ------------------------------------------------------------------------- */
     p_file_info->stream_guid = appconfig_get(&log_management_config, config_section->name, "stream guid", "");
-    collector_info("[%s]: stream guid = %s", p_file_info->chart_name, p_file_info->stream_guid);
+    collector_info("[%s]: stream guid = %s", p_file_info->chartname, p_file_info->stream_guid);
 
 
     /* -------------------------------------------------------------------------
@@ -635,21 +635,21 @@ static void config_section_init(uv_loop_t *main_loop,
             
         switch(p_file_info->log_type){
             case FLB_TAIL:
-                if(!strcasecmp(p_file_info->chart_name, "Netdata_error.log")){
+                if(!strcasecmp(p_file_info->chartname, "Netdata_error.log")){
                     char path[FILENAME_MAX + 1];
                     snprintfz(path, FILENAME_MAX, "%s/error.log", get_log_dir());
                     if(access(path, R_OK)) {
                         collector_error("[%s]: 'Netdata_error.log' path (%s) invalid, unknown or needs permissions", 
-                            p_file_info->chart_name, path);
+                            p_file_info->chartname, path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(path);
-                } else if(!strcasecmp(p_file_info->chart_name, "Netdata_fluentbit.log")){
+                } else if(!strcasecmp(p_file_info->chartname, "Netdata_fluentbit.log")){
                     if(access(p_flb_srvc_config->log_path, R_OK)){
                         collector_error("[%s]: Netdata_fluentbit.log path (%s) invalid, unknown or needs permissions", 
-                            p_file_info->chart_name, p_flb_srvc_config->log_path);
+                            p_file_info->chartname, p_flb_srvc_config->log_path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(p_flb_srvc_config->log_path);
-                } else if(!strcasecmp(p_file_info->chart_name, "Auth.log_tail")){
+                } else if(!strcasecmp(p_file_info->chartname, "Auth.log_tail")){
                     const char * const auth_path_default[] = {
                         "/var/log/auth.log",
                         NULL
@@ -657,10 +657,10 @@ static void config_section_init(uv_loop_t *main_loop,
                     int i = 0;
                     while(auth_path_default[i] && access(auth_path_default[i], R_OK)){i++;};
                     if(!auth_path_default[i]){
-                        collector_error("[%s]: auth.log path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        collector_error("[%s]: auth.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(auth_path_default[i]);
-                } else if(!strcasecmp(p_file_info->chart_name, "syslog_tail")){
+                } else if(!strcasecmp(p_file_info->chartname, "syslog_tail")){
                     const char * const syslog_path_default[] = {
                         "/var/log/syslog",   /* Debian, Ubuntu */
                         "/var/log/messages", /* RHEL, Red Hat, CentOS, Fedora */
@@ -669,13 +669,13 @@ static void config_section_init(uv_loop_t *main_loop,
                     int i = 0;
                     while(syslog_path_default[i] && access(syslog_path_default[i], R_OK)){i++;};
                     if(!syslog_path_default[i]){
-                        collector_error("[%s]: syslog path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        collector_error("[%s]: syslog path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(syslog_path_default[i]);
                 }
                 break;
             case FLB_WEB_LOG:
-                if(!strcasecmp(p_file_info->chart_name, "Apache_access.log")){
+                if(!strcasecmp(p_file_info->chartname, "Apache_access.log")){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
                         "/var/log/apache2/access.log",  /* Debian and derivatives, Alpine */
@@ -687,10 +687,10 @@ static void config_section_init(uv_loop_t *main_loop,
                     int i = 0;
                     while(apache_access_path_default[i] && access(apache_access_path_default[i], R_OK)){i++;};
                     if(!apache_access_path_default[i]){
-                        collector_error("[%s]: Apache access.log path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        collector_error("[%s]: Apache access.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(apache_access_path_default[i]);
-                } else if(!strcasecmp(p_file_info->chart_name, "Nginx_access.log")){
+                } else if(!strcasecmp(p_file_info->chartname, "Nginx_access.log")){
                     const char * const nginx_access_path_default[] = {
                         "/var/log/nginx/access.log",
                         NULL
@@ -698,7 +698,7 @@ static void config_section_init(uv_loop_t *main_loop,
                     int i = 0;
                     while(nginx_access_path_default[i] && access(nginx_access_path_default[i], R_OK)){i++;};
                     if(!nginx_access_path_default[i]){
-                        collector_error("[%s]: Nginx access.log path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        collector_error("[%s]: Nginx access.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(nginx_access_path_default[i]);
                 }
@@ -709,19 +709,19 @@ static void config_section_init(uv_loop_t *main_loop,
                 break;
             case FLB_DOCKER_EV:
                 if(access(DOCKER_EV_DEFAULT_PATH, R_OK)){
-                    collector_error("[%s]: Docker socket Unix path invalid, unknown or needs permissions", p_file_info->chart_name);
+                    collector_error("[%s]: Docker socket Unix path invalid, unknown or needs permissions", p_file_info->chartname);
                     return p_file_info_destroy(p_file_info);
                 } else p_file_info->filename = strdupz(DOCKER_EV_DEFAULT_PATH);
                 break;
             default:
-                collector_error("[%s]: log path invalid or unknown", p_file_info->chart_name);
+                collector_error("[%s]: log path invalid or unknown", p_file_info->chartname);
                 return p_file_info_destroy(p_file_info);
         }
     }
     p_file_info->file_basename = get_basename(p_file_info->filename); 
-    collector_info("[%s]: p_file_info->filename: %s", p_file_info->chart_name, 
+    collector_info("[%s]: p_file_info->filename: %s", p_file_info->chartname, 
                                             p_file_info->filename ? p_file_info->filename : "NULL");
-    collector_info("[%s]: p_file_info->file_basename: %s", p_file_info->chart_name, 
+    collector_info("[%s]: p_file_info->file_basename: %s", p_file_info->chartname, 
                                                  p_file_info->file_basename ? p_file_info->file_basename : "NULL");
     if(unlikely(!p_file_info->filename)) return p_file_info_destroy(p_file_info);
 
@@ -731,12 +731,12 @@ static void config_section_init(uv_loop_t *main_loop,
      * ------------------------------------------------------------------------- */
     p_file_info->update_every = appconfig_get_number(   &log_management_config, config_section->name, 
                                                         "update every", g_logs_manag_config.update_every);
-    collector_info("[%s]: update every = %d", p_file_info->chart_name, p_file_info->update_every);
+    collector_info("[%s]: update every = %d", p_file_info->chartname, p_file_info->update_every);
 
     p_file_info->update_timeout = appconfig_get_number( &log_management_config, config_section->name, 
                                                         "update timeout", g_logs_manag_config.update_timeout);
     if(p_file_info->update_timeout < p_file_info->update_every) p_file_info->update_timeout = p_file_info->update_every;
-    collector_info("[%s]: update timeout = %d", p_file_info->chart_name, p_file_info->update_timeout);
+    collector_info("[%s]: update timeout = %d", p_file_info->chartname, p_file_info->update_timeout);
 
 
     /* -------------------------------------------------------------------------
@@ -745,7 +745,7 @@ static void config_section_init(uv_loop_t *main_loop,
     p_file_info->use_log_timestamp = appconfig_get_boolean_ondemand(&log_management_config, config_section->name, 
                                                                     "use log timestamp", 
                                                                     g_logs_manag_config.use_log_timestamp);
-    collector_info("[%s]: use log timestamp = %s", p_file_info->chart_name, 
+    collector_info("[%s]: use log timestamp = %s", p_file_info->chartname, 
                                                     p_file_info->use_log_timestamp ? "auto or yes" : "no");
 
 
@@ -755,14 +755,14 @@ static void config_section_init(uv_loop_t *main_loop,
     p_file_info->compression_accel = appconfig_get_number(  &log_management_config, config_section->name, 
                                                             "compression acceleration", 
                                                             g_logs_manag_config.compression_acceleration);
-    collector_info("[%s]: compression acceleration = %d", p_file_info->chart_name, p_file_info->compression_accel);
+    collector_info("[%s]: compression acceleration = %d", p_file_info->chartname, p_file_info->compression_accel);
 
 
     /* -------------------------------------------------------------------------
      * Read DB mode.
      * ------------------------------------------------------------------------- */
     const char *const db_mode_str = appconfig_get(&log_management_config, config_section->name, "db mode", NULL);
-    collector_info("[%s]: db mode = %s", p_file_info->chart_name, db_mode_str ? db_mode_str : "NULL");
+    collector_info("[%s]: db mode = %s", p_file_info->chartname, db_mode_str ? db_mode_str : "NULL");
     p_file_info->db_mode = db_mode_str_to_db_mode(db_mode_str);
     freez((void *)db_mode_str);
 
@@ -776,14 +776,14 @@ static void config_section_init(uv_loop_t *main_loop,
     if(p_file_info->buff_flush_to_db_interval > SAVE_BLOB_TO_DB_MAX) {
         p_file_info->buff_flush_to_db_interval = SAVE_BLOB_TO_DB_MAX;
         collector_info("[%s]: circular buffer flush to db out of range. Using maximum permitted value: %d", 
-                p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
+                p_file_info->chartname, p_file_info->buff_flush_to_db_interval);
 
     } else if(p_file_info->buff_flush_to_db_interval < SAVE_BLOB_TO_DB_MIN) {
         p_file_info->buff_flush_to_db_interval = SAVE_BLOB_TO_DB_MIN;
         collector_info("[%s]: circular buffer flush to db out of range. Using minimum permitted value: %d",
-                p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
+                p_file_info->chartname, p_file_info->buff_flush_to_db_interval);
     } 
-    collector_info("[%s]: circular buffer flush to db = %d", p_file_info->chart_name, p_file_info->buff_flush_to_db_interval);
+    collector_info("[%s]: circular buffer flush to db = %d", p_file_info->chartname, p_file_info->buff_flush_to_db_interval);
 
 
     /* -------------------------------------------------------------------------
@@ -792,7 +792,7 @@ static void config_section_init(uv_loop_t *main_loop,
     p_file_info->blob_max_size  = appconfig_get_number( &log_management_config, config_section->name, 
                                                         "disk space limit MiB", 
                                                         g_logs_manag_config.disk_space_limit_in_mib) MiB / BLOB_MAX_FILES;
-    collector_info("[%s]: BLOB max size = %lld", p_file_info->chart_name, (long long)p_file_info->blob_max_size);
+    collector_info("[%s]: BLOB max size = %lld", p_file_info->chartname, (long long)p_file_info->blob_max_size);
 
 
     /* -------------------------------------------------------------------------
@@ -805,7 +805,7 @@ static void config_section_init(uv_loop_t *main_loop,
                              g_logs_manag_config.enable_collected_logs_total)){
         p_file_info->parser_config->chart_config |= CHART_COLLECTED_LOGS_TOTAL;
     }
-    collector_info( "[%s]: collected logs total chart enable = %s",  p_file_info->chart_name, 
+    collector_info( "[%s]: collected logs total chart enable = %s",  p_file_info->chartname, 
                     (p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL) ? "yes" : "no");
 
     if(appconfig_get_boolean(&log_management_config, config_section->name, 
@@ -813,7 +813,7 @@ static void config_section_init(uv_loop_t *main_loop,
                              g_logs_manag_config.enable_collected_logs_rate)){
         p_file_info->parser_config->chart_config |= CHART_COLLECTED_LOGS_RATE;
     }
-    collector_info( "[%s]: collected logs rate chart enable = %s",  p_file_info->chart_name, 
+    collector_info( "[%s]: collected logs rate chart enable = %s",  p_file_info->chartname, 
                     (p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE) ? "yes" : "no");
 
 
@@ -825,7 +825,7 @@ static void config_section_init(uv_loop_t *main_loop,
         Flb_tail_config_t *tail_config = callocz(1, sizeof(Flb_tail_config_t));
         if(appconfig_get_boolean(&log_management_config, config_section->name, "use inotify", CONFIG_BOOLEAN_YES))
             tail_config->use_inotify = 1;
-        collector_info( "[%s]: use inotify = %s",  p_file_info->chart_name, tail_config->use_inotify? "yes" : "no");
+        collector_info( "[%s]: use inotify = %s",  p_file_info->chartname, tail_config->use_inotify? "yes" : "no");
 
         p_file_info->flb_config = tail_config;
     }
@@ -834,17 +834,17 @@ static void config_section_init(uv_loop_t *main_loop,
         /* Check if a valid web log format configuration is detected */
         char *log_format = appconfig_get(&log_management_config, config_section->name, "log format", LOG_PATH_AUTO);
         const char delimiter = ' '; // TODO!!: TO READ FROM CONFIG
-        collector_info("[%s]: log format = %s", p_file_info->chart_name, log_format ? log_format : "NULL!");
+        collector_info("[%s]: log format = %s", p_file_info->chartname, log_format ? log_format : "NULL!");
 
         /* If "log format = auto" or no "log format" config is detected, 
             * try log format autodetection based on last log file line.
             * TODO 1: Add another case in OR where log_format is compared with a valid reg exp.
             * TODO 2: Set default log format and delimiter if not found in config? Or auto-detect? */ 
         if(!log_format || !*log_format || !strcmp(log_format, LOG_PATH_AUTO)){ 
-            collector_info("[%s]: Attempting auto-detection of log format", p_file_info->chart_name);
+            collector_info("[%s]: Attempting auto-detection of log format", p_file_info->chartname);
             char *line = read_last_line(p_file_info->filename, 0);
             if(!line){
-                collector_error("[%s]: read_last_line() returned NULL", p_file_info->chart_name);
+                collector_error("[%s]: read_last_line() returned NULL", p_file_info->chartname);
                 return p_file_info_destroy(p_file_info);
             }
             p_file_info->parser_config->gen_config = auto_detect_web_log_parser_config(line, delimiter);
@@ -852,13 +852,13 @@ static void config_section_init(uv_loop_t *main_loop,
         }
         else{
             p_file_info->parser_config->gen_config = read_web_log_parser_config(log_format, delimiter);
-            collector_info( "[%s]: Read web log parser config: %s", p_file_info->chart_name, 
+            collector_info( "[%s]: Read web log parser config: %s", p_file_info->chartname, 
                     p_file_info->parser_config->gen_config ? "success!" : "failed!");
         }
         freez(log_format);
 
         if(!p_file_info->parser_config->gen_config){
-            collector_error("[%s]: No valid web log parser config found", p_file_info->chart_name);
+            collector_error("[%s]: No valid web log parser config found", p_file_info->chartname);
             return p_file_info_destroy(p_file_info); 
         }
 
@@ -866,10 +866,10 @@ static void config_section_init(uv_loop_t *main_loop,
         Web_log_parser_config_t *wblp_config = (Web_log_parser_config_t *) p_file_info->parser_config->gen_config;
         wblp_config->verify_parsed_logs = appconfig_get_boolean( &log_management_config, config_section->name, 
                                                                     "verify parsed logs", CONFIG_BOOLEAN_NO);
-        collector_info("[%s]: verify parsed logs = %d", p_file_info->chart_name, wblp_config->verify_parsed_logs);
+        collector_info("[%s]: verify parsed logs = %d", p_file_info->chartname, wblp_config->verify_parsed_logs);
 
         wblp_config->skip_timestamp_parsing = p_file_info->use_log_timestamp ? 0 : 1;
-        collector_info("[%s]: skip_timestamp_parsing = %d", p_file_info->chart_name, wblp_config->skip_timestamp_parsing);
+        collector_info("[%s]: skip_timestamp_parsing = %d", p_file_info->chartname, wblp_config->skip_timestamp_parsing);
         
         for(int j = 0; j < wblp_config->num_fields; j++){
             if((wblp_config->fields[j] == VHOST_WITH_PORT || wblp_config->fields[j] == VHOST) 
@@ -949,7 +949,7 @@ static void config_section_init(uv_loop_t *main_loop,
             syslog_config->log_format = appconfig_get(  &log_management_config, 
                                                         config_section->name, 
                                                         "log format", NULL);
-            collector_info("[%s]: log format = %s", p_file_info->chart_name, 
+            collector_info("[%s]: log format = %s", p_file_info->chartname, 
                                                     syslog_config->log_format ? syslog_config->log_format : "NULL!");
             if(!syslog_config->log_format || !*syslog_config->log_format || !strcasecmp(syslog_config->log_format, "auto")){
                 freez(syslog_config->log_format);
@@ -964,7 +964,7 @@ static void config_section_init(uv_loop_t *main_loop,
             syslog_config->socket_config->mode = appconfig_get( &log_management_config, 
                                                                 config_section->name, 
                                                                 "mode", "unix_udp");
-            collector_info("[%s]: mode = %s", p_file_info->chart_name, syslog_config->socket_config->mode);
+            collector_info("[%s]: mode = %s", p_file_info->chartname, syslog_config->socket_config->mode);
 
             /* Check for valid socket path if (mode == unix_udp) or 
              * (mode == unix_tcp), else read syslog network interface to bind, 
@@ -981,18 +981,18 @@ static void config_section_init(uv_loop_t *main_loop,
                 syslog_config->socket_config->unix_perm = appconfig_get(&log_management_config, 
                                                                         config_section->name, 
                                                                         "unix_perm", "0644");
-                collector_info("[%s]: unix_perm = %s", p_file_info->chart_name, syslog_config->socket_config->unix_perm);
+                collector_info("[%s]: unix_perm = %s", p_file_info->chartname, syslog_config->socket_config->unix_perm);
             } else if(  !strcasecmp(syslog_config->socket_config->mode, "udp") || 
                         !strcasecmp(syslog_config->socket_config->mode, "tcp")){
                 // TODO: Check if listen is in valid format
                 syslog_config->socket_config->listen = appconfig_get(   &log_management_config, 
                                                                         config_section->name, 
                                                                         "listen", "0.0.0.0");
-                collector_info("[%s]: listen = %s", p_file_info->chart_name, syslog_config->socket_config->listen);
+                collector_info("[%s]: listen = %s", p_file_info->chartname, syslog_config->socket_config->listen);
                 syslog_config->socket_config->port = appconfig_get( &log_management_config, 
                                                                     config_section->name, 
                                                                     "port", "5140");
-                collector_info("[%s]: port = %s", p_file_info->chart_name, syslog_config->socket_config->port);
+                collector_info("[%s]: port = %s", p_file_info->chartname, syslog_config->socket_config->port);
             } else { 
                 /* Any other modes are invalid */
                 // freez(syslog_config->socket_config->mode);
@@ -1104,7 +1104,7 @@ static void config_section_init(uv_loop_t *main_loop,
         freez(cus_chart_k);
         if(unlikely(!cus_chart_v)){
             collector_error("[%s]: custom %d chart = NULL, custom charts for this log source will be disabled.", 
-                            p_file_info->chart_name, cus_off);
+                            p_file_info->chartname, cus_off);
             break;
         }
 
@@ -1116,7 +1116,7 @@ static void config_section_init(uv_loop_t *main_loop,
         freez(cus_regex_k);
         if(unlikely(!cus_regex_v)) {
             collector_error("[%s]: custom %d regex = NULL, custom charts for this log source will be disabled.", 
-                            p_file_info->chart_name, cus_off);
+                            p_file_info->chartname, cus_off);
             freez(cus_chart_v);
             break;
         }
@@ -1163,7 +1163,7 @@ static void config_section_init(uv_loop_t *main_loop,
             regerror(rc, &regex, regcomp_err_str, regcomp_err_str_size);
             collector_error("[%s]: could not compile regex for custom %d chart: %s due to error: %s. "
                             "Custom charts for this log source will be disabled.", 
-                            p_file_info->chart_name, cus_off, cus_chart_v, regcomp_err_str);
+                            p_file_info->chartname, cus_off, cus_chart_v, regcomp_err_str);
             freez(regcomp_err_str);
             freez(cus_chart_v);
             freez(cus_regex_v);
@@ -1176,7 +1176,7 @@ static void config_section_init(uv_loop_t *main_loop,
                                                     (cus_off + 1) * sizeof(Log_parser_cus_config_t *));
         p_file_info->parser_cus_config[cus_off - 1] = callocz(1, sizeof(Log_parser_cus_config_t));
 
-        p_file_info->parser_cus_config[cus_off - 1]->chart_name = cus_chart_v;
+        p_file_info->parser_cus_config[cus_off - 1]->chartname = cus_chart_v;
         p_file_info->parser_cus_config[cus_off - 1]->regex_str = cus_regex_v;
         p_file_info->parser_cus_config[cus_off - 1]->regex_name = cus_regex_name_v;
         p_file_info->parser_cus_config[cus_off - 1]->regex = regex;
@@ -1207,7 +1207,7 @@ static void config_section_init(uv_loop_t *main_loop,
         freez(out_plugin_k);
         if(unlikely(!out_plugin_v)){
             collector_error("[%s]: output %d "FLB_OUTPUT_PLUGIN_NAME_KEY" = NULL, outputs for this log source will be disabled.", 
-                            p_file_info->chart_name, out_off);
+                            p_file_info->chartname, out_off);
             break;
         }
 
@@ -1233,19 +1233,19 @@ static void config_section_init(uv_loop_t *main_loop,
     if(circular_buffer_max_size > CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX) {
         circular_buffer_max_size = CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX;
         collector_info( "[%s]: circular buffer max size out of range. Using maximum permitted value (MiB): %zu", 
-                p_file_info->chart_name, (size_t) (circular_buffer_max_size / (1 MiB)));
+                p_file_info->chartname, (size_t) (circular_buffer_max_size / (1 MiB)));
     } else if(circular_buffer_max_size < CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN) {
         circular_buffer_max_size = CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN;
         collector_info( "[%s]: circular buffer max size out of range. Using minimum permitted value (MiB): %zu", 
-                p_file_info->chart_name, (size_t) (circular_buffer_max_size / (1 MiB)));
+                p_file_info->chartname, (size_t) (circular_buffer_max_size / (1 MiB)));
     } 
-    collector_info("[%s]: circular buffer max size MiB = %zu", p_file_info->chart_name, (size_t) (circular_buffer_max_size / (1 MiB)));
+    collector_info("[%s]: circular buffer max size MiB = %zu", p_file_info->chartname, (size_t) (circular_buffer_max_size / (1 MiB)));
 
     int circular_buffer_allow_dropped_logs = appconfig_get_boolean( &log_management_config, 
                                                                     config_section->name,
                                                                     "circular buffer drop logs if full", 
                                                                     g_logs_manag_config.circ_buff_drop_logs);
-    collector_info("[%s]: circular buffer drop logs if full = %s", p_file_info->chart_name, 
+    collector_info("[%s]: circular buffer drop logs if full = %s", p_file_info->chartname, 
         circular_buffer_allow_dropped_logs ? "yes" : "no");
 
     p_file_info->circ_buff = circ_buff_init(p_file_info->buff_flush_to_db_interval,
@@ -1270,7 +1270,7 @@ static void config_section_init(uv_loop_t *main_loop,
     if(p_file_info->log_source == LOG_SOURCE_LOCAL){
         int rc = flb_add_input(p_file_info);
         if(unlikely(rc)){
-            collector_error("[%s]: flb_add_input() error: %d", p_file_info->chart_name, rc);
+            collector_error("[%s]: flb_add_input() error: %d", p_file_info->chartname, rc);
             return p_file_info_destroy(p_file_info);
         }
     }
@@ -1297,7 +1297,7 @@ static void config_section_init(uv_loop_t *main_loop,
 
     __atomic_store_n(&p_file_info->state, LOG_SRC_READY, __ATOMIC_RELAXED);
 
-    collector_info("[%s]: initialization completed", p_file_info->chart_name);
+    collector_info("[%s]: initialization completed", p_file_info->chartname);
 }
 
 void config_file_load(  uv_loop_t *main_loop, 

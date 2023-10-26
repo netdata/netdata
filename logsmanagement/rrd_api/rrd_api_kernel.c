@@ -13,7 +13,7 @@ void kernel_chart_init(struct File_info *p_file_info){
     /* Syslog severity level (== Systemd priority) - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "severity_levels"                 // id
             , "Severity Levels"                 // title
             , "severity levels"                 // units
@@ -32,7 +32,7 @@ void kernel_chart_init(struct File_info *p_file_info){
     /* Subsystem - initialise */
     if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
         chart_data->cs_subsys = create_chart(
-            (char *) p_file_info->chart_name            // type
+            (char *) p_file_info->chartname            // type
             , "subsystems"                              // id
             , "Subsystems"                              // title
             , "subsystems"                              // units
@@ -47,7 +47,7 @@ void kernel_chart_init(struct File_info *p_file_info){
     /* Device - initialise */
     if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
         chart_data->cs_device = create_chart(
-            (char *) p_file_info->chart_name            // type
+            (char *) p_file_info->chartname            // type
             , "devices"                                 // id
             , "Devices"                                 // title
             , "devices"                                 // units
@@ -77,13 +77,13 @@ void kernel_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chart_name, "severity_levels");
+                update_chart_begin(p_file_info->chartname, "severity_levels");
                 for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++)
                     update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "severity_levels");
+            update_chart_begin(p_file_info->chartname, "severity_levels");
             for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++){
                 chart_data->num_sever[idx] = p_file_info->parser_metrics->kernel->sever[idx];
                 update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
@@ -99,7 +99,7 @@ void kernel_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "subsystems");
+                update_chart_begin(p_file_info->chartname, "subsystems");
                 dfe_start_read(p_file_info->parser_metrics->kernel->subsystem, it){
                     if(it->dim_initialized)
                         update_chart_set(it_dfe.name, (collected_number) it->num);
@@ -117,7 +117,7 @@ void kernel_chart_update(struct File_info *p_file_info){
             }
             dfe_done(it);
 
-            update_chart_begin(p_file_info->chart_name, "subsystems");
+            update_chart_begin(p_file_info->chartname, "subsystems");
             dfe_start_write(p_file_info->parser_metrics->kernel->subsystem, it){
                 it->num = it->num_new;
                 update_chart_set(it_dfe.name, (collected_number) it->num);
@@ -134,7 +134,7 @@ void kernel_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "devices");
+                update_chart_begin(p_file_info->chartname, "devices");
                 dfe_start_read(p_file_info->parser_metrics->kernel->device, it){
                     if(it->dim_initialized)
                         update_chart_set(it_dfe.name, (collected_number) it->num);
@@ -152,7 +152,7 @@ void kernel_chart_update(struct File_info *p_file_info){
             }
             dfe_done(it);
 
-            update_chart_begin(p_file_info->chart_name, "devices");
+            update_chart_begin(p_file_info->chartname, "devices");
             dfe_start_write(p_file_info->parser_metrics->kernel->device, it){
                 it->num = it->num_new;
                 update_chart_set(it_dfe.name, (collected_number) it->num);

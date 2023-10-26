@@ -53,7 +53,7 @@ void systemd_chart_init(struct File_info *p_file_info){
     /* Syslog priority value - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "priority_values"                 // id
             , "Priority Values"                 // title
             , "priority values"                 // units
@@ -79,7 +79,7 @@ void systemd_chart_init(struct File_info *p_file_info){
     /* Syslog severity level (== Systemd priority) - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "severity_levels"                 // id
             , "Severity Levels"                 // title
             , "severity levels"                 // units
@@ -97,7 +97,7 @@ void systemd_chart_init(struct File_info *p_file_info){
     /* Syslog facility level - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "facility_levels"                 // id
             , "Facility Levels"                 // title
             , "facility levels"                 // units
@@ -130,7 +130,7 @@ void systemd_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chart_name, "priority_values");
+                update_chart_begin(p_file_info->chartname, "priority_values");
                 for(int idx = 0; idx < SYSLOG_PRIOR_ARR_SIZE; idx++){
                     if(chart_data->num_prior[idx])
                         update_chart_set(chart_data->dim_prior[idx], chart_data->num_prior[idx]);
@@ -138,7 +138,7 @@ void systemd_chart_update(struct File_info *p_file_info){
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "priority_values");
+            update_chart_begin(p_file_info->chartname, "priority_values");
             for(int idx = 0; idx < SYSLOG_PRIOR_ARR_SIZE; idx++){
                 if(p_file_info->parser_metrics->systemd->prior[idx]){
                     chart_data->num_prior[idx] = p_file_info->parser_metrics->systemd->prior[idx];
@@ -155,7 +155,7 @@ void systemd_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chart_name, "severity_levels");
+                update_chart_begin(p_file_info->chartname, "severity_levels");
                 for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++){
                     if(chart_data->num_sever[idx])
                         update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
@@ -163,7 +163,7 @@ void systemd_chart_update(struct File_info *p_file_info){
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "severity_levels");
+            update_chart_begin(p_file_info->chartname, "severity_levels");
             for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++){
                 if(p_file_info->parser_metrics->systemd->sever[idx]){
                     chart_data->num_sever[idx] = p_file_info->parser_metrics->systemd->sever[idx];
@@ -180,7 +180,7 @@ void systemd_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chart_name, "facility_levels");
+                update_chart_begin(p_file_info->chartname, "facility_levels");
                 for(int idx = 0; idx < SYSLOG_FACIL_ARR_SIZE; idx++){
                     if(chart_data->num_facil[idx])
                         update_chart_set(dim_facil_str[idx], chart_data->num_facil[idx]);
@@ -188,7 +188,7 @@ void systemd_chart_update(struct File_info *p_file_info){
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "facility_levels");
+            update_chart_begin(p_file_info->chartname, "facility_levels");
             for(int idx = 0; idx < SYSLOG_FACIL_ARR_SIZE; idx++){
                 if(p_file_info->parser_metrics->systemd->facil[idx]){
                     chart_data->num_facil[idx] = p_file_info->parser_metrics->systemd->facil[idx];

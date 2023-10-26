@@ -12,7 +12,7 @@ void docker_ev_chart_init(struct File_info *p_file_info){
     /* Docker events type - initialise */
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_TYPE){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "events_type"                     // id
             , "Events type"                     // title
             , "events types"                    // units
@@ -30,7 +30,7 @@ void docker_ev_chart_init(struct File_info *p_file_info){
     /* Docker events actions - initialise */
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_ACTION){
         create_chart(
-            (char *) p_file_info->chart_name      // type
+            (char *) p_file_info->chartname      // type
             , "events_action"                     // id
             , "Events action"                     // title
             , "events actions"                    // units
@@ -73,13 +73,13 @@ void docker_ev_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "events_type");
+                update_chart_begin(p_file_info->chartname, "events_type");
                 for(int idx = 0; idx < NUM_OF_DOCKER_EV_TYPES; idx++)
                     update_chart_set(docker_ev_type_string[idx], chart_data->num_dock_ev_type[idx]);
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "events_type");
+            update_chart_begin(p_file_info->chartname, "events_type");
             for(int idx = 0; idx < NUM_OF_DOCKER_EV_TYPES; idx++){
                 chart_data->num_dock_ev_type[idx] = p_file_info->parser_metrics->docker_ev->ev_type[idx];
                 update_chart_set(docker_ev_type_string[idx], chart_data->num_dock_ev_type[idx]);
@@ -95,7 +95,7 @@ void docker_ev_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "events_action");
+                update_chart_begin(p_file_info->chartname, "events_action");
                 for(int ev_off = 0; ev_off < NUM_OF_DOCKER_EV_TYPES; ev_off++){
                     int act_off = -1;
                     while(docker_ev_action_string[ev_off][++act_off] != NULL){
@@ -110,7 +110,7 @@ void docker_ev_chart_update(struct File_info *p_file_info){
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "events_action");
+            update_chart_begin(p_file_info->chartname, "events_action");
             for(int ev_off = 0; ev_off < NUM_OF_DOCKER_EV_TYPES; ev_off++){
                 int act_off = -1;
                 while(docker_ev_action_string[ev_off][++act_off] != NULL){

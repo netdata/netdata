@@ -17,7 +17,7 @@
 #define LOGS_MANAG_FUNC_PARAM_AFTER     "after"
 #define LOGS_MANAG_FUNC_PARAM_BEFORE    "before"
 #define LOGS_QRY_KW_QUOTA               "quota"
-#define LOGS_QRY_KW_CHARTNAME           "chart_name"
+#define LOGS_QRY_KW_CHARTNAME           "chartname"
 #define LOGS_QRY_KW_FILENAME            "filename"
 #define LOGS_QRY_KW_KEYWORD             "keyword"
 #define LOGS_QRY_KW_IGNORE_CASE         "ignore_case"
@@ -71,12 +71,12 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb);
  * @param stop_monotonic_ut Monotonic time in usec after which the query
  * will be timed out.
  * 
- * @param chart_name Chart name of log source to be queried, as it appears 
+ * @param chartname Chart name of log source to be queried, as it appears 
  * on the netdata dashboard. If this is defined and not an empty string, the 
  * filename parameter is ignored.
  * 
  * @param filename Full path of log source to be queried. Will only be used 
- * if the chart_name is not used.
+ * if the chartname is not used.
  * 
  * @param keyword The keyword to be searched. IMPORTANT! Regular expressions
  *  are supported (if sanitize_keyword is not set) but have not been tested 
@@ -111,7 +111,7 @@ typedef struct logs_query_params {
     int order_by_asc;
     unsigned long quota;
     usec_t stop_monotonic_ut;
-    char *chart_name[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
+    char *chartname[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *filename[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *keyword;
     int ignore_case;

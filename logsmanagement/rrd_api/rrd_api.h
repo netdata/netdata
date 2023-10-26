@@ -152,7 +152,7 @@ static inline void update_chart_end(time_t sec){
     /* Number of collected logs total - initialise */                                           \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
         create_chart(                                                                           \
-            (char *) p_file_info->chart_name    /* type         */                              \
+            (char *) p_file_info->chartname    /* type         */                              \
             , "collected_logs_total"            /* id           */                              \
             , CHART_TITLE_TOTAL_COLLECTED_LOGS  /* title        */                              \
             , "log records"                     /* units        */                              \
@@ -168,7 +168,7 @@ static inline void update_chart_end(time_t sec){
     /* Number of collected logs rate - initialise */                                            \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){                   \
         create_chart(                                                                           \
-            (char *) p_file_info->chart_name    /* type         */                              \
+            (char *) p_file_info->chartname    /* type         */                              \
             , "collected_logs_rate"             /* id           */                              \
             , CHART_TITLE_RATE_COLLECTED_LOGS   /* title        */                              \
             , "log records"                     /* units        */                              \
@@ -190,7 +190,7 @@ static inline void update_chart_end(time_t sec){
             for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;            \
                         sec < p_file_info->parser_metrics->last_update;                         \
                         sec++){                                                                 \
-                update_chart_begin(p_file_info->chart_name, "collected_logs_total");   \
+                update_chart_begin(p_file_info->chartname, "collected_logs_total");   \
                 update_chart_set("total records", chart_data->num_lines);                       \
                 update_chart_end(sec);                                                          \
             }                                                                                   \
@@ -201,7 +201,7 @@ static inline void update_chart_end(time_t sec){
             for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;            \
                         sec < p_file_info->parser_metrics->last_update;                         \
                         sec++){                                                                 \
-                update_chart_begin(p_file_info->chart_name, "collected_logs_rate");    \
+                update_chart_begin(p_file_info->chartname, "collected_logs_rate");    \
                 update_chart_set("records", chart_data->num_lines);                             \
                 update_chart_end(sec);                                                          \
             }                                                                                   \
@@ -211,14 +211,14 @@ static inline void update_chart_end(time_t sec){
                                                                                                 \
     /* Number of collected logs total - update */                                               \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
-        update_chart_begin( (char *) p_file_info->chart_name, "collected_logs_total");          \
+        update_chart_begin( (char *) p_file_info->chartname, "collected_logs_total");          \
         update_chart_set("total records", chart_data->num_lines);                               \
         update_chart_end(p_file_info->parser_metrics->last_update);                             \
     }                                                                                           \
                                                                                                 \
     /* Number of collected logs rate - update */                                                \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){                   \
-        update_chart_begin( (char *) p_file_info->chart_name, "collected_logs_rate");           \
+        update_chart_begin( (char *) p_file_info->chartname, "collected_logs_rate");           \
         update_chart_set("records", chart_data->num_lines);                                     \
         update_chart_end(p_file_info->parser_metrics->last_update);                             \
     }                                                                                           \
@@ -235,7 +235,7 @@ static inline void update_chart_end(time_t sec){
             cus;                                                                                \
             cus = cus->next){                                                                   \
                                                                                                 \
-            if(!strcmp(cus->id, p_file_info->parser_cus_config[cus_off]->chart_name))           \
+            if(!strcmp(cus->id, p_file_info->parser_cus_config[cus_off]->chartname))           \
                 break;                                                                          \
                                                                                                 \
             p_cus = &(cus->next);                                                               \
@@ -245,10 +245,10 @@ static inline void update_chart_end(time_t sec){
             cus = callocz(1, sizeof(Chart_data_cus_t));                                         \
             *p_cus = cus;                                                                       \
                                                                                                 \
-            cus->id = p_file_info->parser_cus_config[cus_off]->chart_name;                      \
+            cus->id = p_file_info->parser_cus_config[cus_off]->chartname;                      \
                                                                                                 \
             create_chart(                                                                       \
-                (char *) p_file_info->chart_name                        /* type         */      \
+                (char *) p_file_info->chartname                        /* type         */      \
                 , cus->id                                               /* id           */      \
                 , cus->id                                               /* title        */      \
                 , "matches"                                             /* units        */      \
@@ -282,7 +282,7 @@ static inline void update_chart_end(time_t sec){
                               cus;                                                              \
                               cus = cus->next){                                                 \
                                                                                                 \
-            update_chart_begin(p_file_info->chart_name, cus->id);                      \
+            update_chart_begin(p_file_info->chartname, cus->id);                      \
                                                                                                 \
             for(int d_idx = 0; d_idx < cus->dims_size; d_idx++)                                 \
                 update_chart_set(cus->dims[d_idx].name, cus->dims[d_idx].val);                  \
@@ -296,7 +296,7 @@ static inline void update_chart_end(time_t sec){
                           cus;                                                                  \
                           cus = cus->next){                                                     \
                                                                                                 \
-        update_chart_begin(p_file_info->chart_name, cus->id);                          \
+        update_chart_begin(p_file_info->chartname, cus->id);                          \
                                                                                                 \
         for(int d_idx = 0; d_idx < cus->dims_size; d_idx++){                                    \
                                                                                                 \

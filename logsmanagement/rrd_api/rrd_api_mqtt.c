@@ -13,7 +13,7 @@ void mqtt_chart_init(struct File_info *p_file_info){
     /* Topic - initialise */
     if(p_file_info->parser_config->chart_config & CHART_MQTT_TOPIC){
         chart_data->cs_topic = create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "topics"                          // id
             , "Topics"                          // title
             , "topics"                          // units
@@ -45,7 +45,7 @@ void mqtt_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "topics");
+                update_chart_begin(p_file_info->chartname, "topics");
                 dfe_start_read(p_file_info->parser_metrics->mqtt->topic, it){
                     if(it->dim_initialized)
                         update_chart_set(it_dfe.name, (collected_number) it->num);
@@ -63,7 +63,7 @@ void mqtt_chart_update(struct File_info *p_file_info){
             }
             dfe_done(it);
 
-            update_chart_begin(p_file_info->chart_name, "topics");
+            update_chart_begin(p_file_info->chartname, "topics");
             dfe_start_write(p_file_info->parser_metrics->mqtt->topic, it){
                 it->num = it->num_new;
                 update_chart_set(it_dfe.name, (collected_number) it->num);

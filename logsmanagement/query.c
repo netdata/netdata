@@ -69,13 +69,13 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
 
     for (int i = 0; i < p_file_infos_arr->count; i++) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "id", p_file_infos_arr->data[i]->chart_name);
-        buffer_json_member_add_string(wb, "name", p_file_infos_arr->data[i]->chart_name);
+        buffer_json_member_add_string(wb, "id", p_file_infos_arr->data[i]->chartname);
+        buffer_json_member_add_string(wb, "name", p_file_infos_arr->data[i]->chartname);
         buffer_json_member_add_string(wb, "pill", "100"); // TODO
 
         char info[1024];
         snprintfz(info, sizeof(info), "Chart '%s' from log source '%s'",
-                    p_file_infos_arr->data[i]->chart_name,
+                    p_file_infos_arr->data[i]->chartname,
                     p_file_infos_arr->data[i]->file_basename);
 
         buffer_json_member_add_string(wb, "info", info);
@@ -96,7 +96,7 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
         //                     "         \"DB flush interval\": %d,\n"
         //                     "         \"DB disk space limit\": %" PRId64 "\n"
         //                     "      },\n", 
-        //                 p_file_infos_arr->data[i]->chart_name,
+        //                 p_file_infos_arr->data[i]->chartname,
         //                 p_file_infos_arr->data[i]->file_basename,
         //                 p_file_infos_arr->data[i]->filename,
         //                 log_src_type_t_str[p_file_infos_arr->data[i]->log_type],
@@ -131,15 +131,15 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     if(p_file_infos_arr == NULL) 
         return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_INIT_ERR];
 
-    /* Find p_file_infos for this query according to chart_names or filenames 
+    /* Find p_file_infos for this query according to chartnames or filenames 
      * if the former is not valid. Only one of the two will be used, 
      * charts_names and filenames cannot be mixed.
      * If neither list is provided, search all available log sources. */
-    if(p_query_params->chart_name[0]){
+    if(p_query_params->chartname[0]){
         int pfi_off = 0;
-        for(int cn_off = 0; p_query_params->chart_name[cn_off]; cn_off++) {
+        for(int cn_off = 0; p_query_params->chartname[cn_off]; cn_off++) {
             for(int pfi_arr_off = 0; pfi_arr_off < p_file_infos_arr->count; pfi_arr_off++) {
-                if( !strcmp(p_file_infos_arr->data[pfi_arr_off]->chart_name, p_query_params->chart_name[cn_off]) && 
+                if( !strcmp(p_file_infos_arr->data[pfi_arr_off]->chartname, p_query_params->chartname[cn_off]) && 
                     p_file_infos_arr->data[pfi_arr_off]->db_mode != LOGS_MANAG_DB_MODE_NONE) {
                     p_file_infos[pfi_off++] = p_file_infos_arr->data[pfi_arr_off];
                     break;

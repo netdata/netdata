@@ -18,7 +18,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue; 
 
-        update_chart_set(p_file_info->chart_name, 
+        update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED));
     }
     update_chart_end(0);
@@ -30,7 +30,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chart_name, p_file_info->circ_buff->num_of_items);
+        update_chart_set(p_file_info->chartname, p_file_info->circ_buff->num_of_items);
     }
     update_chart_end(0);
 
@@ -41,7 +41,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chart_name, 
+        update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED));
     }
     update_chart_end(0);
@@ -53,7 +53,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chart_name, 
+        update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED));
     }
     update_chart_end(0);
@@ -65,7 +65,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chart_name, 
+        update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->compression_ratio, __ATOMIC_RELAXED));
     }
     update_chart_end(0);
@@ -77,7 +77,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chart_name, 
+        update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->blob_total_size, __ATOMIC_RELAXED));
     }
     update_chart_end(0);
@@ -104,7 +104,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chart_name, 
+        update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->cpu_time_per_mib.user, __ATOMIC_RELAXED));
     }
     update_chart_end(0);
@@ -116,7 +116,7 @@ static void stats_charts_update(void){
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chart_name, 
+        update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->cpu_time_per_mib.sys, __ATOMIC_RELAXED));
     }
     update_chart_end(0);
@@ -144,7 +144,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every          // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* Circular buffer number of items - initialise */
     create_chart(
@@ -159,7 +159,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
         
     /* Circular buffer uncompressed buffered items memory stats - initialise */
     create_chart(
@@ -174,7 +174,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every                      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* Circular buffer compressed buffered items memory stats - initialise */
     create_chart(
@@ -189,7 +189,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every                      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* Compression stats - initialise */
     create_chart(
@@ -204,7 +204,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* DB disk usage stats - initialise */
     create_chart(
@@ -219,7 +219,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every  // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* DB timings - initialise */
     create_chart(
@@ -239,12 +239,12 @@ void stats_charts_init(void *arg){
         dim_db_timings_write = reallocz(dim_db_timings_write, (i + 1) * sizeof(char *));
         dim_db_timings_rotate = reallocz(dim_db_timings_rotate, (i + 1) * sizeof(char *));
 
-        dim_db_timings_write[i] = mallocz(snprintf(NULL, 0, "%s_write", p_file_info->chart_name) + 1);
-        sprintf(dim_db_timings_write[i], "%s_write", p_file_info->chart_name);
+        dim_db_timings_write[i] = mallocz(snprintf(NULL, 0, "%s_write", p_file_info->chartname) + 1);
+        sprintf(dim_db_timings_write[i], "%s_write", p_file_info->chartname);
         add_dim(dim_db_timings_write[i], RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
-        dim_db_timings_rotate[i] = mallocz(snprintf(NULL, 0, "%s_rotate", p_file_info->chart_name) + 1);
-        sprintf(dim_db_timings_rotate[i], "%s_rotate", p_file_info->chart_name);
+        dim_db_timings_rotate[i] = mallocz(snprintf(NULL, 0, "%s_rotate", p_file_info->chartname) + 1);
+        sprintf(dim_db_timings_rotate[i], "%s_rotate", p_file_info->chartname);
         add_dim(dim_db_timings_rotate[i], RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
     }
 
@@ -261,7 +261,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every          // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
 
     /* Query CPU time per byte (system) - initialise */
     create_chart(
@@ -276,7 +276,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every              // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chart_name, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
 
     netdata_mutex_unlock(p_stdout_mut);
 

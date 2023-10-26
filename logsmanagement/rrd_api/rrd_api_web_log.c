@@ -13,7 +13,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Vhost - initialise */
     if(p_file_info->parser_config->chart_config & CHART_VHOST){
         chart_data->cs_vhosts = create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "vhost"                           // id
             , "Requests by Vhost"               // title
             , "requests"                        // units
@@ -28,7 +28,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Port - initialise */
     if(p_file_info->parser_config->chart_config & CHART_PORT){
         chart_data->cs_ports = create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "port"                            // id
             , "Requests by Port"                // title
             , "requests"                        // units
@@ -43,7 +43,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* IP Version - initialise */
     if(p_file_info->parser_config->chart_config & CHART_IP_VERSION){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "ip_version"                      // id
             , "Requests by IP version"          // title
             , "requests"                        // units
@@ -62,7 +62,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Request client current poll - initialise */
     if(p_file_info->parser_config->chart_config & CHART_REQ_CLIENT_CURRENT){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "clients"                         // id
             , "Current Poll Unique Client IPs"  // title
             , "unique ips"                      // units
@@ -80,7 +80,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Request client all-time - initialise */
     if(p_file_info->parser_config->chart_config & CHART_REQ_CLIENT_ALL_TIME){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "clients_all"                     // id
             , "All Time Unique Client IPs"      // title
             , "unique ips"                      // units
@@ -98,7 +98,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Request methods - initialise */
     if(p_file_info->parser_config->chart_config & CHART_REQ_METHODS){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "http_methods"                    // id
             , "Requests Per HTTP Method"        // title
             , "requests"                        // units
@@ -116,7 +116,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Request protocol - initialise */
     if(p_file_info->parser_config->chart_config & CHART_REQ_PROTO){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "http_versions"                   // id
             , "Requests Per HTTP Version"       // title
             , "requests"                        // units
@@ -136,7 +136,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Request bandwidth - initialise */
     if(p_file_info->parser_config->chart_config & CHART_BANDWIDTH){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "bandwidth"                       // id
             , "Bandwidth"                       // title
             , "kilobits"                        // units
@@ -154,7 +154,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Request processing time - initialise */
     if(p_file_info->parser_config->chart_config & CHART_REQ_PROC_TIME){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "timings"                         // id
             , "Request Processing Time"         // title
             , "milliseconds"                    // units
@@ -173,7 +173,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Response code family - initialise */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE_FAMILY){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "responses"                       // id
             , "Response Codes"                  // title
             , "requests"                        // units
@@ -195,7 +195,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Response code - initialise */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "detailed_responses"              // id
             , "Detailed Response Codes"         // title
             , "requests"                        // units
@@ -216,7 +216,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* Response code type - initialise */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE_TYPE){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "response_types"                  // id
             , "Response Statuses"               // title
             , "requests"                        // units
@@ -237,7 +237,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* SSL protocol - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SSL_PROTO){
         create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "ssl_protocol"                    // id
             , "Requests Per SSL Protocol"       // title
             , "requests"                        // units
@@ -260,7 +260,7 @@ void web_log_chart_init(struct File_info *p_file_info){
     /* SSL cipher suite - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SSL_CIPHER){
         chart_data->cs_ssl_ciphers = create_chart(
-            (char *) p_file_info->chart_name    // type
+            (char *) p_file_info->chartname    // type
             , "ssl_cipher_suite"                // id
             , "Requests by SSL cipher suite"    // title
             , "requests"                        // units
@@ -292,7 +292,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "vhost");
+                update_chart_begin(p_file_info->chartname, "vhost");
                 for(int idx = 0; idx < chart_data->vhost_size; idx++)
                     update_chart_set(wlm->vhost_arr.vhosts[idx].name, chart_data->num_vhosts[idx]);
                 update_chart_end(sec);
@@ -316,7 +316,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                 chart_data->vhost_size = wlm->vhost_arr.size;
             }
 
-            update_chart_begin(p_file_info->chart_name, "vhost");
+            update_chart_begin(p_file_info->chartname, "vhost");
             for(int idx = 0; idx < chart_data->vhost_size; idx++){
                 chart_data->num_vhosts[idx] += wlm->vhost_arr.vhosts[idx].count;
                 wlm->vhost_arr.vhosts[idx].count = 0;
@@ -331,7 +331,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "port");
+                update_chart_begin(p_file_info->chartname, "port");
                 for(int idx = 0; idx < chart_data->port_size; idx++)
                     update_chart_set(wlm->port_arr.ports[idx].name, chart_data->num_ports[idx]);
                 update_chart_end(sec);
@@ -354,7 +354,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                 chart_data->port_size = wlm->port_arr.size;
             }
 
-            update_chart_begin(p_file_info->chart_name, "port");
+            update_chart_begin(p_file_info->chartname, "port");
             for(int idx = 0; idx < chart_data->port_size; idx++){
                 chart_data->num_ports[idx] += wlm->port_arr.ports[idx].count;
                 wlm->port_arr.ports[idx].count = 0;
@@ -369,7 +369,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chart_name, "ip_version");
+                update_chart_begin(p_file_info->chartname, "ip_version");
                 update_chart_set("ipv4", chart_data->num_ip_ver_4);
                 update_chart_set("ipv6", chart_data->num_ip_ver_6);
                 update_chart_set("invalid", chart_data->num_ip_ver_invalid);
@@ -381,7 +381,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_ip_ver_invalid += wlm->ip_ver.invalid;
             memset(&wlm->ip_ver, 0, sizeof(wlm->ip_ver));
 
-            update_chart_begin(p_file_info->chart_name, "ip_version");
+            update_chart_begin(p_file_info->chartname, "ip_version");
             update_chart_set("ipv4", chart_data->num_ip_ver_4);
             update_chart_set("ipv6", chart_data->num_ip_ver_6);
             update_chart_set("invalid", chart_data->num_ip_ver_invalid);
@@ -394,7 +394,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "clients");
+                update_chart_begin(p_file_info->chartname, "clients");
                 update_chart_set("ipv4", chart_data->num_req_client_current_ipv4);
                 update_chart_set("ipv6", chart_data->num_req_client_current_ipv6);
                 update_chart_end(sec);
@@ -405,7 +405,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_req_client_current_ipv6 += wlm->req_clients_current_arr.ipv6_size;
             wlm->req_clients_current_arr.ipv6_size = 0;
 
-            update_chart_begin(p_file_info->chart_name, "clients");
+            update_chart_begin(p_file_info->chartname, "clients");
             update_chart_set("ipv4", chart_data->num_req_client_current_ipv4);
             update_chart_set("ipv6", chart_data->num_req_client_current_ipv6);
             update_chart_end(p_file_info->parser_metrics->last_update); 
@@ -417,7 +417,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "clients_all");
+                update_chart_begin(p_file_info->chartname, "clients_all");
                 update_chart_set("ipv4", chart_data->num_req_client_all_time_ipv4);
                 update_chart_set("ipv6", chart_data->num_req_client_all_time_ipv6);
                 update_chart_end(sec);
@@ -426,7 +426,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_req_client_all_time_ipv4 = wlm->req_clients_alltime_arr.ipv4_size;  
             chart_data->num_req_client_all_time_ipv6 = wlm->req_clients_alltime_arr.ipv6_size;
 
-            update_chart_begin(p_file_info->chart_name, "clients_all");
+            update_chart_begin(p_file_info->chartname, "clients_all");
             update_chart_set("ipv4", chart_data->num_req_client_all_time_ipv4);
             update_chart_set("ipv6", chart_data->num_req_client_all_time_ipv6);
             update_chart_end(p_file_info->parser_metrics->last_update);
@@ -438,7 +438,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "http_methods");
+                update_chart_begin(p_file_info->chartname, "http_methods");
                 for(int idx = 0; idx < REQ_METHOD_ARR_SIZE; idx++){
                     if(chart_data->num_req_method[idx])
                         update_chart_set(req_method_str[idx], chart_data->num_req_method[idx]);
@@ -446,7 +446,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "http_methods");
+            update_chart_begin(p_file_info->chartname, "http_methods");
             for(int idx = 0; idx < REQ_METHOD_ARR_SIZE; idx++){
                 chart_data->num_req_method[idx] += wlm->req_method[idx];
                 wlm->req_method[idx] = 0;
@@ -462,7 +462,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "http_versions");
+                update_chart_begin(p_file_info->chartname, "http_versions");
                 update_chart_set("1.0", chart_data->num_req_proto_http_1);
                 update_chart_set("1.1", chart_data->num_req_proto_http_1_1);
                 update_chart_set("2.0", chart_data->num_req_proto_http_2);
@@ -476,7 +476,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_req_proto_other += wlm->req_proto.other;
             memset(&wlm->req_proto, 0, sizeof(wlm->req_proto));
 
-            update_chart_begin(p_file_info->chart_name, "http_versions");
+            update_chart_begin(p_file_info->chartname, "http_versions");
             update_chart_set("1.0", chart_data->num_req_proto_http_1);
             update_chart_set("1.1", chart_data->num_req_proto_http_1_1);
             update_chart_set("2.0", chart_data->num_req_proto_http_2);
@@ -490,7 +490,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "bandwidth");
+                update_chart_begin(p_file_info->chartname, "bandwidth");
                 update_chart_set("received", chart_data->num_bandwidth_req_size);
                 update_chart_set("sent", chart_data->num_bandwidth_resp_size);
                 update_chart_end(sec);
@@ -500,7 +500,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_bandwidth_resp_size += wlm->bandwidth.resp_size;
             memset(&wlm->bandwidth, 0, sizeof(wlm->bandwidth));
 
-            update_chart_begin(p_file_info->chart_name, "bandwidth");
+            update_chart_begin(p_file_info->chartname, "bandwidth");
             update_chart_set("received", chart_data->num_bandwidth_req_size);
             update_chart_set("sent", chart_data->num_bandwidth_resp_size);
             update_chart_end(p_file_info->parser_metrics->last_update);
@@ -512,7 +512,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "timings");
+                update_chart_begin(p_file_info->chartname, "timings");
                 update_chart_set("min", chart_data->num_req_proc_time_min);
                 update_chart_set("max", chart_data->num_req_proc_time_max);
                 update_chart_set("avg", chart_data->num_req_proc_time_avg);
@@ -525,7 +525,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                 wlm->req_proc_time.sum / wlm->req_proc_time.count : 0;
             memset(&wlm->req_proc_time, 0, sizeof(wlm->req_proc_time));
 
-            update_chart_begin(p_file_info->chart_name, "timings");
+            update_chart_begin(p_file_info->chartname, "timings");
             update_chart_set("min", chart_data->num_req_proc_time_min);
             update_chart_set("max", chart_data->num_req_proc_time_max);
             update_chart_set("avg", chart_data->num_req_proc_time_avg);
@@ -538,7 +538,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chart_name, "responses");
+                update_chart_begin(p_file_info->chartname, "responses");
                 update_chart_set("1xx", chart_data->num_resp_code_family_1xx);
                 update_chart_set("2xx", chart_data->num_resp_code_family_2xx);
                 update_chart_set("3xx", chart_data->num_resp_code_family_3xx);
@@ -556,7 +556,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_resp_code_family_other += wlm->resp_code_family.other;
             memset(&wlm->resp_code_family, 0, sizeof(wlm->resp_code_family));
             
-            update_chart_begin(p_file_info->chart_name, "responses");
+            update_chart_begin(p_file_info->chartname, "responses");
             update_chart_set("1xx", chart_data->num_resp_code_family_1xx);
             update_chart_set("2xx", chart_data->num_resp_code_family_2xx);
             update_chart_set("3xx", chart_data->num_resp_code_family_3xx);
@@ -574,7 +574,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "detailed_responses");
+                update_chart_begin(p_file_info->chartname, "detailed_responses");
                 for(int idx = 0; idx < RESP_CODE_ARR_SIZE - 1; idx++){
                     if(chart_data->num_resp_code[idx]){
                         snprintfz(dim_name, 4, "%d", idx + 100);
@@ -586,7 +586,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                 update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chart_name, "detailed_responses");
+            update_chart_begin(p_file_info->chartname, "detailed_responses");
             for(int idx = 0; idx < RESP_CODE_ARR_SIZE - 1; idx++){
                 chart_data->num_resp_code[idx] += wlm->resp_code[idx];
                 wlm->resp_code[idx] = 0;
@@ -608,7 +608,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "response_types");
+                update_chart_begin(p_file_info->chartname, "response_types");
                 update_chart_set("success", chart_data->num_resp_code_type_success);
                 update_chart_set("redirect", chart_data->num_resp_code_type_redirect);
                 update_chart_set("bad", chart_data->num_resp_code_type_bad);
@@ -624,7 +624,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_resp_code_type_other += wlm->resp_code_type.other;
             memset(&wlm->resp_code_type, 0, sizeof(wlm->resp_code_type));
 
-            update_chart_begin(p_file_info->chart_name, "response_types");
+            update_chart_begin(p_file_info->chartname, "response_types");
             update_chart_set("success", chart_data->num_resp_code_type_success);
             update_chart_set("redirect", chart_data->num_resp_code_type_redirect);
             update_chart_set("bad", chart_data->num_resp_code_type_bad);
@@ -639,7 +639,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "ssl_protocol");
+                update_chart_begin(p_file_info->chartname, "ssl_protocol");
                 update_chart_set("TLSV1", chart_data->num_ssl_proto_tlsv1);
                 update_chart_set("TLSV1.1", chart_data->num_ssl_proto_tlsv1_1);
                 update_chart_set("TLSV1.2", chart_data->num_ssl_proto_tlsv1_2);
@@ -659,7 +659,7 @@ void web_log_chart_update(struct File_info *p_file_info){
             chart_data->num_ssl_proto_other += wlm->ssl_proto.other;
             memset(&wlm->ssl_proto, 0, sizeof(wlm->ssl_proto));
 
-            update_chart_begin(p_file_info->chart_name, "ssl_protocol");
+            update_chart_begin(p_file_info->chartname, "ssl_protocol");
             update_chart_set("TLSV1", chart_data->num_ssl_proto_tlsv1);
             update_chart_set("TLSV1.1", chart_data->num_ssl_proto_tlsv1_1);
             update_chart_set("TLSV1.2", chart_data->num_ssl_proto_tlsv1_2);
@@ -676,7 +676,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
                 
-                update_chart_begin(p_file_info->chart_name, "ssl_cipher_suite");
+                update_chart_begin(p_file_info->chartname, "ssl_cipher_suite");
                 for(int idx = 0; idx < chart_data->ssl_cipher_size; idx++)
                     update_chart_set(wlm->ssl_cipher_arr.ssl_ciphers[idx].name, chart_data->num_ssl_ciphers[idx]);
                 update_chart_end(sec);
@@ -697,7 +697,7 @@ void web_log_chart_update(struct File_info *p_file_info){
                 chart_data->ssl_cipher_size = wlm->ssl_cipher_arr.size;
             }
 
-            update_chart_begin(p_file_info->chart_name, "ssl_cipher_suite");
+            update_chart_begin(p_file_info->chartname, "ssl_cipher_suite");
             for(int idx = 0; idx < chart_data->ssl_cipher_size; idx++){
                 chart_data->num_ssl_ciphers[idx] += wlm->ssl_cipher_arr.ssl_ciphers[idx].count;
                 wlm->ssl_cipher_arr.ssl_ciphers[idx].count = 0;

@@ -82,7 +82,7 @@ struct File_info {
      * is not used, depending on the type of the log source. */
 
     /* Struct members core to any log source type */
-    const char *chart_name;                         /**< Top level chart name for this log source on web dashboard **/ 
+    const char *chartname;                         /**< Top level chart name for this log source on web dashboard **/ 
     char *filename;                                 /**< Full path of log source **/
     const char *file_basename;                      /**< Basename of log source **/
     const char *stream_guid;                        /**< Streaming input GUID **/

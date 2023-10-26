@@ -154,7 +154,7 @@ function submit_query() {
     Array.from(document.getElementsByClassName("sourceCheckBox")).forEach(
       function(element, index, array) {
           if(element.checked){
-            xmlhttp_req += ' chart_name:"' + element.name + '"';
+            xmlhttp_req += ' chartname:"' + element.name + '"';
           }
         }
     );
@@ -170,7 +170,7 @@ function submit_query() {
     Array.from(document.getElementsByClassName("sourceCheckBox")).forEach(
       function(element, index, array) {
           if(element.checked){
-            xmlhttp_req += "&chart_name=" + element.name;
+            xmlhttp_req += "&chartname=" + element.name;
           }
         }
     );

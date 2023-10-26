@@ -402,7 +402,7 @@ int search_keyword(	char *src, size_t src_sz,
 /* -------------------------------------------------------------------------- */
 
 typedef struct log_parser_cus_config{
-    char *chart_name;					/**< Chart name where the regex metrics will appear in **/
+    char *chartname;					/**< Chart name where the regex metrics will appear in **/
     char *regex_str;					/**< String representation of the regex **/
     char *regex_name;					/**< If regex is named, this is where its name is stored **/
     regex_t regex;						/**< The compiled regex **/
