@@ -655,8 +655,8 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
 
     if(rpt->config.rrdpush_compression) {
-        char *order = appconfig_get(&stream_config, rpt->key, "compression algorithm preference", "zstd lz4 gzip");
-        order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithm preference", order);
+        char *order = appconfig_get(&stream_config, rpt->key, "compression algorithms order", "zstd lz4 gzip");
+        order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithms order", order);
         rrdpush_parse_compression_order(rpt, order);
     }
 
