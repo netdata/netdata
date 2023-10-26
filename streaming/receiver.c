@@ -778,7 +778,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
                 STREAM_CAPABILITIES exclude = compressions;
                 exclude &= ~c;
 
-                rpt->capabilities &= exclude;
+                rpt->capabilities &= ~exclude;
                 break;
             }
         }
