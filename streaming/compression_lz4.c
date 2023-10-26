@@ -53,7 +53,7 @@ size_t rrdpush_compress_lz4(struct compressor_state *state, const char *data, si
             (char *)state->output.data,
             (int)(state->input.write_pos - state->input.read_pos),
             (int)state->output.size,
-            1);
+            state->level);
 
     if (compressed_data_size <= 0) {
         netdata_log_error("STREAM: LZ4_compress_fast_continue() returned %ld "

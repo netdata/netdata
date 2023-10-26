@@ -113,6 +113,18 @@ int rrdpush_init() {
 #ifdef ENABLE_RRDPUSH_COMPRESSION
     default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
                                                                               "enable compression", default_rrdpush_compression_enabled);
+
+    rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD] = (int)appconfig_get_number(
+            &stream_config, CONFIG_SECTION_STREAM, "zstd compression level",
+            rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD]);
+
+    rrdpush_compression_levels[COMPRESSION_ALGORITHM_LZ4] = (int)appconfig_get_number(
+            &stream_config, CONFIG_SECTION_STREAM, "lz4 compression acceleration",
+            rrdpush_compression_levels[COMPRESSION_ALGORITHM_LZ4]);
+
+    rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP] = (int)appconfig_get_number(
+            &stream_config, CONFIG_SECTION_STREAM, "gzip compression level",
+            rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP]);
 #endif
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
@@ -886,8 +898,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
     rpt->last_msg_t = now_monotonic_sec();
-    rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
+
+    rpt->capabilities = STREAM_CAP_INVALID;
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
@@ -1500,13 +1513,6 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
         // DATA WITH ML requires INTERPOLATED
         common_caps &= ~STREAM_CAP_DATA_WITH_ML;
 
-    if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_GZIP))
-        common_caps &= ~(STREAM_CAP_LZ4|STREAM_CAP_ZSTD); // keep only GZIP
-    else if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_ZSTD))
-        common_caps &= ~(STREAM_CAP_LZ4|STREAM_CAP_GZIP); // keep only ZSTD
-    else if((common_caps & (STREAM_CAP_LZ4|STREAM_CAP_GZIP|STREAM_CAP_ZSTD)) & (STREAM_CAP_LZ4))
-        common_caps &= ~(STREAM_CAP_GZIP|STREAM_CAP_ZSTD); // keep only LZ4
-
     return common_caps;
 }
 
@@ -1515,6 +1521,13 @@ int32_t stream_capabilities_to_vn(uint32_t caps) {
     if(caps & STREAM_CAP_CLABELS) return STREAM_OLD_VERSION_CLABELS;
     return STREAM_OLD_VERSION_CLAIM; // if(caps & STREAM_CAP_CLAIM)
 }
+
+int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {
+        [COMPRESSION_ALGORITHM_NONE] = 0,
+        [COMPRESSION_ALGORITHM_ZSTD] = 3, // 1 (faster) - 22 (best compression),
+        [COMPRESSION_ALGORITHM_LZ4] = 1,  // 1 (best compression) - 9 (faster)
+        [COMPRESSION_ALGORITHM_GZIP] = 1, // 1 (faster) - 9 (best compression)
+};
 
 bool rrdpush_compression_initialize(struct sender_state *s) {
 #ifdef ENABLE_RRDPUSH_COMPRESSION
@@ -1533,6 +1546,7 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
         s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
     if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        s->compressor.level = rrdpush_compression_levels[s->compressor.algorithm];
         rrdpush_compressor_init(&s->compressor);
         return true;
     }

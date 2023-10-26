@@ -79,6 +79,7 @@ static inline void deactivate_compression(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
 
     switch(s->compressor.algorithm) {
+        case COMPRESSION_ALGORITHM_MAX:
         case COMPRESSION_ALGORITHM_NONE:
             netdata_log_error("STREAM_COMPRESSION: compression error on 'host:%s' without any compression enabled. Ignoring error.",
                     rrdhost_hostname(s->host));

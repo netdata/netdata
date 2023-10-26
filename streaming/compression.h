@@ -28,7 +28,12 @@ typedef enum {
     COMPRESSION_ALGORITHM_ZSTD,
     COMPRESSION_ALGORITHM_LZ4,
     COMPRESSION_ALGORITHM_GZIP,
+
+    // terminator
+    COMPRESSION_ALGORITHM_MAX,
 } compression_algorithm_t;
+
+extern int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX];
 
 // ----------------------------------------------------------------------------
 
@@ -78,6 +83,7 @@ struct compressor_state {
     SIMPLE_RING_BUFFER input;
     SIMPLE_RING_BUFFER output;
 
+    int level;
     void *stream;
 
     struct {

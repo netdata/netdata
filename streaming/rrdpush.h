@@ -76,6 +76,11 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 
 #define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)) == (capability))
 
+static inline bool stream_has_more_than_one_capability_of(STREAM_CAPABILITIES caps, STREAM_CAPABILITIES mask) {
+    STREAM_CAPABILITIES common = (STREAM_CAPABILITIES)(caps & mask);
+    return (common & (common - 1)) != 0 && common != 0;
+}
+
 // ----------------------------------------------------------------------------
 // stream handshake
 
@@ -346,6 +351,7 @@ struct receiver_state {
         time_t rrdpush_replication_step;
         char *rrdpush_destination;  // DONT FREE - it is allocated in appconfig
         unsigned int rrdpush_compression;
+        STREAM_CAPABILITIES compression_priorities[COMPRESSION_ALGORITHM_MAX];
     } config;
 
 #ifdef ENABLE_HTTPS

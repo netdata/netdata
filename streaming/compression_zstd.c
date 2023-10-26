@@ -5,16 +5,18 @@
 #ifdef ENABLE_ZSTD
 #include <zstd.h>
 
-#ifndef ZSTD_CLEVEL_DEFAULT
-#  define ZSTD_CLEVEL_DEFAULT 3
-#endif
-
 void rrdpush_compressor_init_zstd(struct compressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
         state->stream = ZSTD_createCStream();
 
-        size_t ret = ZSTD_initCStream(state->stream, ZSTD_CLEVEL_DEFAULT);
+        if(state->level < 1)
+            state->level = 1;
+
+        if(state->level > ZSTD_maxCLevel())
+            state->level = ZSTD_maxCLevel();
+
+        size_t ret = ZSTD_initCStream(state->stream, state->level);
         if(ZSTD_isError(ret))
             netdata_log_error("STREAM: ZSTD_initCStream() returned error: %s", ZSTD_getErrorName(ret));
 

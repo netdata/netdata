@@ -13,8 +13,14 @@ void rrdpush_compressor_init_gzip(struct compressor_state *state) {
         strm->zfree = Z_NULL;
         strm->opaque = Z_NULL;
 
+        if(state->level < Z_BEST_SPEED)
+            state->level = Z_BEST_SPEED;
+
+        if(state->level > Z_BEST_COMPRESSION)
+            state->level = Z_BEST_COMPRESSION;
+
         // int r = deflateInit2(strm, Z_BEST_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
-        int r = deflateInit2(strm, Z_BEST_SPEED, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
+        int r = deflateInit2(strm, state->level, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY);
         if (r != Z_OK) {
             netdata_log_error("Failed to initialize deflate with error: %d", r);
             freez(state->stream);
