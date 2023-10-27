@@ -69,43 +69,6 @@ BUFFER *sender_start(struct sender_state *s) {
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
-/*
-* In case of stream compression buffer overflow
-* Inform the user through the error log file and 
-* deactivate compression by downgrading the stream protocol.
-*/
-static inline void deactivate_compression(struct sender_state *s) {
-    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
-
-    switch(s->compressor.algorithm) {
-        case COMPRESSION_ALGORITHM_MAX:
-        case COMPRESSION_ALGORITHM_NONE:
-            netdata_log_error("STREAM_COMPRESSION: compression error on 'host:%s' without any compression enabled. Ignoring error.",
-                    rrdhost_hostname(s->host));
-            break;
-
-        case COMPRESSION_ALGORITHM_GZIP:
-            netdata_log_error("STREAM_COMPRESSION: GZIP compression error on 'host:%s'. Disabling GZIP for this node.",
-                    rrdhost_hostname(s->host));
-            s->disabled_capabilities |= STREAM_CAP_GZIP;
-            break;
-
-        case COMPRESSION_ALGORITHM_LZ4:
-            netdata_log_error("STREAM_COMPRESSION: LZ4 compression error on 'host:%s'. Disabling ZSTD for this node.",
-                    rrdhost_hostname(s->host));
-            s->disabled_capabilities |= STREAM_CAP_LZ4;
-            break;
-
-        case COMPRESSION_ALGORITHM_ZSTD:
-            netdata_log_error("STREAM_COMPRESSION: ZSTD compression error on 'host:%s'. Disabling ZSTD for this node.",
-                              rrdhost_hostname(s->host));
-            s->disabled_capabilities |= STREAM_CAP_ZSTD;
-            break;
-    }
-
-    rrdpush_sender_thread_close_socket(s->host);
-}
-
 #define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
 // Collector thread finishing a transmission
@@ -179,7 +142,9 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                     netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
                           rrdhost_hostname(s->host), s->connected_to);
 
-                    deactivate_compression(s);
+                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
+                    rrdpush_compression_deactivate(s);
+                    rrdpush_sender_thread_close_socket(s->host);
                     sender_unlock(s);
                     return;
                 }

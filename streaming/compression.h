@@ -26,12 +26,16 @@ typedef enum {
     COMPRESSION_ALGORITHM_ZSTD,
     COMPRESSION_ALGORITHM_LZ4,
     COMPRESSION_ALGORITHM_GZIP,
+    COMPRESSION_ALGORITHM_BROTLI,
 
     // terminator
     COMPRESSION_ALGORITHM_MAX,
 } compression_algorithm_t;
 
 extern int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX];
+
+// this defines the order the algorithms will be selected by the receiver (parent)
+#define RRDPUSH_COMPRESSION_ALGORITHMS_ORDER "zstd lz4 brotli gzip"
 
 // ----------------------------------------------------------------------------
 

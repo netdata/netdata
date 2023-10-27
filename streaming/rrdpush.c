@@ -111,6 +111,10 @@ int rrdpush_init() {
     default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
                                                                               "enable compression", default_rrdpush_compression_enabled);
 
+    rrdpush_compression_levels[COMPRESSION_ALGORITHM_BROTLI] = (int)appconfig_get_number(
+            &stream_config, CONFIG_SECTION_STREAM, "brotli compression level",
+            rrdpush_compression_levels[COMPRESSION_ALGORITHM_BROTLI]);
+
     rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD] = (int)appconfig_get_number(
             &stream_config, CONFIG_SECTION_STREAM, "zstd compression level",
             rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD]);
@@ -1440,6 +1444,7 @@ static struct {
     {STREAM_CAP_SLOTS,        "SLOTS" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
+    {STREAM_CAP_BROTLI,       "BROTLI" },
     {0 , NULL },
 };
 
@@ -1557,58 +1562,4 @@ int32_t stream_capabilities_to_vn(uint32_t caps) {
     if(caps & STREAM_CAP_LZ4) return STREAM_OLD_VERSION_LZ4;
     if(caps & STREAM_CAP_CLABELS) return STREAM_OLD_VERSION_CLABELS;
     return STREAM_OLD_VERSION_CLAIM; // if(caps & STREAM_CAP_CLAIM)
-}
-
-int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {
-        [COMPRESSION_ALGORITHM_NONE] = 0,
-        [COMPRESSION_ALGORITHM_ZSTD] = 3, // 1 (faster) - 22 (best compression),
-        [COMPRESSION_ALGORITHM_LZ4] = 1,  // 1 (best compression) - 9 (faster)
-        [COMPRESSION_ALGORITHM_GZIP] = 1, // 1 (faster) - 9 (best compression)
-};
-
-bool rrdpush_compression_initialize(struct sender_state *s) {
-    rrdpush_compressor_destroy(&s->compressor);
-
-    // IMPORTANT
-    // KEEP THE SAME ORDER IN DECOMPRESSION
-
-    if(stream_has_capability(s, STREAM_CAP_ZSTD))
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
-    else if(stream_has_capability(s, STREAM_CAP_LZ4))
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
-    else if(stream_has_capability(s, STREAM_CAP_GZIP))
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
-    else
-        s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
-
-    if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        s->compressor.level = rrdpush_compression_levels[s->compressor.algorithm];
-        rrdpush_compressor_init(&s->compressor);
-        return true;
-    }
-
-    return false;
-}
-
-bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
-    rrdpush_decompressor_destroy(&rpt->decompressor);
-
-    // IMPORTANT
-    // KEEP THE SAME ORDER IN COMPRESSION
-
-    if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
-    else if(stream_has_capability(rpt, STREAM_CAP_LZ4))
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
-    else if(stream_has_capability(rpt, STREAM_CAP_GZIP))
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
-    else
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
-
-    if(rpt->decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        rrdpush_decompressor_init(&rpt->decompressor);
-        return true;
-    }
-
-    return false;
 }
