@@ -167,20 +167,23 @@ static void ebpf_process_send_data(ebpf_module_t *em)
 void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
 {
     struct ebpf_target *w;
+
     for (w = root; w; w = w->next) {
-        struct ebpf_pid_on_target *pids = w->root_pid;
-        if (!pids)
+        if (!w->exposed)
             continue;
 
         memset(&w->process, 0, sizeof(ebpf_process_stat_t));
         rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-        while (pids) {
-            int32_t pid = pids->pid;
+
+        Pvoid_t *pid_value;
+        Word_t local_pid = 0;
+        bool first_pid = true;
+        while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
             netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
-                                                                                   pid,
+                                                                                   local_pid,
                                                                                    NULL,
-                                                                                   NETDATA_EBPF_MODULE_NAME_PROCESS);
+                                                                                   NETDATA_EBPF_MODULE_NAME_CACHESTAT);
             if (pid_ptr) {
                 rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
                 if (pid_ptr->process_stats.JudyLArray) {
@@ -201,7 +204,6 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
                 }
                 rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
             }
-            pids = pids->next;
         }
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     }
@@ -385,6 +387,7 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
     if (maps_per_core)
         length *= ebpf_nprocs;
 
+    // To avoid call time() different times, we only difference between starts.
     uint64_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, psv)) {
@@ -410,18 +413,6 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
         }
         pid_ptr->tgid = psv[0].tgid;
 
-        if (key != pid_ptr->tgid) {
-            netdata_ebpf_judy_pid_stats_t *tgid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
-                                                                                    pid_ptr->tgid,
-                                                                                    NULL,
-                                                                                    NETDATA_EBPF_MODULE_NAME_PROCESS);
-            if (tgid_ptr && tgid_ptr->name[0] && !pid_ptr->pname[0])
-                strncpyz(pid_ptr->pname, tgid_ptr->name, TASK_COMM_LEN);
-        } else {
-            if (!pid_ptr->pname[0])
-                strncpyz(pid_ptr->pname, psv[0].name, TASK_COMM_LEN);
-        }
-
         // Get Process structure
         rw_spinlock_write_lock(&pid_ptr->process_stats.rw_spinlock);
         ebpf_process_stat_plus_t **ps_pptr = (ebpf_process_stat_plus_t **)ebpf_judy_insert_unsafe(
@@ -441,6 +432,14 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
             } else {
                 if ((update_time - pid_ptr->current_timestamp) > update_every &&
                      ps_ptr->publish & NETDATA_EBPF_PROCESS_PUBLISHED) {
+                    ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
+#ifdef NETDATA_DEV_MODE
+                    collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s",
+                                   psv->name,
+                                   key,
+                                   NETDATA_EBPF_MODULE_NAME_CACHESTAT,
+                                   pid_ptr->apps_target->name);
+#endif
                     JudyLDel(&pid_ptr->process_stats.JudyLArray, psv[0].ct, PJE0);
                     ebpf_process_stat_release(ps_ptr);
                     bpf_map_delete_elem(fd, &key);
