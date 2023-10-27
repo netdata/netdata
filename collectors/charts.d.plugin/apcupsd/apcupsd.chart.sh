@@ -113,7 +113,10 @@ CHART apcupsd_${host}.online '' "UPS ONLINE flag" "boolean" ups apcupsd.online l
 DIMENSION online online absolute 0 1
 
 CHART apcupsd_${host}.selftest '' "UPS SELFTEST status" "Status_Code" ups apcupsd.selftest line $((apcupsd_priority + 10)) $apcupsd_update_every '' '' 'apcupsd'
-DIMENSION selftest_num selftest_num absolute 1 0
+DIMENSION selftest_OK 'OK' absolute 0 1
+DIMENSION selftest_NO 'NO' absolute 0 1
+DIMENSION selftest_BT 'BT' absolute 0 1
+DIMENSION selftest_NG 'NG' absolute 0 1
 
 EOF
   done
@@ -147,7 +150,10 @@ BEGIN {
 	time = 0;
 	nompower = 0;
 	load_usage = 0;
-	selftest_num = 0;
+        selftest_OK = 0;
+        selftest_NO = 0;
+        selftest_BT = 0;
+        selftest_NG = 0;
 }
 /^BCHARGE.*/   { battery_charge = \$3 * 100 };
 /^BATTV.*/     { battery_voltage = \$3 * 100 };
@@ -163,7 +169,11 @@ BEGIN {
 /^NOMPOWER.*/  { nompower = \$3 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
 /^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0; };
-/^SELFTEST.*/  { selftest_code = (\$3 == \"OK\") ? 0 : (\$3 == \"NO\") ? 1 : (\$3 == \"BT\") ? 2 : (\$3 == \"NG\") ? 3 : -1; };
+/^SELFTEST.*/  { selftest_OK = (\$3 == "OK") ? 1 : 0;
+                 selftest_NO = (\$3 == "NO") ? 1 : 0;
+                 selftest_BT = (\$3 == "BT") ? 1 : 0;
+                 selftest_NG = (\$3 == "NG") ? 1 : 0;
+               };
 END {
 	{ load_usage = nompower * load / 100 };
 
@@ -213,8 +223,11 @@ END {
 		print \"END\"
 
 		print \"BEGIN apcupsd_${host}.selftest $1\";
-		print \"SET selftest_num = \" selftest_num;
-		print \"END\";
+		print \"SET selftest_OK = \" selftest_OK;
+		print \"SET selftest_NO = \" selftest_NO;
+		print \"SET selftest_BT = \" selftest_BT;
+		print \"SET selftest_NG = \" selftest_NG;
+		print \"END\"
 	}
 }"
     # shellcheck disable=SC2181
