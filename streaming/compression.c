@@ -21,7 +21,7 @@ int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {
         [COMPRESSION_ALGORITHM_ZSTD] = 3, // 1 (faster) - 22 (smaller)
         [COMPRESSION_ALGORITHM_LZ4] = 1,  // 1 (smaller) - 9 (faster)
         [COMPRESSION_ALGORITHM_GZIP] = 1, // 1 (faster) - 9 (smaller)
-        [COMPRESSION_ALGORITHM_BROTLI] = 11, // 1 (faster) - 11 (smaller)
+        [COMPRESSION_ALGORITHM_BROTLI] = 6, // 0 (faster) - 11 (smaller)
 };
 
 void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order) {
