@@ -413,27 +413,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
             p = x->via.map.ptr;
             pend = x->via.map.ptr + x->via.map.size;
-            do{
-                // if (unlikely(p->key.type != MSGPACK_OBJECT_STR || p->val.type != MSGPACK_OBJECT_STR)) {
-                //     m_assert(0, "Remaining logs?");
-                //     break;
-                // }
-
-                // if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
-                //    !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
-                //     debug_log("msg key:[%.*s]val:[%.*s]", (int) p->key.via.str.size, p->key.via.str.ptr, (int) p->val.via.str.size, p->val.via.str.ptr);
-                //     if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
-                //         msgpack_object_kv* ac = p->val.via.map.ptr;
-                //         msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
-                //         do{
-                //             if(!strncmp(ac->key.via.str.ptr, "Type", (size_t) ac->key.via.str.size)){
-                //                 debug_log("msg key:[%.*s]val:[%.*s]", (int) ac->key.via.str.size, ac->key.via.str.ptr, (int) ac->val.via.str.size, ac->val.via.str.ptr);
-                //             }
-                //             ac++;
-                //             continue;
-                //         } while(ac < ac_pend);
-                //     }
-                // }                    
+            do{              
                 
                 /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case */
                 if( p_file_info->log_type == FLB_TAIL || 
@@ -1030,16 +1010,6 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
         if(likely(docker_ev_id)){
             // debug_log("docker_ev_id: %.*s", (int) docker_ev_id_size, docker_ev_id);
-        //     int i;
-        //     for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
-        //         if(!strncmp(docker_ev_action, docker_ev_action_string[i], docker_ev_action_size)){
-        //             p_file_info->parser_metrics->docker_ev->ev_action[i]++;
-        //             break;
-        //         }
-        //     }
-        //     if(unlikely(i >= NUM_OF_DOCKER_EV_TYPES - 1)){
-        //         p_file_info->parser_metrics->docker_ev->ev_action[i]++; // 'unknown'
-        //     }
 
             new_tmp_text_size += docker_ev_id_size + 1; // +1 for ' ' char
         }
