@@ -169,10 +169,10 @@ BEGIN {
 /^NOMPOWER.*/  { nompower = \$3 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
 /^STATUS.*/    { online=(\$3 != \"COMMLOST\" && !(\$3 == \"SHUTTING\" && \$4 == \"DOWN\"))?1:0; };
-/^SELFTEST.*/  { selftest_OK = (\$3 == "OK") ? 1 : 0;
-                 selftest_NO = (\$3 == "NO") ? 1 : 0;
-                 selftest_BT = (\$3 == "BT") ? 1 : 0;
-                 selftest_NG = (\$3 == "NG") ? 1 : 0;
+/^SELFTEST.*/  { selftest_OK = (\$3 == \"OK\") ? 1 : 0;
+                 selftest_NO = (\$3 == \"NO\") ? 1 : 0;
+                 selftest_BT = (\$3 == \"BT\") ? 1 : 0;
+                 selftest_NG = (\$3 == \"NG\") ? 1 : 0;
                };
 END {
 	{ load_usage = nompower * load / 100 };
