@@ -152,11 +152,11 @@ def get_jinja_env():
 
 
 def strfy(value):
-    if not isinstance(value, str):
-        return value
-
-    return ' '.join([v.strip() for v in value.strip().split("\n") if v]).replace('|', '/')
-
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, str):
+        return ' '.join([v.strip() for v in value.strip().split("\n") if v]).replace('|', '/')
+    return value
 
 
 def get_category_sets(categories):
