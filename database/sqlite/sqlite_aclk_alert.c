@@ -71,9 +71,9 @@ fail:
 //decide if some events should be sent or not
 #define SQL_SELECT_ALERT_BY_ID                                                                                             \
     "SELECT hld.new_status, hl.config_hash_id, hld.unique_id FROM health_log hl, aclk_alert_%s aa, health_log_detail hld " \
-    "WHERE hl.host_id = @host_id AND hld.unique_id = aa.filtered_alert_unique_id "                                         \
+    "WHERE hl.host_id = @host_id AND +hld.unique_id = aa.filtered_alert_unique_id "                                        \
     "AND hld.alarm_id = @alarm_id AND hl.health_log_id = hld.health_log_id "                                               \
-    "ORDER BY hld.alarm_event_id DESC LIMIT 1;"
+    "ORDER BY hld.rowid DESC LIMIT 1;"
 
 static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
