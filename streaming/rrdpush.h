@@ -715,5 +715,6 @@ void rrdpush_send_dyncfg_reset(RRDHOST *host, const char *plugin_name);
 bool rrdpush_compression_initialize(struct sender_state *s);
 bool rrdpush_decompression_initialize(struct receiver_state *rpt);
 void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order);
+void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt);
 
 #endif //NETDATA_RRDPUSH_H

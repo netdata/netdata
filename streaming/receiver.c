@@ -729,27 +729,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
-    if (!rpt->config.rrdpush_compression)
-        rpt->capabilities &= ~STREAM_CAP_COMPRESSIONS_AVAILABLE;
-
-    // select the right compression before sending our capabilities to the child
-    if(stream_has_more_than_one_capability_of(rpt->capabilities, STREAM_CAP_COMPRESSIONS_AVAILABLE)) {
-        STREAM_CAPABILITIES compressions = rpt->capabilities & STREAM_CAP_COMPRESSIONS_AVAILABLE;
-        for(int i = 0; i < COMPRESSION_ALGORITHM_MAX; i++) {
-            STREAM_CAPABILITIES c = rpt->config.compression_priorities[i];
-
-            if(!(c & STREAM_CAP_COMPRESSIONS_AVAILABLE))
-                continue;
-
-            if(compressions & c) {
-                STREAM_CAPABILITIES exclude = compressions;
-                exclude &= ~c;
-
-                rpt->capabilities &= ~exclude;
-                break;
-            }
-        }
-    }
+    rrdpush_select_receiver_compression_algorithm(rpt);
 
     {
         // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
