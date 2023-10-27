@@ -76,33 +76,48 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     rrddim_free(st, rd);
 }
 
-static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
+static inline bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
+    if(!all_dimensions && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
+        return true;
+
     worker_is_busy(WORKER_JOB_ARCHIVE_CHART_DIMENSIONS);
+
+    rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 
     RRDDIM *rd;
     time_t now = now_realtime_sec();
 
-    bool done_all_dimensions = true;
+    size_t dim_candidates = 0;
+    size_t dim_archives = 0;
 
     dfe_start_write(st->rrddim_root_index, rd) {
-        if(unlikely(
-                all_dimensions ||
-                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
-                    )) {
+        bool candidate = (all_dimensions || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE));
 
-            if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
-                netdata_log_info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rrddim_name(rd), rrddim_id(rd), rrdset_name(st), rrdset_id(st));
-                svc_rrddim_obsolete_to_archive(rd);
+        if(candidate) {
+            dim_candidates++;
+
+            if(rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now) {
+                size_t references = dictionary_acquired_item_references(rd_dfe.item);
+                if(references == 1) {
+//                    netdata_log_info("Removing obsolete dimension 'host:%s/chart:%s/dim:%s'",
+//                                     rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+                    svc_rrddim_obsolete_to_archive(rd);
+                    dim_archives++;
+                }
+//                else
+//                    netdata_log_info("Cannot remove obsolete dimension 'host:%s/chart:%s/dim:%s'",
+//                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             }
-            else
-                done_all_dimensions = false;
         }
-        else
-            done_all_dimensions = false;
     }
     dfe_done(rd);
 
-    return done_all_dimensions;
+    if(dim_archives != dim_candidates) {
+        rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
+        return false;
+    }
+
+    return true;
 }
 
 static void svc_rrdset_obsolete_to_free(RRDSET *st) {
@@ -132,8 +147,18 @@ static void svc_rrdset_obsolete_to_free(RRDSET *st) {
     rrdset_free(st);
 }
 
-static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
+static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
+    if(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS))
+        return;
+
     worker_is_busy(WORKER_JOB_CLEANUP_OBSOLETE_CHARTS);
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
+
+    size_t full_candidates = 0;
+    size_t full_archives = 0;
+    size_t partial_candidates = 0;
+    size_t partial_archives = 0;
 
     time_t now = now_realtime_sec();
     RRDSET *st;
@@ -141,25 +166,39 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
         if(rrdset_is_replicating(st))
             continue;
 
-        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
-                     && st->last_accessed_time_s + rrdset_free_obsolete_time_s < now
-                     && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
-                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
-                     )) {
-            svc_rrdset_obsolete_to_free(st);
+        RRDSET_FLAGS flags = rrdset_flag_get(st);
+        bool obsolete_chart = flags & RRDSET_FLAG_OBSOLETE;
+        bool obsolete_dims = flags & RRDSET_FLAG_OBSOLETE_DIMENSIONS;
+
+        if(obsolete_dims) {
+            partial_candidates++;
+
+            if(svc_rrdset_archive_obsolete_dimensions(st, false))
+                partial_archives++;
         }
-        else if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {
-            rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
-            svc_rrdset_archive_obsolete_dimensions(st, false);
-        }
-        else if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
-            rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
+
+        if(obsolete_chart) {
+            full_candidates++;
+
+            if(unlikely(   st->last_accessed_time_s + rrdset_free_obsolete_time_s < now
+                        && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
+                        && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
+                       )) {
+                svc_rrdset_obsolete_to_free(st);
+                full_archives++;
+            }
         }
     }
     rrdset_foreach_done(st);
+
+    if(partial_archives != partial_candidates)
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
+
+    if(full_archives != full_candidates)
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 }
 
-static void svc_rrdset_check_obsoletion(RRDHOST *host) {
+static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
     worker_is_busy(WORKER_JOB_CHILD_CHART_OBSOLETION_CHECK);
 
     time_t now = now_realtime_sec();
@@ -171,11 +210,21 @@ static void svc_rrdset_check_obsoletion(RRDHOST *host) {
 
         last_entry_t = rrdset_last_entry_s(st);
 
-        if(last_entry_t && last_entry_t < host->child_connect_time &&
-           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
-             < now)
+//        if(last_entry_t + st->update_every * 2 + 30 < now)
+//            netdata_log_error("Possibly obsolete chart 'host:%s/chart:%s', last entry is %zu secs old "
+//                              "(replicating: %s, obsolete: %s, obsolete dims: %s)",
+//                              rrdhost_hostname(host), rrdset_id(st), now - last_entry_t,
+//                              rrdset_is_replicating(st) ? "true" : "false",
+//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) ? "true" : "false",
+//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) ? "true" : "false"
+//                              );
 
-            rrdset_is_obsolete(st);
+
+        if(last_entry_t && last_entry_t < host->child_connect_time &&
+           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
+                   (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) < now)
+
+            rrdset_is_obsolete___safe_from_collector_thread(st);
     }
     rrdset_foreach_done(st);
 }
@@ -190,10 +239,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
             continue;
 
-        if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS)) {
-            rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS|RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS);
-            svc_rrdhost_cleanup_obsolete_charts(host);
-        }
+        svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
         if(host != localhost
             && host->trigger_chart_obsoletion_check
@@ -205,7 +251,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
                 || (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
                 )
             ) {
-            svc_rrdset_check_obsoletion(host);
+            svc_rrdhost_detect_obsolete_charts(host);
             host->trigger_chart_obsoletion_check = 0;
         }
     }

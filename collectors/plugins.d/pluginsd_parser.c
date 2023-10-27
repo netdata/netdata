@@ -4,8 +4,8 @@
 
 #define LOG_FUNCTIONS false
 
-#define SERVING_STREAMING(parser) (parser->repertoire == PARSER_INIT_STREAMING)
-#define SERVING_PLUGINSD(parser) (parser->repertoire == PARSER_INIT_PLUGINSD)
+#define SERVING_STREAMING(parser) ((parser)->repertoire == PARSER_INIT_STREAMING)
+#define SERVING_PLUGINSD(parser) ((parser)->repertoire == PARSER_INIT_PLUGINSD)
 
 static ssize_t send_to_plugin(const char *txt, void *data) {
     PARSER *parser = data;
@@ -110,23 +110,6 @@ static inline bool pluginsd_unlock_rrdset_data_collection(PARSER *parser) {
     return false;
 }
 
-void pluginsd_rrdset_cleanup(RRDSET *st) {
-    spinlock_lock(&st->pluginsd.spinlock);
-
-    for(size_t i = 0; i < st->pluginsd.size ; i++) {
-        rrddim_acquired_release(st->pluginsd.rda[i]); // can be NULL
-        st->pluginsd.rda[i] = NULL;
-    }
-
-    freez(st->pluginsd.rda);
-    st->pluginsd.collector_tid = 0;
-    st->pluginsd.rda = NULL;
-    st->pluginsd.size = 0;
-    st->pluginsd.pos = 0;
-
-    spinlock_unlock(&st->pluginsd.spinlock);
-}
-
 static inline void pluginsd_unlock_previous_scope_chart(PARSER *parser, const char *keyword, bool stale) {
     if(unlikely(pluginsd_unlock_rrdset_data_collection(parser))) {
         if(stale)
@@ -150,7 +133,12 @@ static inline void pluginsd_unlock_previous_scope_chart(PARSER *parser, const ch
 
 static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keyword) {
     pluginsd_unlock_previous_scope_chart(parser, keyword, true);
+
+    if(parser->user.cleanup_slots && parser->user.st)
+        rrdset_pluginsd_receive_unslot(parser->user.st);
+
     parser->user.st = NULL;
+    parser->user.cleanup_slots = false;
 }
 
 static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
@@ -176,61 +164,139 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
 
     pluginsd_clear_scope_chart(parser, keyword);
 
-    size_t dims = dictionary_entries(st->rrddim_root_index);
-    if(unlikely(st->pluginsd.size < dims)) {
-        st->pluginsd.rda = reallocz(st->pluginsd.rda, dims * sizeof(RRDDIM_ACQUIRED *));
-
-        // initialize the empty slots
-        for(ssize_t i = (ssize_t)dims - 1; i >= (ssize_t)st->pluginsd.size ;i--)
-            st->pluginsd.rda[i] = NULL;
-
-        st->pluginsd.size = dims;
-    }
-
     st->pluginsd.pos = 0;
     parser->user.st = st;
+    parser->user.cleanup_slots = false;
 
     return true;
 }
 
-static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, const char *cmd) {
+static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDIM *rd, ssize_t slot, bool obsolete)  {
+    size_t wanted_size = st->pluginsd.size;
+
+    if(slot >= 1) {
+        st->pluginsd.with_slots = true;
+        wanted_size = slot;
+    }
+    else
+        wanted_size = dictionary_entries(st->rrddim_root_index);
+
+    if(wanted_size > st->pluginsd.size) {
+        st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, wanted_size * sizeof(struct pluginsd_rrddim));
+
+        // initialize the empty slots
+        for(ssize_t i = (ssize_t) wanted_size - 1; i >= (ssize_t) st->pluginsd.size; i--) {
+            st->pluginsd.prd_array[i].rda = NULL;
+            st->pluginsd.prd_array[i].rd = NULL;
+            st->pluginsd.prd_array[i].id = NULL;
+        }
+
+        st->pluginsd.size = wanted_size;
+    }
+
+    if(st->pluginsd.with_slots) {
+        struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
+
+        if(prd->rd != rd) {
+            prd->rda = rrddim_find_and_acquire(st, string2str(rd->id));
+            prd->rd = rrddim_acquired_to_rrddim(prd->rda);
+            prd->id = string2str(prd->rd->id);
+        }
+
+        if(obsolete)
+            parser->user.cleanup_slots = true;
+    }
+}
+
+static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, ssize_t slot, const char *cmd) {
     if (unlikely(!dimension || !*dimension)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s, without a dimension.",
                           rrdhost_hostname(host), rrdset_id(st), cmd);
         return NULL;
     }
 
-    if(unlikely(st->pluginsd.pos >= st->pluginsd.size))
-        st->pluginsd.pos = 0;
+    if (unlikely(!st->pluginsd.size)) {
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s, but the chart has no dimensions.",
+                rrdhost_hostname(host), rrdset_id(st), cmd);
+        return NULL;
+    }
 
-    RRDDIM_ACQUIRED *rda = st->pluginsd.rda[st->pluginsd.pos];
+    struct pluginsd_rrddim *prd;
+    RRDDIM *rd;
 
-    if(likely(rda)) {
-        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
-        if (likely(rd && string_strcmp(rd->id, dimension) == 0)) {
-            // we found a cached RDA
-            st->pluginsd.pos++;
+    if(likely(st->pluginsd.with_slots)) {
+        // caching with slots
+
+        if(unlikely(slot < 1 || slot > st->pluginsd.size)) {
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %u] are expected.",
+                    rrdhost_hostname(host), rrdset_id(st), cmd, slot, st->pluginsd.size);
+            return NULL;
+        }
+
+        prd = &st->pluginsd.prd_array[slot - 1];
+
+        rd = prd->rd;
+        if(likely(rd)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(strcmp(prd->id, dimension) != 0) {
+                ssize_t t;
+                for(t = 0; t < st->pluginsd.size ;t++) {
+                    if (strcmp(st->pluginsd.prd_array[t].id, dimension) == 0)
+                        break;
+                }
+                if(t >= st->pluginsd.size)
+                    t = -1;
+
+                internal_fatal(true,
+                               "PLUGINSD: expected to find dimension '%s' on slot %zd, but found '%s', "
+                               "the right slot is %zd",
+                               dimension, slot, prd->id, t);
+            }
+#endif
             return rd;
         }
-        else {
-            // the collector is sending dimensions in a different order
-            // release the previous one, to reuse this slot
-            rrddim_acquired_release(rda);
-            st->pluginsd.rda[st->pluginsd.pos] = NULL;
+    }
+    else {
+        // caching without slots
+
+        if(unlikely(st->pluginsd.pos >= st->pluginsd.size))
+            st->pluginsd.pos = 0;
+
+        prd = &st->pluginsd.prd_array[st->pluginsd.pos++];
+
+        rd = prd->rd;
+        if(likely(rd)) {
+            const char *id = prd->id;
+
+            if(strcmp(id, dimension) == 0) {
+                // we found it cached
+                return rd;
+            }
+            else {
+                // the cached one is not good for us
+                rrddim_acquired_release(prd->rda);
+                prd->rda = NULL;
+                prd->rd = rd = NULL;
+                prd->id = NULL;
+            }
         }
     }
 
-    rda = rrddim_find_and_acquire(st, dimension);
+    // we need to find the dimension and set it to prd
+
+    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
     if (unlikely(!rda)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s but dimension does not exist.",
-                          rrdhost_hostname(host), rrdset_id(st), dimension, cmd);
+                rrdhost_hostname(host), rrdset_id(st), dimension, cmd);
 
         return NULL;
     }
 
-    st->pluginsd.rda[st->pluginsd.pos++] = rda;
+    prd->rda = rda;
+    prd->rd = rd = rrddim_acquired_to_rrddim(rda);
+    prd->id = string2str(rd->id);
 
-    return rrddim_acquired_to_rrddim(rda);
+    return rd;
 }
 
 static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, const char *cmd) {
@@ -248,6 +314,70 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
+static inline ssize_t pluginsd_parse_rrd_slot(char **words, size_t num_words) {
+    ssize_t slot = -1;
+    char *id = get_word(words, num_words, 1);
+    if(id && id[0] == PLUGINSD_KEYWORD_SLOT[0] && id[1] == PLUGINSD_KEYWORD_SLOT[1] &&
+        id[2] == PLUGINSD_KEYWORD_SLOT[2] && id[3] == PLUGINSD_KEYWORD_SLOT[3] && id[4] == ':') {
+        slot = (ssize_t) str2ull_encoded(&id[5]);
+        if(slot < 0) slot = 0; // to make the caller increment its idx of the words
+    }
+
+    return slot;
+}
+
+static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st, ssize_t slot, bool obsolete) {
+    // clean possible old cached data
+    rrdset_pluginsd_receive_unslot(st);
+
+    if(unlikely(slot < 1 || slot >= INT32_MAX))
+        return;
+
+    RRDHOST *host = st->rrdhost;
+
+    if(unlikely((size_t)slot > host->rrdpush.receive.pluginsd_chart_slots.size)) {
+        spinlock_lock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+        size_t old_slots = host->rrdpush.receive.pluginsd_chart_slots.size;
+        size_t new_slots = (old_slots < PLUGINSD_MIN_RRDSET_POINTERS_CACHE) ? PLUGINSD_MIN_RRDSET_POINTERS_CACHE : old_slots * 2;
+
+        if(new_slots < (size_t)slot)
+            new_slots = slot;
+
+        host->rrdpush.receive.pluginsd_chart_slots.array =
+                reallocz(host->rrdpush.receive.pluginsd_chart_slots.array, new_slots * sizeof(RRDSET *));
+
+        for(size_t i = old_slots; i < new_slots ;i++)
+            host->rrdpush.receive.pluginsd_chart_slots.array[i] = NULL;
+
+        host->rrdpush.receive.pluginsd_chart_slots.size = new_slots;
+        spinlock_unlock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+    }
+
+    host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1] = st;
+    st->pluginsd.last_slot = (int32_t)slot - 1;
+    parser->user.cleanup_slots = obsolete;
+}
+
+static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser, RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
+    if(unlikely(slot < 1 || (size_t)slot > host->rrdpush.receive.pluginsd_chart_slots.size))
+        return pluginsd_find_chart(host, id, keyword);
+
+    RRDSET *st = host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1];
+
+    if(!st) {
+        st = pluginsd_find_chart(host, id, keyword);
+        if(st)
+            pluginsd_rrdset_cache_put_to_slot(parser, st, slot, rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE));
+    }
+    else {
+        internal_fatal(string_strcmp(st->id, id) != 0,
+                       "PLUGINSD: wrong chart in slot %zd, expected '%s', found '%s'",
+                       slot - 1, id, string2str(st->id));
+    }
+
+    return st;
+}
+
 static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg) {
     parser->user.enabled = 0;
 
@@ -260,8 +390,12 @@ static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyw
 }
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
-    char *dimension = get_word(words, num_words, 1);
-    char *value = get_word(words, num_words, 2);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *dimension = get_word(words, num_words, idx++);
+    char *value = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_SET);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -269,7 +403,7 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_SET, PLUGINSD_KEYWORD_CHART);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_SET);
     if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     st->pluginsd.set = true;
@@ -285,13 +419,17 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
 }
 
 static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *parser) {
-    char *id = get_word(words, num_words, 1);
-    char *microseconds_txt = get_word(words, num_words, 2);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *id = get_word(words, num_words, idx++);
+    char *microseconds_txt = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_BEGIN);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN);
+    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN))
@@ -492,18 +630,22 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    char *type = get_word(words, num_words, 1);
-    char *name = get_word(words, num_words, 2);
-    char *title = get_word(words, num_words, 3);
-    char *units = get_word(words, num_words, 4);
-    char *family = get_word(words, num_words, 5);
-    char *context = get_word(words, num_words, 6);
-    char *chart = get_word(words, num_words, 7);
-    char *priority_s = get_word(words, num_words, 8);
-    char *update_every_s = get_word(words, num_words, 9);
-    char *options = get_word(words, num_words, 10);
-    char *plugin = get_word(words, num_words, 11);
-    char *module = get_word(words, num_words, 12);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *type = get_word(words, num_words, idx++);
+    char *name = get_word(words, num_words, idx++);
+    char *title = get_word(words, num_words, idx++);
+    char *units = get_word(words, num_words, idx++);
+    char *family = get_word(words, num_words, idx++);
+    char *context = get_word(words, num_words, idx++);
+    char *chart = get_word(words, num_words, idx++);
+    char *priority_s = get_word(words, num_words, idx++);
+    char *update_every_s = get_word(words, num_words, idx++);
+    char *options = get_word(words, num_words, idx++);
+    char *plugin = get_word(words, num_words, idx++);
+    char *module = get_word(words, num_words, idx++);
 
     // parse the id from type
     char *id = NULL;
@@ -570,14 +712,15 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         module, priority, update_every,
         chart_type);
 
+    bool obsolete = false;
     if (likely(st)) {
         if (options && *options) {
             if (strstr(options, "obsolete")) {
-                pluginsd_rrdset_cleanup(st);
-                rrdset_is_obsolete(st);
+                rrdset_is_obsolete___safe_from_collector_thread(st);
+                obsolete = true;
             }
             else
-                rrdset_isnot_obsolete(st);
+                rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
             if (strstr(options, "detail"))
                 rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
@@ -595,13 +738,15 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
                 rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
         else {
-            rrdset_isnot_obsolete(st);
+            rrdset_isnot_obsolete___safe_from_collector_thread(st);
             rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
 
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
             return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+
+        pluginsd_rrdset_cache_put_to_slot(parser, st, slot, obsolete);
     }
     else
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART);
@@ -652,12 +797,16 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
 }
 
 static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSER *parser) {
-    char *id = get_word(words, num_words, 1);
-    char *name = get_word(words, num_words, 2);
-    char *algorithm = get_word(words, num_words, 3);
-    char *multiplier_s = get_word(words, num_words, 4);
-    char *divisor_s = get_word(words, num_words, 5);
-    char *options = get_word(words, num_words, 6);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *id = get_word(words, num_words, idx++);
+    char *name = get_word(words, num_words, idx++);
+    char *algorithm = get_word(words, num_words, idx++);
+    char *multiplier_s = get_word(words, num_words, idx++);
+    char *divisor_s = get_word(words, num_words, idx++);
+    char *options = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_DIMENSION);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -696,11 +845,14 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
     int unhide_dimension = 1;
 
     rrddim_option_clear(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
+    bool obsolete = false;
     if (options && *options) {
-        if (strstr(options, "obsolete") != NULL)
-            rrddim_is_obsolete(st, rd);
+        if (strstr(options, "obsolete") != NULL) {
+            obsolete = true;
+            rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+        }
         else
-            rrddim_isnot_obsolete(st, rd);
+            rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
 
         unhide_dimension = !strstr(options, "hidden");
 
@@ -708,8 +860,9 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
             rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
         if (strstr(options, "nooverflow") != NULL)
             rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
-    } else
-        rrddim_isnot_obsolete(st, rd);
+    }
+    else
+        rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
 
     bool should_update_dimension = false;
 
@@ -726,6 +879,8 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
         rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
+
+    pluginsd_rrddim_put_to_slot(parser, st, rd, slot, obsolete);
 
     return PARSER_RC_OK;
 }
@@ -1317,10 +1472,14 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
 }
 
 static inline PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) {
-    char *id = get_word(words, num_words, 1);
-    char *start_time_str = get_word(words, num_words, 2);
-    char *end_time_str = get_word(words, num_words, 3);
-    char *child_now_str = get_word(words, num_words, 4);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *id = get_word(words, num_words, idx++);
+    char *start_time_str = get_word(words, num_words, idx++);
+    char *end_time_str = get_word(words, num_words, idx++);
+    char *child_now_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -1329,7 +1488,7 @@ static inline PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     if (likely(!id || !*id))
         st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     else
-        st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+        st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
@@ -1444,9 +1603,13 @@ static inline SN_FLAGS pluginsd_parse_storage_number_flags(const char *flags_str
 }
 
 static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
-    char *dimension = get_word(words, num_words, 1);
-    char *value_str = get_word(words, num_words, 2);
-    char *flags_str = get_word(words, num_words, 3);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *dimension = get_word(words, num_words, idx++);
+    char *value_str = get_word(words, num_words, idx++);
+    char *flags_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_SET);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -1463,7 +1626,7 @@ static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
         return PARSER_RC_OK;
     }
 
-    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_SET);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_REPLAY_SET);
     if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     st->pluginsd.set = true;
@@ -1517,11 +1680,15 @@ static inline PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
     if(parser->user.replay.rset_enabled == false)
         return PARSER_RC_OK;
 
-    char *dimension = get_word(words, num_words, 1);
-    char *last_collected_ut_str = get_word(words, num_words, 2);
-    char *last_collected_value_str = get_word(words, num_words, 3);
-    char *last_calculated_value_str = get_word(words, num_words, 4);
-    char *last_stored_value_str = get_word(words, num_words, 5);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *dimension = get_word(words, num_words, idx++);
+    char *last_collected_ut_str = get_word(words, num_words, idx++);
+    char *last_collected_value_str = get_word(words, num_words, idx++);
+    char *last_calculated_value_str = get_word(words, num_words, idx++);
+    char *last_stored_value_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -1535,7 +1702,7 @@ static inline PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
         st->pluginsd.set = false;
     }
 
-    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
     if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     usec_t dim_last_collected_ut = (usec_t)rd->collector.last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->collector.last_collected_time.tv_usec;
@@ -1699,10 +1866,14 @@ static inline PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
 static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER *parser) {
     timing_init();
 
-    char *id = get_word(words, num_words, 1);
-    char *update_every_str = get_word(words, num_words, 2);
-    char *end_time_str = get_word(words, num_words, 3);
-    char *wall_clock_time_str = get_word(words, num_words, 4);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *id = get_word(words, num_words, idx++);
+    char *update_every_str = get_word(words, num_words, idx++);
+    char *end_time_str = get_word(words, num_words, idx++);
+    char *wall_clock_time_str = get_word(words, num_words, idx++);
 
     if(unlikely(!id || !update_every_str || !end_time_str || !wall_clock_time_str))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_BEGIN_V2, "missing parameters");
@@ -1712,14 +1883,15 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
     timing_step(TIMING_STEP_BEGIN2_PREPARE);
 
-    RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN_V2);
+    RRDSET *st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
+
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
-        rrdset_isnot_obsolete(st);
+        rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
     timing_step(TIMING_STEP_BEGIN2_FIND_CHART);
 
@@ -1759,9 +1931,12 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
         parser->user.v2.stream_buffer = rrdset_push_metric_initialize(parser->user.st, wall_clock_time);
 
     if(parser->user.v2.stream_buffer.v2 && parser->user.v2.stream_buffer.wb) {
-        // check if receiver and sender have the same number parsing capabilities
+        // check receiver capabilities
         bool can_copy = stream_has_capability(&parser->user, STREAM_CAP_IEEE754) == stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754);
-        NUMBER_ENCODING encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
+
+        // check sender capabilities
+        bool with_slots = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_SLOTS) ? true : false;
+        NUMBER_ENCODING integer_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
 
         BUFFER *wb = parser->user.v2.stream_buffer.wb;
 
@@ -1770,28 +1945,35 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
         if(unlikely(parser->user.v2.stream_buffer.begin_v2_added))
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
 
-        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
+
+        if(with_slots) {
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+            buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush.sender.chart_slot);
+        }
+
+        buffer_fast_strcat(wb, " '", 2);
         buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
         buffer_fast_strcat(wb, "' ", 2);
 
         if(can_copy)
             buffer_strcat(wb, update_every_str);
         else
-            buffer_print_uint64_encoded(wb, encoding, update_every);
+            buffer_print_uint64_encoded(wb, integer_encoding, update_every);
 
         buffer_fast_strcat(wb, " ", 1);
 
         if(can_copy)
             buffer_strcat(wb, end_time_str);
         else
-            buffer_print_uint64_encoded(wb, encoding, end_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, end_time);
 
         buffer_fast_strcat(wb, " ", 1);
 
         if(can_copy)
             buffer_strcat(wb, wall_clock_time_str);
         else
-            buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, wall_clock_time);
 
         buffer_fast_strcat(wb, "\n", 1);
 
@@ -1824,10 +2006,14 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *parser) {
     timing_init();
 
-    char *dimension = get_word(words, num_words, 1);
-    char *collected_str = get_word(words, num_words, 2);
-    char *value_str = get_word(words, num_words, 3);
-    char *flags_str = get_word(words, num_words, 4);
+    int idx = 1;
+    ssize_t slot = pluginsd_parse_rrd_slot(words, num_words);
+    if(slot >= 0) idx++;
+
+    char *dimension = get_word(words, num_words, idx++);
+    char *collected_str = get_word(words, num_words, idx++);
+    char *value_str = get_word(words, num_words, idx++);
+    char *flags_str = get_word(words, num_words, idx++);
 
     if(unlikely(!dimension || !collected_str || !value_str || !flags_str))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_SET_V2, "missing parameters");
@@ -1840,13 +2026,13 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
 
     timing_step(TIMING_STEP_SET2_PREPARE);
 
-    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET_V2);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_SET_V2);
     if(unlikely(!rd)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     st->pluginsd.set = true;
 
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
-        rrddim_isnot_obsolete(st, rd);
+        rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
 
     timing_step(TIMING_STEP_SET2_LOOKUP_DIMENSION);
 
@@ -1892,12 +2078,22 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     if(parser->user.v2.stream_buffer.v2 && parser->user.v2.stream_buffer.begin_v2_added && parser->user.v2.stream_buffer.wb) {
         // check if receiver and sender have the same number parsing capabilities
         bool can_copy = stream_has_capability(&parser->user, STREAM_CAP_IEEE754) == stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754);
+
+        // check the sender capabilities
+        bool with_slots = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_SLOTS) ? true : false;
         NUMBER_ENCODING integer_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
         NUMBER_ENCODING doubles_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
 
         BUFFER *wb = parser->user.v2.stream_buffer.wb;
         buffer_need_bytes(wb, 1024);
-        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2, sizeof(PLUGINSD_KEYWORD_SET_V2) - 1);
+
+        if(with_slots) {
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+        }
+
+        buffer_fast_strcat(wb, " '", 2);
         buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
         buffer_fast_strcat(wb, "' ", 2);
         if(can_copy)
@@ -1978,13 +2174,27 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // ------------------------------------------------------------------------
     // cleanup RRDSET / RRDDIM
 
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        rd->collector.calculated_value = 0;
-        rd->collector.collected_value = 0;
-        rrddim_clear_updated(rd);
+    if(likely(st->pluginsd.with_slots)) {
+        for(size_t i = 0; i < st->pluginsd.size ;i++) {
+            RRDDIM *rd = st->pluginsd.prd_array[i].rd;
+
+            if(!rd)
+                continue;
+
+            rd->collector.calculated_value = 0;
+            rd->collector.collected_value = 0;
+            rrddim_clear_updated(rd);
+        }
     }
-    rrddim_foreach_done(rd);
+    else {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st){
+            rd->collector.calculated_value = 0;
+            rd->collector.collected_value = 0;
+            rrddim_clear_updated(rd);
+        }
+        rrddim_foreach_done(rd);
+    }
 
     // ------------------------------------------------------------------------
     // reset state

@@ -240,7 +240,7 @@ DICTIONARY *zfs_pools = NULL;
 void disable_zfs_pool_state(struct zfs_pool *pool)
 {
     if (pool->st)
-        rrdset_is_obsolete(pool->st);
+        rrdset_is_obsolete___safe_from_collector_thread(pool->st);
 
     pool->st = NULL;
 

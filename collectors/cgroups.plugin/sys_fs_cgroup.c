@@ -1760,36 +1760,36 @@ char *cgroup_parse_resolved_name_and_labels(RRDLABELS *labels, char *data) {
 // ----------------------------------------------------------------------------
 
 static inline void free_pressure(struct pressure *res) {
-    if (res->some.share_time.st)   rrdset_is_obsolete(res->some.share_time.st);
-    if (res->some.total_time.st)   rrdset_is_obsolete(res->some.total_time.st);
-    if (res->full.share_time.st)   rrdset_is_obsolete(res->full.share_time.st);
-    if (res->full.total_time.st)   rrdset_is_obsolete(res->full.total_time.st);
+    if (res->some.share_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->some.share_time.st);
+    if (res->some.total_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->some.total_time.st);
+    if (res->full.share_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->full.share_time.st);
+    if (res->full.total_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->full.total_time.st);
     freez(res->filename);
 }
 
 static inline void cgroup_free(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
-    if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
-    if(cg->st_cpu_limit)             rrdset_is_obsolete(cg->st_cpu_limit);
-    if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
-    if(cg->st_cpu_nr_throttled)      rrdset_is_obsolete(cg->st_cpu_nr_throttled);
-    if(cg->st_cpu_throttled_time)    rrdset_is_obsolete(cg->st_cpu_throttled_time);
-    if(cg->st_cpu_shares)            rrdset_is_obsolete(cg->st_cpu_shares);
-    if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
-    if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
-    if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
-    if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
-    if(cg->st_mem_usage)             rrdset_is_obsolete(cg->st_mem_usage);
-    if(cg->st_mem_usage_limit)       rrdset_is_obsolete(cg->st_mem_usage_limit);
-    if(cg->st_mem_utilization)       rrdset_is_obsolete(cg->st_mem_utilization);
-    if(cg->st_mem_failcnt)           rrdset_is_obsolete(cg->st_mem_failcnt);
-    if(cg->st_io)                    rrdset_is_obsolete(cg->st_io);
-    if(cg->st_serviced_ops)          rrdset_is_obsolete(cg->st_serviced_ops);
-    if(cg->st_throttle_io)           rrdset_is_obsolete(cg->st_throttle_io);
-    if(cg->st_throttle_serviced_ops) rrdset_is_obsolete(cg->st_throttle_serviced_ops);
-    if(cg->st_queued_ops)            rrdset_is_obsolete(cg->st_queued_ops);
-    if(cg->st_merged_ops)            rrdset_is_obsolete(cg->st_merged_ops);
+    if(cg->st_cpu) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu);
+    if(cg->st_cpu_limit) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
+    if(cg->st_cpu_per_core) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_per_core);
+    if(cg->st_cpu_nr_throttled) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_nr_throttled);
+    if(cg->st_cpu_throttled_time) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_throttled_time);
+    if(cg->st_cpu_shares) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_shares);
+    if(cg->st_mem) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem);
+    if(cg->st_writeback) rrdset_is_obsolete___safe_from_collector_thread(cg->st_writeback);
+    if(cg->st_mem_activity) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_activity);
+    if(cg->st_pgfaults) rrdset_is_obsolete___safe_from_collector_thread(cg->st_pgfaults);
+    if(cg->st_mem_usage) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_usage);
+    if(cg->st_mem_usage_limit) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_usage_limit);
+    if(cg->st_mem_utilization) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_utilization);
+    if(cg->st_mem_failcnt) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_failcnt);
+    if(cg->st_io) rrdset_is_obsolete___safe_from_collector_thread(cg->st_io);
+    if(cg->st_serviced_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_serviced_ops);
+    if(cg->st_throttle_io) rrdset_is_obsolete___safe_from_collector_thread(cg->st_throttle_io);
+    if(cg->st_throttle_serviced_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_throttle_serviced_ops);
+    if(cg->st_queued_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_queued_ops);
+    if(cg->st_merged_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_merged_ops);
 
     freez(cg->filename_cpuset_cpus);
     freez(cg->filename_cpu_cfs_period);
@@ -3474,7 +3474,7 @@ void update_cgroup_charts(int update_every) {
                         cpu_usage = (NETDATA_DOUBLE)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
                         NETDATA_DOUBLE cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
 
-                        rrdset_isnot_obsolete(cg->st_cpu_limit);
+                        rrdset_isnot_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
 
                         rrddim_set(cg->st_cpu_limit, "used", (cpu_used > 0)?cpu_used:0);
 
@@ -3485,7 +3485,7 @@ void update_cgroup_charts(int update_every) {
                     }
                     else {
                         if(unlikely(cg->st_cpu_limit)) {
-                            rrdset_is_obsolete(cg->st_cpu_limit);
+                            rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
                             cg->st_cpu_limit = NULL;
                         }
                         rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, NAN);
@@ -3854,7 +3854,7 @@ void update_cgroup_charts(int update_every) {
                         rrddim_add(cg->st_mem_usage_limit, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                     }
 
-                    rrdset_isnot_obsolete(cg->st_mem_usage_limit);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(cg->st_mem_usage_limit);
 
                     rrddim_set(cg->st_mem_usage_limit, "available", memory_limit - cg->memory.usage_in_bytes);
                     rrddim_set(cg->st_mem_usage_limit, "used", cg->memory.usage_in_bytes);
@@ -3884,7 +3884,7 @@ void update_cgroup_charts(int update_every) {
                     }
 
                     if (memory_limit) {
-                        rrdset_isnot_obsolete(cg->st_mem_utilization);
+                        rrdset_isnot_obsolete___safe_from_collector_thread(cg->st_mem_utilization);
 
                         rrddim_set(
                             cg->st_mem_utilization, "utilization", cg->memory.usage_in_bytes * 100 / memory_limit);
@@ -3894,12 +3894,12 @@ void update_cgroup_charts(int update_every) {
             }
             else {
                 if(unlikely(cg->st_mem_usage_limit)) {
-                    rrdset_is_obsolete(cg->st_mem_usage_limit);
+                    rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_usage_limit);
                     cg->st_mem_usage_limit = NULL;
                 }
 
                 if(unlikely(cg->st_mem_utilization)) {
-                    rrdset_is_obsolete(cg->st_mem_utilization);
+                    rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_utilization);
                     cg->st_mem_utilization = NULL;
                 }
             }
@@ -4624,7 +4624,7 @@ void *cgroups_main(void *ptr) {
         collector_error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
         goto exit;
     }
-    uv_thread_set_name_np(discovery_thread.thread, "PLUGIN[cgroups]");
+    uv_thread_set_name_np(discovery_thread.thread, "P[cgroups]");
 
     heartbeat_t hb;
     heartbeat_init(&hb);

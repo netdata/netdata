@@ -216,18 +216,18 @@ static size_t netdev_added = 0, netdev_found = 0;
 // ----------------------------------------------------------------------------
 
 static void netdev_charts_release(struct netdev *d) {
-    if(d->st_bandwidth)  rrdset_is_obsolete(d->st_bandwidth);
-    if(d->st_packets)    rrdset_is_obsolete(d->st_packets);
-    if(d->st_errors)     rrdset_is_obsolete(d->st_errors);
-    if(d->st_drops)      rrdset_is_obsolete(d->st_drops);
-    if(d->st_fifo)       rrdset_is_obsolete(d->st_fifo);
-    if(d->st_compressed) rrdset_is_obsolete(d->st_compressed);
-    if(d->st_events)     rrdset_is_obsolete(d->st_events);
-    if(d->st_speed)      rrdset_is_obsolete(d->st_speed);
-    if(d->st_duplex)     rrdset_is_obsolete(d->st_duplex);
-    if(d->st_operstate)  rrdset_is_obsolete(d->st_operstate);
-    if(d->st_carrier)    rrdset_is_obsolete(d->st_carrier);
-    if(d->st_mtu)        rrdset_is_obsolete(d->st_mtu);
+    if(d->st_bandwidth) rrdset_is_obsolete___safe_from_collector_thread(d->st_bandwidth);
+    if(d->st_packets) rrdset_is_obsolete___safe_from_collector_thread(d->st_packets);
+    if(d->st_errors) rrdset_is_obsolete___safe_from_collector_thread(d->st_errors);
+    if(d->st_drops) rrdset_is_obsolete___safe_from_collector_thread(d->st_drops);
+    if(d->st_fifo) rrdset_is_obsolete___safe_from_collector_thread(d->st_fifo);
+    if(d->st_compressed) rrdset_is_obsolete___safe_from_collector_thread(d->st_compressed);
+    if(d->st_events) rrdset_is_obsolete___safe_from_collector_thread(d->st_events);
+    if(d->st_speed) rrdset_is_obsolete___safe_from_collector_thread(d->st_speed);
+    if(d->st_duplex) rrdset_is_obsolete___safe_from_collector_thread(d->st_duplex);
+    if(d->st_operstate) rrdset_is_obsolete___safe_from_collector_thread(d->st_operstate);
+    if(d->st_carrier) rrdset_is_obsolete___safe_from_collector_thread(d->st_carrier);
+    if(d->st_mtu) rrdset_is_obsolete___safe_from_collector_thread(d->st_mtu);
 
     d->st_bandwidth   = NULL;
     d->st_compressed  = NULL;

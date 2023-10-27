@@ -48,6 +48,7 @@ typedef enum {
     STREAM_CAP_IEEE754          = (1 << 15), // streaming supports binary/hex transfer of double values
     STREAM_CAP_DATA_WITH_ML     = (1 << 16), // streaming supports transferring anomaly bit
     STREAM_CAP_DYNCFG           = (1 << 17), // dynamic configuration of plugins trough streaming
+    STREAM_CAP_SLOTS            = (1 << 18), // the sender can appoint a unique slot for each chart
     STREAM_CAP_ZSTD             = (1 << 19), // ZSTD compression supported
     STREAM_CAP_GZIP             = (1 << 20), // GZIP compression supported
 
@@ -153,6 +154,7 @@ typedef enum __attribute__((packed)) {
     STREAM_TRAFFIC_TYPE_FUNCTIONS,
     STREAM_TRAFFIC_TYPE_METADATA,
     STREAM_TRAFFIC_TYPE_DATA,
+    STREAM_TRAFFIC_TYPE_DYNCFG,
 
     // terminator
     STREAM_TRAFFIC_TYPE_MAX,

@@ -218,11 +218,13 @@ static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
 static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
-    bool replication_progress = false;
+    uint32_t version = rrdset_metadata_version(st);
 
     RRDHOST *host = st->rrdhost;
+    NUMBER_ENCODING integer_encoding = stream_has_capability(host->sender, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
+    bool with_slots = stream_has_capability(host->sender, STREAM_CAP_SLOTS) ? true : false;
 
-    rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    bool replication_progress = false;
 
     // properly set the name for the remote end to parse it
     char *name = "";
@@ -237,10 +239,17 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         }
     }
 
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_CHART, sizeof(PLUGINSD_KEYWORD_CHART) - 1);
+
+    if(with_slots) {
+        buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+        buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush.sender.chart_slot);
+    }
+
     // send the chart
     buffer_sprintf(
             wb
-            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+            , " \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , rrdset_id(st)
             , name
             , rrdset_title(st)
@@ -265,19 +274,25 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // send the dimensions
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_DIMENSION, sizeof(PLUGINSD_KEYWORD_DIMENSION) - 1);
+
+        if(with_slots) {
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+        }
+
         buffer_sprintf(
-                wb
-                , "DIMENSION \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\"\n"
-                , rrddim_id(rd)
-                , rrddim_name(rd)
-                , rrd_algorithm_name(rd->algorithm)
-                , rd->multiplier
-                , rd->divisor
-                , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
-                , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
-                , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+            wb
+            , " \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\"\n"
+            , rrddim_id(rd)
+            , rrddim_name(rd)
+            , rrd_algorithm_name(rd->algorithm)
+            , rd->multiplier
+            , rd->divisor
+            , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
+            , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
+            , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
-        rrddim_set_exposed(rd);
     }
     rrddim_foreach_done(rd);
 
@@ -312,7 +327,17 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 #endif
     }
 
-    st->upstream_resync_time_s = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    // we can set the exposed flag, after we commit the buffer
+    // because replication may pick it up prematurely
+    rrddim_foreach_read(rd, st) {
+        rrddim_metadata_exposed_upstream(rd, version);
+    }
+    rrddim_foreach_done(rd);
+    rrdset_metadata_exposed_upstream(st, version);
+
+    st->rrdpush.sender.resync_time_s = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
     return replication_progress;
 }
 
@@ -322,7 +347,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
 
-    if(st->last_collected_time.tv_sec > st->upstream_resync_time_s)
+    if(st->last_collected_time.tv_sec > st->rrdpush.sender.resync_time_s)
         buffer_print_uint64(wb, st->usec_since_last_update);
     else
         buffer_fast_strcat(wb, "0", 1);
@@ -334,7 +359,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
         if(unlikely(!rrddim_check_updated(rd)))
             continue;
 
-        if(likely(rrddim_check_exposed(rd))) {
+        if(likely(rrddim_check_upstream_exposed_collector(rd))) {
             buffer_fast_strcat(wb, "SET \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
@@ -345,7 +370,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             internal_error(true, "STREAM: 'host:%s/chart:%s/dim:%s' flag 'exposed' is updated but not exposed",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             // we will include it in the next iteration
-            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+            rrdset_metadata_updated(st);
         }
     }
     rrddim_foreach_done(rd);
@@ -363,12 +388,12 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
-        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST))))
+        || !should_send_chart_matching(st, rrdset_flag_get(st)))) {
         return false;
+    }
 
     BUFFER *wb = sender_start(host->sender);
     rrdpush_send_chart_definition(wb, st);
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     sender_thread_buffer_free();
 
     return true;
@@ -383,6 +408,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
         return;
 
+    bool with_slots = stream_has_capability(rsb, STREAM_CAP_SLOTS) ? true : false;
     NUMBER_ENCODING integer_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
     NUMBER_ENCODING doubles_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     BUFFER *wb = rsb->wb;
@@ -392,7 +418,14 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         if(unlikely(rsb->begin_v2_added))
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
 
-        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
+
+        if(with_slots) {
+            buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush.sender.chart_slot);
+        }
+
+        buffer_fast_strcat(wb, " '", 2);
         buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
         buffer_fast_strcat(wb, "' ", 2);
         buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->update_every);
@@ -409,7 +442,14 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         rsb->begin_v2_added = true;
     }
 
-    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2, sizeof(PLUGINSD_KEYWORD_SET_V2) - 1);
+
+    if(with_slots) {
+        buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+        buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+    }
+
+    buffer_fast_strcat(wb, " '", 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
     buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
@@ -465,7 +505,7 @@ void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, cons
 
     buffer_strcat(wb, "\n");
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 
@@ -479,7 +519,7 @@ void rrdpush_send_job_deleted(RRDHOST *host, const char *plugin_name, const char
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_DELETE_JOB " %s %s %s\n", plugin_name, module_name, job_name);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
@@ -511,11 +551,11 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     if(unlikely(host_flags & RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
         BUFFER *wb = sender_start(host->sender);
         rrd_functions_expose_global_rrdpush(host, wb);
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     }
 
-    RRDSET_FLAGS rrdset_flags = __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST);
-    bool exposed_upstream = (rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED);
+    bool exposed_upstream = rrdset_check_upstream_exposed(st);
+    RRDSET_FLAGS rrdset_flags = rrdset_flag_get(st);
     bool replication_in_progress = !(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
     if(unlikely((exposed_upstream && replication_in_progress) ||
@@ -525,7 +565,6 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     if(unlikely(!exposed_upstream)) {
         BUFFER *wb = sender_start(host->sender);
         replication_in_progress = rrdpush_send_chart_definition(wb, st);
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     }
 
     if(replication_in_progress)
@@ -573,7 +612,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
 
     rrd_functions_expose_global_rrdpush(host, wb);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
     sender_thread_buffer_free();
 }
@@ -606,7 +645,7 @@ void rrdpush_send_dyncfg(RRDHOST *host) {
     }
     dfe_done(plug);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
@@ -632,7 +671,7 @@ void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, cons
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE " %s %s %s\n", plugin_name, module_name, module_type2str(type));
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
@@ -645,7 +684,7 @@ void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const c
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB " %s %s %s %s %"PRIu32"\n", plugin_name, module_name, job_name, job_type2str(type), flags);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_DYNCFG);
 
     sender_thread_buffer_free();
 }
@@ -1397,7 +1436,8 @@ static struct {
     {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     {STREAM_CAP_IEEE754,      "IEEE754" },
     {STREAM_CAP_DATA_WITH_ML, "ML" },
-    {STREAM_CAP_DYNCFG,       "DYN_CFG" },
+    {STREAM_CAP_DYNCFG,       "DYNCFG" },
+    {STREAM_CAP_SLOTS,        "SLOTS" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
     {0 , NULL },
@@ -1475,6 +1515,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_REPLICATION |
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
+            STREAM_CAP_SLOTS |
             STREAM_CAP_COMPRESSIONS_AVAILABLE |
             #ifdef NETDATA_TEST_DYNCFG
             STREAM_CAP_DYNCFG |

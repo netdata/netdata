@@ -73,7 +73,7 @@ static inline void make_chart_obsolete(char *name, const char *id_modifier)
         snprintfz(id, 50, "mdstat.%s_%s", name, id_modifier);
         st = rrdset_find_active_byname_localhost(id);
         if (likely(st))
-            rrdset_is_obsolete(st);
+            rrdset_is_obsolete___safe_from_collector_thread(st);
     }
 }
 
@@ -409,7 +409,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            rrdset_isnot_obsolete(st_mdstat_health);
+            rrdset_isnot_obsolete___safe_from_collector_thread(st_mdstat_health);
         }
 
         if (!redundant_num) {
@@ -457,7 +457,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_STACKED);
 
-                    rrdset_isnot_obsolete(raid->st_disks);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_disks);
 
                     add_labels_to_mdstat(raid, raid->st_disks);
                 }
@@ -492,7 +492,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_LINE);
 
-                    rrdset_isnot_obsolete(raid->st_mismatch_cnt);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_mismatch_cnt);
 
                     add_labels_to_mdstat(raid, raid->st_mismatch_cnt);
                 }
@@ -524,7 +524,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_LINE);
 
-                    rrdset_isnot_obsolete(raid->st_operation);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_operation);
 
                     add_labels_to_mdstat(raid, raid->st_operation);
                 }
@@ -561,7 +561,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         NETDATA_CHART_PRIO_MDSTAT_FINISH + raid_idx * 10,
                         update_every, RRDSET_TYPE_LINE);
 
-                    rrdset_isnot_obsolete(raid->st_finish);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_finish);
 
                     add_labels_to_mdstat(raid, raid->st_finish);
                 }
@@ -590,7 +590,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_LINE);
 
-                    rrdset_isnot_obsolete(raid->st_speed);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_speed);
 
                     add_labels_to_mdstat(raid, raid->st_speed);
                 }
@@ -622,7 +622,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                         update_every,
                         RRDSET_TYPE_LINE);
 
-                    rrdset_isnot_obsolete(raid->st_nonredundant);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(raid->st_nonredundant);
 
                     add_labels_to_mdstat(raid, raid->st_nonredundant);
                 }

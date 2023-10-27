@@ -224,7 +224,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     sender_unlock(s);
 
-    if(signal_sender)
+    if(signal_sender && (!stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA))
         rrdpush_signal_sender_to_wake_up(s);
 }
 
@@ -284,14 +284,15 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED | RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+        rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
-        st->upstream_resync_time_s = 0;
+        st->rrdpush.sender.resync_time_s = 0;
+        rrdset_metadata_updated(st);
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st)
-            rrddim_clear_exposed(rd);
+            rrddim_metadata_exposed_upstream_clear(rd);
         rrddim_foreach_done(rd);
     }
     rrdset_foreach_done(st);
@@ -1493,7 +1494,7 @@ void *rrdpush_sender_thread(void *ptr) {
             }
         };
 
-        int poll_rc = poll(fds, 2, 1000);
+        int poll_rc = poll(fds, 2, 50); // timeout in milliseconds
 
         netdata_log_debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);

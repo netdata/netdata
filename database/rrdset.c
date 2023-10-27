@@ -6,6 +6,123 @@
 #include "storage_engine.h"
 
 // ----------------------------------------------------------------------------
+// RRDSET rrdpush send chart_slots
+
+static void rrdset_rrdpush_send_chart_slot_assign(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+
+    if(host->rrdpush.send.pluginsd_chart_slots.available.used > 0)
+        st->rrdpush.sender.chart_slot =
+                host->rrdpush.send.pluginsd_chart_slots.available.array[--host->rrdpush.send.pluginsd_chart_slots.available.used];
+    else
+        st->rrdpush.sender.chart_slot = ++host->rrdpush.send.pluginsd_chart_slots.last_used;
+
+    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+}
+
+static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
+    if(!st->rrdpush.sender.chart_slot || st->rrdhost->rrdpush.send.pluginsd_chart_slots.available.ignore)
+        return;
+
+    RRDHOST *host = st->rrdhost;
+    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+
+    if(host->rrdpush.send.pluginsd_chart_slots.available.used >= host->rrdpush.send.pluginsd_chart_slots.available.size) {
+        uint32_t old_size = host->rrdpush.send.pluginsd_chart_slots.available.size;
+        uint32_t new_size = (old_size > 0) ? (old_size * 2) : 1024;
+
+        host->rrdpush.send.pluginsd_chart_slots.available.array =
+                reallocz(host->rrdpush.send.pluginsd_chart_slots.available.array, new_size * sizeof(uint32_t));
+
+        host->rrdpush.send.pluginsd_chart_slots.available.size = new_size;
+    }
+
+    host->rrdpush.send.pluginsd_chart_slots.available.array[host->rrdpush.send.pluginsd_chart_slots.available.used++] =
+            st->rrdpush.sender.chart_slot;
+
+    st->rrdpush.sender.chart_slot = 0;
+    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+}
+
+void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
+    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+    host->rrdpush.send.pluginsd_chart_slots.available.ignore = true;
+    freez(host->rrdpush.send.pluginsd_chart_slots.available.array);
+    host->rrdpush.send.pluginsd_chart_slots.available.array = NULL;
+    host->rrdpush.send.pluginsd_chart_slots.available.used = 0;
+    host->rrdpush.send.pluginsd_chart_slots.available.size = 0;
+    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+
+    // zero all the slots on all charts, so that they will not attempt to access the array
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        st->rrdpush.sender.chart_slot = 0;
+    }
+    rrdset_foreach_done(st);
+}
+
+void rrdset_pluginsd_receive_unslot(RRDSET *st) {
+    for(size_t i = 0; i < st->pluginsd.size ;i++) {
+        rrddim_acquired_release(st->pluginsd.prd_array[i].rda); // can be NULL
+        st->pluginsd.prd_array[i].rda = NULL;
+        st->pluginsd.prd_array[i].rd = NULL;
+        st->pluginsd.prd_array[i].id = NULL;
+    }
+
+    RRDHOST *host = st->rrdhost;
+
+    if(st->pluginsd.last_slot >= 0 &&
+        (uint32_t)st->pluginsd.last_slot < host->rrdpush.receive.pluginsd_chart_slots.size &&
+        host->rrdpush.receive.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
+        host->rrdpush.receive.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
+    }
+
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.with_slots = false;
+}
+
+void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
+    if(!st)
+        return;
+
+    spinlock_lock(&st->pluginsd.spinlock);
+
+    rrdset_pluginsd_receive_unslot(st);
+
+    freez(st->pluginsd.prd_array);
+    st->pluginsd.prd_array = NULL;
+    st->pluginsd.size = 0;
+    st->pluginsd.pos = 0;
+    st->pluginsd.set = false;
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.with_slots = false;
+    st->pluginsd.collector_tid = 0;
+
+    spinlock_unlock(&st->pluginsd.spinlock);
+}
+
+static void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
+    spinlock_init(&st->pluginsd.spinlock);
+    st->pluginsd.last_slot = -1;
+}
+
+void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
+    spinlock_lock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+
+    if(host->rrdpush.receive.pluginsd_chart_slots.array) {
+        for (size_t s = 0; s < host->rrdpush.receive.pluginsd_chart_slots.size; s++)
+            rrdset_pluginsd_receive_unslot_and_cleanup(host->rrdpush.receive.pluginsd_chart_slots.array[s]);
+
+        freez(host->rrdpush.receive.pluginsd_chart_slots.array);
+        host->rrdpush.receive.pluginsd_chart_slots.array = NULL;
+        host->rrdpush.receive.pluginsd_chart_slots.size = 0;
+    }
+
+    spinlock_unlock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+}
+
+// ----------------------------------------------------------------------------
 // RRDSET name index
 
 static void rrdset_name_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
@@ -64,7 +181,7 @@ static STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const c
                 i++;
             } while (rrdset_index_find_name(host, new_name));
 
-            netdata_log_info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, rrdhost_hostname(host));
+//            netdata_log_info("RRDSET: using name '%s' for chart '%s' on host '%s'.", new_name, full_name, rrdhost_hostname(host));
         }
         else
             return NULL;
@@ -135,6 +252,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->chart_type = ctr->chart_type;
     st->rrdhost = host;
 
+    rrdset_rrdpush_send_chart_slot_assign(st);
+
     spinlock_init(&st->data_collection_lock);
 
     st->flags =   RRDSET_FLAG_SYNC_CLOCK
@@ -179,12 +298,12 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->green = NAN;
     st->red = NAN;
 
+    rrdset_pluginsd_receive_slots_initialize(st);
+
     ctr->react_action = RRDSET_REACT_NEW;
 
     ml_chart_new(st);
 }
-
-void pluginsd_rrdset_cleanup(RRDSET *st);
 
 void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
     RRDHOST *host = st->rrdhost;
@@ -208,7 +327,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         }
     }
 
-    pluginsd_rrdset_cleanup(st);
+    rrdset_pluginsd_receive_unslot_and_cleanup(st);
 }
 
 // the destructor - the dictionary is write locked while this runs
@@ -219,6 +338,8 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
     rrdset_finalize_collection(st, false);
+
+    rrdset_rrdpush_send_chart_slot_release(st);
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
@@ -288,7 +409,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     struct rrdset_constructor *ctr = constructor_data;
     RRDSET *st = rrdset;
 
-    rrdset_isnot_obsolete(st);
+    rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
     ctr->react_action = RRDSET_REACT_NONE;
 
@@ -363,7 +484,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rrdset_update_permanent_labels(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_metadata_updated(st);
 
     return ctr->react_action != RRDSET_REACT_NONE;
 }
@@ -542,7 +663,7 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_IGNORE);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrdset_metadata_updated(st);
 
     rrdcontext_updated_rrdset_name(st);
     return 2;
@@ -651,14 +772,19 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     *last_time_s = db_last_entry_s;
 }
 
-inline void rrdset_is_obsolete(RRDSET *st) {
+inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
+    rrdset_pluginsd_receive_unslot(st);
+
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
+//        netdata_log_info("Setting obsolete flag on chart 'host:%s/chart:%s'",
+//                rrdhost_hostname(st->rrdhost), rrdset_id(st));
+
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
         st->last_accessed_time_s = now_realtime_sec();
 
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        rrdset_metadata_updated(st);
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
@@ -667,12 +793,16 @@ inline void rrdset_is_obsolete(RRDSET *st) {
     }
 }
 
-inline void rrdset_isnot_obsolete(RRDSET *st) {
+inline void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
+
+//        netdata_log_info("Clearing obsolete flag on chart 'host:%s/chart:%s'",
+//                rrdhost_hostname(st->rrdhost), rrdset_id(st));
+
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         st->last_accessed_time_s = now_realtime_sec();
 
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+        rrdset_metadata_updated(st);
 
         // the chart will be pushed upstream automatically
         // due to data collection
@@ -1527,7 +1657,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         netdata_log_error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
-        rrdset_isnot_obsolete(st);
+        rrdset_isnot_obsolete___safe_from_collector_thread(st);
     }
 
     // check if the chart has a long time to be updated
@@ -1674,7 +1804,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
                 netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
-                rrddim_isnot_obsolete(st, rd);
+                rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
             }
         }
     }

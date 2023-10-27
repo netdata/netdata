@@ -1192,6 +1192,12 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     }
 
     // ------------------------------------------------------------------------
+    // clean up streaming chart slots
+
+    rrdhost_pluginsd_send_chart_slots_free(host);
+    rrdhost_pluginsd_receive_chart_slots_free(host);
+
+    // ------------------------------------------------------------------------
     // clean up streaming
 
     rrdhost_streaming_sender_structures_free(host);
@@ -1278,6 +1284,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 
     string_freez(host->hostname);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
+
     freez(host);
 }
 
