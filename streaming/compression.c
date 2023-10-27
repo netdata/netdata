@@ -142,6 +142,44 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
     return false;
 }
 
+/*
+* In case of stream compression buffer overflow
+* Inform the user through the error log file and
+* deactivate compression by downgrading the stream protocol.
+*/
+void rrdpush_compression_deactivate(struct sender_state *s) {
+    switch(s->compressor.algorithm) {
+        case COMPRESSION_ALGORITHM_MAX:
+        case COMPRESSION_ALGORITHM_NONE:
+            netdata_log_error("STREAM_COMPRESSION: compression error on 'host:%s' without any compression enabled. Ignoring error.",
+                    rrdhost_hostname(s->host));
+            break;
+
+        case COMPRESSION_ALGORITHM_GZIP:
+            netdata_log_error("STREAM_COMPRESSION: GZIP compression error on 'host:%s'. Disabling GZIP for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_GZIP;
+            break;
+
+        case COMPRESSION_ALGORITHM_LZ4:
+            netdata_log_error("STREAM_COMPRESSION: LZ4 compression error on 'host:%s'. Disabling ZSTD for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_LZ4;
+            break;
+
+        case COMPRESSION_ALGORITHM_ZSTD:
+            netdata_log_error("STREAM_COMPRESSION: ZSTD compression error on 'host:%s'. Disabling ZSTD for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_ZSTD;
+            break;
+
+        case COMPRESSION_ALGORITHM_BROTLI:
+            netdata_log_error("STREAM_COMPRESSION: BROTLI compression error on 'host:%s'. Disabling BROTLI for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_BROTLI;
+            break;
+    }
+}
 
 // ----------------------------------------------------------------------------
 // compressor public API

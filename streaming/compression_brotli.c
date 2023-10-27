@@ -32,7 +32,7 @@ size_t rrdpush_compress_brotli(struct compressor_state *state, const char *data,
     if (unlikely(!state || !size || !out))
         return 0;
 
-    simple_ring_buffer_make_room(&state->output, BrotliEncoderMaxCompressedSize(size));
+    simple_ring_buffer_make_room(&state->output, MAX(BrotliEncoderMaxCompressedSize(size), COMPRESSION_MAX_CHUNK));
 
     size_t available_out = state->output.size;
 
