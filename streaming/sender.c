@@ -101,6 +101,12 @@ static inline void deactivate_compression(struct sender_state *s) {
                               rrdhost_hostname(s->host));
             s->disabled_capabilities |= STREAM_CAP_ZSTD;
             break;
+
+        case COMPRESSION_ALGORITHM_BROTLI:
+            netdata_log_error("STREAM_COMPRESSION: BROTLI compression error on 'host:%s'. Disabling BROTLI for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_BROTLI;
+            break;
     }
 
     rrdpush_sender_thread_close_socket(s->host);

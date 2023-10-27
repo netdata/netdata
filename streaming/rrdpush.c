@@ -1400,6 +1400,7 @@ static struct {
     {STREAM_CAP_DYNCFG,       "DYN_CFG" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
+    {STREAM_CAP_BROTLI,       "BROTLI" },
     {0 , NULL },
 };
 
@@ -1531,7 +1532,9 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
     // IMPORTANT
     // KEEP THE SAME ORDER IN DECOMPRESSION
 
-    if(stream_has_capability(s, STREAM_CAP_ZSTD))
+    if(stream_has_capability(s, STREAM_CAP_BROTLI))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
+    else if(stream_has_capability(s, STREAM_CAP_ZSTD))
         s->compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
     else if(stream_has_capability(s, STREAM_CAP_LZ4))
         s->compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
@@ -1555,7 +1558,9 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
     // IMPORTANT
     // KEEP THE SAME ORDER IN COMPRESSION
 
-    if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
+    if(stream_has_capability(rpt, STREAM_CAP_BROTLI))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
+    else if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
         rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
     else if(stream_has_capability(rpt, STREAM_CAP_LZ4))
         rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;

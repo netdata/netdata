@@ -12,11 +12,21 @@
 #include "compression_zstd.h"
 #endif
 
+#ifdef ENABLE_BROTLI
+#include "compression_brotli.h"
+#endif
+
 // ----------------------------------------------------------------------------
 // compressor public API
 
 void rrdpush_compressor_init(struct compressor_state *state) {
     switch(state->algorithm) {
+#ifdef ENABLE_BROTLI
+        case COMPRESSION_ALGORITHM_BROTLI:
+            rrdpush_compressor_init_brotli(state);
+            break;
+#endif
+
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
             rrdpush_compressor_init_zstd(state);
@@ -41,6 +51,12 @@ void rrdpush_compressor_init(struct compressor_state *state) {
 
 void rrdpush_compressor_destroy(struct compressor_state *state) {
     switch(state->algorithm) {
+#ifdef ENABLE_BROTLI
+        case COMPRESSION_ALGORITHM_BROTLI:
+            rrdpush_compressor_destroy_brotli(state);
+            break;
+#endif
+
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
             rrdpush_compressor_destroy_zstd(state);
@@ -69,6 +85,12 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
     size_t ret = 0;
 
     switch(state->algorithm) {
+#ifdef ENABLE_BROTLI
+        case COMPRESSION_ALGORITHM_BROTLI:
+            ret = rrdpush_compress_brotli(state, data, size, out);
+            break;
+#endif
+
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
             ret = rrdpush_compress_zstd(state, data, size, out);
@@ -104,6 +126,12 @@ void rrdpush_decompressor_destroy(struct decompressor_state *state) {
         return;
 
     switch(state->algorithm) {
+#ifdef ENABLE_BROTLI
+        case COMPRESSION_ALGORITHM_BROTLI:
+            rrdpush_decompressor_destroy_brotli(state);
+            break;
+#endif
+
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
             rrdpush_decompressor_destroy_zstd(state);
@@ -129,6 +157,12 @@ void rrdpush_decompressor_destroy(struct decompressor_state *state) {
 
 void rrdpush_decompressor_init(struct decompressor_state *state) {
     switch(state->algorithm) {
+#ifdef ENABLE_BROTLI
+        case COMPRESSION_ALGORITHM_BROTLI:
+            rrdpush_decompressor_init_brotli(state);
+            break;
+#endif
+
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
             rrdpush_decompressor_init_zstd(state);
@@ -158,6 +192,12 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
     size_t ret = 0;
 
     switch(state->algorithm) {
+#ifdef ENABLE_BROTLI
+        case COMPRESSION_ALGORITHM_BROTLI:
+            ret = rrdpush_decompress_brotli(state, compressed_data, compressed_size);
+            break;
+#endif
+
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
             ret = rrdpush_decompress_zstd(state, compressed_data, compressed_size);
@@ -218,7 +258,13 @@ int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *
         const char *out;
         size_t size = rrdpush_compress(&cctx, txt, txt_len, &out);
 
-        if(size >= COMPRESSION_MAX_CHUNK) {
+        if(size == 0) {
+            fprintf(stderr, "iteration %d: compressed size %zu is zero\n",
+                    i, size);
+            errors++;
+            goto cleanup;
+        }
+        else if(size >= COMPRESSION_MAX_CHUNK) {
             fprintf(stderr, "iteration %d: compressed size %zu exceeds max allowed size\n",
                     i, size);
             errors++;
@@ -236,7 +282,12 @@ int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *
                 goto cleanup;
             }
 
-            if(dtxt_len != txt_len) {
+            if(!dtxt_len) {
+                fprintf(stderr, "iteration %d: decompressed size is zero\n", i);
+                errors++;
+                goto cleanup;
+            }
+            else if(dtxt_len != txt_len) {
                 fprintf(stderr, "iteration %d: decompressed size %zu does not match original size %zu\n",
                         i, dtxt_len, txt_len
                        );
@@ -278,6 +329,7 @@ cleanup:
 int unittest_rrdpush_compressions(void) {
     int ret = 0;
 
+    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
     ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_GZIP, "GZIP");
     ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_LZ4, "LZ4");
     ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");

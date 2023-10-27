@@ -560,16 +560,19 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 }
 
 static void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order) {
-    rpt->config.compression_priorities[0] = STREAM_CAP_ZSTD;
-    rpt->config.compression_priorities[1] = STREAM_CAP_LZ4;
-    rpt->config.compression_priorities[2] = STREAM_CAP_GZIP;
+    rpt->config.compression_priorities[0] = STREAM_CAP_BROTLI;
+    rpt->config.compression_priorities[1] = STREAM_CAP_ZSTD;
+    rpt->config.compression_priorities[2] = STREAM_CAP_LZ4;
+    rpt->config.compression_priorities[3] = STREAM_CAP_GZIP;
 
     char *s = strdupz(order);
 
     char *words[COMPRESSION_ALGORITHM_MAX] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(s, words, COMPRESSION_ALGORITHM_MAX);
     for(size_t i = 0; i < num_words ;i++) {
-        if(strcasecmp(words[i], "zstd") == 0)
+        if(strcasecmp(words[i], "brotli") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_BROTLI;
+        else if(strcasecmp(words[i], "zstd") == 0)
             rpt->config.compression_priorities[i] = STREAM_CAP_ZSTD;
         else if(strcasecmp(words[i], "lz4") == 0)
             rpt->config.compression_priorities[i] = STREAM_CAP_LZ4;

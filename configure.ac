@@ -578,6 +578,27 @@ if test "x$LIBZSTD_FOUND" = "xyes"; then
 fi
 
 # -----------------------------------------------------------------------------
+# brotli
+
+AC_CHECK_LIB([brotlienc], [BrotliEncoderCreateInstance, BrotliEncoderCompressStream],
+             [LIBBROTLIENC_FOUND=yes],
+             [LIBBROTLIENC_FOUND=no])
+
+if test "x$LIBBROTLIENC_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_BROTLIENC], [1], [libbrotlienc usability])
+    OPTIONAL_BROTLIENC_LIBS="-lbrotlienc"
+fi
+
+AC_CHECK_LIB([brotlidec], [BrotliDecoderCreateInstance, BrotliDecoderDecompressStream],
+             [LIBBROTLIDEC_FOUND=yes],
+             [LIBBROTLIDEC_FOUND=no])
+
+if test "x$LIBBROTLIDEC_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_BROTLIDEC], [1], [libbrotlidec usability])
+    OPTIONAL_BROTLIDEC_LIBS="-lbrotlidec"
+fi
+
+# -----------------------------------------------------------------------------
 # zlib
 
 PKG_CHECK_MODULES(
@@ -1912,6 +1933,8 @@ AC_SUBST([OPTIONAL_MATH_LIBS])
 AC_SUBST([OPTIONAL_DATACHANNEL_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_BROTLIENC_LIBS])
+AC_SUBST([OPTIONAL_BROTLIDEC_LIBS])
 AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
