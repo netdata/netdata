@@ -974,7 +974,7 @@ build_fluentbit() {
   
   rm CMakeCache.txt > /dev/null 2>&1
 
-  if ! run eval "${env_cmd} $1 -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
+  if ! run eval "${env_cmd} $1 -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
     cd - > /dev/null || return 1
     rm -rf fluent-bit/build > /dev/null 2>&1
     return 1
@@ -1011,6 +1011,7 @@ bundle_fluentbit() {
     return 0
   fi
 
+  patch -N -p1 fluent-bit/CMakeLists.txt -i logsmanagement/fluent_bit_build/CMakeLists.patch
   patch -N -p1 fluent-bit/src/flb_log.c -i logsmanagement/fluent_bit_build/flb-log-fmt.patch
 
   # If musl is used, we need to patch chunkio, providing fts has been previously installed.

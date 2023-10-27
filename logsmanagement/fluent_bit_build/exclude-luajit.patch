@@ -1,5 +1,3 @@
-otherwise it installs an unused /usr/bin/luajit ....
--0
 diff --git a/cmake/luajit.cmake b/cmake/luajit.cmake
 index b6774eb..f8042ae 100644
 --- a/cmake/luajit.cmake
