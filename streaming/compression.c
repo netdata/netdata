@@ -411,19 +411,17 @@ void unittest_generate_random_name(char *dst, size_t size) {
     dst[len] = '\0';
 }
 
-void unittest_generate_message(BUFFER *wb, time_t now_s) {
+void unittest_generate_message(BUFFER *wb, time_t now_s, size_t counter) {
     bool with_slots = true;
     NUMBER_ENCODING integer_encoding = NUMBER_ENCODING_BASE64;
     NUMBER_ENCODING doubles_encoding = NUMBER_ENCODING_BASE64;
     time_t update_every = 1;
-    time_t point_end_time_s = now_s + random() % 1000;
-    time_t wall_clock_time_s = now_s + random() % 1000;
-    size_t chart_slot = now_s + random() % 100000;
-    size_t dimensions = 2 + random() % 3;
+    time_t point_end_time_s = now_s;
+    time_t wall_clock_time_s = now_s;
+    size_t chart_slot = counter + 1;
+    size_t dimensions = 2 + random() % 5;
     char chart[RRD_ID_LENGTH_MAX + 1] = "name";
     unittest_generate_random_name(chart, 5 + random() % 30);
-
-    buffer_flush(wb);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
@@ -447,10 +445,10 @@ void unittest_generate_message(BUFFER *wb, time_t now_s) {
 
 
     for(size_t d = 0; d < dimensions ;d++) {
-        size_t dim_slot = random() % dimensions;
+        size_t dim_slot = d + 1;
         char dim_id[RRD_ID_LENGTH_MAX + 1] = "dimension";
         unittest_generate_random_name(dim_id, 10 + random() % 20);
-        int64_t last_collected_value = random();
+        int64_t last_collected_value = (random() % 2 == 0) ? (int64_t)(counter + d) : (int64_t)random();
         NETDATA_DOUBLE value = (random() % 2 == 0) ? (NETDATA_DOUBLE)random() / ((NETDATA_DOUBLE)random() + 1) : (NETDATA_DOUBLE)last_collected_value;
         SN_FLAGS flags = (random() % 1000 == 0) ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
 
@@ -507,11 +505,13 @@ int unittest_rrdpush_compression_speed(compression_algorithm_t algorithm, const 
     usec_t compression_started_ut = now_monotonic_usec();
     usec_t decompression_started_ut = compression_started_ut;
 
-    for(int i = 0; i < 1000000 ;i++) {
+    for(int i = 0; i < 10000 ;i++) {
         compression_started_ut = now_monotonic_usec();
         decompression_ut += compression_started_ut - decompression_started_ut;
 
-        unittest_generate_message(wb, now_s);
+        buffer_flush(wb);
+        while(buffer_strlen(wb) < COMPRESSION_MAX_MSG_SIZE - 1024)
+            unittest_generate_message(wb, now_s, i);
 
         const char *txt = buffer_tostring(wb);
         size_t txt_len = buffer_strlen(wb);
