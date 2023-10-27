@@ -630,6 +630,14 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
                 pid_ptr->current_timestamp = update_time;
                 memcpy(shm_ptr, &cv[0], sizeof(netdata_publish_shm_kernel_t));
             } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
+                ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
+#ifdef NETDATA_DEV_MODE
+                collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s",
+                               cv->name,
+                               key,
+                               NETDATA_EBPF_MODULE_NAME_CACHESTAT,
+                               pid_ptr->apps_target->name);
+#endif
                 JudyLDel(&pid_ptr->shm_stats.JudyLArray, cv[0].ct, PJE0);
                 ebpf_shm_release(shm_ptr);
                 bpf_map_delete_elem(fd, &key);
@@ -700,18 +708,24 @@ static void ebpf_shm_read_global_table(netdata_idx_t *stats, int maps_per_core)
 /**
  * Sum values for all targets.
  */
-static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, struct ebpf_pid_on_target *root)
+static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, Pvoid_t JudyLArray, RW_SPINLOCK rw_spinlock)
 {
-    if (!root)
+    rw_spinlock_read_lock(&rw_spinlock);
+    if (!JudyLArray) {
+        rw_spinlock_read_unlock(&rw_spinlock);
         return;
+    }
 
     memset(shm, 0, sizeof(netdata_publish_shm_kernel_t));
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-    while (root) {
-        int32_t pid = root->pid;
+
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
-                                                                               pid,
+                                                                               local_pid,
                                                                                NULL,
                                                                                NETDATA_EBPF_MODULE_NAME_SHM);
         if (pid_ptr) {
@@ -731,10 +745,10 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, struct ebpf_pid
             }
             rw_spinlock_read_unlock(&pid_ptr->shm_stats.rw_spinlock);
         }
-
-        root = root->next;
     }
+
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_read_unlock(&rw_spinlock);
 }
 
 /**
@@ -746,8 +760,8 @@ void ebpf_shm_update_apps_data(struct ebpf_target *root)
 {
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed && w->processes)) {
-            ebpf_shm_sum_pids(&w->shm, w->root_pid);
+        if (unlikely(w->exposed)) {
+            ebpf_shm_sum_pids(&w->shm, w->pid_list.JudyLArray, w->pid_list.rw_spinlock);
         }
     }
 }
