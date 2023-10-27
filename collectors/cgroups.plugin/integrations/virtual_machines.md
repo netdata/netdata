@@ -61,8 +61,8 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| container_name | TBD |
-| image | TBD |
+| container_name | The container name or group path if name resolution fails. |
+| image | Docker/Podman container image name. |
 
 Metrics:
 
@@ -109,10 +109,11 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| container_name | TBD |
-| image | TBD |
-| device | TBD |
-| interface_type | TBD |
+| container_name | The container name or group path if name resolution fails. |
+| image | Docker/Podman container image name. |
+| device | The name of the host network interface linked to the container's network interface. |
+| container_device | Container network interface name. |
+| interface_type | Network interface type. Always "virtual" for the containers. |
 
 Metrics:
 
