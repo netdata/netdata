@@ -1422,16 +1422,6 @@ static struct {
     STREAM_CAPABILITIES cap;
     const char *str;
 } capability_names[] = {
-<<<<<<< HEAD
-    { STREAM_CAP_V1, "V1" },
-    { STREAM_CAP_V2, "V2" },
-    { STREAM_CAP_VN, "VN" },
-    { STREAM_CAP_VCAPS, "VCAPS" },
-    { STREAM_CAP_HLABELS, "HLABELS" },
-    {STREAM_CAP_CLAIM,        "CLAIM" },
-    {STREAM_CAP_CLABELS,      "CLABELS" },
-    {STREAM_CAP_COMPRESSION,  "COMPRESSION" },
-=======
     {STREAM_CAP_V1,           "V1" },
     {STREAM_CAP_V2,           "V2" },
     {STREAM_CAP_VN,           "VN" },
@@ -1440,21 +1430,16 @@ static struct {
     {STREAM_CAP_CLAIM,        "CLAIM" },
     {STREAM_CAP_CLABELS,      "CLABELS" },
     {STREAM_CAP_LZ4,          "LZ4" },
->>>>>>> origin/master
     {STREAM_CAP_FUNCTIONS,    "FUNCTIONS" },
     {STREAM_CAP_REPLICATION,  "REPLICATION" },
     {STREAM_CAP_BINARY,       "BINARY" },
     {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     {STREAM_CAP_IEEE754,      "IEEE754" },
     {STREAM_CAP_DATA_WITH_ML, "ML" },
-<<<<<<< HEAD
     {STREAM_CAP_DYNCFG,       "DYNCFG" },
     {STREAM_CAP_SLOTS,        "SLOTS" },
-=======
-    {STREAM_CAP_DYNCFG,       "DYN_CFG" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
->>>>>>> origin/master
     {0 , NULL },
 };
 
