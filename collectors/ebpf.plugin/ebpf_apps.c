@@ -268,7 +268,7 @@ void ebpf_fd_release(netdata_fd_stat_t *stat)
  */
 void ebpf_shm_aral_init()
 {
-    ebpf_aral_shm_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SHM_ARAL_NAME, sizeof(netdata_publish_shm_t));
+    ebpf_aral_shm_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SHM_ARAL_NAME, sizeof(netdata_publish_shm_kernel_t));
 }
 
 /**
@@ -278,10 +278,10 @@ void ebpf_shm_aral_init()
  *
  * @return it returns the address on success.
  */
-netdata_publish_shm_t *ebpf_shm_stat_get(void)
+netdata_publish_shm_kernel_t *ebpf_shm_stat_get(void)
 {
-    netdata_publish_shm_t *target = aral_mallocz(ebpf_aral_shm_pid);
-    memset(target, 0, sizeof(netdata_publish_shm_t));
+    netdata_publish_shm_kernel_t *target = aral_mallocz(ebpf_aral_shm_pid);
+    memset(target, 0, sizeof(netdata_publish_shm_kernel_t));
     return target;
 }
 
@@ -290,7 +290,7 @@ netdata_publish_shm_t *ebpf_shm_stat_get(void)
  *
  * @param stat Release a target after usage.
  */
-void ebpf_shm_release(netdata_publish_shm_t *stat)
+void ebpf_shm_release(netdata_publish_shm_kernel_t *stat)
 {
     aral_freez(ebpf_aral_shm_pid, stat);
 }

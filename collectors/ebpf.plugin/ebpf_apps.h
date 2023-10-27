@@ -107,7 +107,7 @@ struct ebpf_target {
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
-    netdata_publish_shm_t shm;
+    netdata_publish_shm_kernel_t shm;
     ebpf_socket_publish_apps_t socket;
     ebpf_process_stat_t process;
 
@@ -260,8 +260,8 @@ void ebpf_fd_release(netdata_fd_stat_t *stat);
 
 extern ARAL *ebpf_aral_shm_pid;
 void ebpf_shm_aral_init();
-netdata_publish_shm_t *ebpf_shm_stat_get(void);
-void ebpf_shm_release(netdata_publish_shm_t *stat);
+netdata_publish_shm_kernel_t *ebpf_shm_stat_get(void);
+void ebpf_shm_release(netdata_publish_shm_kernel_t *stat);
 
 extern ARAL *ebpf_aral_swap_pid;
 void ebpf_swap_release(netdata_publish_swap_t *stat);

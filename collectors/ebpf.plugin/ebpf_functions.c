@@ -2767,10 +2767,10 @@ static void ebpf_fill_shm_function_buffer_unsafe(BUFFER *buf)
         rw_spinlock_read_lock(&pid_ptr->shm_stats.rw_spinlock);
         if (pid_ptr->shm_stats.JudyLArray) {
             while ((shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_timestamp, &first_shm))) {
-                netdata_publish_shm_t *values = (netdata_publish_shm_t *)*shm_value;
+                netdata_publish_shm_kernel_t *values = (netdata_publish_shm_kernel_t *)*shm_value;
                 ebpf_fill_shm_function_buffer(buf,
                                               local_pid,
-                                              &values->data,
+                                              values,
                                               pid_ptr->name,
                                               (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             }
@@ -2780,9 +2780,9 @@ static void ebpf_fill_shm_function_buffer_unsafe(BUFFER *buf)
     }
 
     if (!counter) {
-        netdata_publish_shm_t fake_shm = { };
+        netdata_publish_shm_kernel_t fake_shm = { };
 
-        ebpf_fill_shm_function_buffer(buf, getpid(), &fake_shm.data, EBPF_NOT_IDENFIED, NULL);
+        ebpf_fill_shm_function_buffer(buf, getpid(), &fake_shm, EBPF_NOT_IDENFIED, NULL);
     }
 }
 
@@ -2802,9 +2802,9 @@ static void ebpf_shm_read_judy(BUFFER *buf, struct ebpf_module *em)
     if (!em->maps || (em->maps[NETDATA_PID_SHM_TABLE].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
         !ebpf_judy_pid.index.JudyLArray) {
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
-        netdata_publish_shm_t fake_shm = { };
+        netdata_publish_shm_kernel_t fake_shm = { };
 
-        ebpf_fill_shm_function_buffer(buf, getpid(), &fake_shm.data, EBPF_NOT_IDENFIED, NULL);
+        ebpf_fill_shm_function_buffer(buf, getpid(), &fake_shm, EBPF_NOT_IDENFIED, NULL);
         return;
     }
 
@@ -2832,7 +2832,7 @@ static void ebpf_shm_clean_judy_array_unsafe()
         bool first_shm = true;
         if (pid_ptr->shm_stats.JudyLArray) {
             while ((shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_shm, &first_shm))) {
-                netdata_publish_shm_t *values = (netdata_publish_shm_t *)*shm_value;
+                netdata_publish_shm_kernel_t *values = (netdata_publish_shm_kernel_t *)*shm_value;
                 ebpf_shm_release(values);
             }
             JudyLFreeArray(&pid_ptr->shm_stats.JudyLArray, PJE0);
