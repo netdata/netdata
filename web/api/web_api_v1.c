@@ -1272,12 +1272,8 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression",
-                                   host->sender && stream_has_capability(host->sender, STREAM_CAP_COMPRESSION));
-#else // ! ENABLE_RRDPUSH_COMPRESSION
-    buffer_json_member_add_boolean(wb, "stream-compression", false);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+                                   host->sender && host->sender->compressor.initialized);
 
 #ifdef ENABLE_HTTPS
     buffer_json_member_add_boolean(wb, "https-enabled", true);

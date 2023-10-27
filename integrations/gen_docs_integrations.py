@@ -97,7 +97,7 @@ def clean_string(string):
     The string represents an integration name, as it would be displayed in the final text
     """
 
-    return string.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+    return string.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "").replace(":", "")
 
 
 def read_integrations_js(path_to_file):

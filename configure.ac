@@ -555,15 +555,27 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_initStream],
+    [LZ4_createStream],
     [LZ4_LIBS_FAST="-llz4"]
 )
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_compress_default],
+    [LZ4_compress_fast_continue],
     [LZ4_LIBS="-llz4"]
 )
+
+# -----------------------------------------------------------------------------
+# zstd
+
+AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_compressStream, ZSTD_decompressStream, ZSTD_createDStream],
+             [LIBZSTD_FOUND=yes],
+             [LIBZSTD_FOUND=no])
+
+if test "x$LIBZSTD_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_ZSTD], [1], [libzstd usability])
+    OPTIONAL_ZSTD_LIBS="-lzstd"
+fi
 
 # -----------------------------------------------------------------------------
 # zlib
@@ -702,7 +714,7 @@ if test "${enable_lz4}" != "no"; then
         AC_TRY_LINK(
             [ #include <lz4.h> ],
             [
-                LZ4_stream_t* stream = LZ4_initStream(NULL, 0);
+                LZ4_stream_t* stream = LZ4_createStream();
             ],
             [ enable_lz4="yes"],
             [ enable_lz4="no" ]
@@ -1900,6 +1912,7 @@ AC_SUBST([OPTIONAL_MATH_LIBS])
 AC_SUBST([OPTIONAL_DATACHANNEL_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_YAML_LIBS])
