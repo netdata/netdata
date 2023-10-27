@@ -34,6 +34,8 @@ typedef enum {
 
 extern int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX];
 
+#define RRDPUSH_COMPRESSION_ALGORITHMS_ORDER "brotli zstd lz4 gzip"
+
 // ----------------------------------------------------------------------------
 
 typedef struct simple_ring_buffer {

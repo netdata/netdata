@@ -16,6 +16,93 @@
 #include "compression_brotli.h"
 #endif
 
+int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {
+        [COMPRESSION_ALGORITHM_NONE] = 0,
+        [COMPRESSION_ALGORITHM_ZSTD] = 3, // 1 (faster) - 22 (smaller)
+        [COMPRESSION_ALGORITHM_LZ4] = 1,  // 1 (smaller) - 9 (faster)
+        [COMPRESSION_ALGORITHM_GZIP] = 1, // 1 (faster) - 9 (smaller)
+        [COMPRESSION_ALGORITHM_BROTLI] = 11, // 1 (faster) - 11 (smaller)
+};
+
+void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order) {
+    rpt->config.compression_priorities[0] = STREAM_CAP_BROTLI;
+    rpt->config.compression_priorities[1] = STREAM_CAP_ZSTD;
+    rpt->config.compression_priorities[2] = STREAM_CAP_LZ4;
+    rpt->config.compression_priorities[3] = STREAM_CAP_GZIP;
+
+    char *s = strdupz(order);
+
+    char *words[COMPRESSION_ALGORITHM_MAX] = { NULL };
+    size_t num_words = quoted_strings_splitter_pluginsd(s, words, COMPRESSION_ALGORITHM_MAX);
+    for(size_t i = 0; i < num_words ;i++) {
+        if(strcasecmp(words[i], "brotli") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_BROTLI;
+        else if(strcasecmp(words[i], "zstd") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_ZSTD;
+        else if(strcasecmp(words[i], "lz4") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_LZ4;
+        else if(strcasecmp(words[i], "gzip") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_GZIP;
+        else
+            rpt->config.compression_priorities[i] = 0;
+    }
+
+    freez(s);
+}
+
+bool rrdpush_compression_initialize(struct sender_state *s) {
+    rrdpush_compressor_destroy(&s->compressor);
+
+    // IMPORTANT
+    // KEEP THE SAME ORDER IN DECOMPRESSION
+
+    if(stream_has_capability(s, STREAM_CAP_BROTLI))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
+    else if(stream_has_capability(s, STREAM_CAP_ZSTD))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+    else if(stream_has_capability(s, STREAM_CAP_LZ4))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+    else if(stream_has_capability(s, STREAM_CAP_GZIP))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
+    else
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+
+    if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        s->compressor.level = rrdpush_compression_levels[s->compressor.algorithm];
+        rrdpush_compressor_init(&s->compressor);
+        return true;
+    }
+
+    return false;
+}
+
+bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
+    rrdpush_decompressor_destroy(&rpt->decompressor);
+
+    // IMPORTANT
+    // KEEP THE SAME ORDER IN COMPRESSION
+
+    if(stream_has_capability(rpt, STREAM_CAP_BROTLI))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
+    else if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+    else if(stream_has_capability(rpt, STREAM_CAP_LZ4))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+    else if(stream_has_capability(rpt, STREAM_CAP_GZIP))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
+    else
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+
+    if(rpt->decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        rrdpush_decompressor_init(&rpt->decompressor);
+        return true;
+    }
+
+    return false;
+}
+
+
+
 // ----------------------------------------------------------------------------
 // compressor public API
 
