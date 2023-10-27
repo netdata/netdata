@@ -2,10 +2,12 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.1...HEAD)
 
 **Merged pull requests:**
 
+- Remove semicolons from strings [\#16276](https://github.com/netdata/netdata/pull/16276) ([Ancairon](https://github.com/Ancairon))
+- Prevent wrong optimization armv7l static build [\#16274](https://github.com/netdata/netdata/pull/16274) ([stelfrag](https://github.com/stelfrag))
 - DYNCFG fix REPORT\_JOB\_STATUS streaming [\#16272](https://github.com/netdata/netdata/pull/16272) ([underhood](https://github.com/underhood))
 - fix sources match [\#16271](https://github.com/netdata/netdata/pull/16271) ([ktsaou](https://github.com/ktsaou))
 - journal minor updates [\#16267](https://github.com/netdata/netdata/pull/16267) ([ktsaou](https://github.com/ktsaou))
@@ -37,6 +39,7 @@
 - remove charts.d/nut [\#16230](https://github.com/netdata/netdata/pull/16230) ([ilyam8](https://github.com/ilyam8))
 - kickstart: rename auto-update-method to auto-update-type [\#16229](https://github.com/netdata/netdata/pull/16229) ([ilyam8](https://github.com/ilyam8))
 - update go.d plugin version to v0.56.3 [\#16228](https://github.com/netdata/netdata/pull/16228) ([ilyam8](https://github.com/ilyam8))
+- Add document outlining our versioning policy and public API. [\#16227](https://github.com/netdata/netdata/pull/16227) ([Ferroin](https://github.com/Ferroin))
 - Changes to `systemd-journal` docs [\#16225](https://github.com/netdata/netdata/pull/16225) ([Ancairon](https://github.com/Ancairon))
 - Fix statistics calculation in 32bit systems [\#16222](https://github.com/netdata/netdata/pull/16222) ([stelfrag](https://github.com/stelfrag))
 - Fix meta unittest [\#16221](https://github.com/netdata/netdata/pull/16221) ([stelfrag](https://github.com/stelfrag))
@@ -49,6 +52,10 @@
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 - shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.43.1](https://github.com/netdata/netdata/tree/v1.43.1) (2023-10-26)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.0...v1.43.1)
 
 ## [v1.43.0](https://github.com/netdata/netdata/tree/v1.43.0) (2023-10-16)
 
@@ -320,7 +327,6 @@
 - Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
 - Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
-- Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
@@ -421,10 +427,6 @@
 - Fix formatting [\#15673](https://github.com/netdata/netdata/pull/15673) ([shyamvalsan](https://github.com/shyamvalsan))
 - Fixing tables \(aws sns\) [\#15671](https://github.com/netdata/netdata/pull/15671) ([shyamvalsan](https://github.com/shyamvalsan))
 - Update metadata.yaml for Cloud Notifications [\#15670](https://github.com/netdata/netdata/pull/15670) ([sashwathn](https://github.com/sashwathn))
-- remove " Metrics" from linux categories [\#15669](https://github.com/netdata/netdata/pull/15669) ([ilyam8](https://github.com/ilyam8))
-- Fix table formatting \(custom exporter\) [\#15668](https://github.com/netdata/netdata/pull/15668) ([shyamvalsan](https://github.com/shyamvalsan))
-- Fix icon prometheus exporter icon [\#15666](https://github.com/netdata/netdata/pull/15666) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- freeipmi change restart message to info [\#15664](https://github.com/netdata/netdata/pull/15664) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
