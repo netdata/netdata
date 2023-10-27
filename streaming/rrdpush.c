@@ -39,9 +39,9 @@ struct config stream_config = {
 };
 
 unsigned int default_rrdpush_enabled = 0;
-#ifdef ENABLE_RRDPUSH_COMPRESSION
+STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_NONE;
+
 unsigned int default_rrdpush_compression_enabled = 1;
-#endif
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
@@ -65,43 +65,6 @@ static void load_stream_conf() {
             netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
-}
-
-STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
-
-    // we can have DATA_WITH_ML when INTERPOLATED is available
-    bool ml_capability = true;
-
-    if(host && sender) {
-        // we have DATA_WITH_ML capability
-        // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
-        // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
-        netdata_mutex_lock(&host->receiver_lock);
-
-        if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
-            ml_capability = false;
-
-        netdata_mutex_unlock(&host->receiver_lock);
-    }
-
-    return  STREAM_CAP_V1 |
-            STREAM_CAP_V2 |
-            STREAM_CAP_VN |
-            STREAM_CAP_VCAPS |
-            STREAM_CAP_HLABELS |
-            STREAM_CAP_CLAIM |
-            STREAM_CAP_CLABELS |
-            STREAM_CAP_FUNCTIONS |
-            STREAM_CAP_REPLICATION |
-            STREAM_CAP_BINARY |
-            STREAM_CAP_INTERPOLATED |
-            STREAM_HAS_COMPRESSION |
-#ifdef NETDATA_TEST_DYNCFG
-            STREAM_CAP_DYNCFG |
-#endif
-            (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
-            (ml_capability ? STREAM_CAP_DATA_WITH_ML : 0) |
-            0;
 }
 
 bool rrdpush_receiver_needs_dbengine() {
@@ -145,10 +108,20 @@ int rrdpush_init() {
 
     rrdhost_free_orphan_time_s    = config_get_number(CONFIG_SECTION_DB, "cleanup orphan hosts after secs", rrdhost_free_orphan_time_s);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     default_rrdpush_compression_enabled = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
                                                                               "enable compression", default_rrdpush_compression_enabled);
-#endif
+
+    rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD] = (int)appconfig_get_number(
+            &stream_config, CONFIG_SECTION_STREAM, "zstd compression level",
+            rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD]);
+
+    rrdpush_compression_levels[COMPRESSION_ALGORITHM_LZ4] = (int)appconfig_get_number(
+            &stream_config, CONFIG_SECTION_STREAM, "lz4 compression acceleration",
+            rrdpush_compression_levels[COMPRESSION_ALGORITHM_LZ4]);
+
+    rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP] = (int)appconfig_get_number(
+            &stream_config, CONFIG_SECTION_STREAM, "gzip compression level",
+            rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP]);
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         netdata_log_error("STREAM [send]: cannot enable sending thread - information is missing.");
@@ -921,8 +894,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
     rpt->last_msg_t = now_monotonic_sec();
-    rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
+
+    rpt->capabilities = STREAM_CAP_INVALID;
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
@@ -1380,11 +1354,15 @@ static struct {
     { STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, "DISCONNECTED SHUTDOWN REQUESTED" },
     { STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, "DISCONNECTED NETDATA EXIT" },
     { STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, "DISCONNECTED PARSE ENDED" },
-    { STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, "DISCONNECTED SOCKET READ ERROR" },
+    {STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR, "DISCONNECTED UNKNOWN SOCKET READ ERROR" },
     { STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, "DISCONNECTED PARSE ERROR" },
     { STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, "DISCONNECTED RECEIVER LEFT" },
     { STREAM_HANDSHAKE_DISCONNECT_ORPHAN_HOST, "DISCONNECTED ORPHAN HOST" },
     { STREAM_HANDSHAKE_NON_STREAMABLE_HOST, "NON STREAMABLE HOST" },
+    { STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, "DISCONNECTED NOT SUFFICIENT READ BUFFER" },
+    {STREAM_HANDSHAKE_DISCONNECT_SOCKET_EOF, "DISCONNECTED SOCKET EOF" },
+    {STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, "DISCONNECTED SOCKET READ FAILED" },
+    {STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, "DISCONNECTED SOCKET READ TIMEOUT" },
     { 0, NULL },
 };
 
@@ -1405,22 +1383,24 @@ static struct {
     STREAM_CAPABILITIES cap;
     const char *str;
 } capability_names[] = {
-    { STREAM_CAP_V1, "V1" },
-    { STREAM_CAP_V2, "V2" },
-    { STREAM_CAP_VN, "VN" },
-    { STREAM_CAP_VCAPS, "VCAPS" },
-    { STREAM_CAP_HLABELS, "HLABELS" },
-    { STREAM_CAP_CLAIM, "CLAIM" },
-    { STREAM_CAP_CLABELS, "CLABELS" },
-    { STREAM_CAP_COMPRESSION, "COMPRESSION" },
-    { STREAM_CAP_FUNCTIONS, "FUNCTIONS" },
-    { STREAM_CAP_REPLICATION, "REPLICATION" },
-    { STREAM_CAP_BINARY, "BINARY" },
-    { STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
-    { STREAM_CAP_IEEE754, "IEEE754" },
-    { STREAM_CAP_DATA_WITH_ML, "ML" },
-    { STREAM_CAP_DYNCFG, "DYN_CFG" },
-    { 0 , NULL },
+    {STREAM_CAP_V1,           "V1" },
+    {STREAM_CAP_V2,           "V2" },
+    {STREAM_CAP_VN,           "VN" },
+    {STREAM_CAP_VCAPS,        "VCAPS" },
+    {STREAM_CAP_HLABELS,      "HLABELS" },
+    {STREAM_CAP_CLAIM,        "CLAIM" },
+    {STREAM_CAP_CLABELS,      "CLABELS" },
+    {STREAM_CAP_LZ4,          "LZ4" },
+    {STREAM_CAP_FUNCTIONS,    "FUNCTIONS" },
+    {STREAM_CAP_REPLICATION,  "REPLICATION" },
+    {STREAM_CAP_BINARY,       "BINARY" },
+    {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
+    {STREAM_CAP_IEEE754,      "IEEE754" },
+    {STREAM_CAP_DATA_WITH_ML, "ML" },
+    {STREAM_CAP_DYNCFG,       "DYN_CFG" },
+    {STREAM_CAP_ZSTD,         "ZSTD" },
+    {STREAM_CAP_GZIP,         "GZIP" },
+    {0 , NULL },
 };
 
 static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {
@@ -1466,6 +1446,44 @@ void log_sender_capabilities(struct sender_state *s) {
     buffer_free(wb);
 }
 
+STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
+    STREAM_CAPABILITIES disabled_capabilities = globally_disabled_capabilities;
+
+    if(host && sender) {
+        // we have DATA_WITH_ML capability
+        // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
+        // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
+        netdata_mutex_lock(&host->receiver_lock);
+
+        if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
+            disabled_capabilities |= STREAM_CAP_DATA_WITH_ML;
+
+        netdata_mutex_unlock(&host->receiver_lock);
+
+        if(host->sender)
+            disabled_capabilities |= host->sender->disabled_capabilities;
+    }
+
+    return (STREAM_CAP_V1 |
+            STREAM_CAP_V2 |
+            STREAM_CAP_VN |
+            STREAM_CAP_VCAPS |
+            STREAM_CAP_HLABELS |
+            STREAM_CAP_CLAIM |
+            STREAM_CAP_CLABELS |
+            STREAM_CAP_FUNCTIONS |
+            STREAM_CAP_REPLICATION |
+            STREAM_CAP_BINARY |
+            STREAM_CAP_INTERPOLATED |
+            STREAM_CAP_COMPRESSIONS_AVAILABLE |
+            #ifdef NETDATA_TEST_DYNCFG
+            STREAM_CAP_DYNCFG |
+            #endif
+            STREAM_CAP_IEEE754 |
+            STREAM_CAP_DATA_WITH_ML |
+            0) & ~disabled_capabilities;
+}
+
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDHOST *host, bool sender) {
     STREAM_CAPABILITIES caps = 0;
 
@@ -1473,7 +1491,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
     else if(version < STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_V2 | STREAM_CAP_HLABELS;
     else if(version <= STREAM_OLD_VERSION_CLAIM) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM;
     else if(version <= STREAM_OLD_VERSION_CLABELS) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS;
-    else if(version <= STREAM_OLD_VERSION_COMPRESSION) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_HAS_COMPRESSION;
+    else if(version <= STREAM_OLD_VERSION_LZ4) caps = STREAM_CAP_VN | STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | STREAM_CAP_LZ4_AVAILABLE;
     else caps = version;
 
     if(caps & STREAM_CAP_VCAPS)
@@ -1495,8 +1513,61 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
 }
 
 int32_t stream_capabilities_to_vn(uint32_t caps) {
-    if(caps & STREAM_CAP_COMPRESSION) return STREAM_OLD_VERSION_COMPRESSION;
+    if(caps & STREAM_CAP_LZ4) return STREAM_OLD_VERSION_LZ4;
     if(caps & STREAM_CAP_CLABELS) return STREAM_OLD_VERSION_CLABELS;
     return STREAM_OLD_VERSION_CLAIM; // if(caps & STREAM_CAP_CLAIM)
 }
 
+int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {
+        [COMPRESSION_ALGORITHM_NONE] = 0,
+        [COMPRESSION_ALGORITHM_ZSTD] = 3, // 1 (faster) - 22 (best compression),
+        [COMPRESSION_ALGORITHM_LZ4] = 1,  // 1 (best compression) - 9 (faster)
+        [COMPRESSION_ALGORITHM_GZIP] = 1, // 1 (faster) - 9 (best compression)
+};
+
+bool rrdpush_compression_initialize(struct sender_state *s) {
+    rrdpush_compressor_destroy(&s->compressor);
+
+    // IMPORTANT
+    // KEEP THE SAME ORDER IN DECOMPRESSION
+
+    if(stream_has_capability(s, STREAM_CAP_ZSTD))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+    else if(stream_has_capability(s, STREAM_CAP_LZ4))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+    else if(stream_has_capability(s, STREAM_CAP_GZIP))
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
+    else
+        s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+
+    if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        s->compressor.level = rrdpush_compression_levels[s->compressor.algorithm];
+        rrdpush_compressor_init(&s->compressor);
+        return true;
+    }
+
+    return false;
+}
+
+bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
+    rrdpush_decompressor_destroy(&rpt->decompressor);
+
+    // IMPORTANT
+    // KEEP THE SAME ORDER IN COMPRESSION
+
+    if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+    else if(stream_has_capability(rpt, STREAM_CAP_LZ4))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+    else if(stream_has_capability(rpt, STREAM_CAP_GZIP))
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
+    else
+        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+
+    if(rpt->decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        rrdpush_decompressor_init(&rpt->decompressor);
+        return true;
+    }
+
+    return false;
+}

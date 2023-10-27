@@ -20,9 +20,12 @@
 #define WORKER_SENDER_JOB_BUFFER_RATIO              15
 #define WORKER_SENDER_JOB_BYTES_RECEIVED            16
 #define WORKER_SENDER_JOB_BYTES_SENT                17
-#define WORKER_SENDER_JOB_REPLAY_REQUEST            18
-#define WORKER_SENDER_JOB_FUNCTION_REQUEST          19
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE          20
+#define WORKER_SENDER_JOB_BYTES_COMPRESSED          18
+#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED        19
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO   20
+#define WORKER_SENDER_JOB_REPLAY_REQUEST            21
+#define WORKER_SENDER_JOB_FUNCTION_REQUEST          22
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE          23
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 21
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 21
@@ -66,7 +69,6 @@ BUFFER *sender_start(struct sender_state *s) {
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
 /*
 * In case of stream compression buffer overflow
 * Inform the user through the error log file and 
@@ -74,12 +76,35 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 */
 static inline void deactivate_compression(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
-    netdata_log_error("STREAM_COMPRESSION: Compression returned error, disabling it.");
-    s->flags &= ~SENDER_FLAG_COMPRESSION;
-    netdata_log_error("STREAM %s [send to %s]: Restarting connection without compression.", rrdhost_hostname(s->host), s->connected_to);
+
+    switch(s->compressor.algorithm) {
+        case COMPRESSION_ALGORITHM_MAX:
+        case COMPRESSION_ALGORITHM_NONE:
+            netdata_log_error("STREAM_COMPRESSION: compression error on 'host:%s' without any compression enabled. Ignoring error.",
+                    rrdhost_hostname(s->host));
+            break;
+
+        case COMPRESSION_ALGORITHM_GZIP:
+            netdata_log_error("STREAM_COMPRESSION: GZIP compression error on 'host:%s'. Disabling GZIP for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_GZIP;
+            break;
+
+        case COMPRESSION_ALGORITHM_LZ4:
+            netdata_log_error("STREAM_COMPRESSION: LZ4 compression error on 'host:%s'. Disabling ZSTD for this node.",
+                    rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_LZ4;
+            break;
+
+        case COMPRESSION_ALGORITHM_ZSTD:
+            netdata_log_error("STREAM_COMPRESSION: ZSTD compression error on 'host:%s'. Disabling ZSTD for this node.",
+                              rrdhost_hostname(s->host));
+            s->disabled_capabilities |= STREAM_CAP_ZSTD;
+            break;
+    }
+
     rrdpush_sender_thread_close_socket(s->host);
 }
-#endif
 
 #define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
@@ -117,8 +142,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if (stream_has_capability(s, STREAM_CAP_COMPRESSION) && s->compressor.initialized) {
+    if (s->compressor.initialized) {
         while(src_len) {
             size_t size_to_compress = src_len;
 
@@ -143,13 +167,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 }
             }
 
-            char *dst;
+            const char *dst;
             size_t dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
             if (!dst_len) {
                 netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                       rrdhost_hostname(s->host), s->connected_to);
 
-                rrdpush_compressor_reset(&s->compressor);
+                rrdpush_compression_initialize(s);
                 dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
                 if(!dst_len) {
                     netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
@@ -161,10 +185,25 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 }
             }
 
-            if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
+            rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            // check if reversing the signature provides the same length
+            size_t decoded_dst_len = rrdpush_decompress_decode_signature((const char *)&signature, sizeof(signature));
+            if(decoded_dst_len != dst_len)
+                fatal("RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
+                      "compressed payload length %zu bytes, but signature says payload is %zu bytes",
+                      size_to_compress, dst_len, decoded_dst_len);
+#endif
+
+            if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature)))
                 s->flags |= SENDER_FLAG_OVERFLOW;
-            else
-                s->sent_bytes_on_this_connection_per_type[type] += dst_len;
+            else {
+                if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
+                    s->flags |= SENDER_FLAG_OVERFLOW;
+                else
+                    s->sent_bytes_on_this_connection_per_type[type] += dst_len + sizeof(signature);
+            }
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
@@ -174,12 +213,6 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->flags |= SENDER_FLAG_OVERFLOW;
     else
         s->sent_bytes_on_this_connection_per_type[type] += src_len;
-#else
-    if(cbuffer_add_unsafe(s->buffer, src, src_len))
-        s->flags |= SENDER_FLAG_OVERFLOW;
-    else
-        s->sent_bytes_on_this_connection_per_type[type] += src_len;
-#endif
 
     replication_recalculate_buffer_used_ratio_unsafe(s);
 
@@ -600,12 +633,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     // reset our capabilities to default
     s->capabilities = stream_our_capabilities(host, true);
 
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
-    // If we don't want compression, remove it from our capabilities
-    if(!(s->flags & SENDER_FLAG_COMPRESSION))
-        s->capabilities &= ~STREAM_CAP_COMPRESSION;
-#endif  // ENABLE_RRDPUSH_COMPRESSION
-
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
     */
@@ -766,12 +793,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_validate_response(host, s, http, bytes))
         return false;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(stream_has_capability(s, STREAM_CAP_COMPRESSION))
-        rrdpush_compressor_reset(&s->compressor);
-    else
-        rrdpush_compressor_destroy(&s->compressor);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+    rrdpush_compression_initialize(s);
 
     log_sender_capabilities(s);
 
@@ -1303,6 +1325,9 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENT);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, "bytes compressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
     struct sender_state *s = ptr;
@@ -1422,6 +1447,15 @@ void *rrdpush_sender_thread(void *ptr) {
         if (unlikely(!outstanding)) {
             rrdpush_sender_pipe_clear_pending_data(s);
             rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
+        }
+
+        if(s->compressor.initialized) {
+            size_t bytes_uncompressed = s->compressor.sender_locked.total_uncompressed;
+            size_t bytes_compressed = s->compressor.sender_locked.total_compressed + s->compressor.sender_locked.total_compressions * sizeof(rrdpush_signature_t);
+            NETDATA_DOUBLE ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, ratio);
         }
         sender_unlock(s);
 

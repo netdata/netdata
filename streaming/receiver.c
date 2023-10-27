@@ -28,9 +28,7 @@ void receiver_state_free(struct receiver_state *rpt) {
         close(rpt->fd);
     }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_decompressor_destroy(&rpt->decompressor);
-#endif
 
     if(rpt->system_info)
          rrdhost_system_info_free(rpt->system_info);
@@ -92,15 +90,44 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
     return (int)bytes_read;
 }
 
-static inline bool receiver_read_uncompressed(struct receiver_state *r) {
+static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
+    if(code > 0)
+        return 0;
+
+    switch(code) {
+        case 0:
+            // asked to read zero bytes
+            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER;
+
+        case -1:
+            // EOF
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_EOF;
+
+        case -2:
+            // failed to read
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED;
+
+        case -3:
+            // timeout
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT;
+
+        default:
+            // anything else
+            return STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+    }
+}
+
+static inline bool receiver_read_uncompressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(r->reader.read_buffer[r->reader.read_len] != '\0')
         fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
 #endif
 
     int bytes_read = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
-    if(unlikely(bytes_read <= 0))
+    if(unlikely(bytes_read <= 0)) {
+        *reason = read_stream_error_to_reason(bytes_read);
         return false;
+    }
 
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_read);
@@ -111,8 +138,7 @@ static inline bool receiver_read_uncompressed(struct receiver_state *r) {
     return true;
 }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-static inline bool receiver_read_compressed(struct receiver_state *r) {
+static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
@@ -150,8 +176,10 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     int bytes_read = 0;
     do {
         int ret = read_stream(r, r->reader.read_buffer + r->reader.read_len + bytes_read, r->decompressor.signature_size - bytes_read);
-        if (unlikely(ret <= 0))
+        if (unlikely(ret <= 0)) {
+            *reason = read_stream_error_to_reason(ret);
             return false;
+        }
 
         bytes_read += ret;
     } while(unlikely(bytes_read < (int)r->decompressor.signature_size));
@@ -187,7 +215,7 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 
         int last_read_bytes = read_stream(r, &compressed[start], remaining);
         if (unlikely(last_read_bytes <= 0)) {
-            internal_error(true, "read_stream() failed #2, with code %d", last_read_bytes);
+            *reason = read_stream_error_to_reason(last_read_bytes);
             return false;
         }
 
@@ -217,11 +245,6 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 
     return true;
 }
-#else // !ENABLE_RRDPUSH_COMPRESSION
-static inline bool receiver_read_compressed(struct receiver_state *r) {
-    return receiver_read_uncompressed(r);
-}
-#endif // ENABLE_RRDPUSH_COMPRESSION
 
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
@@ -323,16 +346,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
-    bool compressed_connection = false;
-
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
-        compressed_connection = true;
-        rrdpush_decompressor_reset(&rpt->decompressor);
-    }
-    else
-        rrdpush_decompressor_destroy(&rpt->decompressor);
-#endif
+    bool compressed_connection = rrdpush_decompression_initialize(rpt);
 
     buffered_reader_init(&rpt->reader);
 
@@ -340,10 +354,12 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     while(!receiver_should_stop(rpt)) {
 
         if(!buffered_reader_next_line(&rpt->reader, buffer)) {
-            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt) : receiver_read_uncompressed(rpt);
+            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+
+            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason) : receiver_read_uncompressed(rpt, &reason);
 
             if(unlikely(!have_new_data)) {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, false);
+                receiver_set_exit_reason(rpt, reason, false);
                 break;
             }
 
@@ -543,6 +559,29 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 
 }
 
+static void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order) {
+    rpt->config.compression_priorities[0] = STREAM_CAP_ZSTD;
+    rpt->config.compression_priorities[1] = STREAM_CAP_LZ4;
+    rpt->config.compression_priorities[2] = STREAM_CAP_GZIP;
+
+    char *s = strdupz(order);
+
+    char *words[COMPRESSION_ALGORITHM_MAX] = { NULL };
+    size_t num_words = quoted_strings_splitter_pluginsd(s, words, COMPRESSION_ALGORITHM_MAX);
+    for(size_t i = 0; i < num_words ;i++) {
+        if(strcasecmp(words[i], "zstd") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_ZSTD;
+        else if(strcasecmp(words[i], "lz4") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_LZ4;
+        else if(strcasecmp(words[i], "gzip") == 0)
+            rpt->config.compression_priorities[i] = STREAM_CAP_GZIP;
+        else
+            rpt->config.compression_priorities[i] = 0;
+    }
+
+    freez(s);
+}
+
 static void rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
@@ -611,11 +650,15 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "seconds per replication step", rpt->config.rrdpush_replication_step);
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rpt->config.rrdpush_replication_step);
 
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
     rpt->config.rrdpush_compression = default_rrdpush_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+
+    if(rpt->config.rrdpush_compression) {
+        char *order = appconfig_get(&stream_config, rpt->key, "compression algorithms order", "zstd lz4 gzip");
+        order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithms order", order);
+        rrdpush_parse_compression_order(rpt, order);
+    }
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
@@ -709,12 +752,27 @@ static void rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if (stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
-        if (!rpt->config.rrdpush_compression)
-            rpt->capabilities &= ~STREAM_CAP_COMPRESSION;
+    if (!rpt->config.rrdpush_compression)
+        rpt->capabilities &= ~STREAM_CAP_COMPRESSIONS_AVAILABLE;
+
+    // select the right compression before sending our capabilities to the child
+    if(stream_has_more_than_one_capability_of(rpt->capabilities, STREAM_CAP_COMPRESSIONS_AVAILABLE)) {
+        STREAM_CAPABILITIES compressions = rpt->capabilities & STREAM_CAP_COMPRESSIONS_AVAILABLE;
+        for(int i = 0; i < COMPRESSION_ALGORITHM_MAX; i++) {
+            STREAM_CAPABILITIES c = rpt->config.compression_priorities[i];
+
+            if(!(c & STREAM_CAP_COMPRESSIONS_AVAILABLE))
+                continue;
+
+            if(compressions & c) {
+                STREAM_CAPABILITIES exclude = compressions;
+                exclude &= ~c;
+
+                rpt->capabilities &= ~exclude;
+                break;
+            }
+        }
     }
-#endif // ENABLE_RRDPUSH_COMPRESSION
 
     {
         // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);

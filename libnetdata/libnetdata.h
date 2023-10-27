@@ -11,10 +11,6 @@ extern "C" {
 #include <config.h>
 #endif
 
-#ifdef ENABLE_LZ4
-#define ENABLE_RRDPUSH_COMPRESSION 1
-#endif
-
 #ifdef ENABLE_OPENSSL
 #define ENABLE_HTTPS 1
 #endif
@@ -681,9 +677,10 @@ static inline BITMAPX *bitmapX_create(uint32_t bits) {
 #define bitmap1024_get_bit(ptr, idx) bitmapX_get_bit((BITMAPX *)ptr, idx)
 #define bitmap1024_set_bit(ptr, idx, value) bitmapX_set_bit((BITMAPX *)ptr, idx, value)
 
-
-#define COMPRESSION_MAX_MSG_SIZE 0x4000
-#define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 1024)
+#define COMPRESSION_MAX_CHUNK 0x4000
+#define COMPRESSION_MAX_OVERHEAD 128
+#define COMPRESSION_MAX_MSG_SIZE (COMPRESSION_MAX_CHUNK - COMPRESSION_MAX_OVERHEAD - 1)
+#define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 768)
 int pluginsd_isspace(char c);
 int config_isspace(char c);
 int group_by_label_isspace(char c);
