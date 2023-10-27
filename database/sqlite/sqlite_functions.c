@@ -85,7 +85,6 @@ sqlite3 *db_meta = NULL;
 
 #define MAX_PREPARED_STATEMENTS (32)
 pthread_key_t key_pool[MAX_PREPARED_STATEMENTS];
-pthread_key_t plugin_key;
 
 SQLITE_API int sqlite3_exec_monitored(
     sqlite3 *db,                               /* An open database */
