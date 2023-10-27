@@ -289,6 +289,11 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
         st->rrdpush.sender.resync_time_s = 0;
         rrdset_metadata_updated(st);
+
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st)
+            rrddim_metadata_exposed_upstream_clear(rd);
+        rrddim_foreach_done(rd);
     }
     rrdset_foreach_done(st);
 

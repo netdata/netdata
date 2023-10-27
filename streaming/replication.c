@@ -167,9 +167,8 @@ static struct replication_query *replication_query_prepare(
     // prepare our array of dimensions
     size_t count = 0;
     RRDDIM *rd;
-    uint32_t version = rrdset_metadata_version(st);
     rrddim_foreach_read(rd, st) {
-        if (unlikely(!rd || !rd_dfe.item || rrddim_metadata_upstream_version(rd) >= version))
+        if (unlikely(!rd || !rd_dfe.item || !rrddim_check_upstream_exposed(rd)))
             continue;
 
         if (unlikely(rd_dfe.counter >= q->dimensions)) {
@@ -217,9 +216,8 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
     bool with_slots = (capabilities & STREAM_CAP_SLOTS) ? true : false;
     NUMBER_ENCODING integer_encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
-    uint32_t version = rrdset_metadata_version(st);
     rrddim_foreach_read(rd, st){
-        if (rrddim_metadata_upstream_version(rd) < version) continue;
+        if (!rrddim_check_upstream_exposed(rd)) continue;
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1);
 

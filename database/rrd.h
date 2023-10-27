@@ -910,7 +910,7 @@ static inline void rrdset_metadata_exposed_upstream(RRDSET *st, uint32_t version
 }
 
 static inline bool rrdset_check_upstream_exposed(RRDSET *st) {
-    return rrdset_metadata_version(st) <= rrdset_metadata_upstream_version(st);
+    return rrdset_metadata_version(st) == rrdset_metadata_upstream_version(st);
 }
 
 static inline uint32_t rrddim_metadata_version(RRDDIM *rd) {
@@ -930,8 +930,12 @@ static inline void rrddim_metadata_exposed_upstream(RRDDIM *rd, uint32_t version
     __atomic_store_n(&rd->rrdpush.sender.sent_version, version, __ATOMIC_RELAXED);
 }
 
+static inline void rrddim_metadata_exposed_upstream_clear(RRDDIM *rd) {
+    __atomic_store_n(&rd->rrdpush.sender.sent_version, 0, __ATOMIC_RELAXED);
+}
+
 static inline bool rrddim_check_upstream_exposed(RRDDIM *rd) {
-    return rrdset_metadata_version(rd->rrdset) <= rrddim_metadata_upstream_version(rd);
+    return rrddim_metadata_upstream_version(rd) != 0;
 }
 
 // the collector sets the exposed flag, but anyone can remove it
