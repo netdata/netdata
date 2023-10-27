@@ -112,7 +112,7 @@ DIMENSION time time absolute 1 100
 CHART apcupsd_${host}.online '' "UPS ONLINE flag" "boolean" ups apcupsd.online line $((apcupsd_priority + 9)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION online online absolute 0 1
 
-CHART apcupsd_${host}.selftest '' "UPS SELFTEST status" "Status_Code" ups apcupsd.selftest line $((apcupsd_priority + 10)) $apcupsd_update_every '' '' 'apcupsd'
+CHART apcupsd_${host}.selftest '' "UPS Self-Test status" "status" ups apcupsd.selftest line $((apcupsd_priority + 10)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION selftest_OK 'OK' absolute 0 1
 DIMENSION selftest_NO 'NO' absolute 0 1
 DIMENSION selftest_BT 'BT' absolute 0 1
