@@ -239,10 +239,10 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
     if(unlikely(!rd->rrdset->rrdhost))
         fatal("RRDMETRIC: rrdset '%s' does not have a rrdhost", rrdset_id(rd->rrdset));
 
-    if(unlikely(!rd->rrdset->rrdinstance))
+    if(unlikely(!rd->rrdset->rrdcontexts.rrdinstance))
         fatal("RRDMETRIC: rrdset '%s' does not have a rrdinstance", rrdset_id(rd->rrdset));
 
-    RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdinstance);
+    RRDINSTANCE *ri = rrdinstance_acquired_value(rd->rrdset->rrdcontexts.rrdinstance);
 
     RRDMETRIC trm = {
             .id = string_dup(rd->id),
@@ -254,20 +254,21 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
 
     RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_set_and_acquire_item(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
 
-    if(rd->rrdmetric)
-        rrdmetric_release(rd->rrdmetric);
+    if(rd->rrdcontexts.rrdmetric)
+        rrdmetric_release(rd->rrdcontexts.rrdmetric);
 
-    rd->rrdmetric = rma;
+    rd->rrdcontexts.rrdmetric = rma;
+    rd->rrdcontexts.collected = false;
 }
 
 #define rrddim_get_rrdmetric(rd) rrddim_get_rrdmetric_with_trace(rd, __FUNCTION__)
 static inline RRDMETRIC *rrddim_get_rrdmetric_with_trace(RRDDIM *rd, const char *function) {
-    if(unlikely(!rd->rrdmetric)) {
+    if(unlikely(!rd->rrdcontexts.rrdmetric)) {
         netdata_log_error("RRDMETRIC: RRDDIM '%s' is not linked to an RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
     }
 
-    RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdmetric);
+    RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
     if(unlikely(!rm)) {
         netdata_log_error("RRDMETRIC: RRDDIM '%s' lost the link to its RRDMETRIC at %s()", rrddim_id(rd), function);
         return NULL;
@@ -288,11 +289,14 @@ inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
 
     rm->rrddim = NULL;
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
-    rrdmetric_release(rd->rrdmetric);
-    rd->rrdmetric = NULL;
+    rrdmetric_release(rd->rrdcontexts.rrdmetric);
+    rd->rrdcontexts.rrdmetric = NULL;
+    rd->rrdcontexts.collected = false;
 }
 
 inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
+    rd->rrdcontexts.collected = false;
+
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
     if(unlikely(!rm)) return;
 
@@ -305,6 +309,11 @@ inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
 }
 
 inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
+    if(rd->rrdcontexts.collected)
+        return;
+
+    rd->rrdcontexts.collected = true;
+
     RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
     if(unlikely(!rm)) return;
 
@@ -316,4 +325,3 @@ inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
 
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
-

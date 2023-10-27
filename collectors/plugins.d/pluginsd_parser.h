@@ -13,6 +13,8 @@
 // this controls the max response size of a function
 #define PLUGINSD_MAX_DEFERRED_SIZE (20 * 1024 * 1024)
 
+#define PLUGINSD_MIN_RRDSET_POINTERS_CACHE 1024
+
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
     PARSER_RC_OK,       // Callback was successful, go on
@@ -41,6 +43,7 @@ typedef struct parser_keyword {
 } PARSER_KEYWORD;
 
 typedef struct parser_user_object {
+    bool cleanup_slots;
     RRDSET *st;
     RRDHOST *host;
     void    *opaque;
