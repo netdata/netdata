@@ -176,9 +176,11 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
             break;
     }
 
-    if(unlikely(ret > COMPRESSION_MAX_MSG_SIZE)) {
+    // for backwards compatibility we cannot check for COMPRESSION_MAX_MSG_SIZE,
+    // because old children may send this big payloads.
+    if(unlikely(ret > COMPRESSION_MAX_CHUNK)) {
         netdata_log_error("RRDPUSH_DECOMPRESS: decompressed data is %zu bytes, which is bigger than the max msg size %zu",
-                          ret, COMPRESSION_MAX_MSG_SIZE);
+                          ret, COMPRESSION_MAX_CHUNK);
         return 0;
     }
 
