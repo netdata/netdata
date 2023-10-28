@@ -34,7 +34,7 @@ void rrdpush_compressor_init_gzip(struct compressor_state *state) {
 void rrdpush_compressor_destroy_gzip(struct compressor_state *state) {
     if (state->stream) {
         deflateEnd(state->stream);
-        free(state->stream);
+        freez(state->stream);
         state->stream = NULL;
     }
 }
@@ -92,12 +92,18 @@ void rrdpush_decompressor_init_gzip(struct decompressor_state *state) {
         state->initialized = true;
 
         // Initialize inflate stream
-        z_stream *strm = state->stream = (z_stream *) malloc(sizeof(z_stream));
+        z_stream *strm = state->stream = (z_stream *)mallocz(sizeof(z_stream));
         strm->zalloc = Z_NULL;
         strm->zfree = Z_NULL;
         strm->opaque = Z_NULL;
 
-        inflateInit2(strm, 15 + 16);
+        int r = inflateInit2(strm, 15 + 16);
+        if (r != Z_OK) {
+            netdata_log_error("Failed to initialize inflateInit2() with error: %d", r);
+            freez(state->stream);
+            state->initialized = false;
+            return;
+        }
 
         simple_ring_buffer_make_room(&state->output, COMPRESSION_MAX_CHUNK);
     }
@@ -106,7 +112,7 @@ void rrdpush_decompressor_init_gzip(struct decompressor_state *state) {
 void rrdpush_decompressor_destroy_gzip(struct decompressor_state *state) {
     if (state->stream) {
         inflateEnd(state->stream);
-        free(state->stream);
+        freez(state->stream);
         state->stream = NULL;
     }
 }

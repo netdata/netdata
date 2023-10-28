@@ -46,7 +46,7 @@ size_t rrdpush_compress_brotli(struct compressor_state *state, const char *data,
     }
 
     if(available_in != 0) {
-        netdata_log_error("STREAM: BrotliEncoderCompressStream() did not use all the input buffer, %u bytes out of %zu remain",
+        netdata_log_error("STREAM: BrotliEncoderCompressStream() did not use all the input buffer, %zu bytes out of %zu remain",
                 available_in, size);
         return 0;
     }
@@ -109,7 +109,7 @@ size_t rrdpush_decompress_brotli(struct decompressor_state *state, const char *c
     }
 
     if(available_in != 0) {
-        netdata_log_error("STREAM: BrotliDecoderDecompressStream() did not use all the input buffer, %u bytes out of %zu remain",
+        netdata_log_error("STREAM: BrotliDecoderDecompressStream() did not use all the input buffer, %zu bytes out of %zu remain",
                           available_in, compressed_size);
         return 0;
     }
