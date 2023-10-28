@@ -510,6 +510,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         }
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+        rrdset_metadata_updated(st);
     }
 
     rrdcontext_updated_rrdset(st);
