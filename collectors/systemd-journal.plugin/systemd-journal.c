@@ -647,7 +647,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
     size_t failures = 0;
     size_t filters_added = 0;
 
-    SD_JOURNAL_FOREACH_FIELD(j, field) {
+    SD_JOURNAL_FOREACH_FIELD(j, field) { // for each key
         bool interesting;
 
         if(fqs->data_only)
@@ -660,7 +660,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
                 bool added_this_key = false;
                 size_t added_values = 0;
 
-                SD_JOURNAL_FOREACH_UNIQUE(j, data, data_length) {
+                SD_JOURNAL_FOREACH_UNIQUE(j, data, data_length) { // for each value of the key
                     const char *key, *value;
                     size_t key_length, value_length;
 
@@ -673,18 +673,23 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
                         continue;
 
                     if(added_keys && !added_this_key) {
-                        if(sd_journal_add_conjunction(j) < 0)
+                        if(sd_journal_add_conjunction(j) < 0) // key AND key AND key
                             failures++;
 
                         added_this_key = true;
                         added_keys++;
                     }
                     else if(added_values)
-                        if(sd_journal_add_disjunction(j) < 0)
+                        if(sd_journal_add_disjunction(j) < 0) // value OR value OR value
                             failures++;
 
                     if(sd_journal_add_match(j, data, data_length) < 0)
                         failures++;
+
+                    if(!added_keys) {
+                        added_keys++;
+                        added_this_key = true;
+                    }
 
                     added_values++;
                     filters_added++;
