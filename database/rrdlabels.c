@@ -937,7 +937,7 @@ static void rrdlabels_remove_all_unmarked_unsafe(RRDLABELS *labels)
     bool first_then_next = true;
 
     while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
-        if (!((*((RRDLABEL_SRC *)PValue)) & (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_PERMANENT))) {
+        if (!((*((RRDLABEL_SRC *)PValue)) & (RRDLABEL_FLAG_INTERNAL))) {
 
             size_t mem_before_judyl = JudyLMemUsed(labels->JudyL);
             (void)JudyLDel(&labels->JudyL, Index, PJE0);

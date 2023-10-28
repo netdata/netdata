@@ -156,8 +156,8 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
 static inline void rrdset_update_permanent_labels(RRDSET *st) {
     if(!st->rrdlabels) return;
 
-    rrdlabels_add(st->rrdlabels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
-    rrdlabels_add(st->rrdlabels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO| RRDLABEL_FLAG_PERMANENT);
+    rrdlabels_add(st->rrdlabels, "_collect_plugin", rrdset_plugin_name(st), RRDLABEL_SRC_AUTO | RRDLABEL_FLAG_DONT_DELETE);
+    rrdlabels_add(st->rrdlabels, "_collect_module", rrdset_module_name(st), RRDLABEL_SRC_AUTO | RRDLABEL_FLAG_DONT_DELETE);
 }
 
 static STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const char *type, const char *current_name, const char *name) {

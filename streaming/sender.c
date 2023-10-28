@@ -90,13 +90,15 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     sender_lock(s);
 
-//    FILE *fp = fopen("/tmp/stream.txt", "a");
-//    fprintf(fp,
-//            "\n--- SEND BEGIN: %s ----\n"
-//            "%s"
-//            "--- SEND END ----------------------------------------\n"
-//            , rrdhost_hostname(s->host), src);
-//    fclose(fp);
+//    if(s->host == localhost &&  type == STREAM_TRAFFIC_TYPE_METADATA) {
+//        FILE *fp = fopen("/tmp/stream.txt", "a");
+//        fprintf(fp, "\n--- SEND MESSAGE START: %s ----\n"
+//                    "%s"
+//                    "--- SEND MESSAGE END ----------------------------------------\n"
+//                , rrdhost_hostname(s->host), src
+//               );
+//        fclose(fp);
+//    }
 
     if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         netdata_log_info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
