@@ -704,12 +704,6 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
                 cachestat_update_publish(&pid_ptr->cachestat);
             } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
                 ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
-#ifdef NETDATA_DEV_MODE
-                collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s", cv->name,
-                               key,
-                               NETDATA_EBPF_MODULE_NAME_CACHESTAT,
-                               pid_ptr->apps_target->name);
-#endif
                 bpf_map_delete_elem(fd, &key);
             }
         }
