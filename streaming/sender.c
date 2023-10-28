@@ -91,9 +91,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     sender_lock(s);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
-    if(s->host == localhost &&  type == STREAM_TRAFFIC_TYPE_METADATA) {
-        if(!s->stream_log_fp)
-            s->stream_log_fp = fopen("/tmp/stream-sender-localhost.txt", "w");
+    if(type == STREAM_TRAFFIC_TYPE_METADATA) {
+        if(!s->stream_log_fp) {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "/tmp/stream-sender-%s.txt", s->host ? rrdhost_hostname(s->host) : "unknown");
+
+            s->stream_log_fp = fopen(filename, "w");
+        }
 
         fprintf(s->stream_log_fp, "\n--- SEND MESSAGE START: %s ----\n"
                     "%s"
