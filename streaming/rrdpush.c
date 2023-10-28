@@ -208,7 +208,7 @@ int configured_as_parent() {
 // chart labels
 static int send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     BUFFER *wb = (BUFFER *)data;
-    buffer_sprintf(wb, "CLABEL \"%s\" \"%s\" %d\n", name, value, ls);
+    buffer_sprintf(wb, "CLABEL \"%s\" \"%s\" %d\n", name, value, ls & ~(RRDLABEL_FLAG_INTERNAL));
     return 1;
 }
 
