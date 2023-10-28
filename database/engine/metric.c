@@ -402,10 +402,10 @@ inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric,
                    "DBENGINE METRIC: metric last time is in the future");
 
     if(first_time_s > 0)
-        set_metric_field_with_condition(metric->first_time_s, first_time_s, _current <= 0 || first_time_s > _current);
+        set_metric_field_with_condition(metric->first_time_s, first_time_s, _current <= 0 || _wanted < _current);
 
     if(last_time_s > 0) {
-        if(set_metric_field_with_condition(metric->latest_time_s_clean, last_time_s, _current <= 0 || last_time_s > _current) &&
+        if(set_metric_field_with_condition(metric->latest_time_s_clean, last_time_s, _current <= 0 || _wanted > _current) &&
             update_every_s > 0)
             // set the latest update every too
             set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, true);
@@ -417,7 +417,7 @@ inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric,
 
 inline bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
-    return set_metric_field_with_condition(metric->first_time_s, first_time_s, first_time_s > _current);
+    return set_metric_field_with_condition(metric->first_time_s, first_time_s, _wanted > _current);
 }
 
 inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
@@ -444,7 +444,7 @@ inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *
 
     if(latest_time_s > 0) {
         if(set_metric_field_with_condition(metric->latest_time_s_clean, latest_time_s, true)) {
-            set_metric_field_with_condition(metric->first_time_s, latest_time_s, _current <= 0 || latest_time_s < _current);
+            set_metric_field_with_condition(metric->first_time_s, latest_time_s, _current <= 0 || _wanted < _current);
 
             return true;
         }
