@@ -2890,6 +2890,13 @@ void pluginsd_process_thread_cleanup(void *ptr) {
 
     rrd_collector_finished();
 
+#ifdef NETDATA_LOG_STREAM_RECEIVE
+    if(parser->user.stream_log_fp) {
+        fclose(parser->user.stream_log_fp);
+        parser->user.stream_log_fp = NULL;
+    }
+#endif
+
     parser_destroy(parser);
 }
 
