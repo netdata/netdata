@@ -112,9 +112,9 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| IPv4 ICMP packets | Enable or disable IPv4 ICMP packets metric. | yes | False |
-| IPv4 ICMP error | Enable or disable IPv4 ICMP error metric. | yes | False |
-| IPv4 ICMP messages | Enable or disable IPv4 ICMP messages metric. | yes | False |
+| IPv4 ICMP packets | Enable or disable IPv4 ICMP packets metric. | yes | no |
+| IPv4 ICMP error | Enable or disable IPv4 ICMP error metric. | yes | no |
+| IPv4 ICMP messages | Enable or disable IPv4 ICMP messages metric. | yes | no |
 
 </details>
 

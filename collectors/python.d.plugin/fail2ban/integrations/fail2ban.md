@@ -150,15 +150,15 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| log_path | path to fail2ban.log. | /var/log/fail2ban.log | False |
-| conf_path | path to jail.local/jail.conf. | /etc/fail2ban/jail.local | False |
-| conf_dir | path to jail.d/. | /etc/fail2ban/jail.d/ | False |
-| exclude | jails you want to exclude from autodetection. |  | False |
-| update_every | Sets the default data collection frequency. | 1 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
+| log_path | path to fail2ban.log. | /var/log/fail2ban.log | no |
+| conf_path | path to jail.local/jail.conf. | /etc/fail2ban/jail.local | no |
+| conf_dir | path to jail.d/. | /etc/fail2ban/jail.d/ | no |
+| exclude | jails you want to exclude from autodetection. |  | no |
+| update_every | Sets the default data collection frequency. | 1 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
 
 </details>
 

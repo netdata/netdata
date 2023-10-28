@@ -123,14 +123,14 @@ You can also specify per mount point `[plugin:proc:diskspace:mountpoint]`
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | False |
-| remove charts of unmounted disks | Remove chart when a device is unmounted on host. | yes | False |
-| check for new mount points every | Parse proc files frequency. | 15 | False |
-| exclude space metrics on paths | Do not show metrics (charts) for listed paths. This option accepts netdata simple pattern. | /proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/* | False |
-| exclude space metrics on filesystems | Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern. | *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs | False |
-| exclude inode metrics on filesystems | Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern. | msdosfs msdos vfat overlayfs aufs* *unionfs | False |
-| space usage for all disks | Define if plugin will show metrics for space usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option. | auto | False |
-| inodes usage for all disks | Define if plugin will show metrics for inode usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option. | auto | False |
+| update every | Data collection frequency. | 1 | no |
+| remove charts of unmounted disks | Remove chart when a device is unmounted on host. | yes | no |
+| check for new mount points every | Parse proc files frequency. | 15 | no |
+| exclude space metrics on paths | Do not show metrics (charts) for listed paths. This option accepts netdata simple pattern. | /proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/* | no |
+| exclude space metrics on filesystems | Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern. | *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs | no |
+| exclude inode metrics on filesystems | Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern. | msdosfs msdos vfat overlayfs aufs* *unionfs | no |
+| space usage for all disks | Define if plugin will show metrics for space usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option. | auto | no |
+| inodes usage for all disks | Define if plugin will show metrics for inode usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option. | auto | no |
 
 </details>
 

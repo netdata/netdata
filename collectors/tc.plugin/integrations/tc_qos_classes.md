@@ -131,8 +131,8 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| script to run to get tc values | Path to script `tc-qos-helper.sh` | usr/libexec/netdata/plugins.d/tc-qos-helper.s | False |
-| enable show all classes and qdiscs for all interfaces | yes/no flag to control what data is presented. | yes | False |
+| script to run to get tc values | Path to script `tc-qos-helper.sh` | usr/libexec/netdata/plugins.d/tc-qos-helper.s | no |
+| enable show all classes and qdiscs for all interfaces | yes/no flag to control what data is presented. | yes | no |
 
 </details>
 

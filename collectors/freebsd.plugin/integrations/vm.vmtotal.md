@@ -117,9 +117,9 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable total processes | Number of active processes. | yes | False |
-| processes running | Show number of processes running or blocked. | yes | False |
-| real memory | Memeory used on host. | yes | False |
+| enable total processes | Number of active processes. | yes | no |
+| processes running | Show number of processes running or blocked. | yes | no |
+| real memory | Memeory used on host. | yes | no |
 
 </details>
 

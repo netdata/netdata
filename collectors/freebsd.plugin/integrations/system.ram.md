@@ -119,7 +119,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| system.ram | Enable or disable system RAM metric. | yes | False |
+| system.ram | Enable or disable system RAM metric. | yes | no |
 
 </details>
 

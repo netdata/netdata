@@ -118,9 +118,9 @@ The following collapsed table contains all the options that can be configured fo
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| ap_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | False |
-| ap_priority | Controls the order of charts at the netdata dashboard. | 6900 | False |
-| ap_retries | The number of retries to do in case of failure before disabling the collector. | 10 | False |
+| ap_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | no |
+| ap_priority | Controls the order of charts at the netdata dashboard. | 6900 | no |
+| ap_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
 
 </details>
 

@@ -117,7 +117,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| kern.ipc.sem | Enable or disable semaphore metrics. | yes | False |
+| kern.ipc.sem | Enable or disable semaphore metrics. | yes | no |
 
 </details>
 

@@ -110,7 +110,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| vm.stats.sys.v_soft | Enable or disable software inerrupts metric. | yes | False |
+| vm.stats.sys.v_soft | Enable or disable software inerrupts metric. | yes | no |
 
 </details>
 

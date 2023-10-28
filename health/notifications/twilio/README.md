@@ -52,11 +52,11 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_TWILIO | Set `SEND_TWILIO` to YES | YES | True |
-| TWILIO_ACCOUNT_SID | set `TWILIO_ACCOUNT_SID`  to your account SID. |  | True |
-| TWILIO_ACCOUNT_TOKEN | Set `TWILIO_ACCOUNT_TOKEN` to your account token. |  | True |
-| TWILIO_NUMBER | Set `TWILIO_NUMBER` to your account's number. |  | True |
-| DEFAULT_RECIPIENT_TWILIO | Set DEFAULT_RECIPIENT_TWILIO to the number you want the alert notifications to be sent to. You can define multiple numbers like this: +15555555555 +17777777777. |  | True |
+| SEND_TWILIO | Set `SEND_TWILIO` to YES | YES | yes |
+| TWILIO_ACCOUNT_SID | set `TWILIO_ACCOUNT_SID`  to your account SID. |  | yes |
+| TWILIO_ACCOUNT_TOKEN | Set `TWILIO_ACCOUNT_TOKEN` to your account token. |  | yes |
+| TWILIO_NUMBER | Set `TWILIO_NUMBER` to your account's number. |  | yes |
+| DEFAULT_RECIPIENT_TWILIO | Set DEFAULT_RECIPIENT_TWILIO to the number you want the alert notifications to be sent to. You can define multiple numbers like this: +15555555555 +17777777777. |  | yes |
 
 ##### DEFAULT_RECIPIENT_TWILIO
 

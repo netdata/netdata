@@ -120,9 +120,9 @@ All options are defined inside section `[global]`.
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 5 | False |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | False |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | False |
+| update every | Data collection frequency. | 5 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
 
 </details>
 

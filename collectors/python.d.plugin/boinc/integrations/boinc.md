@@ -124,14 +124,14 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. | 5 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
-| hostname | Define a hostname where boinc is running. | localhost | False |
-| port | The port of boinc RPC interface. |  | False |
-| password | Provide a password to connect to a boinc RPC interface. |  | False |
+| update_every | Sets the default data collection frequency. | 5 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
+| hostname | Define a hostname where boinc is running. | localhost | no |
+| port | The port of boinc RPC interface. |  | no |
+| password | Provide a password to connect to a boinc RPC interface. |  | no |
 
 </details>
 

@@ -133,21 +133,21 @@ This configuration file have two different sections. The `[global]` overwrites a
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 5 | False |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | False |
-| apps | Enable or disable integration with apps.plugin | no | False |
-| cgroups | Enable or disable integration with cgroup.plugin | no | False |
-| pid table size | Number of elements stored inside hash tables used to monitor calls per PID. | 32768 | False |
-| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | False |
-| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | False |
-| maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | False |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | False |
-| sync | Enable or disable monitoring for syscall `sync` | yes | False |
-| msync | Enable or disable monitoring for syscall `msync` | yes | False |
-| fsync | Enable or disable monitoring for syscall `fsync` | yes | False |
-| fdatasync | Enable or disable monitoring for syscall `fdatasync` | yes | False |
-| syncfs | Enable or disable monitoring for syscall `syncfs` | yes | False |
-| sync_file_range | Enable or disable monitoring for syscall `sync_file_range` | yes | False |
+| update every | Data collection frequency. | 5 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| apps | Enable or disable integration with apps.plugin | no | no |
+| cgroups | Enable or disable integration with cgroup.plugin | no | no |
+| pid table size | Number of elements stored inside hash tables used to monitor calls per PID. | 32768 | no |
+| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
+| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
+| maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+| sync | Enable or disable monitoring for syscall `sync` | yes | no |
+| msync | Enable or disable monitoring for syscall `msync` | yes | no |
+| fsync | Enable or disable monitoring for syscall `fsync` | yes | no |
+| fdatasync | Enable or disable monitoring for syscall `fdatasync` | yes | no |
+| syncfs | Enable or disable monitoring for syscall `syncfs` | yes | no |
+| sync_file_range | Enable or disable monitoring for syscall `sync_file_range` | yes | no |
 
 </details>
 

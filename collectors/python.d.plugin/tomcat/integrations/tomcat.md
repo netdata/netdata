@@ -121,14 +121,14 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. | 5 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| url | The URL of the Tomcat server's status endpoint. Always add the suffix ?XML=true. | no | True |
-| user | A valid user with read permission to access the /manager/status endpoint of the server. Required if the endpoint is password protected | no | False |
-| pass | A valid password for the user in question. Required if the endpoint is password protected | no | False |
-| connector_name | The connector component that communicates with a web connector via the AJP protocol, e.g ajp-bio-8009 |  | False |
+| update_every | Sets the default data collection frequency. | 5 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| url | The URL of the Tomcat server's status endpoint. Always add the suffix ?XML=true. | no | yes |
+| user | A valid user with read permission to access the /manager/status endpoint of the server. Required if the endpoint is password protected | no | no |
+| pass | A valid password for the user in question. Required if the endpoint is password protected | no | no |
+| connector_name | The connector component that communicates with a web connector via the AJP protocol, e.g ajp-bio-8009 |  | no |
 
 </details>
 

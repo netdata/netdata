@@ -117,11 +117,11 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable new mount points detected at runtime | Cheeck new mount points during runtime. | auto | False |
-| space usage for all disks | Enable or disable space usage for all disks metric. | auto | False |
-| inodes usage for all disks | Enable or disable inodes usage for all disks metric. | auto | False |
-| exclude space metrics on paths | Do not show metrics for listed paths. | /proc/* | False |
-| exclude space metrics on filesystems | Do not monitor listed filesystems. | autofs procfs subfs devfs none | False |
+| enable new mount points detected at runtime | Cheeck new mount points during runtime. | auto | no |
+| space usage for all disks | Enable or disable space usage for all disks metric. | auto | no |
+| inodes usage for all disks | Enable or disable inodes usage for all disks metric. | auto | no |
+| exclude space metrics on paths | Do not show metrics for listed paths. | /proc/* | no |
+| exclude space metrics on filesystems | Do not monitor listed filesystems. | autofs procfs subfs devfs none | no |
 
 </details>
 

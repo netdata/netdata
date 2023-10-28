@@ -114,9 +114,9 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| counters for static rules | Enable or disable counters for static rules  metric. | yes | False |
-| number of dynamic rules | Enable or disable number of dynamic rules metric. | yes | False |
-| allocated memory | Enable or disable allocated memory metric. | yes | False |
+| counters for static rules | Enable or disable counters for static rules  metric. | yes | no |
+| number of dynamic rules | Enable or disable number of dynamic rules metric. | yes | no |
+| allocated memory | Enable or disable allocated memory metric. | yes | no |
 
 </details>
 

@@ -101,7 +101,7 @@ sudo ./edit-config Config options
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| dev.cpu.0.freq | Enable or disable CPU Scaling frequency metric. | yes | False |
+| dev.cpu.0.freq | Enable or disable CPU Scaling frequency metric. | yes | no |
 
 </details>
 

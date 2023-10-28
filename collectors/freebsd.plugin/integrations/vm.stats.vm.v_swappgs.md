@@ -115,7 +115,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| vm.stats.vm.v_swappgs | Enable or disable infoormation about SWAP I/O metric. | yes | False |
+| vm.stats.vm.v_swappgs | Enable or disable infoormation about SWAP I/O metric. | yes | no |
 
 </details>
 

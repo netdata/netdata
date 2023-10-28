@@ -117,8 +117,8 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| ipv4 UDP packets | Enable or disable ipv4 UDP packets metric. | yes | False |
-| ipv4 UDP errors | Enable or disable ipv4 UDP errors metric. | yes | False |
+| ipv4 UDP packets | Enable or disable ipv4 UDP packets metric. | yes | no |
+| ipv4 UDP errors | Enable or disable ipv4 UDP errors metric. | yes | no |
 
 </details>
 

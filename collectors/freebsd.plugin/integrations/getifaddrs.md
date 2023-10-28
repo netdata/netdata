@@ -140,18 +140,18 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable new interfaces detected at runtime | Enable or disable possibility to discover new interface after plugin starts. | auto | False |
-| total bandwidth for physical interfaces | Enable or disable total bandwidth for physical interfaces  metric. | auto | False |
-| total packets for physical interfaces | Enable or disable total packets for physical interfaces metric. | auto | False |
-| total bandwidth for ipv4 interface | Enable or disable total bandwidth for IPv4 interface metric. | auto | False |
-| total bandwidth for ipv6 interfaces | Enable or disable total bandwidth for ipv6 interfaces metric. | auto | False |
-| bandwidth for all interfaces | Enable or disable bandwidth for all interfaces metric. | auto | False |
-| packets for all interfaces | Enable or disable packets for all interfaces metric. | auto | False |
-| errors for all interfaces | Enable or disable errors for all interfaces metric. | auto | False |
-| drops for all interfaces | Enable or disable drops for all interfaces metric. | auto | False |
-| collisions for all interface | Enable or disable collisions for all interface metric. | auto | False |
-| disable by default interfaces matching | Do not display data for intterfaces listed. | lo* | False |
-| set physical interfaces for system.net | Do not show network traffic for listed interfaces. | igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc* | False |
+| enable new interfaces detected at runtime | Enable or disable possibility to discover new interface after plugin starts. | auto | no |
+| total bandwidth for physical interfaces | Enable or disable total bandwidth for physical interfaces  metric. | auto | no |
+| total packets for physical interfaces | Enable or disable total packets for physical interfaces metric. | auto | no |
+| total bandwidth for ipv4 interface | Enable or disable total bandwidth for IPv4 interface metric. | auto | no |
+| total bandwidth for ipv6 interfaces | Enable or disable total bandwidth for ipv6 interfaces metric. | auto | no |
+| bandwidth for all interfaces | Enable or disable bandwidth for all interfaces metric. | auto | no |
+| packets for all interfaces | Enable or disable packets for all interfaces metric. | auto | no |
+| errors for all interfaces | Enable or disable errors for all interfaces metric. | auto | no |
+| drops for all interfaces | Enable or disable drops for all interfaces metric. | auto | no |
+| collisions for all interface | Enable or disable collisions for all interface metric. | auto | no |
+| disable by default interfaces matching | Do not display data for intterfaces listed. | lo* | no |
+| set physical interfaces for system.net | Do not show network traffic for listed interfaces. | igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc* | no |
 
 </details>
 

@@ -115,7 +115,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| vm.swap_info | Enable or disable SWAP metrics. | yes | False |
+| vm.swap_info | Enable or disable SWAP metrics. | yes | no |
 
 </details>
 

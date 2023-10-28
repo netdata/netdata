@@ -145,15 +145,15 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| charts_regex | what charts to pull data for - A regex like `system\..*/` or `system\..*/apps.cpu/apps.mem` etc. | system\..* | True |
-| charts_to_exclude | charts to exclude, useful if you would like to exclude some specific charts. note: should be a ',' separated string like 'chart.name,chart.name'. |  | False |
-| mode | get ChangeFinder scores 'per_dim' or 'per_chart'. | per_chart | True |
-| cf_r | default parameters that can be passed to the changefinder library. | 0.5 | False |
-| cf_order | default parameters that can be passed to the changefinder library. | 1 | False |
-| cf_smooth | default parameters that can be passed to the changefinder library. | 15 | False |
-| cf_threshold | the percentile above which scores will be flagged. | 99 | False |
-| n_score_samples | the number of recent scores to use when calculating the percentile of the changefinder score. | 14400 | False |
-| show_scores | set to true if you also want to chart the percentile scores in addition to the flags. (mainly useful for debugging or if you want to dive deeper on how the scores are evolving over time) | False | False |
+| charts_regex | what charts to pull data for - A regex like `system\..*/` or `system\..*/apps.cpu/apps.mem` etc. | system\..* | yes |
+| charts_to_exclude | charts to exclude, useful if you would like to exclude some specific charts. note: should be a ',' separated string like 'chart.name,chart.name'. |  | no |
+| mode | get ChangeFinder scores 'per_dim' or 'per_chart'. | per_chart | yes |
+| cf_r | default parameters that can be passed to the changefinder library. | 0.5 | no |
+| cf_order | default parameters that can be passed to the changefinder library. | 1 | no |
+| cf_smooth | default parameters that can be passed to the changefinder library. | 15 | no |
+| cf_threshold | the percentile above which scores will be flagged. | 99 | no |
+| n_score_samples | the number of recent scores to use when calculating the percentile of the changefinder score. | 14400 | no |
+| show_scores | set to true if you also want to chart the percentile scores in addition to the flags. (mainly useful for debugging or if you want to dive deeper on how the scores are evolving over time) | no | no |
 
 </details>
 

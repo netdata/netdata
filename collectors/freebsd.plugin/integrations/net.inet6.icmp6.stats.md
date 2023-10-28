@@ -116,13 +116,13 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| icmp | Enable or disable ICMP metric. | auto | False |
-| icmp redirects | Enable or disable ICMP redirects metric. | auto | False |
-| icmp errors | Enable or disable ICMP errors metric. | auto | False |
-| icmp echos | Enable or disable ICMP echos metric. | auto | False |
-| icmp router | Enable or disable ICMP router metric. | auto | False |
-| icmp neighbor | Enable or disable ICMP neighbor metric. | auto | False |
-| icmp types | Enable or disable ICMP types metric. | auto | False |
+| icmp | Enable or disable ICMP metric. | auto | no |
+| icmp redirects | Enable or disable ICMP redirects metric. | auto | no |
+| icmp errors | Enable or disable ICMP errors metric. | auto | no |
+| icmp echos | Enable or disable ICMP echos metric. | auto | no |
+| icmp router | Enable or disable ICMP router metric. | auto | no |
+| icmp neighbor | Enable or disable ICMP neighbor metric. | auto | no |
+| icmp types | Enable or disable ICMP types metric. | auto | no |
 
 </details>
 

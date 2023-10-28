@@ -111,7 +111,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| vm.stats.sys.v_swtch | Enable or disable CPU context switch metric. | yes | False |
+| vm.stats.sys.v_swtch | Enable or disable CPU context switch metric. | yes | no |
 
 </details>
 

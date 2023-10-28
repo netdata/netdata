@@ -131,12 +131,12 @@ The following collapsed table contains all the options that can be configured fo
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| sensors_sys_dir | The directory the kernel exposes sensor data. | /sys/devices | False |
-| sensors_sys_depth | How deep in the tree to check for sensor data. | 10 | False |
-| sensors_source_update | If set to 1, the script will overwrite internal script functions with code generated ones. | 1 | False |
-| sensors_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | False |
-| sensors_priority | The charts priority on the dashboard. | 90000 | False |
-| sensors_retries | The number of retries to do in case of failure before disabling the collector. | 10 | False |
+| sensors_sys_dir | The directory the kernel exposes sensor data. | /sys/devices | no |
+| sensors_sys_depth | How deep in the tree to check for sensor data. | 10 | no |
+| sensors_source_update | If set to 1, the script will overwrite internal script functions with code generated ones. | 1 | no |
+| sensors_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | no |
+| sensors_priority | The charts priority on the dashboard. | 90000 | no |
+| sensors_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
 
 </details>
 

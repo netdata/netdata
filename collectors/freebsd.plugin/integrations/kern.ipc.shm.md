@@ -111,7 +111,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| kern.ipc.shm | Enable or disable shared memory metric. | yes | False |
+| kern.ipc.shm | Enable or disable shared memory metric. | yes | no |
 
 </details>
 

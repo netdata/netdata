@@ -123,14 +123,14 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. | 1 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. | local | False |
-| url | The URL to fetch Monit's metrics. | http://localhost:2812 | True |
-| user | Username in case the URL is password protected. |  | False |
-| pass | Password in case the URL is password protected. |  | False |
+| update_every | Sets the default data collection frequency. | 1 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. | local | no |
+| url | The URL to fetch Monit's metrics. | http://localhost:2812 | yes |
+| user | Username in case the URL is password protected. |  | no |
+| pass | Password in case the URL is password protected. |  | no |
 
 </details>
 

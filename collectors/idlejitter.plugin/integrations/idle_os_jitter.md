@@ -110,7 +110,7 @@ This integration only supports a single configuration option, and most users wil
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| loop time in ms | Specifies the target time for the data collection thread to sleep, measured in miliseconds. | 20 | False |
+| loop time in ms | Specifies the target time for the data collection thread to sleep, measured in miliseconds. | 20 | no |
 
 #### Examples
 There are no configuration examples.

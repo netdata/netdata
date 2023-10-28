@@ -142,7 +142,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| show zero charts | Do not show charts with zero metrics. | no | False |
+| show zero charts | Do not show charts with zero metrics. | no | no |
 
 </details>
 

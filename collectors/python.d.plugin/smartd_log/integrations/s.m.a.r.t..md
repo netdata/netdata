@@ -169,14 +169,14 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| log_path | path to smartd log files. | /var/log/smartd | True |
-| exclude_disks | Space-separated patterns. If the pattern is in the drive name, the module will not collect data for it. |  | False |
-| age | Time in minutes since the last dump to file. | 30 | False |
-| update_every | Sets the default data collection frequency. | 1 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
+| log_path | path to smartd log files. | /var/log/smartd | yes |
+| exclude_disks | Space-separated patterns. If the pattern is in the drive name, the module will not collect data for it. |  | no |
+| age | Time in minutes since the last dump to file. | 30 | no |
+| update_every | Sets the default data collection frequency. | 1 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
 
 </details>
 

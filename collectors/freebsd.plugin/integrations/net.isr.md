@@ -129,8 +129,8 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| netisr | Enable or disable general vision about softnet stat metrics. | yes | False |
-| netisr per core | Enable or disable softnet stat metric per core. | yes | False |
+| netisr | Enable or disable general vision about softnet stat metrics. | yes | no |
+| netisr per core | Enable or disable softnet stat metric per core. | yes | no |
 
 </details>
 

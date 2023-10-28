@@ -129,7 +129,7 @@ The netdata main configuration file.
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| kern.cp_time | Enable or disable Total CPU usage. | yes | False |
+| kern.cp_time | Enable or disable Total CPU usage. | yes | no |
 
 </details>
 
