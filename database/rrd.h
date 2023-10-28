@@ -903,6 +903,7 @@ static inline uint32_t rrdset_metadata_upstream_version(RRDSET *st) {
 
 static inline void rrdset_metadata_updated(RRDSET *st) {
     __atomic_add_fetch(&st->version, 1, __ATOMIC_RELAXED);
+    rrdcontext_updated_rrdset(st);
 }
 
 static inline void rrdset_metadata_exposed_upstream(RRDSET *st, uint32_t version) {
@@ -923,6 +924,7 @@ static inline uint32_t rrddim_metadata_upstream_version(RRDDIM *rd) {
 }
 
 static inline void rrddim_metadata_updated(RRDDIM *rd) {
+    rrdcontext_updated_rrddim(rd);
     rrdset_metadata_updated(rd->rrdset);
 }
 
