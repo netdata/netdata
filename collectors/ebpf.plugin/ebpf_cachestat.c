@@ -549,7 +549,6 @@ static void ebpf_cachestat_exit(void *ptr)
             ebpf_statistic_obsolete_aral_chart(em, cachestat_disable_priority);
 #endif
 
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -694,23 +693,15 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
             goto end_cachestat_loop;
         }
 
-        // Get Cachestat structure
-        rw_spinlock_write_lock(&pid_ptr->cachestat_stats.rw_spinlock);
-        netdata_publish_cachestat_t **cs_pptr = (netdata_publish_cachestat_t **)ebpf_judy_insert_unsafe(
-            &pid_ptr->cachestat_stats.JudyLArray, cv[0].ct);
-        netdata_publish_cachestat_t *cs_ptr = *cs_pptr;
-        if (likely(*cs_pptr == NULL)) {
-            *cs_pptr = ebpf_publish_cachestat_get();
-            cs_ptr = *cs_pptr;
-
+        if (likely(!pid_ptr->cachestat.plot.ct)) {
             pid_ptr->current_timestamp = update_time;
-            memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
-            cachestat_update_publish(cs_ptr);
-        }  else {
-            if (cv[0].total != cs_ptr->plot.total) {
+            memcpy(&pid_ptr->cachestat.plot, cv, sizeof(netdata_cachestat_pid_t));
+            cachestat_update_publish(&pid_ptr->cachestat);
+        } else {
+            if (cv[0].total != pid_ptr->cachestat.plot.total) {
                 pid_ptr->current_timestamp = update_time;
-                memcpy(&cs_ptr->plot, cv, sizeof(netdata_cachestat_pid_t));
-                cachestat_update_publish(cs_ptr);
+                memcpy(&pid_ptr->cachestat.plot, cv, sizeof(netdata_cachestat_pid_t));
+                cachestat_update_publish(&pid_ptr->cachestat);
             } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
                 ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
 #ifdef NETDATA_DEV_MODE
@@ -719,13 +710,10 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, uint64_t update_ev
                                NETDATA_EBPF_MODULE_NAME_CACHESTAT,
                                pid_ptr->apps_target->name);
 #endif
-                JudyLDel(&pid_ptr->cachestat_stats.JudyLArray, cv[0].ct, PJE0);
-                ebpf_cachestat_release(cs_ptr);
                 bpf_map_delete_elem(fd, &key);
             }
         }
 
-        rw_spinlock_write_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // We are cleaning to avoid passing data read from one process to other.
@@ -754,7 +742,8 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    ebpf_read_cachestat_apps_table(maps_per_core, (uint64_t)update_every);
+    uint64_t remove_time = update_every*5;
+    ebpf_read_cachestat_apps_table(maps_per_core, remove_time);
 
     int counter = update_every - 1;
 
@@ -766,7 +755,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
         if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
-        ebpf_read_cachestat_apps_table(maps_per_core, (uint64_t)update_every);
+        ebpf_read_cachestat_apps_table(maps_per_core, remove_time);
 
         counter = 0;
     }
@@ -796,21 +785,9 @@ static void ebpf_update_cachestat_cgroup()
                                                                                    NULL,
                                                                                    NETDATA_EBPF_MODULE_NAME_CACHESTAT);
             if (pid_ptr) {
-                rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
-                if (pid_ptr->cachestat_stats.JudyLArray) {
-                    Word_t local_timestamp = 0;
-                    bool first_cache = true;
-                    Pvoid_t *cache_value;
-                    while (
-                        (cache_value =
-                             JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
-                        netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                        out->plot.misses += values->plot.misses;
-                        out->plot.total += values->plot.total;
-                        out->plot.dirty += values->plot.dirty;
-                    }
-                }
-                rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+                out->plot.misses += pid_ptr->cachestat.plot.misses;
+                out->plot.total += pid_ptr->cachestat.plot.total;
+                out->plot.dirty += pid_ptr->cachestat.plot.dirty;
             }
         }
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
@@ -990,27 +967,15 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyL
     Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
-    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+    while ((pid_value = JudyLFirstThenNext(JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
                                                                                local_pid,
                                                                                NULL,
                                                                                NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         if (pid_ptr) {
-            rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
-            if (pid_ptr->cachestat_stats.JudyLArray) {
-                Word_t local_timestamp = 0;
-                bool first_cache = true;
-                Pvoid_t *cache_value;
-                while (
-                    (cache_value =
-                         JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
-                    netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                    publish->plot.misses += values->plot.misses;
-                    publish->plot.total += values->plot.total;
-                    publish->plot.dirty += values->plot.dirty;
-                }
-            }
-            rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+            publish->plot.misses += pid_ptr->cachestat.plot.misses;
+            publish->plot.total += pid_ptr->cachestat.plot.total;
+            publish->plot.dirty += pid_ptr->cachestat.plot.dirty;
         }
     }
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
@@ -1397,11 +1362,6 @@ static void cachestat_collector(ebpf_module_t *em)
 
         cachestat_send_global(&publish);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_cachestat_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_cachestat_pid, em);
-#endif
-
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(ebpf_apps_groups_root_target);
@@ -1488,7 +1448,6 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  */
 static void ebpf_cachestat_allocate_global_vectors()
 {
-    ebpf_cachestat_aral_init();
     cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
 
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -1619,10 +1578,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     ebpf_create_memory_charts(em);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_cachestat_pid)
-        cachestat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 

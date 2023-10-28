@@ -238,11 +238,6 @@ extern ebpf_process_stat_plus_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_plus_t *stat);
 extern ebpf_process_stat_t *process_stat_vector;
 
-extern ARAL *ebpf_aral_cachestat_pid;
-void ebpf_cachestat_aral_init();
-netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void);
-void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
-
 extern ARAL *ebpf_aral_dcstat_pid;
 void ebpf_dcstat_aral_init();
 netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void);

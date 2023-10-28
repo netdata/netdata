@@ -96,7 +96,6 @@ typedef struct netdata_publish_cachestat {
 } netdata_publish_cachestat_t;
 
 void *ebpf_cachestat_thread(void *ptr);
-void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
 void ebpf_function_cachestat_manipulation(const char *transaction,
                                           char *function __maybe_unused,
                                           int timeout __maybe_unused,

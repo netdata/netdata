@@ -1196,22 +1196,12 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
     if (!ebpf_judy_pid.index.JudyLArray)
         return;
 
-    Pvoid_t *pid_value, *cache_value;
-    Word_t local_pid = 0, local_cache = 0;
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        rw_spinlock_write_lock(&pid_ptr->cachestat_stats.rw_spinlock);
-        bool first_cache = true;
-        if (pid_ptr->cachestat_stats.JudyLArray) {
-            while ((cache_value = JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_cache, &first_cache))) {
-                netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                ebpf_cachestat_release(values);
-            }
-            JudyLFreeArray(&pid_ptr->cachestat_stats.JudyLArray, PJE0);
-            pid_ptr->cachestat_stats.JudyLArray = NULL;
-        }
-        rw_spinlock_write_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+        memset(&pid_ptr->cachestat, 0, sizeof(netdata_publish_cachestat_t));
     }
 }
 
@@ -1275,26 +1265,17 @@ static void ebpf_cachestat_fill_function_buffer_unsafe(BUFFER *buf)
 {
     int counter = 0;
 
-    Pvoid_t *pid_value, *cache_value;
+    Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        bool first_cache = true;
-        Word_t local_timestamp = 0;
-        rw_spinlock_read_lock(&pid_ptr->cachestat_stats.rw_spinlock);
-        if (pid_ptr->cachestat_stats.JudyLArray) {
-            while ((cache_value = JudyLFirstThenNext(pid_ptr->cachestat_stats.JudyLArray, &local_timestamp, &first_cache))) {
-                netdata_publish_cachestat_t *values = (netdata_publish_cachestat_t *)*cache_value;
-                ebpf_fill_cachestat_function_buffer(buf,
-                                                    local_pid,
-                                                    values,
-                                                    pid_ptr->name,
-                                                    (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
-            }
-            counter++;
-        }
-        rw_spinlock_read_unlock(&pid_ptr->cachestat_stats.rw_spinlock);
+
+        ebpf_fill_cachestat_function_buffer(buf,
+                                            local_pid,
+                                            &pid_ptr->cachestat,
+                                            pid_ptr->name,
+                                            (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
     }
 
     if (!counter) {

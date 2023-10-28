@@ -118,17 +118,13 @@ typedef struct netdata_ebpf_judy_pid_stats {
     uint32_t tgid;
     uint64_t current_timestamp;
 
+    netdata_publish_cachestat_t cachestat;
+
     // Index for Socket timestamp
     struct {                            // support for multiple indexing engines
         Pvoid_t JudyLArray;            // the hash table
         RW_SPINLOCK rw_spinlock;        // protect the index
     } socket_stats;
-
-    // Index for Cachestat timestamp
-    struct {                            // support for multiple indexing engines
-        Pvoid_t JudyLArray;            // the hash table
-        RW_SPINLOCK rw_spinlock;        // protect the index
-    } cachestat_stats;
 
     // Index for file descriptor timestamp
     struct {                            // support for multiple indexing engines
