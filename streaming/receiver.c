@@ -353,6 +353,15 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     buffered_reader_init(&rpt->reader);
 
+#ifdef NETDATA_LOG_STREAM_RECEIVE
+    {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(rpt->host) : "unknown");
+        parser->user.stream_log_fp = fopen(filename, "w");
+        parser->user.stream_log_repertoire = PARSER_REP_METADATA;
+    }
+#endif
+
     BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
     while(!receiver_should_stop(rpt)) {
 

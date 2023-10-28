@@ -901,9 +901,7 @@ static inline uint32_t rrdset_metadata_upstream_version(RRDSET *st) {
     return __atomic_load_n(&st->rrdpush.sender.sent_version, __ATOMIC_RELAXED);
 }
 
-static inline void rrdset_metadata_updated(RRDSET *st) {
-    __atomic_add_fetch(&st->version, 1, __ATOMIC_RELAXED);
-}
+void rrdset_metadata_updated(RRDSET *st);
 
 static inline void rrdset_metadata_exposed_upstream(RRDSET *st, uint32_t version) {
     __atomic_store_n(&st->rrdpush.sender.sent_version, version, __ATOMIC_RELAXED);
@@ -922,9 +920,7 @@ static inline uint32_t rrddim_metadata_upstream_version(RRDDIM *rd) {
     return __atomic_load_n(&rd->rrdpush.sender.sent_version, __ATOMIC_RELAXED);
 }
 
-static inline void rrddim_metadata_updated(RRDDIM *rd) {
-    rrdset_metadata_updated(rd->rrdset);
-}
+void rrddim_metadata_updated(RRDDIM *rd);
 
 static inline void rrddim_metadata_exposed_upstream(RRDDIM *rd, uint32_t version) {
     __atomic_store_n(&rd->rrdpush.sender.sent_version, version, __ATOMIC_RELAXED);

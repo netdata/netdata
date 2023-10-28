@@ -5,6 +5,12 @@
 #include <sched.h>
 #include "storage_engine.h"
 
+
+void rrdset_metadata_updated(RRDSET *st) {
+    __atomic_add_fetch(&st->version, 1, __ATOMIC_RELAXED);
+    rrdcontext_updated_rrdset(st);
+}
+
 // ----------------------------------------------------------------------------
 // RRDSET rrdpush send chart_slots
 
@@ -484,7 +490,6 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rrdset_update_permanent_labels(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_metadata_updated(st);
 
     return ctr->react_action != RRDSET_REACT_NONE;
 }
@@ -510,10 +515,9 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         }
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
-        rrdset_metadata_updated(st);
     }
 
-    rrdcontext_updated_rrdset(st);
+    rrdset_metadata_updated(st);
 }
 
 void rrdset_index_init(RRDHOST *host) {

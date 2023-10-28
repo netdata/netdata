@@ -4,6 +4,11 @@
 #include "rrd.h"
 #include "storage_engine.h"
 
+void rrddim_metadata_updated(RRDDIM *rd) {
+    rrdcontext_updated_rrddim(rd);
+    rrdset_metadata_updated(rd->rrdset);
+}
+
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
@@ -157,7 +162,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_metadata_updated(st);
 
     ml_dimension_new(rd);
 
@@ -285,10 +289,9 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-        rrdset_metadata_updated(st);
     }
 
-    rrdcontext_updated_rrddim(rd);
+    rrddim_metadata_updated(rd);
 }
 
 size_t rrddim_size(void) {

@@ -215,6 +215,10 @@ struct sender_state {
 
     struct compressor_state compressor;
 
+#ifdef NETDATA_LOG_STREAM_SENDER
+    FILE *stream_log_fp;
+#endif
+
 #ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;                     // structure used to encrypt the connection
 #endif

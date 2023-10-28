@@ -30,6 +30,7 @@ typedef enum __attribute__ ((__packed__)) parser_input_type {
 typedef enum __attribute__ ((__packed__)) {
     PARSER_INIT_PLUGINSD        = (1 << 1),
     PARSER_INIT_STREAMING       = (1 << 2),
+    PARSER_REP_METADATA         = (1 << 3),
 } PARSER_REPERTOIRE;
 
 struct parser;
@@ -53,6 +54,11 @@ typedef struct parser_user_object {
     RRDLABELS *chart_rrdlabels_linked_temporarily;
     size_t data_collections_count;
     int enabled;
+
+#ifdef NETDATA_LOG_STREAM_RECEIVE
+    FILE *stream_log_fp;
+    PARSER_REPERTOIRE stream_log_repertoire;
+#endif
 
     STREAM_CAPABILITIES capabilities; // receiver capabilities
 
@@ -154,6 +160,11 @@ static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *co
 }
 
 static inline int parser_action(PARSER *parser, char *input) {
+#ifdef NETDATA_LOG_STREAM_RECEIVE
+    static __thread char line[PLUGINSD_LINE_MAX + 1];
+    strncpyz(line, input, sizeof(line) - 1);
+#endif
+
     parser->line++;
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
@@ -197,6 +208,12 @@ static inline int parser_action(PARSER *parser, char *input) {
     PARSER_KEYWORD *t = parser_find_keyword(parser, command);
     if(likely(t)) {
         worker_is_busy(t->worker_job_id);
+
+#ifdef NETDATA_LOG_STREAM_RECEIVE
+        if(parser->user.stream_log_fp && t->repertoire & parser->user.stream_log_repertoire)
+            fprintf(parser->user.stream_log_fp, "%s", line);
+#endif
+
         rc = parser_execute(parser, t, words, num_words);
         // rc = (*t->func)(words, num_words, parser);
         worker_is_idle();
