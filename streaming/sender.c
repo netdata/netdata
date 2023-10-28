@@ -90,15 +90,18 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     sender_lock(s);
 
-//    if(s->host == localhost &&  type == STREAM_TRAFFIC_TYPE_METADATA) {
-//        FILE *fp = fopen("/tmp/stream.txt", "a");
-//        fprintf(fp, "\n--- SEND MESSAGE START: %s ----\n"
-//                    "%s"
-//                    "--- SEND MESSAGE END ----------------------------------------\n"
-//                , rrdhost_hostname(s->host), src
-//               );
-//        fclose(fp);
-//    }
+#ifdef NETDATA_LOG_STREAM_SENDER
+    if(s->host == localhost &&  type == STREAM_TRAFFIC_TYPE_METADATA) {
+        if(!s->stream_log_fp)
+            s->stream_log_fp = fopen("/tmp/stream-sender-localhost.txt", "w");
+
+        fprintf(s->stream_log_fp, "\n--- SEND MESSAGE START: %s ----\n"
+                    "%s"
+                    "--- SEND MESSAGE END ----------------------------------------\n"
+                , rrdhost_hostname(s->host), src
+               );
+    }
+#endif
 
     if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         netdata_log_info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
@@ -1235,6 +1238,14 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
 
     rrdhost_clear_sender___while_having_sender_mutex(host);
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+    if(host->sender->stream_log_fp) {
+        fclose(host->sender->stream_log_fp);
+        host->sender->stream_log_fp = NULL;
+    }
+#endif
+
     sender_unlock(host->sender);
 
     freez(s->pipe_buffer);
