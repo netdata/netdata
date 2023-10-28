@@ -1311,7 +1311,7 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
 
     rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
-
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     parser->user.chart_rrdlabels_linked_temporarily = NULL;
     return PARSER_RC_OK;
 }
