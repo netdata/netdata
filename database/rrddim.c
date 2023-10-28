@@ -4,6 +4,11 @@
 #include "rrd.h"
 #include "storage_engine.h"
 
+void rrddim_metadata_updated(RRDDIM *rd) {
+    rrdcontext_updated_rrddim(rd);
+    rrdset_metadata_updated(rd->rrdset);
+}
+
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
