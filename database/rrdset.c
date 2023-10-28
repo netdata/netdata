@@ -79,7 +79,7 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     }
 
     st->pluginsd.last_slot = -1;
-    st->pluginsd.with_slots = false;
+    st->pluginsd.dims_with_slots = false;
 }
 
 void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
@@ -96,7 +96,7 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     st->pluginsd.pos = 0;
     st->pluginsd.set = false;
     st->pluginsd.last_slot = -1;
-    st->pluginsd.with_slots = false;
+    st->pluginsd.dims_with_slots = false;
     st->pluginsd.collector_tid = 0;
 
     spinlock_unlock(&st->pluginsd.spinlock);

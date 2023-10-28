@@ -275,7 +275,7 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
     }
 
     if(unlikely(ret >= COMPRESSION_MAX_CHUNK)) {
-        netdata_log_error("RRDPUSH_COMPRESS: compressed data is %zu bytes, which is >= than the max chunk size %zu",
+        netdata_log_error("RRDPUSH_COMPRESS: compressed data is %zu bytes, which is >= than the max chunk size %d",
                 ret, COMPRESSION_MAX_CHUNK);
         return 0;
     }
@@ -384,7 +384,7 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
     // for backwards compatibility we cannot check for COMPRESSION_MAX_MSG_SIZE,
     // because old children may send this big payloads.
     if(unlikely(ret > COMPRESSION_MAX_CHUNK)) {
-        netdata_log_error("RRDPUSH_DECOMPRESS: decompressed data is %zu bytes, which is bigger than the max msg size %zu",
+        netdata_log_error("RRDPUSH_DECOMPRESS: decompressed data is %zu bytes, which is bigger than the max msg size %d",
                           ret, COMPRESSION_MAX_CHUNK);
         return 0;
     }
@@ -395,17 +395,21 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
 // ----------------------------------------------------------------------------
 // unit test
 
+static inline long int my_random (void) {
+    return random();
+}
+
 void unittest_generate_random_name(char *dst, size_t size) {
     if(size < 7)
         size = 7;
 
-    size_t len = 5 + random() % (size - 6);
+    size_t len = 5 + my_random() % (size - 6);
 
     for(size_t i = 0; i < len ; i++) {
-        if(random() % 2 == 0)
-            dst[i] = 'A' + random() % 26;
+        if(my_random() % 2 == 0)
+            dst[i] = 'A' + my_random() % 26;
         else
-            dst[i] = 'a' + random() % 26;
+            dst[i] = 'a' + my_random() % 26;
     }
 
     dst[len] = '\0';
@@ -419,9 +423,9 @@ void unittest_generate_message(BUFFER *wb, time_t now_s, size_t counter) {
     time_t point_end_time_s = now_s;
     time_t wall_clock_time_s = now_s;
     size_t chart_slot = counter + 1;
-    size_t dimensions = 2 + random() % 5;
+    size_t dimensions = 2 + my_random() % 5;
     char chart[RRD_ID_LENGTH_MAX + 1] = "name";
-    unittest_generate_random_name(chart, 5 + random() % 30);
+    unittest_generate_random_name(chart, 5 + my_random() % 30);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
@@ -447,10 +451,10 @@ void unittest_generate_message(BUFFER *wb, time_t now_s, size_t counter) {
     for(size_t d = 0; d < dimensions ;d++) {
         size_t dim_slot = d + 1;
         char dim_id[RRD_ID_LENGTH_MAX + 1] = "dimension";
-        unittest_generate_random_name(dim_id, 10 + random() % 20);
-        int64_t last_collected_value = (random() % 2 == 0) ? (int64_t)(counter + d) : (int64_t)random();
-        NETDATA_DOUBLE value = (random() % 2 == 0) ? (NETDATA_DOUBLE)random() / ((NETDATA_DOUBLE)random() + 1) : (NETDATA_DOUBLE)last_collected_value;
-        SN_FLAGS flags = (random() % 1000 == 0) ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
+        unittest_generate_random_name(dim_id, 10 + my_random() % 20);
+        int64_t last_collected_value = (my_random() % 2 == 0) ? (int64_t)(counter + d) : (int64_t)my_random();
+        NETDATA_DOUBLE value = (my_random() % 2 == 0) ? (NETDATA_DOUBLE)my_random() / ((NETDATA_DOUBLE)my_random() + 1) : (NETDATA_DOUBLE)last_collected_value;
+        SN_FLAGS flags = (my_random() % 1000 == 0) ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2, sizeof(PLUGINSD_KEYWORD_SET_V2) - 1);
 

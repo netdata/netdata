@@ -175,11 +175,13 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
     size_t wanted_size = st->pluginsd.size;
 
     if(slot >= 1) {
-        st->pluginsd.with_slots = true;
+        st->pluginsd.dims_with_slots = true;
         wanted_size = slot;
     }
-    else
+    else {
+        st->pluginsd.dims_with_slots = false;
         wanted_size = dictionary_entries(st->rrddim_root_index);
+    }
 
     if(wanted_size > st->pluginsd.size) {
         st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, wanted_size * sizeof(struct pluginsd_rrddim));
@@ -194,7 +196,7 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
         st->pluginsd.size = wanted_size;
     }
 
-    if(st->pluginsd.with_slots) {
+    if(st->pluginsd.dims_with_slots) {
         struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
 
         if(prd->rd != rd) {
@@ -224,7 +226,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     struct pluginsd_rrddim *prd;
     RRDDIM *rd;
 
-    if(likely(st->pluginsd.with_slots)) {
+    if(likely(st->pluginsd.dims_with_slots)) {
         // caching with slots
 
         if(unlikely(slot < 1 || slot > st->pluginsd.size)) {
@@ -276,7 +278,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
                 // the cached one is not good for us
                 rrddim_acquired_release(prd->rda);
                 prd->rda = NULL;
-                prd->rd = rd = NULL;
+                prd->rd = NULL;
                 prd->id = NULL;
             }
         }
@@ -2175,7 +2177,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // ------------------------------------------------------------------------
     // cleanup RRDSET / RRDDIM
 
-    if(likely(st->pluginsd.with_slots)) {
+    if(likely(st->pluginsd.dims_with_slots)) {
         for(size_t i = 0; i < st->pluginsd.size ;i++) {
             RRDDIM *rd = st->pluginsd.prd_array[i].rd;
 
