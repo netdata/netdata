@@ -815,11 +815,11 @@ static void ebpf_update_fd_cgroup()
  * @param fd   the output
  * @param root list of pids
  */
-static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, Pvoid_t JudyLArray, RW_SPINLOCK rw_spinlock)
+static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, Pvoid_t JudyLArray, RW_SPINLOCK *rw_spinlock)
 {
-    rw_spinlock_read_lock(&rw_spinlock);
+    rw_spinlock_read_lock(rw_spinlock);
     if (!JudyLArray) {
-        rw_spinlock_read_unlock(&rw_spinlock);
+        rw_spinlock_read_unlock(rw_spinlock);
         return;
     }
 
@@ -843,7 +843,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, Pvoid_t JudyLArray, RW_SPINL
         }
     }
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
-    rw_spinlock_read_unlock(&rw_spinlock);
+    rw_spinlock_read_unlock(rw_spinlock);
 }
 
 /**

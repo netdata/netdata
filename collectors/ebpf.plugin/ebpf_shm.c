@@ -680,11 +680,11 @@ static void ebpf_shm_read_global_table(netdata_idx_t *stats, int maps_per_core)
 /**
  * Sum values for all targets.
  */
-static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, Pvoid_t JudyLArray, RW_SPINLOCK rw_spinlock)
+static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, Pvoid_t JudyLArray, RW_SPINLOCK *rw_spinlock)
 {
-    rw_spinlock_read_lock(&rw_spinlock);
+    rw_spinlock_read_lock(rw_spinlock);
     if (!JudyLArray) {
-        rw_spinlock_read_unlock(&rw_spinlock);
+        rw_spinlock_read_unlock(rw_spinlock);
         return;
     }
 
@@ -709,7 +709,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, Pvoid_t JudyLAr
     }
 
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
-    rw_spinlock_read_unlock(&rw_spinlock);
+    rw_spinlock_read_unlock(rw_spinlock);
 }
 
 /**
@@ -722,7 +722,7 @@ void ebpf_shm_update_apps_data(struct ebpf_target *root)
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed)) {
-            ebpf_shm_sum_pids(&w->shm, w->pid_list.JudyLArray, w->pid_list.rw_spinlock);
+            ebpf_shm_sum_pids(&w->shm, w->pid_list.JudyLArray, &w->pid_list.rw_spinlock);
         }
     }
 }

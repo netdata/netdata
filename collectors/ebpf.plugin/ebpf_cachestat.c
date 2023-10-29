@@ -946,11 +946,11 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
  *
  * @param publish  output structure.
  */
-void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyLArray, RW_SPINLOCK rw_spinlock)
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyLArray, RW_SPINLOCK *rw_spinlock)
 {
-    rw_spinlock_read_lock(&rw_spinlock);
+    rw_spinlock_read_lock(rw_spinlock);
     if (!JudyLArray) {
-        rw_spinlock_read_unlock(&rw_spinlock);
+        rw_spinlock_read_unlock(rw_spinlock);
         return;
     }
 
@@ -973,7 +973,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, Pvoid_t JudyL
         }
     }
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
-    rw_spinlock_read_unlock(&rw_spinlock);
+    rw_spinlock_read_unlock(rw_spinlock);
 }
 
 /**
@@ -987,7 +987,7 @@ void ebpf_cache_update_apps_data(struct ebpf_target *root)
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed)) {
-            ebpf_cachestat_sum_pids(&w->cachestat, w->pid_list.JudyLArray, w->pid_list.rw_spinlock);
+            ebpf_cachestat_sum_pids(&w->cachestat, w->pid_list.JudyLArray, &w->pid_list.rw_spinlock);
             cachestat_update_publish(&w->cachestat);
         }
     }

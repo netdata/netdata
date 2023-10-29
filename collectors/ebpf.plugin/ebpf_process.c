@@ -172,6 +172,14 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
         if (!w->exposed)
             continue;
 
+        RW_SPINLOCK *rw_spinlock = &w->pid_list.rw_spinlock;
+        Pvoid_t JudyLArray = w->pid_list.JudyLArray;
+        rw_spinlock_read_lock(rw_spinlock);
+        if (!JudyLArray) {
+            rw_spinlock_read_unlock(rw_spinlock);
+            continue;
+        }
+
         memset(&w->process, 0, sizeof(ebpf_process_stat_t));
         rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
         PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
@@ -179,7 +187,7 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
         Pvoid_t *pid_value;
         Word_t local_pid = 0;
         bool first_pid = true;
-        while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        while ((pid_value = JudyLFirstThenNext(JudyLArray, &local_pid, &first_pid))) {
             netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
                                                                                    local_pid,
                                                                                    NULL,
@@ -193,6 +201,7 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
             }
         }
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        rw_spinlock_read_unlock(rw_spinlock);
     }
 }
 
