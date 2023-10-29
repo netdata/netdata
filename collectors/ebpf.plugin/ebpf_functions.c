@@ -2709,26 +2709,19 @@ static void ebpf_fill_shm_function_buffer_unsafe(BUFFER *buf)
 {
     int counter = 0;
 
-    Pvoid_t *pid_value, *shm_value;
+    Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        bool first_shm = true;
-        Word_t local_timestamp = 0;
-        rw_spinlock_read_lock(&pid_ptr->shm_stats.rw_spinlock);
-        if (pid_ptr->shm_stats.JudyLArray) {
-            while ((shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_timestamp, &first_shm))) {
-                netdata_publish_shm_kernel_t *values = (netdata_publish_shm_kernel_t *)*shm_value;
-                ebpf_fill_shm_function_buffer(buf,
-                                              local_pid,
-                                              values,
-                                              pid_ptr->name,
-                                              (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
-            }
+        if (pid_ptr) {
+            ebpf_fill_shm_function_buffer(buf,
+                                          local_pid,
+                                          &pid_ptr->shm,
+                                          pid_ptr->name,
+                                          (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             counter++;
         }
-        rw_spinlock_read_unlock(&pid_ptr->shm_stats.rw_spinlock);
     }
 
     if (!counter) {
@@ -2775,22 +2768,14 @@ static void ebpf_shm_clean_judy_array_unsafe()
     if (!ebpf_judy_pid.index.JudyLArray)
         return;
 
-    Pvoid_t *pid_value, *shm_value;
-    Word_t local_pid = 0, local_shm = 0;
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        rw_spinlock_write_lock(&pid_ptr->shm_stats.rw_spinlock);
-        bool first_shm = true;
-        if (pid_ptr->shm_stats.JudyLArray) {
-            while ((shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_shm, &first_shm))) {
-                netdata_publish_shm_kernel_t *values = (netdata_publish_shm_kernel_t *)*shm_value;
-                ebpf_shm_release(values);
-            }
-            JudyLFreeArray(&pid_ptr->shm_stats.JudyLArray, PJE0);
-            pid_ptr->shm_stats.JudyLArray = NULL;
+        if (pid_ptr) {
+            memset(&pid_ptr->shm, 0, sizeof(netdata_publish_shm_kernel_t));
         }
-        rw_spinlock_write_unlock(&pid_ptr->shm_stats.rw_spinlock);
     }
 }
 

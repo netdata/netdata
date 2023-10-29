@@ -809,9 +809,6 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
         pid_ptr->socket_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->socket_stats.rw_spinlock);
 
-        pid_ptr->shm_stats.JudyLArray = NULL;
-        rw_spinlock_init(&pid_ptr->shm_stats.rw_spinlock);
-
         pid_ptr->swap_stats.JudyLArray = NULL;
         rw_spinlock_init(&pid_ptr->swap_stats.rw_spinlock);
     } else {
