@@ -2822,6 +2822,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         if(!tty)
             fprintf(stdout, "\n");
 
+        if(iteration % 60 == 0)
+            journal_files_registry_update();
+
         fflush(stdout);
 
         time_t now = now_monotonic_sec();
