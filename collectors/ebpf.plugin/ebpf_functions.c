@@ -1201,7 +1201,9 @@ static void ebpf_cachestat_clean_judy_array_unsafe()
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        memset(&pid_ptr->cachestat, 0, sizeof(netdata_publish_cachestat_t));
+        if (pid_ptr) {
+            memset(&pid_ptr->cachestat, 0, sizeof(netdata_publish_cachestat_t));
+        }
     }
 }
 
@@ -1271,7 +1273,7 @@ static void ebpf_cachestat_fill_function_buffer_unsafe(BUFFER *buf)
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
 
-        if (pid_ptr->fd.ct)
+        if (pid_ptr && pid_ptr->fd.ct)
             ebpf_fill_cachestat_function_buffer(buf,
                                                 local_pid,
                                                 &pid_ptr->cachestat,
@@ -1735,7 +1737,7 @@ static void ebpf_fd_fill_function_buffer_unsafe(BUFFER *buf)
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        if (pid_ptr->fd.ct)
+        if (pid_ptr && pid_ptr->fd.ct)
             ebpf_fill_fd_function_buffer(buf,
                                          local_pid,
                                          &pid_ptr->fd,
@@ -1792,7 +1794,9 @@ static void ebpf_fd_clean_judy_array_unsafe()
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        memset(&pid_ptr->fd, 0 , sizeof(netdata_fd_stat_t));
+        if (pid_ptr) {
+            memset(&pid_ptr->fd, 0 , sizeof(netdata_fd_stat_t));
+        }
     }
 }
 
