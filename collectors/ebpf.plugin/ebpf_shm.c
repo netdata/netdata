@@ -549,22 +549,10 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
                                                                                    NULL,
                                                                                    NETDATA_EBPF_MODULE_NAME_SHM);
             if (pid_ptr) {
-                rw_spinlock_read_lock(&pid_ptr->shm_stats.rw_spinlock);
-                if (pid_ptr->shm_stats.JudyLArray) {
-                    Word_t local_timestamp = 0;
-                    bool first_shm = true;
-                    Pvoid_t *shm_value;
-                    while (
-                        (shm_value = JudyLFirstThenNext(
-                            pid_ptr->shm_stats.JudyLArray, &local_timestamp, &first_shm))) {
-                        netdata_publish_shm_kernel_t *values = (netdata_publish_shm_kernel_t *)*shm_value;
-                        out->get += values->get;
-                        out->dt += values->dt;
-                        out->at += values->at;
-                        out->ctl += values->ctl;
-                    }
-                }
-                rw_spinlock_read_unlock(&pid_ptr->shm_stats.rw_spinlock);
+                out->get += pid_ptr->shm.get;
+                out->dt += pid_ptr->shm.dt;
+                out->at += pid_ptr->shm.at;
+                out->ctl += pid_ptr->shm.ctl;
             }
         }
     }
@@ -614,14 +602,8 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
         }
 
         // Get SHM structure
-        rw_spinlock_write_lock(&pid_ptr->shm_stats.rw_spinlock);
-        netdata_publish_shm_kernel_t **shm_pptr = (netdata_publish_shm_kernel_t **)ebpf_judy_insert_unsafe(
-            &pid_ptr->shm_stats.JudyLArray, cv[0].ct);
-        netdata_publish_shm_kernel_t *shm_ptr = *shm_pptr;
-        if (likely(*shm_pptr == NULL)) {
-            *shm_pptr = ebpf_shm_stat_get();
-            shm_ptr = *shm_pptr;
-
+        netdata_publish_shm_kernel_t *shm_ptr = &pid_ptr->shm;
+        if (likely(!pid_ptr->shm.ct)) {
             pid_ptr->current_timestamp = update_time;
             memcpy(shm_ptr, &cv[0], sizeof(netdata_publish_shm_kernel_t));
         } else {
@@ -631,20 +613,10 @@ static void ebpf_read_shm_apps_table(int maps_per_core, uint64_t update_every)
                 memcpy(shm_ptr, &cv[0], sizeof(netdata_publish_shm_kernel_t));
             } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
                 ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
-#ifdef NETDATA_DEV_MODE
-                collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s",
-                               cv->name,
-                               key,
-                               NETDATA_EBPF_MODULE_NAME_CACHESTAT,
-                               pid_ptr->apps_target->name);
-#endif
-                JudyLDel(&pid_ptr->shm_stats.JudyLArray, cv[0].ct, PJE0);
-                ebpf_shm_release(shm_ptr);
                 bpf_map_delete_elem(fd, &key);
             }
         }
 
-        rw_spinlock_write_unlock(&pid_ptr->shm_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // now that we've consumed the value, zero it out in the map.
@@ -729,21 +701,10 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, Pvoid_t JudyLAr
                                                                                NULL,
                                                                                NETDATA_EBPF_MODULE_NAME_SHM);
         if (pid_ptr) {
-            rw_spinlock_read_lock(&pid_ptr->shm_stats.rw_spinlock);
-            if (pid_ptr->shm_stats.JudyLArray) {
-                Word_t local_timestamp = 0;
-                bool first_shm = true;
-                Pvoid_t *shm_value;
-                while (
-                    (shm_value = JudyLFirstThenNext(pid_ptr->shm_stats.JudyLArray, &local_timestamp, &first_shm))) {
-                    netdata_publish_shm_kernel_t *values = (netdata_publish_shm_kernel_t *)*shm_value;
-                    shm->at += values->at;
-                    shm->ctl += values->ctl;
-                    shm->dt += values->dt;
-                    shm->get += values->get;
-                }
-            }
-            rw_spinlock_read_unlock(&pid_ptr->shm_stats.rw_spinlock);
+            shm->at += pid_ptr->shm.at;
+            shm->ctl += pid_ptr->shm.ctl;
+            shm->dt += pid_ptr->shm.dt;
+            shm->get += pid_ptr->shm.get;
         }
     }
 

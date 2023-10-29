@@ -121,6 +121,7 @@ typedef struct netdata_ebpf_judy_pid_stats {
     netdata_publish_cachestat_t cachestat;
     netdata_fd_stat_t fd;
     ebpf_process_stat_plus_t process;
+    netdata_publish_shm_kernel_t shm;
 
     // Index for Socket timestamp
     struct {                            // support for multiple indexing engines
