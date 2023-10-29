@@ -110,7 +110,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| vm.stats.sys.v_intr | Enable or disable device interrupts metric. | yes | False |
+| vm.stats.sys.v_intr | Enable or disable device interrupts metric. | yes | no |
 
 </details>
 

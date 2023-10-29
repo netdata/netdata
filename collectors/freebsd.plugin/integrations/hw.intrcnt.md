@@ -111,7 +111,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| hw.intrcnt | Enable or disable Interrupts metric. | yes | False |
+| hw.intrcnt | Enable or disable Interrupts metric. | yes | no |
 
 </details>
 

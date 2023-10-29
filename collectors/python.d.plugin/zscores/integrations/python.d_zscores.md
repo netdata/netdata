@@ -124,20 +124,20 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| charts_regex | what charts to pull data for - A regex like `system\..*/` or `system\..*/apps.cpu/apps.mem` etc. | system\..* | True |
-| train_secs | length of time (in seconds) to base calculations off for mean and stddev. | 14400 | True |
-| offset_secs | offset (in seconds) preceding latest data to ignore when calculating mean and stddev. | 300 | True |
-| train_every_n | recalculate the mean and stddev every n steps of the collector. | 900 | True |
-| z_smooth_n | smooth the z score (to reduce sensitivity to spikes) by averaging it over last n values. | 15 | True |
-| z_clip | cap absolute value of zscore (before smoothing) for better stability. | 10 | True |
-| z_abs | set z_abs: 'true' to make all zscores be absolute values only. | true | True |
-| burn_in | burn in period in which to initially calculate mean and stddev on every step. | 2 | True |
-| mode | mode can be to get a zscore 'per_dim' or 'per_chart'. | per_chart | True |
-| per_chart_agg | per_chart_agg is how you aggregate from dimension to chart when mode='per_chart'. | mean | True |
-| update_every | Sets the default data collection frequency. | 5 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
+| charts_regex | what charts to pull data for - A regex like `system\..*/` or `system\..*/apps.cpu/apps.mem` etc. | system\..* | yes |
+| train_secs | length of time (in seconds) to base calculations off for mean and stddev. | 14400 | yes |
+| offset_secs | offset (in seconds) preceding latest data to ignore when calculating mean and stddev. | 300 | yes |
+| train_every_n | recalculate the mean and stddev every n steps of the collector. | 900 | yes |
+| z_smooth_n | smooth the z score (to reduce sensitivity to spikes) by averaging it over last n values. | 15 | yes |
+| z_clip | cap absolute value of zscore (before smoothing) for better stability. | 10 | yes |
+| z_abs | set z_abs: 'true' to make all zscores be absolute values only. | true | yes |
+| burn_in | burn in period in which to initially calculate mean and stddev on every step. | 2 | yes |
+| mode | mode can be to get a zscore 'per_dim' or 'per_chart'. | per_chart | yes |
+| per_chart_agg | per_chart_agg is how you aggregate from dimension to chart when mode='per_chart'. | mean | yes |
+| update_every | Sets the default data collection frequency. | 5 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
 
 </details>
 

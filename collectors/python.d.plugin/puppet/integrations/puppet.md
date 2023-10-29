@@ -122,16 +122,16 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| url | HTTP or HTTPS URL, exact Fully Qualified Domain Name of the node should be used. | https://fqdn.example.com:8081 | True |
-| tls_verify | Control HTTPS server certificate verification. | False | False |
-| tls_ca_file | Optional CA (bundle) file to use |  | False |
-| tls_cert_file | Optional client certificate file |  | False |
-| tls_key_file | Optional client key file |  | False |
-| update_every | Sets the default data collection frequency. | 30 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
+| url | HTTP or HTTPS URL, exact Fully Qualified Domain Name of the node should be used. | https://fqdn.example.com:8081 | yes |
+| tls_verify | Control HTTPS server certificate verification. | False | no |
+| tls_ca_file | Optional CA (bundle) file to use |  | no |
+| tls_cert_file | Optional client certificate file |  | no |
+| tls_key_file | Optional client key file |  | no |
+| update_every | Sets the default data collection frequency. | 30 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
 
 </details>
 

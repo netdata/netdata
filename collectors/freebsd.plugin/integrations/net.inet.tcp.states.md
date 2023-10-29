@@ -115,7 +115,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| net.inet.tcp.states | Enable or disable TCP state metric. | yes | False |
+| net.inet.tcp.states | Enable or disable TCP state metric. | yes | no |
 
 </details>
 

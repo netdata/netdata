@@ -152,8 +152,8 @@ You can get the available options running:
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | False |
-| command options | Command options that specify charts shown by plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | True |
+| update every | Data collection frequency. | 1 | no |
+| command options | Command options that specify charts shown by plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | yes |
 
 </details>
 

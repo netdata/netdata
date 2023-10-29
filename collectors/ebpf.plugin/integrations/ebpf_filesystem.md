@@ -146,14 +146,14 @@ This configuration file have two different sections. The `[global]` overwrites d
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 5 | False |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | False |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | False |
-| btrfsdist | Enable or disable latency monitoring for functions associated with btrfs filesystem. | yes | False |
-| ext4dist | Enable or disable latency monitoring for functions associated with ext4 filesystem. | yes | False |
-| nfsdist | Enable or disable latency monitoring for functions associated with nfs filesystem. | yes | False |
-| xfsdist | Enable or disable latency monitoring for functions associated with xfs filesystem. | yes | False |
-| zfsdist | Enable or disable latency monitoring for functions associated with zfs filesystem. | yes | False |
+| update every | Data collection frequency. | 5 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+| btrfsdist | Enable or disable latency monitoring for functions associated with btrfs filesystem. | yes | no |
+| ext4dist | Enable or disable latency monitoring for functions associated with ext4 filesystem. | yes | no |
+| nfsdist | Enable or disable latency monitoring for functions associated with nfs filesystem. | yes | no |
+| xfsdist | Enable or disable latency monitoring for functions associated with xfs filesystem. | yes | no |
+| zfsdist | Enable or disable latency monitoring for functions associated with zfs filesystem. | yes | no |
 
 </details>
 

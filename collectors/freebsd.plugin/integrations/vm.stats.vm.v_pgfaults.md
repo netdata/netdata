@@ -110,7 +110,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| vm.stats.vm.v_pgfaults | Enable or disable Memory page fault metric. | yes | False |
+| vm.stats.vm.v_pgfaults | Enable or disable Memory page fault metric. | yes | no |
 
 </details>
 

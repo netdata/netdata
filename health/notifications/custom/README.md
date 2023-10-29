@@ -51,9 +51,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_CUSTOM | Set `SEND_CUSTOM` to YES | YES | True |
-| DEFAULT_RECIPIENT_CUSTOM | This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function. |  | True |
-| custom_sender() | You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file. |  | False |
+| SEND_CUSTOM | Set `SEND_CUSTOM` to YES | YES | yes |
+| DEFAULT_RECIPIENT_CUSTOM | This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function. |  | yes |
+| custom_sender() | You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file. |  | no |
 
 ##### DEFAULT_RECIPIENT_CUSTOM
 

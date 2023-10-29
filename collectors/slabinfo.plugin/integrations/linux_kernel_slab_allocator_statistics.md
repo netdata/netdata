@@ -121,7 +121,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| Enable plugin | As described above plugin is disabled by default, this option is used to enable plugin. | no | True |
+| Enable plugin | As described above plugin is disabled by default, this option is used to enable plugin. | no | yes |
 
 </details>
 

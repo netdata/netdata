@@ -117,9 +117,9 @@ At least one option ('clock synchronization state', 'time offset') needs to be e
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | False |
-| clock synchronization state | Make chart showing system clock synchronization state. | yes | True |
-| time offset | Make chart showing computed time offset between local system and reference clock | yes | True |
+| update every | Data collection frequency. | 1 | no |
+| clock synchronization state | Make chart showing system clock synchronization state. | yes | yes |
+| time offset | Make chart showing computed time offset between local system and reference clock | yes | yes |
 
 </details>
 

@@ -110,7 +110,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| dev.cpu.temperature | Enable or disable CPU temperature metric. | yes | False |
+| dev.cpu.temperature | Enable or disable CPU temperature metric. | yes | no |
 
 </details>
 

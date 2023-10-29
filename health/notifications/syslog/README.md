@@ -52,9 +52,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SYSLOG_FACILITY | Set `SYSLOG_FACILITY` to the facility used for logging, by default this value is set to `local6`. |  | True |
-| DEFAULT_RECIPIENT_SYSLOG | Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert notifications to be sent to. |  | True |
-| SEND_SYSLOG | Set SEND_SYSLOG to YES, make sure you have everything else configured before turning this on. |  | True |
+| SYSLOG_FACILITY | Set `SYSLOG_FACILITY` to the facility used for logging, by default this value is set to `local6`. |  | yes |
+| DEFAULT_RECIPIENT_SYSLOG | Set `DEFAULT_RECIPIENT_SYSLOG` to the recipient you want the alert notifications to be sent to. |  | yes |
+| SEND_SYSLOG | Set SEND_SYSLOG to YES, make sure you have everything else configured before turning this on. |  | yes |
 
 ##### DEFAULT_RECIPIENT_SYSLOG
 

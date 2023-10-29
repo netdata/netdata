@@ -118,7 +118,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| vm.loadavg | Enable or disable load average metric. | yes | False |
+| vm.loadavg | Enable or disable load average metric. | yes | no |
 
 </details>
 

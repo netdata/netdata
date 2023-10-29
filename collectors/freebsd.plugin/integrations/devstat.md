@@ -134,18 +134,18 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enable new disks detected at runtime | Enable or disable possibility to detect new disks. | auto | False |
-| performance metrics for pass devices | Enable or disable metrics for disks with type `PASS`. | auto | False |
-| total bandwidth for all disks | Enable or disable total bandwidth metric for all disks. | yes | False |
-| bandwidth for all disks | Enable or disable bandwidth for all disks metric. | auto | False |
-| operations for all disks | Enable or disable operations for all disks metric. | auto | False |
-| queued operations for all disks | Enable or disable queued operations for all disks  metric. | auto | False |
-| utilization percentage for all disks | Enable or disable utilization percentage for all disks metric. | auto | False |
-| i/o time for all disks | Enable or disable I/O time for all disks metric. | auto | False |
-| average completed i/o time for all disks | Enable or disable average completed I/O time for all disks metric. | auto | False |
-| average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. | auto | False |
-| average service time for all disks | Enable or disable average service time for all disks metric. | auto | False |
-| disable by default disks matching | Do not create charts for disks listed. |  | False |
+| enable new disks detected at runtime | Enable or disable possibility to detect new disks. | auto | no |
+| performance metrics for pass devices | Enable or disable metrics for disks with type `PASS`. | auto | no |
+| total bandwidth for all disks | Enable or disable total bandwidth metric for all disks. | yes | no |
+| bandwidth for all disks | Enable or disable bandwidth for all disks metric. | auto | no |
+| operations for all disks | Enable or disable operations for all disks metric. | auto | no |
+| queued operations for all disks | Enable or disable queued operations for all disks  metric. | auto | no |
+| utilization percentage for all disks | Enable or disable utilization percentage for all disks metric. | auto | no |
+| i/o time for all disks | Enable or disable I/O time for all disks metric. | auto | no |
+| average completed i/o time for all disks | Enable or disable average completed I/O time for all disks metric. | auto | no |
+| average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. | auto | no |
+| average service time for all disks | Enable or disable average service time for all disks metric. | auto | no |
+| disable by default disks matching | Do not create charts for disks listed. |  | no |
 
 </details>
 

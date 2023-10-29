@@ -122,14 +122,14 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. | 1 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
-| host | The host's IP to connect to. | localhost | True |
-| port | The port the remote console is listening on. | 25575 | True |
-| password | Remote console password if any. |  | False |
+| update_every | Sets the default data collection frequency. | 1 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
+| host | The host's IP to connect to. | localhost | yes |
+| port | The port the remote console is listening on. | 25575 | yes |
+| password | Remote console password if any. |  | no |
 
 </details>
 

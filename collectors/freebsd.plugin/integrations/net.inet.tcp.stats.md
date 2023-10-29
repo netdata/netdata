@@ -125,14 +125,14 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| ipv4 TCP packets | Enable or disable ipv4 TCP packets metric. | yes | False |
-| ipv4 TCP errors | Enable or disable pv4 TCP errors metric. | yes | False |
-| ipv4 TCP handshake issues | Enable or disable ipv4 TCP handshake issue metric. | yes | False |
-| TCP connection aborts | Enable or disable TCP connection aborts metric. | auto | False |
-| TCP out-of-order queue | Enable or disable TCP out-of-order queue metric. | auto | False |
-| TCP SYN cookies | Enable or disable TCP SYN cookies metric. | auto | False |
-| TCP listen issues | Enable or disable TCP listen issues metric. | auto | False |
-| ECN packets | Enable or disable ECN packets metric. | auto | False |
+| ipv4 TCP packets | Enable or disable ipv4 TCP packets metric. | yes | no |
+| ipv4 TCP errors | Enable or disable pv4 TCP errors metric. | yes | no |
+| ipv4 TCP handshake issues | Enable or disable ipv4 TCP handshake issue metric. | yes | no |
+| TCP connection aborts | Enable or disable TCP connection aborts metric. | auto | no |
+| TCP out-of-order queue | Enable or disable TCP out-of-order queue metric. | auto | no |
+| TCP SYN cookies | Enable or disable TCP SYN cookies metric. | auto | no |
+| TCP listen issues | Enable or disable TCP listen issues metric. | auto | no |
+| ECN packets | Enable or disable ECN packets metric. | auto | no |
 
 </details>
 

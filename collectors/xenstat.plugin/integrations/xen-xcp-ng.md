@@ -166,7 +166,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | False |
+| update every | Data collection frequency. | 1 | no |
 
 </details>
 

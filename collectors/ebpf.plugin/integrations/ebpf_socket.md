@@ -177,18 +177,18 @@ All options are defined inside section `[global]`. Options inside `network conne
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 5 | False |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | False |
-| apps | Enable or disable integration with apps.plugin | no | False |
-| cgroups | Enable or disable integration with cgroup.plugin | no | False |
-| bandwidth table size | Number of elements stored inside hash tables used to monitor calls per PID. | 16384 | False |
-| ipv4 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV4 connections. | 16384 | False |
-| ipv6 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV6 connections. | 16384 | False |
-| udp connection table size | Number of temporary elements stored inside hash tables used to monitor UDP connections. | 4096 | False |
-| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | False |
-| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | False |
-| maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | False |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | False |
+| update every | Data collection frequency. | 5 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| apps | Enable or disable integration with apps.plugin | no | no |
+| cgroups | Enable or disable integration with cgroup.plugin | no | no |
+| bandwidth table size | Number of elements stored inside hash tables used to monitor calls per PID. | 16384 | no |
+| ipv4 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV4 connections. | 16384 | no |
+| ipv6 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV6 connections. | 16384 | no |
+| udp connection table size | Number of temporary elements stored inside hash tables used to monitor UDP connections. | 4096 | no |
+| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
+| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
+| maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
 
 </details>
 

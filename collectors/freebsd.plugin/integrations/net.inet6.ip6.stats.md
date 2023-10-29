@@ -113,10 +113,10 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| ipv6 packets | Enable or disable ipv6 packet metric. | auto | False |
-| ipv6 fragments sent | Enable or disable ipv6 fragments sent metric. | auto | False |
-| ipv6 fragments assembly | Enable or disable ipv6 fragments assembly metric. | auto | False |
-| ipv6 errors | Enable or disable ipv6 errors metric. | auto | False |
+| ipv6 packets | Enable or disable ipv6 packet metric. | auto | no |
+| ipv6 fragments sent | Enable or disable ipv6 fragments sent metric. | auto | no |
+| ipv6 fragments assembly | Enable or disable ipv6 fragments assembly metric. | auto | no |
+| ipv6 errors | Enable or disable ipv6 errors metric. | auto | no |
 
 </details>
 

@@ -171,30 +171,30 @@ To display a help message listing the available command line options:
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SECONDS | Data collection frequency. |  | False |
-| debug | Enable verbose output. | disabled | False |
-| no-sel | Disable System Event Log (SEL) collection. | disabled | False |
-| reread-sdr-cache | Re-read SDR cache on every iteration. | disabled | False |
-| interpret-oem-data | Attempt to parse OEM data. | disabled | False |
-| assume-system-event-record | treat illegal SEL events records as normal. | disabled | False |
-| ignore-non-interpretable-sensors | Do not read sensors that cannot be interpreted. | disabled | False |
-| bridge-sensors | Bridge sensors not owned by the BMC. | disabled | False |
-| shared-sensors | Enable shared sensors if found. | disabled | False |
-| no-discrete-reading | Do not read sensors if their event/reading type code is invalid. | enabled | False |
-| ignore-scanning-disabled | Ignore the scanning bit and read sensors no matter what. | disabled | False |
-| assume-bmc-owner | Assume the BMC is the sensor owner no matter what (usually bridging is required too). | disabled | False |
-| hostname HOST | Remote IPMI hostname or IP address. | local | False |
-| username USER | Username that will be used when connecting to the remote host. |  | False |
-| password PASS | Password that will be used when connecting to the remote host. |  | False |
-| noauthcodecheck / no-auth-code-check | Don't check the authentication codes returned. |  | False |
-| driver-type IPMIDRIVER | Specify the driver type to use instead of doing an auto selection. The currently available outofband drivers are LAN and LAN_2_0, which  perform  IPMI  1.5  and  IPMI  2.0 respectively. The currently available inband drivers are KCS, SSIF, OPENIPMI and SUNBMC. |  | False |
-| sdr-cache-dir PATH | SDR cache files directory. | /tmp | False |
-| sensor-config-file FILE | Sensors configuration filename. | system default | False |
-| sel-config-file FILE | SEL configuration filename. | system default | False |
-| ignore N1,N2,N3,... | Sensor IDs to ignore. |  | False |
-| ignore-status N1,N2,N3,... | Sensor IDs to ignore status (nominal/warning/critical). |  | False |
-| -v | Print version and exit. |  | False |
-| --help | Print usage message and exit. |  | False |
+| SECONDS | Data collection frequency. |  | no |
+| debug | Enable verbose output. | disabled | no |
+| no-sel | Disable System Event Log (SEL) collection. | disabled | no |
+| reread-sdr-cache | Re-read SDR cache on every iteration. | disabled | no |
+| interpret-oem-data | Attempt to parse OEM data. | disabled | no |
+| assume-system-event-record | treat illegal SEL events records as normal. | disabled | no |
+| ignore-non-interpretable-sensors | Do not read sensors that cannot be interpreted. | disabled | no |
+| bridge-sensors | Bridge sensors not owned by the BMC. | disabled | no |
+| shared-sensors | Enable shared sensors if found. | disabled | no |
+| no-discrete-reading | Do not read sensors if their event/reading type code is invalid. | enabled | no |
+| ignore-scanning-disabled | Ignore the scanning bit and read sensors no matter what. | disabled | no |
+| assume-bmc-owner | Assume the BMC is the sensor owner no matter what (usually bridging is required too). | disabled | no |
+| hostname HOST | Remote IPMI hostname or IP address. | local | no |
+| username USER | Username that will be used when connecting to the remote host. |  | no |
+| password PASS | Password that will be used when connecting to the remote host. |  | no |
+| noauthcodecheck / no-auth-code-check | Don't check the authentication codes returned. |  | no |
+| driver-type IPMIDRIVER | Specify the driver type to use instead of doing an auto selection. The currently available outofband drivers are LAN and LAN_2_0, which  perform  IPMI  1.5  and  IPMI  2.0 respectively. The currently available inband drivers are KCS, SSIF, OPENIPMI and SUNBMC. |  | no |
+| sdr-cache-dir PATH | SDR cache files directory. | /tmp | no |
+| sensor-config-file FILE | Sensors configuration filename. | system default | no |
+| sel-config-file FILE | SEL configuration filename. | system default | no |
+| ignore N1,N2,N3,... | Sensor IDs to ignore. |  | no |
+| ignore-status N1,N2,N3,... | Sensor IDs to ignore status (nominal/warning/critical). |  | no |
+| -v | Print version and exit. |  | no |
+| --help | Print usage message and exit. |  | no |
 
 </details>
 

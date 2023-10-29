@@ -130,8 +130,8 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | False |
-| command options | Additional parameters for the collector |  | False |
+| update every | Data collection frequency. | 1 | no |
+| command options | Additional parameters for the collector |  | no |
 
 </details>
 

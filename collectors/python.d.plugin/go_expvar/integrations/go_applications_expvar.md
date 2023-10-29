@@ -196,16 +196,16 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| update_every | Sets the default data collection frequency. | 5 | False |
-| priority | Controls the order of charts at the netdata dashboard. | 60000 | False |
-| autodetection_retry | Sets the job re-check interval in seconds. | 0 | False |
-| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | False |
-| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | False |
-| url | the URL and port of the expvar endpoint. Please include the whole path of the endpoint, as the expvar handler can be installed in a non-standard location. |  | True |
-| user | If the URL is password protected, this is the username to use. |  | False |
-| pass | If the URL is password protected, this is the password to use. |  | False |
-| collect_memstats | Enables charts for Go runtime's memory statistics. |  | False |
-| extra_charts | Defines extra data/charts to monitor, please see the example below. |  | False |
+| update_every | Sets the default data collection frequency. | 5 | no |
+| priority | Controls the order of charts at the netdata dashboard. | 60000 | no |
+| autodetection_retry | Sets the job re-check interval in seconds. | 0 | no |
+| penalty | Indicates whether to apply penalty to update_every in case of failures. | yes | no |
+| name | Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works. |  | no |
+| url | the URL and port of the expvar endpoint. Please include the whole path of the endpoint, as the expvar handler can be installed in a non-standard location. |  | yes |
+| user | If the URL is password protected, this is the username to use. |  | no |
+| pass | If the URL is password protected, this is the password to use. |  | no |
+| collect_memstats | Enables charts for Go runtime's memory statistics. |  | no |
+| extra_charts | Defines extra data/charts to monitor, please see the example below. |  | no |
 
 </details>
 

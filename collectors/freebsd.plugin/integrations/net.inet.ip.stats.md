@@ -113,10 +113,10 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| ipv4 packets | Enable or disable IPv4 packets metric. | yes | False |
-| ipv4 fragments sent | Enable or disable IPv4 fragments sent metric. | yes | False |
-| ipv4 fragments assembly | Enable or disable IPv4 fragments assembly metric. | yes | False |
-| ipv4 errors | Enable or disable IPv4 errors metric. | yes | False |
+| ipv4 packets | Enable or disable IPv4 packets metric. | yes | no |
+| ipv4 fragments sent | Enable or disable IPv4 fragments sent metric. | yes | no |
+| ipv4 fragments assembly | Enable or disable IPv4 fragments assembly metric. | yes | no |
+| ipv4 errors | Enable or disable IPv4 errors metric. | yes | no |
 
 </details>
 

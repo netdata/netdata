@@ -112,7 +112,7 @@ sudo ./edit-config netdata.conf
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| kern.ipc.msq | Enable or disable IPC message queue metric. | yes | False |
+| kern.ipc.msq | Enable or disable IPC message queue metric. | yes | no |
 
 </details>
 

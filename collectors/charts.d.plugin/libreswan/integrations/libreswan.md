@@ -133,10 +133,10 @@ The following collapsed table contains all the options that can be configured fo
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| libreswan_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | False |
-| libreswan_priority | The charts priority on the dashboard | 90000 | False |
-| libreswan_retries | The number of retries to do in case of failure before disabling the collector. | 10 | False |
-| libreswan_sudo | Whether to run `ipsec` with `sudo` or not. | 1 | False |
+| libreswan_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 1 | no |
+| libreswan_priority | The charts priority on the dashboard | 90000 | no |
+| libreswan_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
+| libreswan_sudo | Whether to run `ipsec` with `sudo` or not. | 1 | no |
 
 </details>
 
