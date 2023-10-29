@@ -1040,8 +1040,6 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     lfe_start_nolock(src, label, ls)
     {
         RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label);
-        if (old_label_with_key)
-                continue;
 
         Pvoid_t *PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
