@@ -185,24 +185,11 @@ void ebpf_process_sum_values_for_pids(struct ebpf_target *root)
                                                                                    NULL,
                                                                                    NETDATA_EBPF_MODULE_NAME_CACHESTAT);
             if (pid_ptr) {
-                rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
-                if (pid_ptr->process_stats.JudyLArray) {
-                    Word_t local_timestamp = 0;
-                    bool first_process = true;
-                    Pvoid_t *process_value;
-                    while (
-                        (process_value =
-                             JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_timestamp, &first_process))) {
-                        ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
-
-                        w->process.release_call += values->data.release_call;
-                        w->process.task_err += values->data.task_err;
-                        w->process.create_thread += values->data.create_thread;
-                        w->process.create_process += values->data.create_process;
-                        w->process.exit_call += values->data.exit_call;
-                    }
-                }
-                rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
+                w->process.release_call += pid_ptr->process.data.release_call;
+                w->process.task_err += pid_ptr->process.data.task_err;
+                w->process.create_thread += pid_ptr->process.data.create_thread;
+                w->process.create_process += pid_ptr->process.data.create_process;
+                w->process.exit_call += pid_ptr->process.data.exit_call;
             }
         }
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
@@ -344,24 +331,11 @@ static void ebpf_update_process_cgroup()
                                                                                    NULL,
                                                                                    NETDATA_EBPF_MODULE_NAME_PROCESS);
             if (pid_ptr) {
-                rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
-                if (pid_ptr->process_stats.JudyLArray) {
-                    Word_t local_timestamp = 0;
-                    bool first_process = true;
-                    Pvoid_t *process_value;
-                    while (
-                        (process_value =
-                             JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_timestamp, &first_process))) {
-                        ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
-
-                        out->exit_call += values->data.exit_call;
-                        out->create_process += values->data.create_process;
-                        out->create_thread += values->data.create_thread;
-                        out->task_err += values->data.task_err;
-                        out->release_call += values->data.release_call;
-                    }
-                }
-                rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
+                out->exit_call += pid_ptr->process.data.exit_call;
+                out->create_process += pid_ptr->process.data.create_process;
+                out->create_thread += pid_ptr->process.data.create_thread;
+                out->task_err += pid_ptr->process.data.task_err;
+                out->release_call += pid_ptr->process.data.release_call;
             }
         }
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
@@ -414,14 +388,8 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
         pid_ptr->tgid = psv[0].tgid;
 
         // Get Process structure
-        rw_spinlock_write_lock(&pid_ptr->process_stats.rw_spinlock);
-        ebpf_process_stat_plus_t **ps_pptr = (ebpf_process_stat_plus_t **)ebpf_judy_insert_unsafe(
-            &pid_ptr->process_stats.JudyLArray, psv[0].ct);
-        ebpf_process_stat_plus_t *ps_ptr = *ps_pptr;
-        if (likely(*ps_pptr == NULL)) {
-            *ps_pptr = ebpf_process_stat_get();
-            ps_ptr = *ps_pptr;
-
+        ebpf_process_stat_plus_t *ps_ptr = &pid_ptr->process;
+        if (likely(!ps_ptr->data.ct)) {
             pid_ptr->current_timestamp = update_time;
             memcpy(&ps_ptr->data, &psv[0], sizeof(ebpf_process_stat_t));
         }  else {
@@ -433,15 +401,6 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
                 if ((update_time - pid_ptr->current_timestamp) > update_every &&
                      ps_ptr->publish & NETDATA_EBPF_PROCESS_PUBLISHED) {
                     ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
-#ifdef NETDATA_DEV_MODE
-                    collector_info("Remove APPS: Removing process %s with PID %u from module %s to target %s",
-                                   psv->name,
-                                   key,
-                                   NETDATA_EBPF_MODULE_NAME_CACHESTAT,
-                                   pid_ptr->apps_target->name);
-#endif
-                    JudyLDel(&pid_ptr->process_stats.JudyLArray, psv[0].ct, PJE0);
-                    ebpf_process_stat_release(ps_ptr);
                     bpf_map_delete_elem(fd, &key);
                 } else { // This else is here, to be sure that we still clean data independent of apps and functions
                     ps_ptr->publish = NETDATA_EBPF_PROCESS_PUBLISHED;
@@ -449,7 +408,6 @@ static void ebpf_read_process_apps_table(int maps_per_core, uint64_t update_ever
             }
         }
 
-        rw_spinlock_write_unlock(&pid_ptr->process_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
 end_process_loop:
@@ -478,7 +436,8 @@ void *ebpf_read_process_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
+    uint64_t remove_time = update_every * 5;
+    ebpf_read_process_apps_table(maps_per_core, remove_time);
 
     int counter = update_every - 1;
 
@@ -490,7 +449,7 @@ void *ebpf_read_process_thread(void *ptr)
         if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
-        ebpf_read_process_apps_table(maps_per_core, (uint64_t)update_every);
+        ebpf_read_process_apps_table(maps_per_core, remove_time);
 
         counter = 0;
     }

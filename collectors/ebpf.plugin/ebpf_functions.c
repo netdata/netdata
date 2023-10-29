@@ -2207,26 +2207,19 @@ static void ebpf_fill_process_function_buffer_unsafe(BUFFER *buf)
 {
     int counter = 0;
 
-    Pvoid_t *pid_value, *process_value;
+    Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        bool first_process = true;
-        Word_t local_timestamp = 0;
-        rw_spinlock_read_lock(&pid_ptr->process_stats.rw_spinlock);
-        if (pid_ptr->process_stats.JudyLArray) {
-            while ((process_value = JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_timestamp, &first_process))) {
-                ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
-                ebpf_fill_process_function_buffer(buf,
-                                                  local_pid,
-                                                  values,
-                                                  pid_ptr->name,
-                                                  (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
-            }
+        if (pid_ptr) {
+            ebpf_fill_process_function_buffer(buf,
+                                              local_pid,
+                                              &pid_ptr->process,
+                                              pid_ptr->name,
+                                              (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             counter++;
         }
-        rw_spinlock_read_unlock(&pid_ptr->process_stats.rw_spinlock);
     }
 
     if (!counter) {
@@ -2273,22 +2266,14 @@ static void ebpf_process_clean_judy_array_unsafe()
     if (!ebpf_judy_pid.index.JudyLArray)
         return;
 
-    Pvoid_t *pid_value, *process_value;
-    Word_t local_pid = 0, local_process = 0;
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        rw_spinlock_write_lock(&pid_ptr->process_stats.rw_spinlock);
-        bool first_process = true;
-        if (pid_ptr->process_stats.JudyLArray) {
-            while ((process_value = JudyLFirstThenNext(pid_ptr->process_stats.JudyLArray, &local_process, &first_process))) {
-                ebpf_process_stat_plus_t *values = (ebpf_process_stat_plus_t *)*process_value;
-                ebpf_process_stat_release(values);
-            }
-            JudyLFreeArray(&pid_ptr->process_stats.JudyLArray, PJE0);
-            pid_ptr->process_stats.JudyLArray = NULL;
+        if (pid_ptr) {
+            memset(&pid_ptr->process, 0, sizeof(ebpf_process_stat_plus_t));
         }
-        rw_spinlock_write_unlock(&pid_ptr->process_stats.rw_spinlock);
     }
 }
 
