@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- fix missing labels from parents [\#16296](https://github.com/netdata/netdata/pull/16296) ([ktsaou](https://github.com/ktsaou))
+- do not propagate upstream internal label sources [\#16295](https://github.com/netdata/netdata/pull/16295) ([ktsaou](https://github.com/ktsaou))
+- fix various issues identified by coverity [\#16294](https://github.com/netdata/netdata/pull/16294) ([ktsaou](https://github.com/ktsaou))
+- fix missing labels from parents [\#16293](https://github.com/netdata/netdata/pull/16293) ([ktsaou](https://github.com/ktsaou))
+- fix renames in freebsd [\#16292](https://github.com/netdata/netdata/pull/16292) ([ktsaou](https://github.com/ktsaou))
+- fix retention loading [\#16290](https://github.com/netdata/netdata/pull/16290) ([ktsaou](https://github.com/ktsaou))
+- integrations: yes/no instead of True/False in tables [\#16289](https://github.com/netdata/netdata/pull/16289) ([ilyam8](https://github.com/ilyam8))
 - Brotli streaming compression [\#16287](https://github.com/netdata/netdata/pull/16287) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16284](https://github.com/netdata/netdata/pull/16284) ([netdatabot](https://github.com/netdatabot))
 - Small optimization of alert queries [\#16282](https://github.com/netdata/netdata/pull/16282) ([MrZammler](https://github.com/MrZammler))
@@ -421,13 +428,6 @@
 - Update metadata.yaml [\#15688](https://github.com/netdata/netdata/pull/15688) ([sashwathn](https://github.com/sashwathn))
 - Update deploy.yaml [\#15687](https://github.com/netdata/netdata/pull/15687) ([sashwathn](https://github.com/sashwathn))
 - Update categories.yaml [\#15686](https://github.com/netdata/netdata/pull/15686) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15685](https://github.com/netdata/netdata/pull/15685) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15684](https://github.com/netdata/netdata/pull/15684) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15683](https://github.com/netdata/netdata/pull/15683) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15682](https://github.com/netdata/netdata/pull/15682) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15681](https://github.com/netdata/netdata/pull/15681) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15680](https://github.com/netdata/netdata/pull/15680) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15679](https://github.com/netdata/netdata/pull/15679) ([shyamvalsan](https://github.com/shyamvalsan))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
