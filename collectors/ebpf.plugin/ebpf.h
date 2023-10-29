@@ -122,18 +122,13 @@ typedef struct netdata_ebpf_judy_pid_stats {
     netdata_fd_stat_t fd;
     ebpf_process_stat_plus_t process;
     netdata_publish_shm_kernel_t shm;
+    netdata_publish_swap_t swap;
 
     // Index for Socket timestamp
     struct {                            // support for multiple indexing engines
         Pvoid_t JudyLArray;            // the hash table
         RW_SPINLOCK rw_spinlock;        // protect the index
     } socket_stats;
-
-    // Index for swap timestamp
-    struct {                            // support for multiple indexing engines
-        Pvoid_t JudyLArray;             // the hash table
-        RW_SPINLOCK rw_spinlock;        // protect the index
-    } swap_stats;
 } netdata_ebpf_judy_pid_stats_t;
 
 extern ebpf_module_t ebpf_modules[];

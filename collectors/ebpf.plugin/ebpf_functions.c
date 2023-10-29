@@ -3121,22 +3121,14 @@ static void ebpf_swap_clean_judy_array_unsafe()
     if (!ebpf_judy_pid.index.JudyLArray)
         return;
 
-    Pvoid_t *pid_value, *swap_value;
-    Word_t local_pid = 0, local_swap = 0;
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        rw_spinlock_write_lock(&pid_ptr->swap_stats.rw_spinlock);
-        bool first_swap = true;
-        if (pid_ptr->swap_stats.JudyLArray) {
-            while ((swap_value = JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_swap, &first_swap))) {
-                netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
-                ebpf_swap_release(values);
-            }
-            JudyLFreeArray(&pid_ptr->swap_stats.JudyLArray, PJE0);
-            pid_ptr->swap_stats.JudyLArray = NULL;
+        if (pid_ptr) {
+            memset(&pid_ptr->swap, 0, sizeof(netdata_publish_swap_t));
         }
-        rw_spinlock_write_unlock(&pid_ptr->swap_stats.rw_spinlock);
     }
 }
 
@@ -3194,26 +3186,19 @@ static void ebpf_fill_swap_function_buffer_unsafe(BUFFER *buf)
 {
     int counter = 0;
 
-    Pvoid_t *pid_value, *swap_value;
+    Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
-        bool first_swap = true;
-        Word_t local_timestamp = 0;
-        rw_spinlock_read_lock(&pid_ptr->swap_stats.rw_spinlock);
-        if (pid_ptr->swap_stats.JudyLArray) {
-            while ((swap_value = JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_timestamp, &first_swap))) {
-                netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
-                ebpf_fill_swap_function_buffer(buf,
-                                               local_pid,
-                                               &values->data,
-                                               pid_ptr->name,
-                                               (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
-            }
+        if (pid_ptr) {
+            ebpf_fill_swap_function_buffer(buf,
+                                           local_pid,
+                                           &pid_ptr->swap.data,
+                                           pid_ptr->name,
+                                           (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             counter++;
         }
-        rw_spinlock_read_unlock(&pid_ptr->swap_stats.rw_spinlock);
     }
 
     if (!counter) {

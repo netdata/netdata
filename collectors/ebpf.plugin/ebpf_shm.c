@@ -695,7 +695,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_kernel_t *shm, Pvoid_t JudyLAr
     Pvoid_t *pid_value;
     Word_t local_pid = 0;
     bool first_pid = true;
-    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+    while ((pid_value = JudyLFirstThenNext(JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
                                                                                local_pid,
                                                                                NULL,

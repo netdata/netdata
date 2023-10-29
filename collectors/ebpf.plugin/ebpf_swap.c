@@ -426,20 +426,8 @@ static void ebpf_update_swap_cgroup()
                                                                                    NULL,
                                                                                    NETDATA_EBPF_MODULE_NAME_SWAP);
             if (pid_ptr) {
-                rw_spinlock_read_lock(&pid_ptr->swap_stats.rw_spinlock);
-                if (pid_ptr->swap_stats.JudyLArray) {
-                    Word_t local_timestamp = 0;
-                    bool first_swap = true;
-                    Pvoid_t *swap_value;
-                    while (
-                        (swap_value =
-                             JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_timestamp, &first_swap))) {
-                        netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
-                        out->data.read += values->data.read;
-                        out->data.write += values->data.write;
-                    }
-                }
-                rw_spinlock_read_unlock(&pid_ptr->swap_stats.rw_spinlock);
+                out->data.read += pid_ptr->swap.data.read;
+                out->data.write += pid_ptr->swap.data.write;
             }
         }
         rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
@@ -488,14 +476,8 @@ static void read_swap_apps_table(int maps_per_core, uint64_t update_every)
         }
 
         // Get SWAP structure
-        rw_spinlock_write_lock(&pid_ptr->swap_stats.rw_spinlock);
-        netdata_publish_swap_t **swap_pptr = (netdata_publish_swap_t **)ebpf_judy_insert_unsafe(
-            &pid_ptr->swap_stats.JudyLArray, sv[0].ct);
-        netdata_publish_swap_t *swap_ptr = *swap_pptr;
-        if (likely(*swap_pptr == NULL)) {
-            *swap_pptr = ebpf_publish_swap_get();
-            swap_ptr = *swap_pptr;
-
+        netdata_publish_swap_t *swap_ptr = &pid_ptr->swap;
+        if (likely(!pid_ptr->swap.data.ct)) {
             pid_ptr->current_timestamp = update_time;
             memcpy(&swap_ptr->data, &sv[0], sizeof(netdata_publish_swap_kernel_t));
         }  else {
@@ -503,13 +485,11 @@ static void read_swap_apps_table(int maps_per_core, uint64_t update_every)
                 pid_ptr->current_timestamp = update_time;
                 memcpy(&swap_ptr->data, &sv[0], sizeof(netdata_publish_swap_kernel_t));
             } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
-                JudyLDel(&pid_ptr->swap_stats.JudyLArray, sv[0].ct, PJE0);
-                ebpf_swap_release(swap_ptr);
+                ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
                 bpf_map_delete_elem(fd, &key);
             }
         }
 
-        rw_spinlock_write_unlock(&pid_ptr->swap_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // We are cleaning to avoid passing data read from one process to other.
@@ -566,40 +546,35 @@ static void ebpf_swap_read_global_table(netdata_idx_t *stats, int maps_per_core)
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_target *root)
+static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap,
+                               Pvoid_t JudyLArray,
+                               RW_SPINLOCK *rw_spinlock)
 {
-    if (!root)
+    rw_spinlock_read_lock(rw_spinlock);
+    if (!JudyLArray) {
+        rw_spinlock_read_unlock(rw_spinlock);
         return;
+    }
 
-    memset(swap, 0, sizeof(netdata_publish_swap_t));
+    memset(&swap->data, 0, sizeof(netdata_publish_swap_kernel_t));
     rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
     PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
-    while (root) {
-        int32_t pid = root->pid;
-        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
-                                                                               pid,
-                                                                               NULL,
-                                                                               NETDATA_EBPF_MODULE_NAME_SWAP);
-        if (pid_ptr) {
-            rw_spinlock_read_lock(&pid_ptr->swap_stats.rw_spinlock);
-            if (pid_ptr->swap_stats.JudyLArray) {
-                Word_t local_timestamp = 0;
-                bool first_swap = true;
-                Pvoid_t *swap_value;
-                while (
-                    (swap_value =
-                         JudyLFirstThenNext(pid_ptr->swap_stats.JudyLArray, &local_timestamp, &first_swap))) {
-                    netdata_publish_swap_t *values = (netdata_publish_swap_t *)*swap_value;
-                    swap->data.read += values->data.read;
-                    swap->data.write += values->data.write;
-                }
-            }
-            rw_spinlock_read_unlock(&pid_ptr->swap_stats.rw_spinlock);
-        }
 
-        root = root->next;
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               local_pid,
+                                                                               NULL,
+                                                                               NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        if (pid_ptr) {
+            swap->data.read += pid_ptr->swap.data.read;
+            swap->data.write += pid_ptr->swap.data.write;
+        }
     }
     rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_read_unlock(rw_spinlock);
 }
 
 /**
@@ -613,7 +588,7 @@ void ebpf_swap_update_apps_data(struct ebpf_target *root)
 
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
-            ebpf_swap_sum_pids(&w->swap, w->root_pid);
+            ebpf_swap_sum_pids(&w->swap, w->pid_list.JudyLArray, &w->pid_list.rw_spinlock);
         }
     }
 }
@@ -821,7 +796,8 @@ void *ebpf_read_swap_thread(void *ptr)
 
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    read_swap_apps_table(maps_per_core, (uint64_t)update_every);
+    uint64_t remove_time = update_every * 5;
+    read_swap_apps_table(maps_per_core, remove_time);
 
     int counter = update_every - 1;
 
@@ -833,7 +809,7 @@ void *ebpf_read_swap_thread(void *ptr)
         if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
-        read_swap_apps_table(maps_per_core, (uint64_t)update_every);
+        read_swap_apps_table(maps_per_core, remove_time);
 
         counter = 0;
     }
