@@ -1040,8 +1040,6 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     lfe_start_nolock(src, label, ls)
     {
         RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label);
-        if (old_label_with_key)
-                continue;
 
         Pvoid_t *PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
@@ -1486,6 +1484,36 @@ int rrdlabels_unittest_double_check() {
     return errors;
 }
 
+static int rrdlabels_walkthrough_index_read(RRDLABELS *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, size_t index, void *data), void *data)
+{
+    int ret = 0;
+
+    if(unlikely(!labels || !callback)) return 0;
+
+    RRDLABEL *lb;
+    RRDLABEL_SRC ls;
+    size_t index = 0;
+    lfe_start_read(labels, lb, ls)
+    {
+        ret = callback(string2str(lb->index.key), string2str(lb->index.value), ls, index, data);
+        if (ret < 0)
+            break;
+        index++;
+    }
+    lfe_done(labels);
+
+    return ret;
+}
+
+static int unittest_dump_labels(const char *name, const char *value, RRDLABEL_SRC ls, size_t index, void *data __maybe_unused)
+{
+    if (!index && data) {
+        fprintf(stderr, "%s\n", (char *) data);
+    }
+    fprintf(stderr, "LABEL \"%s\" = %d \"%s\"\n", name, ls & (~RRDLABEL_FLAG_INTERNAL), value);
+    return 1;
+}
+
 int rrdlabels_unittest_migrate_check() {
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
 
@@ -1520,26 +1548,35 @@ int rrdlabels_unittest_migrate_check() {
     labels2 = rrdlabels_create();
 
     rrdlabels_add(labels1, "key1", "value1", RRDLABEL_SRC_CONFIG);
-    rrdlabels_add(labels1, "key2", "value1", RRDLABEL_SRC_CONFIG);
-    rrdlabels_add(labels1, "key3", "value1", RRDLABEL_SRC_CONFIG);
-    rrdlabels_add(labels1, "key4", "value1", RRDLABEL_SRC_CONFIG);  // 4 keys
+    rrdlabels_add(labels1, "key2", "value2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels1, "key3", "value3", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels1, "key4", "value4", RRDLABEL_SRC_CONFIG);  // 4 keys
+    rrdlabels_walkthrough_index_read(labels1, unittest_dump_labels, "\nlabels1");
 
-    rrdlabels_add(labels2, "key1", "value10", RRDLABEL_SRC_CONFIG);
-    rrdlabels_add(labels2, "key2", "value1", RRDLABEL_SRC_CONFIG);
-    rrdlabels_add(labels2, "key0", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels2, "key1", "value1_new", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels2, "key2", "value2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels2, "key0", "value0", RRDLABEL_SRC_CONFIG);
+    rrdlabels_walkthrough_index_read(labels2, unittest_dump_labels, "\nlabels2");
 
     rrdlabels_copy(labels1, labels2); // labels1 should have 5 keys
+    rrdlabels_walkthrough_index_read(labels1, unittest_dump_labels, "\nlabels1 after copy from labels2");
 
     entries = rrdlabels_entries(labels1);
     fprintf(stderr, "labels1 (copied) entries found %zu (should be 5)\n",  rrdlabels_entries(labels1));
     if (entries != 5)
         return 1;
 
-    rrdlabels_add(labels1, "key100", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels1, "key100", "value100", RRDLABEL_SRC_CONFIG);
+    rrdlabels_walkthrough_index_read(labels1, unittest_dump_labels, "\nlabels1 now after key100");
+
     rrdlabels_copy(labels2, labels1); // labels2 should have 6 keys
     entries = rrdlabels_entries(labels1);
 
     fprintf(stderr, "labels2 (copied) entries found %zu (should be 6)\n",  rrdlabels_entries(labels1));
+
+    rrdlabels_walkthrough_index_read(labels1, unittest_dump_labels, "\nlabels2 after labels1 copy");
+
+    rrdlabels_walkthrough_index_read(labels1, unittest_dump_labels, "\nfinal labels1");
 
     rrdlabels_destroy(labels1);
     rrdlabels_destroy(labels2);
