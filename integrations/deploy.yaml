@@ -5,7 +5,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: 'linux.png'
+    icon_filename: 'linux.svg'
   keywords:
     - linux
   most_popular: true
@@ -48,7 +48,7 @@
     <<: *linux_meta
     name: Ubuntu
     link: https://ubuntu.com/
-    icon_filename: 'ubuntu.png'
+    icon_filename: 'ubuntu.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -144,7 +144,7 @@
     <<: *linux_meta
     name: CentOS
     link: https://www.centos.org/
-    icon_filename: 'centos.png'
+    icon_filename: 'centos.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -156,7 +156,7 @@
     <<: *linux_meta
     name: CentOS Stream
     link: https://www.centos.org/centos-stream
-    icon_filename: 'centos.png'
+    icon_filename: 'centos.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -168,7 +168,7 @@
     <<: *linux_meta
     name: Manjaro Linux
     link: https://manjaro.org/
-    icon_filename: 'manjaro.png'
+    icon_filename: 'manjaro.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -192,7 +192,7 @@
     <<: *linux_meta
     name: SUSE Linux
     link: https://www.suse.com/
-    icon_filename: 'openSUSE.png'
+    icon_filename: 'openSUSE.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -204,7 +204,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: 'apple.svg'
+    icon_filename: 'macos.svg'
   most_popular: true
   keywords:
     - macOS
