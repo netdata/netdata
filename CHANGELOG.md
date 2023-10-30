@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- update journal sources once per minute [\#16298](https://github.com/netdata/netdata/pull/16298) ([ktsaou](https://github.com/ktsaou))
+- Fix label copy [\#16297](https://github.com/netdata/netdata/pull/16297) ([stelfrag](https://github.com/stelfrag))
 - fix missing labels from parents [\#16296](https://github.com/netdata/netdata/pull/16296) ([ktsaou](https://github.com/ktsaou))
 - do not propagate upstream internal label sources [\#16295](https://github.com/netdata/netdata/pull/16295) ([ktsaou](https://github.com/ktsaou))
 - fix various issues identified by coverity [\#16294](https://github.com/netdata/netdata/pull/16294) ([ktsaou](https://github.com/ktsaou))
 - fix missing labels from parents [\#16293](https://github.com/netdata/netdata/pull/16293) ([ktsaou](https://github.com/ktsaou))
 - fix renames in freebsd [\#16292](https://github.com/netdata/netdata/pull/16292) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16291](https://github.com/netdata/netdata/pull/16291) ([netdatabot](https://github.com/netdatabot))
 - fix retention loading [\#16290](https://github.com/netdata/netdata/pull/16290) ([ktsaou](https://github.com/ktsaou))
 - integrations: yes/no instead of True/False in tables [\#16289](https://github.com/netdata/netdata/pull/16289) ([ilyam8](https://github.com/ilyam8))
 - Brotli streaming compression [\#16287](https://github.com/netdata/netdata/pull/16287) ([ktsaou](https://github.com/ktsaou))
@@ -425,9 +428,6 @@
 - Update names [\#15691](https://github.com/netdata/netdata/pull/15691) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update metadata.yaml [\#15690](https://github.com/netdata/netdata/pull/15690) ([sashwathn](https://github.com/sashwathn))
 - Update categories.yaml [\#15689](https://github.com/netdata/netdata/pull/15689) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15688](https://github.com/netdata/netdata/pull/15688) ([sashwathn](https://github.com/sashwathn))
-- Update deploy.yaml [\#15687](https://github.com/netdata/netdata/pull/15687) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15686](https://github.com/netdata/netdata/pull/15686) ([sashwathn](https://github.com/sashwathn))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
