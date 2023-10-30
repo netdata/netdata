@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "../circular_buffer.h"
-#include "../compression.h"
 #include "../helper.h"
 #include "../logsmanag_config.h"
 #include "../parser.h"
@@ -122,7 +121,11 @@ static int test_compression_decompression() {
     }
 
     char *decompressed_text = mallocz(item.text_size);
-    if(decompress_text(&item, decompressed_text) <= 0){
+
+    if(LZ4_decompress_safe( item.text_compressed, 
+                            decompressed_text, 
+                            item.text_compressed_size, 
+                            item.text_size) < 0){
         fprintf(stderr, "- Error in decompress_text()\n");
         return ++errors;
     }

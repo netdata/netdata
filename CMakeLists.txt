@@ -721,44 +721,6 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         collectors/systemd-journal.plugin/systemd-journal.c
         )
 
-set(LOGS_MANAGEMENT_PLUGIN_FILES
-        logsmanagement/rrd_api/rrd_api_docker_ev.c
-        logsmanagement/rrd_api/rrd_api_docker_ev.h
-        logsmanagement/rrd_api/rrd_api_generic.c
-        logsmanagement/rrd_api/rrd_api_generic.h
-        logsmanagement/rrd_api/rrd_api_kernel.c
-        logsmanagement/rrd_api/rrd_api_kernel.h
-        logsmanagement/rrd_api/rrd_api_mqtt.c
-        logsmanagement/rrd_api/rrd_api_mqtt.h
-        logsmanagement/rrd_api/rrd_api_stats.c
-        logsmanagement/rrd_api/rrd_api_stats.h
-        logsmanagement/rrd_api/rrd_api_systemd.c
-        logsmanagement/rrd_api/rrd_api_systemd.h
-        logsmanagement/rrd_api/rrd_api_web_log.c
-        logsmanagement/rrd_api/rrd_api_web_log.h
-        logsmanagement/rrd_api/rrd_api.h
-        logsmanagement/unit_test/unit_test.c
-        logsmanagement/unit_test/unit_test.h
-        logsmanagement/circular_buffer.c
-        logsmanagement/circular_buffer.h
-        logsmanagement/compression.c
-        logsmanagement/compression.h
-        logsmanagement/db_api.c
-        logsmanagement/db_api.h
-        logsmanagement/file_info.h
-        logsmanagement/flb_plugin.c
-        logsmanagement/flb_plugin.h
-        logsmanagement/functions.c
-        logsmanagement/functions.h
-        logsmanagement/helper.h
-        logsmanagement/defaults.h
-        logsmanagement/logsmanagement.c
-        logsmanagement/parser.c
-        logsmanagement/parser.h
-        logsmanagement/query.c
-        logsmanagement/query.h
-        )
-
 set(RRD_PLUGIN_FILES
         database/contexts/api_v1.c
         database/contexts/api_v2.c
@@ -1127,8 +1089,6 @@ set(LOGSMANAGEMENT_FILES
         logsmanagement/unit_test/unit_test.h
         logsmanagement/circular_buffer.c
         logsmanagement/circular_buffer.h
-        logsmanagement/compression.c
-        logsmanagement/compression.h
         logsmanagement/db_api.c
         logsmanagement/db_api.h
         logsmanagement/file_info.h

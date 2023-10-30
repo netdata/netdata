@@ -316,8 +316,6 @@ SYSTEMD_JOURNAL_PLUGIN_FILES = \
 LOGSMANAGEMENT_FILES = \
     logsmanagement/circular_buffer.c \
     logsmanagement/circular_buffer.h \
-    logsmanagement/compression.c \
-    logsmanagement/compression.h \
     logsmanagement/db_api.c \
     logsmanagement/db_api.h \
     logsmanagement/defaults.h \

@@ -512,11 +512,9 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                                 "p->val.via.str.size >= TIMESTAMP_MS_STR_SIZE");
                         strncpyz(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
 
-                        /* TODO: Write dedicated function for timestamp conversion, with better error checking. */
-                        errno = 0;
                         char *endptr = NULL;
-                        timestamp = strtoll(timestamp_str, &endptr, 10);
-                        timestamp = errno || *endptr ? 0 : timestamp;
+                        timestamp = str2ll(timestamp, &endptr);
+                        timestamp = *endptr ? 0 : timestamp;
                     }
                     else if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
                         m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");

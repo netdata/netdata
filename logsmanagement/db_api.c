@@ -11,7 +11,6 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "circular_buffer.h"
-#include "compression.h"
 #include "helper.h"
 #include "lz4.h"
 #include "parser.h"
@@ -1303,7 +1302,10 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         }
         uv_fs_t read_req;
         uv_buf_t uv_buf = uv_buf_init(tmp_itm.text_compressed, tmp_itm.text_compressed_size);
-        rc = uv_fs_read(NULL, &read_req, p_file_infos[db_off]->blob_handles[blob_handles_offset], &uv_buf, 1, blob_offset, NULL);
+        rc = uv_fs_read(NULL, 
+                        &read_req, 
+                        p_file_infos[db_off]->blob_handles[blob_handles_offset], 
+                        &uv_buf, 1, blob_offset, NULL);
         uv_fs_req_cleanup(&read_req);
         if (unlikely(rc < 0)){
             throw_error(NULL, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
@@ -1316,13 +1318,32 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         buffer_increase(res_buff, sizeof(res_hdr) + tmp_itm.text_size);
                                                         
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
-            // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
-            decompress_text(&tmp_itm, &res_buff->buffer[res_buff->len + sizeof(res_hdr)]);
+            rc = LZ4_decompress_safe(tmp_itm.text_compressed, 
+                                    &res_buff->buffer[res_buff->len + sizeof(res_hdr)], 
+                                    tmp_itm.text_compressed_size, 
+                                    tmp_itm.text_size);
+            
+            if(unlikely(rc < 0)){
+                throw_error(p_file_infos[db_off]->chartname, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
+                break; 
+            }
+
             res_hdr.matches = num_lines;
             res_hdr.text_size = tmp_itm.text_size;
         } 
         else {
-            decompress_text(&tmp_itm, NULL);
+            tmp_itm.data = mallocz(tmp_itm.text_size);
+            rc = LZ4_decompress_safe(tmp_itm.text_compressed, 
+                                    tmp_itm.data, 
+                                    tmp_itm.text_compressed_size, 
+                                    tmp_itm.text_size);
+            
+            if(unlikely(rc < 0)){
+                freez(tmp_itm.data);
+                throw_error(p_file_infos[db_off]->chartname, ERR_TYPE_OTHER, rc, __LINE__, __FILE__, __FUNCTION__);
+                break; 
+            }
+
             res_hdr.matches = search_keyword(   tmp_itm.data, tmp_itm.text_size, 
                                                 &res_buff->buffer[res_buff->len + sizeof(res_hdr)], 
                                                 &res_hdr.text_size, p_query_params->keyword, NULL, 

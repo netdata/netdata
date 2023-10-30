@@ -7,7 +7,6 @@
  */
 
 #include "circular_buffer.h"
-#include "compression.h"
 #include "helper.h"
 #include "parser.h"
 
