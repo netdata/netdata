@@ -7,11 +7,42 @@
 #include "unit_test.h"
 #include <stdlib.h>
 #include <stdio.h>
+#define __USE_XOPEN_EXTENDED
+#include <ftw.h>
+#include <unistd.h>
 #include "../circular_buffer.h"
 #include "../helper.h"
 #include "../logsmanag_config.h"
 #include "../parser.h"
 #include "../query.h"
+#include "../db_api.h"
+
+static int old_stdout = STDOUT_FILENO;
+static int old_stderr = STDERR_FILENO;
+
+#define SUPRESS_STDX(stream_no)                                                     \
+{                                                                                   \
+    if(stream_no == STDOUT_FILENO)                                                  \
+        old_stdout = dup(old_stdout);                                               \
+    else                                                                            \
+        old_stderr = dup(old_stderr);                                               \
+    if(!freopen("/dev/null", "w", stream_no == STDOUT_FILENO ? stdout : stderr))    \
+        exit(-1);                                                                   \
+}
+
+#define UNSUPRESS_STDX(stream_no)                                                   \
+{                                                                                   \
+    fclose(stream_no == STDOUT_FILENO ? stdout : stderr);                           \
+    if(stream_no == STDOUT_FILENO)                                                  \
+        stdout = fdopen(old_stdout, "w");                                           \
+    else                                                                            \
+        stderr = fdopen(old_stderr, "w");                                           \
+}
+
+#define SUPRESS_STDOUT()    SUPRESS_STDX(STDOUT_FILENO)
+#define SUPRESS_STDERR()    SUPRESS_STDX(STDERR_FILENO)
+#define UNSUPRESS_STDOUT()  UNSUPRESS_STDX(STDOUT_FILENO)
+#define UNSUPRESS_STDERR()  UNSUPRESS_STDX(STDERR_FILENO)
 
 #define LOG_RECORDS_PARTIAL "\
 127.0.0.1 - - [30/Jun/2022:16:43:51 +0300] \"GET / HTTP/1.0\" 200 11192 \"-\" \"ApacheBench/2.3\"\n\
@@ -545,10 +576,22 @@ static int test_search_keyword(){
     return errors;
 }
 
+static Flb_socket_config_t *p_forward_in_config = NULL;
 
+static flb_srvc_config_t flb_srvc_config = {
+    .flush           = FLB_FLUSH_DEFAULT,
+    .http_listen     = FLB_HTTP_LISTEN_DEFAULT,
+    .http_port       = FLB_HTTP_PORT_DEFAULT,
+    .http_server     = FLB_HTTP_SERVER_DEFAULT,
+    .log_path        = "NULL",
+    .log_level       = FLB_LOG_LEVEL_DEFAULT,
+    .coro_stack_size = FLB_CORO_STACK_SIZE_DEFAULT
+};
+
+static flb_srvc_config_t *p_flb_srvc_config = NULL;
 
 static int test_logsmanag_config_funcs(){
-    int errors = 0;
+    int errors = 0, rc;
     fprintf(stderr, "%s():\n", __FUNCTION__);
 
     fprintf(stderr, "Testing get_X_dir() functions...\n"); 
@@ -572,28 +615,24 @@ static int test_logsmanag_config_funcs(){
         ++errors;
     }
 
-    Flb_socket_config_t *p_forward_in_config = NULL;
+    fprintf(stderr, "Testing logs_manag_config_load() when p_flb_srvc_config is NULL...\n"); 
 
-    flb_srvc_config_t flb_srvc_config = {
-        .flush           = FLB_FLUSH_DEFAULT,
-        .http_listen     = FLB_HTTP_LISTEN_DEFAULT,
-        .http_port       = FLB_HTTP_PORT_DEFAULT,
-        .http_server     = FLB_HTTP_SERVER_DEFAULT,
-        .log_path        = "NULL",
-        .log_level       = FLB_LOG_LEVEL_DEFAULT,
-        .coro_stack_size = FLB_CORO_STACK_SIZE_DEFAULT
-    };
+    SUPRESS_STDERR();
+    rc = logs_manag_config_load(p_flb_srvc_config, &p_forward_in_config, 1);
+    UNSUPRESS_STDERR();
 
-    flb_srvc_config_t *p_flb_srvc_config = &flb_srvc_config;
+    if(LOGS_MANAG_CONFIG_LOAD_ERROR_P_FLB_SRVC_NULL != rc){
+        fprintf(stderr, "- Error, logs_manag_config_load() returns %d.\n", rc);
+        ++errors;
+    } 
+
+    p_flb_srvc_config = &flb_srvc_config;
 
     fprintf(stderr, "Testing logs_manag_config_load() can load stock config...\n"); 
 
-
-    int old_stderr = dup(STDERR_FILENO);
-    if(!freopen("/dev/null", "w", stderr)) exit(-1);
-    int rc = logs_manag_config_load(&flb_srvc_config, &p_forward_in_config, 1);
-    fclose(stderr);
-    stderr = fdopen(old_stderr, "w");
+    SUPRESS_STDERR();
+    rc = logs_manag_config_load(&flb_srvc_config, &p_forward_in_config, 1);
+    UNSUPRESS_STDERR();
 
     if( LOGS_MANAG_CONFIG_LOAD_ERROR_OK != rc && 
         LOGS_MANAG_CONFIG_LOAD_ERROR_DISABLED != rc){
@@ -601,21 +640,101 @@ static int test_logsmanag_config_funcs(){
         ++errors;
     }
 
-    fprintf(stderr, "Testing logs_manag_config_load() when p_flb_srvc_config is NULL...\n"); 
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
+    return errors;
+}
 
-    p_flb_srvc_config = NULL;
+uv_loop_t *main_loop;
 
-    old_stderr = dup(old_stderr);
-    if(!freopen("/dev/null", "w", stderr)) exit(-1);
-    rc = logs_manag_config_load(p_flb_srvc_config, &p_forward_in_config, 1);
-    fclose(stderr);
-    stderr = fdopen(old_stderr, "w");
+static void setup_p_file_infos_arr_and_main_loop() {
+    fprintf(stderr, "%s():\n", __FUNCTION__);
 
-    if(LOGS_MANAG_CONFIG_LOAD_ERROR_P_FLB_SRVC_NULL != rc){
-        fprintf(stderr, "- Error, logs_manag_config_load() returns %d.\n", rc);
+    p_file_infos_arr = callocz(1, sizeof(struct File_infos_arr));
+    main_loop = mallocz(sizeof(uv_loop_t));
+    if(uv_loop_init(main_loop)) 
+        exit(EXIT_FAILURE);
+
+    fprintf(stderr, "OK\n");
+}
+
+static int test_flb_init(){
+    int errors = 0, rc;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
+
+    fprintf(stderr, "Testing flb_init() with wrong stock_config_dir...\n"); 
+
+    SUPRESS_STDERR();
+    rc = flb_init(flb_srvc_config, "/tmp");
+    UNSUPRESS_STDERR();
+    if(!rc){
+        fprintf(stderr, "- Error, flb_init() should fail but it returns %d.\n", rc);
         ++errors;
-    } 
+    }
 
+    fprintf(stderr, "Testing flb_init() with correct stock_config_dir...\n"); 
+
+    rc = flb_init(flb_srvc_config, get_stock_config_dir());
+    if(rc){
+        fprintf(stderr, "- Error, flb_init() should fail but it returns %d.\n", rc);
+        ++errors;
+    }
+
+    fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
+    return errors;
+}
+
+static int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf){
+    UNUSED(sb);
+    UNUSED(typeflag);
+    UNUSED(ftwbuf);
+
+    return remove(fpath);
+}
+
+static int test_db_init(){
+    int errors = 0;
+    fprintf(stderr, "%s():\n", __FUNCTION__);
+
+    extern netdata_mutex_t stdout_mut;
+
+    SUPRESS_STDOUT();
+    SUPRESS_STDERR();
+    config_file_load(main_loop, p_forward_in_config, &flb_srvc_config, &stdout_mut);
+    UNSUPRESS_STDOUT();
+    UNSUPRESS_STDERR();
+
+    fprintf(stderr, "Testing db_init() with main_db_dir == NULL...\n"); 
+
+    SUPRESS_STDERR();
+    db_set_main_dir(NULL);
+    int rc = db_init();
+    UNSUPRESS_STDERR();
+    
+    if(!rc){
+        fprintf(stderr, "- Error, db_init() returns %d even though db_set_main_dir(NULL); was called.\n", rc);
+        ++errors;
+    }
+
+    char tmpdir[] = "/tmp/tmpdir.XXXXXX";
+    char *main_db_dir = mkdtemp (tmpdir);
+    fprintf(stderr, "Testing db_init() with main_db_dir == %s...\n", main_db_dir); 
+
+    SUPRESS_STDERR();
+    db_set_main_dir(main_db_dir);
+    rc = db_init();
+    UNSUPRESS_STDERR();
+
+    if(rc){
+        fprintf(stderr, "- Error, db_init() returns %d.\n", rc);
+        ++errors;
+    }
+
+    fprintf(stderr, "Cleaning up %s...\n", main_db_dir);
+
+    if(nftw(main_db_dir, unlink_cb, 64, FTW_DEPTH | FTW_PHYS) == -1){
+        fprintf(stderr, "Error while remove path:%s. Will exit...\n", strerror(errno)); 
+        exit(EXIT_FAILURE);
+    }
 
     fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;
@@ -645,6 +764,12 @@ int logs_management_unittest(void){
     errors += test_search_keyword();
     fprintf(stderr, "------------------------------------------------------\n");
     errors += test_logsmanag_config_funcs();
+    fprintf(stderr, "------------------------------------------------------\n");
+    setup_p_file_infos_arr_and_main_loop();
+    fprintf(stderr, "------------------------------------------------------\n");
+    errors += test_flb_init();
+    fprintf(stderr, "------------------------------------------------------\n");
+    errors += test_db_init();
     fprintf(stderr, "------------------------------------------------------\n");
     fprintf(stderr, "[%s] Total errors: %d\n", errors ? "FAILED" : "SUCCEEDED", errors);
     fprintf(stderr, "======================================================\n");

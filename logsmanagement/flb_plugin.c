@@ -130,7 +130,6 @@ int flb_init(flb_srvc_config_t flb_srvc_config, const char *const stock_config_d
     if (unlikely(NULL == (flb_lib_handle = dlopen(flb_lib_path, RTLD_LAZY)))){
         if (NULL != (dl_error = dlerror())) 
             collector_error("dlopen() libfluent-bit.so error: %s", dl_error);
-        m_assert(flb_lib_handle, "dlopen() libfluent-bit.so error");
         rc = -1;
         goto do_return;
     }
