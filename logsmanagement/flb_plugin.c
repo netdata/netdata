@@ -1189,7 +1189,7 @@ int flb_add_input(struct File_info *const p_file_info){
             /* Set up systemd input */
             p_file_info->flb_input = flb_input(ctx, "systemd", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
-            if(!strcmp(p_file_info->filename, LOG_PATH_AUTO)){
+            if(!strcmp(p_file_info->filename, SYSTEMD_DEFAULT_PATH)){
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
                     "Read_From_Tail", "On",

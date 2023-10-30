@@ -704,12 +704,16 @@ static void config_section_init(uv_loop_t *main_loop,
                 }
                 break;
             case FLB_KMSG:
+                if(access(KMSG_DEFAULT_PATH, R_OK)){
+                    collector_error("[%s]: kmsg default path invalid, unknown or needs permissions", p_file_info->chartname);
+                    return p_file_info_destroy(p_file_info);
+                } else p_file_info->filename = strdupz(KMSG_DEFAULT_PATH);
             case FLB_SYSTEMD:
-                p_file_info->filename = strdupz(LOG_PATH_AUTO);
+                p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
                 break;
             case FLB_DOCKER_EV:
                 if(access(DOCKER_EV_DEFAULT_PATH, R_OK)){
-                    collector_error("[%s]: Docker socket Unix path invalid, unknown or needs permissions", p_file_info->chartname);
+                    collector_error("[%s]: Docker socket default Unix path invalid, unknown or needs permissions", p_file_info->chartname);
                     return p_file_info_destroy(p_file_info);
                 } else p_file_info->filename = strdupz(DOCKER_EV_DEFAULT_PATH);
                 break;

@@ -11,6 +11,8 @@
 #include <uv.h>
 
 #define LOG_PATH_AUTO "auto"
+#define KMSG_DEFAULT_PATH "/dev/kmsg"
+#define SYSTEMD_DEFAULT_PATH "SD_JOURNAL_LOCAL_ONLY"
 #define DOCKER_EV_DEFAULT_PATH "/var/run/docker.sock"
 
 typedef struct {
