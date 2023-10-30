@@ -1349,7 +1349,7 @@ if [ "$(id -u)" -eq 0 ]; then
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
-      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"; then
+      if run setcap cap_dac_read_search,cap_syslog+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"; then
         capabilities=1 
       fi
     fi
