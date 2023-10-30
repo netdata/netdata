@@ -513,7 +513,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         strncpyz(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
 
                         char *endptr = NULL;
-                        timestamp = str2ll(timestamp, &endptr);
+                        timestamp = str2ll(timestamp_str, &endptr);
                         timestamp = *endptr ? 0 : timestamp;
                     }
                     else if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){

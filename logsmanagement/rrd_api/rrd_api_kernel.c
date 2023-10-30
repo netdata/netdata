@@ -8,12 +8,12 @@ void kernel_chart_init(struct File_info *p_file_info){
     chart_data->last_update = now_realtime_sec(); // initial value shouldn't be 0
     long chart_prio = p_file_info->chart_meta->base_prio;
 
-    do_num_of_logs_charts_init(p_file_info, chart_prio);
+    lgs_mng_do_num_of_logs_charts_init(p_file_info, chart_prio);
 
     /* Syslog severity level (== Systemd priority) - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-        create_chart(
-            (char *) p_file_info->chartname    // type
+        lgs_mng_create_chart(
+            (char *) p_file_info->chartname     // type
             , "severity_levels"                 // id
             , "Severity Levels"                 // title
             , "severity levels"                 // units
@@ -25,14 +25,14 @@ void kernel_chart_init(struct File_info *p_file_info){
         ); 
 
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++)
-            add_dim(dim_sever_str[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+            lgs_mng_add_dim(dim_sever_str[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
   
     }
 
     /* Subsystem - initialise */
     if(p_file_info->parser_config->chart_config & CHART_KMSG_SUBSYSTEM){
-        chart_data->cs_subsys = create_chart(
-            (char *) p_file_info->chartname            // type
+        chart_data->cs_subsys = lgs_mng_create_chart(
+            (char *) p_file_info->chartname             // type
             , "subsystems"                              // id
             , "Subsystems"                              // title
             , "subsystems"                              // units
@@ -46,8 +46,8 @@ void kernel_chart_init(struct File_info *p_file_info){
 
     /* Device - initialise */
     if(p_file_info->parser_config->chart_config & CHART_KMSG_DEVICE){
-        chart_data->cs_device = create_chart(
-            (char *) p_file_info->chartname            // type
+        chart_data->cs_device = lgs_mng_create_chart(
+            (char *) p_file_info->chartname             // type
             , "devices"                                 // id
             , "Devices"                                 // title
             , "devices"                                 // units
@@ -59,7 +59,7 @@ void kernel_chart_init(struct File_info *p_file_info){
         ); 
     }
 
-    do_custom_charts_init(p_file_info);
+    lgs_mng_do_custom_charts_init(p_file_info);
 }
 
 void kernel_chart_update(struct File_info *p_file_info){
@@ -69,7 +69,7 @@ void kernel_chart_update(struct File_info *p_file_info){
 
         time_t lag_in_sec = p_file_info->parser_metrics->last_update - chart_data->last_update - 1;
 
-        do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
+        lgs_mng_do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
 
         /* Syslog severity level (== Systemd priority) - update */
         if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
@@ -77,18 +77,18 @@ void kernel_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chartname, "severity_levels");
+                lgs_mng_update_chart_begin(p_file_info->chartname, "severity_levels");
                 for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++)
-                    update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
-                update_chart_end(sec);
+                    lgs_mng_update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
+                lgs_mng_update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chartname, "severity_levels");
+            lgs_mng_update_chart_begin(p_file_info->chartname, "severity_levels");
             for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++){
                 chart_data->num_sever[idx] = p_file_info->parser_metrics->kernel->sever[idx];
-                update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
+                lgs_mng_update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
             }
-            update_chart_end(p_file_info->parser_metrics->last_update); 
+            lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
         /* Subsystem - update */
@@ -99,31 +99,31 @@ void kernel_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chartname, "subsystems");
+                lgs_mng_update_chart_begin(p_file_info->chartname, "subsystems");
                 dfe_start_read(p_file_info->parser_metrics->kernel->subsystem, it){
                     if(it->dim_initialized)
-                        update_chart_set(it_dfe.name, (collected_number) it->num);
+                        lgs_mng_update_chart_set(it_dfe.name, (collected_number) it->num);
                 } 
                 dfe_done(it);
-                update_chart_end(sec);
+                lgs_mng_update_chart_end(sec);
             }
 
             dfe_start_write(p_file_info->parser_metrics->kernel->subsystem, it){
                 if(!it->dim_initialized){
                     it->dim_initialized = true;
-                    add_dim_post_init(  &chart_data->cs_subsys, it_dfe.name, 
-                                        RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+                    lgs_mng_add_dim_post_init(  &chart_data->cs_subsys, it_dfe.name, 
+                                                RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
                 }
             }
             dfe_done(it);
 
-            update_chart_begin(p_file_info->chartname, "subsystems");
+            lgs_mng_update_chart_begin(p_file_info->chartname, "subsystems");
             dfe_start_write(p_file_info->parser_metrics->kernel->subsystem, it){
                 it->num = it->num_new;
-                update_chart_set(it_dfe.name, (collected_number) it->num);
+                lgs_mng_update_chart_set(it_dfe.name, (collected_number) it->num);
             }
             dfe_done(it);
-            update_chart_end(p_file_info->parser_metrics->last_update); 
+            lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
         /* Device - update */
@@ -134,34 +134,34 @@ void kernel_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chartname, "devices");
+                lgs_mng_update_chart_begin(p_file_info->chartname, "devices");
                 dfe_start_read(p_file_info->parser_metrics->kernel->device, it){
                     if(it->dim_initialized)
-                        update_chart_set(it_dfe.name, (collected_number) it->num);
+                        lgs_mng_update_chart_set(it_dfe.name, (collected_number) it->num);
                 } 
                 dfe_done(it);
-                update_chart_end(sec);
+                lgs_mng_update_chart_end(sec);
             }
 
             dfe_start_write(p_file_info->parser_metrics->kernel->device, it){
                 if(!it->dim_initialized){
                     it->dim_initialized = true;
-                    add_dim_post_init(  &chart_data->cs_device, it_dfe.name,
-                                        RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+                    lgs_mng_add_dim_post_init(  &chart_data->cs_device, it_dfe.name,
+                                                RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
                 }
             }
             dfe_done(it);
 
-            update_chart_begin(p_file_info->chartname, "devices");
+            lgs_mng_update_chart_begin(p_file_info->chartname, "devices");
             dfe_start_write(p_file_info->parser_metrics->kernel->device, it){
                 it->num = it->num_new;
-                update_chart_set(it_dfe.name, (collected_number) it->num);
+                lgs_mng_update_chart_set(it_dfe.name, (collected_number) it->num);
             }
             dfe_done(it);
-            update_chart_end(p_file_info->parser_metrics->last_update); 
+            lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
-        do_custom_charts_update(p_file_info, lag_in_sec);
+        lgs_mng_do_custom_charts_update(p_file_info, lag_in_sec);
 
         chart_data->last_update = p_file_info->parser_metrics->last_update;
     }

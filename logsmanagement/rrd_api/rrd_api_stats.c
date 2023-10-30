@@ -12,114 +12,114 @@ extern atomic_bool logsmanagement_should_exit;
 static void stats_charts_update(void){
 
     /* Circular buffer total memory stats - update */
-    update_chart_begin(rrd_type, "circular_buffers_mem_total_cached");
+    lgs_mng_update_chart_begin(rrd_type, "circular_buffers_mem_total_cached");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue; 
 
-        update_chart_set(p_file_info->chartname, 
+        lgs_mng_update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* Circular buffer number of items - update */
-    update_chart_begin(rrd_type, "circular_buffers_num_of_items");
+    lgs_mng_update_chart_begin(rrd_type, "circular_buffers_num_of_items");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chartname, p_file_info->circ_buff->num_of_items);
+        lgs_mng_update_chart_set(p_file_info->chartname, p_file_info->circ_buff->num_of_items);
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* Circular buffer uncompressed buffered items memory stats - update */
-    update_chart_begin(rrd_type, "circular_buffers_mem_uncompressed_used");
+    lgs_mng_update_chart_begin(rrd_type, "circular_buffers_mem_uncompressed_used");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chartname, 
+        lgs_mng_update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* Circular buffer compressed buffered items memory stats - update */
-    update_chart_begin(rrd_type, "circular_buffers_mem_compressed_used");
+    lgs_mng_update_chart_begin(rrd_type, "circular_buffers_mem_compressed_used");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chartname, 
+        lgs_mng_update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* Compression stats - update */
-    update_chart_begin(rrd_type, "average_compression_ratio");
+    lgs_mng_update_chart_begin(rrd_type, "average_compression_ratio");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chartname, 
+        lgs_mng_update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->circ_buff->compression_ratio, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* DB disk usage stats - update */
-    update_chart_begin(rrd_type, "database_disk_usage");
+    lgs_mng_update_chart_begin(rrd_type, "database_disk_usage");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chartname, 
+        lgs_mng_update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->blob_total_size, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* DB timings - update */
-    update_chart_begin(rrd_type, "database_timings");
+    lgs_mng_update_chart_begin(rrd_type, "database_timings");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(dim_db_timings_write[i], 
+        lgs_mng_update_chart_set(dim_db_timings_write[i], 
             __atomic_exchange_n(&p_file_info->db_write_duration, 0, __ATOMIC_RELAXED));
         
-        update_chart_set(dim_db_timings_rotate[i], 
+        lgs_mng_update_chart_set(dim_db_timings_rotate[i], 
             __atomic_exchange_n(&p_file_info->db_rotate_duration, 0, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* Query CPU time per byte (user) - update */
-    update_chart_begin(rrd_type, "query_cpu_time_per_MiB_user");
+    lgs_mng_update_chart_begin(rrd_type, "query_cpu_time_per_MiB_user");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chartname, 
+        lgs_mng_update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->cpu_time_per_mib.user, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
     /* Query CPU time per byte (user) - update */
-    update_chart_begin(rrd_type, "query_cpu_time_per_MiB_sys");
+    lgs_mng_update_chart_begin(rrd_type, "query_cpu_time_per_MiB_sys");
     for(int i = 0; i < p_file_infos_arr->count; i++){
         struct File_info *p_file_info = p_file_infos_arr->data[i];
         if(!p_file_info->parser_config) 
             continue;
         
-        update_chart_set(p_file_info->chartname, 
+        lgs_mng_update_chart_set(p_file_info->chartname, 
             __atomic_load_n(&p_file_info->cpu_time_per_mib.sys, __ATOMIC_RELAXED));
     }
-    update_chart_end(0);
+    lgs_mng_update_chart_end(0);
 
 }
 
@@ -132,7 +132,7 @@ void stats_charts_init(void *arg){
     int chart_prio = NETDATA_CHART_PRIO_LOGS_STATS_BASE;
 
     /* Circular buffer total memory stats - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                                    // type
         , "circular_buffers_mem_total_cached"       // id
         , "Circular buffers total cached memory"    // title
@@ -144,10 +144,10 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every          // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* Circular buffer number of items - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                                // type
         , "circular_buffers_num_of_items"       // id
         , "Circular buffers number of items"    // title
@@ -159,10 +159,10 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
         
     /* Circular buffer uncompressed buffered items memory stats - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                                                // type
         , "circular_buffers_mem_uncompressed_used"              // id
         , "Circular buffers used memory for uncompressed logs"  // title
@@ -174,10 +174,10 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every                      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* Circular buffer compressed buffered items memory stats - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                                                // type
         , "circular_buffers_mem_compressed_used"                // id
         , "Circular buffers used memory for compressed logs"    // title
@@ -189,10 +189,10 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every                      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* Compression stats - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                                // type
         , "average_compression_ratio"           // id
         , "Average compression ratio"           // title
@@ -204,10 +204,10 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every      // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* DB disk usage stats - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                            // type
         , "database_disk_usage"             // id
         , "Database disk usage"             // title
@@ -219,10 +219,10 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every  // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
     /* DB timings - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                            // type
         , "database_timings"                // id
         , "Database timings"                // title
@@ -241,15 +241,15 @@ void stats_charts_init(void *arg){
 
         dim_db_timings_write[i] = mallocz(snprintf(NULL, 0, "%s_write", p_file_info->chartname) + 1);
         sprintf(dim_db_timings_write[i], "%s_write", p_file_info->chartname);
-        add_dim(dim_db_timings_write[i], RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(dim_db_timings_write[i], RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
 
         dim_db_timings_rotate[i] = mallocz(snprintf(NULL, 0, "%s_rotate", p_file_info->chartname) + 1);
         sprintf(dim_db_timings_rotate[i], "%s_rotate", p_file_info->chartname);
-        add_dim(dim_db_timings_rotate[i], RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
+        lgs_mng_add_dim(dim_db_timings_rotate[i], RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);
     }
 
     /* Query CPU time per byte (user) - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                                    // type
         , "query_cpu_time_per_MiB_user"             // id
         , "CPU user time per MiB of query results"  // title
@@ -261,10 +261,10 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every          // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
 
     /* Query CPU time per byte (system) - initialise */
-    create_chart(
+    lgs_mng_create_chart(
         rrd_type                                        // type
         , "query_cpu_time_per_MiB_sys"                  // id
         , "CPU system time per MiB of query results"    // title
@@ -276,7 +276,7 @@ void stats_charts_init(void *arg){
         , g_logs_manag_config.update_every              // update_every
     );
     for(int i = 0; i < p_file_infos_arr->count; i++)
-        add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+        lgs_mng_add_dim(p_file_infos_arr->data[i]->chartname, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
 
     netdata_mutex_unlock(p_stdout_mut);
 

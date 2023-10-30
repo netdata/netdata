@@ -69,15 +69,15 @@ struct Chart_meta {
 
 };
 
-static inline struct Chart_str create_chart(const char *type,  
-                                            const char *id,      
-                                            const char *title,
-                                            const char *units, 
-                                            const char *family,  
-                                            const char *context,
-                                            const char *chart_type, 
-                                            long priority,  
-                                            int update_every){
+static inline struct Chart_str lgs_mng_create_chart(const char *type,  
+                                                    const char *id,      
+                                                    const char *title,
+                                                    const char *units, 
+                                                    const char *family,  
+                                                    const char *context,
+                                                    const char *chart_type, 
+                                                    long priority,  
+                                                    int update_every){
 
     struct Chart_str cs = {
         .type           = type,
@@ -106,7 +106,7 @@ static inline struct Chart_str create_chart(const char *type,
     return cs;
 }
 
-static inline void add_dim( const char *id, 
+static inline void lgs_mng_add_dim( const char *id, 
                             const char *algorithm,
                             collected_number multiplier, 
                             collected_number divisor){
@@ -114,7 +114,7 @@ static inline void add_dim( const char *id,
     printf("DIMENSION '%s' '' '%s' %lld %lld\n", id, algorithm, multiplier, divisor);
 }
 
-static inline void add_dim_post_init(   struct Chart_str *cs,
+static inline void lgs_mng_add_dim_post_init(   struct Chart_str *cs,
                                         const char *dim_id, 
                                         const char *algorithm,
                                         collected_number multiplier, 
@@ -131,28 +131,28 @@ static inline void add_dim_post_init(   struct Chart_str *cs,
         cs->priority, 
         cs->update_every
     );
-    add_dim(dim_id, algorithm, multiplier, divisor);
+    lgs_mng_add_dim(dim_id, algorithm, multiplier, divisor);
 }
 
-static inline void update_chart_begin(const char *type, const char *id){
+static inline void lgs_mng_update_chart_begin(const char *type, const char *id){
 
     printf("BEGIN '%s.%s'\n", type, id);
 }
 
-static inline void update_chart_set(const char *id, collected_number val){
+static inline void lgs_mng_update_chart_set(const char *id, collected_number val){
     printf("SET '%s' = %lld\n", id, val);
 }
 
-static inline void update_chart_end(time_t sec){
+static inline void lgs_mng_update_chart_end(time_t sec){
     printf("END %" PRId64 " 0 1\n", sec);
 }
 
-#define do_num_of_logs_charts_init(p_file_info, chart_prio){                                    \
+#define lgs_mng_do_num_of_logs_charts_init(p_file_info, chart_prio){                            \
                                                                                                 \
     /* Number of collected logs total - initialise */                                           \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
-        create_chart(                                                                           \
-            (char *) p_file_info->chartname    /* type         */                              \
+        lgs_mng_create_chart(                                                                   \
+            (char *) p_file_info->chartname     /* type         */                              \
             , "collected_logs_total"            /* id           */                              \
             , CHART_TITLE_TOTAL_COLLECTED_LOGS  /* title        */                              \
             , "log records"                     /* units        */                              \
@@ -162,13 +162,13 @@ static inline void update_chart_end(time_t sec){
             , ++chart_prio                      /* priority     */                              \
             , p_file_info->update_every         /* update_every */                              \
         );                                                                                      \
-        add_dim("total records", RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);                            \
+        lgs_mng_add_dim("total records", RRD_ALGORITHM_ABSOLUTE_NAME, 1, 1);                    \
     }                                                                                           \
                                                                                                 \
     /* Number of collected logs rate - initialise */                                            \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){                   \
-        create_chart(                                                                           \
-            (char *) p_file_info->chartname    /* type         */                              \
+        lgs_mng_create_chart(                                                                   \
+            (char *) p_file_info->chartname     /* type         */                              \
             , "collected_logs_rate"             /* id           */                              \
             , CHART_TITLE_RATE_COLLECTED_LOGS   /* title        */                              \
             , "log records"                     /* units        */                              \
@@ -178,21 +178,21 @@ static inline void update_chart_end(time_t sec){
             , ++chart_prio                      /* priority     */                              \
             , p_file_info->update_every         /* update_every */                              \
         );                                                                                      \
-        add_dim("records", RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);                               \
+        lgs_mng_add_dim("records", RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);                       \
     }                                                                                           \
                                                                                                 \
 }                                                                                               \
 
-#define do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data){                      \
+#define lgs_mng_do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data){              \
                                                                                                 \
     /* Number of collected logs total - update previous values */                               \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
             for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;            \
                         sec < p_file_info->parser_metrics->last_update;                         \
                         sec++){                                                                 \
-                update_chart_begin(p_file_info->chartname, "collected_logs_total");   \
-                update_chart_set("total records", chart_data->num_lines);                       \
-                update_chart_end(sec);                                                          \
+                lgs_mng_update_chart_begin(p_file_info->chartname, "collected_logs_total");     \
+                lgs_mng_update_chart_set("total records", chart_data->num_lines);               \
+                lgs_mng_update_chart_end(sec);                                                  \
             }                                                                                   \
     }                                                                                           \
                                                                                                 \
@@ -201,9 +201,9 @@ static inline void update_chart_end(time_t sec){
             for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;            \
                         sec < p_file_info->parser_metrics->last_update;                         \
                         sec++){                                                                 \
-                update_chart_begin(p_file_info->chartname, "collected_logs_rate");    \
-                update_chart_set("records", chart_data->num_lines);                             \
-                update_chart_end(sec);                                                          \
+                lgs_mng_update_chart_begin(p_file_info->chartname, "collected_logs_rate");      \
+                lgs_mng_update_chart_set("records", chart_data->num_lines);                     \
+                lgs_mng_update_chart_end(sec);                                                  \
             }                                                                                   \
     }                                                                                           \
                                                                                                 \
@@ -211,20 +211,20 @@ static inline void update_chart_end(time_t sec){
                                                                                                 \
     /* Number of collected logs total - update */                                               \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
-        update_chart_begin( (char *) p_file_info->chartname, "collected_logs_total");          \
-        update_chart_set("total records", chart_data->num_lines);                               \
-        update_chart_end(p_file_info->parser_metrics->last_update);                             \
+        lgs_mng_update_chart_begin( (char *) p_file_info->chartname, "collected_logs_total");   \
+        lgs_mng_update_chart_set("total records", chart_data->num_lines);                       \
+        lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);                     \
     }                                                                                           \
                                                                                                 \
     /* Number of collected logs rate - update */                                                \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_RATE){                   \
-        update_chart_begin( (char *) p_file_info->chartname, "collected_logs_rate");           \
-        update_chart_set("records", chart_data->num_lines);                                     \
-        update_chart_end(p_file_info->parser_metrics->last_update);                             \
+        lgs_mng_update_chart_begin( (char *) p_file_info->chartname, "collected_logs_rate");    \
+        lgs_mng_update_chart_set("records", chart_data->num_lines);                             \
+        lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);                     \
     }                                                                                           \
 }
 
-#define do_custom_charts_init(p_file_info) {                                                    \
+#define lgs_mng_do_custom_charts_init(p_file_info) {                                            \
                                                                                                 \
     for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){                   \
                                                                                                 \
@@ -235,7 +235,7 @@ static inline void update_chart_end(time_t sec){
             cus;                                                                                \
             cus = cus->next){                                                                   \
                                                                                                 \
-            if(!strcmp(cus->id, p_file_info->parser_cus_config[cus_off]->chartname))           \
+            if(!strcmp(cus->id, p_file_info->parser_cus_config[cus_off]->chartname))            \
                 break;                                                                          \
                                                                                                 \
             p_cus = &(cus->next);                                                               \
@@ -245,10 +245,10 @@ static inline void update_chart_end(time_t sec){
             cus = callocz(1, sizeof(Chart_data_cus_t));                                         \
             *p_cus = cus;                                                                       \
                                                                                                 \
-            cus->id = p_file_info->parser_cus_config[cus_off]->chartname;                      \
+            cus->id = p_file_info->parser_cus_config[cus_off]->chartname;                       \
                                                                                                 \
-            create_chart(                                                                       \
-                (char *) p_file_info->chartname                        /* type         */      \
+            lgs_mng_create_chart(                                                               \
+                (char *) p_file_info->chartname                         /* type         */      \
                 , cus->id                                               /* id           */      \
                 , cus->id                                               /* title        */      \
                 , "matches"                                             /* units        */      \
@@ -267,12 +267,13 @@ static inline void update_chart_end(time_t sec){
         cus->dims[cus->dims_size - 1].p_counter =                                               \
             &p_file_info->parser_metrics->parser_cus[cus_off]->count;                           \
                                                                                                 \
-        add_dim(cus->dims[cus->dims_size - 1].name, RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);      \
+        lgs_mng_add_dim(cus->dims[cus->dims_size - 1].name,                                     \
+                        RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);                                  \
                                                                                                 \
     }                                                                                           \
 }
 
-#define do_custom_charts_update(p_file_info, lag_in_sec) {                                      \
+#define lgs_mng_do_custom_charts_update(p_file_info, lag_in_sec) {                              \
                                                                                                 \
     for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;                    \
                 sec < p_file_info->parser_metrics->last_update;                                 \
@@ -282,12 +283,12 @@ static inline void update_chart_end(time_t sec){
                               cus;                                                              \
                               cus = cus->next){                                                 \
                                                                                                 \
-            update_chart_begin(p_file_info->chartname, cus->id);                      \
+            lgs_mng_update_chart_begin(p_file_info->chartname, cus->id);                        \
                                                                                                 \
             for(int d_idx = 0; d_idx < cus->dims_size; d_idx++)                                 \
-                update_chart_set(cus->dims[d_idx].name, cus->dims[d_idx].val);                  \
+                lgs_mng_update_chart_set(cus->dims[d_idx].name, cus->dims[d_idx].val);          \
                                                                                                 \
-            update_chart_end(sec);                                                              \
+            lgs_mng_update_chart_end(sec);                                                      \
         }                                                                                       \
                                                                                                 \
     }                                                                                           \
@@ -296,17 +297,17 @@ static inline void update_chart_end(time_t sec){
                           cus;                                                                  \
                           cus = cus->next){                                                     \
                                                                                                 \
-        update_chart_begin(p_file_info->chartname, cus->id);                          \
+        lgs_mng_update_chart_begin(p_file_info->chartname, cus->id);                            \
                                                                                                 \
         for(int d_idx = 0; d_idx < cus->dims_size; d_idx++){                                    \
                                                                                                 \
             cus->dims[d_idx].val += *(cus->dims[d_idx].p_counter);                              \
             *(cus->dims[d_idx].p_counter) = 0;                                                  \
                                                                                                 \
-            update_chart_set(cus->dims[d_idx].name, cus->dims[d_idx].val);                      \
+            lgs_mng_update_chart_set(cus->dims[d_idx].name, cus->dims[d_idx].val);              \
         }                                                                                       \
                                                                                                 \
-        update_chart_end(p_file_info->parser_metrics->last_update);                             \
+        lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);                     \
     }                                                                                           \
 }
 

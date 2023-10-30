@@ -8,12 +8,12 @@ void mqtt_chart_init(struct File_info *p_file_info){
     chart_data->last_update = now_realtime_sec(); // initial value shouldn't be 0
     long chart_prio = p_file_info->chart_meta->base_prio;
 
-    do_num_of_logs_charts_init(p_file_info, chart_prio);
+    lgs_mng_do_num_of_logs_charts_init(p_file_info, chart_prio);
 
     /* Topic - initialise */
     if(p_file_info->parser_config->chart_config & CHART_MQTT_TOPIC){
-        chart_data->cs_topic = create_chart(
-            (char *) p_file_info->chartname    // type
+        chart_data->cs_topic = lgs_mng_create_chart(
+            (char *) p_file_info->chartname     // type
             , "topics"                          // id
             , "Topics"                          // title
             , "topics"                          // units
@@ -25,7 +25,7 @@ void mqtt_chart_init(struct File_info *p_file_info){
         ); 
     }
 
-    do_custom_charts_init(p_file_info);
+    lgs_mng_do_custom_charts_init(p_file_info);
 }
 
 void mqtt_chart_update(struct File_info *p_file_info){
@@ -35,7 +35,7 @@ void mqtt_chart_update(struct File_info *p_file_info){
 
         time_t lag_in_sec = p_file_info->parser_metrics->last_update - chart_data->last_update - 1;
 
-        do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
+        lgs_mng_do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
 
         /* Topic - update */
         if(p_file_info->parser_config->chart_config & CHART_MQTT_TOPIC){
@@ -45,34 +45,34 @@ void mqtt_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
 
-                update_chart_begin(p_file_info->chartname, "topics");
+                lgs_mng_update_chart_begin(p_file_info->chartname, "topics");
                 dfe_start_read(p_file_info->parser_metrics->mqtt->topic, it){
                     if(it->dim_initialized)
-                        update_chart_set(it_dfe.name, (collected_number) it->num);
+                        lgs_mng_update_chart_set(it_dfe.name, (collected_number) it->num);
                 } 
                 dfe_done(it);
-                update_chart_end(sec);
+                lgs_mng_update_chart_end(sec);
             }
 
             dfe_start_write(p_file_info->parser_metrics->mqtt->topic, it){
                 if(!it->dim_initialized){
                     it->dim_initialized = true;
-                    add_dim_post_init(  &chart_data->cs_topic, it_dfe.name, 
-                                        RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+                    lgs_mng_add_dim_post_init(  &chart_data->cs_topic, it_dfe.name, 
+                                                RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
                 }
             }
             dfe_done(it);
 
-            update_chart_begin(p_file_info->chartname, "topics");
+            lgs_mng_update_chart_begin(p_file_info->chartname, "topics");
             dfe_start_write(p_file_info->parser_metrics->mqtt->topic, it){
                 it->num = it->num_new;
-                update_chart_set(it_dfe.name, (collected_number) it->num);
+                lgs_mng_update_chart_set(it_dfe.name, (collected_number) it->num);
             }
             dfe_done(it);
-            update_chart_end(p_file_info->parser_metrics->last_update); 
+            lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update); 
         }
 
-        do_custom_charts_update(p_file_info, lag_in_sec);
+        lgs_mng_do_custom_charts_update(p_file_info, lag_in_sec);
 
         chart_data->last_update = p_file_info->parser_metrics->last_update;
     }

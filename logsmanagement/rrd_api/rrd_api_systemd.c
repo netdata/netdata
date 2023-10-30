@@ -48,12 +48,12 @@ void systemd_chart_init(struct File_info *p_file_info){
     chart_data->last_update = now_realtime_sec(); // initial value shouldn't be 0
     long chart_prio = p_file_info->chart_meta->base_prio;
 
-    do_num_of_logs_charts_init(p_file_info, chart_prio);
+    lgs_mng_do_num_of_logs_charts_init(p_file_info, chart_prio);
 
     /* Syslog priority value - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
-        create_chart(
-            (char *) p_file_info->chartname    // type
+        lgs_mng_create_chart(
+            (char *) p_file_info->chartname     // type
             , "priority_values"                 // id
             , "Priority Values"                 // title
             , "priority values"                 // units
@@ -68,18 +68,18 @@ void systemd_chart_init(struct File_info *p_file_info){
             char dim_id[4];
             snprintfz(dim_id, 4, "%d", i);
             chart_data->dim_prior[i] = strdupz(dim_id);
-            add_dim(chart_data->dim_prior[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+            lgs_mng_add_dim(chart_data->dim_prior[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
         }
         chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1] = "uknown";
-        add_dim(chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1], 
-                RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+        lgs_mng_add_dim(chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1], 
+                        RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
 
     }
 
     /* Syslog severity level (== Systemd priority) - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-        create_chart(
-            (char *) p_file_info->chartname    // type
+        lgs_mng_create_chart(
+            (char *) p_file_info->chartname     // type
             , "severity_levels"                 // id
             , "Severity Levels"                 // title
             , "severity levels"                 // units
@@ -91,12 +91,12 @@ void systemd_chart_init(struct File_info *p_file_info){
         );
 
         for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++)
-            add_dim(dim_sever_str[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+            lgs_mng_add_dim(dim_sever_str[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
     }
     
     /* Syslog facility level - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
-        create_chart(
+        lgs_mng_create_chart(
             (char *) p_file_info->chartname    // type
             , "facility_levels"                 // id
             , "Facility Levels"                 // title
@@ -109,10 +109,10 @@ void systemd_chart_init(struct File_info *p_file_info){
         );
 
         for(int i = 0; i < SYSLOG_FACIL_ARR_SIZE; i++)
-            add_dim(dim_facil_str[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
+            lgs_mng_add_dim(dim_facil_str[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
     }
 
-    do_custom_charts_init(p_file_info);
+    lgs_mng_do_custom_charts_init(p_file_info);
 }
 
 void systemd_chart_update(struct File_info *p_file_info){
@@ -122,7 +122,7 @@ void systemd_chart_update(struct File_info *p_file_info){
 
         time_t lag_in_sec = p_file_info->parser_metrics->last_update - chart_data->last_update - 1;
 
-        do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
+        lgs_mng_do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data);
 
         /* Syslog priority value - update */
         if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
@@ -130,22 +130,22 @@ void systemd_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chartname, "priority_values");
+                lgs_mng_update_chart_begin(p_file_info->chartname, "priority_values");
                 for(int idx = 0; idx < SYSLOG_PRIOR_ARR_SIZE; idx++){
                     if(chart_data->num_prior[idx])
-                        update_chart_set(chart_data->dim_prior[idx], chart_data->num_prior[idx]);
+                        lgs_mng_update_chart_set(chart_data->dim_prior[idx], chart_data->num_prior[idx]);
                 }
-                update_chart_end(sec);
+                lgs_mng_update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chartname, "priority_values");
+            lgs_mng_update_chart_begin(p_file_info->chartname, "priority_values");
             for(int idx = 0; idx < SYSLOG_PRIOR_ARR_SIZE; idx++){
                 if(p_file_info->parser_metrics->systemd->prior[idx]){
                     chart_data->num_prior[idx] = p_file_info->parser_metrics->systemd->prior[idx];
-                    update_chart_set(chart_data->dim_prior[idx], chart_data->num_prior[idx]);
+                    lgs_mng_update_chart_set(chart_data->dim_prior[idx], chart_data->num_prior[idx]);
                 }
             }
-            update_chart_end(p_file_info->parser_metrics->last_update);
+            lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);
         
         }
 
@@ -155,22 +155,22 @@ void systemd_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chartname, "severity_levels");
+                lgs_mng_update_chart_begin(p_file_info->chartname, "severity_levels");
                 for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++){
                     if(chart_data->num_sever[idx])
-                        update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
+                        lgs_mng_update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
                 }
-                update_chart_end(sec);
+                lgs_mng_update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chartname, "severity_levels");
+            lgs_mng_update_chart_begin(p_file_info->chartname, "severity_levels");
             for(int idx = 0; idx < SYSLOG_SEVER_ARR_SIZE; idx++){
                 if(p_file_info->parser_metrics->systemd->sever[idx]){
                     chart_data->num_sever[idx] = p_file_info->parser_metrics->systemd->sever[idx];
-                    update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
+                    lgs_mng_update_chart_set(dim_sever_str[idx], chart_data->num_sever[idx]);
                 }
             }
-            update_chart_end(p_file_info->parser_metrics->last_update);
+            lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);
 
         }
 
@@ -180,26 +180,26 @@ void systemd_chart_update(struct File_info *p_file_info){
                         sec < p_file_info->parser_metrics->last_update;
                         sec++){
             
-                update_chart_begin(p_file_info->chartname, "facility_levels");
+                lgs_mng_update_chart_begin(p_file_info->chartname, "facility_levels");
                 for(int idx = 0; idx < SYSLOG_FACIL_ARR_SIZE; idx++){
                     if(chart_data->num_facil[idx])
-                        update_chart_set(dim_facil_str[idx], chart_data->num_facil[idx]);
+                        lgs_mng_update_chart_set(dim_facil_str[idx], chart_data->num_facil[idx]);
                 }
-                update_chart_end(sec);
+                lgs_mng_update_chart_end(sec);
             }
 
-            update_chart_begin(p_file_info->chartname, "facility_levels");
+            lgs_mng_update_chart_begin(p_file_info->chartname, "facility_levels");
             for(int idx = 0; idx < SYSLOG_FACIL_ARR_SIZE; idx++){
                 if(p_file_info->parser_metrics->systemd->facil[idx]){
                     chart_data->num_facil[idx] = p_file_info->parser_metrics->systemd->facil[idx];
-                    update_chart_set(dim_facil_str[idx], chart_data->num_facil[idx]);
+                    lgs_mng_update_chart_set(dim_facil_str[idx], chart_data->num_facil[idx]);
                 }
             }
-            update_chart_end(p_file_info->parser_metrics->last_update);
+            lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);
         
         }
 
-        do_custom_charts_update(p_file_info, lag_in_sec);
+        lgs_mng_do_custom_charts_update(p_file_info, lag_in_sec);
 
         chart_data->last_update = p_file_info->parser_metrics->last_update;
     }
