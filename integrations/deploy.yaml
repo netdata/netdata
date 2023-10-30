@@ -372,7 +372,6 @@
                 container_name: netdata
                 pid: host
                 network_mode: host
-                restart: unless-stopped
                 cap_add:
                   - SYS_PTRACE
                   - SYS_ADMIN
@@ -397,6 +396,8 @@
             {% /if %}
                 deploy:
                   mode: global
+                  restart_policy:
+                    condition: on-failure
             volumes:
               netdataconfig:
               netdatalib:
@@ -410,7 +411,6 @@
                 container_name: netdata
                 pid: host
                 network_mode: host
-                restart: unless-stopped
                 cap_add:
                   - SYS_PTRACE
                   - SYS_ADMIN
@@ -435,6 +435,8 @@
             {% /if %}
                 deploy:
                   mode: global
+                  restart_policy:
+                    condition: on-failure
             volumes:
               netdataconfig:
               netdatalib:
