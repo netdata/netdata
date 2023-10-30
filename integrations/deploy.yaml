@@ -370,11 +370,12 @@
               netdata:
                 image: netdata/netdata:edge
                 container_name: netdata
-                ports:
-                  - 19999:19999
+                pid: host
+                network_mode: host
                 restart: unless-stopped
                 cap_add:
                   - SYS_PTRACE
+                  - SYS_ADMIN
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -387,6 +388,7 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+                  - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
@@ -406,11 +408,12 @@
               netdata:
                 image: netdata/netdata:stable
                 container_name: netdata
-                ports:
-                  - 19999:19999
+                pid: host
+                network_mode: host
                 restart: unless-stopped
                 cap_add:
                   - SYS_PTRACE
+                  - SYS_ADMIN
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -423,6 +426,7 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+                  - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
