@@ -258,7 +258,7 @@ endmeta-->
 
 def build_path(meta_yaml_link):
     """
-    funtion that takes a metadata yaml file link, and makes it into a path that gets used to write to a file.
+    function that takes a metadata yaml file link, and makes it into a path that gets used to write to a file.
     """
     return meta_yaml_link.replace("https://github.com/netdata/", "") \
         .split("/", 1)[1] \
