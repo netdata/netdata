@@ -175,7 +175,7 @@ elif [ -f "${MACHINE_GUID_FILE}" ]; then
         echo >&2 "netdata.public.unique.id is not readable. Please make sure you have rights to read it (Filename: ${MACHINE_GUID_FILE})."
         exit 18
 else
-        if mkdir -p "${MACHINE_GUID_FILE%/*}" && /bin/echo -n "$(gen_id)" > "${MACHINE_GUID_FILE}"; then
+        if mkdir -p "${MACHINE_GUID_FILE%/*}" && echo -n "$(gen_id)" > "${MACHINE_GUID_FILE}"; then
                 ID="$(cat "${MACHINE_GUID_FILE}")"
                 MGUID=$ID
         else
