@@ -1,15 +1,35 @@
 # Changelog
 
-## [v1.43.1](https://github.com/netdata/netdata/tree/v1.43.1) (2023-10-26)
+## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.0...v1.43.1)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.1...v1.43.2)
 
 **Merged pull requests:**
 
+- update journal sources once per minute [\#16298](https://github.com/netdata/netdata/pull/16298) ([ktsaou](https://github.com/ktsaou))
+- Fix label copy [\#16297](https://github.com/netdata/netdata/pull/16297) ([stelfrag](https://github.com/stelfrag))
+- fix missing labels from parents [\#16296](https://github.com/netdata/netdata/pull/16296) ([ktsaou](https://github.com/ktsaou))
+- do not propagate upstream internal label sources [\#16295](https://github.com/netdata/netdata/pull/16295) ([ktsaou](https://github.com/ktsaou))
+- fix various issues identified by coverity [\#16294](https://github.com/netdata/netdata/pull/16294) ([ktsaou](https://github.com/ktsaou))
+- fix missing labels from parents [\#16293](https://github.com/netdata/netdata/pull/16293) ([ktsaou](https://github.com/ktsaou))
+- fix renames in freebsd [\#16292](https://github.com/netdata/netdata/pull/16292) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16291](https://github.com/netdata/netdata/pull/16291) ([netdatabot](https://github.com/netdatabot))
+- fix retention loading [\#16290](https://github.com/netdata/netdata/pull/16290) ([ktsaou](https://github.com/ktsaou))
+- integrations: yes/no instead of True/False in tables [\#16289](https://github.com/netdata/netdata/pull/16289) ([ilyam8](https://github.com/ilyam8))
+- typo fixed in gen\_docs\_integrations.py [\#16288](https://github.com/netdata/netdata/pull/16288) ([khalid586](https://github.com/khalid586))
+- Brotli streaming compression [\#16287](https://github.com/netdata/netdata/pull/16287) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16284](https://github.com/netdata/netdata/pull/16284) ([netdatabot](https://github.com/netdatabot))
+- Small optimization of alert queries [\#16282](https://github.com/netdata/netdata/pull/16282) ([MrZammler](https://github.com/MrZammler))
+- update go.d version to 0.56.4 [\#16281](https://github.com/netdata/netdata/pull/16281) ([ilyam8](https://github.com/ilyam8))
+- update bundled UI to v6.57.0 [\#16277](https://github.com/netdata/netdata/pull/16277) ([ilyam8](https://github.com/ilyam8))
+- Remove semicolons from strings [\#16276](https://github.com/netdata/netdata/pull/16276) ([Ancairon](https://github.com/Ancairon))
 - Prevent wrong optimization armv7l static build [\#16274](https://github.com/netdata/netdata/pull/16274) ([stelfrag](https://github.com/stelfrag))
+- local\_listeners: add cmd args for reading specific files [\#16273](https://github.com/netdata/netdata/pull/16273) ([ilyam8](https://github.com/ilyam8))
 - DYNCFG fix REPORT\_JOB\_STATUS streaming [\#16272](https://github.com/netdata/netdata/pull/16272) ([underhood](https://github.com/underhood))
 - fix sources match [\#16271](https://github.com/netdata/netdata/pull/16271) ([ktsaou](https://github.com/ktsaou))
+- ZSTD and GZIP/DEFLATE streaming support [\#16268](https://github.com/netdata/netdata/pull/16268) ([ktsaou](https://github.com/ktsaou))
 - journal minor updates [\#16267](https://github.com/netdata/netdata/pull/16267) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16266](https://github.com/netdata/netdata/pull/16266) ([netdatabot](https://github.com/netdatabot))
 - Fix coverity issue 403725 [\#16265](https://github.com/netdata/netdata/pull/16265) ([stelfrag](https://github.com/stelfrag))
 - SUBSTRING simple patterns fix [\#16264](https://github.com/netdata/netdata/pull/16264) ([ktsaou](https://github.com/ktsaou))
 - QUERIES: use tiers only when they have useful data [\#16263](https://github.com/netdata/netdata/pull/16263) ([ktsaou](https://github.com/ktsaou))
@@ -48,9 +68,14 @@
 - docker install: support for Proxmox vms/containers name resolution [\#16193](https://github.com/netdata/netdata/pull/16193) ([ilyam8](https://github.com/ilyam8))
 - Introduce workflow to always update bundled packages \(static builds\) into their latest release \(part1\) [\#16191](https://github.com/netdata/netdata/pull/16191) ([tkatsoulas](https://github.com/tkatsoulas))
 - Improvements for labels handling [\#16172](https://github.com/netdata/netdata/pull/16172) ([stelfrag](https://github.com/stelfrag))
+- Faster parents [\#16127](https://github.com/netdata/netdata/pull/16127) ([ktsaou](https://github.com/ktsaou))
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 - shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.43.1](https://github.com/netdata/netdata/tree/v1.43.1) (2023-10-26)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.0...v1.43.1)
 
 ## [v1.43.0](https://github.com/netdata/netdata/tree/v1.43.0) (2023-10-16)
 
@@ -322,7 +347,6 @@
 - Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
 - Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
-- Misc code cleanup [\#15665](https://github.com/netdata/netdata/pull/15665) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
@@ -402,31 +426,6 @@
 - Extend eBPF default shutdown [\#15694](https://github.com/netdata/netdata/pull/15694) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix integrations regen workflow [\#15693](https://github.com/netdata/netdata/pull/15693) ([Ferroin](https://github.com/Ferroin))
 - bump go.d.plugin v0.54.1 [\#15692](https://github.com/netdata/netdata/pull/15692) ([ilyam8](https://github.com/ilyam8))
-- Update names [\#15691](https://github.com/netdata/netdata/pull/15691) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update metadata.yaml [\#15690](https://github.com/netdata/netdata/pull/15690) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15689](https://github.com/netdata/netdata/pull/15689) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15688](https://github.com/netdata/netdata/pull/15688) ([sashwathn](https://github.com/sashwathn))
-- Update deploy.yaml [\#15687](https://github.com/netdata/netdata/pull/15687) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15686](https://github.com/netdata/netdata/pull/15686) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15685](https://github.com/netdata/netdata/pull/15685) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15684](https://github.com/netdata/netdata/pull/15684) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15683](https://github.com/netdata/netdata/pull/15683) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15682](https://github.com/netdata/netdata/pull/15682) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15681](https://github.com/netdata/netdata/pull/15681) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15680](https://github.com/netdata/netdata/pull/15680) ([sashwathn](https://github.com/sashwathn))
-- Update metadata.yaml [\#15679](https://github.com/netdata/netdata/pull/15679) ([shyamvalsan](https://github.com/shyamvalsan))
-- Update metadata.yaml [\#15678](https://github.com/netdata/netdata/pull/15678) ([sashwathn](https://github.com/sashwathn))
-- Update Webhook icon [\#15677](https://github.com/netdata/netdata/pull/15677) ([sashwathn](https://github.com/sashwathn))
-- Update deploy.yaml to fix Docker and Kubernetes commands [\#15676](https://github.com/netdata/netdata/pull/15676) ([sashwathn](https://github.com/sashwathn))
-- meta MacOS =\> macOS [\#15675](https://github.com/netdata/netdata/pull/15675) ([ilyam8](https://github.com/ilyam8))
-- Adapt Cloud notifications to the new schema [\#15674](https://github.com/netdata/netdata/pull/15674) ([sashwathn](https://github.com/sashwathn))
-- Fix formatting [\#15673](https://github.com/netdata/netdata/pull/15673) ([shyamvalsan](https://github.com/shyamvalsan))
-- Fixing tables \(aws sns\) [\#15671](https://github.com/netdata/netdata/pull/15671) ([shyamvalsan](https://github.com/shyamvalsan))
-- Update metadata.yaml for Cloud Notifications [\#15670](https://github.com/netdata/netdata/pull/15670) ([sashwathn](https://github.com/sashwathn))
-- remove " Metrics" from linux categories [\#15669](https://github.com/netdata/netdata/pull/15669) ([ilyam8](https://github.com/ilyam8))
-- Fix table formatting \(custom exporter\) [\#15668](https://github.com/netdata/netdata/pull/15668) ([shyamvalsan](https://github.com/shyamvalsan))
-- Fix icon prometheus exporter icon [\#15666](https://github.com/netdata/netdata/pull/15666) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- freeipmi change restart message to info [\#15664](https://github.com/netdata/netdata/pull/15664) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
