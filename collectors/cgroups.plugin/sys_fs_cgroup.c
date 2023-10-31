@@ -2992,6 +2992,13 @@ void *cgroups_main(void *ptr) {
     }
     uv_thread_set_name_np(discovery_thread.thread, "P[cgroups]");
 
+    // we register this only on localhost
+    // for the other nodes, the origin server should register it
+    rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
+    rrd_function_add(localhost, NULL, "cgtop", 10,
+            RRDFUNCTIONS_CGTOP_HELP, true,
+            cgroup_function_cgroup_top, NULL);
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = cgroup_update_every * USEC_PER_SEC;

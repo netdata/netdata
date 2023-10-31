@@ -406,3 +406,9 @@ static inline int k8s_is_kubepod(struct cgroup *cg) {
     return cg->container_orchestrator == CGROUPS_ORCHESTRATOR_K8S;
 }
 
+#define RRDFUNCTIONS_CGTOP_HELP "View running containers"
+
+int cgroup_function_cgroup_top(BUFFER *wb, int timeout, const char *function, void *collector_data,
+        rrd_function_result_callback_t result_cb, void *result_cb_data,
+        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+        rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data);
