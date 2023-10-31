@@ -321,9 +321,6 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
     return false;
 }
 
-extern pthread_key_t plugin_key;
-struct plugin_data;
-
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
     size_t result = 0;
 

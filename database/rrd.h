@@ -258,8 +258,8 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
     RRDDIM_FLAG_ARCHIVED                        = (1 << 2),
     RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 3),  // Metadata needs to go to the database
 
-    RRDDIM_FLAG_META_HIDDEN                     = (1 << 4), // Status of hidden option in the metadata database
-
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 4),  // Status of hidden option in the metadata database
+    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 5),  // Do ML LOAD for this dimension
 
     // this is 8 bit
 } RRDDIM_FLAGS;
