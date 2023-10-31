@@ -538,7 +538,7 @@ void netdata_cgroup_ebpf_initialize_shm()
     }
 
     size_t length = sizeof(netdata_ebpf_cgroup_shm_header_t) + cgroup_root_max * sizeof(netdata_ebpf_cgroup_shm_body_t);
-    if (ftruncate(shm_fd_cgroup_ebpf, (__off_t)length)) {
+    if (ftruncate(shm_fd_cgroup_ebpf, length)) {
         collector_error("Cannot set size for shared memory.");
         goto end_init_shm;
     }
@@ -2985,7 +2985,7 @@ void *cgroups_main(void *ptr) {
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
     cgroup_netdev_link_init();
-    rrd_function_add(localhost, NULL, "cgtop", 10,
+    rrd_function_add(localhost, NULL, "cgroups", 10,
             RRDFUNCTIONS_CGTOP_HELP, true,
             cgroup_function_cgroup_top, NULL);
 
