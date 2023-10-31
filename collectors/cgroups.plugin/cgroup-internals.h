@@ -1,5 +1,8 @@
 #include "sys_fs_cgroup.h"
 
+#ifndef NETDATA_CGROUP_INTERNALS_H
+#define NETDATA_CGROUP_INTERNALS_H 1
+
 #ifdef NETDATA_INTERNAL_CHECKS
 #define CGROUP_PROCFILE_FLAG PROCFILE_FLAG_DEFAULT
 #else
@@ -222,6 +225,9 @@ struct cgroup {
 
     // per cgroup charts
     RRDSET *st_cpu;
+    RRDDIM *st_cpu_rd_user;
+    RRDDIM *st_cpu_rd_system;
+
     RRDSET *st_cpu_limit;
     RRDSET *st_cpu_per_core;
     RRDSET *st_cpu_nr_throttled;
@@ -229,6 +235,9 @@ struct cgroup {
     RRDSET *st_cpu_shares;
 
     RRDSET *st_mem;
+    RRDDIM *st_mem_rd_ram;
+    RRDDIM *st_mem_rd_swap;
+
     RRDSET *st_mem_utilization;
     RRDSET *st_writeback;
     RRDSET *st_mem_activity;
@@ -264,6 +273,8 @@ struct cgroup {
     char *filename_memoryswap_limit;
     unsigned long long memoryswap_limit;
     const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
+
+    const DICTIONARY_ITEM *cgroup_netdev_link;
 
     struct cgroup *next;
     struct cgroup *discovered_next;
@@ -412,3 +423,9 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout, const char *function, vo
         rrd_function_result_callback_t result_cb, void *result_cb_data,
         rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
         rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data);
+
+void cgroup_netdev_link_init(void);
+const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg);
+void cgroup_netdev_delete(struct cgroup *cg);
+
+#endif // NETDATA_CGROUP_INTERNALS_H

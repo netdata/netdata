@@ -53,6 +53,8 @@ static inline void free_cgroup_network_interfaces(struct cgroup *cg) {
 static inline void cgroup_free(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
+    cgroup_netdev_delete(cg);
+
     if(cg->st_cpu) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu);
     if(cg->st_cpu_limit) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
     if(cg->st_cpu_per_core) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_per_core);
@@ -1135,8 +1137,8 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
             collector_info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
 
             // register a device rename to proc_net_dev.c
-            netdev_rename_device_add(
-                    i->host_device, i->container_device, cg->chart_id, cg->chart_labels, k8s_is_kubepod(cg) ? "k8s." : "");
+            netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id, cg->chart_labels,
+                                     k8s_is_kubepod(cg) ? "k8s." : "", cgroup_netdev_get(cg));
         }
     }
 

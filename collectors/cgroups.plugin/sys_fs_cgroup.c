@@ -1208,6 +1208,58 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
 // ----------------------------------------------------------------------------
 // generate charts
 
+static void update_mem_usage_chart(
+        struct cgroup *cg,
+        char *type,
+        char *title,
+        char *context,
+        char *module,
+        int priority,
+        int update_every,
+        bool do_swap_usage) {
+    if (unlikely(!cg->st_mem_usage)) {
+        cg->st_mem_usage = rrdset_create_localhost(
+                cgroup_chart_type(type, cg),
+                "mem_usage",
+                NULL,
+                "mem",
+                context,
+                title,
+                "MiB",
+                PLUGIN_CGROUPS_NAME,
+                module,
+                priority,
+                update_every,
+                RRDSET_TYPE_STACKED);
+
+        rrdset_update_rrdlabels(cg->st_mem_usage, cg->chart_labels);
+
+        cg->st_mem_rd_ram = rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+        if (likely(do_swap_usage))
+            cg->st_mem_rd_swap = rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(cg->st_mem_usage, cg->st_mem_rd_ram, (collected_number)cg->memory.usage_in_bytes);
+
+    if (likely(do_swap_usage)) {
+        if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED))
+            rrddim_set_by_pointer(
+                    cg->st_mem_usage,
+                    cg->st_mem_rd_swap,
+                    cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
+                    (collected_number)(cg->memory.msw_usage_in_bytes -
+                                       (cg->memory.usage_in_bytes + cg->memory.total_inactive_file)) : 0);
+        else
+            rrddim_set_by_pointer(cg->st_mem_usage, cg->st_mem_rd_swap, (collected_number)cg->memory.msw_usage_in_bytes);
+    }
+
+    rrdset_done(cg->st_mem_usage);
+}
+
+
+// ----------------------------------------------------------------------------
+// generate charts
+
 #define CHART_TITLE_MAX 300
 
 void update_systemd_services_charts(
@@ -1252,58 +1304,25 @@ void update_systemd_services_charts(
 
                 rrdset_update_rrdlabels(cg->st_cpu, cg->chart_labels);
                 if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                    rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_user = rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_system = rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
                 } else {
-                    rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_user = rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_system = rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
                 }
             }
 
             // complete the iteration
-            rrddim_set(cg->st_cpu, "user", (collected_number)cg->cpuacct_stat.user);
-            rrddim_set(cg->st_cpu, "system", (collected_number)cg->cpuacct_stat.system);
+            rrddim_set_by_pointer(cg->st_cpu, cg->st_cpu_rd_user, (collected_number)cg->cpuacct_stat.user);
+            rrddim_set_by_pointer(cg->st_cpu, cg->st_cpu_rd_system, (collected_number)cg->cpuacct_stat.system);
             rrdset_done(cg->st_cpu);
         }
 
-        if (unlikely(do_mem_usage && cg->memory.updated_usage_in_bytes)) {
-            if (unlikely(!cg->st_mem_usage)) {
-                cg->st_mem_usage = rrdset_create_localhost(
-                    cgroup_chart_type(type, cg),
-                    "mem_usage",
-                    NULL,
-                    "mem",
-                    "systemd.service.memory.usage",
-                    "Systemd Services Used Memory",
-                    "MiB",
-                    PLUGIN_CGROUPS_NAME,
-                    PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME,
-                    systemd_cgroup_chart_priority + 5,
-                    update_every,
-                    RRDSET_TYPE_STACKED);
-
-                rrdset_update_rrdlabels(cg->st_mem_usage, cg->chart_labels);
-                rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                if (likely(do_swap_usage))
-                    rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set(cg->st_mem_usage, "ram", (collected_number)cg->memory.usage_in_bytes);
-            if (likely(do_swap_usage)) {
-                if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                    rrddim_set(
-                        cg->st_mem_usage,
-                        "swap",
-                        cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
-                        (collected_number)(cg->memory.msw_usage_in_bytes -
-                                (cg->memory.usage_in_bytes + cg->memory.total_inactive_file)) :
-                            0);
-                } else {
-                    rrddim_set(cg->st_mem_usage, "swap", (collected_number)cg->memory.msw_usage_in_bytes);
-                }
-            }
-            rrdset_done(cg->st_mem_usage);
-        }
+        if (unlikely(do_mem_usage && cg->memory.updated_usage_in_bytes))
+            update_mem_usage_chart(cg, type, "Systemd Services Used Memory", "systemd.service.memory.usage"
+                                   , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME, systemd_cgroup_chart_priority + 5, update_every
+                                   , do_swap_usage
+                                  );
 
         if (likely(do_mem_failcnt && cg->memory.updated_failcnt)) {
             if (unlikely(do_mem_failcnt && !cg->st_mem_failcnt)) {
@@ -1761,17 +1780,17 @@ void update_cgroup_charts(int update_every) {
                 rrdset_update_rrdlabels(cg->st_cpu, cg->chart_labels);
 
                 if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                    rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_user = rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_system = rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else {
-                    rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_user = rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                    cg->st_cpu_rd_system = rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
                 }
             }
 
-            rrddim_set(cg->st_cpu, "user", (collected_number)cg->cpuacct_stat.user);
-            rrddim_set(cg->st_cpu, "system", (collected_number)cg->cpuacct_stat.system);
+            rrddim_set_by_pointer(cg->st_cpu, cg->st_cpu_rd_user, (collected_number)cg->cpuacct_stat.user);
+            rrddim_set_by_pointer(cg->st_cpu, cg->st_cpu_rd_system, (collected_number)cg->cpuacct_stat.system);
             rrdset_done(cg->st_cpu);
 
             if(likely(cg->filename_cpuset_cpus || cg->filename_cpu_cfs_period || cg->filename_cpu_cfs_quota)) {
@@ -2131,41 +2150,11 @@ void update_cgroup_charts(int update_every) {
         }
 
         if(likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES)) {
-            if(unlikely(!cg->st_mem_usage)) {
-                snprintfz(title, CHART_TITLE_MAX, "Used Memory");
-
-                cg->st_mem_usage = rrdset_create_localhost(
-                          cgroup_chart_type(type, cg)
-                        , "mem_usage"
-                        , NULL
-                        , "mem"
-                        , k8s_is_kubepod(cg) ? "k8s.cgroup.mem_usage" : "cgroup.mem_usage"
-                        , title
-                        , "MiB"
-                        , PLUGIN_CGROUPS_NAME
-                        , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , cgroup_containers_chart_priority + 210
-                        , update_every
-                        , RRDSET_TYPE_STACKED
-                );
-
-                rrdset_update_rrdlabels(cg->st_mem_usage, cg->chart_labels);
-
-                rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set(cg->st_mem_usage, "ram", (collected_number)cg->memory.usage_in_bytes);
-            if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
-                rrddim_set(
-                    cg->st_mem_usage,
-                    "swap",
-                    cg->memory.msw_usage_in_bytes > (cg->memory.usage_in_bytes + cg->memory.total_inactive_file) ?
-                    (collected_number)(cg->memory.msw_usage_in_bytes - (cg->memory.usage_in_bytes + cg->memory.total_inactive_file)) : 0);
-            } else {
-                rrddim_set(cg->st_mem_usage, "swap", (collected_number)cg->memory.msw_usage_in_bytes);
-            }
-            rrdset_done(cg->st_mem_usage);
+            update_mem_usage_chart(cg, type, "Used Memory"
+                                   , k8s_is_kubepod(cg) ? "k8s.cgroup.mem_usage" : "cgroup.mem_usage"
+                                   , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME, cgroup_containers_chart_priority + 210
+                                   , update_every, true
+                                  );
 
             if (likely(update_memory_limits(&cg->filename_memory_limit, &cg->chart_var_memory_limit, &cg->memory_limit, "memory_limit", cg))) {
                 static unsigned long long ram_total = 0;
@@ -2995,6 +2984,7 @@ void *cgroups_main(void *ptr) {
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
+    cgroup_netdev_link_init();
     rrd_function_add(localhost, NULL, "cgtop", 10,
             RRDFUNCTIONS_CGTOP_HELP, true,
             cgroup_function_cgroup_top, NULL);
