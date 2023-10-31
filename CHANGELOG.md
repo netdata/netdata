@@ -2,10 +2,13 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.2...HEAD)
 
 **Merged pull requests:**
 
+- Use proper icons for deploy integrations [\#16305](https://github.com/netdata/netdata/pull/16305) ([Ancairon](https://github.com/Ancairon))
+- bump openssl for static in 3.1.4 [\#16303](https://github.com/netdata/netdata/pull/16303) ([tkatsoulas](https://github.com/tkatsoulas))
+- claim.sh: use echo instead of /bin/echo [\#16300](https://github.com/netdata/netdata/pull/16300) ([ilyam8](https://github.com/ilyam8))
 - update journal sources once per minute [\#16298](https://github.com/netdata/netdata/pull/16298) ([ktsaou](https://github.com/ktsaou))
 - Fix label copy [\#16297](https://github.com/netdata/netdata/pull/16297) ([stelfrag](https://github.com/stelfrag))
 - fix missing labels from parents [\#16296](https://github.com/netdata/netdata/pull/16296) ([ktsaou](https://github.com/ktsaou))
@@ -16,7 +19,10 @@
 - Regenerate integrations.js [\#16291](https://github.com/netdata/netdata/pull/16291) ([netdatabot](https://github.com/netdatabot))
 - fix retention loading [\#16290](https://github.com/netdata/netdata/pull/16290) ([ktsaou](https://github.com/ktsaou))
 - integrations: yes/no instead of True/False in tables [\#16289](https://github.com/netdata/netdata/pull/16289) ([ilyam8](https://github.com/ilyam8))
+- typo fixed in gen\_docs\_integrations.py [\#16288](https://github.com/netdata/netdata/pull/16288) ([khalid586](https://github.com/khalid586))
 - Brotli streaming compression [\#16287](https://github.com/netdata/netdata/pull/16287) ([ktsaou](https://github.com/ktsaou))
+- Apcupsd selftest metric [\#16286](https://github.com/netdata/netdata/pull/16286) ([thomasbeaudry](https://github.com/thomasbeaudry))
+- Fix 404s in markdown files [\#16285](https://github.com/netdata/netdata/pull/16285) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#16284](https://github.com/netdata/netdata/pull/16284) ([netdatabot](https://github.com/netdatabot))
 - Small optimization of alert queries [\#16282](https://github.com/netdata/netdata/pull/16282) ([MrZammler](https://github.com/MrZammler))
 - update go.d version to 0.56.4 [\#16281](https://github.com/netdata/netdata/pull/16281) ([ilyam8](https://github.com/ilyam8))
@@ -71,6 +77,10 @@
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 - shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.1...v1.43.2)
 
 ## [v1.43.1](https://github.com/netdata/netdata/tree/v1.43.1) (2023-10-26)
 
@@ -419,15 +429,6 @@
 - Assorted fixes for integrations templates. [\#15702](https://github.com/netdata/netdata/pull/15702) ([Ferroin](https://github.com/Ferroin))
 - integrations: fix metrics availability [\#15701](https://github.com/netdata/netdata/pull/15701) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of troubleshooting section in integrations. [\#15700](https://github.com/netdata/netdata/pull/15700) ([Ferroin](https://github.com/Ferroin))
-- update vscode yaml schemas association [\#15697](https://github.com/netdata/netdata/pull/15697) ([ilyam8](https://github.com/ilyam8))
-- Update categories.yaml [\#15696](https://github.com/netdata/netdata/pull/15696) ([sashwathn](https://github.com/sashwathn))
-- Regenerate integrations.js [\#15695](https://github.com/netdata/netdata/pull/15695) ([netdatabot](https://github.com/netdatabot))
-- Extend eBPF default shutdown [\#15694](https://github.com/netdata/netdata/pull/15694) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix integrations regen workflow [\#15693](https://github.com/netdata/netdata/pull/15693) ([Ferroin](https://github.com/Ferroin))
-- bump go.d.plugin v0.54.1 [\#15692](https://github.com/netdata/netdata/pull/15692) ([ilyam8](https://github.com/ilyam8))
-- Update names [\#15691](https://github.com/netdata/netdata/pull/15691) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update metadata.yaml [\#15690](https://github.com/netdata/netdata/pull/15690) ([sashwathn](https://github.com/sashwathn))
-- Update categories.yaml [\#15689](https://github.com/netdata/netdata/pull/15689) ([sashwathn](https://github.com/sashwathn))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
