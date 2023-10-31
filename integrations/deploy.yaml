@@ -369,7 +369,6 @@
             services:
               netdata:
                 image: netdata/netdata:edge
-                container_name: netdata
                 pid: host
                 network_mode: host
                 cap_add:
@@ -408,7 +407,6 @@
             services:
               netdata:
                 image: netdata/netdata:stable
-                container_name: netdata
                 pid: host
                 network_mode: host
                 cap_add:
