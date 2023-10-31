@@ -333,6 +333,8 @@ volumes:
 
 #### CetusGuard
 
+> Note: This deployment method is supported by the community
+
 ```yaml
 version: '3'
 services:
