@@ -142,12 +142,37 @@ static void db_writer_db_mode_none(void *arg){
     }
 }
 
+#define return_db_writer_db_mode_none(p_file_info, do_mut_unlock){              \
+    p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;                             \
+    freez((void *) p_file_info->db_dir);                                        \
+    p_file_info->db_dir = strdupz("");                                          \
+    freez((void *) p_file_info->db_metadata);                                   \
+    p_file_info->db_metadata = NULL;                                            \
+    sqlite3_finalize(stmt_logs_insert);                                         \
+    sqlite3_finalize(stmt_blobs_get_total_filesize);                            \
+    sqlite3_finalize(stmt_blobs_update);                                        \
+    sqlite3_finalize(stmt_blobs_set_zero_filesize);                             \
+    sqlite3_finalize(stmt_logs_delete);                                         \
+    if(do_mut_unlock){                                                          \
+        uv_mutex_unlock(p_file_info->db_mut);                                   \
+        uv_rwlock_rdunlock(&p_file_info->circ_buff->buff_realloc_rwlock);       \
+    }                                                                           \
+    if(__atomic_load_n(&p_file_info->state, __ATOMIC_RELAXED) == LOG_SRC_READY) \
+        return (void) uv_thread_create( p_file_info->db_writer_thread,          \
+                                        db_writer_db_mode_none, p_file_info);   \
+}
+
 static void db_writer_db_mode_full(void *arg){
     int rc = 0;
     struct File_info *const p_file_info = (struct File_info *) arg;
+
+    sqlite3_stmt *stmt_logs_insert = NULL;
+    sqlite3_stmt *stmt_blobs_get_total_filesize = NULL;
+    sqlite3_stmt *stmt_blobs_update = NULL;
+    sqlite3_stmt *stmt_blobs_set_zero_filesize = NULL;
+    sqlite3_stmt *stmt_logs_delete = NULL;
     
     /* Prepare LOGS_TABLE INSERT statement */
-    sqlite3_stmt *stmt_logs_insert;
     rc = sqlite3_prepare_v2(p_file_info->db,
                         "INSERT INTO " LOGS_TABLE "("
                         "FK_BLOB_Id,"
@@ -160,27 +185,19 @@ static void db_writer_db_mode_full(void *arg){
                         -1, &stmt_logs_insert, NULL);
     if (unlikely(SQLITE_OK != rc)) {
         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-        freez((void *) p_file_info->db_dir);
-        p_file_info->db_dir = strdupz("");
-        return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
+        return_db_writer_db_mode_none(p_file_info, 0);
     }
     
     /* Prepare BLOBS_TABLE get total filesize statement */
-    sqlite3_stmt *stmt_blobs_get_total_filesize;
     rc = sqlite3_prepare_v2(p_file_info->db,
                             "SELECT SUM(Filesize) FROM " BLOBS_TABLE " ;",
                             -1, &stmt_blobs_get_total_filesize, NULL);
     if (unlikely(SQLITE_OK != rc)) {
         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-        freez((void *) p_file_info->db_dir);
-        p_file_info->db_dir = strdupz("");
-        return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
+        return_db_writer_db_mode_none(p_file_info, 0);
     }
      
     /* Prepare BLOBS_TABLE UPDATE statement */
-    sqlite3_stmt *stmt_blobs_update;
     rc = sqlite3_prepare_v2(p_file_info->db,
                             "UPDATE " BLOBS_TABLE
                             " SET Filesize = Filesize + ?"
@@ -188,14 +205,10 @@ static void db_writer_db_mode_full(void *arg){
                             -1, &stmt_blobs_update, NULL);
     if (unlikely(SQLITE_OK != rc)) {
         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-        freez((void *) p_file_info->db_dir);
-        p_file_info->db_dir = strdupz("");
-        return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
+        return_db_writer_db_mode_none(p_file_info, 0);
     }
     
     /* Prepare BLOBS_TABLE UPDATE SET zero filesize statement */
-    sqlite3_stmt *stmt_blobs_set_zero_filesize;
     rc = sqlite3_prepare_v2(p_file_info->db,
                             "UPDATE " BLOBS_TABLE
                             " SET Filesize = 0"
@@ -203,29 +216,21 @@ static void db_writer_db_mode_full(void *arg){
                             -1, &stmt_blobs_set_zero_filesize, NULL);
     if (unlikely(SQLITE_OK != rc)) {
         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-        freez((void *) p_file_info->db_dir);
-        p_file_info->db_dir = strdupz("");
-        return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
+        return_db_writer_db_mode_none(p_file_info, 0);
     }
     
     /* Prepare LOGS_TABLE DELETE statement */
-    sqlite3_stmt *stmt_logs_delete;
     rc = sqlite3_prepare_v2(p_file_info->db,
                             "DELETE FROM " LOGS_TABLE
                             " WHERE FK_BLOB_Id = ? ;",
                             -1, &stmt_logs_delete, NULL);
     if (unlikely(SQLITE_OK != rc)) {
         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-        freez((void *) p_file_info->db_dir);
-        p_file_info->db_dir = strdupz("");
-        return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
+        return_db_writer_db_mode_none(p_file_info, 0);
     }
         
     /* Get initial filesize of logs.bin.0 BLOB */
-    sqlite3_stmt *stmt_retrieve_filesize_from_id;
-    
+    sqlite3_stmt *stmt_retrieve_filesize_from_id = NULL;
     if(unlikely(
         SQLITE_OK != (rc = sqlite3_prepare_v2(p_file_info->db,  
                                                 "SELECT Filesize FROM " BLOBS_TABLE 
@@ -236,30 +241,15 @@ static void db_writer_db_mode_full(void *arg){
         SQLITE_ROW != (rc = sqlite3_step(stmt_retrieve_filesize_from_id))
         )){
             throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-            p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-            freez((void *) p_file_info->db_dir);
-            p_file_info->db_dir = strdupz("");
-            return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
+            return_db_writer_db_mode_none(p_file_info, 0);
     }
     int64_t blob_filesize = (int64_t) sqlite3_column_int64(stmt_retrieve_filesize_from_id, 0);
     rc = sqlite3_finalize(stmt_retrieve_filesize_from_id);
     if (unlikely(SQLITE_OK != rc)) {
         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-        p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;
-        freez((void *) p_file_info->db_dir);
-        p_file_info->db_dir = strdupz("");
-        return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
+        return_db_writer_db_mode_none(p_file_info, 0);
     }
 
-    #define return_db_writer_db_mode_none(p_file_info){\
-        p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;\
-        freez((void *) p_file_info->db_dir);\
-        p_file_info->db_dir = strdupz("");\
-        uv_mutex_unlock(p_file_info->db_mut);\
-        uv_rwlock_rdunlock(&p_file_info->circ_buff->buff_realloc_rwlock);\
-        return (void) uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);\
-    }
-        
     struct timespec ts_db_write_start, ts_db_write_end, ts_db_rotate_end;
     while(__atomic_load_n(&p_file_info->state, __ATOMIC_RELAXED) == LOG_SRC_READY){
         clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts_db_write_start);
@@ -287,7 +277,7 @@ static void db_writer_db_mode_full(void *arg){
             if(unlikely(rc < 0)){
                 throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 circ_buff_read_done(p_file_info->circ_buff);
-                return_db_writer_db_mode_none(p_file_info);
+                return_db_writer_db_mode_none(p_file_info, 1);
             }
             
             /* Ensure data is flushed to BLOB via fdatasync() */
@@ -298,7 +288,7 @@ static void db_writer_db_mode_full(void *arg){
             if (unlikely(rc)){
                 throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 circ_buff_read_done(p_file_info->circ_buff);
-                return_db_writer_db_mode_none(p_file_info);
+                return_db_writer_db_mode_none(p_file_info, 1);
             }
             
             if(unlikely(
@@ -325,7 +315,7 @@ static void db_writer_db_mode_full(void *arg){
                     if (unlikely(SQLITE_OK != rc)) 
                         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                     circ_buff_read_done(p_file_info->circ_buff);
-                    return_db_writer_db_mode_none(p_file_info);
+                    return_db_writer_db_mode_none(p_file_info, 1);
             }
 
             /* TODO: Should we log it if there is a fatal error in the transaction, 
@@ -357,7 +347,7 @@ static void db_writer_db_mode_full(void *arg){
                     //TODO: This error case needs better handling, as it will result in mismatch with sqlite metadata.
                     //      We probably require a WAL or something similar.
                     throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
-                    return_db_writer_db_mode_none(p_file_info);
+                    return_db_writer_db_mode_none(p_file_info, 1);
                 }
             }
             
@@ -370,7 +360,7 @@ static void db_writer_db_mode_full(void *arg){
                 //TODO: This error case needs better handling, as it will result in mismatch with sqlite metadata.
                 //      We probably require a WAL or something similar.
                 throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
-                return_db_writer_db_mode_none(p_file_info);
+                return_db_writer_db_mode_none(p_file_info, 1);
             }
 
             /* Rotate BLOBS_TABLE Filenames */
@@ -386,7 +376,7 @@ static void db_writer_db_mode_full(void *arg){
             if (unlikely(rc != SQLITE_OK)) {
                 throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
                 //TODO: Undo rotation if possible?
-                return_db_writer_db_mode_none(p_file_info);
+                return_db_writer_db_mode_none(p_file_info, 1);
             }
             
             /* -----------------------------------------------------------------
@@ -408,7 +398,7 @@ static void db_writer_db_mode_full(void *arg){
                 //TODO: This error case needs better handling, as it will result in mismatch with sqlite metadata.
                 //      We probably require a WAL or something similar.
                 throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
-                return_db_writer_db_mode_none(p_file_info);
+                return_db_writer_db_mode_none(p_file_info, 1);
             }
             
             /* (c) */ 
@@ -428,7 +418,7 @@ static void db_writer_db_mode_full(void *arg){
                     rc = sqlite3_exec(p_file_info->db, "ROLLBACK;", NULL, NULL, NULL);
                     if (unlikely(SQLITE_OK != rc)) 
                         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-                    return_db_writer_db_mode_none(p_file_info);
+                    return_db_writer_db_mode_none(p_file_info, 1);
             }
 
             /* (e) */
@@ -450,13 +440,13 @@ static void db_writer_db_mode_full(void *arg){
         rc = sqlite3_step(stmt_blobs_get_total_filesize);
         if (unlikely(SQLITE_ROW != rc)) {
             throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-            return_db_writer_db_mode_none(p_file_info);
+            return_db_writer_db_mode_none(p_file_info, 1);
         }
         __atomic_store_n(&p_file_info->blob_total_size, sqlite3_column_int64(stmt_blobs_get_total_filesize, 0), __ATOMIC_RELAXED);
         rc = sqlite3_reset(stmt_blobs_get_total_filesize);
         if (unlikely(SQLITE_OK != rc)) {
             throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);
-            return_db_writer_db_mode_none(p_file_info);
+            return_db_writer_db_mode_none(p_file_info, 1);
         }
 
         // TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
@@ -467,8 +457,9 @@ static void db_writer_db_mode_full(void *arg){
                 break;
             sleep_usec(USEC_PER_SEC);
         }
-
     }
+
+    return_db_writer_db_mode_none(p_file_info, 0);
 }
 
 inline void db_set_main_dir(char *const dir){
@@ -554,7 +545,7 @@ int db_init() {
         goto return_error;
     }
     
-    sqlite3_stmt *stmt_search_if_log_source_exists;
+    sqlite3_stmt *stmt_search_if_log_source_exists = NULL;
     rc = sqlite3_prepare_v2(main_db,
                             "SELECT COUNT(*), Id, DB_Dir FROM " MAIN_COLLECTIONS_TABLE
                             " WHERE Stream_Tag = ? AND Log_Source_Path = ? AND Type = ? ;",
@@ -565,7 +556,7 @@ int db_init() {
     }
 
     
-    sqlite3_stmt *stmt_insert_log_collection_metadata;
+    sqlite3_stmt *stmt_insert_log_collection_metadata = NULL;
     rc = sqlite3_prepare_v2(main_db,
                             "INSERT INTO " MAIN_COLLECTIONS_TABLE
                             " (Stream_Tag, Log_Source_Path, Type, DB_Dir) VALUES (?,?,?,?) ;",
@@ -581,8 +572,8 @@ int db_init() {
 
         if(p_file_info->db_mode == LOGS_MANAG_DB_MODE_NONE){
             p_file_info->db_dir = strdupz("");
-            uv_thread_t *db_writer_thread = mallocz(sizeof(uv_thread_t));
-            rc = uv_thread_create(db_writer_thread, db_writer_db_mode_none, p_file_info);
+            p_file_info->db_writer_thread = mallocz(sizeof(uv_thread_t));
+            rc = uv_thread_create(p_file_info->db_writer_thread, db_writer_db_mode_none, p_file_info);
             if (unlikely(rc)){
                 throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                 goto return_error;
@@ -723,7 +714,7 @@ int db_init() {
                 do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
 
                 /* Check if BLOBS_TABLE exists or not */
-                sqlite3_stmt *stmt_check_if_BLOBS_TABLE_exists;
+                sqlite3_stmt *stmt_check_if_BLOBS_TABLE_exists = NULL;
                 rc = sqlite3_prepare_v2(p_file_info->db,
                                         "SELECT COUNT(*) FROM sqlite_master" 
                                         " WHERE type='table' AND name='"BLOBS_TABLE"';",
@@ -751,7 +742,7 @@ int db_init() {
                     } else collector_info("[%s]: Table " BLOBS_TABLE " created successfully", p_file_info->chartname);
                     
                     /* 2. Populate it */
-                    sqlite3_stmt *stmt_init_BLOBS_table;
+                    sqlite3_stmt *stmt_init_BLOBS_table = NULL;
                     rc = sqlite3_prepare_v2(p_file_info->db,
                                     "INSERT INTO " BLOBS_TABLE 
                                     " (Filename, Filesize) VALUES (?,?) ;",
@@ -826,7 +817,7 @@ int db_init() {
              * entries should be deleted automatically (due to ON DELETE CASCADE). 
              * -------------------------------------------------------------- */
             {
-                sqlite3_stmt *stmt_get_BLOBS_TABLE_size;
+                sqlite3_stmt *stmt_get_BLOBS_TABLE_size = NULL;
                 rc = sqlite3_prepare_v2(p_file_info->db,
                                         "SELECT MAX(Id) FROM " BLOBS_TABLE ";",
                                         -1, &stmt_get_BLOBS_TABLE_size, NULL);
@@ -836,7 +827,7 @@ int db_init() {
 
                 const int blobs_table_max_id = sqlite3_column_int(stmt_get_BLOBS_TABLE_size, 0);
 
-                sqlite3_stmt *stmt_retrieve_filename_last_digits; // This statement retrieves the last digit(s) from the Filename column of BLOBS_TABLE
+                sqlite3_stmt *stmt_retrieve_filename_last_digits = NULL; // This statement retrieves the last digit(s) from the Filename column of BLOBS_TABLE
                 rc = sqlite3_prepare_v2(p_file_info->db,
                     "WITH split(word, str) AS ( SELECT '', (SELECT Filename FROM " BLOBS_TABLE " WHERE Id = ? ) || '.' "
                     "UNION ALL SELECT substr(str, 0, instr(str, '.')), substr(str, instr(str, '.')+1) FROM split WHERE str!='' ) "
@@ -844,7 +835,7 @@ int db_init() {
                     -1, &stmt_retrieve_filename_last_digits, NULL);
                 do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
 
-                sqlite3_stmt *stmt_delete_row_by_id; 
+                sqlite3_stmt *stmt_delete_row_by_id = NULL; 
                 rc = sqlite3_prepare_v2(p_file_info->db,
                     "DELETE FROM " BLOBS_TABLE " WHERE Id = ?;",
                     -1, &stmt_delete_row_by_id, NULL);
@@ -902,7 +893,7 @@ int db_init() {
 
                 int old_blobs_table_ids[BLOB_MAX_FILES];
                 int off = 0;
-                sqlite3_stmt *stmt_retrieve_all_ids; 
+                sqlite3_stmt *stmt_retrieve_all_ids = NULL; 
                 rc = sqlite3_prepare_v2(p_file_info->db,
                     "SELECT Id FROM " BLOBS_TABLE " ORDER BY Id ASC;",
                     -1, &stmt_retrieve_all_ids, NULL);
@@ -917,7 +908,7 @@ int db_init() {
                 rc = sqlite3_finalize(stmt_retrieve_all_ids);
                 do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
 
-                sqlite3_stmt *stmt_update_id; 
+                sqlite3_stmt *stmt_update_id = NULL; 
                 rc = sqlite3_prepare_v2(p_file_info->db,
                     "UPDATE " BLOBS_TABLE " SET Id = ? WHERE Id = ?;",
                     -1, &stmt_update_id, NULL);
@@ -942,14 +933,14 @@ int db_init() {
              * Traverse BLOBS_TABLE, open logs.bin.X files and store their 
              * file handles in p_file_info array. 
              * -------------------------------------------------------------- */
-            sqlite3_stmt *stmt_retrieve_metadata_from_id;
+            sqlite3_stmt *stmt_retrieve_metadata_from_id = NULL;
             rc = sqlite3_prepare_v2(p_file_info->db,
                                     "SELECT Filename, Filesize FROM " BLOBS_TABLE 
                                     " WHERE Id = ? ;",
                                     -1, &stmt_retrieve_metadata_from_id, NULL);
             do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
             
-            sqlite3_stmt *stmt_retrieve_total_logs_size;
+            sqlite3_stmt *stmt_retrieve_total_logs_size = NULL;
             rc = sqlite3_prepare_v2(p_file_info->db,
                                     "SELECT SUM(Msg_compr_size) FROM " LOGS_TABLE 
                                     " WHERE FK_BLOB_Id = ? GROUP BY FK_BLOB_Id ;",

@@ -659,22 +659,11 @@ If during the Fluent Bit build step you are seeing the following message:
 ``` 
 it means that the systemd development libraries are missing from your system. Please see [how to install them alongside other required packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md).
 
-2. Logs management and kernel log collection do not work at all and I am seeing the following error in `collector.log`:
-
-```
-[2020/10/20 10:39:06] [error] [plugins/in_kmsg/in_kmsg.c:291 errno=1] Operation not permitted
-[2020/10/20 10:39:06] [error] Failed initialize input kmsg.0
-```
-Netdata is executed without root permissions, so the kernel ring buffer logs may not be accessible from normal users. Please try executing:
-```
-sudo sysctl kernel.dmesg_restrict=0
-```
-
-3. I am observing very high CPU usage when monitoring a log source using `flb_tail` or `flb_web_log`.
+2. I am observing very high CPU usage when monitoring a log source using `flb_tail` or `flb_web_log`.
 
 The log source is probably producing a very high number of unbuffered logs, which results in too many filesystem events. Try setting `use inotify = no` to use file stat watchers instead.
 
-4. I am using Podman instead of Docker, but I cannot see any Podman events logs being collected.
+3. I am using Podman instead of Docker, but I cannot see any Podman events logs being collected.
 
 Please ensure there is a listening service running that answers API calls for Podman. Instructions on how to start such a service can be found [here](https://docs.podman.io/en/latest/markdown/podman-system-service.1.html).
 

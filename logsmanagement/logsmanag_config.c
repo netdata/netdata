@@ -86,6 +86,7 @@ char *get_cache_dir(void){
 static void p_file_info_destroy(struct File_info *p_file_info){
 
     // TODO: Clean up rrd / chart stuff.
+    // p_file_info->chart_meta
 
     if(unlikely(!p_file_info)){
         collector_info("p_file_info_destroy() called but p_file_info == NULL - already destroyed?");
@@ -107,13 +108,14 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     // TODO: Need to do proper termination of DB threads and allocated memory.
     if(p_file_info->db_writer_thread){
         uv_thread_join(p_file_info->db_writer_thread);
-        sqlite3_close(p_file_info->db);
-        uv_mutex_destroy(p_file_info->db_mut);
+        sqlite3_finalize(p_file_info->stmt_get_log_msg_metadata_asc);
+        sqlite3_finalize(p_file_info->stmt_get_log_msg_metadata_desc);
+        if(sqlite3_close(p_file_info->db) != SQLITE_OK)
+            collector_error("[%s]: Failed to close database", chartname);
+        freez(p_file_info->db_mut);
         freez((void *) p_file_info->db_metadata);
         freez((void *) p_file_info->db_dir);
         freez(p_file_info->db_writer_thread);
-        sqlite3_finalize(p_file_info->stmt_get_log_msg_metadata_asc);
-        sqlite3_finalize(p_file_info->stmt_get_log_msg_metadata_desc);
     }
 
     freez((void *) p_file_info->chartname);
@@ -206,6 +208,8 @@ static void p_file_info_destroy(struct File_info *p_file_info){
         freez(output->plugin);
         freez(output);
     }
+
+    freez(p_file_info->flb_config);
     
     freez(p_file_info);
 
@@ -678,10 +682,10 @@ static void config_section_init(uv_loop_t *main_loop,
                 if(!strcasecmp(p_file_info->chartname, "Apache_access.log")){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
-                        "/var/log/apache2/access.log",  /* Debian and derivatives, Alpine */
-                        "/var/log/apache2/access_log",  /* Gentoo ? */
-                        "/var/log/httpd/access_log",    /* RHEL and derivatives */
-                        "/var/log/httpd-access.log",    /* FreeBSD */
+                        "/var/log/apache2/access.log",
+                        "/var/log/apache2/access_log",
+                        "/var/log/httpd/access_log",
+                        "/var/log/httpd-access.log",
                         NULL
                     };
                     int i = 0;
@@ -708,6 +712,7 @@ static void config_section_init(uv_loop_t *main_loop,
                     collector_error("[%s]: kmsg default path invalid, unknown or needs permissions", p_file_info->chartname);
                     return p_file_info_destroy(p_file_info);
                 } else p_file_info->filename = strdupz(KMSG_DEFAULT_PATH);
+                break;
             case FLB_SYSTEMD:
                 p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
                 break;
