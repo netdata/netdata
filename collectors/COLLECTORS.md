@@ -1109,8 +1109,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Eaton UPS](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/eaton_ups.md)
 
-- [Network UPS Tools (NUT)](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/nut/integrations/network_ups_tools_nut.md)
-
 - [UPS (NUT)](https://github.com/netdata/go.d.plugin/blob/master/modules/upsd/integrations/ups_nut.md)
 
 ### VPNs

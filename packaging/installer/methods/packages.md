@@ -23,10 +23,10 @@ and fail if it cannot do so.
 
 
 > ### Note
-> 
+>
 > In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
-> We still maintain the Package cloud repositories, but they are not guaranteed to work and may be removed 
-> without prior warning. 
+> We still maintain the Package cloud repositories, but they are not guaranteed to work and may be removed
+> without prior warning.
 >
 > When selecting a repository configuration package, note that the version 2 packages provide configuration for
 > our self-hosted repositories, and then version 1 packages provide configuration for Package Cloud.
@@ -99,3 +99,44 @@ If you are explicitly configuring a system to use our repositories, the recommen
 appropriate repository configuration package from https://repo.netdata.cloud/repos/repoconfig and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
+
+## Local mirrors of the official Netdata repositories
+
+Local mirrors of our official repositories can be created in one of two ways:
+
+1. Using the standard tooling for mirroring the type of repository you want a local mirror of, such as Aptly for
+   APT repositories, or reposync for RPM repositories. For this approach, please consult the documentation for
+   the specific tool you are using for info on how to mirror the repositories.
+2. Using a regular website mirroring tool, such as GNU wget’s `--mirror` option. For this approach, simply point
+   your mirroring tool at `https://repo.netdata.cloud/repos/`, and everything should just work.
+
+We do not provide official support for mirroring our repositories,
+but we do have some tips for anyone looking to do so:
+
+- Our `robots.txt` file explicitly disallows indexing, so if you’re using a regular website mirroring tool,
+  you wil need to tell it to ignore `robots.txt` (for example, if using GNU wget, add `-e robots=off` to the
+  options you pass) to ensure that it actually retrieves everything.
+- Excluding special cases of caching proxies (such as apt-cacher-ng), our repository configuration packages _DO NOT_
+  work with custom local mirrors. Thus, you will need to manually configure your systems to use your local mirror.
+- Packages are published as they are built, with 64-bit x86 packages being built first, followed by 32-bit x86,
+  and then non-x86 packages in alphabetical order of the CPU architecture. Because of the number of different
+  packages being built, this means that packages for a given nightly build or stable release are typically published
+  over the course of a few hours, usually starting about 15-20 minutes after the build or release is started.
+- Repository metadata is updated every hour on the hour, and the process may take anywhere from a few seconds to
+  more than 20 minutes. Because of this, it makes little sense to sync your mirror more frequently than once an hour,
+  and it’s generally preferred to start syncing at least 30 minutes into the hour.
+- A full mirror of all of our repositories currently requires up to 100 GB of storage space, though the exact
+  amount of space needed fluctuates over time. Because of this, users seeking to mirror our repositories are
+  encouraged to mirror only those repositories they actually need instead of mirroring everything.
+- If syncing daily (or less frequently), some time between 05:00 and 08:00 UTC each day is usually the saftest
+  time to do so, as publishing nightly packages will almost always be done by this point, and publishing of stable
+  releases typically happens after that time window.
+- If you intend to use our existing GPG signatures on the repository metadata and packages, you probably also want
+  a local copy of our public GPG key, which can be fetched from `https://repo.netdata.cloud/netdatabot.gpg.key`.
+
+## Public mirrors of the official Netdata repositories
+
+There are no official public mirrors of our repositories.
+
+If you wish to provide a public mirror of our official repositories, you are free to do so, but we kindly ask that
+you make it clear to your users that your mirror is not an official mirror of our repositories.

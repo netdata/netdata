@@ -201,7 +201,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     if (unlikely(!handle->page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
         return false;
 
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct rrdengine_instance *ctx = handle->ctx;
 
     uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->page);
@@ -257,6 +257,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
     handle->common.backend = STORAGE_ENGINE_BACKEND_DBENGINE;
     handle->metric = metric;
+    handle->ctx = ctx;
     handle->page = NULL;
     handle->data = NULL;
     handle->data_size = 0;
@@ -312,7 +313,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
         default: {
             static bool logged = false;
             if(!logged) {
-                netdata_log_error("DBENGINE: cannot check page for nulls on unknown page type id %d", (mrg_metric_ctx(handle->metric))->config.page_type);
+                netdata_log_error("DBENGINE: cannot check page for nulls on unknown page type id %d", handle->ctx->config.page_type);
                 logged = true;
             }
             return false;
@@ -442,7 +443,7 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
 }
 
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct rrdengine_instance *ctx = handle->ctx;
 
     size_t max_size = tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
@@ -484,7 +485,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
                                              const SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct rrdengine_instance *ctx = handle->ctx;
 
     if(unlikely(!handle->data))
         handle->data = rrdeng_alloc_new_metric_data(handle, &handle->data_size, point_in_time_ut);
@@ -656,7 +657,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
  */
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct rrdengine_instance *ctx = handle->ctx;
 
     handle->page_flags |= RRDENG_PAGE_COLLECT_FINALIZE;
     rrdeng_store_metric_flush_current_page(collection_handle);

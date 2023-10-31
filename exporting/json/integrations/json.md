@@ -52,21 +52,21 @@ The following options can be defined for this exporter.
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| enabled | Enables or disables an exporting connector instance (yes/no). | no | True |
-| destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | pubsub.googleapis.com | True |
-| username | Username for HTTP authentication | my_username | False |
-| password | Password for HTTP authentication | my_password | False |
-| data source | Selects the kind of data that will be sent to the external database. (as collected/average/sum) |  | False |
-| hostname | The hostname to be used for sending data to the external database server. | [global].hostname | False |
-| prefix | The prefix to add to all metrics. | Netdata | False |
-| update every | Frequency of sending sending data to the external database, in seconds. | 10 | False |
-| buffer on failures | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. | 10 | False |
-| timeout ms | The timeout in milliseconds to wait for the external database server to process the data. | 2 * update_every * 1000 | False |
-| send hosts matching | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns). | localhost * | False |
-| send charts matching | One or more space separated patterns (use * as wildcard) checked against both chart id and chart name. | * | False |
-| send names instead of ids | Controls the metric names Netdata should send to the external database (yes/no). |  | False |
-| send configured labels | Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes/no). |  | False |
-| send automatic labels | Controls if automatically created labels, like `_os_name` or `_architecture` should be sent to the external database (yes/no). |  | False |
+| enabled | Enables or disables an exporting connector instance (yes/no). | no | yes |
+| destination | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | pubsub.googleapis.com | yes |
+| username | Username for HTTP authentication | my_username | no |
+| password | Password for HTTP authentication | my_password | no |
+| data source | Selects the kind of data that will be sent to the external database. (as collected/average/sum) |  | no |
+| hostname | The hostname to be used for sending data to the external database server. | [global].hostname | no |
+| prefix | The prefix to add to all metrics. | Netdata | no |
+| update every | Frequency of sending sending data to the external database, in seconds. | 10 | no |
+| buffer on failures | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. | 10 | no |
+| timeout ms | The timeout in milliseconds to wait for the external database server to process the data. | 2 * update_every * 1000 | no |
+| send hosts matching | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns). | localhost * | no |
+| send charts matching | One or more space separated patterns (use * as wildcard) checked against both chart id and chart name. | * | no |
+| send names instead of ids | Controls the metric names Netdata should send to the external database (yes/no). |  | no |
+| send configured labels | Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes/no). |  | no |
+| send automatic labels | Controls if automatically created labels, like `_os_name` or `_architecture` should be sent to the external database (yes/no). |  | no |
 
 ##### destination
 

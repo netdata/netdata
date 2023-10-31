@@ -329,11 +329,11 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, string2str(tri.id), &tri, sizeof(tri));
 
-    RRDCONTEXT_ACQUIRED *rca_old = st->rrdcontext;
-    RRDINSTANCE_ACQUIRED *ria_old = st->rrdinstance;
+    RRDCONTEXT_ACQUIRED *rca_old = st->rrdcontexts.rrdcontext;
+    RRDINSTANCE_ACQUIRED *ria_old = st->rrdcontexts.rrdinstance;
 
-    st->rrdcontext = rca;
-    st->rrdinstance = ria;
+    st->rrdcontexts.rrdcontext = rca;
+    st->rrdcontexts.rrdinstance = ria;
 
     if(rca == rca_old) {
         rrdcontext_release(rca_old);
@@ -354,16 +354,16 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
         // migrate all dimensions to the new metrics
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-                    if (!rd->rrdmetric) continue;
+                    if (!rd->rrdcontexts.rrdmetric) continue;
 
-                    RRDMETRIC *rm_old = rrdmetric_acquired_value(rd->rrdmetric);
+                    RRDMETRIC *rm_old = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
                     rrd_flags_replace(rm_old, RRD_FLAG_DELETED|RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
                     rm_old->rrddim = NULL;
                     rm_old->first_time_s = 0;
                     rm_old->last_time_s = 0;
 
-                    rrdmetric_release(rd->rrdmetric);
-                    rd->rrdmetric = NULL;
+                    rrdmetric_release(rd->rrdcontexts.rrdmetric);
+                    rd->rrdcontexts.rrdmetric = NULL;
 
                     rrdmetric_from_rrddim(rd);
                 }
@@ -406,12 +406,12 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
 
 #define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
 static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const char *function) {
-    if(unlikely(!st->rrdinstance)) {
+    if(unlikely(!st->rrdcontexts.rrdinstance)) {
         netdata_log_error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
     }
 
-    RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdinstance);
+    RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdcontexts.rrdinstance);
     if(unlikely(!ri)) {
         netdata_log_error("RRDINSTANCE: RRDSET '%s' lost its link to an RRDINSTANCE at %s()", rrdset_id(st), function);
         return NULL;
@@ -439,14 +439,17 @@ inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
     rrdinstance_trigger_updates(ri, __FUNCTION__ );
 
-    rrdinstance_release(st->rrdinstance);
-    st->rrdinstance = NULL;
+    rrdinstance_release(st->rrdcontexts.rrdinstance);
+    st->rrdcontexts.rrdinstance = NULL;
 
-    rrdcontext_release(st->rrdcontext);
-    st->rrdcontext = NULL;
+    rrdcontext_release(st->rrdcontexts.rrdcontext);
+    st->rrdcontexts.rrdcontext = NULL;
+    st->rrdcontexts.collected = false;
 }
 
 inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
+    st->rrdcontexts.collected = false;
+
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
 
@@ -455,8 +458,10 @@ inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
 }
 
 inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
+    st->rrdcontexts.collected = false;
+
     // the chart may not be initialized when this is called
-    if(unlikely(!st->rrdinstance)) return;
+    if(unlikely(!st->rrdcontexts.rrdinstance)) return;
 
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
@@ -491,6 +496,8 @@ inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *
 }
 
 inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
+    st->rrdcontexts.collected = false;
+
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
 
@@ -503,6 +510,11 @@ inline void rrdinstance_updated_rrdset_flags(RRDSET *st) {
 }
 
 inline void rrdinstance_collected_rrdset(RRDSET *st) {
+    if(st->rrdcontexts.collected)
+        return;
+
+    st->rrdcontexts.collected = true;
+
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) {
         rrdcontext_updated_rrdset(st);

@@ -1,7 +1,7 @@
 [% if entry.metrics.scopes %]
 ## Metrics
 
-[% if entry.metrics.folding.enabled %]
+[% if entry.metrics.folding.enabled and not clean %]
 {% details summary="[[ entry.metrics.folding.title ]]" %}
 [% endif %]
 Metrics grouped by *scope*.
@@ -39,7 +39,7 @@ Metrics:
 [% endfor %]
 
 [% endfor %]
-[% if entry.metrics.folding.enabled %]
+[% if entry.metrics.folding.enabled and not clean %]
 {% /details %}
 [% endif %]
 [% else %]

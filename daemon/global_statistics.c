@@ -1881,8 +1881,6 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_mrg_metrics = NULL;
         static RRDDIM *rd_mrg_acquired = NULL;
         static RRDDIM *rd_mrg_collected = NULL;
-        static RRDDIM *rd_mrg_with_retention = NULL;
-        static RRDDIM *rd_mrg_without_retention = NULL;
         static RRDDIM *rd_mrg_multiple_writers = NULL;
 
         if (unlikely(!st_mrg_metrics)) {
@@ -1903,8 +1901,6 @@ static void dbengine2_statistics_charts(void) {
             rd_mrg_metrics = rrddim_add(st_mrg_metrics, "all", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_mrg_acquired = rrddim_add(st_mrg_metrics, "acquired", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_mrg_collected = rrddim_add(st_mrg_metrics, "collected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_mrg_with_retention = rrddim_add(st_mrg_metrics, "with retention", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_mrg_without_retention = rrddim_add(st_mrg_metrics, "without retention", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_mrg_multiple_writers = rrddim_add(st_mrg_metrics, "multi-collected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         priority++;
@@ -1912,8 +1908,6 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_metrics, (collected_number)mrg_stats.entries);
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_acquired, (collected_number)mrg_stats.entries_referenced);
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_collected, (collected_number)mrg_stats.writers);
-        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_with_retention, (collected_number)mrg_stats.entries_with_retention);
-        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_without_retention, (collected_number)mrg_stats.entries - (collected_number)mrg_stats.entries_with_retention);
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_multiple_writers, (collected_number)mrg_stats.writers_conflicts);
 
         rrdset_done(st_mrg_metrics);

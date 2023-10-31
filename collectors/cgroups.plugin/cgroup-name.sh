@@ -620,21 +620,19 @@ if [ -z "${NAME}" ]; then
     # libvirtd / qemu virtual machines
     NAME="qemu_$(echo "${CGROUP}" | sed 's/^machine_//; s/\.libvirt-qemu$//; s/-/_/;')"
 
-  elif [[ ${CGROUP} =~ qemu.slice_([0-9]+).scope && -d /etc/pve ]]; then
+  elif [[ ${CGROUP} =~ qemu.slice_([0-9]+).scope && -d "${NETDATA_HOST_PREFIX}/etc/pve" ]]; then
     # Proxmox VMs
-
-    FILENAME="/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf"
+    FILENAME="${NETDATA_HOST_PREFIX}/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf"
     if [[ -f $FILENAME && -r $FILENAME ]]; then
-      NAME="qemu_$(grep -e '^name: ' "/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')"
+      NAME="qemu_$(grep -e '^name: ' "${FILENAME}" | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')"
     else
       error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
     fi
-  elif [[ ${CGROUP} =~ lxc_([0-9]+) && -d /etc/pve ]]; then
+  elif [[ ${CGROUP} =~ lxc_([0-9]+) && -d "${NETDATA_HOST_PREFIX}/etc/pve" ]]; then
     # Proxmox Containers (LXC)
-
-    FILENAME="/etc/pve/lxc/${BASH_REMATCH[1]}.conf"
+    FILENAME="${NETDATA_HOST_PREFIX}/etc/pve/lxc/${BASH_REMATCH[1]}.conf"
     if [[ -f ${FILENAME} && -r ${FILENAME} ]]; then
-      NAME=$(grep -e '^hostname: ' "/etc/pve/lxc/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*hostname\s*:\s*(.*)?$|\1|p')
+      NAME=$(grep -e '^hostname: ' "${FILENAME}" | head -1 | sed -rn 's|\s*hostname\s*:\s*(.*)?$|\1|p')
     else
       error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
     fi

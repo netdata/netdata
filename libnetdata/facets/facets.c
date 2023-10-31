@@ -307,7 +307,8 @@ struct facets {
 
     struct {
         FACET_ROW_SEVERITY severity;
-        size_t keys_matched_by_query;   // the number of fields matched the full text search (per row)
+        size_t keys_matched_by_query_positive;   // the number of fields matched the full text search (per row)
+        size_t keys_matched_by_query_negative;   // the number of fields matched the full text search (per row)
     } current_row;
 
     struct {
@@ -1583,8 +1584,18 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
     if(facets->query && !facet_key_value_empty(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         facets->operations.fts.searches++;
         facets_key_value_copy_to_buffer(k);
-        if(simple_pattern_matches(facets->query, buffer_tostring(k->current_value.b)))
-            facets->current_row.keys_matched_by_query++;
+        switch(simple_pattern_matches_extract(facets->query, buffer_tostring(k->current_value.b), NULL, 0)) {
+            case SP_MATCHED_POSITIVE:
+                facets->current_row.keys_matched_by_query_positive++;
+                break;
+
+            case SP_MATCHED_NEGATIVE:
+                facets->current_row.keys_matched_by_query_negative++;
+                break;
+
+            case SP_NOT_MATCHED:
+                break;
+        }
     }
 
     if(k->values.enabled)
@@ -1844,7 +1855,8 @@ static void facets_reset_keys_with_value_and_row(FACETS *facets) {
     }
 
     facets->current_row.severity = FACET_ROW_SEVERITY_NORMAL;
-    facets->current_row.keys_matched_by_query = 0;
+    facets->current_row.keys_matched_by_query_positive = 0;
+    facets->current_row.keys_matched_by_query_negative = 0;
     facets->keys_in_row.used = 0;
 }
 
@@ -1862,9 +1874,10 @@ void facets_rows_begin(FACETS *facets) {
 bool facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.rows.evaluated++;
 
-    if(unlikely((facets->query && facets->keys_filtered_by_query && !facets->current_row.keys_matched_by_query) ||
-            (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
-            (facets->timeframe.after_ut && usec < facets->timeframe.after_ut))) {
+    if(unlikely((facets->query && facets->keys_filtered_by_query &&
+                (!facets->current_row.keys_matched_by_query_positive || facets->current_row.keys_matched_by_query_negative)) ||
+                (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
+                (facets->timeframe.after_ut && usec < facets->timeframe.after_ut))) {
         // this row is not useful
         // 1. not matched by full text search, or
         // 2. not in our timeframe

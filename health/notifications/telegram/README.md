@@ -54,9 +54,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_TELEGRAM | Set `SEND_TELEGRAM` to YES | YES | True |
-| TELEGRAM_BOT_TOKEN | set `TELEGRAM_BOT_TOKEN` to your bot token. |  | True |
-| DEFAULT_RECIPIENT_TELEGRAM | Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: 49999333322 -1009999222255. |  | True |
+| SEND_TELEGRAM | Set `SEND_TELEGRAM` to YES | YES | yes |
+| TELEGRAM_BOT_TOKEN | set `TELEGRAM_BOT_TOKEN` to your bot token. |  | yes |
+| DEFAULT_RECIPIENT_TELEGRAM | Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: 49999333322 -1009999222255. |  | yes |
 
 ##### DEFAULT_RECIPIENT_TELEGRAM
 

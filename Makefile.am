@@ -711,6 +711,15 @@ API_PLUGIN_FILES = \
 STREAMING_PLUGIN_FILES = \
     streaming/rrdpush.c \
     streaming/compression.c \
+    streaming/compression.h \
+    streaming/compression_brotli.c \
+    streaming/compression_brotli.h \
+    streaming/compression_gzip.c \
+    streaming/compression_gzip.h \
+    streaming/compression_lz4.c \
+    streaming/compression_lz4.h \
+    streaming/compression_zstd.c \
+    streaming/compression_zstd.h \
     streaming/sender.c \
     streaming/receiver.c \
     streaming/replication.h \
@@ -1188,6 +1197,9 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
+    $(OPTIONAL_ZSTD_LIBS) \
+    $(OPTIONAL_BROTLIENC_LIBS) \
+    $(OPTIONAL_BROTLIDEC_LIBS) \
     $(OPTIONAL_DATACHANNEL_LIBS) \
     libjudy.a \
     $(OPTIONAL_SSL_LIBS) \

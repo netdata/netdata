@@ -216,18 +216,18 @@ static size_t netdev_added = 0, netdev_found = 0;
 // ----------------------------------------------------------------------------
 
 static void netdev_charts_release(struct netdev *d) {
-    if(d->st_bandwidth)  rrdset_is_obsolete(d->st_bandwidth);
-    if(d->st_packets)    rrdset_is_obsolete(d->st_packets);
-    if(d->st_errors)     rrdset_is_obsolete(d->st_errors);
-    if(d->st_drops)      rrdset_is_obsolete(d->st_drops);
-    if(d->st_fifo)       rrdset_is_obsolete(d->st_fifo);
-    if(d->st_compressed) rrdset_is_obsolete(d->st_compressed);
-    if(d->st_events)     rrdset_is_obsolete(d->st_events);
-    if(d->st_speed)      rrdset_is_obsolete(d->st_speed);
-    if(d->st_duplex)     rrdset_is_obsolete(d->st_duplex);
-    if(d->st_operstate)  rrdset_is_obsolete(d->st_operstate);
-    if(d->st_carrier)    rrdset_is_obsolete(d->st_carrier);
-    if(d->st_mtu)        rrdset_is_obsolete(d->st_mtu);
+    if(d->st_bandwidth) rrdset_is_obsolete___safe_from_collector_thread(d->st_bandwidth);
+    if(d->st_packets) rrdset_is_obsolete___safe_from_collector_thread(d->st_packets);
+    if(d->st_errors) rrdset_is_obsolete___safe_from_collector_thread(d->st_errors);
+    if(d->st_drops) rrdset_is_obsolete___safe_from_collector_thread(d->st_drops);
+    if(d->st_fifo) rrdset_is_obsolete___safe_from_collector_thread(d->st_fifo);
+    if(d->st_compressed) rrdset_is_obsolete___safe_from_collector_thread(d->st_compressed);
+    if(d->st_events) rrdset_is_obsolete___safe_from_collector_thread(d->st_events);
+    if(d->st_speed) rrdset_is_obsolete___safe_from_collector_thread(d->st_speed);
+    if(d->st_duplex) rrdset_is_obsolete___safe_from_collector_thread(d->st_duplex);
+    if(d->st_operstate) rrdset_is_obsolete___safe_from_collector_thread(d->st_operstate);
+    if(d->st_carrier) rrdset_is_obsolete___safe_from_collector_thread(d->st_carrier);
+    if(d->st_mtu) rrdset_is_obsolete___safe_from_collector_thread(d->st_mtu);
 
     d->st_bandwidth   = NULL;
     d->st_compressed  = NULL;
@@ -521,6 +521,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     d->chart_family = strdupz("net");
 
     rrdlabels_copy(d->chart_labels, r->chart_labels);
+    rrdlabels_add(d->chart_labels, "container_device", r->container_device, RRDLABEL_SRC_AUTO);
 
     d->priority = NETDATA_CHART_PRIO_CGROUP_NET_IFACE;
     d->flipped = 1;
@@ -784,13 +785,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
             if (likely(access(buffer, R_OK) == 0)) {
                 d->virtual = 1;
-                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
+                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO);
             }
             else {
                 d->virtual = 0;
-                rrdlabels_add(d->chart_labels, "interface_type", "real", RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
+                rrdlabels_add(d->chart_labels, "interface_type", "real", RRDLABEL_SRC_AUTO);
             }
-            rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO|RRDLABEL_FLAG_PERMANENT);
+            rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO);
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed

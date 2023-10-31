@@ -895,7 +895,6 @@ struct discovery_thread {
     uv_thread_t thread;
     uv_mutex_t mutex;
     uv_cond_t cond_var;
-    int start_discovery;
     int exited;
 } discovery_thread;
 
@@ -1761,36 +1760,36 @@ char *cgroup_parse_resolved_name_and_labels(RRDLABELS *labels, char *data) {
 // ----------------------------------------------------------------------------
 
 static inline void free_pressure(struct pressure *res) {
-    if (res->some.share_time.st)   rrdset_is_obsolete(res->some.share_time.st);
-    if (res->some.total_time.st)   rrdset_is_obsolete(res->some.total_time.st);
-    if (res->full.share_time.st)   rrdset_is_obsolete(res->full.share_time.st);
-    if (res->full.total_time.st)   rrdset_is_obsolete(res->full.total_time.st);
+    if (res->some.share_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->some.share_time.st);
+    if (res->some.total_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->some.total_time.st);
+    if (res->full.share_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->full.share_time.st);
+    if (res->full.total_time.st) rrdset_is_obsolete___safe_from_collector_thread(res->full.total_time.st);
     freez(res->filename);
 }
 
 static inline void cgroup_free(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
-    if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
-    if(cg->st_cpu_limit)             rrdset_is_obsolete(cg->st_cpu_limit);
-    if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
-    if(cg->st_cpu_nr_throttled)      rrdset_is_obsolete(cg->st_cpu_nr_throttled);
-    if(cg->st_cpu_throttled_time)    rrdset_is_obsolete(cg->st_cpu_throttled_time);
-    if(cg->st_cpu_shares)            rrdset_is_obsolete(cg->st_cpu_shares);
-    if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
-    if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
-    if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
-    if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
-    if(cg->st_mem_usage)             rrdset_is_obsolete(cg->st_mem_usage);
-    if(cg->st_mem_usage_limit)       rrdset_is_obsolete(cg->st_mem_usage_limit);
-    if(cg->st_mem_utilization)       rrdset_is_obsolete(cg->st_mem_utilization);
-    if(cg->st_mem_failcnt)           rrdset_is_obsolete(cg->st_mem_failcnt);
-    if(cg->st_io)                    rrdset_is_obsolete(cg->st_io);
-    if(cg->st_serviced_ops)          rrdset_is_obsolete(cg->st_serviced_ops);
-    if(cg->st_throttle_io)           rrdset_is_obsolete(cg->st_throttle_io);
-    if(cg->st_throttle_serviced_ops) rrdset_is_obsolete(cg->st_throttle_serviced_ops);
-    if(cg->st_queued_ops)            rrdset_is_obsolete(cg->st_queued_ops);
-    if(cg->st_merged_ops)            rrdset_is_obsolete(cg->st_merged_ops);
+    if(cg->st_cpu) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu);
+    if(cg->st_cpu_limit) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
+    if(cg->st_cpu_per_core) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_per_core);
+    if(cg->st_cpu_nr_throttled) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_nr_throttled);
+    if(cg->st_cpu_throttled_time) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_throttled_time);
+    if(cg->st_cpu_shares) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_shares);
+    if(cg->st_mem) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem);
+    if(cg->st_writeback) rrdset_is_obsolete___safe_from_collector_thread(cg->st_writeback);
+    if(cg->st_mem_activity) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_activity);
+    if(cg->st_pgfaults) rrdset_is_obsolete___safe_from_collector_thread(cg->st_pgfaults);
+    if(cg->st_mem_usage) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_usage);
+    if(cg->st_mem_usage_limit) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_usage_limit);
+    if(cg->st_mem_utilization) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_utilization);
+    if(cg->st_mem_failcnt) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_failcnt);
+    if(cg->st_io) rrdset_is_obsolete___safe_from_collector_thread(cg->st_io);
+    if(cg->st_serviced_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_serviced_ops);
+    if(cg->st_throttle_io) rrdset_is_obsolete___safe_from_collector_thread(cg->st_throttle_io);
+    if(cg->st_throttle_serviced_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_throttle_serviced_ops);
+    if(cg->st_queued_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_queued_ops);
+    if(cg->st_merged_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_merged_ops);
 
     freez(cg->filename_cpuset_cpus);
     freez(cg->filename_cpu_cfs_period);
@@ -2781,14 +2780,6 @@ static inline void discovery_find_all_cgroups() {
     netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
 
-static void cgroup_discovery_cleanup(void *ptr) {
-    UNUSED(ptr);
-
-    discovery_thread.exited = 1;
-    worker_unregister();
-    service_exits();
-}
-
 static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
     if(buffer[0]) return buffer;
 
@@ -2805,8 +2796,6 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
-
-    netdata_thread_cleanup_push(cgroup_discovery_cleanup, ptr);
 
     worker_register("CGROUPSDISC");
     worker_register_job_name(WORKER_DISCOVERY_INIT,               "init");
@@ -2827,13 +2816,13 @@ void cgroup_discovery_worker(void *ptr)
             NULL,
             SIMPLE_PATTERN_EXACT, true);
 
+    service_register(SERVICE_THREAD_TYPE_LIBUV, NULL, NULL, NULL, false);
+
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         uv_mutex_lock(&discovery_thread.mutex);
-        while (!discovery_thread.start_discovery && service_running(SERVICE_COLLECTORS))
-            uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
-        discovery_thread.start_discovery = 0;
+        uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
         uv_mutex_unlock(&discovery_thread.mutex);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
@@ -2841,8 +2830,10 @@ void cgroup_discovery_worker(void *ptr)
 
         discovery_find_all_cgroups();
     }
-
-    netdata_thread_cleanup_pop(1);
+    collector_info("discovery thread stopped");
+    worker_unregister();
+    service_exits();
+    __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
@@ -3483,7 +3474,7 @@ void update_cgroup_charts(int update_every) {
                         cpu_usage = (NETDATA_DOUBLE)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
                         NETDATA_DOUBLE cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
 
-                        rrdset_isnot_obsolete(cg->st_cpu_limit);
+                        rrdset_isnot_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
 
                         rrddim_set(cg->st_cpu_limit, "used", (cpu_used > 0)?cpu_used:0);
 
@@ -3494,7 +3485,7 @@ void update_cgroup_charts(int update_every) {
                     }
                     else {
                         if(unlikely(cg->st_cpu_limit)) {
-                            rrdset_is_obsolete(cg->st_cpu_limit);
+                            rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
                             cg->st_cpu_limit = NULL;
                         }
                         rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, NAN);
@@ -3863,7 +3854,7 @@ void update_cgroup_charts(int update_every) {
                         rrddim_add(cg->st_mem_usage_limit, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                     }
 
-                    rrdset_isnot_obsolete(cg->st_mem_usage_limit);
+                    rrdset_isnot_obsolete___safe_from_collector_thread(cg->st_mem_usage_limit);
 
                     rrddim_set(cg->st_mem_usage_limit, "available", memory_limit - cg->memory.usage_in_bytes);
                     rrddim_set(cg->st_mem_usage_limit, "used", cg->memory.usage_in_bytes);
@@ -3893,7 +3884,7 @@ void update_cgroup_charts(int update_every) {
                     }
 
                     if (memory_limit) {
-                        rrdset_isnot_obsolete(cg->st_mem_utilization);
+                        rrdset_isnot_obsolete___safe_from_collector_thread(cg->st_mem_utilization);
 
                         rrddim_set(
                             cg->st_mem_utilization, "utilization", cg->memory.usage_in_bytes * 100 / memory_limit);
@@ -3903,12 +3894,12 @@ void update_cgroup_charts(int update_every) {
             }
             else {
                 if(unlikely(cg->st_mem_usage_limit)) {
-                    rrdset_is_obsolete(cg->st_mem_usage_limit);
+                    rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_usage_limit);
                     cg->st_mem_usage_limit = NULL;
                 }
 
                 if(unlikely(cg->st_mem_utilization)) {
-                    rrdset_is_obsolete(cg->st_mem_utilization);
+                    rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_utilization);
                     cg->st_mem_utilization = NULL;
                 }
             }
@@ -4569,19 +4560,15 @@ static void cgroup_main_cleanup(void *ptr) {
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
-    if (!discovery_thread.exited) {
-        collector_info("stopping discovery thread worker");
-        uv_mutex_lock(&discovery_thread.mutex);
-        discovery_thread.start_discovery = 1;
-        uv_cond_signal(&discovery_thread.cond_var);
-        uv_mutex_unlock(&discovery_thread.mutex);
-    }
-
-    collector_info("waiting for discovery thread to finish...");
-    
-    while (!discovery_thread.exited && max > 0) {
-        max -= step;
-        sleep_usec(step);
+    if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED)) {
+        collector_info("waiting for discovery thread to finish...");
+        while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED) && max > 0) {
+            uv_mutex_lock(&discovery_thread.mutex);
+            uv_cond_signal(&discovery_thread.cond_var);
+            uv_mutex_unlock(&discovery_thread.mutex);
+            max -= step;
+            sleep_usec(step);
+        }
     }
 
     if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
@@ -4621,8 +4608,6 @@ void *cgroups_main(void *ptr) {
         goto exit;
     }
 
-    // dispatch a discovery worker thread
-    discovery_thread.start_discovery = 0;
     discovery_thread.exited = 0;
 
     if (uv_mutex_init(&discovery_thread.mutex)) {
@@ -4639,13 +4624,14 @@ void *cgroups_main(void *ptr) {
         collector_error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
         goto exit;
     }
-    uv_thread_set_name_np(discovery_thread.thread, "PLUGIN[cgroups]");
+    uv_thread_set_name_np(discovery_thread.thread, "P[cgroups]");
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
+    netdata_thread_disable_cancelability();
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
@@ -4654,8 +4640,9 @@ void *cgroups_main(void *ptr) {
 
         find_dt += hb_dt;
         if (unlikely(find_dt >= find_every || (!is_inside_k8s && cgroups_check))) {
+            uv_mutex_lock(&discovery_thread.mutex);
             uv_cond_signal(&discovery_thread.cond_var);
-            discovery_thread.start_discovery = 1;
+            uv_mutex_unlock(&discovery_thread.mutex);
             find_dt = 0;
             cgroups_check = 0;
         }
@@ -4665,18 +4652,22 @@ void *cgroups_main(void *ptr) {
 
         worker_is_busy(WORKER_CGROUPS_READ);
         read_all_discovered_cgroups(cgroup_root);
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
-
+        if (unlikely(!service_running(SERVICE_COLLECTORS))) {
+            uv_mutex_unlock(&cgroup_root_mutex);
+            break;
+        }
         worker_is_busy(WORKER_CGROUPS_CHART);
         update_cgroup_charts(cgroup_update_every);
-        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+        if (unlikely(!service_running(SERVICE_COLLECTORS))) {
+           uv_mutex_unlock(&cgroup_root_mutex);
+           break;
+        }
 
         worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);
     }
 
 exit:
-    worker_unregister();
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

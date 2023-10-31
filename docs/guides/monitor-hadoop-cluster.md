@@ -179,7 +179,6 @@ The Netdata community helped us create sane defaults for alerts related to both 
 investigate these to ensure they work well with your Hadoop implementation.
 
 -   [HDFS alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/hdfs.conf)
--   [Zookeeper alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/zookeeper.conf)
 
 You can also access/edit these files directly with `edit-config`:
 

@@ -4,6 +4,11 @@
 #include "rrd.h"
 #include "storage_engine.h"
 
+void rrddim_metadata_updated(RRDDIM *rd) {
+    rrdcontext_updated_rrddim(rd);
+    rrdset_metadata_updated(rd->rrdset);
+}
+
 // ----------------------------------------------------------------------------
 // RRDDIM index
 
@@ -47,6 +52,8 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(!rd->divisor) rd->divisor = 1;
 
     rd->rrdset = st;
+
+    rd->rrdpush.sender.dim_slot = __atomic_add_fetch(&st->rrdpush.sender.dim_last_slot_used, 1, __ATOMIC_RELAXED);
 
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collector.counter = 1;
@@ -126,7 +133,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(rrdset_number_of_dimensions(st) != 0) {
         RRDDIM *td;
         dfe_start_write(st->rrddim_root_index, td) {
-            if(!td) break;
+            if(td) break;
         }
         dfe_done(td);
 
@@ -155,7 +162,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     ml_dimension_new(rd);
 
@@ -283,10 +289,9 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     if(ctr->react_action == RRDDIM_REACT_UPDATED) {
         // the chart needs to be updated to the parent
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     }
 
-    rrdcontext_updated_rrddim(rd);
+    rrddim_metadata_updated(rd);
 }
 
 size_t rrddim_size(void) {
@@ -369,8 +374,7 @@ inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
 
     rrddimvar_rename_all(rd);
 
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
 
     return 1;
 }
@@ -381,8 +385,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
 
     netdata_log_debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", rrdset_id(st), rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_algorithm(rd);
     return 1;
@@ -395,8 +398,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
     netdata_log_debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from %d to %d",
           rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
     rd->multiplier = multiplier;
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_multiplier(rd);
     return 1;
@@ -409,8 +411,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
     netdata_log_debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from %d to %d",
           rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
     rd->divisor = divisor;
-    rrddim_clear_exposed(rd);
-    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+    rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdcontext_updated_rrddim_divisor(rd);
     return 1;
@@ -532,8 +533,8 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     return 0;
 }
 
-inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
+inline void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *rd) {
+    netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))) {
         netdata_log_info("Cannot obsolete already archived dimension %s from chart %s", rrddim_name(rd), rrdset_name(st));
@@ -545,8 +546,8 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrdcontext_updated_rrddim_flags(rd);
 }
 
-inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
+inline void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st __maybe_unused, RRDDIM *rd) {
+    netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
     rrdcontext_updated_rrddim_flags(rd);

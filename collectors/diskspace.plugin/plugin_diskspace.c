@@ -59,7 +59,7 @@ struct mount_point_metadata {
 
 static DICTIONARY *dict_mountpoints = NULL;
 
-#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
 int mount_point_cleanup(const char *name, void *entry, int slow) {
     (void)name;
