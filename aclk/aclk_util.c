@@ -440,6 +440,7 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt
 
     freez(proxy);
 }
+#endif /* ENABLE_ACLK */
 
 #if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
@@ -457,8 +458,6 @@ static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
 	return;
 }
 #endif
-
-#endif /* ENABLE_ACLK */
 
 int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
 {
