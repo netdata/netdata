@@ -147,12 +147,18 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         max_ram = MAX(max_ram, ram);
         buffer_json_add_array_item_double(wb, ram);
 
-        double disk_io_read = cg->st_io_rd_read->collector.last_stored_value;
-        max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
+        double disk_io_read = NAN;
+        if (cg->st_io_rd_read) {
+            double disk_io_read = cg->st_io_rd_read->collector.last_stored_value;
+            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
+        }
         buffer_json_add_array_item_double(wb, disk_io_read);
 
-        double disk_io_written = ABS(cg->st_io_rd_written->collector.last_stored_value);
-        max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
+        double disk_io_written = NAN;
+        if (cg->st_io_rd_written) {
+            double disk_io_written = ABS(cg->st_io_rd_written->collector.last_stored_value);
+            max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
+        }
         buffer_json_add_array_item_double(wb, disk_io_written);
 
         NETDATA_DOUBLE received, sent;
@@ -178,7 +184,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
                 NULL);
 
         // Kind
@@ -368,12 +374,18 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
         max_ram = MAX(max_ram, ram);
         buffer_json_add_array_item_double(wb, ram);
 
-        double disk_io_read = cg->st_io_rd_read->collector.last_stored_value;
-        max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
+        double disk_io_read = NAN;
+        if (cg->st_io_rd_read) {
+            double disk_io_read = cg->st_io_rd_read->collector.last_stored_value;
+            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
+        }
         buffer_json_add_array_item_double(wb, disk_io_read);
 
-        double disk_io_written = ABS(cg->st_io_rd_written->collector.last_stored_value);
-        max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
+        double disk_io_written = NAN;
+        if (cg->st_io_rd_written) {
+            double disk_io_written = ABS(cg->st_io_rd_written->collector.last_stored_value);
+            max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
+        }
         buffer_json_add_array_item_double(wb, disk_io_written);
 
         buffer_json_array_close(wb);
