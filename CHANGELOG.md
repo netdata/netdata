@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Add a note for the docker deployment alongside with cetus [\#16312](https://github.com/netdata/netdata/pull/16312) ([tkatsoulas](https://github.com/tkatsoulas))
 - Use proper icons for deploy integrations [\#16305](https://github.com/netdata/netdata/pull/16305) ([Ancairon](https://github.com/Ancairon))
 - bump openssl for static in 3.1.4 [\#16303](https://github.com/netdata/netdata/pull/16303) ([tkatsoulas](https://github.com/tkatsoulas))
 - claim.sh: use echo instead of /bin/echo [\#16300](https://github.com/netdata/netdata/pull/16300) ([ilyam8](https://github.com/ilyam8))
@@ -38,7 +39,9 @@
 - Fix coverity issue 403725 [\#16265](https://github.com/netdata/netdata/pull/16265) ([stelfrag](https://github.com/stelfrag))
 - SUBSTRING simple patterns fix [\#16264](https://github.com/netdata/netdata/pull/16264) ([ktsaou](https://github.com/ktsaou))
 - QUERIES: use tiers only when they have useful data [\#16263](https://github.com/netdata/netdata/pull/16263) ([ktsaou](https://github.com/ktsaou))
+- Improve dimension ML model load [\#16262](https://github.com/netdata/netdata/pull/16262) ([stelfrag](https://github.com/stelfrag))
 - cgroup: add net container\_device label [\#16261](https://github.com/netdata/netdata/pull/16261) ([ilyam8](https://github.com/ilyam8))
+- Replace distutils with packaging for version [\#16259](https://github.com/netdata/netdata/pull/16259) ([MrZammler](https://github.com/MrZammler))
 - Regenerate integrations.js [\#16258](https://github.com/netdata/netdata/pull/16258) ([netdatabot](https://github.com/netdatabot))
 - Fix Discord webhook payload [\#16257](https://github.com/netdata/netdata/pull/16257) ([luchaos](https://github.com/luchaos))
 - Fix HAProxy server status parsing and add MAINT status chart [\#16253](https://github.com/netdata/netdata/pull/16253) ([seniorquico](https://github.com/seniorquico))
@@ -425,10 +428,6 @@
 - integrations: fix docker compose indent [\#15708](https://github.com/netdata/netdata/pull/15708) ([ilyam8](https://github.com/ilyam8))
 - Better cleanup of aclk alert table entries [\#15706](https://github.com/netdata/netdata/pull/15706) ([MrZammler](https://github.com/MrZammler))
 - Regenerate integrations.js [\#15705](https://github.com/netdata/netdata/pull/15705) ([netdatabot](https://github.com/netdatabot))
-- Fix typo in categories for beanstalk collector metadata. [\#15703](https://github.com/netdata/netdata/pull/15703) ([Ferroin](https://github.com/Ferroin))
-- Assorted fixes for integrations templates. [\#15702](https://github.com/netdata/netdata/pull/15702) ([Ferroin](https://github.com/Ferroin))
-- integrations: fix metrics availability [\#15701](https://github.com/netdata/netdata/pull/15701) ([ilyam8](https://github.com/ilyam8))
-- Fix handling of troubleshooting section in integrations. [\#15700](https://github.com/netdata/netdata/pull/15700) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
