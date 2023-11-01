@@ -5,13 +5,7 @@
  *  GPL v3+
  */
 
-#include "collectors/all.h"
-#include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
-
-#include <linux/capability.h>
-#include <systemd/sd-journal.h>
-#include <syslog.h>
+#include "systemd-internals.h"
 
 /*
  * TODO
@@ -104,7 +98,6 @@ int fstat64(int fd, struct stat64 *buf) {
 #define SYSTEMD_JOURNAL_MAX_PARAMS              100
 #define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (1 * 3600)
 #define SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY 200
-#define SYSTEMD_JOURNAL_WORKER_THREADS          5
 
 #define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (5 * USEC_PER_SEC) // assume always 5 seconds latency
 #define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2 minutes latency
@@ -247,9 +240,6 @@ int fstat64(int fd, struct stat64 *buf) {
     /* "|CONTAINER_PARTIAL_MESSAGE" */          \
                                                 \
     ""
-
-static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
-static bool plugin_should_exit = false;
 
 // ----------------------------------------------------------------------------
 
@@ -1155,7 +1145,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
     closedir(dir);
 }
 
-static void journal_files_registry_update() {
+void journal_files_registry_update(void) {
     usec_t scan_ut = now_monotonic_usec();
 
     for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES ;i++) {
@@ -2108,7 +2098,7 @@ static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, 
     buffer_json_object_close(json_array);
 }
 
-DICTIONARY *function_query_status_dict = NULL;
+static DICTIONARY *function_query_status_dict = NULL;
 
 static void function_systemd_journal_progress(BUFFER *wb, const char *transaction, const char *progress_id) {
     if(!progress_id || !(*progress_id)) {
@@ -2168,7 +2158,7 @@ static void function_systemd_journal_progress(BUFFER *wb, const char *transactio
     dictionary_acquired_item_release(function_query_status_dict, item);
 }
 
-static void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
+void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
     fstat_thread_calls = 0;
     fstat_thread_cached_responses = 0;
     journal_files_registry_update();
@@ -2705,30 +2695,11 @@ cleanup:
     }
 }
 
-// ----------------------------------------------------------------------------
-
-int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    stderror = stderr;
-    clocks_init();
-
-    program_name = "systemd-journal.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
-
-    // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
-
-    log_set_global_severity_for_external_plugins();
-
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(verify_netdata_host_prefix() == -1) exit(1);
+void journal_init(void) {
+    unsigned d = 0;
 
     // ------------------------------------------------------------------------
     // setup the journal directories
-
-    unsigned d = 0;
 
     journal_directories[d++].path = strdupz("/var/log/journal");
     journal_directories[d++].path = strdupz("/run/log/journal");
@@ -2755,10 +2726,6 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
-
-    // ------------------------------------------------------------------------
-    // initialize the journal files registry
-
     systemd_journal_session = (now_realtime_usec() / USEC_PER_SEC) * USEC_PER_SEC;
 
     journal_files_registry = dictionary_create_advanced(
@@ -2774,63 +2741,4 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             NULL, sizeof(usec_t));
 
     journal_files_registry_update();
-
-
-    // ------------------------------------------------------------------------
-    // debug
-
-    if(argc == 2 && strcmp(argv[1], "debug") == 0) {
-        bool cancelled = false;
-        char buf[] = "systemd-journal after:-16000000 before:0 last:1";
-        // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
-        // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
-        function_systemd_journal("123", buf, 600, &cancelled);
-        exit(1);
-    }
-
-    // ------------------------------------------------------------------------
-    // the event loop for functions
-
-    struct functions_evloop_globals *wg =
-            functions_evloop_init(SYSTEMD_JOURNAL_WORKER_THREADS, "SDJ", &stdout_mutex, &plugin_should_exit);
-
-    functions_evloop_add_function(wg, SYSTEMD_JOURNAL_FUNCTION_NAME, function_systemd_journal,
-                                  SYSTEMD_JOURNAL_DEFAULT_TIMEOUT);
-
-
-    // ------------------------------------------------------------------------
-
-    time_t started_t = now_monotonic_sec();
-
-    size_t iteration = 0;
-    usec_t step = 1000 * USEC_PER_MS;
-    bool tty = isatty(fileno(stderr)) == 1;
-
-    netdata_mutex_lock(&stdout_mutex);
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
-            SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    while(!plugin_should_exit) {
-        iteration++;
-
-        netdata_mutex_unlock(&stdout_mutex);
-        heartbeat_next(&hb, step);
-        netdata_mutex_lock(&stdout_mutex);
-
-        if(!tty)
-            fprintf(stdout, "\n");
-
-        if(iteration % 60 == 0)
-            journal_files_registry_update();
-
-        fflush(stdout);
-
-        time_t now = now_monotonic_sec();
-        if(now - started_t > 86400)
-            break;
-    }
-
-    exit(0);
 }

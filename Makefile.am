@@ -308,6 +308,9 @@ FREEIPMI_PLUGIN_FILES = \
     $(NULL)
 
 SYSTEMD_JOURNAL_PLUGIN_FILES = \
+    collectors/systemd-journal.plugin/systemd-internals.h \
+    collectors/systemd-journal.plugin/systemd-main.c \
+    collectors/systemd-journal.plugin/systemd-units.c \
     collectors/systemd-journal.plugin/systemd-journal.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
