@@ -14,6 +14,11 @@
 #define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
 #define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
 
+extern __thread size_t fstat_thread_calls;
+extern __thread size_t fstat_thread_cached_responses;
+void fstat_cache_enable_on_thread(void);
+void fstat_cache_disable_on_thread(void);
+
 extern netdata_mutex_t stdout_mutex;
 
 void journal_init(void);

@@ -312,6 +312,7 @@ SYSTEMD_JOURNAL_PLUGIN_FILES = \
     collectors/systemd-journal.plugin/systemd-main.c \
     collectors/systemd-journal.plugin/systemd-units.c \
     collectors/systemd-journal.plugin/systemd-journal.c \
+    collectors/systemd-journal.plugin/systemd-journal-fstat.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
