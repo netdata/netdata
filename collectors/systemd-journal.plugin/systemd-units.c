@@ -94,7 +94,7 @@ static UnitInfo *systemd_units_get_all(void) {
 
     UnitInfo u;
     memset(&u, 0, sizeof(u));
-    while ((r = bus_parse_unit_info(reply, &u) > 0)) {
+    while ((r = bus_parse_unit_info(reply, &u)) > 0) {
         UnitInfo *i = callocz(1, sizeof(u));
 
         // un-escape hex sequences (\xNN) in id
