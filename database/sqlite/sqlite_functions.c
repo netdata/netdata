@@ -471,6 +471,9 @@ void sql_close_database(void)
 
     add_stmt_to_list(NULL);
 
+    (void) db_execute(db_meta, "PRAGMA analysis_limit=1000");
+    (void) db_execute(db_meta, "PRAGMA optimize");
+
     rc = sqlite3_close_v2(db_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
