@@ -1008,7 +1008,7 @@ void update_cpu_full_pressure_stall_time_chart(struct cgroup *cg) {
             "cpu_full_pressure_stall_time",
             NULL,
             "cpu",
-            k8s_is_kubepod(cg) ? "k8s.cgroup.cpu_full_pressure_stall_time" : "cgroup.cpu_full_pressure_stall_time",
+            context,
             title,
             "ms",
             PLUGIN_CGROUPS_NAME,
