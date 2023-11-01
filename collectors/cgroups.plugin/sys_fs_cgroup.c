@@ -1257,14 +1257,12 @@ static inline int update_memory_limits(struct cgroup *cg) {
     char **filename = &cg->filename_memory_limit;
     const RRDSETVAR_ACQUIRED **chart_var = &cg->chart_var_memory_limit;
     unsigned long long *value = &cg->memory_limit;
-    const char *chart_var_name = "memory_limit";
-
 
     if(*filename) {
         if(unlikely(!*chart_var)) {
-            *chart_var = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_mem_usage, chart_var_name);
+            *chart_var = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_mem_usage, "memory_limit");
             if(!*chart_var) {
-                collector_error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, chart_var_name);
+                collector_error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, "memory_limit");
                 freez(*filename);
                 *filename = NULL;
             }

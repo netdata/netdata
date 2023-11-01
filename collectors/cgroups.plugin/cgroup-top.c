@@ -104,8 +104,6 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
         void *register_canceller_cb_data __maybe_unused) {
 
-    time_t now = now_realtime_sec();
-
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -342,8 +340,6 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
         rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
         rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
         void *register_canceller_cb_data __maybe_unused) {
-
-    time_t now = now_realtime_sec();
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
