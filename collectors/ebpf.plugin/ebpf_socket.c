@@ -1073,9 +1073,9 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         ebpf_write_end_chart();
 
         if (tcp_v6_connect_address.type == 'T') {
-            write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_tcp_v6_connection");
+            ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_tcp_v6_connection");
             write_chart_dimension("calls", values[1]);
-            write_end_chart();
+            ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_sent");
@@ -2278,10 +2278,10 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
     ebpf_write_end_chart();
 
     if (tcp_v6_connect_address.type == 'T') {
-        write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V6, "");
+        ebpf_write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V6, "");
         write_chart_dimension(
             socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V6].name, (long long)values->call_tcp_v6_connection);
-        write_end_chart();
+        ebpf_write_end_chart();
     }
 
     ebpf_write_begin_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT, "");
@@ -2438,13 +2438,13 @@ static void ebpf_send_systemd_socket_charts()
     ebpf_write_end_chart();
 
     if (tcp_v6_connect_address.type == 'T') {
-        write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6, "");
+        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6, "");
         for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
             if (unlikely(ect->systemd) && unlikely(ect->updated)) {
                 write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v6_connection);
             }
         }
-        write_end_chart();
+        ebpf_write_end_chart();
     }
 
     ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_BANDWIDTH_SENT, "");
