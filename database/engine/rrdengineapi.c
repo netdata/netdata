@@ -1241,12 +1241,14 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     // 4. then wait for completion
 
     bool logged = false;
-    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
+    size_t count = 10;
+    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count && !unittest_running) {
         if(!logged) {
             netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
             logged = true;
         }
         sleep_usec(100 * USEC_PER_MS);
+        count--;
     }
 
     netdata_log_info("DBENGINE: flushing main cache for tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
