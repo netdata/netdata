@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifdef ENABLE_SYSTEMD_DBUS
-
-#include <systemd/sd-bus.h>
 #include "systemd-internals.h"
+
+#ifdef ENABLE_SYSTEMD_DBUS
+#include <systemd/sd-bus.h>
 
 #define SYSTEMD_UNITS_MAX_PARAMS 10
 #define SYSTEMD_UNITS_DBUS_TYPES "(ssssssouso)"
