@@ -247,6 +247,9 @@ struct cgroup {
     RRDSET *st_mem_failcnt;
 
     RRDSET *st_io;
+    RRDDIM *st_io_rd_read;
+    RRDDIM *st_io_rd_written;
+
     RRDSET *st_serviced_ops;
     RRDSET *st_throttle_io;
     RRDSET *st_throttle_serviced_ops;
@@ -417,9 +420,26 @@ static inline int k8s_is_kubepod(struct cgroup *cg) {
     return cg->container_orchestrator == CGROUPS_ORCHESTRATOR_K8S;
 }
 
+static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
+    buffer[0] = '\0';
+
+    if (cg->chart_id[0] == '\0' || (cg->chart_id[0] == '/' && cg->chart_id[1] == '\0'))
+        strncpy(buffer, "cgroup_root", RRD_ID_LENGTH_MAX);
+    else if (is_cgroup_systemd_service(cg))
+        snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s%s", services_chart_id_prefix, cg->chart_id);
+    else
+        snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s%s", cgroup_chart_id_prefix, cg->chart_id);
+
+    return buffer;
+}
+
 #define RRDFUNCTIONS_CGTOP_HELP "View running containers"
 
 int cgroup_function_cgroup_top(BUFFER *wb, int timeout, const char *function, void *collector_data,
+        rrd_function_result_callback_t result_cb, void *result_cb_data,
+        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+        rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data);
+int cgroup_function_systemd_top(BUFFER *wb, int timeout, const char *function, void *collector_data,
         rrd_function_result_callback_t result_cb, void *result_cb_data,
         rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
         rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data);
@@ -427,5 +447,45 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout, const char *function, vo
 void cgroup_netdev_link_init(void);
 const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg);
 void cgroup_netdev_delete(struct cgroup *cg);
+
+void update_cpu_utilization_chart(struct cgroup *cg);
+void update_cpu_utilization_limit_chart(struct cgroup *cg, NETDATA_DOUBLE cpu_limit);
+void update_cpu_throttled_chart(struct cgroup *cg);
+void update_cpu_throttled_duration_chart(struct cgroup *cg);
+void update_cpu_shares_chart(struct cgroup *cg);
+void update_cpu_per_core_usage_chart(struct cgroup *cg);
+
+void update_mem_usage_limit_chart(struct cgroup *cg, unsigned long long memory_limit);
+void update_mem_utilization_chart(struct cgroup *cg, unsigned long long memory_limit);
+void update_mem_usage_detailed_chart(struct cgroup *cg);
+void update_mem_writeback_chart(struct cgroup *cg);
+void update_mem_activity_chart(struct cgroup *cg);
+void update_mem_pgfaults_chart(struct cgroup *cg);
+void update_mem_failcnt_chart(struct cgroup *cg);
+void update_mem_usage_chart(struct cgroup *cg);
+
+void update_io_serviced_bytes_chart(struct cgroup *cg);
+void update_io_serviced_ops_chart(struct cgroup *cg);
+void update_throttle_io_serviced_bytes_chart(struct cgroup *cg);
+void update_throttle_io_serviced_ops_chart(struct cgroup *cg);
+void update_io_queued_ops_chart(struct cgroup *cg);
+void update_io_merged_ops_chart(struct cgroup *cg);
+
+void update_cpu_some_pressure_chart(struct cgroup *cg);
+void update_cpu_some_pressure_stall_time_chart(struct cgroup *cg);
+void update_cpu_full_pressure_chart(struct cgroup *cg);
+void update_cpu_full_pressure_stall_time_chart(struct cgroup *cg);
+void update_mem_some_pressure_chart(struct cgroup *cg);
+void update_mem_some_pressure_stall_time_chart(struct cgroup *cg);
+void update_mem_full_pressure_chart(struct cgroup *cg);
+void update_mem_full_pressure_stall_time_chart(struct cgroup *cg);
+void update_irq_some_pressure_chart(struct cgroup *cg);
+void update_irq_some_pressure_stall_time_chart(struct cgroup *cg);
+void update_irq_full_pressure_chart(struct cgroup *cg);
+void update_irq_full_pressure_stall_time_chart(struct cgroup *cg);
+void update_io_some_pressure_chart(struct cgroup *cg);
+void update_io_some_pressure_stall_time_chart(struct cgroup *cg);
+void update_io_full_pressure_chart(struct cgroup *cg);
+void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
 
 #endif // NETDATA_CGROUP_INTERNALS_H
