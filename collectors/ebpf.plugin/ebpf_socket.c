@@ -178,7 +178,7 @@ static void ebpf_set_trampoline_target(struct socket_bpf *obj)
     bpf_program__set_attach_target(obj->progs.netdata_tcp_v4_connect_fexit, 0,
                                    socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
 
-    if (!tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         bpf_program__set_attach_target(
             obj->progs.netdata_tcp_v6_connect_fentry, 0, socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
 
@@ -335,7 +335,7 @@ static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t
         if (ret)
             return -1;
 
-        if (!tcp_v6_connect_address.addr) {
+        if (tcp_v6_connect_address.type == 'T') {
             obj->links.netdata_tcp_v6_connect_kretprobe = bpf_program__attach_kprobe(
                 obj->progs.netdata_tcp_v6_connect_kretprobe, true, socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
             ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kretprobe);
@@ -364,7 +364,7 @@ static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t
         if (ret)
             return -1;
 
-        if (!tcp_v6_connect_address.addr) {
+        if (tcp_v6_connect_address.type == 'T') {
             obj->links.netdata_tcp_v6_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_tcp_v6_connect_kprobe,
                                                                                   false,
                                                                                   socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
@@ -455,7 +455,7 @@ static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_modul
 
     ebpf_socket_adjust_map(obj, em);
 
-    if (!tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type != 'T') {
         ebpf_disable_tcp_v6_connect(obj);
     }
 
@@ -523,7 +523,7 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every)
                               order++,
                               update_every);
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                                   NETDATA_NET_APPS_CONNECTION_TCP_V6,
                                   "Calls to tcp_v6_connection",
@@ -649,7 +649,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
                               order++,
                               em->update_every);
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         ebpf_write_chart_obsolete(NETDATA_APPS_FAMILY,
                                   NETDATA_NET_APPS_CONNECTION_TCP_V6,
                                   "Calls to tcp_v6_connection",
@@ -1041,7 +1041,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     }
     write_end_chart();
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed && w->processes)) {
@@ -1275,7 +1275,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
                                root, em->update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V6,
                               "Calls to tcp_v6_connection",
                                    EBPF_COMMON_DIMENSION_CONNECTIONS,
@@ -2064,7 +2064,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         ebpf_create_chart(type,
                           NETDATA_NET_APPS_CONNECTION_TCP_V6,
                           "Calls to tcp_v6_connection",
@@ -2167,7 +2167,7 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++, update_every);
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         ebpf_write_chart_obsolete(type,
                                   NETDATA_NET_APPS_CONNECTION_TCP_V6,
                                   "Calls to tcp_v6_connection",
@@ -2230,7 +2230,7 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
                           (long long) values->call_tcp_v4_connection);
     write_end_chart();
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         write_begin_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V6);
         write_chart_dimension(
             socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V6].name, (long long)values->call_tcp_v6_connection);
@@ -2292,7 +2292,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
                                   NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT, NETDATA_EBPF_MODULE_NAME_SOCKET,
                                   update_every);
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         ebpf_create_charts_on_systemd(NETDATA_NET_APPS_CONNECTION_TCP_V6,
                                       "Calls to tcp_v6_connection",
                                       EBPF_COMMON_DIMENSION_CONNECTIONS,
@@ -2390,7 +2390,7 @@ static void ebpf_send_systemd_socket_charts()
     }
     write_end_chart();
 
-    if (tcp_v6_connect_address.addr) {
+    if (tcp_v6_connect_address.type == 'T') {
         write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V6);
         for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
             if (unlikely(ect->systemd) && unlikely(ect->updated)) {
