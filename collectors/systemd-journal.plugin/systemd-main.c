@@ -27,9 +27,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     if(verify_netdata_host_prefix() == -1) exit(1);
 
     // ------------------------------------------------------------------------
-    // setup the journal directories
+    // initialization
 
-    journal_init();
+    journal_init_query_status();
+    journal_init_files_and_directories();
 
     // ------------------------------------------------------------------------
     // debug
