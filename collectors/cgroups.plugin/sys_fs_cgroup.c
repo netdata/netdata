@@ -1348,6 +1348,8 @@ void update_cgroup_systemd_services_charts() {
         if (likely(cg->io_merged.updated)) {
             update_io_merged_ops_chart(cg);
         }
+
+        cg->function_ready = true;
     }
 }
 
@@ -1530,6 +1532,8 @@ void update_cgroup_charts() {
                 }
             }
         }
+
+        cg->function_ready = true;
     }
 }
 

@@ -375,6 +375,7 @@ static inline void discovery_find_cgroup_in_dir_callback(const char *dir) {
     cg = discovery_cgroup_add(dir);
     cg->available = 1;
     cg->first_time_seen = 1;
+    cg->function_ready = false;
     cgroup_root_count++;
 }
 

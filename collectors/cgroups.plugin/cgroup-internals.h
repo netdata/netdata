@@ -182,6 +182,8 @@ struct cgroup {
     char available;      // found in the filesystem
     char enabled;        // enabled in the config
 
+    bool function_ready; // true after the first iteration of chart creation/update
+
     char pending_renames;
 
     char *id;
