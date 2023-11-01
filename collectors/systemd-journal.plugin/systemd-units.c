@@ -120,15 +120,15 @@ static UnitInfo *systemd_units_get_all(void) {
         else
             i->type = strdupz("unknown");
 
-        i->description = strdupz(u.description ? u.description : "");
-        i->load_state = strdupz(u.load_state ? u.load_state : "");
-        i->active_state = strdupz(u.active_state ? u.active_state : "");
-        i->sub_state = strdupz(u.sub_state ? u.sub_state : "");
-        i->following = strdupz(u.following ? u.following : "");
-        i->unit_path = strdupz(u.unit_path ? u.unit_path : "");
+        i->description = strdupz(u.description && *u.description ? u.description : "-");
+        i->load_state = strdupz(u.load_state && *u.load_state ? u.load_state : "-");
+        i->active_state = strdupz(u.active_state && *u.active_state ? u.active_state : "-");
+        i->sub_state = strdupz(u.sub_state && *u.sub_state ? u.sub_state : "-");
+        i->following = strdupz(u.following && *u.following ? u.following : "-");
+        i->unit_path = strdupz(u.unit_path && *u.unit_path ? u.unit_path : "-");
+        i->job_type = strdupz(u.job_type && *u.job_type ? u.job_type : "-");
+        i->job_path = strdupz(u.job_path && *u.job_path ? u.job_path : "-");
         i->job_id = u.job_id;
-        i->job_type = strdupz(u.job_type ? u.job_type : "");
-        i->job_path = strdupz(u.job_path ? u.job_path : "");
 
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, i, prev, next);
         memset(&u, 0, sizeof(u));
@@ -390,14 +390,14 @@ void function_systemd_units(const char *transaction, char *function, int timeout
                 NULL,
                 RRDF_FIELD_SUMMARY_COUNT,
                 RRDF_FIELD_FILTER_NONE,
-                RRDR_FIELD_OPTS_DUMMY,
+                RRDF_FIELD_OPTS_DUMMY,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "type", "Unit Type",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "description", "Unit Description",
@@ -411,21 +411,21 @@ void function_systemd_units(const char *transaction, char *function, int timeout
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "activeState", "Unit Active State",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "subState", "Unit Sub State",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_EXPANDED_FILTER,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "following", "Unit Following",

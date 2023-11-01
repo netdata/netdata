@@ -31,6 +31,7 @@ typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_RICH_TEXT      = (1 << 7),
     FACET_KEY_OPTION_REORDER        = (1 << 8), // give the key a new order id on first encounter
     FACET_KEY_OPTION_TRANSFORM_VIEW = (1 << 9), // when registering the transformation, do it only at the view, not on all data
+    FACET_KEY_OPTION_EXPANDED_FILTER = (1 << 10), // the presentation should have this filter expanded by default
 } FACET_KEY_OPTIONS;
 
 typedef enum __attribute__((packed)) {

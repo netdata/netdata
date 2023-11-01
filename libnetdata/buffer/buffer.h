@@ -959,7 +959,8 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_OPTS_STICKY       = (1 << 2), // the field should be sticky
     RRDF_FIELD_OPTS_FULL_WIDTH   = (1 << 3), // the field should get full width
     RRDF_FIELD_OPTS_WRAP         = (1 << 4), // the field should wrap
-    RRDR_FIELD_OPTS_DUMMY        = (1 << 5), // not a presentable field
+    RRDF_FIELD_OPTS_DUMMY        = (1 << 5), // not a presentable field
+    RRDF_FIELD_OPTS_EXPANDED_FILTER = (1 << 6), // show the filter expanded
 } RRDF_FIELD_OPTIONS;
 
 typedef enum __attribute__((packed)) {
@@ -1173,8 +1174,9 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
 
         buffer_json_member_add_boolean(wb, "full_width", options & RRDF_FIELD_OPTS_FULL_WIDTH);
         buffer_json_member_add_boolean(wb, "wrap", options & RRDF_FIELD_OPTS_WRAP);
+        buffer_json_member_add_boolean(wb, "default_expanded_filter", options & RRDF_FIELD_OPTS_EXPANDED_FILTER);
 
-        if(options & RRDR_FIELD_OPTS_DUMMY)
+        if(options & RRDF_FIELD_OPTS_DUMMY)
             buffer_json_member_add_boolean(wb, "dummy", true);
     }
     buffer_json_object_close(wb);

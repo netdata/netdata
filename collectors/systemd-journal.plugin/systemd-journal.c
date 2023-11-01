@@ -1080,11 +1080,13 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
 //                             netdata_systemd_journal_rich_message, NULL);
 
     facets_register_key_name_transformation(facets, "PRIORITY",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW |
+                                                    FACET_KEY_OPTION_EXPANDED_FILTER,
                                             netdata_systemd_journal_transform_priority, NULL);
 
     facets_register_key_name_transformation(facets, "SYSLOG_FACILITY",
-                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW,
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW |
+                                                    FACET_KEY_OPTION_EXPANDED_FILTER,
                                             netdata_systemd_journal_transform_syslog_facility, NULL);
 
     facets_register_key_name_transformation(facets, "ERRNO",
