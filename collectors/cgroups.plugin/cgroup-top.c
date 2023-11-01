@@ -283,8 +283,8 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Received");
-                buffer_json_add_array_item_string(wb, "Sent");
+                buffer_json_add_array_item_string(wb, "Net In");
+                buffer_json_add_array_item_string(wb, "Net Out");
             }
             buffer_json_array_close(wb);
         }
