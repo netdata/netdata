@@ -1948,7 +1948,7 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
 // ----------------------------------------------------------------------------
 // output
 
-static const char *facets_severity_to_string(FACET_ROW_SEVERITY severity) {
+const char *facets_severity_to_string(FACET_ROW_SEVERITY severity) {
     switch(severity) {
         default:
         case FACET_ROW_SEVERITY_NORMAL:

@@ -115,4 +115,6 @@ uint32_t facets_rows(FACETS *facets);
 
 void facets_table_config(BUFFER *wb);
 
+const char *facets_severity_to_string(FACET_ROW_SEVERITY severity);
+
 #endif

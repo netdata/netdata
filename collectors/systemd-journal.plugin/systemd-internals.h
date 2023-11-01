@@ -14,6 +14,10 @@
 #define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
 #define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
 
+#define SYSTEMD_UNITS_FUNCTION_DESCRIPTION      "View the status of systemd units"
+#define SYSTEMD_UNITS_FUNCTION_NAME              "systemd-units"
+#define SYSTEMD_UNITS_DEFAULT_TIMEOUT            30
+
 extern __thread size_t fstat_thread_calls;
 extern __thread size_t fstat_thread_cached_responses;
 void fstat_cache_enable_on_thread(void);
@@ -96,5 +100,7 @@ void journal_init_files_and_directories(void);
 void journal_init_query_status(void);
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled);
 void journal_files_registry_update(void);
+
+void function_systemd_units(const char *transaction, char *function, int timeout, bool *cancelled);
 
 #endif //NETDATA_COLLECTORS_SYSTEMD_INTERNALS_H
