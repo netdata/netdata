@@ -75,7 +75,7 @@ static netdata_publish_syscall_t socket_publish_aggregated[NETDATA_MAX_SOCKET_VE
 netdata_socket_t *socket_values;
 
 ebpf_network_viewer_port_list_t *listen_ports = NULL;
-ebpf_addresses_t tcp_v6_connect_address = {.function = "tcp_v6_connect", .hash = 0, .addr = 0};
+ebpf_addresses_t tcp_v6_connect_address = {.function = "tcp_v6_connect", .hash = 0, .addr = 0, .type = 0};
 
 struct config socket_config = { .first_section = NULL,
     .last_section = NULL,
