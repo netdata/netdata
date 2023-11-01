@@ -30,6 +30,15 @@
 
 <hr class="solid">
 
+<p align="center">
+<a href="netdata.cloud#gh-light-mode-only">
+  <img src="https://github.com/netdata/netdata/assets/139226121/9949ef9b-50ad-457f-8072-afa5323d1ee5#gh-light-mode-only" alt="ObservabilityCon23" width="600"/>
+</a>
+<a href="netdata.cloud#gh-dark-mode-only">
+  <img src="https://github.com/netdata/netdata/assets/139226121/09b5d082-ba1e-48a0-a823-f364a145c1cb#gh-dark-mode-only" alt="ObservabilityCon23" width="600"/>
+</a>
+</p>
+
 MENU: **[WHAT IS NEW](#whats-new-and-coming)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)**
 
 Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers, and applications.
