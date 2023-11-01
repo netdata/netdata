@@ -1184,6 +1184,14 @@ if test "${have_sd_journal_restart_fields}" = "yes"; then
     AC_DEFINE([HAVE_SD_JOURNAL_RESTART_FIELDS], [1], [sd_journal_restart_fields usability])
 fi
 
+AC_CHECK_LIB([systemd], [sd_bus_default_system, sd_bus_call_method, sd_bus_message_enter_container, sd_bus_message_read, sd_bus_message_exit_container],
+             [SYSTEMD_DBUS_FOUND=yes],
+             [SYSTEMD_DBUS_FOUND=no])
+
+if test "x$SYSTEMD_DBUS_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_SYSTEMD_DBUS], [1], [libsystemd dbus usability])
+fi
+
 AC_MSG_NOTICE([OPTIONAL_SYSTEMD_LIBS is set to: ${OPTIONAL_SYSTEMD_LIBS}])
 
 if test "${enable_plugin_systemd_journal}" = "yes"; then

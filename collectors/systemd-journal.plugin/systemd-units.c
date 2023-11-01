@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#ifdef ENABLE_SYSTEMD_DBUS
+
 #include <systemd/sd-bus.h>
 #include "systemd-internals.h"
 
@@ -550,3 +552,5 @@ void function_systemd_units(const char *transaction, char *function, int timeout
     buffer_free(wb);
     systemd_units_free_all(base);
 }
+
+#endif // ENABLE_SYSTEMD_DBUS

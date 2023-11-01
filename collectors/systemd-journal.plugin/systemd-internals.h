@@ -101,6 +101,8 @@ void journal_init_query_status(void);
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled);
 void journal_files_registry_update(void);
 
+#ifdef ENABLE_SYSTEMD_DBUS
 void function_systemd_units(const char *transaction, char *function, int timeout, bool *cancelled);
+#endif
 
 #endif //NETDATA_COLLECTORS_SYSTEMD_INTERNALS_H

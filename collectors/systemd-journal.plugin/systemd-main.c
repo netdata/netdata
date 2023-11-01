@@ -53,8 +53,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     functions_evloop_add_function(wg, SYSTEMD_JOURNAL_FUNCTION_NAME, function_systemd_journal,
             SYSTEMD_JOURNAL_DEFAULT_TIMEOUT);
 
+#ifdef ENABLE_SYSTEMD_DBUS
     functions_evloop_add_function(wg, SYSTEMD_UNITS_FUNCTION_NAME, function_systemd_units,
             SYSTEMD_UNITS_DEFAULT_TIMEOUT);
+#endif
 
     // ------------------------------------------------------------------------
 
@@ -69,8 +71,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
             SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
 
+#ifdef ENABLE_SYSTEMD_DBUS
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
             SYSTEMD_UNITS_FUNCTION_NAME, SYSTEMD_UNITS_DEFAULT_TIMEOUT, SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
+#endif
 
     heartbeat_t hb;
     heartbeat_init(&hb);
