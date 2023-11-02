@@ -1948,7 +1948,7 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
 // ----------------------------------------------------------------------------
 // output
 
-static const char *facets_severity_to_string(FACET_ROW_SEVERITY severity) {
+const char *facets_severity_to_string(FACET_ROW_SEVERITY severity) {
     switch(severity) {
         default:
         case FACET_ROW_SEVERITY_NORMAL:
@@ -2338,7 +2338,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 NULL,
                 RRDF_FIELD_SUMMARY_COUNT,
                 RRDF_FIELD_FILTER_NONE,
-                RRDR_FIELD_OPTS_DUMMY,
+                RRDF_FIELD_OPTS_DUMMY,
                 NULL);
 
         FACET_KEY *k;
@@ -2358,6 +2358,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                     if (k->options & FACET_KEY_OPTION_MAIN_TEXT)
                         options |= RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_WRAP;
 
+                    if (k->options & FACET_KEY_OPTION_EXPANDED_FILTER)
+                        options |= RRDF_FIELD_OPTS_EXPANDED_FILTER;
+
                     const char *hash_str = hash_to_static_string(k->hash);
 
                     buffer_rrdf_table_add_field(
@@ -2369,8 +2372,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                             RRDF_FIELD_SORT_FIXED,
                             NULL,
                             RRDF_FIELD_SUMMARY_COUNT,
-                            (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE
-                                                                        : RRDF_FIELD_FILTER_FACET,
+                            (k->options & FACET_KEY_OPTION_NEVER_FACET) ? RRDF_FIELD_FILTER_NONE : RRDF_FIELD_FILTER_FACET,
                             options, FACET_VALUE_UNSET);
                 }
         foreach_key_in_facets_done(k);
