@@ -23,5 +23,3 @@ exclude_paths:
   - build_external/**
   - libnetdata/dyn_conf/tests/**
   - packaging/**
-
-  
