@@ -466,7 +466,7 @@
         - channel: nightly
           command: |
             helm install netdata netdata/netdata \
-            --set image.tag=latest{% if $showClaimingOptions %} \
+            --set image.tag=edge{% if $showClaimingOptions %} \
             --set parent.claiming.enabled="true" \
             --set parent.claiming.token={% claim_token %} \
             --set parent.claiming.rooms={% $claim_rooms %} \
@@ -488,7 +488,7 @@
         - channel: nightly
           command: |
             image:
-              tag: latest
+              tag: edge
 
             restarter:
               enabled: true
