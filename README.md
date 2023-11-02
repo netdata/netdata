@@ -73,6 +73,23 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ---
 
+**LATEST BLOG POST**:<br/>
+
+<p align="center">
+<a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/#gh-light-mode-only">
+  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata%20vs%20prometheus.png#gh-light-mode-only" alt="Netdata vs Prometheus" width="700"/>
+</a>
+<a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/#gh-dark-mode-only">
+  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata%20vs%20prometheus%20dark.png#gh-dark-mode-only" alt="Netdata" width="700"/>
+</a>
+</p>
+
+In an era dominated by data-driven decision making, **monitoring tools** play an indispensable role in ensuring that our systems run efficiently and without interruption. When considering tools like Netdata and Prometheus, performance isn't just a number; it's about empowering users with real-time insights and enabling them to act with agility.
+
+A performance comparison between **Netdata and Prometheus** is not a race for the top spot but an exploration of where we stand today and where improvements can be made. Through this, we hope to drive innovation, ensure optimal performance, and ultimately deliver better value to our users. [READ MORE](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/)
+
+---
+
 NEW: **Netdata and LOGS !** 🥳</br>
 
 Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query `systemd` journal logs!
