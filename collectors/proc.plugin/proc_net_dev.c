@@ -9,6 +9,11 @@
 
 #define READ_RETRY_PERIOD 60 // seconds
 
+void cgroup_netdev_reset_all(void);
+void cgroup_netdev_release(const DICTIONARY_ITEM *link);
+const void *cgroup_netdev_dup(const DICTIONARY_ITEM *link);
+void cgroup_netdev_add_bandwidth(const DICTIONARY_ITEM *link, NETDATA_DOUBLE received, NETDATA_DOUBLE sent);
+
 enum {
     NETDEV_DUPLEX_UNKNOWN,
     NETDEV_DUPLEX_HALF,
@@ -208,6 +213,8 @@ static struct netdev {
     char *filename_carrier;
     char *filename_mtu;
 
+    const DICTIONARY_ITEM *cgroup_netdev_link;
+
     struct netdev *next;
 } *netdev_root = NULL, *netdev_last_used = NULL;
 
@@ -326,6 +333,7 @@ static void netdev_free(struct netdev *d) {
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
     rrdlabels_destroy(d->chart_labels);
+    cgroup_netdev_release(d->cgroup_netdev_link);
 
     freez((void *)d->name);
     freez((void *)d->filename_speed);
@@ -352,6 +360,8 @@ static struct netdev_rename {
 
     int processed;
 
+    const DICTIONARY_ITEM *cgroup_netdev_link;
+
     struct netdev_rename *next;
 } *netdev_rename_root = NULL;
 
@@ -374,7 +384,8 @@ void netdev_rename_device_add(
     const char *container_device,
     const char *container_name,
     RRDLABELS *labels,
-    const char *ctx_prefix)
+    const char *ctx_prefix,
+    const DICTIONARY_ITEM *cgroup_netdev_link)
 {
     netdata_mutex_lock(&netdev_rename_mutex);
 
@@ -391,6 +402,8 @@ void netdev_rename_device_add(
         r->hash             = hash;
         r->next             = netdev_rename_root;
         r->processed        = 0;
+        r->cgroup_netdev_link = cgroup_netdev_link;
+
         netdev_rename_root  = r;
         netdev_pending_renames++;
         collector_info("CGROUP: registered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
@@ -406,6 +419,8 @@ void netdev_rename_device_add(
             rrdlabels_migrate_to_these(r->chart_labels, labels);
             
             r->processed        = 0;
+            r->cgroup_netdev_link = cgroup_netdev_link;
+
             netdev_pending_renames++;
             collector_info("CGROUP: altered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
         }
@@ -438,6 +453,7 @@ void netdev_rename_device_del(const char *host_device) {
             freez((void *) r->container_device);
             freez((void *) r->ctx_prefix);
             rrdlabels_destroy(r->chart_labels);
+            cgroup_netdev_release(r->cgroup_netdev_link);
             freez((void *) r);
             break;
         }
@@ -451,6 +467,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
 
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
+    d->cgroup_netdev_link = cgroup_netdev_dup(r->cgroup_netdev_link);
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
@@ -1009,6 +1026,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_bandwidth, d->rd_tbytes, (collected_number)d->tbytes);
             rrdset_done(d->st_bandwidth);
 
+            if(d->cgroup_netdev_link)
+                cgroup_netdev_add_bandwidth(d->cgroup_netdev_link,
+                                            d->flipped ? d->rd_tbytes->collector.last_stored_value : -d->rd_rbytes->collector.last_stored_value,
+                                            d->flipped ? -d->rd_rbytes->collector.last_stored_value : d->rd_tbytes->collector.last_stored_value);
+
             // update the interface speed
             if(d->filename_speed) {
                 if(unlikely(!d->chart_var_speed)) {
@@ -1529,6 +1551,8 @@ void *netdev_main(void *ptr)
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
+
+        cgroup_netdev_reset_all();
 
         worker_is_busy(0);
         if(do_proc_net_dev(localhost->rrd_update_every, hb_dt))

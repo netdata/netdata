@@ -280,6 +280,10 @@ IDLEJITTER_PLUGIN_FILES = \
     $(NULL)
 
 CGROUPS_PLUGIN_FILES = \
+    collectors/cgroups.plugin/cgroup-internals.h \
+    collectors/cgroups.plugin/cgroup-discovery.c \
+    collectors/cgroups.plugin/cgroup-charts.c \
+    collectors/cgroups.plugin/cgroup-top.c \
     collectors/cgroups.plugin/sys_fs_cgroup.c \
     collectors/cgroups.plugin/sys_fs_cgroup.h \
     $(NULL)
