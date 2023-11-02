@@ -1022,20 +1022,71 @@ libh2o_a_SOURCES = \
     web/server/h2o/libh2o/deps/libyrmcds/strerror.c \
     web/server/h2o/libh2o/deps/libyrmcds/text_mode.c \
     web/server/h2o/libh2o/deps/picohttpparser/picohttpparser.c \
+    web/server/h2o/libh2o/deps/quicly/lib/cc-cubic.c \
+    web/server/h2o/libh2o/deps/quicly/lib/cc-pico.c \
+    web/server/h2o/libh2o/deps/quicly/lib/cc-reno.c \
+    web/server/h2o/libh2o/deps/quicly/lib/defaults.c \
+    web/server/h2o/libh2o/deps/quicly/lib/frame.c \
+    web/server/h2o/libh2o/deps/quicly/lib/local_cid.c \
+    web/server/h2o/libh2o/deps/quicly/lib/loss.c \
+    web/server/h2o/libh2o/deps/quicly/lib/quicly.c \
+    web/server/h2o/libh2o/deps/quicly/lib/ranges.c \
+    web/server/h2o/libh2o/deps/quicly/lib/rate.c \
+    web/server/h2o/libh2o/deps/quicly/lib/recvstate.c \
+    web/server/h2o/libh2o/deps/quicly/lib/remote_cid.c \
+    web/server/h2o/libh2o/deps/quicly/lib/retire_cid.c \
+    web/server/h2o/libh2o/deps/quicly/lib/sendstate.c \
+    web/server/h2o/libh2o/deps/quicly/lib/sentmap.c \
+    web/server/h2o/libh2o/deps/quicly/lib/streambuf.c \
+    web/server/h2o/libh2o/deps/hiredis/async.c \
+    web/server/h2o/libh2o/deps/hiredis/async.h \
+    web/server/h2o/libh2o/deps/hiredis/dict.c \
+    web/server/h2o/libh2o/deps/hiredis/dict.h \
+    web/server/h2o/libh2o/deps/hiredis/fmacros.h \
+    web/server/h2o/libh2o/deps/hiredis/hiredis.c \
+    web/server/h2o/libh2o/deps/hiredis/hiredis.h \
+    web/server/h2o/libh2o/deps/hiredis/net.c \
+    web/server/h2o/libh2o/deps/hiredis/net.h \
+    web/server/h2o/libh2o/deps/hiredis/read.c \
+    web/server/h2o/libh2o/deps/hiredis/read.h \
+    web/server/h2o/libh2o/deps/hiredis/sdsalloc.h \
+    web/server/h2o/libh2o/deps/hiredis/sds.c \
+    web/server/h2o/libh2o/deps/hiredis/sds.h \
+    web/server/h2o/libh2o/deps/hiredis/test.c \
+    web/server/h2o/libh2o/deps/picotls/deps/cifra/src/blockwise.c \
+    web/server/h2o/libh2o/deps/picotls/deps/cifra/src/chash.c \
+    web/server/h2o/libh2o/deps/picotls/deps/cifra/src/curve25519.c \
+    web/server/h2o/libh2o/deps/picotls/deps/cifra/src/drbg.c \
+    web/server/h2o/libh2o/deps/picotls/deps/cifra/src/hmac.c \
+    web/server/h2o/libh2o/deps/picotls/deps/cifra/src/sha256.c \
+    web/server/h2o/libh2o/deps/picotls/lib/hpke.c \
+    web/server/h2o/libh2o/deps/picotls/lib/pembase64.c \
+    web/server/h2o/libh2o/deps/picotls/lib/picotls.c \
+    web/server/h2o/libh2o/deps/picotls/lib/openssl.c \
+    web/server/h2o/libh2o/deps/picotls/lib/cifra/random.c \
+    web/server/h2o/libh2o/deps/picotls/lib/cifra/x25519.c \
+    web/server/h2o/libh2o/lib/common/absprio.c \
+    web/server/h2o/libh2o/lib/common/balancer/roundrobin.c \
     web/server/h2o/libh2o/lib/common/cache.c \
     web/server/h2o/libh2o/lib/common/file.c \
     web/server/h2o/libh2o/lib/common/filecache.c \
     web/server/h2o/libh2o/lib/common/hostinfo.c \
     web/server/h2o/libh2o/lib/common/http1client.c \
+    web/server/h2o/libh2o/lib/common/http2client.c \
+    web/server/h2o/libh2o/lib/common/http3client.c \
+    web/server/h2o/libh2o/lib/common/httpclient.c \
     web/server/h2o/libh2o/lib/common/memcached.c \
     web/server/h2o/libh2o/lib/common/memory.c \
     web/server/h2o/libh2o/lib/common/multithread.c \
+    web/server/h2o/libh2o/lib/common/rand.c \
+    web/server/h2o/libh2o/lib/common/redis.c \
     web/server/h2o/libh2o/lib/common/serverutil.c \
     web/server/h2o/libh2o/lib/common/socket.c \
     web/server/h2o/libh2o/lib/common/socketpool.c \
     web/server/h2o/libh2o/lib/common/string.c \
     web/server/h2o/libh2o/lib/common/time.c \
-    web/server/h2o/libh2o/lib/common/timeout.c \
+    web/server/h2o/libh2o/lib/common/timerwheel.c \
+    web/server/h2o/libh2o/lib/common/token.c \
     web/server/h2o/libh2o/lib/common/url.c \
     web/server/h2o/libh2o/lib/core/config.c \
     web/server/h2o/libh2o/lib/core/configurator.c \
@@ -1044,10 +1095,8 @@ libh2o_a_SOURCES = \
     web/server/h2o/libh2o/lib/core/logconf.c \
     web/server/h2o/libh2o/lib/core/proxy.c \
     web/server/h2o/libh2o/lib/core/request.c \
-    web/server/h2o/libh2o/lib/core/token.c \
     web/server/h2o/libh2o/lib/core/util.c \
     web/server/h2o/libh2o/lib/handler/access_log.c \
-    web/server/h2o/libh2o/lib/handler/chunked.c \
     web/server/h2o/libh2o/lib/handler/compress.c \
     web/server/h2o/libh2o/lib/handler/compress/gzip.c \
     web/server/h2o/libh2o/lib/handler/errordoc.c \
@@ -1081,7 +1130,6 @@ libh2o_a_SOURCES = \
     web/server/h2o/libh2o/lib/handler/configurator/http2_debug_state.c \
     web/server/h2o/libh2o/lib/handler/configurator/headers_util.c \
     web/server/h2o/libh2o/lib/http1.c \
-    web/server/h2o/libh2o/lib/tunnel.c \
     web/server/h2o/libh2o/lib/http2/cache_digests.c \
     web/server/h2o/libh2o/lib/http2/casper.c \
     web/server/h2o/libh2o/lib/http2/connection.c \
@@ -1090,6 +1138,10 @@ libh2o_a_SOURCES = \
     web/server/h2o/libh2o/lib/http2/scheduler.c \
     web/server/h2o/libh2o/lib/http2/stream.c \
     web/server/h2o/libh2o/lib/http2/http2_debug_state.c \
+    web/server/h2o/libh2o/lib/http3/common.c \
+    web/server/h2o/libh2o/lib/http3/frame.c \
+    web/server/h2o/libh2o/lib/http3/qpack.c \
+    web/server/h2o/libh2o/lib/http3/server.c \
     $(NULL)
 
 libh2o_a_INCLUDES = \
@@ -1105,13 +1157,18 @@ libh2o_a_INCLUDES = \
     -I$(srcdir)/web/server/h2o/libh2o/deps/picotest \
     -I$(srcdir)/web/server/h2o/libh2o/deps/yaml/include \
     -I$(srcdir)/web/server/h2o/libh2o/deps/yoml \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/hiredis \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/picotls \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/picotls/deps/cifra/src \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/picotls/deps/cifra/src/ext \
+    -I$(srcdir)/web/server/h2o/libh2o/deps/
     $(NULL)
 
 if ENABLE_H2O
 noinst_LIBRARIES += libh2o.a
 
 # until h2o updates support for OpenSSL 3.0 we silence the warnings
-libh2o_a_CFLAGS = $(CFLAGS) -Wno-old-style-declaration -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 $(libh2o_a_INCLUDES)
+libh2o_a_CFLAGS = $(CFLAGS) -Wno-old-style-declaration -Wno-deprecated-declarations -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers -DH2O_USE_LIBUV=0 -DH2O_USE_BROTLI=0 -DPICOTLS_USE_BROTLI=0 $(libh2o_a_INCLUDES)
 
 if LINUX
     libh2o_a_CFLAGS += -D_GNU_SOURCE
