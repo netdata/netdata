@@ -128,7 +128,7 @@ typedef enum {
 /* -------------------------------------------------------------------------- */
 
 #define LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES 10U       /**< Maximum allowed number of log sources that can be searched in a single query **/
-#define LOGS_MANAG_QUERY_QUOTA_DEFAULT 10485760UL       /**< Default logs management query quota (10MB) **/
+#define LOGS_MANAG_QUERY_QUOTA_DEFAULT (10 MiB)         /**< Default logs management query quota **/
 #define LOGS_MANAG_QUERY_QUOTA_MAX MAX_LOG_MSG_SIZE     /**< Max logs management query quota **/
 #define LOGS_MANAG_QUERY_IGNORE_CASE_DEFAULT 0          /**< Boolean to indicate whether to ignore case for keyword or not **/
 #define LOGS_MANAG_QUERY_SANITIZE_KEYWORD_DEFAULT 0     /**< Boolean to indicate whether to sanitize keyword or not **/

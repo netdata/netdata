@@ -377,64 +377,6 @@ typedef struct function_query_status {
     size_t file_working;
 } FUNCTION_QUERY_STATUS;
 
-static void function_systemd_journal_progress(BUFFER *wb, const char *transaction, const char *progress_id) {
-    if(!progress_id || !(*progress_id)) {
-        netdata_mutex_lock(&stdout_mut);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, "missing progress id");
-        netdata_mutex_unlock(&stdout_mut);
-        return;
-    }
-
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(function_query_status_dict, progress_id);
-
-    if(!item) {
-        netdata_mutex_lock(&stdout_mut);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND, "progress id is not found here");
-        netdata_mutex_unlock(&stdout_mut);
-        return;
-    }
-
-    FUNCTION_QUERY_STATUS *fqs = dictionary_acquired_item_value(item);
-
-    usec_t now_monotonic_ut = now_monotonic_usec();
-    if(now_monotonic_ut + 10 * USEC_PER_SEC > fqs->stop_monotonic_ut)
-        fqs->stop_monotonic_ut = now_monotonic_ut + 10 * USEC_PER_SEC;
-
-    usec_t duration_ut = now_monotonic_ut - fqs->started_monotonic_ut;
-
-    size_t files_matched = fqs->files_matched;
-    size_t file_working = fqs->file_working;
-    if(file_working > files_matched)
-        files_matched = file_working;
-
-    size_t rows_read = __atomic_load_n(&fqs->rows_read, __ATOMIC_RELAXED);
-    size_t bytes_read = __atomic_load_n(&fqs->bytes_read, __ATOMIC_RELAXED);
-
-    buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
-    buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_uint64(wb, "running_duration_usec", duration_ut);
-    buffer_json_member_add_double(wb, "progress", (double)file_working * 100.0 / (double)files_matched);
-    char msg[1024 + 1];
-    snprintfz(msg, 1024,
-              "Read %zu rows (%0.0f rows/s), "
-              "data %0.1f MB (%0.1f MB/s), "
-              "file %zu of %zu",
-              rows_read, (double)rows_read / (double)duration_ut * (double)USEC_PER_SEC,
-              (double)bytes_read / 1024.0 / 1024.0, ((double)bytes_read / (double)duration_ut * (double)USEC_PER_SEC) / 1024.0 / 1024.0,
-              file_working, files_matched
-              );
-    buffer_json_member_add_string(wb, "message", msg);
-    buffer_json_finalize(wb);
-
-    netdata_mutex_lock(&stdout_mut);
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_realtime_sec() + 1, wb);
-    netdata_mutex_unlock(&stdout_mut);
-
-    dictionary_acquired_item_release(function_query_status_dict, item);
-}
-
 
 #define FACET_MAX_VALUE_LENGTH      8192
 
@@ -873,19 +815,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
 
     // buffer_json_journal_versions(wb);
 
-    // buffer_json_member_add_string(wb, "source", source ? source : "default");
-    // buffer_json_member_add_time_t(wb, "after", after_s);
-    // buffer_json_member_add_time_t(wb, "before", before_s);
-    // buffer_json_member_add_uint64(wb, "if_modified_since", if_modified_since);
-    // buffer_json_member_add_uint64(wb, "anchor", anchor);
-    // buffer_json_member_add_string(wb, "direction", direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
-    // buffer_json_member_add_uint64(wb, "last", last);
-    // buffer_json_member_add_string(wb, "query", query);
-    // buffer_json_member_add_string(wb, "chart", chart);
-    // buffer_json_member_add_time_t(wb, "timeout", timeout);
-    // buffer_json_object_close(wb); // request
-
-
     // ------------------------------------------------------------------------
     // run the request
 
@@ -918,111 +847,98 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     }
     
     if(progress) {
-        function_systemd_journal_progress(wb, transaction, progress_id);
+        // TODO: Add progress function
+        // function_logsmanagement_progress(wb, transaction, progress_id);
         goto cleanup;
     }
 
-    // if(sources){
-    //     buffer_sprintf( wb, 
-    //                     ",\n"
-    //                     "   \"api version\": %s,\n" 
-    //                     "   \"log sources\": {\n",
-    //                     LOGS_QRY_VERSION);
-    //     const logs_qry_res_err_t *const res_err = fetch_log_sources(wb);
-    //     buffer_sprintf( wb, 
-    //                     "\n"
-    //                     "   },\n"
-    //                     "   \"error code\": %d,\n"
-    //                     "   \"error\": \"%s\"\n}",
-    //                     (int) res_err->err_code,
-    //                     res_err->err_str);
+    if(!req_quota) 
+        query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
+    else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) 
+        query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;
+    else query_params.quota = req_quota;
 
-    //     ret = res_err->http_code;
-    //     goto cleanup;
-    // }
-
-    
-    // For now, always perform descending timestamp query
-    // TODO: FIXME
-    query_params.req_from_ts = before_s * MSEC_PER_SEC;
-    query_params.req_to_ts = after_s * MSEC_PER_SEC;
 
     if(fqs->source)
         query_params.chartname[0] = (char *) string2str(fqs->source);
 
-    query_params.order_by_asc = query_params.req_from_ts <= query_params.req_to_ts ? 1 : 0;
+    query_params.order_by_asc = 0;
 
-    // fn_off = cn_off = 0;
-
-    if(!req_quota) query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
-    else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;
-    else query_params.quota = req_quota;
-
+    
+    // NOTE: Always perform descending timestamp query
+    query_params.req_from_ts = before_s * MSEC_PER_SEC;
+    query_params.req_to_ts = after_s * MSEC_PER_SEC;
     query_params.stop_monotonic_ut = now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC;
-
     query_params.results_buff = buffer_create(query_params.quota, NULL);
 
-    const logs_qry_res_err_t *const res_err = execute_logs_manag_query(&query_params);
-    ret = res_err->http_code;
-
-    // if(data_only)
-    //     facets_data_only_mode(facets);
-
     facets_rows_begin(facets);
+    logs_qry_res_err_t *res_err;
 
+    do{
+        if(query_params.act_to_ts)
+            query_params.req_from_ts = query_params.act_to_ts - 1000;
 
-    usec_t last_modified = 0;
+        res_err = execute_logs_manag_query(&query_params);
+        ret = res_err->http_code;
 
-    size_t res_off = 0;
-    logs_query_res_hdr_t *p_res_hdr;
-    while(query_params.results_buff->len - res_off > 0){
-        p_res_hdr = (logs_query_res_hdr_t *) &query_params.results_buff->buffer[res_off];
+        usec_t last_modified = 0;
 
+        size_t res_off = 0;
+        logs_query_res_hdr_t *p_res_hdr;
+        while(query_params.results_buff->len - res_off > 0){
+            p_res_hdr = (logs_query_res_hdr_t *) &query_params.results_buff->buffer[res_off];
 
-
-        ssize_t remaining = p_res_hdr->text_size;
-        char *ls = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr) + p_res_hdr->text_size - 1;
-        *ls = '\0';
-        int timestamp_off = p_res_hdr->matches;
-        do{
+            ssize_t remaining = p_res_hdr->text_size;
+            char *ls = &query_params.results_buff->buffer[res_off] + sizeof(*p_res_hdr) + p_res_hdr->text_size - 1;
+            *ls = '\0';
+            int timestamp_off = p_res_hdr->matches;
             do{
+                do{
+                    --remaining;
+                    --ls;
+                } while(remaining > 0 && *ls != '\n');
+                *ls = '\0';
                 --remaining;
                 --ls;
-            } while(remaining > 0 && *ls != '\n');
-            *ls = '\0';
-            --remaining;
-            --ls;
 
-            usec_t timestamp = p_res_hdr->timestamp * USEC_PER_MS + --timestamp_off;
+                usec_t timestamp = p_res_hdr->timestamp * USEC_PER_MS + --timestamp_off;
 
-            if(unlikely(!last_modified)) {
-                if(timestamp == if_modified_since){
-                    ret = HTTP_RESP_NOT_MODIFIED;
-                    goto cleanup;
+                if(unlikely(!last_modified)) {
+                    if(timestamp == if_modified_since){
+                        ret = HTTP_RESP_NOT_MODIFIED;
+                        goto cleanup;
+                    }
+                    
+                    last_modified = timestamp;
                 }
-                
-                last_modified = timestamp;
-            }
 
-            facets_add_key_value(facets, "log_source", p_res_hdr->log_source[0] ? p_res_hdr->log_source : "-");
+                facets_add_key_value(facets, "log_source", p_res_hdr->log_source[0] ? p_res_hdr->log_source : "-");
 
-            facets_add_key_value(facets, "log_type", p_res_hdr->log_type[0] ? p_res_hdr->log_type : "-");
+                facets_add_key_value(facets, "log_type", p_res_hdr->log_type[0] ? p_res_hdr->log_type : "-");
 
-            facets_add_key_value(facets, "filename", p_res_hdr->filename[0] ? p_res_hdr->filename : "-");
+                facets_add_key_value(facets, "filename", p_res_hdr->filename[0] ? p_res_hdr->filename : "-");
 
-            facets_add_key_value(facets, "basename", p_res_hdr->basename[0] ? p_res_hdr->basename : "-");
+                facets_add_key_value(facets, "basename", p_res_hdr->basename[0] ? p_res_hdr->basename : "-");
 
-            facets_add_key_value(facets, "chartname", p_res_hdr->chartname[0] ? p_res_hdr->chartname : "-");
+                facets_add_key_value(facets, "chartname", p_res_hdr->chartname[0] ? p_res_hdr->chartname : "-");
 
-            facets_add_key_value(facets, "message", ls + 2);
+                facets_add_key_value(facets, "message", ls + 2);
 
-            facets_row_finished(facets, timestamp);
+                facets_row_finished(facets, timestamp);
 
-        } while(remaining > 0);
+            } while(remaining > 0);
 
-        res_off += sizeof(*p_res_hdr) + p_res_hdr->text_size;
+            res_off += sizeof(*p_res_hdr) + p_res_hdr->text_size;
 
-    }
+        }
+
+        buffer_flush(query_params.results_buff);
+
+    } while(query_params.act_to_ts > query_params.req_to_ts);
+
+    m_assert(query_params.req_from_ts == query_params.act_from_ts, "query_params.req_from_ts != query_params.act_from_ts");
+    m_assert(query_params.req_to_ts   == query_params.act_to_ts  , "query_params.req_to_ts != query_params.act_to_ts");
+    
 
     getrusage(RUSAGE_THREAD, &end);
     time_t user_time =  end.ru_utime.tv_sec * USEC_PER_SEC + end.ru_utime.tv_usec - 

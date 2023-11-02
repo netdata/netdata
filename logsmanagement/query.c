@@ -87,31 +87,8 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
         buffer_json_member_add_uint64(wb, "db_version", db_user_version(p_file_infos_arr->data[i]->db, -1));
         buffer_json_member_add_uint64(wb, "db_flush_freq", db_user_version(p_file_infos_arr->data[i]->db, -1));
         buffer_json_member_add_int64( wb, "db_disk_space_limit", p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES);
-        // buffer_sprintf( wb, "       \"%s\": {\n"
-        //                     "         \"basename\": \"%s\",\n"
-        //                     "         \"filename\": \"%s\",\n"
-        //                     "         \"log type\": \"%s\",\n"
-        //                     "         \"DB dir\": \"%s\",\n"
-        //                     "         \"DB version\": %d,\n"
-        //                     "         \"DB flush interval\": %d,\n"
-        //                     "         \"DB disk space limit\": %" PRId64 "\n"
-        //                     "      },\n", 
-        //                 p_file_infos_arr->data[i]->chartname,
-        //                 p_file_infos_arr->data[i]->file_basename,
-        //                 p_file_infos_arr->data[i]->filename,
-        //                 log_src_type_t_str[p_file_infos_arr->data[i]->log_type],
-        //                 p_file_infos_arr->data[i]->db_dir,
-        //                 db_user_version(p_file_infos_arr->data[i]->db, -1),
-        //                 p_file_infos_arr->data[i]->buff_flush_to_db_interval,
-        //                 p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES
-        //                 );
         buffer_json_object_close(wb); // options object
     }
-
-    /* Results are terminated as ",\n" but should actually be null-terminated, 
-     * so replace those 2 characters with '\0' */
-    // wb->len -= 2;
-    // wb->buffer[wb->len] = '\0';
 
     return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_OK];
 }
