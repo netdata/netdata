@@ -9,7 +9,6 @@
  */
 
 #include <uv.h>
-#include <stdatomic.h>
 #include "daemon/common.h"
 #include "db_api.h"
 #include "file_info.h"
@@ -49,12 +48,12 @@ static struct {
     {.signum = SIGTERM}
 };
 
-static void signal_handler(uv_signal_t *handle, int signum) {
+static void signal_handler(uv_signal_t *handle, int signum __maybe_unused) {
     UNUSED(handle);
 
-    collector_info("Signal received: %d\n", signum);
+    debug_log("Signal received: %d\n", signum);
 
-    logsmanagement_should_exit = true;
+    __atomic_store_n(&logsmanagement_should_exit, true, __ATOMIC_RELAXED);
 
 }
 
@@ -236,7 +235,7 @@ int main(int argc, char **argv) {
     collector_info("%s setup completed successfully", program_name);
 
     /* Run uvlib loop. */
-    while(!logsmanagement_should_exit)
+    while(!__atomic_load_n(&logsmanagement_should_exit, __ATOMIC_RELAXED))
         uv_run(main_loop, UV_RUN_ONCE);
 
     /* If there are valid log sources, there should always be valid handles */

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrd_api_stats.h"
-#include <stdatomic.h>
 
 static const char *const rrd_type = "netdata";
 
 static char **dim_db_timings_write, **dim_db_timings_rotate;
 
-extern atomic_bool logsmanagement_should_exit;
+extern bool logsmanagement_should_exit;
 
 static void stats_charts_update(void){
 
@@ -287,7 +286,8 @@ void stats_charts_init(void *arg){
 
     while (1) {
         heartbeat_next(&hb, step_ut);
-        if (logsmanagement_should_exit) break;
+        if (__atomic_load_n(&logsmanagement_should_exit, __ATOMIC_RELAXED)) 
+            break;
 
         netdata_mutex_lock(p_stdout_mut);
         stats_charts_update();
