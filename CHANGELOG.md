@@ -6,7 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix journal file index when collision is detected [\#16319](https://github.com/netdata/netdata/pull/16319) ([stelfrag](https://github.com/stelfrag))
+- Optimize database before agent shutdown [\#16317](https://github.com/netdata/netdata/pull/16317) ([stelfrag](https://github.com/stelfrag))
+- `tcp_v6_connect` monitoring [\#16316](https://github.com/netdata/netdata/pull/16316) ([thiagoftsm](https://github.com/thiagoftsm))
+- Improve shutdown when collectors are active [\#16315](https://github.com/netdata/netdata/pull/16315) ([stelfrag](https://github.com/stelfrag))
 - Add a note for the docker deployment alongside with cetus [\#16312](https://github.com/netdata/netdata/pull/16312) ([tkatsoulas](https://github.com/tkatsoulas))
+- Update ObservabilityCon README.md [\#16311](https://github.com/netdata/netdata/pull/16311) ([Aliki92](https://github.com/Aliki92))
+- update docker swarm deploy info [\#16308](https://github.com/netdata/netdata/pull/16308) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16306](https://github.com/netdata/netdata/pull/16306) ([netdatabot](https://github.com/netdatabot))
 - Use proper icons for deploy integrations [\#16305](https://github.com/netdata/netdata/pull/16305) ([Ancairon](https://github.com/Ancairon))
 - bump openssl for static in 3.1.4 [\#16303](https://github.com/netdata/netdata/pull/16303) ([tkatsoulas](https://github.com/tkatsoulas))
 - claim.sh: use echo instead of /bin/echo [\#16300](https://github.com/netdata/netdata/pull/16300) ([ilyam8](https://github.com/ilyam8))
@@ -423,11 +430,6 @@
 - Regenerate integrations.js [\#15717](https://github.com/netdata/netdata/pull/15717) ([netdatabot](https://github.com/netdatabot))
 - fix meta deploy docker swarm NC env var [\#15716](https://github.com/netdata/netdata/pull/15716) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#15713](https://github.com/netdata/netdata/pull/15713) ([netdatabot](https://github.com/netdatabot))
-- Update metadata.yaml [\#15710](https://github.com/netdata/netdata/pull/15710) ([sashwathn](https://github.com/sashwathn))
-- Regenerate integrations.js [\#15709](https://github.com/netdata/netdata/pull/15709) ([netdatabot](https://github.com/netdatabot))
-- integrations: fix docker compose indent [\#15708](https://github.com/netdata/netdata/pull/15708) ([ilyam8](https://github.com/ilyam8))
-- Better cleanup of aclk alert table entries [\#15706](https://github.com/netdata/netdata/pull/15706) ([MrZammler](https://github.com/MrZammler))
-- Regenerate integrations.js [\#15705](https://github.com/netdata/netdata/pull/15705) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
