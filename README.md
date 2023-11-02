@@ -1,9 +1,9 @@
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
 </a>
 <a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
 <h3 align="center">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
@@ -32,10 +32,10 @@
 
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/srecon_light.png" alt="ObservabilityCon23" width="600"/>
+  <img src="https://www.netdata.cloud/img/readme-images/srecon_light.png" alt="ObservabilityCon23" width="600"/>
 </a>
 <a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/srecon_dark.png" alt="ObservabilityCon23" width="600"/>
+  <img src="https://www.netdata.cloud/img/readme-images/srecon_dark.png" alt="ObservabilityCon23" width="600"/>
 </a>
 </p>
 
@@ -77,10 +77,10 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 <p align="center">
 <a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/#gh-light-mode-only">
-  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata%20vs%20prometheus.png#gh-light-mode-only" alt="Netdata vs Prometheus" width="700"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus.png#gh-light-mode-only" alt="Netdata vs Prometheus" width="700"/>
 </a>
 <a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/#gh-dark-mode-only">
-  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata%20vs%20prometheus%20dark.png#gh-dark-mode-only" alt="Netdata" width="700"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus%20dark.png#gh-dark-mode-only" alt="Netdata" width="700"/>
 </a>
 </p>
 
