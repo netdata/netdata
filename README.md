@@ -1,9 +1,9 @@
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/2662304/a62997fb-d75d-42df-b188-b804cd034a70#gh-light-mode-only" alt="Netdata" width="300"/>
+  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
 </a>
 <a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/2662304/95ea1560-5e83-44d3-ad33-7980f8298b65#gh-dark-mode-only" alt="Netdata" width="300"/>
+  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
 <h3 align="center">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
@@ -31,11 +31,11 @@
 <hr class="solid">
 
 <p align="center">
-<a href="netdata.cloud#gh-light-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/139226121/9949ef9b-50ad-457f-8072-afa5323d1ee5#gh-light-mode-only" alt="ObservabilityCon23" width="600"/>
+<a href="https://www.netdata.cloud#gh-light-mode-only">
+  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/srecon_light.png" alt="ObservabilityCon23" width="600"/>
 </a>
-<a href="netdata.cloud#gh-dark-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/139226121/09b5d082-ba1e-48a0-a823-f364a145c1cb#gh-dark-mode-only" alt="ObservabilityCon23" width="600"/>
+<a href="https://www.netdata.cloud#gh-dark-mode-only">
+  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/srecon_dark.png" alt="ObservabilityCon23" width="600"/>
 </a>
 </p>
 
