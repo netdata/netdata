@@ -51,11 +51,32 @@ static void log_dbus_error(int r, const char *msg) {
     netdata_log_error("SYSTEMD_UNITS: %s failed with error %d", msg, r);
 }
 
-int hex_to_int(char c) {
+static int hex_to_int(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
     return 0;
+}
+
+// un-escape hex sequences (\xNN) in id
+static void txt_decode(char *txt) {
+    if(!txt || !*txt)
+        return;
+
+    char *src = txt, *dst = txt;
+
+    size_t id_len = strlen(src);
+    size_t s = 0, d = 0;
+    for(; s < id_len ; s++) {
+        if(src[s] == '\\' && src[s + 1] == 'x' && isxdigit(src[s + 2]) && isxdigit(src[s + 3])) {
+            int value = (hex_to_int(src[s + 2]) << 4) + hex_to_int(src[s + 3]);
+            dst[d++] = (char)value;
+            s += 3;
+        }
+        else
+            dst[d++] = src[s];
+    }
+    dst[d] = '\0';
 }
 
 static UnitInfo *systemd_units_get_all(void) {
@@ -97,30 +118,18 @@ static UnitInfo *systemd_units_get_all(void) {
     while ((r = bus_parse_unit_info(reply, &u)) > 0) {
         UnitInfo *i = callocz(1, sizeof(u));
 
-        // un-escape hex sequences (\xNN) in id
-        i->id = strdupz(u.id);
-        size_t id_len = strlen(u.id);
-        size_t s = 0, d = 0;
-        for(; s < id_len ; s++) {
-            if(u.id[s] == '\\' && u.id[s + 1] == 'x' && isxdigit(u.id[s + 2]) && isxdigit(u.id[s + 3])) {
-                int value = (hex_to_int(u.id[s + 2]) << 4) + hex_to_int(u.id[s + 3]);
-                i->id[d++] = (char)value;
-                s += 3;
-            }
-            else
-                i->id[d++] = u.id[s];
-        }
-        i->id[d] = '\0';
+        i->id = strdupz(u.id && *u.id ? u.id : "-");
+        txt_decode(i->id);
 
         char *dot = strrchr(i->id, '.');
-        if(dot) {
-            *dot = '\0';
+        if(dot)
             i->type = strdupz(&dot[1]);
-        }
         else
             i->type = strdupz("unknown");
 
         i->description = strdupz(u.description && *u.description ? u.description : "-");
+        txt_decode(i->description);
+
         i->load_state = strdupz(u.load_state && *u.load_state ? u.load_state : "-");
         i->active_state = strdupz(u.active_state && *u.active_state ? u.active_state : "-");
         i->sub_state = strdupz(u.sub_state && *u.sub_state ? u.sub_state : "-");
