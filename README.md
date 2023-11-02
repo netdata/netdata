@@ -31,10 +31,10 @@
 <hr class="solid">
 
 <p align="center">
-<a href="netdata.cloud#gh-light-mode-only">
+<a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/srecon_light.png" alt="ObservabilityCon23" width="600"/>
 </a>
-<a href="netdata.cloud#gh-dark-mode-only">
+<a href="https://www.netdata.cloud#gh-dark-mode-only">
   <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/srecon_dark.png" alt="ObservabilityCon23" width="600"/>
 </a>
 </p>
