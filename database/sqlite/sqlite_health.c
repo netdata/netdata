@@ -1332,6 +1332,10 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
      }
 
      rc = sqlite3_bind_int64(stmt_query, ++param, max);
+     if (unlikely(rc != SQLITE_OK)) {
+         error_report("Failed to bind max lines for SQL_SELECT_HEALTH_LOG.");
+         goto finish;
+     }
 
      while (sqlite3_step(stmt_query) == SQLITE_ROW) {
          char old_value_string[100 + 1];
