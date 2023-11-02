@@ -504,16 +504,19 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 /* FLB_SYSTEMD or FLB_SYSLOG case */
                 if( p_file_info->log_type == FLB_SYSTEMD || 
                     p_file_info->log_type == FLB_SYSLOG){
+                        
                     if( p_file_info->use_log_timestamp && !strncmp( p->key.via.str.ptr, 
-                                                                    "_SOURCE_REALTIME_TIMESTAMP", 
+                                                                    "SOURCE_REALTIME_TIMESTAMP", 
                                                                     (size_t) p->key.via.str.size)){
-                        m_assert(p->val.via.str.size <= TIMESTAMP_MS_STR_SIZE - 1, 
-                                "p->val.via.str.size >= TIMESTAMP_MS_STR_SIZE");
+
+                        m_assert(p->val.via.str.size - 3 == TIMESTAMP_MS_STR_SIZE - 1, 
+                                "p->val.via.str.size - 3 != TIMESTAMP_MS_STR_SIZE");
+                        
                         strncpyz(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
 
                         char *endptr = NULL;
                         timestamp = str2ll(timestamp_str, &endptr);
-                        timestamp = *endptr ? 0 : timestamp;
+                        timestamp = *endptr ? 0 : timestamp / USEC_PER_MS;
                     }
                     else if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
                         m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
@@ -565,6 +568,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                         new_tmp_text_size += pid_size;
                     }
                     else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
+                        
                         message = (char *) p->val.via.str.ptr;
                         message_size = p->val.via.str.size;
 
