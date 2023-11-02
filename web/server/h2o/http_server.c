@@ -17,6 +17,7 @@ static h2o_accept_ctx_t accept_ctx;
 #define CONTENT_TEXT_UTF8 H2O_STRLIT("text/plain; charset=utf-8")
 #define NBUF_INITIAL_SIZE_RESP (4096)
 #define API_V1_PREFIX "/api/v1/"
+#define API_V2_PREFIX "/api/v2/"
 #define HOST_SELECT_PREFIX "/host/"
 
 #define HTTPD_CONFIG_SECTION "httpd"
@@ -173,13 +174,24 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
             norm_path.len--;
     }
 
-    size_t api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V1_PREFIX));
-    if (api_loc == SIZE_MAX)
-        return 1;
+    unsigned int api_version = 2;
+    size_t api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V2_PREFIX));
+    if (api_loc == SIZE_MAX) {
+        api_version = 1;
+        api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V1_PREFIX));
+        if (api_loc == SIZE_MAX)
+            return 1;
+    }
+
+    // API_V1_PREFIX and API_V2_PREFIX are the same length
+    // but I did this just in case someone changes the length of the prefix in future
+    // so he will not be shot in the leg here
+    // until then compiler will optimize this out
+    size_t api_len = api_version == 1 ? strlen(API_V1_PREFIX) : strlen(API_V2_PREFIX);
 
     h2o_iovec_t api_command = norm_path;
-    api_command.base += api_loc + strlen(API_V1_PREFIX);
-    api_command.len -= api_loc + strlen(API_V1_PREFIX);
+    api_command.base += api_loc + api_len;
+    api_command.len -= api_loc + api_len;
 
     if (!api_command.len)
         return 1;
@@ -210,7 +222,11 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         freez(query_unescaped);
     }
 
-    web_client_api_request_v1(*host, &w, path_unescaped);
+//inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
+    if (api_version == 2)
+        web_client_api_request_v2(*host, &w, path_unescaped);
+    else
+        web_client_api_request_v1(*host, &w, path_unescaped);
     freez(path_unescaped);
 
     h2o_iovec_t body = buffer_to_h2o_iovec(w.response.data);
