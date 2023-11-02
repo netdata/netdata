@@ -15,7 +15,7 @@
 #define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
 
 #define SYSTEMD_UNITS_FUNCTION_DESCRIPTION      "View the status of systemd units"
-#define SYSTEMD_UNITS_FUNCTION_NAME              "systemd-units"
+#define SYSTEMD_UNITS_FUNCTION_NAME              "systemd-list-units"
 #define SYSTEMD_UNITS_DEFAULT_TIMEOUT            30
 
 extern __thread size_t fstat_thread_calls;
