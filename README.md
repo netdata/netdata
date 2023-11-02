@@ -80,7 +80,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
   <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata%20vs%20prometheus.png#gh-light-mode-only" alt="Netdata vs Prometheus" width="700"/>
 </a>
 <a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/#gh-dark-mode-only">
-  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata%20vs%20prometheus.png#gh-dark-mode-only" alt="Netdata" width="700"/>
+  <img src="https://github.com/netdata/website/blob/master/themes/tailwind/static/img/readme-images/netdata%20vs%20prometheus%20dark.png#gh-dark-mode-only" alt="Netdata" width="700"/>
 </a>
 </p>
 
