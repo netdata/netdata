@@ -737,12 +737,12 @@ void update_throttle_io_serviced_bytes_chart(struct cgroup *cg) {
 
         rrdset_update_rrdlabels(chart, cg->chart_labels);
 
-        rrddim_add(chart, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
-        rrddim_add(chart, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
+        cg->st_throttle_io_rd_read = rrddim_add(chart, "read", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
+        cg->st_throttle_io_rd_written = rrddim_add(chart, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set(chart, "read", (collected_number)cg->throttle_io_service_bytes.Read);
-    rrddim_set(chart, "write", (collected_number)cg->throttle_io_service_bytes.Write);
+    rrddim_set_by_pointer(chart, cg->st_throttle_io_rd_read, (collected_number)cg->throttle_io_service_bytes.Read);
+    rrddim_set_by_pointer(chart, cg->st_throttle_io_rd_written, (collected_number)cg->throttle_io_service_bytes.Write);
     rrdset_done(chart);
 }
 

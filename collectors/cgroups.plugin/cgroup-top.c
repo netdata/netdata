@@ -146,28 +146,32 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_json_add_array_item_double(wb, ram);
 
         double disk_io_read = NAN;
-        if (cg->st_io_rd_read) {
-            disk_io_read = cg->st_io_rd_read->collector.last_stored_value;
-            disk_io_read /= 1024.0;
-            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
-        }
-        buffer_json_add_array_item_double(wb, disk_io_read);
-
         double disk_io_written = NAN;
-        if (cg->st_io_rd_written) {
-            disk_io_written = ABS(cg->st_io_rd_written->collector.last_stored_value);
-            disk_io_written /= 1024.0;
+        if (cg->st_throttle_io_rd_read) {
+            disk_io_read = (cg->st_throttle_io_rd_read->collector.last_stored_value / 1024.0);
+            disk_io_written = (ABS(cg->st_throttle_io_rd_written->collector.last_stored_value) / 1024.0);
+        } else if (cg->st_io_rd_read) {
+            disk_io_read = (cg->st_io_rd_read->collector.last_stored_value / 1024.0);
+            disk_io_written = (ABS(cg->st_io_rd_written->collector.last_stored_value) / 1024.0);
+        }
+
+        if (!isnan(disk_io_read) && !isnan(disk_io_written)) {
+            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
             max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
         }
+
+        buffer_json_add_array_item_double(wb, disk_io_read);
         buffer_json_add_array_item_double(wb, disk_io_written);
+
 
         NETDATA_DOUBLE received, sent;
         cgroup_netdev_get_bandwidth(cg, &received, &sent);
-        // kilobits => megabits
-        received /= 1000.0;
-        sent /= 1000.0;
-        max_net_received = MAX(max_net_received, received);
-        max_net_sent = MAX(max_net_sent, sent);
+        if (!isnan(received) && !isnan(sent)) {
+            received /= 1000.0;
+            sent /= 1000.0;
+            max_net_received = MAX(max_net_received, received);
+            max_net_sent = MAX(max_net_sent, sent);
+        }
 
         buffer_json_add_array_item_double(wb, received);
         buffer_json_add_array_item_double(wb, sent);
@@ -202,7 +206,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "CPU", "CPU Usage",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "%", max_cpu, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
@@ -210,39 +214,39 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "RAM", "RAM Usage",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "MiB", max_ram, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
         
         // Disk IO Reads
-        buffer_rrdf_table_add_field(wb, field_id++, "Disk Reads", "Disk Read Data",
+        buffer_rrdf_table_add_field(wb, field_id++, "Reads", "Disk Read Data",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "MiB", max_disk_io_read, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         // Disk IO Writes
-        buffer_rrdf_table_add_field(wb, field_id++, "Disk Writes", "Disk Written Data",
+        buffer_rrdf_table_add_field(wb, field_id++, "Writes", "Disk Written Data",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "MiB", max_disk_io_written, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         // Network Received
-        buffer_rrdf_table_add_field(wb, field_id++, "Net In", "Network Traffic Received",
+        buffer_rrdf_table_add_field(wb, field_id++, "Received", "Network Traffic Received",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "Mbps", max_net_received, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         // Network Sent
-        buffer_rrdf_table_add_field(wb, field_id++, "Net Out", "Network Traffic Sent ",
+        buffer_rrdf_table_add_field(wb, field_id++, "Sent", "Network Traffic Sent ",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "Mbps", max_net_sent, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
     }
@@ -281,8 +285,8 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Net In");
-                buffer_json_add_array_item_string(wb, "Net Out");
+                buffer_json_add_array_item_string(wb, "Received");
+                buffer_json_add_array_item_string(wb, "Sent");
             }
             buffer_json_array_close(wb);
         }
@@ -376,19 +380,21 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
         buffer_json_add_array_item_double(wb, ram);
 
         double disk_io_read = NAN;
-        if (cg->st_io_rd_read) {
-            disk_io_read = cg->st_io_rd_read->collector.last_stored_value;
-            disk_io_read /= 1024.0;
-            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
-        }
-        buffer_json_add_array_item_double(wb, disk_io_read);
-
         double disk_io_written = NAN;
-        if (cg->st_io_rd_written) {
-            disk_io_written = ABS(cg->st_io_rd_written->collector.last_stored_value);
-            disk_io_written /= 1024.0;
+        if (cg->st_throttle_io_rd_read) {
+            disk_io_read = (cg->st_throttle_io_rd_read->collector.last_stored_value / 1024.0);
+            disk_io_written = (ABS(cg->st_throttle_io_rd_written->collector.last_stored_value) / 1024.0);
+        } else if (cg->st_io_rd_read) {
+            disk_io_read = (cg->st_io_rd_read->collector.last_stored_value / 1024.0);
+            disk_io_written = (ABS(cg->st_io_rd_written->collector.last_stored_value) / 1024.0);
+        }
+
+        if (!isnan(disk_io_read) && !isnan(disk_io_written)) {
+            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
             max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
         }
+
+        buffer_json_add_array_item_double(wb, disk_io_read);
         buffer_json_add_array_item_double(wb, disk_io_written);
 
         buffer_json_array_close(wb);
@@ -413,7 +419,7 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
         buffer_rrdf_table_add_field(wb, field_id++, "CPU", "CPU Usage",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "%", max_cpu, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
@@ -421,23 +427,23 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
         buffer_rrdf_table_add_field(wb, field_id++, "RAM", "RAM Usage",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "MiB", max_ram, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         // Disk IO Reads
-        buffer_rrdf_table_add_field(wb, field_id++, "Disk Reads", "Disk Read Data",
+        buffer_rrdf_table_add_field(wb, field_id++, "Reads", "Disk Read Data",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "MiB", max_disk_io_read, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         // Disk IO Writes
-        buffer_rrdf_table_add_field(wb, field_id++, "Disk Writes", "Disk Written Data",
+        buffer_rrdf_table_add_field(wb, field_id++, "Writes", "Disk Written Data",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "MiB", max_disk_io_written, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
     }

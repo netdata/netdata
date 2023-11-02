@@ -253,8 +253,13 @@ struct cgroup {
     RRDDIM *st_io_rd_written;
 
     RRDSET *st_serviced_ops;
+
     RRDSET *st_throttle_io;
+    RRDDIM *st_throttle_io_rd_read;
+    RRDDIM *st_throttle_io_rd_written;
+
     RRDSET *st_throttle_serviced_ops;
+
     RRDSET *st_queued_ops;
     RRDSET *st_merged_ops;
 
