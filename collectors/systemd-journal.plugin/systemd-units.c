@@ -1268,7 +1268,7 @@ void function_systemd_units(const char *transaction, char *function, int timeout
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
+                RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "jobId", "Unit Job ID",
@@ -1289,7 +1289,7 @@ void function_systemd_units(const char *transaction, char *function, int timeout
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
+                RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "priority", "Priority",
