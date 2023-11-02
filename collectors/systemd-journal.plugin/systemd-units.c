@@ -823,7 +823,14 @@ FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
             break;
 
         default:
+        case UNIT_RELOADING:
+        case UNIT_ACTIVATING:
+        case UNIT_DEACTIVATING:
             severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_WARNING);
+            break;
+
+        case UNIT_MAINTENANCE:
+            severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_NOTICE);
             break;
 
         case UNIT_ACTIVE:
