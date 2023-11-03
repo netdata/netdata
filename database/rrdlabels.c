@@ -1323,8 +1323,8 @@ struct rrdlabels_unittest_add_a_pair {
 
 RRDLABEL *rrdlabels_find_label_with_key(RRDLABELS *labels, const char *key, RRDLABEL_SRC *source)
 {
-    if (!labels)
-        return false;
+    if (!labels || !key)
+        return NULL;
 
     STRING *this_key = string_strdupz(key);
 
@@ -1334,7 +1334,8 @@ RRDLABEL *rrdlabels_find_label_with_key(RRDLABELS *labels, const char *key, RRDL
     lfe_start_read(labels, lb, ls)
     {
         if (lb->index.key == this_key) {
-            *source = ls;
+            if (source)
+                *source = ls;
            break;
         }
     }
