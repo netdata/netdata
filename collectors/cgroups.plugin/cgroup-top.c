@@ -138,7 +138,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
             buffer_json_add_array_item_string(wb, "cgroup"); // Kind
 
         double cpu = NAN;
-        if (cg->st_cpu_rd_user &&  cg->st_cpu_rd_system) {
+        if (cg->st_cpu_rd_user && cg->st_cpu_rd_system) {
             cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
             max_cpu = MAX(max_cpu, cpu);
         }
@@ -378,7 +378,7 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
         buffer_json_add_array_item_string(wb, cg->name);
 
         double cpu = NAN;
-        if (cg->st_cpu_rd_user &&  cg->st_cpu_rd_system) {
+        if (cg->st_cpu_rd_user && cg->st_cpu_rd_system) {
             cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
             max_cpu = MAX(max_cpu, cpu);
         }
