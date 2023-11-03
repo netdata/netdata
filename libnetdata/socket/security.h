@@ -64,6 +64,7 @@ bool netdata_ssl_connect(NETDATA_SSL *ssl);
 bool netdata_ssl_accept(NETDATA_SSL *ssl);
 
 bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd);
+bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned char *alpn_protos, unsigned int alpn_protos_len);
 void netdata_ssl_close(NETDATA_SSL *ssl);
 
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num);

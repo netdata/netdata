@@ -1743,7 +1743,7 @@ void web_client_process_request(struct web_client *w) {
                         return;
                     }
 
-                    w->response.code = rrdpush_receiver_thread_spawn(w, (char *)buffer_tostring(w->url_query_string_decoded));
+                    w->response.code = rrdpush_receiver_thread_spawn(w, (char *)buffer_tostring(w->url_query_string_decoded), NULL);
                     return;
 
                 case WEB_CLIENT_MODE_OPTIONS:

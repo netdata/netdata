@@ -930,7 +930,7 @@ static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struc
 }
 
 void *rrdpush_receiver_thread(void *ptr);
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string) {
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx) {
 
     if(!service_running(ABILITY_STREAMING_CONNECTIONS))
         return rrdpush_receiver_too_busy_now(w);
@@ -940,6 +940,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->hops = 1;
 
     rpt->capabilities = STREAM_CAP_INVALID;
+
+#ifdef ENABLE_H2O
+    rpt->h2o_ctx = h2o_ctx;
+#endif
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);

@@ -936,9 +936,6 @@ if test "${enable_h2o}" != "no"; then
     else
         can_build_h2o="no"
     fi
-    if test "${with_zlib}" != "yes"; then
-        can_build_h2o="no"
-    fi
     AC_MSG_RESULT([${can_build_h2o}])
 
     if test "${can_build_h2o}" = "no" -a "${enable_h2o}" = "yes"; then

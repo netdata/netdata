@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
+#include "streaming/common.h"
 #include "http_server.h"
-#include "h2o.h"
 
+#include "h2o.h"
+#include "h2o/http1.h"
+
+#include "streaming.h"
 #include "h2o_utils.h"
 
 static h2o_globalconf_t config;
@@ -188,6 +191,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     // individual response generators and thus remove the need to "emulate"
     // the old webserver calling this function here and in ACLK
     struct web_client w;
+    memset(&w, 0, sizeof(w));
     w.response.data = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_query_string_decoded = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
@@ -241,17 +245,19 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 
     int ret = _netdata_uberhandler(req, &host);
 
-    char host_uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(host->host_uuid, host_uuid_str);
-
     if (!ret) {
+        char host_uuid_str[UUID_STR_LEN];
+
+        if (host != NULL)
+            uuid_unparse_lower(host->host_uuid, host_uuid_str);
+
         netdata_log_access("HTTPD OK method: " PRINTF_H2O_IOVEC_FMT
                    ", path: " PRINTF_H2O_IOVEC_FMT
                    ", as host: %s"
                    ", response: %d",
                    PRINTF_H2O_IOVEC(&req->method),
                    PRINTF_H2O_IOVEC(&req->input.path),
-                   host == localhost ? "localhost" : host_uuid_str,
+                   host == NULL ? "unknown" : (localhost ? "localhost" : host_uuid_str),
                    req->res.status);
     } else {
         netdata_log_access("HTTPD %d"
@@ -288,6 +294,33 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
+static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
+{
+    UNUSED(self);
+    netdata_log_info("Streaming request trough h2o received");
+    h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
+    h2o_stream_conn_t_init(conn);
+
+    if (is_streaming_handshake(req)) {
+        h2o_stream_conn_t_destroy(conn);
+        freez(conn);
+        return 1;
+    }
+
+    /* build response */
+    req->res.status = HTTP_RESP_SWITCH_PROTO;
+    req->res.reason = "Switching Protocols";
+    h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_UPGRADE, NULL, H2O_STRLIT(NETDATA_STREAM_PROTO_NAME));
+
+//  TODO we should consider adding some nonce header here
+//    h2o_add_header_by_str(&req->pool, &req->res.headers, H2O_STRLIT("whatever reply"), 0, NULL, accept_key,
+//                          strlen(accept_key));
+
+    h2o_http1_upgrade(req, NULL, 0, stream_on_complete, conn);
+
+    return 0;
+}
+
 #define POLL_INTERVAL 100
 
 void *h2o_main(void *ptr) {
@@ -307,6 +340,10 @@ void *h2o_main(void *ptr) {
     pathconf = h2o_config_register_path(hostconf, "/netdata.conf", 0);
     h2o_handler_t *handler = h2o_create_handler(pathconf, sizeof(*handler));
     handler->on_req = hdl_netdata_conf;
+
+    pathconf = h2o_config_register_path(hostconf, NETDATA_STREAM_URL, 0);
+    handler = h2o_create_handler(pathconf, sizeof(*handler));
+    handler->on_req = hdl_stream;
 
     pathconf = h2o_config_register_path(hostconf, "/", 0);
     handler = h2o_create_handler(pathconf, sizeof(*handler));
@@ -328,11 +365,18 @@ void *h2o_main(void *ptr) {
         return NULL;
     }
 
+    usec_t last_wpoll = now_monotonic_usec();
     while (service_running(SERVICE_HTTPD)) {
         int rc = h2o_evloop_run(ctx.loop, POLL_INTERVAL);
         if (rc < 0 && errno != EINTR) {
             netdata_log_error("h2o_evloop_run returned (%d) with errno other than EINTR. Aborting", rc);
             break;
+        }
+        usec_t now = now_monotonic_usec();
+        if (now - last_wpoll > POLL_INTERVAL * USEC_PER_MS) {
+            last_wpoll = now;
+
+            h2o_stream_check_pending_write_reqs();
         }
     } 
 

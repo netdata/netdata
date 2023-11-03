@@ -13,6 +13,11 @@ static ssize_t send_to_plugin(const char *txt, void *data) {
     if(!txt || !*txt)
         return 0;
 
+#ifdef ENABLE_H2O
+    if(parser->h2o_ctx)
+        return h2o_stream_write(parser->h2o_ctx, txt, strlen(txt));
+#endif
+
     errno = 0;
     spinlock_lock(&parser->writer.spinlock);
     ssize_t bytes = -1;

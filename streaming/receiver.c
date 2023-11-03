@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "web/server/h2o/http_server.h"
 
 extern struct config stream_config;
 
@@ -56,6 +57,11 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
         return 0;
     }
+
+#ifdef ENABLE_H2O
+    if (is_h2o_rrdpush(r))
+        return (int)h2o_stream_read(r->h2o_ctx, buffer, size);
+#endif
 
     int tries = 100;
     ssize_t bytes_read;
@@ -337,6 +343,10 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
         parser = parser_init(&user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
     }
+
+#ifdef ENABLE_H2O
+    parser->h2o_ctx = rpt->h2o_ctx;
+#endif
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
@@ -761,19 +771,30 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-        ssize_t bytes_sent = send_timeout(
-#ifdef ENABLE_HTTPS
-                &rpt->ssl,
+#ifdef ENABLE_H2O
+        if (is_h2o_rrdpush(rpt)) {
+            h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
+        } else {
 #endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60);
+            ssize_t bytes_sent = send_timeout(
+#ifdef ENABLE_HTTPS
+                    &rpt->ssl,
+#endif
+                    rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
-        if(bytes_sent != (ssize_t)strlen(initial_response)) {
-            internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
-            rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
-            goto cleanup;
+            if(bytes_sent != (ssize_t)strlen(initial_response)) {
+                internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
+                rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
+                goto cleanup;
+            }
+#ifdef ENABLE_H2O
         }
+#endif
     }
 
+#ifdef ENABLE_H2O
+    unless_h2o_rrdpush(rpt)
+#endif
     {
         // remove the non-blocking flag from the socket
         if(sock_delnonblock(rpt->fd) < 0)
