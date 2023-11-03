@@ -220,7 +220,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest);
 
 void ebpf_collect_data_for_all_processes();
 
-extern netdata_publish_dcstat_t **dcstat_pid;
 extern netdata_publish_vfs_t **vfs_pid;
 struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t hash, uint32_t pid);
 

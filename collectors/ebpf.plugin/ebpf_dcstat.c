@@ -59,6 +59,17 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = "d_lookup", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+struct netdata_static_thread ebpf_read_dcstat = {
+    .name = "EBPF_READ_DCSTAT",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 #ifdef NETDATA_DEV_MODE
 int dcstat_disable_priority;
 #endif
@@ -467,6 +478,9 @@ static void ebpf_dcstat_exit(void *ptr)
         pthread_mutex_unlock(&lock);
     }
 
+    if (ebpf_read_dcstat.thread)
+        netdata_thread_cancel(*ebpf_read_dcstat.thread);
+
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
 
 #ifdef LIBBPF_MAJOR_VERSION
@@ -603,108 +617,137 @@ static void dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per_core
 }
 
 /**
- * Save PID values
- *
- * Save the current values inside the structure
- *
- * @param out     vector used to plot charts
- * @param publish vector with values read from hash tables.
- */
-static inline void dcstat_save_pid_values(netdata_publish_dcstat_t *out, netdata_dcstat_pid_t *publish)
-{
-    memcpy(&out->curr, &publish[0], sizeof(netdata_dcstat_pid_t));
-}
-
-/**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
- */
-static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
-{
-    netdata_publish_dcstat_t *curr = dcstat_pid[current_pid];
-    if (!curr) {
-        curr = ebpf_publish_dcstat_get();
-        dcstat_pid[current_pid] = curr;
-    }
-
-    dcstat_save_pid_values(curr, publish);
-}
-
-/**
  * Read Directory Cache APPS table
  *
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void read_dc_apps_table(int maps_per_core)
+static void ebpf_read_dc_apps_table(int maps_per_core, uint64_t update_every)
 {
-    netdata_dcstat_pid_t *cv = dcstat_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
+    netdata_thread_disable_cancelability();
+    netdata_dcstat_pid_t *dv = dcstat_vector;
+    uint32_t key = 0, next_key = 0;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_dcstat_pid_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-
-        if (bpf_map_lookup_elem(fd, &key, cv)) {
-            pids = pids->next;
-            continue;
+    // To avoid call time() different times, we only difference between starts.
+    uint64_t update_time = time(NULL);
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (bpf_map_lookup_elem(fd, &key, dv)) {
+            goto end_dcread_loop;
         }
 
-        dcstat_apps_accumulator(cv, maps_per_core);
+        if (key > (uint32_t)pid_max) {
+            goto end_dcread_loop;
+        }
 
-        dcstat_fill_pid(key, cv);
+        dcstat_apps_accumulator(dv, maps_per_core);
+
+        // Get PID structure
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               key,
+                                                                               dv->name,
+                                                                               NETDATA_EBPF_MODULE_NAME_DCSTAT);
+
+        if (!pid_ptr) {
+            goto end_dcread_loop;
+        }
+
+        if (likely(!pid_ptr->dc.ct)) {
+            pid_ptr->current_timestamp = update_time;
+            memcpy(&pid_ptr->dc, &dv[0], sizeof(netdata_dcstat_pid_t));
+        } else {
+            if ((dv[0].not_found + dv[0].cache_access + dv[0].file_system) !=
+                (pid_ptr->dc.not_found + pid_ptr->dc.cache_access + pid_ptr->dc.file_system)) {
+                pid_ptr->current_timestamp = update_time;
+                memcpy(&pid_ptr->dc, &dv[0], sizeof(netdata_dcstat_pid_t));
+            } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
+                ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
+                bpf_map_delete_elem(fd, &key);
+            }
+        }
 
         // We are cleaning to avoid passing data read from one process to other.
-        memset(cv, 0, length);
-
-        pids = pids->next;
+end_dcread_loop:
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        memset(dv, 0, length);
+        key = next_key;
     }
+    netdata_thread_enable_cancelability();
+}
+
+/**
+ * Cachestat thread
+ *
+ * Thread used to generate cachestat charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_dcstat_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+    uint64_t remove_time = update_every*5;
+    ebpf_read_dc_apps_table(maps_per_core, remove_time);
+
+    int counter = update_every - 1;
+
+    uint32_t running_time = 0;
+    uint32_t lifetime = em->lifetime;
+    usec_t period = update_every * USEC_PER_SEC;
+    while (!ebpf_plugin_exit && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_plugin_exit || ++counter != update_every)
+            continue;
+
+        ebpf_read_dc_apps_table(maps_per_core, remove_time);
+
+        counter = 0;
+    }
+
+    return NULL;
 }
 
 /**
  * Update cgroup
  *
  * Update cgroup data based in collected PID.
- *
- * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_dc_cgroup(int maps_per_core)
+static void ebpf_update_dc_cgroup()
 {
-    netdata_dcstat_pid_t *cv = dcstat_vector;
-    int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_dcstat_pid_t)*ebpf_nprocs;
-
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_dcstat_pid_t *out = &pids->dc;
-            if (likely(dcstat_pid) && dcstat_pid[pid]) {
-                netdata_publish_dcstat_t *in = dcstat_pid[pid];
-
-                memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
-            } else {
-                memset(cv, 0, length);
-                if (bpf_map_lookup_elem(fd, &pid, cv)) {
-                    continue;
-                }
-
-                dcstat_apps_accumulator(cv, maps_per_core);
-
-                memcpy(out, cv, sizeof(netdata_dcstat_pid_t));
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                   pid,
+                                                                                   NULL,
+                                                                                   NETDATA_EBPF_MODULE_NAME_DCSTAT);
+            if (pid_ptr) {
+                netdata_dcstat_pid_t *dst = &ect->publish_dc.curr;
+                netdata_dcstat_pid_t *src = &pid_ptr->dc;
+                dst->cache_access += src->cache_access;
+                dst->file_system += src->file_system;
+                dst->not_found += src->not_found;
             }
         }
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
@@ -742,22 +785,36 @@ static void ebpf_dc_read_global_tables(netdata_idx_t *stats, int maps_per_core)
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_target *root)
+void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, Pvoid_t JudyLArray, RW_SPINLOCK *rw_spinlock)
 {
-    memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
+    rw_spinlock_read_lock(rw_spinlock);
+    if (!JudyLArray) {
+        rw_spinlock_read_unlock(rw_spinlock);
+        return;
+    }
+
     netdata_dcstat_pid_t *dst = &publish->curr;
-    while (root) {
-        int32_t pid = root->pid;
-        netdata_publish_dcstat_t *w = dcstat_pid[pid];
-        if (w) {
-            netdata_dcstat_pid_t *src = &w->curr;
+    memset(dst, 0, sizeof(netdata_dcstat_pid_t));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
+
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               local_pid,
+                                                                               NULL,
+                                                                               NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+        if (pid_ptr) {
+            netdata_dcstat_pid_t *src = &pid_ptr->dc;
             dst->cache_access += src->cache_access;
             dst->file_system += src->file_system;
             dst->not_found += src->not_found;
         }
-
-        root = root->next;
     }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_read_unlock(rw_spinlock);
 }
 
 /**
@@ -1196,11 +1253,9 @@ static void dcstat_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_dc_read_global_tables(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
-        if (apps)
-            read_dc_apps_table(maps_per_core);
 
         if (cgroups)
-            ebpf_update_dc_cgroup(maps_per_core);
+            ebpf_update_dc_cgroup();
 
         pthread_mutex_lock(&lock);
 
@@ -1276,13 +1331,10 @@ static void ebpf_create_dc_global_charts(int update_every)
  *
  * @param apps is apps enabled?
  */
-static void ebpf_dcstat_allocate_global_vectors(int apps)
+static void ebpf_dcstat_allocate_global_vectors()
 {
-    if (apps) {
-        ebpf_dcstat_aral_init();
-        dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
-        dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
-    }
+    ebpf_dcstat_aral_init();
+    dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
 
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
@@ -1360,7 +1412,14 @@ void *ebpf_dcstat_thread(void *ptr)
         goto enddcstat;
     }
 
-    ebpf_dcstat_allocate_global_vectors(em->apps_charts);
+    ebpf_read_dcstat.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_dcstat.thread,
+                          ebpf_read_dcstat.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_dcstat_thread,
+                          em);
+
+    ebpf_dcstat_allocate_global_vectors();
 
     int algorithms[NETDATA_DCSTAT_IDX_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
