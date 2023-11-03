@@ -716,7 +716,6 @@ static inline void discovery_update_filenames_cgroup_v2(struct cgroup *cg) {
 }
 
 static inline void discovery_update_filenames_all_cgroups() {
-    struct stat buf;
     for (struct cgroup *cg = discovered_cgroup_root; cg; cg = cg->discovered_next) {
         if (unlikely(!cg->available || !cg->enabled || cg->pending_renames))
             continue;
