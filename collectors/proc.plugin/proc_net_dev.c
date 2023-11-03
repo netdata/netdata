@@ -716,8 +716,8 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
 
         rd = d->flipped ? d->rd_rdrops : d->rd_tdrops;
         double drops_tx = NAN;
-        if (d->rd_tdrops) {
-            drops_tx = ABS(d->rd_tdrops->collector.last_stored_value);
+        if (rd) {
+            drops_tx = ABS(rd->collector.last_stored_value);
             max_drops_tx = MAX(max_drops_tx, drops_tx);
         }
         buffer_json_add_array_item_double(wb, drops_tx);
