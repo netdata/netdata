@@ -6,10 +6,16 @@
 
 **Merged pull requests:**
 
+- Fix readme images [\#16327](https://github.com/netdata/netdata/pull/16327) ([Ancairon](https://github.com/Ancairon))
+- rename newly added functions [\#16325](https://github.com/netdata/netdata/pull/16325) ([ktsaou](https://github.com/ktsaou))
+- Added section Blog posts README.md [\#16323](https://github.com/netdata/netdata/pull/16323) ([Aliki92](https://github.com/Aliki92))
+- Fix README images [\#16320](https://github.com/netdata/netdata/pull/16320) ([Ancairon](https://github.com/Ancairon))
 - Fix journal file index when collision is detected [\#16319](https://github.com/netdata/netdata/pull/16319) ([stelfrag](https://github.com/stelfrag))
+- Systemd units function [\#16318](https://github.com/netdata/netdata/pull/16318) ([ktsaou](https://github.com/ktsaou))
 - Optimize database before agent shutdown [\#16317](https://github.com/netdata/netdata/pull/16317) ([stelfrag](https://github.com/stelfrag))
 - `tcp_v6_connect` monitoring [\#16316](https://github.com/netdata/netdata/pull/16316) ([thiagoftsm](https://github.com/thiagoftsm))
 - Improve shutdown when collectors are active [\#16315](https://github.com/netdata/netdata/pull/16315) ([stelfrag](https://github.com/stelfrag))
+- cgroup-top function [\#16314](https://github.com/netdata/netdata/pull/16314) ([ktsaou](https://github.com/ktsaou))
 - Add a note for the docker deployment alongside with cetus [\#16312](https://github.com/netdata/netdata/pull/16312) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update ObservabilityCon README.md [\#16311](https://github.com/netdata/netdata/pull/16311) ([Aliki92](https://github.com/Aliki92))
 - update docker swarm deploy info [\#16308](https://github.com/netdata/netdata/pull/16308) ([ilyam8](https://github.com/ilyam8))
@@ -425,11 +431,6 @@
 - Fix memory corruption [\#15724](https://github.com/netdata/netdata/pull/15724) ([stelfrag](https://github.com/stelfrag))
 - Revert "Refactor RRD code. \(\#15423\)" [\#15723](https://github.com/netdata/netdata/pull/15723) ([vkalintiris](https://github.com/vkalintiris))
 - Changes to the templates for integrations [\#15721](https://github.com/netdata/netdata/pull/15721) ([Ancairon](https://github.com/Ancairon))
-- fix the freez pointer of dyncfg [\#15719](https://github.com/netdata/netdata/pull/15719) ([ktsaou](https://github.com/ktsaou))
-- Update the bundled v2 dashboard to the latest release. [\#15718](https://github.com/netdata/netdata/pull/15718) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#15717](https://github.com/netdata/netdata/pull/15717) ([netdatabot](https://github.com/netdatabot))
-- fix meta deploy docker swarm NC env var [\#15716](https://github.com/netdata/netdata/pull/15716) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#15713](https://github.com/netdata/netdata/pull/15713) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
