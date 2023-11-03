@@ -84,7 +84,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 </a>
 </p>
 
-On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% less bandwidth**, **98% less disk I/O**, and is **75% more disk space efficient** while providing more than a year of overall retention on the same disk footprint Prometheus offers 7 days of retention. [Read the full analysis in our blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
+On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% less bandwidth**, **98% less disk I/O**, and is **75% more disk space efficient** on high resolution metrics storage, while providing more than a year of overall retention on the same disk footprint Prometheus offers 7 days of retention. [Read the full analysis in our blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
 
 ---
 
