@@ -650,6 +650,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core, uint64_t update_every)
                                                                                NETDATA_EBPF_MODULE_NAME_DCSTAT);
 
         if (!pid_ptr) {
+            rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             goto end_dcread_loop;
         }
 
@@ -666,10 +667,10 @@ static void ebpf_read_dc_apps_table(int maps_per_core, uint64_t update_every)
                 bpf_map_delete_elem(fd, &key);
             }
         }
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // We are cleaning to avoid passing data read from one process to other.
 end_dcread_loop:
-        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
         memset(dv, 0, length);
         key = next_key;
     }
