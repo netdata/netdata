@@ -137,12 +137,18 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         else
             buffer_json_add_array_item_string(wb, "cgroup"); // Kind
 
-        double cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
-        max_cpu = MAX(max_cpu, cpu);
+        double cpu = NAN;
+        if (cg->st_cpu_rd_user && cg->st_cpu_rd_system) {
+            cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
+            max_cpu = MAX(max_cpu, cpu);
+        }
         buffer_json_add_array_item_double(wb, cpu);
 
-        double ram = cg->st_mem_rd_ram->collector.last_stored_value;
-        max_ram = MAX(max_ram, ram);
+        double ram = NAN;
+        if (cg->st_mem_rd_ram) {
+            ram = cg->st_mem_rd_ram->collector.last_stored_value;
+            max_ram = MAX(max_ram, ram);
+        }
         buffer_json_add_array_item_double(wb, ram);
 
         double disk_io_read = NAN;
@@ -371,12 +377,18 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
 
         buffer_json_add_array_item_string(wb, cg->name);
 
-        double cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
-        max_cpu = MAX(max_cpu, cpu);
+        double cpu = NAN;
+        if (cg->st_cpu_rd_user && cg->st_cpu_rd_system) {
+            cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
+            max_cpu = MAX(max_cpu, cpu);
+        }
         buffer_json_add_array_item_double(wb, cpu);
 
-        double ram = cg->st_mem_rd_ram->collector.last_stored_value;
-        max_ram = MAX(max_ram, ram);
+        double ram = NAN;
+        if (cg->st_mem_rd_ram) {
+            ram = cg->st_mem_rd_ram->collector.last_stored_value;
+            max_ram = MAX(max_ram, ram);
+        }
         buffer_json_add_array_item_double(wb, ram);
 
         double disk_io_read = NAN;
