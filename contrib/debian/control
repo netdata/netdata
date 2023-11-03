@@ -208,7 +208,7 @@ Description: The systemd-journal collector for the Netdata Agent
 Package: netdata-plugin-logs-management
 Architecture: any
 Depends: ${shlibs:Depends},
-         netdata (= ${source:Version}
+         netdata (= ${source:Version})
 Pre-Depends: libcap2-bin, adduser
 Conflicts: netdata (<< ${source:Version})
 Description: The logs-management plugin for the Netdata Agent
