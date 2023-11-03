@@ -1586,7 +1586,7 @@ void cgroup_read_host_total_ram() {
     if (likely((ff = procfile_readall(ff)) && procfile_lines(ff) && !strncmp(procfile_word(ff, 0), "MemTotal", 8)))
         host_ram_total = str2ull(procfile_word(ff, 1), NULL) * 1024;
     else
-        collector_error("Cannot read file %s. Will not create cgroup %s RAM limit charts.", filename);
+        collector_error("Cannot read file %s. Will not create RAM limit charts.", filename);
 
     procfile_close(ff);
 }
