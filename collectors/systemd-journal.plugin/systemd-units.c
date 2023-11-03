@@ -603,10 +603,36 @@ static void txt_decode(char *txt) {
     dst[d] = '\0';
 }
 
+#define _cleanup_(x) __attribute__((__cleanup__(x)))
+
+//static void systemd_unit_get_all_properties(sd_bus *bus, UnitInfo *u) {
+//    _cleanup_(sd_bus_message_unrefp) sd_bus_message *reply = NULL;
+//    _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
+//
+//    r = sd_bus_call_method(bus,
+//            dest,
+//            path,
+//            "org.freedesktop.DBus.Properties",
+//            "GetAll",
+//            &error,
+//            &reply,
+//            "s", "");
+//    if (r < 0)
+//        return r;
+//
+//    return bus_message_print_all_properties(reply, func, filter, flags, found_properties);
+//}
+//
+//static void systemd_units_get_all_properties(sd_bus *bus, UnitInfo *base) {
+//    for(UnitInfo *u = base ; u ;u = u->next)
+//        systemd_unit_get_all_properties(bus, u);
+//}
+
 static UnitInfo *systemd_units_get_all(void) {
-    sd_bus *bus = NULL;
-    sd_bus_error error = SD_BUS_ERROR_NULL;
-    sd_bus_message *reply = NULL;
+    _cleanup_(sd_bus_unrefp) sd_bus *bus = NULL;
+    _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
+    _cleanup_(sd_bus_message_unrefp) sd_bus_message *reply = NULL;
+
     UnitInfo *base = NULL;
     int r;
 
@@ -672,6 +698,8 @@ static UnitInfo *systemd_units_get_all(void) {
         log_dbus_error(r, "sd_bus_message_exit_container()");
         return base;
     }
+
+//    systemd_units_get_all_properties(bus, base);
 
     return base;
 }
