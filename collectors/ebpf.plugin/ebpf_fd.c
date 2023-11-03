@@ -571,7 +571,6 @@ static void ebpf_fd_exit(void *ptr)
 #endif
 
 
-        fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
 
@@ -1187,10 +1186,6 @@ static void fd_collector(ebpf_module_t *em)
         pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&lock);
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_fd_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_fd_pid, em);
-#endif
 
         ebpf_fd_send_data(em);
 
@@ -1362,7 +1357,6 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  */
 static void ebpf_fd_allocate_global_vectors()
 {
-    ebpf_fd_aral_init();
     fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
 
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -1448,10 +1442,6 @@ void *ebpf_fd_thread(void *ptr)
     ebpf_create_fd_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_fd_pid)
-        fd_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_FD_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 

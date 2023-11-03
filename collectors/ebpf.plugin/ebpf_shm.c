@@ -1121,11 +1121,6 @@ static void shm_collector(ebpf_module_t *em)
 
         shm_send_global();
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_shm_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_shm_pid, em);
-#endif
-
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
             ebpf_shm_send_apps_data(ebpf_apps_groups_root_target);
@@ -1243,7 +1238,6 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_shm_allocate_global_vectors()
 {
-    ebpf_shm_aral_init();
     shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_kernel_t));
 
     shm_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -1371,10 +1365,6 @@ void *ebpf_shm_thread(void *ptr)
     ebpf_create_shm_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_shm_pid)
-        shm_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SHM_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 

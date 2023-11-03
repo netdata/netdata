@@ -1344,11 +1344,6 @@ static void process_collector(ebpf_module_t *em)
             ebpf_process_send_data(em);
         }
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_process_stat)
-            ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
-#endif
-
         pthread_mutex_unlock(&collect_data_mutex);
         if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
             ebpf_process_send_apps_data(ebpf_apps_groups_root_target, em);
@@ -1502,11 +1497,6 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_process_stat)
-        process_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_PROC_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 

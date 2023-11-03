@@ -469,11 +469,6 @@ static void ebpf_dcstat_exit(void *ptr)
 
         ebpf_obsolete_dc_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_dcstat_pid)
-            ebpf_statistic_obsolete_aral_chart(em, dcstat_disable_priority);
-#endif
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -1264,11 +1259,6 @@ static void dcstat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_dcache_send_apps_data(ebpf_apps_groups_root_target);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_dcstat_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_dcstat_pid, em);
-#endif
-
         if (cgroups)
             ebpf_dc_send_cgroup_data(update_every);
 
@@ -1333,7 +1323,6 @@ static void ebpf_create_dc_global_charts(int update_every)
  */
 static void ebpf_dcstat_allocate_global_vectors()
 {
-    ebpf_dcstat_aral_init();
     dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
 
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -1434,10 +1423,6 @@ void *ebpf_dcstat_thread(void *ptr)
     ebpf_create_dc_global_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_dcstat_pid)
-        dcstat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 
