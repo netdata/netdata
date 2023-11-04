@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- fix: check for null rrdim in cgroup functions [\#16331](https://github.com/netdata/netdata/pull/16331) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16330](https://github.com/netdata/netdata/pull/16330) ([netdatabot](https://github.com/netdatabot))
+- fix coverity warnings in cgroups [\#16328](https://github.com/netdata/netdata/pull/16328) ([ilyam8](https://github.com/ilyam8))
 - Fix readme images [\#16327](https://github.com/netdata/netdata/pull/16327) ([Ancairon](https://github.com/Ancairon))
+- integrations: fix nightly tag in helm deploy [\#16326](https://github.com/netdata/netdata/pull/16326) ([ilyam8](https://github.com/ilyam8))
 - rename newly added functions [\#16325](https://github.com/netdata/netdata/pull/16325) ([ktsaou](https://github.com/ktsaou))
 - Added section Blog posts README.md [\#16323](https://github.com/netdata/netdata/pull/16323) ([Aliki92](https://github.com/Aliki92))
 - Fix README images [\#16320](https://github.com/netdata/netdata/pull/16320) ([Ancairon](https://github.com/Ancairon))
@@ -371,7 +375,6 @@
 - don't return `-1` if the socket was closed [\#15771](https://github.com/netdata/netdata/pull/15771) ([moonbreon](https://github.com/moonbreon))
 - Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
 - Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
-- Unconditionally delete very old models. [\#15720](https://github.com/netdata/netdata/pull/15720) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
@@ -429,8 +432,6 @@
 - fix systemd-journal makefile [\#15727](https://github.com/netdata/netdata/pull/15727) ([ktsaou](https://github.com/ktsaou))
 - disable systemdunits alarms [\#15726](https://github.com/netdata/netdata/pull/15726) ([ilyam8](https://github.com/ilyam8))
 - Fix memory corruption [\#15724](https://github.com/netdata/netdata/pull/15724) ([stelfrag](https://github.com/stelfrag))
-- Revert "Refactor RRD code. \(\#15423\)" [\#15723](https://github.com/netdata/netdata/pull/15723) ([vkalintiris](https://github.com/vkalintiris))
-- Changes to the templates for integrations [\#15721](https://github.com/netdata/netdata/pull/15721) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
