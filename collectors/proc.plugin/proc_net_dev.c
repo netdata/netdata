@@ -738,7 +738,7 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
     {
         size_t field_id = 0;
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Name", "Network Interface Name",
+        buffer_rrdf_table_add_field(wb, field_id++, "Interface", "Network Interface Name",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -894,7 +894,7 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
     {
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "Traffic");
-        buffer_json_add_array_item_string(wb, "Name");
+        buffer_json_add_array_item_string(wb, "Interface");
         buffer_json_array_close(wb);
 
         buffer_json_add_array_item_array(wb);
