@@ -5,6 +5,8 @@
 #define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
 #define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
 
+#define RRDFUNCTIONS_NETDEV_HELP "View network interface statistics"
+
 #define STATE_LENGTH_MAX 32
 
 #define READ_RETRY_PERIOD 60 // seconds
@@ -19,6 +21,18 @@ enum {
     NETDEV_DUPLEX_HALF,
     NETDEV_DUPLEX_FULL
 };
+
+static const char *get_duplex_string(int duplex)
+{
+    switch (duplex) {
+        case NETDEV_DUPLEX_FULL:
+            return "full";
+        case NETDEV_DUPLEX_HALF:
+            return "half";
+        default:
+            return "unknown";
+    }
+}
 
 enum {
     NETDEV_OPERSTATE_UNKNOWN,
@@ -49,6 +63,26 @@ static inline int get_operstate(char *operstate)
     return NETDEV_OPERSTATE_UNKNOWN;
 }
 
+static const char *get_operstate_string(int operstate)
+{
+    switch (operstate) {
+        case NETDEV_OPERSTATE_UP:
+            return "up";
+        case NETDEV_OPERSTATE_DOWN:
+            return "down";
+        case NETDEV_OPERSTATE_NOTPRESENT:
+            return "notpresent";
+        case NETDEV_OPERSTATE_LOWERLAYERDOWN:
+            return "lowerlayerdown";
+        case NETDEV_OPERSTATE_TESTING:
+            return "testing";
+        case NETDEV_OPERSTATE_DORMANT:
+            return "dormant";
+        default:
+            return "unknown";
+    }
+}
+
 // ----------------------------------------------------------------------------
 // netdev list
 
@@ -62,6 +96,8 @@ static struct netdev {
     int configured;
     int enabled;
     int updated;
+
+    bool function_ready;
 
     time_t discover_time;
     
@@ -367,6 +403,7 @@ static struct netdev_rename {
 
 static int netdev_pending_renames = 0;
 static netdata_mutex_t netdev_rename_mutex = NETDATA_MUTEX_INITIALIZER;
+static netdata_mutex_t netdev_dev_mutex = NETDATA_MUTEX_INITIALIZER;
 
 static struct netdev_rename *netdev_rename_find(const char *host_device, uint32_t hash) {
     struct netdev_rename *r;
@@ -572,6 +609,297 @@ static inline void netdev_rename_all_lock(void) {
 }
 
 // ----------------------------------------------------------------------------
+
+int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
+        void *collector_data __maybe_unused,
+        rrd_function_result_callback_t result_cb, void *result_cb_data,
+        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+        rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+        void *register_canceller_cb_data __maybe_unused) {
+
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_NETDEV_HELP);
+    buffer_json_member_add_array(wb, "data");
+
+    double max_traffic_rx = 0.0;
+    double max_traffic_tx = 0.0;
+    double max_traffic = 0.0;
+    double max_packets_rx = 0.0;
+    double max_packets_tx = 0.0;
+    double max_mcast_rx = 0.0;
+    double max_drops_rx = 0.0;
+    double max_drops_tx = 0.0;
+
+    netdata_mutex_lock(&netdev_dev_mutex);
+
+    RRDDIM *rd = NULL;
+
+    for (struct netdev *d = netdev_root; d != netdev_last_used; d = d->next) {
+        if (unlikely(!d->function_ready))
+            continue;
+
+        buffer_json_add_array_item_array(wb);
+
+        buffer_json_add_array_item_string(wb, d->name);
+
+        buffer_json_add_array_item_string(wb, d->virtual ? "virtual" : "physical");
+        buffer_json_add_array_item_string(wb, d->carrier == 1 ? "up" : "down");
+        buffer_json_add_array_item_string(wb, get_operstate_string(d->operstate));
+        buffer_json_add_array_item_string(wb, get_duplex_string(d->duplex));
+        buffer_json_add_array_item_double(wb, d->speed > 0 ? d->speed : NAN);
+        buffer_json_add_array_item_double(wb, d->mtu > 0 ? d->mtu : NAN);
+
+        rd = d->flipped ? d->rd_tbytes : d->rd_rbytes;
+        double traffic_rx = NAN;
+        if (rd) {
+            traffic_rx = rd->collector.last_stored_value / 1000.0;
+            max_traffic_rx = MAX(max_traffic_rx, traffic_rx);
+        }
+
+        rd = d->flipped ? d->rd_rbytes : d->rd_tbytes;
+        double traffic_tx = NAN;
+        if (rd) {
+            traffic_tx = ABS(rd->collector.last_stored_value / 1000.0);
+            max_traffic_tx = MAX(max_traffic_tx, traffic_tx);
+        }
+
+        // FIXME: "traffic" (total) is needed only for default_sorting
+        // can be removed when default_sorting will accept multiple columns (sum)
+        double traffic = NAN;
+        if (!isnan(traffic_rx) && !isnan(traffic_tx)) {
+            traffic = traffic_rx + traffic_tx;
+            max_traffic = MAX(max_traffic, traffic);
+        }
+
+        buffer_json_add_array_item_double(wb, traffic_rx);
+        buffer_json_add_array_item_double(wb, traffic_tx);
+        buffer_json_add_array_item_double(wb, traffic);
+
+        rd = d->flipped ? d->rd_tpackets : d->rd_rpackets;
+        double packets_rx = NAN;
+        if (rd) {
+            packets_rx = rd->collector.last_stored_value / 1000.0;
+            max_packets_rx = MAX(max_packets_rx, packets_rx);
+        }
+        buffer_json_add_array_item_double(wb, packets_rx);
+
+        rd = d->flipped ? d->rd_rpackets : d->rd_tpackets;
+        double packets_tx = NAN;
+        if (rd) {
+            packets_tx = ABS(rd->collector.last_stored_value / 1000.0);
+            max_packets_tx = MAX(max_packets_tx, packets_tx);
+        }
+        buffer_json_add_array_item_double(wb, packets_tx);
+
+        double mcast_rx = NAN;
+        if (d->rd_rmulticast) {
+            mcast_rx = ABS(d->rd_rmulticast->collector.last_stored_value / 1000.0);
+            max_mcast_rx = MAX(max_mcast_rx, mcast_rx);
+        }
+        buffer_json_add_array_item_double(wb, mcast_rx);
+
+
+        rd = d->flipped ? d->rd_tdrops : d->rd_rdrops;
+        double drops_rx = NAN;
+        if (rd) {
+            drops_rx = rd->collector.last_stored_value;
+            max_drops_rx = MAX(max_drops_rx, drops_rx);
+        }
+        buffer_json_add_array_item_double(wb, drops_rx);
+
+        rd = d->flipped ? d->rd_rdrops : d->rd_tdrops;
+        double drops_tx = NAN;
+        if (rd) {
+            drops_tx = ABS(rd->collector.last_stored_value);
+            max_drops_tx = MAX(max_drops_tx, drops_tx);
+        }
+        buffer_json_add_array_item_double(wb, drops_tx);
+
+        buffer_json_array_close(wb);
+    }
+
+    netdata_mutex_unlock(&netdev_dev_mutex);
+
+    buffer_json_array_close(wb); // data
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Name", "Network Interface Name",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Type", "Network Interface Type",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "PhState", "Current Physical State",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "OpState", "Current Operational State",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Duplex", "Current Duplex Mode",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Speed", "Current Link Speed",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "Mbit", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "MTU", "Maximum Transmission Unit",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "Octets", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "In", "Traffic Received",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "MiB", max_traffic_rx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Out", "Traffic Sent",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "MiB", max_traffic_tx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Total", "Traffic Received and Sent",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "MiB", max_traffic, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "PktsIn", "Received Packets",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "Kpps", max_packets_rx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "PktsOut", "Sent Packets",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "Kpps", max_packets_tx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "McastIn", "Multicast Received Packets",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "Kpps", max_mcast_rx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "DropsIn", "Dropped Inbound Packets",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "Drops", max_drops_rx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "DropsOut", "Dropped Outbound Packets",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "Drops", max_drops_tx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+    }
+
+    buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "Total");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Traffic");
+        {
+            buffer_json_member_add_string(wb, "name", "Traffic");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "In");
+                buffer_json_add_array_item_string(wb, "Out");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Packets");
+        {
+            buffer_json_member_add_string(wb, "name", "Packets");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PktsIn");
+                buffer_json_add_array_item_string(wb, "PktsOut");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Traffic");
+        buffer_json_add_array_item_string(wb, "Name");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Traffic");
+        buffer_json_add_array_item_string(wb, "Type");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+
+    int response = HTTP_RESP_OK;
+    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data)) {
+        buffer_flush(wb);
+        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
+    }
+
+    if(result_cb)
+        result_cb(wb, response, result_cb_data);
+
+    return response;
+}
+
 // netdev data collection
 
 static void netdev_cleanup() {
@@ -633,6 +961,7 @@ static struct netdev *get_netdev(const char *name) {
     d->hash = simple_hash(d->name);
     d->len = strlen(d->name);
     d->chart_labels = rrdlabels_create();
+    d->function_ready = false;
 
     d->chart_type_net_bytes      = strdupz("net");
     d->chart_type_net_compressed = strdupz("net_compressed");
@@ -1485,6 +1814,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_events, d->rd_tcarrier,    (collected_number)d->tcarrier);
             rrdset_done(d->st_events);
         }
+
+        d->function_ready = true;
     }
 
     if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
@@ -1541,6 +1872,9 @@ void *netdev_main(void *ptr)
 
     netdata_thread_cleanup_push(netdev_main_cleanup, ptr);
 
+    rrd_collector_started();
+    rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_NETDEV_HELP, true, netdev_function_net_interfaces, NULL);
+
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -1555,10 +1889,14 @@ void *netdev_main(void *ptr)
         cgroup_netdev_reset_all();
 
         worker_is_busy(0);
+
+        netdata_mutex_lock(&netdev_dev_mutex);
         if(do_proc_net_dev(localhost->rrd_update_every, hb_dt))
             break;
+        netdata_mutex_unlock(&netdev_dev_mutex);
     }
 
     netdata_thread_cleanup_pop(1);
+
     return NULL;
 }
