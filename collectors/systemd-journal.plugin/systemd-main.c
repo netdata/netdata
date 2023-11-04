@@ -44,6 +44,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 //        function_systemd_units("123", "systemd-units", 600, &cancelled);
         exit(1);
     }
+#ifdef ENABLE_SYSTEMD_DBUS
+    if(argc == 2 && strcmp(argv[1], "debug-units") == 0) {
+        bool cancelled = false;
+        function_systemd_units("123", "systemd-units", 600, &cancelled);
+        exit(1);
+    }
+#endif
 
     // ------------------------------------------------------------------------
     // the event loop for functions

@@ -50,7 +50,7 @@ static inline bool streq_ptr(const sd_char *a, const sd_char *b) {
 }
 
 ssize_t string_table_lookup(const char * const *table, size_t len, const char *key) {
-    if (!key)
+    if (!key || !*key)
         return -EINVAL;
 
     for (size_t i = 0; i < len; ++i)
@@ -264,6 +264,15 @@ typedef enum TimerState {
     _TIMER_STATE_INVALID = -EINVAL,
 } TimerState;
 
+typedef enum FreezerState {
+    FREEZER_RUNNING,
+    FREEZER_FREEZING,
+    FREEZER_FROZEN,
+    FREEZER_THAWING,
+    _FREEZER_STATE_MAX,
+    _FREEZER_STATE_INVALID = -EINVAL,
+} FreezerState;
+
 // ----------------------------------------------------------------------------
 // copied from systemd: unit-def.c
 
@@ -449,6 +458,177 @@ static const char* const timer_state_table[_TIMER_STATE_MAX] = {
 
 DEFINE_STRING_TABLE_LOOKUP(timer_state, TimerState);
 
+static const char* const freezer_state_table[_FREEZER_STATE_MAX] = {
+        [FREEZER_RUNNING]  = "running",
+        [FREEZER_FREEZING] = "freezing",
+        [FREEZER_FROZEN]   = "frozen",
+        [FREEZER_THAWING]  = "thawing",
+};
+
+DEFINE_STRING_TABLE_LOOKUP(freezer_state, FreezerState);
+
+// ----------------------------------------------------------------------------
+// our code
+
+typedef struct UnitAttribute {
+    union {
+        int boolean;
+        char *str;
+        uint64_t uint64;
+        int64_t int64;
+        uint32_t uint32;
+        int32_t int32;
+        double dbl;
+    };
+} UnitAttribute;
+
+struct UnitInfo;
+typedef void (*attribute_handler_t)(struct UnitInfo *u, UnitAttribute *ua);
+
+static void update_freezer_state(struct UnitInfo *u, UnitAttribute *ua);
+
+struct {
+    const char *member;
+    char value_type;
+
+    const char *show_as;
+    const char *info;
+    RRDF_FIELD_OPTIONS options;
+    RRDF_FIELD_FILTER filter;
+
+    attribute_handler_t handler;
+} unit_attributes[] = {
+    {
+        .member = "Type",
+        .value_type = SD_BUS_TYPE_STRING,
+        .show_as = "ServiceType",
+        .info = "Service Type",
+        .options = RRDF_FIELD_OPTS_VISIBLE,
+        .filter = RRDF_FIELD_FILTER_MULTISELECT,
+        }, {
+        .member = "Result",
+        .value_type = SD_BUS_TYPE_STRING,
+        .show_as = "Result",
+        .info = "Result",
+        .options = RRDF_FIELD_OPTS_VISIBLE,
+        .filter = RRDF_FIELD_FILTER_MULTISELECT,
+        }, {
+        .member = "UnitFileState",
+        .value_type = SD_BUS_TYPE_STRING,
+        .show_as = "Enabled",
+        .info = "Unit File State",
+        .options = RRDF_FIELD_OPTS_VISIBLE,
+        .filter = RRDF_FIELD_FILTER_MULTISELECT,
+        }, {
+        .member = "UnitFilePreset",
+        .value_type = SD_BUS_TYPE_STRING,
+        .show_as = "Preset",
+        .info = "Unit File Preset",
+        .options = RRDF_FIELD_OPTS_VISIBLE,
+        .filter = RRDF_FIELD_FILTER_MULTISELECT,
+        }, {
+        .member = "FreezerState",
+        .value_type = SD_BUS_TYPE_STRING,
+        .show_as = "FreezerState",
+        .info = "Freezer State",
+        .options = RRDF_FIELD_OPTS_NONE,
+        .filter = RRDF_FIELD_FILTER_MULTISELECT,
+        .handler = update_freezer_state,
+        },
+//    { .member = "Id",                             .signature = "s",               },
+//    { .member = "LoadState",                      .signature = "s",               },
+//    { .member = "ActiveState",                    .signature = "s",               },
+//    { .member = "SubState",                       .signature = "s",               },
+//    { .member = "Description",                    .signature = "s",               },
+//    { .member = "Following",                      .signature = "s",               },
+//    { .member = "Documentation",                  .signature = "as",              },
+//    { .member = "FragmentPath",                   .signature = "s",               },
+//    { .member = "SourcePath",                     .signature = "s",               },
+//    { .member = "ControlGroup",                   .signature = "s",               },
+//    { .member = "DropInPaths",                    .signature = "as",              },
+//    { .member = "LoadError",                      .signature = "(ss)",            },
+//    { .member = "TriggeredBy",                    .signature = "as",              },
+//    { .member = "Triggers",                       .signature = "as",              },
+//    { .member = "InactiveExitTimestamp",          .signature = "t",               },
+//    { .member = "InactiveExitTimestampMonotonic", .signature = "t",               },
+//    { .member = "ActiveEnterTimestamp",           .signature = "t",               },
+//    { .member = "ActiveExitTimestamp",            .signature = "t",               },
+//    { .member = "RuntimeMaxUSec",                 .signature = "t",               },
+//    { .member = "InactiveEnterTimestamp",         .signature = "t",               },
+//    { .member = "NeedDaemonReload",               .signature = "b",               },
+//    { .member = "Transient",                      .signature = "b",               },
+//    { .member = "ExecMainPID",                    .signature = "u",               },
+//    { .member = "MainPID",                        .signature = "u",               },
+//    { .member = "ControlPID",                     .signature = "u",               },
+//    { .member = "StatusText",                     .signature = "s",               },
+//    { .member = "PIDFile",                        .signature = "s",               },
+//    { .member = "StatusErrno",                    .signature = "i",               },
+//    { .member = "FileDescriptorStoreMax",         .signature = "u",               },
+//    { .member = "NFileDescriptorStore",           .signature = "u",               },
+//    { .member = "ExecMainStartTimestamp",         .signature = "t",               },
+//    { .member = "ExecMainExitTimestamp",          .signature = "t",               },
+//    { .member = "ExecMainCode",                   .signature = "i",               },
+//    { .member = "ExecMainStatus",                 .signature = "i",               },
+//    { .member = "LogNamespace",                   .signature = "s",               },
+//    { .member = "ConditionTimestamp",             .signature = "t",               },
+//    { .member = "ConditionResult",                .signature = "b",               },
+//    { .member = "Conditions",                     .signature = "a(sbbsi)",        },
+//    { .member = "AssertTimestamp",                .signature = "t",               },
+//    { .member = "AssertResult",                   .signature = "b",               },
+//    { .member = "Asserts",                        .signature = "a(sbbsi)",        },
+//    { .member = "NextElapseUSecRealtime",         .signature = "t",               },
+//    { .member = "NextElapseUSecMonotonic",        .signature = "t",               },
+//    { .member = "NAccepted",                      .signature = "u",               },
+//    { .member = "NConnections",                   .signature = "u",               },
+//    { .member = "NRefused",                       .signature = "u",               },
+//    { .member = "Accept",                         .signature = "b",               },
+//    { .member = "Listen",                         .signature = "a(ss)",           },
+//    { .member = "SysFSPath",                      .signature = "s",               },
+//    { .member = "Where",                          .signature = "s",               },
+//    { .member = "What",                           .signature = "s",               },
+//    { .member = "MemoryCurrent",                  .signature = "t",               },
+//    { .member = "MemoryAvailable",                .signature = "t",               },
+//    { .member = "DefaultMemoryMin",               .signature = "t",               },
+//    { .member = "DefaultMemoryLow",               .signature = "t",               },
+//    { .member = "DefaultStartupMemoryLow",        .signature = "t",               },
+//    { .member = "MemoryMin",                      .signature = "t",               },
+//    { .member = "MemoryLow",                      .signature = "t",               },
+//    { .member = "StartupMemoryLow",               .signature = "t",               },
+//    { .member = "MemoryHigh",                     .signature = "t",               },
+//    { .member = "StartupMemoryHigh",              .signature = "t",               },
+//    { .member = "MemoryMax",                      .signature = "t",               },
+//    { .member = "StartupMemoryMax",               .signature = "t",               },
+//    { .member = "MemorySwapMax",                  .signature = "t",               },
+//    { .member = "StartupMemorySwapMax",           .signature = "t",               },
+//    { .member = "MemoryZSwapMax",                 .signature = "t",               },
+//    { .member = "StartupMemoryZSwapMax",          .signature = "t",               },
+//    { .member = "MemoryLimit",                    .signature = "t",               },
+//    { .member = "CPUUsageNSec",                   .signature = "t",               },
+//    { .member = "TasksCurrent",                   .signature = "t",               },
+//    { .member = "TasksMax",                       .signature = "t",               },
+//    { .member = "IPIngressBytes",                 .signature = "t",               },
+//    { .member = "IPEgressBytes",                  .signature = "t",               },
+//    { .member = "IOReadBytes",                    .signature = "t",               },
+//    { .member = "IOWriteBytes",                   .signature = "t",               },
+//    { .member = "ExecCondition",                  .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecConditionEx",                .signature = "a(sasasttttuii)", },
+//    { .member = "ExecStartPre",                   .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecStartPreEx",                 .signature = "a(sasasttttuii)", },
+//    { .member = "ExecStart",                      .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecStartEx",                    .signature = "a(sasasttttuii)", },
+//    { .member = "ExecStartPost",                  .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecStartPostEx",                .signature = "a(sasasttttuii)", },
+//    { .member = "ExecReload",                     .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecReloadEx",                   .signature = "a(sasasttttuii)", },
+//    { .member = "ExecStopPre",                    .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecStop",                       .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecStopEx",                     .signature = "a(sasasttttuii)", },
+//    { .member = "ExecStopPost",                   .signature = "a(sasbttttuii)",  },
+//    { .member = "ExecStopPostEx",                 .signature = "a(sasasttttuii)", },
+};
+
+#define _UNIT_ATTRIBUTE_MAX (sizeof(unit_attributes) / sizeof(unit_attributes[0]))
+
 typedef struct UnitInfo {
     char *id;
     char *type;
@@ -465,6 +645,7 @@ typedef struct UnitInfo {
     UnitType UnitType;
     UnitLoadState UnitLoadState;
     UnitActiveState UnitActiveState;
+    FreezerState FreezerState;
 
     union {
         AutomountState AutomountState;
@@ -480,11 +661,262 @@ typedef struct UnitInfo {
         TimerState TimerState;
     };
 
+    struct UnitAttribute attributes[_UNIT_ATTRIBUTE_MAX];
+
     FACET_ROW_SEVERITY severity;
     uint32_t prio;
 
     struct UnitInfo *prev, *next;
 } UnitInfo;
+
+static void update_freezer_state(UnitInfo *u, UnitAttribute *ua) {
+    u->FreezerState = freezer_state_from_string(ua->str);
+}
+
+// ----------------------------------------------------------------------------
+// common helpers
+
+#define _cleanup_(x) __attribute__((__cleanup__(x)))
+
+static void log_dbus_error(int r, const char *msg) {
+    netdata_log_error("SYSTEMD_UNITS: %s failed with error %d (%s)", msg, r, strerror(-r));
+}
+
+// ----------------------------------------------------------------------------
+// attributes management
+
+static inline ssize_t unit_property_slot_from_string(const char *s) {
+    if(!s || !*s)
+        return -EINVAL;
+
+    for(size_t i = 0; i < _UNIT_ATTRIBUTE_MAX ;i++)
+        if(streq_ptr(unit_attributes[i].member, s))
+            return (ssize_t)i;
+
+    return -EINVAL;
+}
+
+static inline const char *unit_property_name_to_string_from_slot(ssize_t i) {
+    if(i >= 0 && i < (ssize_t)_UNIT_ATTRIBUTE_MAX)
+        return unit_attributes[i].member;
+
+    return NULL;
+}
+
+static inline void systemd_unit_free_property(char type, struct UnitAttribute *at) {
+    switch(type) {
+        case SD_BUS_TYPE_STRING:
+        case SD_BUS_TYPE_OBJECT_PATH:
+            freez(at->str);
+            at->str = NULL;
+            break;
+
+        default:
+            break;
+    }
+}
+
+static int systemd_unit_get_property(sd_bus_message *m, UnitInfo *u, const char *name) {
+    int r;
+    char type;
+
+    r = sd_bus_message_peek_type(m, &type, NULL);
+    if(r < 0) {
+        log_dbus_error(r, "sd_bus_message_peek_type()");
+        return r;
+    }
+
+    ssize_t slot = unit_property_slot_from_string(name);
+    if(slot < 0) {
+        // internal_error(true, "unused attribute '%s' for unit '%s'", name, u->id);
+        sd_bus_message_skip(m, NULL);
+        return 0;
+    }
+
+    systemd_unit_free_property(unit_attributes[slot].value_type, &u->attributes[slot]);
+
+    if(unit_attributes[slot].value_type != type) {
+        netdata_log_error("Type of field '%s' expected to be '%c' but found '%c'. Ignoring field.",
+                unit_attributes[slot].member, unit_attributes[slot].value_type, type);
+        sd_bus_message_skip(m, NULL);
+        return 0;
+    }
+
+    switch (type) {
+        case SD_BUS_TYPE_OBJECT_PATH:
+        case SD_BUS_TYPE_STRING: {
+            char *s;
+
+            r = sd_bus_message_read_basic(m, type, &s);
+            if(r < 0) {
+                log_dbus_error(r, "sd_bus_message_read_basic()");
+                return r;
+            }
+
+            if(s && *s)
+                u->attributes[slot].str = strdupz(s);
+        }
+            break;
+
+        case SD_BUS_TYPE_BOOLEAN: {
+            r = sd_bus_message_read_basic(m, type, &u->attributes[slot].boolean);
+            if(r < 0) {
+                log_dbus_error(r, "sd_bus_message_read_basic()");
+                return r;
+            }
+        }
+            break;
+
+        case SD_BUS_TYPE_UINT64: {
+            r = sd_bus_message_read_basic(m, type, &u->attributes[slot].uint64);
+            if(r < 0) {
+                log_dbus_error(r, "sd_bus_message_read_basic()");
+                return r;
+            }
+        }
+            break;
+
+        case SD_BUS_TYPE_INT64: {
+            r = sd_bus_message_read_basic(m, type, &u->attributes[slot].int64);
+            if(r < 0) {
+                log_dbus_error(r, "sd_bus_message_read_basic()");
+                return r;
+            }
+        }
+            break;
+
+        case SD_BUS_TYPE_UINT32: {
+            r = sd_bus_message_read_basic(m, type, &u->attributes[slot].uint32);
+            if(r < 0) {
+                log_dbus_error(r, "sd_bus_message_read_basic()");
+                return r;
+            }
+        }
+            break;
+
+        case SD_BUS_TYPE_INT32: {
+            r = sd_bus_message_read_basic(m, type, &u->attributes[slot].int32);
+            if(r < 0) {
+                log_dbus_error(r, "sd_bus_message_read_basic()");
+                return r;
+            }
+        }
+            break;
+
+        case SD_BUS_TYPE_DOUBLE: {
+            r = sd_bus_message_read_basic(m, type, &u->attributes[slot].dbl);
+            if(r < 0) {
+                log_dbus_error(r, "sd_bus_message_read_basic()");
+                return r;
+            }
+        }
+            break;
+
+        case SD_BUS_TYPE_ARRAY: {
+            internal_error(true, "member '%s' is an array", name);
+            sd_bus_message_skip(m, NULL);
+            return 0;
+        }
+            break;
+
+        default: {
+            internal_error(true, "unknown field type '%c' for key '%s'", type, name);
+            sd_bus_message_skip(m, NULL);
+            return 0;
+        }
+            break;
+    }
+
+    if(unit_attributes[slot].handler)
+        unit_attributes[slot].handler(u, &u->attributes[slot]);
+
+    return 0;
+}
+
+static int systemd_unit_get_all_properties(sd_bus *bus, UnitInfo *u) {
+    _cleanup_(sd_bus_message_unrefp) sd_bus_message *m = NULL;
+    _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
+    int r;
+
+    r = sd_bus_call_method(bus,
+            "org.freedesktop.systemd1",
+            u->unit_path,
+            "org.freedesktop.DBus.Properties",
+            "GetAll",
+            &error,
+            &m,
+            "s", "");
+    if (r < 0) {
+        log_dbus_error(r, "sd_bus_call_method(p1)");
+        return r;
+    }
+
+    r = sd_bus_message_enter_container(m, SD_BUS_TYPE_ARRAY, "{sv}");
+    if (r < 0) {
+        log_dbus_error(r, "sd_bus_message_enter_container(p2)");
+        return r;
+    }
+
+    int c = 0;
+    while ((r = sd_bus_message_enter_container(m, SD_BUS_TYPE_DICT_ENTRY, "sv")) > 0) {
+        const char *member, *contents;
+        c++;
+
+        r = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &member);
+        if (r < 0) {
+            log_dbus_error(r, "sd_bus_message_read_basic(p3)");
+            return r;
+        }
+
+        r = sd_bus_message_peek_type(m, NULL, &contents);
+        if (r < 0) {
+            log_dbus_error(r, "sd_bus_message_peek_type(p4)");
+            return r;
+        }
+
+        r = sd_bus_message_enter_container(m, SD_BUS_TYPE_VARIANT, contents);
+        if (r < 0) {
+            log_dbus_error(r, "sd_bus_message_enter_container(p5)");
+            return r;
+        }
+
+        systemd_unit_get_property(m, u, member);
+
+        r = sd_bus_message_exit_container(m);
+        if(r < 0) {
+            log_dbus_error(r, "sd_bus_message_exit_container(p6)");
+            return r;
+        }
+
+        r = sd_bus_message_exit_container(m);
+        if(r < 0) {
+            log_dbus_error(r, "sd_bus_message_exit_container(p7)");
+            return r;
+        }
+    }
+    if(r < 0) {
+        log_dbus_error(r, "sd_bus_message_enter_container(p8)");
+        return r;
+    }
+
+    r = sd_bus_message_exit_container(m);
+    if(r < 0) {
+        log_dbus_error(r, "sd_bus_message_exit_container(p9)");
+        return r;
+    }
+
+    return 0;
+}
+
+static void systemd_units_get_all_properties(sd_bus *bus, UnitInfo *base) {
+    for(UnitInfo *u = base ; u ;u = u->next)
+        systemd_unit_get_all_properties(bus, u);
+}
+
+
+
+// ----------------------------------------------------------------------------
+// main unit info
 
 int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
     assert(message);
@@ -571,10 +1003,6 @@ int bus_parse_unit_info(sd_bus_message *message, UnitInfo *u) {
     return r;
 }
 
-static void log_dbus_error(int r, const char *msg) {
-    netdata_log_error("SYSTEMD_UNITS: %s failed with error %d", msg, r);
-}
-
 static int hex_to_int(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
@@ -604,9 +1032,10 @@ static void txt_decode(char *txt) {
 }
 
 static UnitInfo *systemd_units_get_all(void) {
-    sd_bus *bus = NULL;
-    sd_bus_error error = SD_BUS_ERROR_NULL;
-    sd_bus_message *reply = NULL;
+    _cleanup_(sd_bus_unrefp) sd_bus *bus = NULL;
+    _cleanup_(sd_bus_error_free) sd_bus_error error = SD_BUS_ERROR_NULL;
+    _cleanup_(sd_bus_message_unrefp) sd_bus_message *reply = NULL;
+
     UnitInfo *base = NULL;
     int r;
 
@@ -673,6 +1102,8 @@ static UnitInfo *systemd_units_get_all(void) {
         return base;
     }
 
+    systemd_units_get_all_properties(bus, base);
+
     return base;
 }
 
@@ -690,9 +1121,15 @@ void systemd_units_free_all(UnitInfo *base) {
         freez((void *)u->unit_path);
         freez((void *)u->job_type);
         freez((void *)u->job_path);
+
+        for(int i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX ;i++)
+            systemd_unit_free_property(unit_attributes[i].value_type, &u->attributes[i]);
+
         freez(u);
     }
 }
+
+// ----------------------------------------------------------------------------
 
 static void netdata_systemd_units_function_help(const char *transaction) {
     BUFFER *wb = buffer_create(0, NULL);
@@ -739,6 +1176,8 @@ static void netdata_systemd_units_function_info(const char *transaction) {
 
     buffer_free(wb);
 }
+
+// ----------------------------------------------------------------------------
 
 static void systemd_unit_priority(UnitInfo *u, size_t units) {
     uint32_t prio;
@@ -838,6 +1277,18 @@ FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
 
         case UNIT_INACTIVE:
             severity = if_normal(severity, max_severity, FACET_ROW_SEVERITY_DEBUG);
+            break;
+    }
+
+    switch(u->FreezerState) {
+        default:
+        case FREEZER_FROZEN:
+        case FREEZER_FREEZING:
+        case FREEZER_THAWING:
+            severity = if_less(severity, max_severity, FACET_ROW_SEVERITY_WARNING);
+            break;
+
+        case FREEZER_RUNNING:
             break;
     }
 
@@ -1176,6 +1627,9 @@ void function_systemd_units(const char *transaction, char *function, int timeout
     buffer_json_member_add_string(wb, "help", SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
     buffer_json_member_add_array(wb, "data");
 
+    size_t count[_UNIT_ATTRIBUTE_MAX] = { 0 };
+    struct UnitAttribute max[_UNIT_ATTRIBUTE_MAX];
+
     for(UnitInfo *u = base; u ;u = u->next) {
         buffer_json_add_array_item_array(wb);
         {
@@ -1197,6 +1651,53 @@ void function_systemd_units(const char *transaction, char *function, int timeout
             buffer_json_add_array_item_uint64(wb, u->job_id);
             buffer_json_add_array_item_string(wb, u->job_type);
             buffer_json_add_array_item_string(wb, u->job_path);
+
+            for(ssize_t i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX ;i++) {
+                switch(unit_attributes[i].value_type) {
+                    case SD_BUS_TYPE_OBJECT_PATH:
+                    case SD_BUS_TYPE_STRING:
+                        buffer_json_add_array_item_string(wb, u->attributes[i].str && *u->attributes[i].str ? u->attributes[i].str : "-");
+                        break;
+
+                    case SD_BUS_TYPE_UINT64:
+                        buffer_json_add_array_item_uint64(wb, u->attributes[i].uint64);
+                        if(!count[i]++) max[i].uint64 = 0;
+                        max[i].uint64 = MAX(max[i].uint64, u->attributes[i].uint64);
+                        break;
+
+                    case SD_BUS_TYPE_UINT32:
+                        buffer_json_add_array_item_uint64(wb, u->attributes[i].uint32);
+                        if(!count[i]++) max[i].uint32 = 0;
+                        max[i].uint32 = MAX(max[i].uint32, u->attributes[i].uint32);
+                        break;
+
+                    case SD_BUS_TYPE_INT64:
+                        buffer_json_add_array_item_uint64(wb, u->attributes[i].int64);
+                        if(!count[i]++) max[i].uint64 = 0;
+                        max[i].int64 = MAX(max[i].int64, u->attributes[i].int64);
+                        break;
+
+                    case SD_BUS_TYPE_INT32:
+                        buffer_json_add_array_item_uint64(wb, u->attributes[i].int32);
+                        if(!count[i]++) max[i].int32 = 0;
+                        max[i].int32 = MAX(max[i].int32, u->attributes[i].int32);
+                        break;
+
+                    case SD_BUS_TYPE_DOUBLE:
+                        buffer_json_add_array_item_double(wb, u->attributes[i].dbl);
+                        if(!count[i]++) max[i].dbl = 0.0;
+                        max[i].dbl = MAX(max[i].dbl, u->attributes[i].dbl);
+                        break;
+
+                    case SD_BUS_TYPE_BOOLEAN:
+                        buffer_json_add_array_item_boolean(wb, u->attributes[i].boolean);
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+
             buffer_json_add_array_item_uint64(wb, u->prio);
             buffer_json_add_array_item_uint64(wb, 1); // count
         }
@@ -1298,6 +1799,80 @@ void function_systemd_units(const char *transaction, char *function, int timeout
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_FULL_WIDTH,
                 NULL);
+
+        for(ssize_t i = 0; i < (ssize_t)_UNIT_ATTRIBUTE_MAX ;i++) {
+            char key[256], name[256];
+
+            if(unit_attributes[i].show_as)
+                snprintfz(key, sizeof(key), "%s", unit_attributes[i].show_as);
+            else
+                snprintfz(key, sizeof(key), "attribute%s", unit_property_name_to_string_from_slot(i));
+
+            if(unit_attributes[i].info)
+                snprintfz(name, sizeof(name), "%s", unit_attributes[i].info);
+            else
+                snprintfz(name, sizeof(name), "Attribute %s", unit_property_name_to_string_from_slot(i));
+
+            RRDF_FIELD_OPTIONS options = unit_attributes[i].options;
+            RRDF_FIELD_FILTER filter = unit_attributes[i].filter;
+
+            switch(unit_attributes[i].value_type) {
+                case SD_BUS_TYPE_OBJECT_PATH:
+                case SD_BUS_TYPE_STRING:
+                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
+                            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                            RRDF_FIELD_SUMMARY_COUNT, filter,
+                            RRDF_FIELD_OPTS_WRAP | options,
+                            NULL);
+                    break;
+
+                case SD_BUS_TYPE_INT32:
+                case SD_BUS_TYPE_UINT32:
+                case SD_BUS_TYPE_INT64:
+                case SD_BUS_TYPE_UINT64: {
+                    double m;
+                    if(unit_attributes[i].value_type == SD_BUS_TYPE_UINT64)
+                        m = (double)max[i].uint64;
+                    else if(unit_attributes[i].value_type == SD_BUS_TYPE_INT64)
+                        m = (double)max[i].int64;
+                    else if(unit_attributes[i].value_type == SD_BUS_TYPE_UINT32)
+                        m = (double)max[i].uint32;
+                    else if(unit_attributes[i].value_type == SD_BUS_TYPE_INT32)
+                        m = (double)max[i].int32;
+
+                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
+                            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                            0, NULL, m, RRDF_FIELD_SORT_ASCENDING, NULL,
+                            RRDF_FIELD_SUMMARY_SUM, filter,
+                            RRDF_FIELD_OPTS_WRAP | options,
+                            NULL);
+                }
+                    break;
+
+                case SD_BUS_TYPE_DOUBLE:
+                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
+                            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                            2, NULL, max[i].dbl, RRDF_FIELD_SORT_ASCENDING, NULL,
+                            RRDF_FIELD_SUMMARY_SUM, filter,
+                            RRDF_FIELD_OPTS_WRAP | options,
+                            NULL);
+                    break;
+
+                case SD_BUS_TYPE_BOOLEAN:
+                    buffer_rrdf_table_add_field(wb, field_id++, key, name,
+                            RRDF_FIELD_TYPE_BOOLEAN, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                            RRDF_FIELD_SUMMARY_COUNT, filter,
+                            RRDF_FIELD_OPTS_WRAP | options,
+                            NULL);
+                    break;
+
+                default:
+                    break;
+            }
+
+        }
 
         buffer_rrdf_table_add_field(wb, field_id++, "priority", "Priority",
                 RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,

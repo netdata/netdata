@@ -860,6 +860,13 @@ static inline void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value)
     wb->json.stack[wb->json.depth].count++;
 }
 
+static inline void buffer_json_add_array_item_boolean(BUFFER *wb, bool value) {
+    buffer_print_json_comma_newline_spacing(wb);
+
+    buffer_strcat(wb, value ? "true" : "false");
+    wb->json.stack[wb->json.depth].count++;
+}
+
 static inline void buffer_json_add_array_item_time_t(BUFFER *wb, time_t value) {
     buffer_print_json_comma_newline_spacing(wb);
 
@@ -966,6 +973,7 @@ typedef enum __attribute__((packed)) {
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_TYPE_NONE,
     RRDF_FIELD_TYPE_INTEGER,
+    RRDF_FIELD_TYPE_BOOLEAN,
     RRDF_FIELD_TYPE_STRING,
     RRDF_FIELD_TYPE_DETAIL_STRING,
     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
@@ -982,6 +990,9 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
 
         case RRDF_FIELD_TYPE_INTEGER:
             return "integer";
+
+        case RRDF_FIELD_TYPE_BOOLEAN:
+            return "boolean";
 
         case RRDF_FIELD_TYPE_STRING:
             return "string";
@@ -1113,7 +1124,7 @@ static inline const char *rrdf_field_summary_to_string(RRDF_FIELD_SUMMARY summar
 }
 
 typedef enum __attribute__((packed)) {
-    RRDF_FIELD_FILTER_NONE,
+    RRDF_FIELD_FILTER_NONE = 0,
     RRDF_FIELD_FILTER_RANGE,
     RRDF_FIELD_FILTER_MULTISELECT,
     RRDF_FIELD_FILTER_FACET,
