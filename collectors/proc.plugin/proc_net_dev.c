@@ -722,6 +722,12 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
         }
         buffer_json_add_array_item_double(wb, drops_tx);
 
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "severity", drops_rx + drops_tx > 0 ? "warning" : "normal");
+        }
+        buffer_json_object_close(wb);
+
         buffer_json_array_close(wb);
     }
 
@@ -732,7 +738,7 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
     {
         size_t field_id = 0;
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Name", "Network Interface Name",
+        buffer_rrdf_table_add_field(wb, field_id++, "Interface", "Network Interface Name",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -836,6 +842,19 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
                 RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
+
+        buffer_rrdf_table_add_field(
+                wb, field_id++,
+                "rowOptions", "rowOptions",
+                RRDF_FIELD_TYPE_NONE,
+                RRDR_FIELD_VISUAL_ROW_OPTIONS,
+                RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                RRDF_FIELD_SORT_FIXED,
+                NULL,
+                RRDF_FIELD_SUMMARY_COUNT,
+                RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_DUMMY,
+                NULL);
     }
 
     buffer_json_object_close(wb); // columns
@@ -875,7 +894,7 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
     {
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "Traffic");
-        buffer_json_add_array_item_string(wb, "Name");
+        buffer_json_add_array_item_string(wb, "Interface");
         buffer_json_array_close(wb);
 
         buffer_json_add_array_item_array(wb);
@@ -884,6 +903,21 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
         buffer_json_array_close(wb);
     }
     buffer_json_array_close(wb);
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Type");
+        {
+            buffer_json_member_add_string(wb, "name", "Type");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Type");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
 
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
