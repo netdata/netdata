@@ -22,14 +22,14 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_APPS_GROUP_OTHER "other"
 
 // function list
-#define EBPF_FUNCTION_THREAD "ebpf_thread"
-#define EBPF_FUNCTION_SOCKET "ebpf_socket"
-#define EBPF_FUNCTION_CACHESTAT "ebpf_cachestat"
-#define EBPF_FUNCTION_FD "ebpf_fd"
-#define EBPF_FUNCTION_PROCESS "ebpf_process"
-#define EBPF_FUNCTION_SHM "ebpf_shm"
-#define EBPF_FUNCTION_SWAP "ebpf_swap"
-#define EBPF_FUNCTION_DC "ebpf_dc"
+#define EBPF_FUNCTION_THREAD "eBPF-thread"
+#define EBPF_FUNCTION_SOCKET "eBPF-socket"
+#define EBPF_FUNCTION_CACHESTAT "eBPF-cachestat"
+#define EBPF_FUNCTION_FD "eBPF-fd"
+#define EBPF_FUNCTION_PROCESS "eBPF-process"
+#define EBPF_FUNCTION_SHM "eBPF-shm"
+#define EBPF_FUNCTION_SWAP "eBPF-swap"
+#define EBPF_FUNCTION_DC "eBPF-dc"
 
 // thread constants
 #define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information about eBPF threads."
