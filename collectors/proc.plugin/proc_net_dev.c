@@ -650,6 +650,7 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
         buffer_json_add_array_item_string(wb, d->name);
 
         buffer_json_add_array_item_string(wb, d->virtual ? "virtual" : "physical");
+        buffer_json_add_array_item_string(wb, d->flipped ? "cgroup" : "host");
         buffer_json_add_array_item_string(wb, d->carrier == 1 ? "up" : "down");
         buffer_json_add_array_item_string(wb, get_operstate_string(d->operstate));
         buffer_json_add_array_item_string(wb, get_duplex_string(d->duplex));
@@ -746,6 +747,13 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "Type", "Network Interface Type",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "UsedBy", "Indicates whether the network interface is used by a cgroup or by the host system",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -912,6 +920,17 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Type");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "UsedBy");
+        {
+            buffer_json_member_add_string(wb, "name", "UsedBy");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "UsedBy");
             }
             buffer_json_array_close(wb);
         }
