@@ -3619,9 +3619,9 @@ static void ebpf_fill_dc_function_buffer_unsafe(BUFFER *buf)
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
         if (pid_ptr) {
-            ebpf_fill_swap_function_buffer(buf,
+            ebpf_fill_dc_function_buffer(buf,
                                            local_pid,
-                                           &pid_ptr->swap.data,
+                                           &pid_ptr->dc,
                                            pid_ptr->name,
                                            (pid_ptr->apps_target) ? pid_ptr->apps_target->name : NULL);
             counter++;
