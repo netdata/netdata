@@ -1253,7 +1253,7 @@ static int diskstats_function_block_devices(BUFFER *wb, int timeout __maybe_unus
                 NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "WritesTime", "Write Operations Time",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "milliseconds", max_iops_time_reads, RRDF_FIELD_SORT_DESCENDING, NULL,
+                2, "milliseconds", max_iops_time_writes, RRDF_FIELD_SORT_DESCENDING, NULL,
                 RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
