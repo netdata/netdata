@@ -3593,7 +3593,7 @@ static void ebpf_dc_clean_judy_array_unsafe()
     while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
         netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
         if (pid_ptr) {
-            memset(&pid_ptr->dc, 0, sizeof(netdata_dcstat_pid_t));
+            memset(&pid_ptr->dc.curr, 0, sizeof(netdata_dcstat_pid_t));
         }
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);

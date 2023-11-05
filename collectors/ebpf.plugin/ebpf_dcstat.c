@@ -654,19 +654,20 @@ static void ebpf_read_dc_apps_table(int maps_per_core, uint64_t update_every)
             goto end_dcread_loop;
         }
 
-        if (likely(!pid_ptr->dc.ct)) {
+        if (likely(!pid_ptr->dc.curr.ct)) {
             pid_ptr->current_timestamp = update_time;
-            memcpy(&pid_ptr->dc, &dv[0], sizeof(netdata_dcstat_pid_t));
+            memcpy(&pid_ptr->dc.curr, &dv[0], sizeof(netdata_dcstat_pid_t));
         } else {
             if ((dv[0].not_found + dv[0].cache_access + dv[0].file_system) !=
-                (pid_ptr->dc.not_found + pid_ptr->dc.cache_access + pid_ptr->dc.file_system)) {
+                (pid_ptr->dc.curr.not_found + pid_ptr->dc.curr.cache_access + pid_ptr->dc.curr.file_system)) {
                 pid_ptr->current_timestamp = update_time;
-                memcpy(&pid_ptr->dc, &dv[0], sizeof(netdata_dcstat_pid_t));
+                memcpy(&pid_ptr->dc.curr, &dv[0], sizeof(netdata_dcstat_pid_t));
             } else if ((update_time - pid_ptr->current_timestamp) > update_every) {
                 ebpf_remove_pid_from_apps_group(pid_ptr->apps_target, key);
                 bpf_map_delete_elem(fd, &key);
             }
         }
+        dcstat_update_publish(&pid_ptr->dc, pid_ptr->dc.curr.cache_access, pid_ptr->dc.curr.not_found);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
         // We are cleaning to avoid passing data read from one process to other.
@@ -737,7 +738,7 @@ static void ebpf_update_dc_cgroup()
                                                                                    NETDATA_EBPF_MODULE_NAME_DCSTAT);
             if (pid_ptr) {
                 netdata_dcstat_pid_t *dst = &ect->publish_dc.curr;
-                netdata_dcstat_pid_t *src = &pid_ptr->dc;
+                netdata_dcstat_pid_t *src = &pid_ptr->dc.curr;
                 dst->cache_access += src->cache_access;
                 dst->file_system += src->file_system;
                 dst->not_found += src->not_found;
@@ -803,7 +804,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, Pvoid_t JudyLArray,
                                                                                NULL,
                                                                                NETDATA_EBPF_MODULE_NAME_CACHESTAT);
         if (pid_ptr) {
-            netdata_dcstat_pid_t *src = &pid_ptr->dc;
+            netdata_dcstat_pid_t *src = &pid_ptr->dc.curr;
             dst->cache_access += src->cache_access;
             dst->file_system += src->file_system;
             dst->not_found += src->not_found;
