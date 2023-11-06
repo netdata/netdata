@@ -240,7 +240,7 @@ are no "leftover" artifacts from previous builds and that your submodules are up
 
 
 ```sh
-git clean -dfx && git submodule foreach 'git clean -dfx' && git submodule update --recursive
+git clean -dfx && git submodule foreach 'git clean -dfx' && git submodule update --recursive --init
 ```
 
 
