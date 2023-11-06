@@ -1054,102 +1054,44 @@ static int diskstats_function_block_devices(BUFFER *wb, int timeout __maybe_unus
         buffer_json_add_array_item_string(wb, d->serial);
 
         // IO
-        double io_reads = NAN;
-        if (d->rd_io_reads) {
-            io_reads = d->rd_io_reads->collector.last_stored_value / 1024.0;
-            max_io_reads = MAX(max_io_reads, io_reads);
-        }
-        buffer_json_add_array_item_double(wb, io_reads);
-
-        double io_writes = NAN;
-        if (d->rd_io_writes) {
-            io_writes = ABS(d->rd_io_writes->collector.last_stored_value / 1024.0);
-            max_io_writes = MAX(max_io_writes, io_writes);
-        }
-        buffer_json_add_array_item_double(wb, io_writes);
-
+        double io_reads = rrddim_get_last_stored_value(d->rd_io_reads, &max_io_reads, 1024.0);
+        double io_writes = rrddim_get_last_stored_value(d->rd_io_writes, &max_io_writes, 1024.0);
         double io_total = NAN;
         if (!isnan(io_reads) && !isnan(io_writes)) {
             io_total = io_reads + io_writes;
             max_io = MAX(max_io, io_total);
         }
-        buffer_json_add_array_item_double(wb, io_total);
-
         // Backlog and Busy Time
-        double busy_perc = NAN;
-        if (d->rd_util_utilization) {
-            busy_perc = d->rd_util_utilization->collector.last_stored_value;
-            max_busy_perc = MAX(max_busy_perc, busy_perc);
-        }
-        buffer_json_add_array_item_double(wb, busy_perc);
-        double busy_time = NAN;
-        if (d->rd_busy_busy) {
-            busy_time = d->rd_busy_busy->collector.last_stored_value;
-            max_busy_time = MAX(max_busy_time, busy_time);
-        }
-        buffer_json_add_array_item_double(wb, busy_time);
-        double backlog_time = NAN;
-        if (d->rd_backlog_backlog) {
-            backlog_time = d->rd_backlog_backlog->collector.last_stored_value;
-            max_backlog_time = MAX(max_backlog_time, backlog_time);
-        }
-        buffer_json_add_array_item_double(wb, backlog_time);
-
+        double busy_perc = rrddim_get_last_stored_value(d->rd_util_utilization, &max_busy_perc, 1);
+        double busy_time = rrddim_get_last_stored_value(d->rd_busy_busy, &max_busy_time, 1);
+        double backlog_time = rrddim_get_last_stored_value(d->rd_backlog_backlog, &max_backlog_time, 1);
         // IOPS
-        double iops_reads = NAN;
-        if (d->rd_ops_reads) {
-            iops_reads = d->rd_ops_reads->collector.last_stored_value;
-            max_iops_reads = MAX(max_iops_reads, iops_reads);
-        }
-        buffer_json_add_array_item_double(wb, iops_reads);
-        double iops_writes = NAN;
-        if (d->rd_ops_writes) {
-            iops_writes = ABS(d->rd_ops_writes->collector.last_stored_value);
-            max_iops_writes = MAX(max_iops_writes, iops_writes);
-        }
-        buffer_json_add_array_item_double(wb, iops_writes);
-
+        double iops_reads = rrddim_get_last_stored_value(d->rd_ops_reads, &max_iops_reads, 1);
+        double iops_writes = rrddim_get_last_stored_value(d->rd_ops_writes, &max_iops_writes, 1);
         // IO Time
-        double iops_time_reads = NAN;
-        if (d->rd_iotime_reads) {
-            iops_time_reads = d->rd_iotime_reads->collector.last_stored_value;
-            max_iops_time_reads = MAX(max_iops_time_reads, iops_time_reads);
-        }
-        buffer_json_add_array_item_double(wb, iops_time_reads);
-
-        double iops_time_writes = NAN;
-        if (d->rd_iotime_writes) {
-            iops_time_writes = ABS(d->rd_iotime_writes->collector.last_stored_value);
-            max_iops_time_writes = MAX(max_iops_time_writes, iops_time_writes);
-        }
-        buffer_json_add_array_item_double(wb, iops_time_writes);
-
+        double iops_time_reads = rrddim_get_last_stored_value(d->rd_iotime_reads, &max_iops_time_reads, 1);
+        double iops_time_writes = rrddim_get_last_stored_value(d->rd_iotime_writes, &max_iops_time_writes, 1);
         // Avg IO Time
-        double iops_avg_time_read = NAN;
-        if (d->rd_await_reads) {
-            iops_avg_time_read = d->rd_await_reads->collector.last_stored_value;
-            max_iops_avg_time_read = MAX(max_iops_avg_time_read, iops_avg_time_read);
-        }
-        buffer_json_add_array_item_double(wb, iops_avg_time_read);
-        double iops_avg_time_write = NAN;
-        if (d->rd_await_writes) {
-            iops_avg_time_write = ABS(d->rd_await_writes->collector.last_stored_value);
-            max_iops_avg_time_write = MAX(max_iops_avg_time_write, iops_avg_time_write);
-        }
-        buffer_json_add_array_item_double(wb, iops_avg_time_write);
-
+        double iops_avg_time_read = rrddim_get_last_stored_value(d->rd_await_reads, &max_iops_avg_time_read, 1);
+        double iops_avg_time_write = rrddim_get_last_stored_value(d->rd_await_writes, &max_iops_avg_time_write, 1);
         // Avg IO Size
-        double iops_avg_size_read = NAN;
-        if (d->rd_avgsz_reads) {
-            iops_avg_size_read = d->rd_avgsz_reads->collector.last_stored_value;
-            max_iops_avg_size_read = MAX(max_iops_avg_size_read, iops_avg_size_read);
-        }
+        double iops_avg_size_read = rrddim_get_last_stored_value(d->rd_avgsz_reads, &max_iops_avg_size_read, 1);
+        double iops_avg_size_write = rrddim_get_last_stored_value(d->rd_avgsz_writes, &max_iops_avg_size_write, 1);
+
+
+        buffer_json_add_array_item_double(wb, io_reads);
+        buffer_json_add_array_item_double(wb, io_writes);
+        buffer_json_add_array_item_double(wb, io_total);
+        buffer_json_add_array_item_double(wb, busy_perc);
+        buffer_json_add_array_item_double(wb, busy_time);
+        buffer_json_add_array_item_double(wb, backlog_time);
+        buffer_json_add_array_item_double(wb, iops_reads);
+        buffer_json_add_array_item_double(wb, iops_writes);
+        buffer_json_add_array_item_double(wb, iops_time_reads);
+        buffer_json_add_array_item_double(wb, iops_time_writes);
+        buffer_json_add_array_item_double(wb, iops_avg_time_read);
+        buffer_json_add_array_item_double(wb, iops_avg_time_write);
         buffer_json_add_array_item_double(wb, iops_avg_size_read);
-        double iops_avg_size_write = NAN;
-        if (d->rd_avgsz_writes) {
-            iops_avg_size_write = ABS(d->rd_avgsz_writes->collector.last_stored_value);
-            max_iops_avg_size_write = MAX(max_iops_avg_size_write, iops_avg_size_write);
-        }
         buffer_json_add_array_item_double(wb, iops_avg_size_write);
 
         // End
