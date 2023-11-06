@@ -170,7 +170,7 @@ void aclk_check_node_info_and_collectors(void)
 
     if (context_loading || replicating) {
         error_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
-        error_limit(&erl, "ACLK: %zu nodes loading contexts, %zu replicating data", context_loading, replicating);
+        error_limit(&erl, "%zu nodes loading contexts, %zu replicating data", context_loading, replicating);
     }
 }
 
