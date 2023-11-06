@@ -8,8 +8,6 @@
 
 #ifdef ENABLE_ACLK
 
-void aclk_check_node_info_and_collectors(void);
-
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
     char name[500];
@@ -136,19 +134,23 @@ void aclk_check_node_info_and_collectors(void)
     if (unlikely(!aclk_connected))
         return;
 
-    dfe_start_reentrant(rrdhost_root_index, host) {
-
+    size_t context_loading = 0;
+    size_t replicating = 0;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
         if (unlikely(!wc))
             continue;
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             internal_error(true, "ACLK SYNC: Context still pending for %s", rrdhost_hostname(host));
+            context_loading++;
             continue;
         }
 
         if (unlikely(host_is_replicating(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating", rrdhost_hostname(host));
+            replicating++;
             continue;
         }
 
@@ -165,6 +167,11 @@ void aclk_check_node_info_and_collectors(void)
         }
     }
     dfe_done(host);
+
+    if (context_loading || replicating) {
+        error_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
+        error_limit(&erl, "ACLK: %zu nodes loading contexts, %zu replicating data", context_loading, replicating);
+    }
 }
 
 #endif
