@@ -21,11 +21,14 @@ you can do so by adding `--static-only` to the options you pass to the installer
 
 ## Building a static binary package
 
-To build the static binary 64-bit distribution package, run:
+Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
+Otherwise, [perform a cleanup](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+
+
+To build the static binary 64-bit distribution package, into the root folder on the netdata repo, run:
 
 ```bash
-cd /path/to/netdata.git
-./packaging/makeself/build-x86_64-static.sh
+./packaging/makeself/build-static.sh x86_64
 ```
 
 The program will:
