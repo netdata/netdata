@@ -517,14 +517,14 @@ struct {
         .value_type = SD_BUS_TYPE_STRING,
         .show_as = "Enabled",
         .info = "Unit File State",
-        .options = RRDF_FIELD_OPTS_VISIBLE,
+        .options = RRDF_FIELD_OPTS_NONE,
         .filter = RRDF_FIELD_FILTER_MULTISELECT,
         }, {
         .member = "UnitFilePreset",
         .value_type = SD_BUS_TYPE_STRING,
         .show_as = "Preset",
         .info = "Unit File Preset",
-        .options = RRDF_FIELD_OPTS_VISIBLE,
+        .options = RRDF_FIELD_OPTS_NONE,
         .filter = RRDF_FIELD_FILTER_MULTISELECT,
         }, {
         .member = "FreezerState",
