@@ -49,7 +49,7 @@ UNIT_STATIC char *sanitise_string(char *const s){
 
 const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
     if(unlikely(!p_file_infos_arr || !p_file_infos_arr->count)) 
-        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_SERVER_ERR];   
     
     buffer_json_add_array_item_object(wb);
     buffer_json_member_add_string(wb, "id", "all");
@@ -66,6 +66,15 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
     buffer_json_member_add_uint64(wb, "db_flush_freq", 0);
     buffer_json_member_add_int64( wb, "db_disk_space_limit", 0);
     buffer_json_object_close(wb); // options object
+
+    bool queryable_sources = false;
+    for (int i = 0; i < p_file_infos_arr->count; i++) {
+        if(p_file_infos_arr->data[i]->db_mode == LOGS_MANAG_DB_MODE_FULL)
+            queryable_sources = true;
+    }
+
+    if(!queryable_sources)
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
 
     for (int i = 0; i < p_file_infos_arr->count; i++) {
         buffer_json_add_array_item_object(wb);
@@ -145,7 +154,7 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     }
 
     if(unlikely(!p_file_infos[0])) 
-        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR];
+        return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR];
 
     
     if( p_query_params->sanitize_keyword && p_query_params->keyword && 

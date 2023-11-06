@@ -171,7 +171,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
 
-    int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
+    const logs_qry_res_err_t *ret = &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_SERVER_ERR];
 
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
@@ -274,7 +274,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
             pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
             netdata_mutex_unlock(&stdout_mut);
             buffer_free(wb);
-            ret = HTTP_RESP_OK;
             goto cleanup;
         }
         else if(!strcmp(keyword, LOGS_MANAG_FUNC_PARAM_INFO)){
@@ -413,8 +412,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
             }
         }
         
-
-
         // else if(!strcmp(key, LOGS_QRY_KW_QUOTA)){
         //     req_quota = strtoll(value, NULL, 10);
         // }
@@ -556,9 +553,10 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     // buffer_json_member_add_uint64(wb, "source_type", fqs->source_type);
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_AFTER, fqs->after_ut / USEC_PER_SEC);
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_BEFORE, fqs->before_ut / USEC_PER_SEC);
-    buffer_json_member_add_uint64(wb, "if_modified_since", fqs->if_modified_since);
+    buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_IF_MODIFIED_SINCE, fqs->if_modified_since);
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_ANCHOR, anchor);
-    buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_DIRECTION, fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
+    buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_DIRECTION, 
+        fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD ? "forward" : "backward");
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_LAST, fqs->entries);
     buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_QUERY, fqs->query);
     buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_HISTOGRAM, fqs->histogram);
@@ -580,8 +578,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
                 buffer_json_member_add_string(wb, "help", "Select the Logs Management source to query");
                 buffer_json_member_add_string(wb, "type", "select");
                 buffer_json_member_add_array(wb, "options");
-                const logs_qry_res_err_t *const res_err = fetch_log_sources(wb);
-                ret = res_err->http_code;
+                ret = fetch_log_sources(wb);
                 buffer_json_array_close(wb); // options array
             }
             buffer_json_object_close(wb); // required params object
@@ -623,16 +620,12 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     query_params.results_buff = buffer_create(query_params.quota, NULL);
 
     facets_rows_begin(facets);
-    const logs_qry_res_err_t *res_err;
 
     do{
         if(query_params.act_to_ts)
             query_params.req_from_ts = query_params.act_to_ts - 1000;
 
-        res_err = execute_logs_manag_query(&query_params);
-        ret = res_err->http_code;
-
-        usec_t last_modified = 0;
+        ret = execute_logs_manag_query(&query_params);
 
         size_t res_off = 0;
         logs_query_res_hdr_t *p_res_hdr;
@@ -654,14 +647,14 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
 
                 usec_t timestamp = p_res_hdr->timestamp * USEC_PER_MS + --timestamp_off;
 
-                if(unlikely(!last_modified)) {
-                    if(timestamp == if_modified_since){
-                        ret = HTTP_RESP_NOT_MODIFIED;
-                        goto cleanup;
-                    }
+                // if(unlikely(!fqs->last_modified)) {
+                //     if(timestamp == if_modified_since){
+                //         ret-> = HTTP_RESP_NOT_MODIFIED;
+                //         goto cleanup;
+                //     }
                     
-                    last_modified = timestamp;
-                }
+                //     fqs->last_modified = timestamp;
+                // }
 
                 facets_add_key_value(facets, "log_source", p_res_hdr->log_source[0] ? p_res_hdr->log_source : "-");
 
@@ -703,12 +696,12 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     buffer_json_member_add_uint64(wb, "user_time", user_time);
     buffer_json_member_add_uint64(wb, "system_time", sys_time);
     buffer_json_member_add_uint64(wb, "total_time", user_time + sys_time);
-    buffer_json_member_add_uint64(wb, "error_code", (uint64_t) res_err->err_code);
-    buffer_json_member_add_string(wb, "error_string", res_err->err_str);
+    buffer_json_member_add_uint64(wb, "error_code", (uint64_t) ret->err_code);
+    buffer_json_member_add_string(wb, "error_string", ret->err_str);
     buffer_json_object_close(wb); // logs_management_meta
 
-    buffer_json_member_add_uint64(wb, "status", ret);
-    buffer_json_member_add_boolean(wb, "partial", ret != HTTP_RESP_OK);
+    buffer_json_member_add_uint64(wb, "status", ret->http_code);
+    buffer_json_member_add_boolean(wb, "partial", ret->http_code != HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
 
 
@@ -736,16 +729,16 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     // ------------------------------------------------------------------------
     // handle error response
 
-    if(ret != HTTP_RESP_OK) {
+    if(ret->http_code != HTTP_RESP_OK) {
         netdata_mutex_lock(&stdout_mut);
-        pluginsd_function_json_error_to_stdout(transaction, ret, "failed");
+        pluginsd_function_json_error_to_stdout(transaction, ret->http_code, ret->err_str);
         netdata_mutex_unlock(&stdout_mut);
         goto cleanup;
     }
 
 output:
     netdata_mutex_lock(&stdout_mut);
-    pluginsd_function_result_to_stdout(transaction, ret, "application/json", expires, wb);
+    pluginsd_function_result_to_stdout(transaction, ret->http_code, "application/json", expires, wb);
     netdata_mutex_unlock(&stdout_mut);
 
 cleanup:

@@ -25,24 +25,20 @@
 
 typedef struct {
     const enum {LOGS_QRY_RES_ERR_CODE_OK = 0, 
-                LOGS_QRY_RES_ERR_CODE_GEN_ERR, 
-                LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR,
                 LOGS_QRY_RES_ERR_CODE_INV_TS_ERR,
-                LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR,
                 LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR,
-                LOGS_QRY_RES_ERR_CODE_NOT_INIT_ERR } err_code;
+                LOGS_QRY_RES_ERR_CODE_NOT_INIT_ERR,
+                LOGS_QRY_RES_ERR_CODE_SERVER_ERR } err_code;
     char const *const err_str;
     const int http_code;
 } logs_qry_res_err_t;
 
 static const logs_qry_res_err_t logs_qry_res_err[] = {
     { LOGS_QRY_RES_ERR_CODE_OK,             "success",                              HTTP_RESP_OK                    },
-    { LOGS_QRY_RES_ERR_CODE_GEN_ERR,        "generic error",                        HTTP_RESP_INTERNAL_SERVER_ERROR },
-    { LOGS_QRY_RES_ERR_CODE_INV_REQ_ERR,    "invalid request",                      HTTP_RESP_BAD_REQUEST           },
     { LOGS_QRY_RES_ERR_CODE_INV_TS_ERR,     "invalid timestamp range",              HTTP_RESP_BAD_REQUEST           },
-    { LOGS_QRY_RES_ERR_CODE_NO_MATCH_ERR,   "no matching chart or filename found",  HTTP_RESP_BAD_REQUEST           },
     { LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR,  "no results found",                     HTTP_RESP_OK                    },
-    { LOGS_QRY_RES_ERR_CODE_NOT_INIT_ERR,   "logs management engine not running",   HTTP_RESP_SERVICE_UNAVAILABLE   }
+    { LOGS_QRY_RES_ERR_CODE_NOT_INIT_ERR,   "logs management engine not running",   HTTP_RESP_SERVICE_UNAVAILABLE   },
+    { LOGS_QRY_RES_ERR_CODE_SERVER_ERR,     "server error",                         HTTP_RESP_INTERNAL_SERVER_ERROR }
 };
 
 const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb);
