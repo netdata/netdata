@@ -1448,66 +1448,33 @@ static int rrdlabels_unittest_add_pairs() {
     return errors;
 }
 
-static int rrdlabels_unittest_double_check() {
+static int rrdlabels_unittest_expect_value(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC required_source)
+{
+    RRDLABEL_SRC source;
+    RRDLABEL *label = rrdlabels_find_label_with_key(labels, key, &source);
+    return (!label || strcmp(string2str(label->index.value), value) != 0 || !(source & required_source));
+}
+
+static int rrdlabels_unittest_double_check()
+{
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
 
-    int errors = 1;
     int ret = 0;
     RRDLABELS *labels = rrdlabels_create();
 
-    const char *pair = "key1=value1";
+    rrdlabels_add(labels, "key1", "value1", RRDLABEL_SRC_CONFIG);
+    ret += rrdlabels_unittest_expect_value(labels, "key1", "value1", RRDLABEL_FLAG_NEW);
 
-    struct rrdlabels_unittest_add_a_pair tmp = {
-        .pair = pair,
-        .expected_name = "key1",
-        .expected_value = NULL,
-        .errors = 0
-    };
+    rrdlabels_add(labels, "key1", "value2", RRDLABEL_SRC_CONFIG);
+    ret += !rrdlabels_unittest_expect_value(labels, "key1", "value2", RRDLABEL_FLAG_OLD);
 
-    fprintf(stderr, "rrdlabels_add_pair(labels, %s) ...\n ", pair);
-
-    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
-    size_t count = rrdlabels_entries(labels);
-    fprintf(stderr, "Added one key with \"value1\", entries found %zu\n", count);
-    tmp.expected_value = "value1";
-    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
-
-    fprintf(stderr, "Adding key with same value \"value1\" (collision check)\n");
-    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
-    count = rrdlabels_entries(labels);
-    fprintf(stderr, "Added same key again \"value1\", entries found %zu\n", count);
-
-    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
-
-    // Add same key with different value
-    pair = "key1=value2";
-    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
-    count = rrdlabels_entries(labels);
-    fprintf(stderr, "Added same key again with \"value2\", entries found %zu\n", count);
-
-    tmp.expected_value = "value2";
-    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
-
-    fprintf(stderr, "Adding key with same value \"value2\" (collision check)\n");
-    rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_CONFIG);
-    count = rrdlabels_entries(labels);
-    fprintf(stderr, "Added same key again with \"value2\", entries found %zu\n", count);
-
-    ret = rrdlabels_walkthrough_read(labels, rrdlabels_unittest_add_a_pair_callback, &tmp);
-    errors = tmp.errors;
-    if(ret != 1) {
-        fprintf(stderr, "failed to get \"%s\" label", "key1");
-        errors++;
-    }
-
-    if(!errors)
-        fprintf(stderr, " OK, name='%s' and value='%s'\n", tmp.name, tmp.value?tmp.value:"(null)");
-    else
-        fprintf(stderr, " FAILED\n");
+    ret += (rrdlabels_entries(labels) != 1);
 
     rrdlabels_destroy(labels);
 
-    return errors;
+    if (ret)
+        fprintf(stderr, "\n%s() tests failed\n", __FUNCTION__);
+    return ret;
 }
 
 static int rrdlabels_walkthrough_index_read(RRDLABELS *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, size_t index, void *data), void *data)
@@ -1538,13 +1505,6 @@ static int unittest_dump_labels(const char *name, const char *value, RRDLABEL_SR
     }
     fprintf(stderr, "LABEL \"%s\" = %d \"%s\"\n", name, ls & (~RRDLABEL_FLAG_INTERNAL), value);
     return 1;
-}
-
-int rrdlabels_unittest_expect_value(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC required_source)
-{
-    RRDLABEL_SRC source;
-    RRDLABEL *label = rrdlabels_find_label_with_key(labels, key, &source);
-    return (!label || strcmp(string2str(label->index.value), value) != 0 || !(source & required_source));
 }
 
 static int rrdlabels_unittest_migrate_check()
