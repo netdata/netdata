@@ -514,22 +514,25 @@ int db_execute(sqlite3 *db, const char *cmd)
 {
     int rc;
     int cnt = 0;
+
     while (cnt < SQL_MAX_RETRY) {
         char *err_msg;
         rc = sqlite3_exec_monitored(db, cmd, 0, 0, &err_msg);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
-            sqlite3_free(err_msg);
-            if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
-                usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
-            }
-            else
-                break;
-        }
-        else
+        if (likely(rc == SQLITE_OK))
             break;
 
         ++cnt;
+        error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
+        sqlite3_free(err_msg);
+
+        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
+            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+            continue;
+        }
+
+        if (rc == SQLITE_CORRUPT)
+            mark_database_to_recover(NULL, db);
+        break;
     }
     return (rc != SQLITE_OK);
 }
