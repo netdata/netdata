@@ -813,7 +813,7 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                 2, "Mbit", max_traffic, RRDF_FIELD_SORT_DESCENDING, NULL,
                 RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_VISIBLE,
+                RRDF_FIELD_OPTS_NONE,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "PktsIn", "Received Packets",
