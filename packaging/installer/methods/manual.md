@@ -23,7 +23,7 @@ To install the latest git version of Netdata, please follow these 2 steps:
 ## Prepare your system
 
 Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
-Otherwise, [perform a cleanup](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+Otherwise, [perform a cleanup](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
 
 Use our automatic requirements installer (_no need to be `root`_), which attempts to find the packages that
 should be installed on your system to build and run Netdata. It supports a large variety of major Linux distributions
