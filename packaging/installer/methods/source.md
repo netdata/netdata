@@ -51,7 +51,7 @@ libraries and their header files must be copied into specific locations
 in the source tree to be used.
 
 Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
-Otherwise, [perform a cleanup](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+Otherwise, [perform a cleanup](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
 
 ### Netdata cloud
 
