@@ -122,6 +122,8 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
     double max_net_received = 0.0;
     double max_net_sent = 0.0;
 
+    RRDDIM *rd = NULL;
+
     uv_mutex_lock(&cgroup_root_mutex);
 
     for(struct cgroup *cg = cgroup_root; cg ; cg = cg->next) {
@@ -142,32 +144,13 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
             cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
             max_cpu = MAX(max_cpu, cpu);
         }
-        buffer_json_add_array_item_double(wb, cpu);
 
-        double ram = NAN;
-        if (cg->st_mem_rd_ram) {
-            ram = cg->st_mem_rd_ram->collector.last_stored_value;
-            max_ram = MAX(max_ram, ram);
-        }
-        buffer_json_add_array_item_double(wb, ram);
+        double ram = rrddim_get_last_stored_value(cg->st_mem_rd_ram, &max_ram, 1.0);
 
-        double disk_io_read = NAN;
-        double disk_io_written = NAN;
-        if (cg->st_throttle_io_rd_read) {
-            disk_io_read = (cg->st_throttle_io_rd_read->collector.last_stored_value / 1024.0);
-            disk_io_written = (ABS(cg->st_throttle_io_rd_written->collector.last_stored_value) / 1024.0);
-        } else if (cg->st_io_rd_read) {
-            disk_io_read = (cg->st_io_rd_read->collector.last_stored_value / 1024.0);
-            disk_io_written = (ABS(cg->st_io_rd_written->collector.last_stored_value) / 1024.0);
-        }
-
-        if (!isnan(disk_io_read) && !isnan(disk_io_written)) {
-            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
-            max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
-        }
-
-        buffer_json_add_array_item_double(wb, disk_io_read);
-        buffer_json_add_array_item_double(wb, disk_io_written);
+        rd = cg->st_throttle_io_rd_read ? cg->st_throttle_io_rd_read : cg->st_io_rd_read;
+        double disk_io_read = rrddim_get_last_stored_value(rd, &max_disk_io_read, 1024.0);
+        rd = cg->st_throttle_io_rd_written ? cg->st_throttle_io_rd_written : cg->st_io_rd_written;
+        double disk_io_written = rrddim_get_last_stored_value(rd, &max_disk_io_written, 1024.0);
 
 
         NETDATA_DOUBLE received, sent;
@@ -179,6 +162,10 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
             max_net_sent = MAX(max_net_sent, sent);
         }
 
+        buffer_json_add_array_item_double(wb, cpu);
+        buffer_json_add_array_item_double(wb, ram);
+        buffer_json_add_array_item_double(wb, disk_io_read);
+        buffer_json_add_array_item_double(wb, disk_io_written);
         buffer_json_add_array_item_double(wb, received);
         buffer_json_add_array_item_double(wb, sent);
 
@@ -367,6 +354,8 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
     double max_disk_io_read = 0.0;
     double max_disk_io_written = 0.0;
 
+    RRDDIM *rd = NULL;
+
     uv_mutex_lock(&cgroup_root_mutex);
 
     for(struct cgroup *cg = cgroup_root; cg ; cg = cg->next) {
@@ -382,30 +371,16 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
             cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
             max_cpu = MAX(max_cpu, cpu);
         }
+
+        double ram = rrddim_get_last_stored_value(cg->st_mem_rd_ram, &max_ram, 1.0);
+
+        rd = cg->st_throttle_io_rd_read ? cg->st_throttle_io_rd_read : cg->st_io_rd_read;
+        double disk_io_read = rrddim_get_last_stored_value(rd, &max_disk_io_read, 1024.0);
+        rd = cg->st_throttle_io_rd_written ? cg->st_throttle_io_rd_written : cg->st_io_rd_written;
+        double disk_io_written = rrddim_get_last_stored_value(rd, &max_disk_io_written, 1024.0);
+
         buffer_json_add_array_item_double(wb, cpu);
-
-        double ram = NAN;
-        if (cg->st_mem_rd_ram) {
-            ram = cg->st_mem_rd_ram->collector.last_stored_value;
-            max_ram = MAX(max_ram, ram);
-        }
         buffer_json_add_array_item_double(wb, ram);
-
-        double disk_io_read = NAN;
-        double disk_io_written = NAN;
-        if (cg->st_throttle_io_rd_read) {
-            disk_io_read = (cg->st_throttle_io_rd_read->collector.last_stored_value / 1024.0);
-            disk_io_written = (ABS(cg->st_throttle_io_rd_written->collector.last_stored_value) / 1024.0);
-        } else if (cg->st_io_rd_read) {
-            disk_io_read = (cg->st_io_rd_read->collector.last_stored_value / 1024.0);
-            disk_io_written = (ABS(cg->st_io_rd_written->collector.last_stored_value) / 1024.0);
-        }
-
-        if (!isnan(disk_io_read) && !isnan(disk_io_written)) {
-            max_disk_io_read = MAX(max_disk_io_read, disk_io_read);
-            max_disk_io_written = MAX(max_disk_io_written, disk_io_written);
-        }
-
         buffer_json_add_array_item_double(wb, disk_io_read);
         buffer_json_add_array_item_double(wb, disk_io_written);
 
