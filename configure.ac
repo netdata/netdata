@@ -698,10 +698,10 @@ AC_CHECK_SIZEOF(void *)
 if test "$ac_cv_sizeof_void_p" = 8; then
     AC_MSG_RESULT(Detected 64-bit Build Environment)
     	LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -DJU_64BIT"
-                else
+else
     AC_MSG_RESULT(Detected 32-bit Build Environment)
         LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -UJU_64BIT"
-                fi
+fi
 
 AC_SUBST([LIBJUDY_CFLAGS])
 
