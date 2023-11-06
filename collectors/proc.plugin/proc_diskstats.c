@@ -6,6 +6,8 @@
 #define PLUGIN_PROC_MODULE_DISKSTATS_NAME "/proc/diskstats"
 #define CONFIG_SECTION_PLUGIN_PROC_DISKSTATS "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_DISKSTATS_NAME
 
+#define RRDFUNCTIONS_DISKSTATS_HELP "View block device statistics"
+
 #define DISK_TYPE_UNKNOWN   0
 #define DISK_TYPE_PHYSICAL  1
 #define DISK_TYPE_PARTITION 2
@@ -13,6 +15,8 @@
 
 #define DEFAULT_PREFERRED_IDS "*"
 #define DEFAULT_EXCLUDED_DISKS "loop* ram*"
+
+static netdata_mutex_t diskstats_dev_mutex = NETDATA_MUTEX_INITIALIZER;
 
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc, after being looked up)
@@ -27,6 +31,9 @@ static struct disk {
     unsigned long minor;
     int sector_size;
     int type;
+
+    bool excluded;
+    bool function_ready;
 
     char *mount_point;
 
@@ -543,7 +550,11 @@ static inline char *get_disk_model(char *device) {
             return NULL;
     }
 
-    return strdupz(buffer);
+    char *clean = trim(buffer);
+    if (!clean)
+        return NULL;
+
+    return strdupz(clean);
 }
 
 static inline char *get_disk_serial(char *device) {
@@ -582,8 +593,10 @@ static inline char *get_disk_serial(char *device) {
 static void get_disk_config(struct disk *d) {
     int def_enable = global_enable_new_disks_detected_at_runtime;
 
-    if(def_enable != CONFIG_BOOLEAN_NO && (simple_pattern_matches(excluded_disks, d->device) || simple_pattern_matches(excluded_disks, d->disk)))
+    if(def_enable != CONFIG_BOOLEAN_NO && (simple_pattern_matches(excluded_disks, d->device) || simple_pattern_matches(excluded_disks, d->disk))) {
+        d->excluded = true;
         def_enable = CONFIG_BOOLEAN_NO;
+    }
 
     char var_name[4096 + 1];
     snprintfz(var_name, 4096, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS ":%s", d->disk);
@@ -663,6 +676,8 @@ static void get_disk_config(struct disk *d) {
             ddo_ext = global_do_ext,
             ddo_backlog = global_do_backlog,
             ddo_bcache = global_do_bcache;
+        } else {
+            d->excluded = true;
         }
 
         d->do_io      = config_get_boolean_ondemand(var_name, "bandwidth", ddo_io);
@@ -702,6 +717,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // create a new disk structure
     d = (struct disk *)callocz(1, sizeof(struct disk));
 
+    d->excluded = false;
+    d->function_ready = false;
     d->disk = get_disk_name(major, minor, disk);
     d->device = strdupz(disk);
     d->disk_by_id = get_disk_by_id(disk);
@@ -963,7 +980,21 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     }
 
     get_disk_config(d);
+
     return d;
+}
+
+static const char *get_disk_type_string(int disk_type) {
+    switch (disk_type) {
+        case DISK_TYPE_PHYSICAL:
+            return "physical";
+        case DISK_TYPE_PARTITION:
+            return "partition";
+        case DISK_TYPE_VIRTUAL:
+            return "virtual";
+        default:
+            return "unknown";
+    }
 }
 
 static void add_labels_to_disk(struct disk *d, RRDSET *st) {
@@ -972,26 +1003,434 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "id", d->disk_by_id, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "model", d->model, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "serial", d->serial, RRDLABEL_SRC_AUTO);
-//    rrdlabels_add(st->rrdlabels, "rotational", d->rotational ? "true" : "false", RRDLABEL_SRC_AUTO);
-//    rrdlabels_add(st->rrdlabels, "removable", d->removable ? "true" : "false", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "device_type", get_disk_type_string(d->type), RRDLABEL_SRC_AUTO);
+}
 
-    switch (d->type) {
-        default:
-        case DISK_TYPE_UNKNOWN:
-            rrdlabels_add(st->rrdlabels, "device_type", "unknown", RRDLABEL_SRC_AUTO);
-            break;
+static int diskstats_function_block_devices(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
+        void *collector_data __maybe_unused,
+        rrd_function_result_callback_t result_cb, void *result_cb_data,
+        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+        rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+        void *register_canceller_cb_data __maybe_unused) {
 
-        case DISK_TYPE_PHYSICAL:
-            rrdlabels_add(st->rrdlabels, "device_type", "physical", RRDLABEL_SRC_AUTO);
-            break;
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-        case DISK_TYPE_PARTITION:
-            rrdlabels_add(st->rrdlabels, "device_type", "partition", RRDLABEL_SRC_AUTO);
-            break;
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_DISKSTATS_HELP);
+    buffer_json_member_add_array(wb, "data");
 
-        case DISK_TYPE_VIRTUAL:
-            rrdlabels_add(st->rrdlabels, "device_type", "virtual", RRDLABEL_SRC_AUTO);
-            break;
+    double max_io_reads = 0.0;
+    double max_io_writes = 0.0;
+    double max_io = 0.0;
+    double max_backlog_time = 0.0;
+    double max_busy_time = 0.0;
+    double max_busy_perc = 0.0;
+    double max_iops_reads = 0.0;
+    double max_iops_writes = 0.0;
+    double max_iops_time_reads = 0.0;
+    double max_iops_time_writes = 0.0;
+    double max_iops_avg_time_read = 0.0;
+    double max_iops_avg_time_write = 0.0;
+    double max_iops_avg_size_read = 0.0;
+    double max_iops_avg_size_write = 0.0;
+
+    netdata_mutex_lock(&diskstats_dev_mutex);
+
+    for (struct disk *d = disk_root; d; d = d->next) {
+        if (unlikely(!d->function_ready))
+            continue;
+
+        buffer_json_add_array_item_array(wb);
+
+        buffer_json_add_array_item_string(wb, d->device);
+        buffer_json_add_array_item_string(wb, get_disk_type_string(d->type));
+        buffer_json_add_array_item_string(wb, d->disk_by_id);
+        buffer_json_add_array_item_string(wb, d->model);
+        buffer_json_add_array_item_string(wb, d->serial);
+
+        // IO
+        double io_reads = NAN;
+        if (d->rd_io_reads) {
+            io_reads = d->rd_io_reads->collector.last_stored_value / 1024.0;
+            max_io_reads = MAX(max_io_reads, io_reads);
+        }
+        buffer_json_add_array_item_double(wb, io_reads);
+
+        double io_writes = NAN;
+        if (d->rd_io_writes) {
+            io_writes = ABS(d->rd_io_writes->collector.last_stored_value / 1024.0);
+            max_io_writes = MAX(max_io_writes, io_writes);
+        }
+        buffer_json_add_array_item_double(wb, io_writes);
+
+        double io_total = NAN;
+        if (!isnan(io_reads) && !isnan(io_writes)) {
+            io_total = io_reads + io_writes;
+            max_io = MAX(max_io, io_total);
+        }
+        buffer_json_add_array_item_double(wb, io_total);
+
+        // Backlog and Busy Time
+        double busy_perc = NAN;
+        if (d->rd_util_utilization) {
+            busy_perc = d->rd_util_utilization->collector.last_stored_value;
+            max_busy_perc = MAX(max_busy_perc, busy_perc);
+        }
+        buffer_json_add_array_item_double(wb, busy_perc);
+        double busy_time = NAN;
+        if (d->rd_busy_busy) {
+            busy_time = d->rd_busy_busy->collector.last_stored_value;
+            max_busy_time = MAX(max_busy_time, busy_time);
+        }
+        buffer_json_add_array_item_double(wb, busy_time);
+        double backlog_time = NAN;
+        if (d->rd_backlog_backlog) {
+            backlog_time = d->rd_backlog_backlog->collector.last_stored_value;
+            max_backlog_time = MAX(max_backlog_time, backlog_time);
+        }
+        buffer_json_add_array_item_double(wb, backlog_time);
+
+        // IOPS
+        double iops_reads = NAN;
+        if (d->rd_ops_reads) {
+            iops_reads = d->rd_ops_reads->collector.last_stored_value;
+            max_iops_reads = MAX(max_iops_reads, iops_reads);
+        }
+        buffer_json_add_array_item_double(wb, iops_reads);
+        double iops_writes = NAN;
+        if (d->rd_ops_writes) {
+            iops_writes = ABS(d->rd_ops_writes->collector.last_stored_value);
+            max_iops_writes = MAX(max_iops_writes, iops_writes);
+        }
+        buffer_json_add_array_item_double(wb, iops_writes);
+
+        // IO Time
+        double iops_time_reads = NAN;
+        if (d->rd_iotime_reads) {
+            iops_time_reads = d->rd_iotime_reads->collector.last_stored_value;
+            max_iops_time_reads = MAX(max_iops_time_reads, iops_time_reads);
+        }
+        buffer_json_add_array_item_double(wb, iops_time_reads);
+
+        double iops_time_writes = NAN;
+        if (d->rd_iotime_writes) {
+            iops_time_writes = ABS(d->rd_iotime_writes->collector.last_stored_value);
+            max_iops_time_writes = MAX(max_iops_time_writes, iops_time_writes);
+        }
+        buffer_json_add_array_item_double(wb, iops_time_writes);
+
+        // Avg IO Time
+        double iops_avg_time_read = NAN;
+        if (d->rd_await_reads) {
+            iops_avg_time_read = d->rd_await_reads->collector.last_stored_value;
+            max_iops_avg_time_read = MAX(max_iops_avg_time_read, iops_avg_time_read);
+        }
+        buffer_json_add_array_item_double(wb, iops_avg_time_read);
+        double iops_avg_time_write = NAN;
+        if (d->rd_await_writes) {
+            iops_avg_time_write = ABS(d->rd_await_writes->collector.last_stored_value);
+            max_iops_avg_time_write = MAX(max_iops_avg_time_write, iops_avg_time_write);
+        }
+        buffer_json_add_array_item_double(wb, iops_avg_time_write);
+
+        // Avg IO Size
+        double iops_avg_size_read = NAN;
+        if (d->rd_avgsz_reads) {
+            iops_avg_size_read = d->rd_avgsz_reads->collector.last_stored_value;
+            max_iops_avg_size_read = MAX(max_iops_avg_size_read, iops_avg_size_read);
+        }
+        buffer_json_add_array_item_double(wb, iops_avg_size_read);
+        double iops_avg_size_write = NAN;
+        if (d->rd_avgsz_writes) {
+            iops_avg_size_write = ABS(d->rd_avgsz_writes->collector.last_stored_value);
+            max_iops_avg_size_write = MAX(max_iops_avg_size_write, iops_avg_size_write);
+        }
+        buffer_json_add_array_item_double(wb, iops_avg_size_write);
+
+        // End
+        buffer_json_array_close(wb);
+    }
+
+    netdata_mutex_unlock(&diskstats_dev_mutex);
+
+    buffer_json_array_close(wb); // data
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Device", "Device Name",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Type", "Device Type",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "ID", "Device ID",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Model", "Device Model",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Serial", "Device Serial Number",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Read", "Data Read from Device",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "MiB", max_io_reads, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Written", "Data Writen to Device",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "MiB", max_io_writes, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Total", "Data Transferred to and from Device",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "MiB", max_io, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Busy%", "Disk Busy Percentage",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "%", max_busy_perc, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Busy", "Disk Busy Time",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "milliseconds", max_busy_time, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Backlog", "Disk Backlog",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "milliseconds", max_backlog_time, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Reads", "Completed Read Operations",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "ops", max_iops_reads, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Writes", "Completed Write Operations",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "ops", max_iops_writes, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ReadsTime", "Read Operations Time",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "milliseconds", max_iops_time_reads, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "WritesTime", "Write Operations Time",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "milliseconds", max_iops_time_writes, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ReadAvgTime", "Average Read Operation Service Time",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "milliseconds", max_iops_avg_time_read, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "WriteAvgTime", "Average Write Operation Service Time",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "milliseconds", max_iops_avg_time_write, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ReadAvgSz", "Average Read Operation Size",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "KiB", max_iops_avg_size_read, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "WriteAvgSz", "Average Write Operation Size",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "KiB", max_iops_avg_size_write, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+    }
+
+    buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "Total");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "IO");
+        {
+            buffer_json_member_add_string(wb, "name", "IO");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Read");
+                buffer_json_add_array_item_string(wb, "Written");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Busy");
+        {
+            buffer_json_member_add_string(wb, "name", "Busy");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Busy");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "IO");
+        buffer_json_add_array_item_string(wb, "Device");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Busy");
+        buffer_json_add_array_item_string(wb, "Device");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Type");
+        {
+            buffer_json_member_add_string(wb, "name", "Type");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Type");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+
+    int response = HTTP_RESP_OK;
+    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data)) {
+        buffer_flush(wb);
+        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
+    }
+
+    if(result_cb)
+        result_cb(wb, response, result_cb_data);
+
+    return response;
+}
+
+static void diskstats_cleanup_disks() {
+    struct disk *d = disk_root, *last = NULL;
+    while (d) {
+        if (unlikely(global_cleanup_removed_disks && !d->updated)) {
+            struct disk *t = d;
+
+            rrdset_obsolete_and_pointer_null(d->st_avgsz);
+            rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
+            rrdset_obsolete_and_pointer_null(d->st_await);
+            rrdset_obsolete_and_pointer_null(d->st_ext_await);
+            rrdset_obsolete_and_pointer_null(d->st_backlog);
+            rrdset_obsolete_and_pointer_null(d->st_busy);
+            rrdset_obsolete_and_pointer_null(d->st_io);
+            rrdset_obsolete_and_pointer_null(d->st_ext_io);
+            rrdset_obsolete_and_pointer_null(d->st_iotime);
+            rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
+            rrdset_obsolete_and_pointer_null(d->st_mops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_mops);
+            rrdset_obsolete_and_pointer_null(d->st_ops);
+            rrdset_obsolete_and_pointer_null(d->st_ext_ops);
+            rrdset_obsolete_and_pointer_null(d->st_qops);
+            rrdset_obsolete_and_pointer_null(d->st_svctm);
+            rrdset_obsolete_and_pointer_null(d->st_util);
+            rrdset_obsolete_and_pointer_null(d->st_bcache);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_bypass);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_rates);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_size);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_usage);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_hit_ratio);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_allocations);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_read_races);
+
+            if (d == disk_root) {
+                disk_root = d = d->next;
+                last = NULL;
+            } else if (last) {
+                last->next = d = d->next;
+            }
+
+            freez(t->bcache_filename_dirty_data);
+            freez(t->bcache_filename_writeback_rate);
+            freez(t->bcache_filename_cache_congested);
+            freez(t->bcache_filename_cache_available_percent);
+            freez(t->bcache_filename_stats_five_minute_cache_hit_ratio);
+            freez(t->bcache_filename_stats_hour_cache_hit_ratio);
+            freez(t->bcache_filename_stats_day_cache_hit_ratio);
+            freez(t->bcache_filename_stats_total_cache_hit_ratio);
+            freez(t->bcache_filename_stats_total_cache_hits);
+            freez(t->bcache_filename_stats_total_cache_misses);
+            freez(t->bcache_filename_stats_total_cache_miss_collisions);
+            freez(t->bcache_filename_stats_total_cache_bypass_hits);
+            freez(t->bcache_filename_stats_total_cache_bypass_misses);
+            freez(t->bcache_filename_stats_total_cache_readaheads);
+            freez(t->bcache_filename_cache_read_races);
+            freez(t->bcache_filename_cache_io_errors);
+            freez(t->bcache_filename_priority_stats);
+
+            freez(t->disk);
+            freez(t->device);
+            freez(t->disk_by_id);
+            freez(t->model);
+            freez(t->serial);
+            freez(t->mount_point);
+            freez(t->chart_id);
+            freez(t);
+        } else {
+            d->updated = 0;
+            last = d;
+            d = d->next;
+        }
     }
 }
 
@@ -1080,11 +1519,19 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
+    static bool add_func = true;
+    if (add_func) {
+        rrd_function_add(localhost, NULL, "block-devices", 10, RRDFUNCTIONS_DISKSTATS_HELP, true, diskstats_function_block_devices, NULL);
+        add_func = false;
+    }
+
     size_t lines = procfile_lines(ff), l;
 
     collected_number system_read_kb = 0, system_write_kb = 0;
 
     int do_dc_stats = 0, do_fl_stats = 0;
+
+    netdata_mutex_lock(&diskstats_dev_mutex);
 
     for(l = 0; l < lines ;l++) {
         // --------------------------------------------------------------------------
@@ -1210,7 +1657,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------------
         // Do performance metrics
-
         if(d->do_io == CONFIG_BOOLEAN_YES || (d->do_io == CONFIG_BOOLEAN_AUTO &&
                                               (readsectors || writesectors || discardsectors ||
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -2056,8 +2502,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(d->st_bcache_bypass);
             }
         }
+
+        d->function_ready = !d->excluded;
     }
 
+    diskstats_cleanup_disks();
+
+    netdata_mutex_unlock(&diskstats_dev_mutex);
     // update the system total I/O
 
     if(global_do_io == CONFIG_BOOLEAN_YES || (global_do_io == CONFIG_BOOLEAN_AUTO &&
@@ -2089,81 +2540,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_io, rd_in, system_read_kb);
         rrddim_set_by_pointer(st_io, rd_out, system_write_kb);
         rrdset_done(st_io);
-    }
-
-    // cleanup removed disks
-
-    struct disk *d = disk_root, *last = NULL;
-    while(d) {
-        if(unlikely(global_cleanup_removed_disks && !d->updated)) {
-            struct disk *t = d;
-
-            rrdset_obsolete_and_pointer_null(d->st_avgsz);
-            rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
-            rrdset_obsolete_and_pointer_null(d->st_await);
-            rrdset_obsolete_and_pointer_null(d->st_ext_await);
-            rrdset_obsolete_and_pointer_null(d->st_backlog);
-            rrdset_obsolete_and_pointer_null(d->st_busy);
-            rrdset_obsolete_and_pointer_null(d->st_io);
-            rrdset_obsolete_and_pointer_null(d->st_ext_io);
-            rrdset_obsolete_and_pointer_null(d->st_iotime);
-            rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
-            rrdset_obsolete_and_pointer_null(d->st_mops);
-            rrdset_obsolete_and_pointer_null(d->st_ext_mops);
-            rrdset_obsolete_and_pointer_null(d->st_ops);
-            rrdset_obsolete_and_pointer_null(d->st_ext_ops);
-            rrdset_obsolete_and_pointer_null(d->st_qops);
-            rrdset_obsolete_and_pointer_null(d->st_svctm);
-            rrdset_obsolete_and_pointer_null(d->st_util);
-            rrdset_obsolete_and_pointer_null(d->st_bcache);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_bypass);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_rates);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_size);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_usage);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_hit_ratio);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_allocations);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_cache_read_races);
-
-            if(d == disk_root) {
-                disk_root = d = d->next;
-                last = NULL;
-            }
-            else if(last) {
-                last->next = d = d->next;
-            }
-
-            freez(t->bcache_filename_dirty_data);
-            freez(t->bcache_filename_writeback_rate);
-            freez(t->bcache_filename_cache_congested);
-            freez(t->bcache_filename_cache_available_percent);
-            freez(t->bcache_filename_stats_five_minute_cache_hit_ratio);
-            freez(t->bcache_filename_stats_hour_cache_hit_ratio);
-            freez(t->bcache_filename_stats_day_cache_hit_ratio);
-            freez(t->bcache_filename_stats_total_cache_hit_ratio);
-            freez(t->bcache_filename_stats_total_cache_hits);
-            freez(t->bcache_filename_stats_total_cache_misses);
-            freez(t->bcache_filename_stats_total_cache_miss_collisions);
-            freez(t->bcache_filename_stats_total_cache_bypass_hits);
-            freez(t->bcache_filename_stats_total_cache_bypass_misses);
-            freez(t->bcache_filename_stats_total_cache_readaheads);
-            freez(t->bcache_filename_cache_read_races);
-            freez(t->bcache_filename_cache_io_errors);
-            freez(t->bcache_filename_priority_stats);
-
-            freez(t->disk);
-            freez(t->device);
-            freez(t->disk_by_id);
-            freez(t->model);
-            freez(t->serial);
-            freez(t->mount_point);
-            freez(t->chart_id);
-            freez(t);
-        }
-        else {
-            d->updated = 0;
-            last = d;
-            d = d->next;
-        }
     }
 
     return 0;
