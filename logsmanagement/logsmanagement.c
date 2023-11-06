@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
     stderror = stderr;
     clocks_init();
 
-    program_name = "logs-management.plugin";
+    program_name = LOGS_MANAGEMENT_PLUGIN_STR;
 
     // disable syslog
     error_log_syslog = 0;

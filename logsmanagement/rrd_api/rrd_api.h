@@ -5,8 +5,8 @@
 #define RRD_API_H_
 
 #include "daemon/common.h"
-
 #include "../circular_buffer.h"
+#include "../helper.h"
 
 struct Chart_meta;
 struct Chart_str {
@@ -27,8 +27,6 @@ struct Chart_str {
 #include "rrd_api_systemd.h"
 #include "rrd_api_docker_ev.h"
 #include "rrd_api_mqtt.h"
-
-#define LOGS_MANAGEMENT_PLUGIN_STR          "logsmanagement.plugin"
 
 #define CHART_TITLE_TOTAL_COLLECTED_LOGS    "Total collected log records"
 #define CHART_TITLE_RATE_COLLECTED_LOGS     "Rate of collected log records"
@@ -91,7 +89,7 @@ static inline struct Chart_str lgs_mng_create_chart(const char *type,
         .update_every   = update_every
     };
 
-    printf("CHART '%s.%s' '' '%s' '%s' '%s' '%s' '%s' %ld %d '' 'logsmanagement.plugin' ''\n",
+    printf("CHART '%s.%s' '' '%s' '%s' '%s' '%s' '%s' %ld %d '' '" LOGS_MANAGEMENT_PLUGIN_STR "' ''\n",
         cs.type, 
         cs.id, 
         cs.title, 
@@ -120,7 +118,7 @@ static inline void lgs_mng_add_dim_post_init(   struct Chart_str *cs,
                                         collected_number multiplier, 
                                         collected_number divisor){
 
-    printf("CHART '%s.%s' '' '%s' '%s' '%s' '%s' '%s' %ld %d '' 'logsmanagement.plugin' ''\n",
+    printf("CHART '%s.%s' '' '%s' '%s' '%s' '%s' '%s' %ld %d '' '" LOGS_MANAGEMENT_PLUGIN_STR "' ''\n",
         cs->type, 
         cs->id, 
         cs->title, 

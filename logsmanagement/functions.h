@@ -9,8 +9,8 @@
 
 #include "../database/rrdfunctions.h"
 
-#define LOGS_MANAG_FUNC_NAME "logsmanagement"
-#define FUNCTION_LOGSMANAGEMENT_HELP_SHORT "Query of logs management engine running on this node"
+#define LOGS_MANAG_FUNC_NAME "logs-management"
+#define FUNCTION_LOGSMANAGEMENT_HELP_SHORT "View, search and analyze logs monitored through the logs management engine."
 
 int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout, 
                                         const char *function, void *collector_data, 

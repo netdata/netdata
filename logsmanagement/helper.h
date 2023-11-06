@@ -10,6 +10,8 @@
 #include "libnetdata/libnetdata.h"
 #include <assert.h>
 
+#define LOGS_MANAGEMENT_PLUGIN_STR  "logs-management.plugin"
+
 #define LOGS_MANAG_STR_HELPER(x) #x
 #define LOGS_MANAG_STR(x) LOGS_MANAG_STR_HELPER(x)
 
