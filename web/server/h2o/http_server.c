@@ -137,6 +137,8 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         *host = rrdhost_find_by_hostname(c_host_id);
         if (!*host)
             *host = rrdhost_find_by_guid(c_host_id);
+        if (!*host)
+            *host = find_host_by_node_id(c_host_id);
         if (!*host) {
             req->res.status = HTTP_RESP_BAD_REQUEST;
             req->res.reason = "Wrong host id";
