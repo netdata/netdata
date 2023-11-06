@@ -40,13 +40,15 @@ The program will:
 
 Once finished, a file named `netdata-vX.X.X-gGITHASH-x86_64-DATE-TIME.run` will be created in the current directory. This is the Netdata binary package that can be run to install Netdata on any other computer.
 
+You can build static binaries for other architectures such as `armv7l`, `aarch64`, and `ppc64le`.
+
 ## Building binaries with debug info
 
 To build Netdata binaries with debugging / tracing information in them, use:
 
 ```bash
 cd /path/to/netdata.git
-./packaging/makeself/build-x86_64-static.sh debug
+./packaging/makeself/build-static.sh x86_64 debug
 ```
 
 These binaries are not optimized (they are a bit slower), they have certain features disables (like log flood protection), other features enables (like `debug flags`) and are not stripped (the binary files are bigger, since they now include source code tracing information).
