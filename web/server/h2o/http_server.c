@@ -207,10 +207,12 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     w.response.data = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_query_string_decoded = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
+    w.url_as_received = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.acl = WEB_CLIENT_ACL_DASHBOARD;
 
     char *path_c_str = iovec_to_cstr(&api_command);
     char *path_unescaped = url_unescape(path_c_str);
+    buffer_strcat(w.url_as_received, iovec_to_cstr(&norm_path));
     freez(path_c_str);
 
     IF_HAS_URL_PARAMS(req) {
@@ -250,6 +252,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     buffer_free(w.response.data);
     buffer_free(w.response.header);
     buffer_free(w.url_query_string_decoded);
+    buffer_free(w.url_as_received);
 
     return 0;
 }
