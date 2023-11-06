@@ -33,6 +33,8 @@
 
 #define LOGS_MANAG_DEFAULT_DIRECTION            FACETS_ANCHOR_DIRECTION_BACKWARD
 
+#define FACET_MAX_VALUE_LENGTH      8192
+
 #define FUNCTION_LOGSMANAGEMENT_HELP_LONG \
     LOGS_MANAGEMENT_PLUGIN_STR " / " LOGS_MANAG_FUNC_NAME"\n" \
     "\n" \
@@ -108,7 +110,7 @@
 
 extern netdata_mutex_t stdout_mut;
 
-DICTIONARY *function_query_status_dict = NULL;
+static DICTIONARY *function_query_status_dict = NULL;
 
 static DICTIONARY *used_hashes_registry = NULL;
 
@@ -152,9 +154,6 @@ typedef struct function_query_status {
     size_t files_matched;
     size_t file_working;
 } FUNCTION_QUERY_STATUS;
-
-
-#define FACET_MAX_VALUE_LENGTH      8192
 
 
 #define LOGS_MANAG_KEYS_INCLUDED_IN_FACETS      \
@@ -328,23 +327,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
             source = !strcmp("all", &keyword[sizeof(LOGS_MANAG_FUNC_PARAM_SOURCE ":") - 1]) ? 
                 NULL : &keyword[sizeof(LOGS_MANAG_FUNC_PARAM_SOURCE ":") - 1];
         }
-
-
-
-        // char *key = strsep_skip_consecutive_separators(&value, ":");
-        // if(!key || !*key) continue;
-        // if(!value || !*value) continue;
-
-        // Kludge to respect quotes with spaces in between
-        // Not proper fix
-        // if(*value == '_'){
-        //     value++;
-        //     value[strlen(value)] = ' '; 
-        //     value = strsep_skip_consecutive_separators(&value, "_");
-        //     function = strrchr(value, 0);
-        //     function++;
-        // }
-
         else if(strncmp(keyword, LOGS_MANAG_FUNC_PARAM_AFTER ":", sizeof(LOGS_MANAG_FUNC_PARAM_AFTER ":") - 1) == 0) {
             after_s = str2l(&keyword[sizeof(LOGS_MANAG_FUNC_PARAM_AFTER ":") - 1]);
         }
@@ -411,22 +393,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
                 buffer_json_array_close(wb); // keyword
             }
         }
-        
-        // else if(!strcmp(key, LOGS_QRY_KW_QUOTA)){
-        //     req_quota = strtoll(value, NULL, 10);
-        // }
-        // else if(!strcmp(key, LOGS_QRY_KW_FILENAME) && fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
-        //     query_params.filename[fn_off++] = value;
-        // }
-        // else if(!strcmp(key, LOGS_QRY_KW_CHARTNAME) && cn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
-        //     query_params.chartname[cn_off++] = value;
-        // }
-        // else if(!strcmp(key, LOGS_QRY_KW_IGNORE_CASE)){
-        //     query_params.ignore_case = strtol(value, NULL, 10) ? 1 : 0;
-        // }
-        // else if(!strcmp(key, LOGS_QRY_KW_SANITIZE_KW)){
-        //     query_params.sanitize_keyword = strtol(value, NULL, 10) ? 1 : 0;
-        // }
     }
 
     // ------------------------------------------------------------------------
@@ -647,14 +613,14 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
 
                 usec_t timestamp = p_res_hdr->timestamp * USEC_PER_MS + --timestamp_off;
 
-                // if(unlikely(!fqs->last_modified)) {
-                //     if(timestamp == if_modified_since){
-                //         ret-> = HTTP_RESP_NOT_MODIFIED;
-                //         goto cleanup;
-                //     }
-                    
-                //     fqs->last_modified = timestamp;
-                // }
+                if(unlikely(!fqs->last_modified)) {
+                    if(timestamp == if_modified_since){
+                        ret = &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_UNMODIFIED];
+                        goto output;
+                    }
+                    else                    
+                        fqs->last_modified = timestamp;
+                }
 
                 facets_add_key_value(facets, "log_source", p_res_hdr->log_source[0] ? p_res_hdr->log_source : "-");
 
@@ -666,7 +632,9 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
 
                 facets_add_key_value(facets, "chartname", p_res_hdr->chartname[0] ? p_res_hdr->chartname : "-");
 
-                facets_add_key_value(facets, "message", ls + 2);
+                size_t ls_len = strlen(ls + 2);
+                facets_add_key_value_length(facets, "message", sizeof("message") - 1, 
+                                            ls + 2, ls_len <= FACET_MAX_VALUE_LENGTH ? ls_len : FACET_MAX_VALUE_LENGTH);
 
                 facets_row_finished(facets, timestamp);
 
@@ -729,16 +697,12 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     // ------------------------------------------------------------------------
     // handle error response
 
-    if(ret->http_code != HTTP_RESP_OK) {
-        netdata_mutex_lock(&stdout_mut);
-        pluginsd_function_json_error_to_stdout(transaction, ret->http_code, ret->err_str);
-        netdata_mutex_unlock(&stdout_mut);
-        goto cleanup;
-    }
-
 output:
     netdata_mutex_lock(&stdout_mut);
-    pluginsd_function_result_to_stdout(transaction, ret->http_code, "application/json", expires, wb);
+    if(ret->http_code != HTTP_RESP_OK)
+        pluginsd_function_json_error_to_stdout(transaction, ret->http_code, ret->err_str);
+    else
+        pluginsd_function_result_to_stdout(transaction, ret->http_code, "application/json", expires, wb);
     netdata_mutex_unlock(&stdout_mut);
 
 cleanup:
