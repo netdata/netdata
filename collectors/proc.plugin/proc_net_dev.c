@@ -650,6 +650,7 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
         buffer_json_add_array_item_string(wb, d->name);
 
         buffer_json_add_array_item_string(wb, d->virtual ? "virtual" : "physical");
+        buffer_json_add_array_item_string(wb, d->flipped ? "cgroup" : "host");
         buffer_json_add_array_item_string(wb, d->carrier == 1 ? "up" : "down");
         buffer_json_add_array_item_string(wb, get_operstate_string(d->operstate));
         buffer_json_add_array_item_string(wb, get_duplex_string(d->duplex));
@@ -752,6 +753,13 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
                 RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
                 NULL);
 
+        buffer_rrdf_table_add_field(wb, field_id++, "UsedBy", "Indicates whether the network interface is used by a cgroup or by the host system",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
         buffer_rrdf_table_add_field(wb, field_id++, "PhState", "Current Physical State",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
@@ -789,21 +797,21 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
 
         buffer_rrdf_table_add_field(wb, field_id++, "In", "Traffic Received",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "MiB", max_traffic_rx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                2, "Mbit", max_traffic_rx, RRDF_FIELD_SORT_DESCENDING, NULL,
                 RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "Out", "Traffic Sent",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "MiB", max_traffic_tx, RRDF_FIELD_SORT_DESCENDING, NULL,
+                2, "Mbit", max_traffic_tx, RRDF_FIELD_SORT_DESCENDING, NULL,
                 RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "Total", "Traffic Received and Sent",
                 RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "MiB", max_traffic, RRDF_FIELD_SORT_DESCENDING, NULL,
+                2, "Mbit", max_traffic, RRDF_FIELD_SORT_DESCENDING, NULL,
                 RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
@@ -912,6 +920,17 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
             buffer_json_member_add_array(wb, "columns");
             {
                 buffer_json_add_array_item_string(wb, "Type");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "UsedBy");
+        {
+            buffer_json_member_add_string(wb, "name", "UsedBy");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "UsedBy");
             }
             buffer_json_array_close(wb);
         }
