@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Network-interfaces function small improvements [\#16336](https://github.com/netdata/netdata/pull/16336) ([ilyam8](https://github.com/ilyam8))
 - proc netstat: add network interface statistics function [\#16334](https://github.com/netdata/netdata/pull/16334) ([ilyam8](https://github.com/ilyam8))
 - systemd-units improvements [\#16333](https://github.com/netdata/netdata/pull/16333) ([ktsaou](https://github.com/ktsaou))
 - fix: check for null rrdim in cgroup functions [\#16331](https://github.com/netdata/netdata/pull/16331) ([ilyam8](https://github.com/ilyam8))
@@ -430,7 +431,6 @@
 - Add netdata-plugin-systemd-journal package. [\#15733](https://github.com/netdata/netdata/pull/15733) ([Ferroin](https://github.com/Ferroin))
 - proc.plugin: dont log if pressure/irq does not exist [\#15732](https://github.com/netdata/netdata/pull/15732) ([ilyam8](https://github.com/ilyam8))
 - ci: run "Generate Integrations" only in netdata/netdata [\#15731](https://github.com/netdata/netdata/pull/15731) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#15728](https://github.com/netdata/netdata/pull/15728) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
