@@ -19,6 +19,10 @@ will be used by default for installation.
 If you want to enforce the usage of a static build and have the installer return a failure if one is not available,
 you can do so by adding `--static-only` to the options you pass to the installer.
 
+## Requirements
+
+- Container runtime tool (Docker or Podman)
+
 ## Building a static binary package
 
 Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
