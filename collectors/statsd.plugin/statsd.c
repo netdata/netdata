@@ -484,7 +484,7 @@ static inline void metric_update_counters_and_obsoletion(STATSD_METRIC *m) {
     m->count++;
     m->last_collected = now_realtime_sec();
     if (m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE))) {
-        rrdset_isnot_obsolete(m->st);
+        rrdset_isnot_obsolete___safe_from_collector_thread(m->st);
         m->options &= ~STATSD_METRIC_OPTION_OBSOLETE;
     }
 }
@@ -1870,7 +1870,7 @@ static inline void metric_check_obsoletion(STATSD_METRIC *m) {
        !rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE) &&
        m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED &&
        m->last_collected + statsd.set_obsolete_after < now_realtime_sec()) {
-        rrdset_is_obsolete(m->st);
+        rrdset_is_obsolete___safe_from_collector_thread(m->st);
         m->options |= STATSD_METRIC_OPTION_OBSOLETE;
     }
 }
