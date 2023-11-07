@@ -1203,15 +1203,25 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         char tmp_view_query[sizeof(TMP_VIEW_QUERY_PREFIX) + (
                                 sizeof(TMP_VIEW_QUERY_BODY_1) + 
                                 sizeof(TMP_VIEW_QUERY_BODY_2) + 
-                                sizeof(TMP_VIEW_QUERY_BODY_3) + 4 ) * (LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES - 1) + 
-                            sizeof(TMP_VIEW_QUERY_POSTFIX) + 50] = TMP_VIEW_QUERY_PREFIX; // +50 bytes - play it safe
-        int n = sizeof(TMP_VIEW_QUERY_PREFIX) - 1;
+                                sizeof(TMP_VIEW_QUERY_BODY_3) + 4 
+                            ) * (LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES - 1) + 
+                            sizeof(TMP_VIEW_QUERY_POSTFIX) + 
+                            50 /* +50 bytes to play it safe */] = TMP_VIEW_QUERY_PREFIX; 
+        int pos = sizeof(TMP_VIEW_QUERY_PREFIX) - 1;
         for(pfi_off = 1; p_file_infos[pfi_off]; pfi_off++){ // Skip p_file_infos[0]
-            n += snprintf(  &tmp_view_query[n], sizeof(tmp_view_query) - n, "%s%d%s%d%s", 
+            int n = snprintf(&tmp_view_query[pos], sizeof(tmp_view_query) - pos, "%s%d%s%d%s", 
                             TMP_VIEW_QUERY_BODY_1, pfi_off, 
-                            TMP_VIEW_QUERY_BODY_2, pfi_off, TMP_VIEW_QUERY_BODY_3);
+                            TMP_VIEW_QUERY_BODY_2, pfi_off, 
+                            TMP_VIEW_QUERY_BODY_3);
+            
+            if (n < 0 || n >= (int) sizeof(tmp_view_query) - pos){
+                throw_error(p_file_infos[pfi_off]->chartname, ERR_TYPE_OTHER, n, __LINE__, __FILE__, __FUNCTION__);
+                sqlite3_close_v2(dbt);
+                return;
+            }
+            pos += n;
         }
-        snprintf(&tmp_view_query[n], sizeof(tmp_view_query) - n, "%s", TMP_VIEW_QUERY_POSTFIX);
+        snprintf(&tmp_view_query[pos], sizeof(tmp_view_query) - pos, "%s", TMP_VIEW_QUERY_POSTFIX);
 
         if(unlikely(
             SQLITE_OK !=    (rc = sqlite3_prepare_v2(dbt, tmp_view_query, -1, &stmt_create_tmp_view, NULL)) ||
