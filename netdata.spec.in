@@ -1003,7 +1003,8 @@ fi
 %{_libdir}/%{name}/conf.d/logsmanagement.d.conf
 %{_libdir}/%{name}/conf.d/logsmanagement.d
 %defattr(0750,root,netdata,0750)
-%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
+# CAP_DAC_READ_SEARCH and CAP_SYSLOG needed for data collection.
+%caps(cap_dac_read_search,cap_syslog=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
 
 %changelog
 * Thu Oct 26 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-24
