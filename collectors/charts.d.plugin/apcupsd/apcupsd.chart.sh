@@ -118,6 +118,18 @@ DIMENSION selftest_NO 'NO' absolute 0 1
 DIMENSION selftest_BT 'BT' absolute 0 1
 DIMENSION selftest_NG 'NG' absolute 0 1
 
+CHART apcupsd_${host}.status '' "UPS STATUS code" "Status" ups apcupsd.status line $((apcupsd_priority + 11)) $apcupsd_update_every '' '' 'apcupsd'
+DIMENSION status_ONLINE 'ONLINE' absolute 0 1
+DIMENSION status_ONBATT 'ONBATT' absolute 0 1
+DIMENSION status_OVERLOAD 'OVERLOAD' absolute 0 1
+DIMENSION status_LOWBATT 'LOWBATT' absolute 0 1
+DIMENSION status_REPLACEBATT 'REPLACEBATT' absolute 0 1
+DIMENSION status_NOBATT 'NOBATT' absolute 0 1
+DIMENSION status_SLAVE 'SLAVE' absolute 0 1
+DIMENSION status_SLAVEDOWN 'SLAVEDOWN' absolute 0 1
+DIMENSION status_COMMLOST 'COMMLOST' absolute 0 1
+DIMENSION status_SHUTTING_DOWN 'SHUTTING_DOWN' absolute 0 1
+
 EOF
   done
   return 0
@@ -154,6 +166,17 @@ BEGIN {
         selftest_NO = 0;
         selftest_BT = 0;
         selftest_NG = 0;
+	status_ONLINE = 0;
+        status_ONBATT = 0;
+        status_OVERLOAD = 0;
+        status_LOWBATT = 0;
+        status_REPLACEBATT = 0;
+        status_NOBATT = 0;
+        status_SLAVE = 0;
+        status_SLAVEDOWN = 0;
+        status_COMMLOST = 0;
+        status_SHUTTING_DOWN = 0;
+
 }
 /^BCHARGE.*/   { battery_charge = \$3 * 100 };
 /^BATTV.*/     { battery_voltage = \$3 * 100 };
@@ -174,6 +197,18 @@ BEGIN {
                  selftest_BT = (\$3 == \"BT\") ? 1 : 0;
                  selftest_NG = (\$3 == \"NG\") ? 1 : 0;
                };
+/^STATUS.*/    { status_ONLINE = (\$3 == \"ONLINE\") ? 1 : 0;
+                 status_ONBATT = (\$3 == \"ONBATT\") ? 1 : 0;
+                 status_OVERLOAD = (\$3 == \"OVERLOAD\") ? 1 : 0;
+                 status_LOWBATT = (\$3 == \"LOWBATT\") ? 1 : 0;
+                 status_REPLACEBATT = (\$3 == \"REPLACEBATT\") ? 1 : 0;
+                 status_NOBATT = (\$3 == \"NOBATT\") ? 1 : 0;
+                 status_SLAVE = (\$3 == \"SLAVE\") ? 1 : 0;
+                 status_SLAVEDOWN = (\$3 == \"SLAVEDOWN\") ? 1 : 0;
+                 status_COMMLOST = (\$3 == \"COMMLOST\") ? 1 : 0;
+                 status_SHUTTING_DOWN = (\$3 == \"SHUTTING\" && \$4 == \"DOWN\") ? 1 : 0;
+               };
+
 END {
 	{ load_usage = nompower * load / 100 };
 
@@ -228,6 +263,19 @@ END {
 		print \"SET selftest_BT = \" selftest_BT;
 		print \"SET selftest_NG = \" selftest_NG;
 		print \"END\"
+
+                print \"BEGIN apcupsd_${host}.status $1\";
+                print \"SET status_ONLINE = \" status_ONLINE;
+		print \"SET status_ONBATT = \" status_ONBATT;
+		print \"SET status_OVERLOAD = \" status_OVERLOAD;
+		print \"SET status_LOWBATT = \" status_LOWBATT;
+		print \"SET status_REPLACEBATT = \" status_REPLACEBATT;
+		print \"SET status_NOBATT = \" status_NOBATT;
+		print \"SET status_SLAVE = \" status_SLAVE;
+		print \"SET status_SLAVEDOWN = \" status_SLAVEDOWN;
+		print \"SET status_COMMLOST = \" status_COMMLOST;
+		print \"SET status_SHUTTING_DOWN = \" status_SHUTTING_DOWN;
+                print \"END\";
 	}
 }"
     # shellcheck disable=SC2181
