@@ -169,7 +169,7 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
             *PValue = datafile;
             break;
         }
-    } while(0);
+    } while(1);
 
     rw_spinlock_write_unlock(&datafile->ctx->njfv2idx.spinlock);
 }

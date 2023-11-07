@@ -119,8 +119,10 @@ Where:
 #### REPORT_JOB_STATUS
 
 ```
-REPORT_JOB_STATUS {MODULE_NAME} {JOB_NAME} {STATUS} {STATE} "{REASON}"
+REPORT_JOB_STATUS {MODULE_NAME} {JOB_NAME} {STATUS} {STATE} ["REASON"]
 ```
+
+Note the REASON parameter is optional and can be entirelly ommited (for example when state is OK there is no need to send any reason).
 
 Where:
 
@@ -128,7 +130,7 @@ Where:
 - `JOB_NAME` is the name of the job.
 - `STATUS` is one of `stopped`, `running`, or `error`.
 - `STATE`, just send zero.
-- `REASON` is a message describing the status.
+- `REASON` is a message describing the status. In case you don't want to send any reason string it is preferable to omit this parameter altogether (as opposed to sending empty string `""`).
 
 
 ### Commands plugins must serve

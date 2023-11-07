@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "common.h"
+#include "aclk/https_client.h"
 
 #define WORKER_SENDER_JOB_CONNECT                    0
 #define WORKER_SENDER_JOB_PIPE_READ                  1
@@ -20,9 +22,12 @@
 #define WORKER_SENDER_JOB_BUFFER_RATIO              15
 #define WORKER_SENDER_JOB_BYTES_RECEIVED            16
 #define WORKER_SENDER_JOB_BYTES_SENT                17
-#define WORKER_SENDER_JOB_REPLAY_REQUEST            18
-#define WORKER_SENDER_JOB_FUNCTION_REQUEST          19
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE          20
+#define WORKER_SENDER_JOB_BYTES_COMPRESSED          18
+#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED        19
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO   20
+#define WORKER_SENDER_JOB_REPLAY_REQUEST            21
+#define WORKER_SENDER_JOB_FUNCTION_REQUEST          22
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE          23
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 21
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 21
@@ -66,21 +71,6 @@ BUFFER *sender_start(struct sender_state *s) {
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-/*
-* In case of stream compression buffer overflow
-* Inform the user through the error log file and 
-* deactivate compression by downgrading the stream protocol.
-*/
-static inline void deactivate_compression(struct sender_state *s) {
-    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
-    netdata_log_error("STREAM_COMPRESSION: Compression returned error, disabling it.");
-    s->flags &= ~SENDER_FLAG_COMPRESSION;
-    netdata_log_error("STREAM %s [send to %s]: Restarting connection without compression.", rrdhost_hostname(s->host), s->connected_to);
-    rrdpush_sender_thread_close_socket(s->host);
-}
-#endif
-
 #define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
 // Collector thread finishing a transmission
@@ -102,13 +92,22 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     sender_lock(s);
 
-//    FILE *fp = fopen("/tmp/stream.txt", "a");
-//    fprintf(fp,
-//            "\n--- SEND BEGIN: %s ----\n"
-//            "%s"
-//            "--- SEND END ----------------------------------------\n"
-//            , rrdhost_hostname(s->host), src);
-//    fclose(fp);
+#ifdef NETDATA_LOG_STREAM_SENDER
+    if(type == STREAM_TRAFFIC_TYPE_METADATA) {
+        if(!s->stream_log_fp) {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "/tmp/stream-sender-%s.txt", s->host ? rrdhost_hostname(s->host) : "unknown");
+
+            s->stream_log_fp = fopen(filename, "w");
+        }
+
+        fprintf(s->stream_log_fp, "\n--- SEND MESSAGE START: %s ----\n"
+                    "%s"
+                    "--- SEND MESSAGE END ----------------------------------------\n"
+                , rrdhost_hostname(s->host), src
+               );
+    }
+#endif
 
     if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         netdata_log_info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
@@ -117,8 +116,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if (stream_has_capability(s, STREAM_CAP_COMPRESSION) && s->compressor.initialized) {
+    if (s->compressor.initialized) {
         while(src_len) {
             size_t size_to_compress = src_len;
 
@@ -143,28 +141,45 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 }
             }
 
-            char *dst;
+            const char *dst;
             size_t dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
             if (!dst_len) {
                 netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                       rrdhost_hostname(s->host), s->connected_to);
 
-                rrdpush_compressor_reset(&s->compressor);
+                rrdpush_compression_initialize(s);
                 dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
                 if(!dst_len) {
                     netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
                           rrdhost_hostname(s->host), s->connected_to);
 
-                    deactivate_compression(s);
+                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
+                    rrdpush_compression_deactivate(s);
+                    rrdpush_sender_thread_close_socket(s->host);
                     sender_unlock(s);
                     return;
                 }
             }
 
-            if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
+            rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            // check if reversing the signature provides the same length
+            size_t decoded_dst_len = rrdpush_decompress_decode_signature((const char *)&signature, sizeof(signature));
+            if(decoded_dst_len != dst_len)
+                fatal("RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
+                      "compressed payload length %zu bytes, but signature says payload is %zu bytes",
+                      size_to_compress, dst_len, decoded_dst_len);
+#endif
+
+            if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature)))
                 s->flags |= SENDER_FLAG_OVERFLOW;
-            else
-                s->sent_bytes_on_this_connection_per_type[type] += dst_len;
+            else {
+                if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
+                    s->flags |= SENDER_FLAG_OVERFLOW;
+                else
+                    s->sent_bytes_on_this_connection_per_type[type] += dst_len + sizeof(signature);
+            }
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
@@ -174,12 +189,6 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->flags |= SENDER_FLAG_OVERFLOW;
     else
         s->sent_bytes_on_this_connection_per_type[type] += src_len;
-#else
-    if(cbuffer_add_unsafe(s->buffer, src, src_len))
-        s->flags |= SENDER_FLAG_OVERFLOW;
-    else
-        s->sent_bytes_on_this_connection_per_type[type] += src_len;
-#endif
 
     replication_recalculate_buffer_used_ratio_unsafe(s);
 
@@ -191,7 +200,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     sender_unlock(s);
 
-    if(signal_sender)
+    if(signal_sender && (!stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA))
         rrdpush_signal_sender_to_wake_up(s);
 }
 
@@ -251,15 +260,17 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED | RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+        rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
-        st->upstream_resync_time_s = 0;
+        st->rrdpush.sender.resync_time_s = 0;
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st)
-            rrddim_clear_exposed(rd);
+            rrddim_metadata_exposed_upstream_clear(rd);
         rrddim_foreach_done(rd);
+
+        rrdset_metadata_updated(st);
     }
     rrdset_foreach_done(st);
 
@@ -376,7 +387,7 @@ struct {
     bool dynamic;
     const char *error;
     int worker_job_id;
-    time_t postpone_reconnect_seconds;
+    int postpone_reconnect_seconds;
     bool prevent_log;
 } stream_responses[] = {
     {
@@ -505,7 +516,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     bool prevent_log = stream_responses[i].prevent_log;
     const char *error = stream_responses[i].error;
     int worker_job_id = stream_responses[i].worker_job_id;
-    time_t delay = stream_responses[i].postpone_reconnect_seconds;
+    int delay = stream_responses[i].postpone_reconnect_seconds;
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(host);
@@ -519,11 +530,18 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
         internal_error(true, "STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
                        rrdhost_hostname(host), s->connected_to, error, delay, buf);
     else
-        netdata_log_error("STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
+        netdata_log_error("STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
                           rrdhost_hostname(host), s->connected_to, error, delay, buf);
 
     return false;
 }
+
+unsigned char alpn_proto_list[] = {
+    18, 'n', 'e', 't', 'd', 'a', 't', 'a', '_', 's', 't', 'r', 'e', 'a', 'm', '/', '2', '.', '0',
+    8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+};
+
+#define CONN_UPGRADE_VAL "upgrade"
 
 static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 #ifdef ENABLE_HTTPS
@@ -535,7 +553,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
     if(!ssl_required)
         return true;
 
-    if (netdata_ssl_open(&host->sender->ssl, netdata_ssl_streaming_sender_ctx, s->rrdpush_sender_socket)) {
+    if (netdata_ssl_open_ext(&host->sender->ssl, netdata_ssl_streaming_sender_ctx, s->rrdpush_sender_socket, alpn_proto_list, sizeof(alpn_proto_list))) {
         if(!netdata_ssl_connect(&host->sender->ssl)) {
             // couldn't connect
 
@@ -570,6 +588,104 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 #endif
 }
 
+static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
+
+    char http[HTTP_HEADER_SIZE + 1];
+    snprintfz(http, HTTP_HEADER_SIZE,
+            "GET " NETDATA_STREAM_URL HTTP_1_1 HTTP_ENDL
+            "Upgrade: " NETDATA_STREAM_PROTO_NAME HTTP_ENDL
+            "Connection: Upgrade"
+            HTTP_HDR_END);
+
+    ssize_t bytes = send_timeout(
+#ifdef ENABLE_HTTPS
+        &host->sender->ssl,
+#endif
+        s->rrdpush_sender_socket,
+        http,
+        strlen(http),
+        0,
+        1000);
+
+    bytes = recv_timeout(
+#ifdef ENABLE_HTTPS
+        &host->sender->ssl,
+#endif
+        s->rrdpush_sender_socket,
+        http,
+        HTTP_HEADER_SIZE,
+        0,
+        1000);
+
+    if (bytes <= 0) {
+        error_report("Error reading from remote");
+        return 1;
+    }
+
+    rbuf_t buf = rbuf_create(bytes);
+    rbuf_push(buf, http, bytes);
+
+    http_parse_ctx ctx;
+    http_parse_ctx_create(&ctx);
+    ctx.flags |= HTTP_PARSE_FLAG_DONT_WAIT_FOR_CONTENT;
+
+    int rc;
+//    while((rc = parse_http_response(buf, &ctx)) == HTTP_PARSE_NEED_MORE_DATA);
+    rc = parse_http_response(buf, &ctx);
+
+    if (rc != HTTP_PARSE_SUCCESS) {
+        error_report("Failed to parse HTTP response sent. (%d)", rc);
+        goto err_cleanup;
+    }
+    if (ctx.http_code == HTTP_RESP_MOVED_PERM) {
+        const char *hdr = get_http_header_by_name(&ctx, "location");
+        if (hdr) 
+            error_report("HTTP response is %d Moved Permanently (location: \"%s\") instead of expected %d Switching Protocols.", ctx.http_code, hdr, HTTP_RESP_SWITCH_PROTO);
+        else
+            error_report("HTTP response is %d instead of expected %d Switching Protocols.", ctx.http_code, HTTP_RESP_SWITCH_PROTO);
+        goto err_cleanup;
+    }
+    if (ctx.http_code == HTTP_RESP_NOT_FOUND) {
+        error_report("HTTP response is %d instead of expected %d Switching Protocols. Parent version too old.", ctx.http_code, HTTP_RESP_SWITCH_PROTO);
+        // TODO set some flag here that will signify parent is older version
+        // and to try connection without rrdpush_http_upgrade_prelude next time
+        goto err_cleanup;
+    }
+    if (ctx.http_code != HTTP_RESP_SWITCH_PROTO) {
+        error_report("HTTP response is %d instead of expected %d Switching Protocols", ctx.http_code, HTTP_RESP_SWITCH_PROTO);
+        goto err_cleanup;
+    }
+
+    const char *hdr = get_http_header_by_name(&ctx, "connection");
+    if (!hdr) {
+        error_report("Missing \"connection\" header in reply");
+        goto err_cleanup;
+    }
+    if (strncmp(hdr, CONN_UPGRADE_VAL, strlen(CONN_UPGRADE_VAL))) {
+        error_report("Expected \"connection: " CONN_UPGRADE_VAL "\"");
+        goto err_cleanup;
+    }
+
+    hdr = get_http_header_by_name(&ctx, "upgrade");
+    if (!hdr) {
+        error_report("Missing \"upgrade\" header in reply");
+        goto err_cleanup;
+    }
+    if (strncmp(hdr, NETDATA_STREAM_PROTO_NAME, strlen(NETDATA_STREAM_PROTO_NAME))) {
+        error_report("Expected \"upgrade: " NETDATA_STREAM_PROTO_NAME "\"");
+        goto err_cleanup;
+    }
+
+    netdata_log_debug(D_STREAM, "Stream sender upgrade to \"" NETDATA_STREAM_PROTO_NAME "\" successful");
+    rbuf_free(buf);
+    http_parse_ctx_destroy(&ctx);
+    return 0;
+err_cleanup:
+    rbuf_free(buf);
+    http_parse_ctx_destroy(&ctx);
+    return 1;
+}
+
 static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
     struct timeval tv = {
@@ -599,12 +715,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     // reset our capabilities to default
     s->capabilities = stream_our_capabilities(host, true);
-
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
-    // If we don't want compression, remove it from our capabilities
-    if(!(s->flags & SENDER_FLAG_COMPRESSION))
-        s->capabilities &= ~STREAM_CAP_COMPRESSION;
-#endif  // ENABLE_RRDPUSH_COMPRESSION
 
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
@@ -660,7 +770,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                  "&NETDATA_SYSTEM_TOTAL_RAM=%s"
                  "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
                  "&NETDATA_PROTOCOL_VERSION=%s"
-                 " HTTP/1.1\r\n"
+                 HTTP_1_1 HTTP_ENDL
                  "User-Agent: %s/%s\r\n"
                  "Accept: */*\r\n\r\n"
                  , host->rrdpush_send_api_key
@@ -715,6 +825,13 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_connect_ssl(s))
         return false;
 
+    if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
+        rrdpush_sender_thread_close_socket(host);
+        host->destination->reason = STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE;
+        host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
+        return false;
+    }
+    
     ssize_t bytes, len = (ssize_t)strlen(http);
 
     bytes = send_timeout(
@@ -766,12 +883,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_validate_response(host, s, http, bytes))
         return false;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(stream_has_capability(s, STREAM_CAP_COMPRESSION))
-        rrdpush_compressor_reset(&s->compressor);
-    else
-        rrdpush_compressor_destroy(&s->compressor);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+    rrdpush_compression_initialize(s);
 
     log_sender_capabilities(s);
 
@@ -1245,6 +1357,14 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
 
     rrdhost_clear_sender___while_having_sender_mutex(host);
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+    if(host->sender->stream_log_fp) {
+        fclose(host->sender->stream_log_fp);
+        host->sender->stream_log_fp = NULL;
+    }
+#endif
+
     sender_unlock(host->sender);
 
     freez(s->pipe_buffer);
@@ -1303,6 +1423,9 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENT);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, "bytes compressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
     struct sender_state *s = ptr;
@@ -1341,6 +1464,9 @@ void *rrdpush_sender_thread(void *ptr) {
         &stream_config, CONFIG_SECTION_STREAM,
         "initial clock resync iterations",
         remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+
+    s->parent_using_h2o = appconfig_get_boolean(
+        &stream_config, CONFIG_SECTION_STREAM, "parent using h2o", false);
 
     // initialize rrdpush globals
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
@@ -1423,6 +1549,15 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_sender_pipe_clear_pending_data(s);
             rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
         }
+
+        if(s->compressor.initialized) {
+            size_t bytes_uncompressed = s->compressor.sender_locked.total_uncompressed;
+            size_t bytes_compressed = s->compressor.sender_locked.total_compressed + s->compressor.sender_locked.total_compressions * sizeof(rrdpush_signature_t);
+            NETDATA_DOUBLE ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, ratio);
+        }
         sender_unlock(s);
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size);
@@ -1459,7 +1594,7 @@ void *rrdpush_sender_thread(void *ptr) {
             }
         };
 
-        int poll_rc = poll(fds, 2, 1000);
+        int poll_rc = poll(fds, 2, 50); // timeout in milliseconds
 
         netdata_log_debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);

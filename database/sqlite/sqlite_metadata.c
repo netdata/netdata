@@ -83,7 +83,6 @@ enum metadata_opcode {
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
-    METADATA_ML_LOAD_MODELS,
     // leave this last
     // we need it to check for worker utilization
     METADATA_MAX_ENUMERATIONS_DEFINED
@@ -97,14 +96,9 @@ struct metadata_cmd {
     struct metadata_cmd *prev, *next;
 };
 
-struct metadata_database_cmdqueue {
-    struct metadata_cmd *cmd_base;
-};
-
 typedef enum {
     METADATA_FLAG_PROCESSING    = (1 << 0), // store or cleanup
     METADATA_FLAG_SHUTDOWN      = (1 << 1), // Shutting down
-    METADATA_FLAG_ML_LOADING    = (1 << 2), // ML model load in progress
 } METADATA_FLAG;
 
 struct metadata_wc {
@@ -113,13 +107,12 @@ struct metadata_wc {
     uv_async_t async;
     uv_timer_t timer_req;
     time_t metadata_check_after;
-    volatile unsigned queue_size;
     METADATA_FLAG flags;
-    struct completion init_complete;
+    struct completion start_stop_complete;
     struct completion *scan_complete;
     /* FIFO command queue */
-    uv_mutex_t cmd_mutex;
-    struct metadata_database_cmdqueue cmd_queue;
+    SPINLOCK cmd_queue_lock;
+    struct metadata_cmd *cmd_base;
 };
 
 #define metadata_flag_check(target_flags, flag) (__atomic_load_n(&((target_flags)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -1058,21 +1051,15 @@ static void cleanup_health_log(struct metadata_wc *wc)
 // EVENT LOOP STARTS HERE
 //
 
-static void metadata_init_cmd_queue(struct metadata_wc *wc)
-{
-    wc->cmd_queue.cmd_base = NULL;
-    fatal_assert(0 == uv_mutex_init(&wc->cmd_mutex));
-}
-
 static void metadata_free_cmd_queue(struct metadata_wc *wc)
 {
-    uv_mutex_lock(&wc->cmd_mutex);
-    while(wc->cmd_queue.cmd_base) {
-        struct metadata_cmd *t = wc->cmd_queue.cmd_base;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_queue.cmd_base, t, prev, next);
+    spinlock_lock(&wc->cmd_queue_lock);
+    while(wc->cmd_base) {
+        struct metadata_cmd *t = wc->cmd_base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
         freez(t);
     }
-    uv_mutex_unlock(&wc->cmd_mutex);
+    spinlock_unlock(&wc->cmd_queue_lock);
 }
 
 static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
@@ -1089,9 +1076,9 @@ static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
     *t = *cmd;
     t->prev = t->next = NULL;
 
-    uv_mutex_lock(&wc->cmd_mutex);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wc->cmd_queue.cmd_base, t, prev, next);
-    uv_mutex_unlock(&wc->cmd_mutex);
+    spinlock_lock(&wc->cmd_queue_lock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
+    spinlock_unlock(&wc->cmd_queue_lock);
 
 wakeup_event_loop:
     (void) uv_async_send(&wc->async);
@@ -1101,10 +1088,10 @@ static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc)
 {
     struct metadata_cmd ret;
 
-    uv_mutex_lock(&wc->cmd_mutex);
-    if(wc->cmd_queue.cmd_base) {
-        struct metadata_cmd *t = wc->cmd_queue.cmd_base;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_queue.cmd_base, t, prev, next);
+    spinlock_lock(&wc->cmd_queue_lock);
+    if(wc->cmd_base) {
+        struct metadata_cmd *t = wc->cmd_base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
         ret = *t;
         freez(t);
     }
@@ -1112,7 +1099,7 @@ static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc)
         ret.opcode = METADATA_DATABASE_NOOP;
         ret.completion = NULL;
     }
-    uv_mutex_unlock(&wc->cmd_mutex);
+    spinlock_unlock(&wc->cmd_queue_lock);
 
     return ret;
 }
@@ -1182,13 +1169,6 @@ void run_metadata_cleanup(struct metadata_wc *wc)
 
     (void) sqlite3_wal_checkpoint(db_meta, NULL);
 }
-
-struct ml_model_payload {
-    uv_work_t request;
-    struct metadata_wc *wc;
-    Pvoid_t JudyL;
-    size_t count;
-};
 
 struct scan_metadata_payload {
     uv_work_t request;
@@ -1338,6 +1318,10 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     bool more_to_do = false;
     uint32_t scan_count = 1;
 
+    sqlite3_stmt *ml_load_stmt = NULL;
+
+    bool load_ml_models = max_count;
+
     if (use_transaction)
         (void)db_execute(db_meta, "BEGIN TRANSACTION");
 
@@ -1382,6 +1366,14 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
                                  rrdhost_hostname(host), rrdset_name(st),
                                  rrddim_name(rd));
             }
+
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_ML_MODEL_LOAD)) {
+                rrddim_flag_clear(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
+                if (likely(load_ml_models))
+                    (void) ml_dimension_load_models(rd, &ml_load_stmt);
+            }
+
+            worker_is_idle();
         }
         rrddim_foreach_done(rd);
     }
@@ -1389,6 +1381,11 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
 
     if (use_transaction)
         (void)db_execute(db_meta, "COMMIT TRANSACTION");
+
+    if (ml_load_stmt) {
+        sqlite3_finalize(ml_load_stmt);
+        ml_load_stmt = NULL;
+    }
 
     return more_to_do;
 }
@@ -1519,49 +1516,6 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     worker_is_idle();
 }
 
-// Callback after scan of hosts is done
-static void after_start_ml_model_load(uv_work_t *req, int status __maybe_unused)
-{
-    struct ml_model_payload *ml_data = req->data;
-    struct metadata_wc *wc = ml_data->wc;
-    metadata_flag_clear(wc, METADATA_FLAG_ML_LOADING);
-    JudyLFreeArray(&ml_data->JudyL, PJE0);
-    freez(ml_data);
-}
-
-static void start_ml_model_load(uv_work_t *req __maybe_unused)
-{
-    register_libuv_worker_jobs();
-
-    struct ml_model_payload *ml_data = req->data;
-
-    worker_is_busy(UV_EVENT_METADATA_ML_LOAD);
-
-    Pvoid_t *PValue;
-    Word_t Index = 0;
-    bool first = true;
-    RRDDIM *rd;
-    RRDDIM_ACQUIRED *rda;
-    internal_error(true, "Batch ML load loader, %zu items", ml_data->count);
-
-    sqlite3_stmt *ml_load_stmt = NULL;
-    while((PValue = JudyLFirstThenNext(ml_data->JudyL, &Index, &first))) {
-        UNUSED(PValue);
-        rda = (RRDDIM_ACQUIRED *) Index;
-        rd = rrddim_acquired_to_rrddim(rda);
-        ml_dimension_load_models(rd, &ml_load_stmt);
-        rrddim_acquired_release(rda);
-    }
-
-    if (ml_load_stmt) {
-        sqlite3_finalize(ml_load_stmt);
-        ml_load_stmt = NULL;
-    }
-    worker_is_idle();
-}
-
-
-
 static void metadata_event_loop(void *arg)
 {
     worker_register("METASYNC");
@@ -1571,7 +1525,6 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_STORE_CLAIM_ID,       "add claim id");
     worker_register_job_name(METADATA_ADD_HOST_INFO,        "add host info");
     worker_register_job_name(METADATA_MAINTENANCE,          "maintenance");
-    worker_register_job_name(METADATA_ML_LOAD_MODELS,       "ml load models");
 
     int ret;
     uv_loop_t *loop;
@@ -1612,11 +1565,10 @@ static void metadata_event_loop(void *arg)
     wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
 
     int shutdown = 0;
-    completion_mark_complete(&wc->init_complete);
+    completion_mark_complete(&wc->start_stop_complete);
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
 
-    struct ml_model_payload *ml_data = NULL;
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         uuid_t  *uuid;
         RRDHOST *host = NULL;
@@ -1643,43 +1595,10 @@ static void metadata_event_loop(void *arg)
             if (likely(opcode != METADATA_DATABASE_NOOP))
                 worker_is_busy(opcode);
 
-            // Have pending ML models to load?
-            if (opcode != METADATA_ML_LOAD_MODELS && ml_data && ml_data->count) {
-                static usec_t ml_submit_last = 0;
-                usec_t now = now_monotonic_usec();
-                if (!ml_submit_last)
-                    ml_submit_last = now;
-
-                if (!metadata_flag_check(wc, METADATA_FLAG_ML_LOADING) && (now - ml_submit_last > 150 * USEC_PER_MS)) {
-                    metadata_flag_set(wc, METADATA_FLAG_ML_LOADING);
-                    if (unlikely(uv_queue_work(loop, &ml_data->request, start_ml_model_load, after_start_ml_model_load)))
-                        metadata_flag_clear(wc, METADATA_FLAG_ML_LOADING);
-                    else {
-                        ml_submit_last = now;
-                        ml_data = NULL;
-                    }
-                }
-            }
-
             switch (opcode) {
                 case METADATA_DATABASE_NOOP:
                 case METADATA_DATABASE_TIMER:
                     break;
-
-                case METADATA_ML_LOAD_MODELS: {
-                    RRDDIM *rd = (RRDDIM *) cmd.param[0];
-                    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(rd->rrdset, rrddim_id(rd));
-                    if (likely(rda)) {
-                        if (!ml_data) {
-                            ml_data = callocz(1,sizeof(*ml_data));
-                            ml_data->request.data = ml_data;
-                            ml_data->wc = wc;
-                        }
-                        JudyLIns(&ml_data->JudyL, (Word_t)rda, PJE0);
-                        ml_data->count++;
-                    }
-                    break;
-                }
                 case METADATA_DEL_DIMENSION:
                     uuid = (uuid_t *) cmd.param[0];
                     if (likely(dimension_can_be_deleted(uuid, NULL, false)))
@@ -1765,8 +1684,8 @@ static void metadata_event_loop(void *arg)
     freez(loop);
     worker_unregister();
 
-    netdata_log_info("METADATA: Shutting down event loop");
-    completion_mark_complete(&wc->init_complete);
+    netdata_log_info("Shutting down event loop");
+    completion_mark_complete(&wc->start_stop_complete);
     if (wc->scan_complete) {
         completion_destroy(wc->scan_complete);
         freez(wc->scan_complete);
@@ -1787,7 +1706,7 @@ struct metadata_wc metasync_worker = {.loop = NULL};
 
 void metadata_sync_shutdown(void)
 {
-    completion_init(&metasync_worker.init_complete);
+    completion_init(&metasync_worker.start_stop_complete);
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -1797,8 +1716,8 @@ void metadata_sync_shutdown(void)
 
     /* wait for metadata thread to shut down */
     netdata_log_info("METADATA: Waiting for shutdown ACK");
-    completion_wait_for(&metasync_worker.init_complete);
-    completion_destroy(&metasync_worker.init_complete);
+    completion_wait_for(&metasync_worker.start_stop_complete);
+    completion_destroy(&metasync_worker.start_stop_complete);
     netdata_log_info("METADATA: Shutdown complete");
 }
 
@@ -1840,13 +1759,12 @@ void metadata_sync_init(void)
     struct metadata_wc *wc = &metasync_worker;
 
     memset(wc, 0, sizeof(*wc));
-    metadata_init_cmd_queue(wc);
-    completion_init(&wc->init_complete);
+    completion_init(&wc->start_stop_complete);
 
     fatal_assert(0 == uv_thread_create(&(wc->thread), metadata_event_loop, wc));
 
-    completion_wait_for(&wc->init_complete);
-    completion_destroy(&wc->init_complete);
+    completion_wait_for(&wc->start_stop_complete);
+    completion_destroy(&wc->start_stop_complete);
 
     netdata_log_info("SQLite metadata sync initialization complete");
 }
@@ -1899,9 +1817,7 @@ void metaqueue_host_update_info(RRDHOST *host)
 
 void metaqueue_ml_load_models(RRDDIM *rd)
 {
-    if (unlikely(!metasync_worker.loop))
-        return;
-    queue_metadata_cmd(METADATA_ML_LOAD_MODELS, rd, NULL);
+    rrddim_flag_set(rd, RRDDIM_FLAG_ML_MODEL_LOAD);
 }
 
 void metadata_queue_load_host_context(RRDHOST *host)

@@ -2,12 +2,12 @@
 
 #include "test_cgroups_plugin.h"
 
-void rrdset_is_obsolete(RRDSET *st)
+void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st)
 {
     UNUSED(st);
 }
 
-void rrdset_isnot_obsolete(RRDSET *st)
+void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st)
 {
     UNUSED(st);
 }

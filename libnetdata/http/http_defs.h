@@ -3,6 +3,13 @@
 #ifndef NETDATA_HTTP_DEFS_H
 #define NETDATA_HTTP_DEFS_H
 
+#define HTTP_1_1 " HTTP/1.1"
+#define HTTP_HDR_END "\r\n\r\n"
+#define HTTP_ENDL "\r\n"
+
+// HTTP_CODES 1XX
+#define HTTP_RESP_SWITCH_PROTO 101
+
 // HTTP_CODES 2XX Success
 #define HTTP_RESP_OK 200
 

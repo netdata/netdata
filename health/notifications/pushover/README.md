@@ -56,9 +56,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_PUSHOVER | Set `SEND_PUSHOVER` to YES | YES | True |
-| PUSHOVER_WEBHOOK_URL | set `PUSHOVER_WEBHOOK_URL` to your Pushover Application token. |  | True |
-| DEFAULT_RECIPIENT_PUSHOVER | Set `DEFAULT_RECIPIENT_PUSHOVER` the Pushover User token you want the alert notifications to be sent to. You can define multiple User tokens like this: `USERTOKEN1` `USERTOKEN2`. |  | True |
+| SEND_PUSHOVER | Set `SEND_PUSHOVER` to YES | YES | yes |
+| PUSHOVER_WEBHOOK_URL | set `PUSHOVER_WEBHOOK_URL` to your Pushover Application token. |  | yes |
+| DEFAULT_RECIPIENT_PUSHOVER | Set `DEFAULT_RECIPIENT_PUSHOVER` the Pushover User token you want the alert notifications to be sent to. You can define multiple User tokens like this: `USERTOKEN1` `USERTOKEN2`. |  | yes |
 
 ##### DEFAULT_RECIPIENT_PUSHOVER
 

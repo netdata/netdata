@@ -1786,7 +1786,7 @@ send_discord() {
                     "text": "${info}",
                     "fields": [
                         {
-                            "title": "${chart}",
+                            "title": "${chart}"
                         }
                     ],
                     "thumb_url": "${image}",

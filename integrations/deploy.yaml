@@ -5,7 +5,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: 'linux.png'
+    icon_filename: 'linux.svg'
   keywords:
     - linux
   most_popular: true
@@ -48,7 +48,7 @@
     <<: *linux_meta
     name: Ubuntu
     link: https://ubuntu.com/
-    icon_filename: 'ubuntu.png'
+    icon_filename: 'ubuntu.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -144,7 +144,7 @@
     <<: *linux_meta
     name: CentOS
     link: https://www.centos.org/
-    icon_filename: 'centos.png'
+    icon_filename: 'centos.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -156,7 +156,7 @@
     <<: *linux_meta
     name: CentOS Stream
     link: https://www.centos.org/centos-stream
-    icon_filename: 'centos.png'
+    icon_filename: 'centos.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -168,7 +168,7 @@
     <<: *linux_meta
     name: Manjaro Linux
     link: https://manjaro.org/
-    icon_filename: 'manjaro.png'
+    icon_filename: 'manjaro.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -192,7 +192,7 @@
     <<: *linux_meta
     name: SUSE Linux
     link: https://www.suse.com/
-    icon_filename: 'openSUSE.png'
+    icon_filename: 'openSUSE.svg'
   most_popular: false
   platform_info:
     group: 'include'
@@ -204,7 +204,7 @@
     link: ''
     categories:
       - deploy.operating-systems
-    icon_filename: 'apple.svg'
+    icon_filename: 'macos.svg'
   most_popular: true
   keywords:
     - macOS
@@ -369,12 +369,11 @@
             services:
               netdata:
                 image: netdata/netdata:edge
-                container_name: netdata
-                ports:
-                  - 19999:19999
-                restart: unless-stopped
+                pid: host
+                network_mode: host
                 cap_add:
                   - SYS_PTRACE
+                  - SYS_ADMIN
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -387,6 +386,7 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+                  - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
@@ -395,6 +395,8 @@
             {% /if %}
                 deploy:
                   mode: global
+                  restart_policy:
+                    condition: on-failure
             volumes:
               netdataconfig:
               netdatalib:
@@ -405,12 +407,11 @@
             services:
               netdata:
                 image: netdata/netdata:stable
-                container_name: netdata
-                ports:
-                  - 19999:19999
-                restart: unless-stopped
+                pid: host
+                network_mode: host
                 cap_add:
                   - SYS_PTRACE
+                  - SYS_ADMIN
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -423,6 +424,7 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+                  - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
                   - NETDATA_CLAIM_TOKEN={% claim_token %}
@@ -431,6 +433,8 @@
             {% /if %}
                 deploy:
                   mode: global
+                  restart_policy:
+                    condition: on-failure
             volumes:
               netdataconfig:
               netdatalib:
@@ -462,7 +466,7 @@
         - channel: nightly
           command: |
             helm install netdata netdata/netdata \
-            --set image.tag=latest{% if $showClaimingOptions %} \
+            --set image.tag=edge{% if $showClaimingOptions %} \
             --set parent.claiming.enabled="true" \
             --set parent.claiming.token={% claim_token %} \
             --set parent.claiming.rooms={% $claim_rooms %} \
@@ -484,7 +488,7 @@
         - channel: nightly
           command: |
             image:
-              tag: latest
+              tag: edge
 
             restarter:
               enabled: true

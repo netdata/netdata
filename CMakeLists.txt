@@ -884,6 +884,7 @@ set(STREAMING_PLUGIN_FILES
         streaming/sender.c
         streaming/replication.c
         streaming/replication.h
+        streaming/common.h
         )
 
 set(CLAIM_PLUGIN_FILES

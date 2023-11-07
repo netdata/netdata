@@ -2101,6 +2101,14 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
     return errors + value_errors + time_errors;
 }
 
+void test_dbengine_charts_and_dims_are_not_collected(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]) {
+    for(int c = 0; c < CHARTS ; c++) {
+        st[c]->rrdcontexts.collected = false;
+        for(int d = 0; d < DIMS ; d++)
+            rd[c][d]->rrdcontexts.collected = false;
+    }
+}
+
 int test_dbengine(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -2128,6 +2136,7 @@ int test_dbengine(void)
     time_end[current_region] = test_dbengine_create_metrics(st,rd, current_region, time_start[current_region]);
 
     errors += test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
+    test_dbengine_charts_and_dims_are_not_collected(st, rd);
 
     current_region = 1; //this is the second region of data
     update_every = REGION_UPDATE_EVERY[current_region]; // set data collection frequency to 3 seconds
@@ -2145,6 +2154,7 @@ int test_dbengine(void)
     time_end[current_region] = test_dbengine_create_metrics(st,rd, current_region, time_start[current_region]);
 
     errors += test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
+    test_dbengine_charts_and_dims_are_not_collected(st, rd);
 
     current_region = 2; //this is the third region of data
     update_every = REGION_UPDATE_EVERY[current_region]; // set data collection frequency to 1 seconds
@@ -2162,6 +2172,7 @@ int test_dbengine(void)
     time_end[current_region] = test_dbengine_create_metrics(st,rd, current_region, time_start[current_region]);
 
     errors += test_dbengine_check_metrics(st, rd, current_region, time_start[current_region]);
+    test_dbengine_charts_and_dims_are_not_collected(st, rd);
 
     for (current_region = 0 ; current_region < REGIONS ; ++current_region) {
         errors += test_dbengine_check_rrdr(st, rd, current_region, time_start[current_region], time_end[current_region]);

@@ -444,7 +444,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 }
 
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
-    uint32_t after = 0;
+    time_t after = 0;
     char *chart = NULL;
 
     while(url) {
@@ -455,7 +455,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if (!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
+        if (!strcmp(name, "after")) after = (time_t) strtoul(value, NULL, 0);
         else if (!strcmp(name, "chart")) chart = value;
     }
 
@@ -1272,12 +1272,8 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
     buffer_json_member_add_boolean(wb, "stream-compression",
-                                   host->sender && stream_has_capability(host->sender, STREAM_CAP_COMPRESSION));
-#else // ! ENABLE_RRDPUSH_COMPRESSION
-    buffer_json_member_add_boolean(wb, "stream-compression", false);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+                                   host->sender && host->sender->compressor.initialized);
 
 #ifdef ENABLE_HTTPS
     buffer_json_member_add_boolean(wb, "https-enabled", true);

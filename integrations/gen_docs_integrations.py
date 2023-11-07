@@ -97,7 +97,7 @@ def clean_string(string):
     The string represents an integration name, as it would be displayed in the final text
     """
 
-    return string.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+    return string.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "").replace(":", "")
 
 
 def read_integrations_js(path_to_file):
@@ -258,7 +258,7 @@ endmeta-->
 
 def build_path(meta_yaml_link):
     """
-    funtion that takes a metadata yaml file link, and makes it into a path that gets used to write to a file.
+    function that takes a metadata yaml file link, and makes it into a path that gets used to write to a file.
     """
     return meta_yaml_link.replace("https://github.com/netdata/", "") \
         .split("/", 1)[1] \
