@@ -1,4 +1,4 @@
-# 1hour_ecc_memory_uncorrectable
+# ecc_memory_mc_uncorrectable
 
 ## OS: Linux
 
