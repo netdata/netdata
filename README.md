@@ -1,9 +1,9 @@
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/2662304/a62997fb-d75d-42df-b188-b804cd034a70#gh-light-mode-only" alt="Netdata" width="300"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
 </a>
 <a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/2662304/95ea1560-5e83-44d3-ad33-7980f8298b65#gh-dark-mode-only" alt="Netdata" width="300"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
 <h3 align="center">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
@@ -29,6 +29,15 @@
 <p align="center"><b>Visit the <a href="https://www.netdata.cloud">Project's Home Page</a></b></p>
 
 <hr class="solid">
+
+<p align="center">
+<a href="https://www.netdata.cloud#gh-light-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/srecon_light.png" alt="ObservabilityCon23" width="600"/>
+</a>
+<a href="https://www.netdata.cloud#gh-dark-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/srecon_dark.png" alt="ObservabilityCon23" width="600"/>
+</a>
+</p>
 
 MENU: **[WHAT IS NEW](#whats-new-and-coming)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)**
 
@@ -61,6 +70,21 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 - :star: **Open and Extensible**<br/>
   Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
+
+---
+
+**LATEST BLOG POST**:<br/>
+
+<p align="center">
+<a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-light-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus.png" alt="Netdata" width="500"/>
+</a>
+<a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-dark-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus%20dark.png" alt="Netdata" width="500"/>
+</a>
+</p>
+
+On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% less bandwidth**, **98% less disk I/O**, and is **75% more disk space efficient** on high resolution metrics storage, while providing more than a year of overall retention on the same disk footprint Prometheus offers 7 days of retention. [Read the full analysis in our blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
 
 ---
 
@@ -421,6 +445,8 @@ Yes, you can!
 
 Netdata has been designed to spread disk writes across time. Each metric is flushed to disk every 17 minutes, but metrics are flushed evenly across time, at an almost constant rate. Also, metrics are packed into bigger blocks we call `extents` and are compressed with LZ4 before saving them, to minimize the number of I/O operations made.
 
+Netdata also employs direct I/O for all its database operations, ensuring optimized performance. By managing its own caches, Netdata avoids overburdening system caches, facilitating a harmonious coexistence with other applications.
+
 Single node Agents (not Parents), should have a constant rate of about 50 KiB/s or less, with some spikes above that every minute (flushing of tier 1) and higher spikes every hour (flushing of tier 2).
 
 Health Alerts and Machine-Learning run queries to evaluate their expressions and learn from the metrics' patterns. These are also spread over time, so there should be an almost constant read rate too.
@@ -753,7 +779,6 @@ General information about contributions:
 - Check our [Security Policy](https://github.com/netdata/netdata/security/policy).
 - Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - Read our [Contributing Guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
-- We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
 
 Package maintainers should read the guide on [building Netdata from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from the source and preparing a package.

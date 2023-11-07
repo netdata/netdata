@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
+#include "streaming/common.h"
 #include "http_server.h"
-#include "h2o.h"
 
+#include "h2o.h"
+#include "h2o/http1.h"
+
+#include "streaming.h"
 #include "h2o_utils.h"
 
 static h2o_globalconf_t config;
@@ -14,6 +17,7 @@ static h2o_accept_ctx_t accept_ctx;
 #define CONTENT_TEXT_UTF8 H2O_STRLIT("text/plain; charset=utf-8")
 #define NBUF_INITIAL_SIZE_RESP (4096)
 #define API_V1_PREFIX "/api/v1/"
+#define API_V2_PREFIX "/api/v2/"
 #define HOST_SELECT_PREFIX "/host/"
 
 #define HTTPD_CONFIG_SECTION "httpd"
@@ -133,6 +137,8 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         *host = rrdhost_find_by_hostname(c_host_id);
         if (!*host)
             *host = rrdhost_find_by_guid(c_host_id);
+        if (!*host)
+            *host = find_host_by_node_id(c_host_id);
         if (!*host) {
             req->res.status = HTTP_RESP_BAD_REQUEST;
             req->res.reason = "Wrong host id";
@@ -170,13 +176,24 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
             norm_path.len--;
     }
 
-    size_t api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V1_PREFIX));
-    if (api_loc == SIZE_MAX)
-        return 1;
+    unsigned int api_version = 2;
+    size_t api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V2_PREFIX));
+    if (api_loc == SIZE_MAX) {
+        api_version = 1;
+        api_loc = h2o_strstr(norm_path.base, norm_path.len, H2O_STRLIT(API_V1_PREFIX));
+        if (api_loc == SIZE_MAX)
+            return 1;
+    }
+
+    // API_V1_PREFIX and API_V2_PREFIX are the same length
+    // but I did this just in case someone changes the length of the prefix in future
+    // so he will not be shot in the leg here
+    // until then compiler will optimize this out
+    size_t api_len = api_version == 1 ? strlen(API_V1_PREFIX) : strlen(API_V2_PREFIX);
 
     h2o_iovec_t api_command = norm_path;
-    api_command.base += api_loc + strlen(API_V1_PREFIX);
-    api_command.len -= api_loc + strlen(API_V1_PREFIX);
+    api_command.base += api_loc + api_len;
+    api_command.len -= api_loc + api_len;
 
     if (!api_command.len)
         return 1;
@@ -188,13 +205,16 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     // individual response generators and thus remove the need to "emulate"
     // the old webserver calling this function here and in ACLK
     struct web_client w;
+    memset(&w, 0, sizeof(w));
     w.response.data = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_query_string_decoded = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
+    w.url_as_received = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.acl = WEB_CLIENT_ACL_DASHBOARD;
 
     char *path_c_str = iovec_to_cstr(&api_command);
     char *path_unescaped = url_unescape(path_c_str);
+    buffer_strcat(w.url_as_received, iovec_to_cstr(&norm_path));
     freez(path_c_str);
 
     IF_HAS_URL_PARAMS(req) {
@@ -206,7 +226,11 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         freez(query_unescaped);
     }
 
-    web_client_api_request_v1(*host, &w, path_unescaped);
+//inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
+    if (api_version == 2)
+        web_client_api_request_v2(*host, &w, path_unescaped);
+    else
+        web_client_api_request_v1(*host, &w, path_unescaped);
     freez(path_unescaped);
 
     h2o_iovec_t body = buffer_to_h2o_iovec(w.response.data);
@@ -230,6 +254,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     buffer_free(w.response.data);
     buffer_free(w.response.header);
     buffer_free(w.url_query_string_decoded);
+    buffer_free(w.url_as_received);
 
     return 0;
 }
@@ -241,17 +266,19 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
 
     int ret = _netdata_uberhandler(req, &host);
 
-    char host_uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(host->host_uuid, host_uuid_str);
-
     if (!ret) {
+        char host_uuid_str[UUID_STR_LEN];
+
+        if (host != NULL)
+            uuid_unparse_lower(host->host_uuid, host_uuid_str);
+
         netdata_log_access("HTTPD OK method: " PRINTF_H2O_IOVEC_FMT
                    ", path: " PRINTF_H2O_IOVEC_FMT
                    ", as host: %s"
                    ", response: %d",
                    PRINTF_H2O_IOVEC(&req->method),
                    PRINTF_H2O_IOVEC(&req->input.path),
-                   host == localhost ? "localhost" : host_uuid_str,
+                   host == NULL ? "unknown" : (localhost ? "localhost" : host_uuid_str),
                    req->res.status);
     } else {
         netdata_log_access("HTTPD %d"
@@ -288,6 +315,33 @@ static int hdl_netdata_conf(h2o_handler_t *self, h2o_req_t *req)
     return 0;
 }
 
+static int hdl_stream(h2o_handler_t *self, h2o_req_t *req)
+{
+    UNUSED(self);
+    netdata_log_info("Streaming request trough h2o received");
+    h2o_stream_conn_t *conn = mallocz(sizeof(*conn));
+    h2o_stream_conn_t_init(conn);
+
+    if (is_streaming_handshake(req)) {
+        h2o_stream_conn_t_destroy(conn);
+        freez(conn);
+        return 1;
+    }
+
+    /* build response */
+    req->res.status = HTTP_RESP_SWITCH_PROTO;
+    req->res.reason = "Switching Protocols";
+    h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_UPGRADE, NULL, H2O_STRLIT(NETDATA_STREAM_PROTO_NAME));
+
+//  TODO we should consider adding some nonce header here
+//    h2o_add_header_by_str(&req->pool, &req->res.headers, H2O_STRLIT("whatever reply"), 0, NULL, accept_key,
+//                          strlen(accept_key));
+
+    h2o_http1_upgrade(req, NULL, 0, stream_on_complete, conn);
+
+    return 0;
+}
+
 #define POLL_INTERVAL 100
 
 void *h2o_main(void *ptr) {
@@ -307,6 +361,10 @@ void *h2o_main(void *ptr) {
     pathconf = h2o_config_register_path(hostconf, "/netdata.conf", 0);
     h2o_handler_t *handler = h2o_create_handler(pathconf, sizeof(*handler));
     handler->on_req = hdl_netdata_conf;
+
+    pathconf = h2o_config_register_path(hostconf, NETDATA_STREAM_URL, 0);
+    handler = h2o_create_handler(pathconf, sizeof(*handler));
+    handler->on_req = hdl_stream;
 
     pathconf = h2o_config_register_path(hostconf, "/", 0);
     handler = h2o_create_handler(pathconf, sizeof(*handler));
@@ -328,11 +386,18 @@ void *h2o_main(void *ptr) {
         return NULL;
     }
 
+    usec_t last_wpoll = now_monotonic_usec();
     while (service_running(SERVICE_HTTPD)) {
         int rc = h2o_evloop_run(ctx.loop, POLL_INTERVAL);
         if (rc < 0 && errno != EINTR) {
             netdata_log_error("h2o_evloop_run returned (%d) with errno other than EINTR. Aborting", rc);
             break;
+        }
+        usec_t now = now_monotonic_usec();
+        if (now - last_wpoll > POLL_INTERVAL * USEC_PER_MS) {
+            last_wpoll = now;
+
+            h2o_stream_check_pending_write_reqs();
         }
     } 
 

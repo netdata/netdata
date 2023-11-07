@@ -1072,14 +1072,12 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         return 1;
     }
 
-#ifdef NETDATA_DEV_MODE
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
     rrd_function_add(localhost, NULL, "streaming", 10,
                      RRDFUNCTIONS_STREAMING_HELP, true,
                      rrdhost_function_streaming, NULL);
-#endif
 
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);
@@ -1145,13 +1143,10 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
     host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
     host->sender->rrdpush_sender_socket  = -1;
+    host->sender->disabled_capabilities = STREAM_CAP_NONE;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(default_rrdpush_compression_enabled)
-        host->sender->flags |= SENDER_FLAG_COMPRESSION;
-    else
-        host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
-#endif
+    if(!default_rrdpush_compression_enabled)
+        host->sender->disabled_capabilities |= STREAM_CAP_COMPRESSIONS_AVAILABLE;
 
     spinlock_init(&host->sender->spinlock);
     replication_init_sender(host->sender);
@@ -1167,9 +1162,7 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
     rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_compressor_destroy(&host->sender->compressor);
-#endif
 
     replication_cleanup_sender(host->sender);
 
@@ -1195,6 +1188,12 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         if (host->prev)
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
     }
+
+    // ------------------------------------------------------------------------
+    // clean up streaming chart slots
+
+    rrdhost_pluginsd_send_chart_slots_free(host);
+    rrdhost_pluginsd_receive_chart_slots_free(host);
 
     // ------------------------------------------------------------------------
     // clean up streaming
@@ -1283,6 +1282,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 
     string_freez(host->hostname);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
+
     freez(host);
 }
 
@@ -1885,9 +1885,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
             else
                 s->stream.status = RRDHOST_STREAM_STATUS_ONLINE;
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-            s->stream.compression = (stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) && host->sender->compressor.initialized);
-#endif
+            s->stream.compression = host->sender->compressor.initialized;
         }
         else {
             s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;

@@ -54,11 +54,11 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_ALERTA | Set `SEND_ALERTA` to YES |  | True |
-| ALERTA_WEBHOOK_URL | set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server. |  | True |
-| ALERTA_API_KEY | Set `ALERTA_API_KEY` to your API key. |  | True |
-| DEFAULT_RECIPIENT_ALERTA | Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | True |
-| DEFAULT_RECIPIENT_CUSTOM | Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice |  | False |
+| SEND_ALERTA | Set `SEND_ALERTA` to YES |  | yes |
+| ALERTA_WEBHOOK_URL | set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server. |  | yes |
+| ALERTA_API_KEY | Set `ALERTA_API_KEY` to your API key. |  | yes |
+| DEFAULT_RECIPIENT_ALERTA | Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | yes |
+| DEFAULT_RECIPIENT_CUSTOM | Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice |  | no |
 
 ##### ALERTA_API_KEY
 

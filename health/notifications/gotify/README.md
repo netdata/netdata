@@ -53,9 +53,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_GOTIFY | Set `SEND_GOTIFY` to YES | YES | True |
-| GOTIFY_APP_TOKEN | set `GOTIFY_APP_TOKEN` to the app token you generated. |  | True |
-| GOTIFY_APP_URL | Set `GOTIFY_APP_URL` to point to your Gotify instance, for example `https://push.example.domain/` |  | True |
+| SEND_GOTIFY | Set `SEND_GOTIFY` to YES | YES | yes |
+| GOTIFY_APP_TOKEN | set `GOTIFY_APP_TOKEN` to the app token you generated. |  | yes |
+| GOTIFY_APP_URL | Set `GOTIFY_APP_URL` to point to your Gotify instance, for example `https://push.example.domain/` |  | yes |
 
 </details>
 

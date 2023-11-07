@@ -22,6 +22,9 @@ To install the latest git version of Netdata, please follow these 2 steps:
 
 ## Prepare your system
 
+Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
+Otherwise, [perform a cleanup](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+
 Use our automatic requirements installer (_no need to be `root`_), which attempts to find the packages that
 should be installed on your system to build and run Netdata. It supports a large variety of major Linux distributions
 and other operating systems and is regularly tested. You can find this tool [here](https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) or run it directly with `bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh)`. Otherwise read on for how to get requires packages manually:
@@ -226,3 +229,20 @@ Our current build process unfortunately has some issues when using certain confi
 If the installation fails with errors like `/bin/ld: externaldeps/libwebsockets/libwebsockets.a(context.c.o): relocation R_X86_64_32 against '.rodata.str1.1' can not be used when making a PIE object; recompile with -fPIC`, and you are trying to build with `clang` on Linux, you will need to build Netdata using GCC to get a fully functional install. 
 
 In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
+
+
+### Perform a cleanup in your netdata repo
+
+The Netdata repo consist of the main git tree and it's submodules. Either working on a fork or on the main repo you need to make sure that there
+are no "leftover" artifacts from previous builds and that your submodules are up to date to the **corresponding checkouts**.
+
+> #### Important: Make sure that you have commited any work in progress, before you proceed the with the clean up instruction below
+
+
+```sh
+git clean -dfx && git submodule foreach 'git clean -dfx' && git submodule update --recursive --init
+```
+
+
+> Note: In previous builds, you may have created artifacts belonging to an another user (e.g root), so you may need to run
+> each of the _git clean_ commands as sudoer.

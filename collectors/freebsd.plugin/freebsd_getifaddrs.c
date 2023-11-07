@@ -52,15 +52,15 @@ static size_t network_interfaces_added = 0, network_interfaces_found = 0;
 
 static void network_interface_free(struct cgroup_network_interface *ifm) {
     if (likely(ifm->st_bandwidth))
-        rrdset_is_obsolete(ifm->st_bandwidth);
+        rrdset_is_obsolete___safe_from_collector_thread(ifm->st_bandwidth);
     if (likely(ifm->st_packets))
-        rrdset_is_obsolete(ifm->st_packets);
+        rrdset_is_obsolete___safe_from_collector_thread(ifm->st_packets);
     if (likely(ifm->st_errors))
-        rrdset_is_obsolete(ifm->st_errors);
+        rrdset_is_obsolete___safe_from_collector_thread(ifm->st_errors);
     if (likely(ifm->st_drops))
-        rrdset_is_obsolete(ifm->st_drops);
+        rrdset_is_obsolete___safe_from_collector_thread(ifm->st_drops);
     if (likely(ifm->st_events))
-        rrdset_is_obsolete(ifm->st_events);
+        rrdset_is_obsolete___safe_from_collector_thread(ifm->st_events);
 
     network_interfaces_added--;
     freez(ifm->name);

@@ -371,6 +371,10 @@ void netdata_cleanup_and_exit(int ret) {
             SERVICE_REPLICATION // replication has to be stopped after STREAMING, because it cleans up ARAL
             , 3 * USEC_PER_SEC);
 
+    delta_shutdown_time("prepare metasync shutdown");
+
+    metadata_sync_shutdown_prepare();
+
     delta_shutdown_time("disable ML detection and training threads");
 
     ml_stop_threads();
@@ -395,10 +399,6 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("clean rrdhost database");
 
     rrdhost_cleanup_all();
-
-    delta_shutdown_time("prepare metasync shutdown");
-
-    metadata_sync_shutdown_prepare();
 
     delta_shutdown_time("stop aclk threads");
 
@@ -440,7 +440,8 @@ void netdata_cleanup_and_exit(int ret) {
             delta_shutdown_time("wait for dbengine collectors to finish");
 
             size_t running = 1;
-            while(running) {
+            size_t count = 10;
+            while(running && count) {
                 running = 0;
                 for (size_t tier = 0; tier < storage_tiers; tier++)
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
@@ -451,6 +452,7 @@ void netdata_cleanup_and_exit(int ret) {
                     // sleep_usec(100 * USEC_PER_MS);
                     cleanup_destroyed_dictionaries();
                 }
+                count--;
             }
 
             delta_shutdown_time("wait for dbengine main cache to finish flushing");
@@ -1337,6 +1339,7 @@ int julytest(void);
 int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
+int unittest_rrdpush_compressions(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1549,6 +1552,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;
                             return pluginsd_parser_unittest();
+                        }
+                        else if(strcmp(optarg, "rrdpush_compressions_test") == 0) {
+                            unittest_running = true;
+                            return unittest_rrdpush_compressions();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1901,6 +1908,8 @@ int main(int argc, char **argv) {
         netdata_log_info("Netdata agent version \""VERSION"\" is starting");
 
         ieee754_doubles = is_system_ieee754_double();
+        if(!ieee754_doubles)
+            globally_disabled_capabilities |= STREAM_CAP_IEEE754;
 
         aral_judy_init();
 

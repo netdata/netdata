@@ -338,25 +338,59 @@ bool read_proc_net_x(const char *filename, PROC_NET_PROTOCOLS protocol) {
 }
 
 // ----------------------------------------------------------------------------
+typedef struct {
+  bool read_tcp;
+  bool read_tcp6;
+  bool read_udp;
+  bool read_udp6;
+} CommandLineArguments;
 
-int main(int argc __maybe_unused, char **argv __maybe_unused) {
+int main(int argc, char **argv) {
     char path[FILENAME_MAX + 1];
     hashTable_key_inode_port_value = createHashTable();
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(!netdata_configured_host_prefix) netdata_configured_host_prefix = "";
 
-    snprintfz(path, FILENAME_MAX, "%s/proc/net/tcp", netdata_configured_host_prefix);
-    read_proc_net_x(path, PROC_NET_PROTOCOL_TCP);
+    CommandLineArguments args = {.read_tcp = false, .read_tcp6 = false, .read_udp = false, .read_udp6 = false};
 
-    snprintfz(path, FILENAME_MAX, "%s/proc/net/udp", netdata_configured_host_prefix);
-    read_proc_net_x(path, PROC_NET_PROTOCOL_UDP);
+    for (int i = 1; i < argc; i++) {
+        if (strcmp("tcp", argv[i]) == 0) {
+            args.read_tcp = true;
+            continue;
+        } else if (strcmp("tcp6", argv[i]) == 0) {
+            args.read_tcp6 = true;
+            continue;
+        } else if (strcmp("udp", argv[i]) == 0) {
+            args.read_udp = true;
+            continue;
+        } else if (strcmp("udp6", argv[i]) == 0) {
+            args.read_udp6 = true;
+            continue;
+        }
+    }
 
-    snprintfz(path, FILENAME_MAX, "%s/proc/net/tcp6", netdata_configured_host_prefix);
-    read_proc_net_x(path, PROC_NET_PROTOCOL_TCP6);
+    bool read_all_files = (!args.read_tcp && !args.read_tcp6 && !args.read_udp && !args.read_udp6);
 
-    snprintfz(path, FILENAME_MAX, "%s/proc/net/udp6", netdata_configured_host_prefix);
-    read_proc_net_x(path, PROC_NET_PROTOCOL_UDP6);
+    if (read_all_files || args.read_tcp) {
+        snprintfz(path, FILENAME_MAX, "%s/proc/net/tcp", netdata_configured_host_prefix);
+        read_proc_net_x(path, PROC_NET_PROTOCOL_TCP);
+    }
+
+    if (read_all_files || args.read_udp) {
+        snprintfz(path, FILENAME_MAX, "%s/proc/net/udp", netdata_configured_host_prefix);
+        read_proc_net_x(path, PROC_NET_PROTOCOL_UDP);
+    }
+
+    if (read_all_files || args.read_tcp6) {
+        snprintfz(path, FILENAME_MAX, "%s/proc/net/tcp6", netdata_configured_host_prefix);
+        read_proc_net_x(path, PROC_NET_PROTOCOL_TCP6);
+    }
+
+    if (read_all_files || args.read_udp6) {
+        snprintfz(path, FILENAME_MAX, "%s/proc/net/udp6", netdata_configured_host_prefix);
+        read_proc_net_x(path, PROC_NET_PROTOCOL_UDP6);
+    }
 
     snprintfz(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
     find_all_sockets_in_proc(path);

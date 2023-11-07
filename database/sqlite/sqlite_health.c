@@ -1270,184 +1270,211 @@ done:
      "hl.units, hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, "    \
      "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.summary "             \
      "FROM health_log hl, alert_hash ah, health_log_detail hld WHERE hl.config_hash_id = ah.hash_id and "              \
-     "hl.health_log_id = hld.health_log_id and hl.host_id = @host_id "
+     "hl.health_log_id = hld.health_log_id and hl.host_id = @host_id AND hld.unique_id > @after "
 
-void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart) {
+void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const char *chart)
+{
+     buffer_strcat(wb, "[");
 
-    buffer_strcat(wb, "[");
+     unsigned int max = host->health_log.max;
 
-    unsigned int max = host->health_log.max;
-    unsigned int count = 0;
+     static __thread sqlite3_stmt *stmt_no_chart = NULL;
+     static __thread sqlite3_stmt *stmt_with_chart = NULL;
 
-    sqlite3_stmt *res = NULL;
-    int rc;
+     sqlite3_stmt **active_stmt;
+     sqlite3_stmt *stmt_query;
 
-    BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
-    buffer_sprintf(command, SQL_SELECT_HEALTH_LOG);
+     int count = 0, rc;
 
-    if (chart) {
-        char chart_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(chart_sql, MAX_HEALTH_SQL_SIZE, "AND hl.chart = '%s' ", chart);
-        buffer_strcat(command, chart_sql);
-    }
+     active_stmt = chart ? &stmt_with_chart : &stmt_no_chart;
 
-    if (after) {
-        char after_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(after_sql, MAX_HEALTH_SQL_SIZE, "AND hld.unique_id > %u ", after);
-        buffer_strcat(command, after_sql);
-    }
+     if (!*active_stmt) {
 
-    {
-        char limit_sql[MAX_HEALTH_SQL_SIZE + 1];
-        snprintfz(limit_sql, MAX_HEALTH_SQL_SIZE, "ORDER BY hld.unique_id DESC LIMIT %u ", max);
-        buffer_strcat(command, limit_sql);
-    }
+         BUFFER *command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
+         buffer_sprintf(command, SQL_SELECT_HEALTH_LOG);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(command), -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
-        buffer_free(command);
-        return;
-    }
+         if (chart)
+            buffer_strcat(command, " AND hl.chart = @chart ");
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for SQL_SELECT_HEALTH_LOG.");
-        sqlite3_finalize(res);
-        buffer_free(command);
-        return;
-    }
+         buffer_strcat(command, " ORDER BY hld.unique_id DESC LIMIT @limit");
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
+         rc = prepare_statement(db_meta, buffer_tostring(command), active_stmt);
+         buffer_free(command);
 
-        char old_value_string[100 + 1];
-        char new_value_string[100 + 1];
+         if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
+            buffer_strcat(wb, "\n]");
+            return;
+         }
+     }
 
-        char config_hash_id[UUID_STR_LEN];
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 3)), config_hash_id);
+     stmt_query = *active_stmt;
 
-        char transition_id[UUID_STR_LEN] = {0};
-        if (sqlite3_column_type(res, 30) != SQLITE_NULL)
-            uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, 30)), transition_id);
+     int param = 0;
+     rc = sqlite3_bind_blob(stmt_query, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+     if (unlikely(rc != SQLITE_OK)) {
+         error_report("Failed to bind host_id for SQL_SELECT_HEALTH_LOG.");
+         goto finish;
+     }
 
-        char *edit_command = sqlite3_column_bytes(res, 16) > 0 ? health_edit_command_from_source((char *)sqlite3_column_text(res, 16)) : strdupz("UNKNOWN=0=UNKNOWN");
+     rc = sqlite3_bind_int64(stmt_query, ++param, after);
+     if (unlikely(rc != SQLITE_OK)) {
+         error_report("Failed to bind after for SQL_SELECT_HEALTH_LOG.");
+         goto finish;
+     }
 
-        if (count)
+     if (chart) {
+         rc = sqlite3_bind_text(stmt_query, ++param, chart, -1, SQLITE_STATIC);
+         if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to bind after for SQL_SELECT_HEALTH_LOG.");
+            goto finish;
+         }
+     }
+
+     rc = sqlite3_bind_int64(stmt_query, ++param, max);
+     if (unlikely(rc != SQLITE_OK)) {
+         error_report("Failed to bind max lines for SQL_SELECT_HEALTH_LOG.");
+         goto finish;
+     }
+
+     while (sqlite3_step(stmt_query) == SQLITE_ROW) {
+         char old_value_string[100 + 1];
+         char new_value_string[100 + 1];
+
+         char config_hash_id[UUID_STR_LEN];
+         uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(stmt_query, 3)), config_hash_id);
+
+         char transition_id[UUID_STR_LEN] = {0};
+         if (sqlite3_column_type(stmt_query, 30) != SQLITE_NULL)
+            uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(stmt_query, 30)), transition_id);
+
+         char *edit_command = sqlite3_column_bytes(stmt_query, 16) > 0 ?
+                                  health_edit_command_from_source((char *)sqlite3_column_text(stmt_query, 16)) :
+                                  strdupz("UNKNOWN=0=UNKNOWN");
+
+         if (count)
             buffer_sprintf(wb, ",");
 
-        count++;
+         count++;
 
-        buffer_sprintf(
-            wb,
-            "\n\t{\n"
-            "\t\t\"hostname\": \"%s\",\n"
-            "\t\t\"utc_offset\": %d,\n"
-            "\t\t\"timezone\": \"%s\",\n"
-            "\t\t\"unique_id\": %u,\n"
-            "\t\t\"alarm_id\": %u,\n"
-            "\t\t\"alarm_event_id\": %u,\n"
-            "\t\t\"config_hash_id\": \"%s\",\n"
-            "\t\t\"transition_id\": \"%s\",\n"
-            "\t\t\"name\": \"%s\",\n"
-            "\t\t\"chart\": \"%s\",\n"
-            "\t\t\"context\": \"%s\",\n"
-            "\t\t\"class\": \"%s\",\n"
-            "\t\t\"component\": \"%s\",\n"
-            "\t\t\"type\": \"%s\",\n"
-            "\t\t\"processed\": %s,\n"
-            "\t\t\"updated\": %s,\n"
-            "\t\t\"exec_run\": %lu,\n"
-            "\t\t\"exec_failed\": %s,\n"
-            "\t\t\"exec\": \"%s\",\n"
-            "\t\t\"recipient\": \"%s\",\n"
-            "\t\t\"exec_code\": %d,\n"
-            "\t\t\"source\": \"%s\",\n"
-            "\t\t\"command\": \"%s\",\n"
-            "\t\t\"units\": \"%s\",\n"
-            "\t\t\"when\": %lu,\n"
-            "\t\t\"duration\": %lu,\n"
-            "\t\t\"non_clear_duration\": %lu,\n"
-            "\t\t\"status\": \"%s\",\n"
-            "\t\t\"old_status\": \"%s\",\n"
-            "\t\t\"delay\": %d,\n"
-            "\t\t\"delay_up_to_timestamp\": %lu,\n"
-            "\t\t\"updated_by_id\": %u,\n"
-            "\t\t\"updates_id\": %u,\n"
-            "\t\t\"value_string\": \"%s\",\n"
-            "\t\t\"old_value_string\": \"%s\",\n"
-            "\t\t\"last_repeat\": %lu,\n"
-            "\t\t\"silenced\": \"%s\",\n",
-            rrdhost_hostname(host),
-            host->utc_offset,
-            rrdhost_abbrev_timezone(host),
-            (unsigned int) sqlite3_column_int64(res, 0),
-            (unsigned int) sqlite3_column_int64(res, 1),
-            (unsigned int) sqlite3_column_int64(res, 2),
-            config_hash_id,
-            transition_id,
-            sqlite3_column_text(res, 12),
-            sqlite3_column_text(res, 13),
-            sqlite3_column_text(res, 29),
-            sqlite3_column_text(res, 26) ? (const char *) sqlite3_column_text(res, 26) : (char *) "Unknown",
-            sqlite3_column_text(res, 27) ? (const char *) sqlite3_column_text(res, 27) : (char *) "Unknown",
-            sqlite3_column_text(res, 28) ? (const char *) sqlite3_column_text(res, 28) : (char *) "Unknown",
-            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false",
-            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false",
-            (long unsigned int)sqlite3_column_int64(res, 10),
-            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false",
-            sqlite3_column_text(res, 14) ? (const char *) sqlite3_column_text(res, 14) : string2str(host->health.health_default_exec),
-            sqlite3_column_text(res, 15) ? (const char *) sqlite3_column_text(res, 15) : string2str(host->health.health_default_recipient),
-            sqlite3_column_int(res, 19),
-            sqlite3_column_text(res, 16) ? (const char *) sqlite3_column_text(res, 16) : (char *) "Unknown",
-            edit_command,
-            sqlite3_column_text(res, 17),
-            (long unsigned int)sqlite3_column_int64(res, 6),
-            (long unsigned int)sqlite3_column_int64(res, 7),
-            (long unsigned int)sqlite3_column_int64(res, 8),
-            rrdcalc_status2string(sqlite3_column_int(res, 20)),
-            rrdcalc_status2string(sqlite3_column_int(res, 21)),
-            sqlite3_column_int(res, 22),
-            (long unsigned int)sqlite3_column_int64(res, 11),
-            (unsigned int)sqlite3_column_int64(res, 4),
-            (unsigned int)sqlite3_column_int64(res, 5),
-            sqlite3_column_type(res, 23) == SQLITE_NULL ? "-" : format_value_and_unit(new_value_string, 100, sqlite3_column_double(res, 23), (char *) sqlite3_column_text(res, 17), -1),
-            sqlite3_column_type(res, 24) == SQLITE_NULL ? "-" : format_value_and_unit(old_value_string, 100, sqlite3_column_double(res, 24), (char *) sqlite3_column_text(res, 17), -1),
-            (long unsigned int)sqlite3_column_int64(res, 25),
-            (sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false");
+         buffer_sprintf(
+             wb,
+             "\n\t{\n"
+             "\t\t\"hostname\": \"%s\",\n"
+             "\t\t\"utc_offset\": %d,\n"
+             "\t\t\"timezone\": \"%s\",\n"
+             "\t\t\"unique_id\": %u,\n"
+             "\t\t\"alarm_id\": %u,\n"
+             "\t\t\"alarm_event_id\": %u,\n"
+             "\t\t\"config_hash_id\": \"%s\",\n"
+             "\t\t\"transition_id\": \"%s\",\n"
+             "\t\t\"name\": \"%s\",\n"
+             "\t\t\"chart\": \"%s\",\n"
+             "\t\t\"context\": \"%s\",\n"
+             "\t\t\"class\": \"%s\",\n"
+             "\t\t\"component\": \"%s\",\n"
+             "\t\t\"type\": \"%s\",\n"
+             "\t\t\"processed\": %s,\n"
+             "\t\t\"updated\": %s,\n"
+             "\t\t\"exec_run\": %lu,\n"
+             "\t\t\"exec_failed\": %s,\n"
+             "\t\t\"exec\": \"%s\",\n"
+             "\t\t\"recipient\": \"%s\",\n"
+             "\t\t\"exec_code\": %d,\n"
+             "\t\t\"source\": \"%s\",\n"
+             "\t\t\"command\": \"%s\",\n"
+             "\t\t\"units\": \"%s\",\n"
+             "\t\t\"when\": %lu,\n"
+             "\t\t\"duration\": %lu,\n"
+             "\t\t\"non_clear_duration\": %lu,\n"
+             "\t\t\"status\": \"%s\",\n"
+             "\t\t\"old_status\": \"%s\",\n"
+             "\t\t\"delay\": %d,\n"
+             "\t\t\"delay_up_to_timestamp\": %lu,\n"
+             "\t\t\"updated_by_id\": %u,\n"
+             "\t\t\"updates_id\": %u,\n"
+             "\t\t\"value_string\": \"%s\",\n"
+             "\t\t\"old_value_string\": \"%s\",\n"
+             "\t\t\"last_repeat\": %lu,\n"
+             "\t\t\"silenced\": \"%s\",\n",
+             rrdhost_hostname(host),
+             host->utc_offset,
+             rrdhost_abbrev_timezone(host),
+             (unsigned int)sqlite3_column_int64(stmt_query, 0),
+             (unsigned int)sqlite3_column_int64(stmt_query, 1),
+             (unsigned int)sqlite3_column_int64(stmt_query, 2),
+             config_hash_id,
+             transition_id,
+             sqlite3_column_text(stmt_query, 12),
+             sqlite3_column_text(stmt_query, 13),
+             sqlite3_column_text(stmt_query, 29),
+             sqlite3_column_text(stmt_query, 26) ? (const char *)sqlite3_column_text(stmt_query, 26) : (char *)"Unknown",
+             sqlite3_column_text(stmt_query, 27) ? (const char *)sqlite3_column_text(stmt_query, 27) : (char *)"Unknown",
+             sqlite3_column_text(stmt_query, 28) ? (const char *)sqlite3_column_text(stmt_query, 28) : (char *)"Unknown",
+             (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_PROCESSED) ? "true" : "false",
+             (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_UPDATED) ? "true" : "false",
+             (long unsigned int)sqlite3_column_int64(stmt_query, 10),
+             (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_EXEC_FAILED) ? "true" : "false",
+             sqlite3_column_text(stmt_query, 14) ? (const char *)sqlite3_column_text(stmt_query, 14) :
+                                            string2str(host->health.health_default_exec),
+             sqlite3_column_text(stmt_query, 15) ? (const char *)sqlite3_column_text(stmt_query, 15) :
+                                            string2str(host->health.health_default_recipient),
+             sqlite3_column_int(stmt_query, 19),
+             sqlite3_column_text(stmt_query, 16) ? (const char *)sqlite3_column_text(stmt_query, 16) : (char *)"Unknown",
+             edit_command,
+             sqlite3_column_text(stmt_query, 17),
+             (long unsigned int)sqlite3_column_int64(stmt_query, 6),
+             (long unsigned int)sqlite3_column_int64(stmt_query, 7),
+             (long unsigned int)sqlite3_column_int64(stmt_query, 8),
+             rrdcalc_status2string(sqlite3_column_int(stmt_query, 20)),
+             rrdcalc_status2string(sqlite3_column_int(stmt_query, 21)),
+             sqlite3_column_int(stmt_query, 22),
+             (long unsigned int)sqlite3_column_int64(stmt_query, 11),
+             (unsigned int)sqlite3_column_int64(stmt_query, 4),
+             (unsigned int)sqlite3_column_int64(stmt_query, 5),
+             sqlite3_column_type(stmt_query, 23) == SQLITE_NULL ?
+                 "-" :
+                 format_value_and_unit(
+                     new_value_string, 100, sqlite3_column_double(stmt_query, 23), (char *)sqlite3_column_text(stmt_query, 17), -1),
+             sqlite3_column_type(stmt_query, 24) == SQLITE_NULL ?
+                 "-" :
+                 format_value_and_unit(
+                     old_value_string, 100, sqlite3_column_double(stmt_query, 24), (char *)sqlite3_column_text(stmt_query, 17), -1),
+             (long unsigned int)sqlite3_column_int64(stmt_query, 25),
+             (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_SILENCED) ? "true" : "false");
 
-        health_string2json(wb, "\t\t", "summary", (char *) sqlite3_column_text(res, 31), ",\n");
-        health_string2json(wb, "\t\t", "info", (char *) sqlite3_column_text(res, 18), ",\n");
+         health_string2json(wb, "\t\t", "summary", (char *)sqlite3_column_text(stmt_query, 31), ",\n");
+         health_string2json(wb, "\t\t", "info", (char *)sqlite3_column_text(stmt_query, 18), ",\n");
 
-        if(unlikely(sqlite3_column_int64(res, 9) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
+         if (unlikely(sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
             buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");
-        }
+         }
 
-        buffer_strcat(wb, "\t\t\"value\":");
-        if (sqlite3_column_type(res, 23) == SQLITE_NULL)
+         buffer_strcat(wb, "\t\t\"value\":");
+         if (sqlite3_column_type(stmt_query, 23) == SQLITE_NULL)
             buffer_strcat(wb, "null");
-        else
-            buffer_print_netdata_double(wb, sqlite3_column_double(res, 23));
-        buffer_strcat(wb, ",\n");
+         else
+            buffer_print_netdata_double(wb, sqlite3_column_double(stmt_query, 23));
+         buffer_strcat(wb, ",\n");
 
-        buffer_strcat(wb, "\t\t\"old_value\":");
-        if (sqlite3_column_type(res, 24) == SQLITE_NULL)
+         buffer_strcat(wb, "\t\t\"old_value\":");
+         if (sqlite3_column_type(stmt_query, 24) == SQLITE_NULL)
             buffer_strcat(wb, "null");
-        else
-            buffer_print_netdata_double(wb, sqlite3_column_double(res, 24));
-        buffer_strcat(wb, "\n");
+         else
+            buffer_print_netdata_double(wb, sqlite3_column_double(stmt_query, 24));
+         buffer_strcat(wb, "\n");
 
-        buffer_strcat(wb, "\t}");
+         buffer_strcat(wb, "\t}");
 
-        freez(edit_command);
-    }
+         freez(edit_command);
+     }
 
-    buffer_strcat(wb, "\n]");
+finish:
+     buffer_strcat(wb, "\n]");
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
-
-    buffer_free(command);
+     rc = sqlite3_reset(stmt_query);
+     if (unlikely(rc != SQLITE_OK))
+         error_report("Failed to finalize statement for SQL_SELECT_HEALTH_LOG");
 }
 
 #define SQL_COPY_HEALTH_LOG(table) "INSERT OR IGNORE INTO health_log (host_id, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context) SELECT ?1, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context from %s;", table

@@ -128,7 +128,7 @@ Click on the gear icon of the War Room's name in the top of the page to do that.
 2. To **include an existing node** to a War Room or **connect a new node\*** click on **Nodes** tab. Choose any connected node you want to add to this War Room by clicking on the checkbox next to its hostname, then click **+ Add** at the top of the panel.
 
 3. To **add existing users to a War Room**, click on **Add Users**.
-   See our [invite doc](#invite-your-team.md) for details on inviting new users to your Space in Netdata Cloud.
+   See our [invite section](#invite-your-team) for details on inviting new users to your Space in Netdata Cloud.
 
 > #### Note
 >

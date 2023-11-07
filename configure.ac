@@ -555,15 +555,48 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_initStream],
+    [LZ4_createStream],
     [LZ4_LIBS_FAST="-llz4"]
 )
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_compress_default],
+    [LZ4_compress_fast_continue],
     [LZ4_LIBS="-llz4"]
 )
+
+# -----------------------------------------------------------------------------
+# zstd
+
+AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_createDStream],
+             [LIBZSTD_FOUND=yes],
+             [LIBZSTD_FOUND=no])
+
+if test "x$LIBZSTD_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_ZSTD], [1], [libzstd usability])
+    OPTIONAL_ZSTD_LIBS="-lzstd"
+fi
+
+# -----------------------------------------------------------------------------
+# brotli
+
+AC_CHECK_LIB([brotlienc], [BrotliEncoderCreateInstance, BrotliEncoderCompressStream],
+             [LIBBROTLIENC_FOUND=yes],
+             [LIBBROTLIENC_FOUND=no])
+
+if test "x$LIBBROTLIENC_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_BROTLIENC], [1], [libbrotlienc usability])
+    OPTIONAL_BROTLIENC_LIBS="-lbrotlienc"
+fi
+
+AC_CHECK_LIB([brotlidec], [BrotliDecoderCreateInstance, BrotliDecoderDecompressStream],
+             [LIBBROTLIDEC_FOUND=yes],
+             [LIBBROTLIDEC_FOUND=no])
+
+if test "x$LIBBROTLIDEC_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_BROTLIDEC], [1], [libbrotlidec usability])
+    OPTIONAL_BROTLIDEC_LIBS="-lbrotlidec"
+fi
 
 # -----------------------------------------------------------------------------
 # zlib
@@ -702,7 +735,7 @@ if test "${enable_lz4}" != "no"; then
         AC_TRY_LINK(
             [ #include <lz4.h> ],
             [
-                LZ4_stream_t* stream = LZ4_initStream(NULL, 0);
+                LZ4_stream_t* stream = LZ4_createStream();
             ],
             [ enable_lz4="yes"],
             [ enable_lz4="no" ]
@@ -901,9 +934,6 @@ if test "${enable_h2o}" != "no"; then
         OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
         OPTIONAL_SSL_LIBS="${SSL_LIBS}"
     else
-        can_build_h2o="no"
-    fi
-    if test "${with_zlib}" != "yes"; then
         can_build_h2o="no"
     fi
     AC_MSG_RESULT([${can_build_h2o}])
@@ -1149,6 +1179,14 @@ fi
 AC_CHECK_LIB([systemd], [sd_journal_restart_fields], [have_sd_journal_restart_fields=yes], [have_sd_journal_restart_fields=no])
 if test "${have_sd_journal_restart_fields}" = "yes"; then
     AC_DEFINE([HAVE_SD_JOURNAL_RESTART_FIELDS], [1], [sd_journal_restart_fields usability])
+fi
+
+AC_CHECK_LIB([systemd], [sd_bus_default_system, sd_bus_call_method, sd_bus_message_enter_container, sd_bus_message_read, sd_bus_message_exit_container],
+             [SYSTEMD_DBUS_FOUND=yes],
+             [SYSTEMD_DBUS_FOUND=no])
+
+if test "x$SYSTEMD_DBUS_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_SYSTEMD_DBUS], [1], [libsystemd dbus usability])
 fi
 
 AC_MSG_NOTICE([OPTIONAL_SYSTEMD_LIBS is set to: ${OPTIONAL_SYSTEMD_LIBS}])
@@ -1900,6 +1938,9 @@ AC_SUBST([OPTIONAL_MATH_LIBS])
 AC_SUBST([OPTIONAL_DATACHANNEL_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_BROTLIENC_LIBS])
+AC_SUBST([OPTIONAL_BROTLIDEC_LIBS])
+AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_YAML_LIBS])

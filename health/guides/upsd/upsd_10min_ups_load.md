@@ -1,0 +1,26 @@
+# nut_10min_ups_load
+
+**Power Supply | UPS**
+
+Network UPS Tools (NUT) is a suite of software component designed to monitor power devices, such as
+uninterruptible power supplies, power distribution units, solar controllers and servers power supply
+units.
+
+The Netdata Agent monitors the average UPS load over the last 10 minutes.
+
+<details>
+<summary>References and Sources</summary>
+
+1. [NUT user manual]https://networkupstools.org/docs/user-manual.chunked/index.html
+
+</details>
+
+### Troubleshooting section:
+
+<details>
+<summary>Reduce the load on the UPS</summary>
+
+To avoid ungraceful shutdowns of your systems, consider to reduce the load on this particular UPS.
+To achieve this, consider removing attached devices that are not mission critical.
+
+</details>

@@ -31,9 +31,6 @@ emoji.
 The same idea about voice and tone applies to organizations, too. Our voice shouldn't change much between two pieces of
 content, no matter who wrote each, but the tone might be quite different based on who we think is reading.
 
-For example, a [blog post](https://www.netdata.cloud/blog/) and a [press release](https://www.netdata.cloud/news/)
-should have a similar voice, despite most often being written by different people. However, blog posts are relaxed and
-witty, while press releases are focused and academic. You won't see any emoji in a press release.
 
 ### Voice
 

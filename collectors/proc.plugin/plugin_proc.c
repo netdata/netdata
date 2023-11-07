@@ -142,6 +142,8 @@ void *proc_main(void *ptr)
 {
     worker_register("PROC");
 
+    rrd_collector_started();
+
     if (config_get_boolean("plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
         netdev_thread = mallocz(sizeof(netdata_thread_t));
         netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);

@@ -44,6 +44,7 @@ ORDER = [
     'bctime',
     'health_sup',
     'health_sdown',
+    'health_smaint',
     'health_bdown',
     'health_idle'
 ]
@@ -167,6 +168,10 @@ CHARTS = {
         'options': [None, 'Backend Servers In UP State', 'health servers', 'health', 'haproxy_hs.up', 'line'],
         'lines': []
     },
+    'health_smaint': {
+        'options': [None, 'Backend Servers In MAINT State', 'maintenance servers', 'health', 'haproxy_hs.maint', 'line'],
+        'lines': []
+    },
     'health_bdown': {
         'options': [None, 'Is Backend Failed?', 'boolean', 'health', 'haproxy_hb.down', 'line'],
         'lines': []
@@ -267,6 +272,8 @@ class Service(UrlService, SocketService):
                                             if server_status(server, name, 'UP')])
             stat_data['hsdown_' + idx] = len([server for server in self.data['servers']
                                               if server_status(server, name, 'DOWN')])
+            stat_data['hsmaint_' + idx] = len([server for server in self.data['servers']
+                                               if server_status(server, name, 'MAINT')])
             stat_data['hbdown_' + idx] = 1 if backend.get('status') == 'DOWN' else 0
             for metric in BACKEND_METRICS:
                 stat_data['_'.join(['backend', metric, idx])] = backend.get(metric) or 0
@@ -321,6 +328,7 @@ class Service(UrlService, SocketService):
                                                                 BACKEND_METRICS[metric]['divisor']])
             self.definitions['health_sup']['lines'].append(['hsup_' + idx, name, 'absolute'])
             self.definitions['health_sdown']['lines'].append(['hsdown_' + idx, name, 'absolute'])
+            self.definitions['health_smaint']['lines'].append(['hsmaint_' + idx, name, 'absolute'])
             self.definitions['health_bdown']['lines'].append(['hbdown_' + idx, name, 'absolute'])
 
 
@@ -352,7 +360,7 @@ def parse_data_(data):
 
 
 def server_status(server, backend_name, status='DOWN'):
-    return server.get('# pxname') == backend_name and server.get('status') == status
+    return server.get('# pxname') == backend_name and server.get('status').partition(' ')[0] == status
 
 
 def url_remove_params(url):

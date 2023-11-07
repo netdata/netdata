@@ -9,6 +9,8 @@
 #define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
+#define RRDFUNCTIONS_DISKSPACE_HELP "View mount point statistics"
+
 #define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5
 
@@ -42,6 +44,11 @@ struct mount_point_metadata {
     int updated;
     int slow;
 
+    bool function_ready;
+
+    STRING *filesystem;
+    STRING *mountroot;
+
     RRDLABELS *chart_labels;
 
     size_t collected; // the number of times this has been collected
@@ -59,7 +66,7 @@ struct mount_point_metadata {
 
 static DICTIONARY *dict_mountpoints = NULL;
 
-#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
 int mount_point_cleanup(const char *name, void *entry, int slow) {
     (void)name;
@@ -76,9 +83,16 @@ int mount_point_cleanup(const char *name, void *entry, int slow) {
     }
 
     if(likely(cleanup_mount_points && mp->collected)) {
+        mp->function_ready = false;
         mp->collected = 0;
         mp->updated = 0;
         mp->shown_error = 0;
+
+        string_freez(mp->filesystem);
+        string_freez(mp->mountroot);
+
+        rrdset_obsolete_and_pointer_null(mp->st_space);
+        rrdset_obsolete_and_pointer_null(mp->st_inodes);
 
         mp->rd_space_avail = NULL;
         mp->rd_space_used = NULL;
@@ -87,9 +101,6 @@ int mount_point_cleanup(const char *name, void *entry, int slow) {
         mp->rd_inodes_avail = NULL;
         mp->rd_inodes_used = NULL;
         mp->rd_inodes_reserved = NULL;
-
-        rrdset_obsolete_and_pointer_null(mp->st_space);
-        rrdset_obsolete_and_pointer_null(mp->st_inodes);
     }
 
     return 0;
@@ -286,6 +297,8 @@ static void calculate_values_and_show_charts(
         rendered++;
     }
 
+    m->function_ready = rendered > 0;
+
     if(likely(rendered))
         m->collected++;
 }
@@ -407,6 +420,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .rd_inodes_used = NULL,
                 .rd_inodes_reserved = NULL
         };
+
+        mp.filesystem = string_strdupz(mi->filesystem);
+        mp.mountroot = string_strdupz(mi->root);
 
         mp.chart_labels = rrdlabels_create();
         rrdlabels_add(mp.chart_labels, "mount_point", mi->mount_point, RRDLABEL_SRC_AUTO);
@@ -614,6 +630,228 @@ static void diskspace_main_cleanup(void *ptr) {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
 #endif
 
+int diskspace_function_mount_points(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
+        void *collector_data __maybe_unused,
+        rrd_function_result_callback_t result_cb, void *result_cb_data,
+        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+        rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+        void *register_canceller_cb_data __maybe_unused) {
+
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_DISKSPACE_HELP);
+    buffer_json_member_add_array(wb, "data");
+
+    double max_space_util = 0.0;
+    double max_space_avail = 0.0;
+    double max_space_used = 0.0;
+    double max_space_reserved = 0.0;
+
+    double max_inodes_util = 0.0;
+    double max_inodes_avail = 0.0;
+    double max_inodes_used = 0.0;
+    double max_inodes_reserved = 0.0;
+
+    struct mount_point_metadata *mp;
+    dfe_start_write(dict_mountpoints, mp) {
+        if (!mp->function_ready)
+            continue;
+
+        buffer_json_add_array_item_array(wb);
+
+        buffer_json_add_array_item_string(wb, mp_dfe.name);
+        buffer_json_add_array_item_string(wb, string2str(mp->filesystem));
+        buffer_json_add_array_item_string(wb, string2str(mp->mountroot));
+
+        double space_avail = rrddim_get_last_stored_value(mp->rd_space_avail, &max_space_avail, 1.0);
+        double space_used = rrddim_get_last_stored_value(mp->rd_space_used, &max_space_used, 1.0);
+        double space_reserved = rrddim_get_last_stored_value(mp->rd_space_reserved, &max_space_reserved, 1.0);
+        double inodes_avail = rrddim_get_last_stored_value(mp->rd_inodes_avail, &max_inodes_avail, 1.0);
+        double inodes_used = rrddim_get_last_stored_value(mp->rd_inodes_used, &max_inodes_used, 1.0);
+        double inodes_reserved = rrddim_get_last_stored_value(mp->rd_inodes_reserved, &max_inodes_reserved, 1.0);
+
+        double space_util = NAN;
+        if (!isnan(space_avail) && !isnan(space_used)) {
+            space_util = space_avail + space_used > 0 ? space_used * 100.0 / (space_avail + space_used) : 0;
+            max_space_util = MAX(max_space_util, space_util);
+        }
+        double inodes_util = NAN;
+        if (!isnan(inodes_avail) && !isnan(inodes_used)) {
+            inodes_util = inodes_avail + inodes_used > 0 ? inodes_used * 100.0 / (inodes_avail + inodes_used) : 0;
+            max_inodes_util = MAX(max_inodes_util, inodes_util);
+        }
+
+        buffer_json_add_array_item_double(wb, space_util);
+        buffer_json_add_array_item_double(wb, space_avail);
+        buffer_json_add_array_item_double(wb, space_used);
+        buffer_json_add_array_item_double(wb, space_reserved);
+
+        buffer_json_add_array_item_double(wb, inodes_util);
+        buffer_json_add_array_item_double(wb, inodes_avail);
+        buffer_json_add_array_item_double(wb, inodes_used);
+        buffer_json_add_array_item_double(wb, inodes_reserved);
+
+        buffer_json_array_close(wb);
+    }
+    dfe_done(mp);
+
+    buffer_json_array_close(wb); // data
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Mountpoint", "Mountpoint Name",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Filesystem", "Mountpoint Filesystem",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Root", "Mountpoint Root",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Used%", "Space Utilization",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "%", max_space_util, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Avail", "Space Avail",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "GiB", max_space_avail, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Used", "Space Used",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "GiB", max_space_used, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Reserved", "Space Reserved for root",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "GiB", max_space_reserved, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "iUsed%", "Inodes Utilization",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "%", max_inodes_util, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "iAvail", "Inodes Avail",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "inodes", max_inodes_avail, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "iUsed", "Inodes Used",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "inodes", max_inodes_used, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "iReserved", "Inodes Reserved for root",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "inodes", max_inodes_reserved, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+    }
+
+    buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "Used%");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Utilization");
+        {
+            buffer_json_member_add_string(wb, "name", "Utilization");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Used%");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Usage");
+        {
+            buffer_json_member_add_string(wb, "name", "Usage");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Avail");
+                buffer_json_add_array_item_string(wb, "Used");
+                buffer_json_add_array_item_string(wb, "Reserved");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Inodes");
+        {
+            buffer_json_member_add_string(wb, "name", "Inodes");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "iAvail");
+                buffer_json_add_array_item_string(wb, "iUsed");
+                buffer_json_add_array_item_string(wb, "iReserved");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Utilization");
+        buffer_json_add_array_item_string(wb, "Mountpoint");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Usage");
+        buffer_json_add_array_item_string(wb, "Mountpoint");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+
+    int response = HTTP_RESP_OK;
+    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data)) {
+        buffer_flush(wb);
+        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
+    }
+
+    if(result_cb)
+        result_cb(wb, response, result_cb_data);
+
+    return response;
+}
+
 void *diskspace_main(void *ptr) {
     worker_register("DISKSPACE");
     worker_register_job_name(WORKER_JOB_MOUNTINFO, "mountinfo");
@@ -621,6 +859,7 @@ void *diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
     rrd_collector_started();
+    rrd_function_add(localhost, NULL, "mount-points", 10, RRDFUNCTIONS_DISKSPACE_HELP, true, diskspace_function_mount_points, NULL);
 
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 

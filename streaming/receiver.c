@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "web/server/h2o/http_server.h"
 
 extern struct config stream_config;
 
@@ -28,9 +29,7 @@ void receiver_state_free(struct receiver_state *rpt) {
         close(rpt->fd);
     }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     rrdpush_decompressor_destroy(&rpt->decompressor);
-#endif
 
     if(rpt->system_info)
          rrdhost_system_info_free(rpt->system_info);
@@ -58,6 +57,11 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
         return 0;
     }
+
+#ifdef ENABLE_H2O
+    if (is_h2o_rrdpush(r))
+        return (int)h2o_stream_read(r->h2o_ctx, buffer, size);
+#endif
 
     int tries = 100;
     ssize_t bytes_read;
@@ -92,15 +96,44 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
     return (int)bytes_read;
 }
 
-static inline bool receiver_read_uncompressed(struct receiver_state *r) {
+static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
+    if(code > 0)
+        return 0;
+
+    switch(code) {
+        case 0:
+            // asked to read zero bytes
+            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER;
+
+        case -1:
+            // EOF
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_EOF;
+
+        case -2:
+            // failed to read
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED;
+
+        case -3:
+            // timeout
+            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT;
+
+        default:
+            // anything else
+            return STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+    }
+}
+
+static inline bool receiver_read_uncompressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(r->reader.read_buffer[r->reader.read_len] != '\0')
         fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
 #endif
 
     int bytes_read = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
-    if(unlikely(bytes_read <= 0))
+    if(unlikely(bytes_read <= 0)) {
+        *reason = read_stream_error_to_reason(bytes_read);
         return false;
+    }
 
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_read);
@@ -111,8 +144,7 @@ static inline bool receiver_read_uncompressed(struct receiver_state *r) {
     return true;
 }
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-static inline bool receiver_read_compressed(struct receiver_state *r) {
+static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
@@ -150,8 +182,10 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
     int bytes_read = 0;
     do {
         int ret = read_stream(r, r->reader.read_buffer + r->reader.read_len + bytes_read, r->decompressor.signature_size - bytes_read);
-        if (unlikely(ret <= 0))
+        if (unlikely(ret <= 0)) {
+            *reason = read_stream_error_to_reason(ret);
             return false;
+        }
 
         bytes_read += ret;
     } while(unlikely(bytes_read < (int)r->decompressor.signature_size));
@@ -187,7 +221,7 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 
         int last_read_bytes = read_stream(r, &compressed[start], remaining);
         if (unlikely(last_read_bytes <= 0)) {
-            internal_error(true, "read_stream() failed #2, with code %d", last_read_bytes);
+            *reason = read_stream_error_to_reason(last_read_bytes);
             return false;
         }
 
@@ -217,11 +251,6 @@ static inline bool receiver_read_compressed(struct receiver_state *r) {
 
     return true;
 }
-#else // !ENABLE_RRDPUSH_COMPRESSION
-static inline bool receiver_read_compressed(struct receiver_state *r) {
-    return receiver_read_uncompressed(r);
-}
-#endif // ENABLE_RRDPUSH_COMPRESSION
 
 /* Produce a full line if one exists, statefully return where we start next time.
  * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
@@ -315,6 +344,10 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         parser = parser_init(&user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
     }
 
+#ifdef ENABLE_H2O
+    parser->h2o_ctx = rpt->h2o_ctx;
+#endif
+
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
     rrd_collector_started();
@@ -323,27 +356,29 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
-    bool compressed_connection = false;
-
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if(stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
-        compressed_connection = true;
-        rrdpush_decompressor_reset(&rpt->decompressor);
-    }
-    else
-        rrdpush_decompressor_destroy(&rpt->decompressor);
-#endif
+    bool compressed_connection = rrdpush_decompression_initialize(rpt);
 
     buffered_reader_init(&rpt->reader);
+
+#ifdef NETDATA_LOG_STREAM_RECEIVE
+    {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(rpt->host) : "unknown");
+        parser->user.stream_log_fp = fopen(filename, "w");
+        parser->user.stream_log_repertoire = PARSER_REP_METADATA;
+    }
+#endif
 
     BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
     while(!receiver_should_stop(rpt)) {
 
         if(!buffered_reader_next_line(&rpt->reader, buffer)) {
-            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt) : receiver_read_uncompressed(rpt);
+            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+
+            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason) : receiver_read_uncompressed(rpt, &reason);
 
             if(unlikely(!have_new_data)) {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_ERROR, false);
+                receiver_set_exit_reason(rpt, reason, false);
                 break;
             }
 
@@ -611,11 +646,15 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "seconds per replication step", rpt->config.rrdpush_replication_step);
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "seconds per replication step", rpt->config.rrdpush_replication_step);
 
-#ifdef  ENABLE_RRDPUSH_COMPRESSION
     rpt->config.rrdpush_compression = default_rrdpush_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
-#endif  // ENABLE_RRDPUSH_COMPRESSION
+
+    if(rpt->config.rrdpush_compression) {
+        char *order = appconfig_get(&stream_config, rpt->key, "compression algorithms order", RRDPUSH_COMPRESSION_ALGORITHMS_ORDER);
+        order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithms order", order);
+        rrdpush_parse_compression_order(rpt, order);
+    }
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
@@ -709,12 +748,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
-    if (stream_has_capability(rpt, STREAM_CAP_COMPRESSION)) {
-        if (!rpt->config.rrdpush_compression)
-            rpt->capabilities &= ~STREAM_CAP_COMPRESSION;
-    }
-#endif // ENABLE_RRDPUSH_COMPRESSION
+    rrdpush_select_receiver_compression_algorithm(rpt);
 
     {
         // netdata_log_info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
@@ -737,19 +771,30 @@ static void rrdpush_receive(struct receiver_state *rpt)
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
-        ssize_t bytes_sent = send_timeout(
-#ifdef ENABLE_HTTPS
-                &rpt->ssl,
+#ifdef ENABLE_H2O
+        if (is_h2o_rrdpush(rpt)) {
+            h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
+        } else {
 #endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60);
+            ssize_t bytes_sent = send_timeout(
+#ifdef ENABLE_HTTPS
+                    &rpt->ssl,
+#endif
+                    rpt->fd, initial_response, strlen(initial_response), 0, 60);
 
-        if(bytes_sent != (ssize_t)strlen(initial_response)) {
-            internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
-            rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
-            goto cleanup;
+            if(bytes_sent != (ssize_t)strlen(initial_response)) {
+                internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
+                rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
+                goto cleanup;
+            }
+#ifdef ENABLE_H2O
         }
+#endif
     }
 
+#ifdef ENABLE_H2O
+    unless_h2o_rrdpush(rpt)
+#endif
     {
         // remove the non-blocking flag from the socket
         if(sock_delnonblock(rpt->fd) < 0)
