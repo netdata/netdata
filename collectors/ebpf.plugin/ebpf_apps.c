@@ -504,6 +504,10 @@ struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char
 
     strncpyz(w->clean_name, w->name, EBPF_MAX_NAME);
     netdata_fix_chart_name(w->clean_name);
+    for (char *d = w->clean_name; *d; d++) {
+        if (*d == '.')
+            *d = '_';
+    }
 
     strncpyz(w->compare, nid, EBPF_MAX_COMPARE_NAME);
     size_t len = strlen(w->compare);
