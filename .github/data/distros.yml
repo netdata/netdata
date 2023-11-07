@@ -246,6 +246,7 @@ include:
       alt_links:
         - el/9Server
         - el/9Client
+        - el/9RedHatVirtualizationHost
       arches:
         - x86_64
         - aarch64
@@ -259,6 +260,7 @@ include:
       alt_links:
         - el/8Server
         - el/8Client
+        - el/8RedHatVirtualizationHost
 
   - &ubuntu
     distro: ubuntu
