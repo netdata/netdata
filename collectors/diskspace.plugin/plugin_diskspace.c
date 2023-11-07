@@ -630,22 +630,6 @@ static void diskspace_main_cleanup(void *ptr) {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
 #endif
 
-static double get_last_stored_value(RRDDIM *rd_dim, double *max_value, double mul, double div) {
-    if (!rd_dim)
-        return NAN;
-
-    if (isnan(mul) || mul == 0)
-        mul = 1.0;
-    if (isnan(div) || div == 0)
-        div = 1.0;
-
-    double value = rd_dim->collector.last_stored_value * mul / div;
-    value = ABS(value);
-    *max_value = MAX(*max_value, value);
-
-    return value;
-}
-
 int diskspace_function_mount_points(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
         void *collector_data __maybe_unused,
         rrd_function_result_callback_t result_cb, void *result_cb_data,
@@ -685,12 +669,12 @@ int diskspace_function_mount_points(BUFFER *wb, int timeout __maybe_unused, cons
         buffer_json_add_array_item_string(wb, string2str(mp->filesystem));
         buffer_json_add_array_item_string(wb, string2str(mp->mountroot));
 
-        double space_avail = get_last_stored_value(mp->rd_space_avail, &max_space_avail, 1.0, 1.0);
-        double space_used = get_last_stored_value(mp->rd_space_used, &max_space_used, 1.0, 1.0);
-        double space_reserved = get_last_stored_value(mp->rd_space_reserved, &max_space_reserved, 1.0, 1.0);
-        double inodes_avail = get_last_stored_value(mp->rd_space_avail, &max_space_avail, 1.0, 1.0);
-        double inodes_used = get_last_stored_value(mp->rd_space_used, &max_space_used, 1.0, 1.0);
-        double inodes_reserved = get_last_stored_value(mp->rd_space_reserved, &max_space_reserved, 1.0, 1.0);
+        double space_avail = rrddim_get_last_stored_value(mp->rd_space_avail, &max_space_avail, 1.0);
+        double space_used = rrddim_get_last_stored_value(mp->rd_space_used, &max_space_used, 1.0);
+        double space_reserved = rrddim_get_last_stored_value(mp->rd_space_reserved, &max_space_reserved, 1.0);
+        double inodes_avail = rrddim_get_last_stored_value(mp->rd_inodes_avail, &max_inodes_avail, 1.0);
+        double inodes_used = rrddim_get_last_stored_value(mp->rd_inodes_used, &max_inodes_used, 1.0);
+        double inodes_reserved = rrddim_get_last_stored_value(mp->rd_inodes_reserved, &max_inodes_reserved, 1.0);
 
         double space_util = NAN;
         if (!isnan(space_avail) && !isnan(space_used)) {

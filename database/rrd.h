@@ -1668,6 +1668,22 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st);
 void rrdset_pluginsd_receive_unslot(RRDSET *st);
 
 // ----------------------------------------------------------------------------
+static inline double rrddim_get_last_stored_value(RRDDIM *rd_dim, double *max_value, double div) {
+    if (!rd_dim)
+        return NAN;
+
+    if (isnan(div) || div == 0.0)
+        div = 1.0;
+
+    double value = rd_dim->collector.last_stored_value / div;
+    value = ABS(value);
+
+    *max_value = MAX(*max_value, value);
+
+    return value;
+}
+
+//
 // RRD DB engine declarations
 
 #ifdef ENABLE_DBENGINE

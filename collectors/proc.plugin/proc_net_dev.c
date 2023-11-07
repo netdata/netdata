@@ -658,18 +658,21 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
         buffer_json_add_array_item_double(wb, d->mtu > 0 ? d->mtu : NAN);
 
         rd = d->flipped ? d->rd_tbytes : d->rd_rbytes;
-        double traffic_rx = NAN;
-        if (rd) {
-            traffic_rx = rd->collector.last_stored_value / 1000.0;
-            max_traffic_rx = MAX(max_traffic_rx, traffic_rx);
-        }
-
+        double traffic_rx = rrddim_get_last_stored_value(rd, &max_traffic_rx, 1000.0);
         rd = d->flipped ? d->rd_rbytes : d->rd_tbytes;
-        double traffic_tx = NAN;
-        if (rd) {
-            traffic_tx = ABS(rd->collector.last_stored_value / 1000.0);
-            max_traffic_tx = MAX(max_traffic_tx, traffic_tx);
-        }
+        double traffic_tx = rrddim_get_last_stored_value(rd, &max_traffic_tx, 1000.0);
+
+        rd = d->flipped ? d->rd_tpackets : d->rd_rpackets;
+        double packets_rx = rrddim_get_last_stored_value(rd, &max_packets_rx, 1000.0);
+        rd = d->flipped ? d->rd_rpackets : d->rd_tpackets;
+        double packets_tx = rrddim_get_last_stored_value(rd, &max_packets_tx, 1000.0);
+
+        double mcast_rx = rrddim_get_last_stored_value(d->rd_rmulticast, &max_mcast_rx, 1000.0);
+
+        rd = d->flipped ? d->rd_tdrops : d->rd_rdrops;
+        double drops_rx = rrddim_get_last_stored_value(rd, &max_drops_rx, 1.0);
+        rd = d->flipped ? d->rd_rdrops : d->rd_tdrops;
+        double drops_tx = rrddim_get_last_stored_value(rd, &max_drops_tx, 1.0);
 
         // FIXME: "traffic" (total) is needed only for default_sorting
         // can be removed when default_sorting will accept multiple columns (sum)
@@ -679,48 +682,14 @@ int netdev_function_net_interfaces(BUFFER *wb, int timeout __maybe_unused, const
             max_traffic = MAX(max_traffic, traffic);
         }
 
+
         buffer_json_add_array_item_double(wb, traffic_rx);
         buffer_json_add_array_item_double(wb, traffic_tx);
         buffer_json_add_array_item_double(wb, traffic);
-
-        rd = d->flipped ? d->rd_tpackets : d->rd_rpackets;
-        double packets_rx = NAN;
-        if (rd) {
-            packets_rx = rd->collector.last_stored_value / 1000.0;
-            max_packets_rx = MAX(max_packets_rx, packets_rx);
-        }
         buffer_json_add_array_item_double(wb, packets_rx);
-
-        rd = d->flipped ? d->rd_rpackets : d->rd_tpackets;
-        double packets_tx = NAN;
-        if (rd) {
-            packets_tx = ABS(rd->collector.last_stored_value / 1000.0);
-            max_packets_tx = MAX(max_packets_tx, packets_tx);
-        }
         buffer_json_add_array_item_double(wb, packets_tx);
-
-        double mcast_rx = NAN;
-        if (d->rd_rmulticast) {
-            mcast_rx = ABS(d->rd_rmulticast->collector.last_stored_value / 1000.0);
-            max_mcast_rx = MAX(max_mcast_rx, mcast_rx);
-        }
         buffer_json_add_array_item_double(wb, mcast_rx);
-
-
-        rd = d->flipped ? d->rd_tdrops : d->rd_rdrops;
-        double drops_rx = NAN;
-        if (rd) {
-            drops_rx = rd->collector.last_stored_value;
-            max_drops_rx = MAX(max_drops_rx, drops_rx);
-        }
         buffer_json_add_array_item_double(wb, drops_rx);
-
-        rd = d->flipped ? d->rd_rdrops : d->rd_tdrops;
-        double drops_tx = NAN;
-        if (rd) {
-            drops_tx = ABS(rd->collector.last_stored_value);
-            max_drops_tx = MAX(max_drops_tx, drops_tx);
-        }
         buffer_json_add_array_item_double(wb, drops_tx);
 
         buffer_json_add_array_item_object(wb);
