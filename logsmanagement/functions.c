@@ -204,7 +204,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_DATA_ONLY);
     // facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_ID);
     // facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_PROGRESS);
-    // facets_accepted_param(facets, JOURNAL_PARAMETER_DELTA);
+    facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_DELTA);
     // facets_accepted_param(facets, JOURNAL_PARAMETER_TAIL);
 
 // #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
@@ -281,14 +281,14 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
         else if(!strcmp(keyword, LOGS_MANAG_FUNC_PARAM_PROGRESS)){
             progress = true;
         }
-        // else if(strncmp(keyword, JOURNAL_PARAMETER_DELTA ":", sizeof(JOURNAL_PARAMETER_DELTA ":") - 1) == 0) {
-        //     char *v = &keyword[sizeof(JOURNAL_PARAMETER_DELTA ":") - 1];
+        else if(strncmp(keyword, LOGS_MANAG_FUNC_PARAM_DELTA ":", sizeof(LOGS_MANAG_FUNC_PARAM_DELTA ":") - 1) == 0) {
+            char *v = &keyword[sizeof(LOGS_MANAG_FUNC_PARAM_DELTA ":") - 1];
 
-        //     if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
-        //         delta = false;
-        //     else
-        //         delta = true;
-        // }
+            if(strcmp(v, "false") == 0 || strcmp(v, "no") == 0 || strcmp(v, "0") == 0)
+                delta = false;
+            else
+                delta = true;
+        }
         // else if(strncmp(keyword, JOURNAL_PARAMETER_TAIL ":", sizeof(JOURNAL_PARAMETER_TAIL ":") - 1) == 0) {
         //     char *v = &keyword[sizeof(JOURNAL_PARAMETER_TAIL ":") - 1];
 
@@ -579,9 +579,20 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     query_params.order_by_asc = 0;
 
     
-    // NOTE: Always perform descending timestamp query
-    query_params.req_from_ts = before_s * MSEC_PER_SEC;
-    query_params.req_to_ts = after_s * MSEC_PER_SEC;
+    // NOTE: Always perform descending timestamp query, req_from_ts >= req_to_ts.
+    if(fqs->direction == FACETS_ANCHOR_DIRECTION_BACKWARD){
+        query_params.req_from_ts = 
+            (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut / USEC_PER_MS : before_s * MSEC_PER_SEC;
+        query_params.req_to_ts = 
+            (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut / USEC_PER_MS : after_s * MSEC_PER_SEC;
+    }
+    else{
+        query_params.req_from_ts =
+            (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut / USEC_PER_MS : before_s * MSEC_PER_SEC;
+        query_params.req_to_ts = 
+            (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut / USEC_PER_MS : after_s * MSEC_PER_SEC;
+    }
+    
     query_params.stop_monotonic_ut = now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC;
     query_params.results_buff = buffer_create(query_params.quota, NULL);
 
