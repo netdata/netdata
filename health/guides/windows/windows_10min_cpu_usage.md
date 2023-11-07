@@ -1,4 +1,4 @@
-# wmi_10min_cpu_usage
+# windows_10min_cpu_usage
 
 ## Windows | CPU
 
