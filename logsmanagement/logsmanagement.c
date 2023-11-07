@@ -240,6 +240,8 @@ int main(int argc, char **argv) {
 
     /* If there are valid log sources, there should always be valid handles */
     collector_info("uv_run(main_loop, ...); no handles or requests - cleaning up...");
+    
+    error_log_limit_unlimited();
 
     // TODO: Clean up stats charts memory
     uv_thread_join(&stats_charts_thread_id);
@@ -250,13 +252,13 @@ int main(int argc, char **argv) {
 
     flb_free_fwd_input_out_cb();
 
+    p_file_info_destroy_all();
+
     uv_walk(main_loop, on_walk_cleanup, NULL);
     while(0 != uv_run(main_loop, UV_RUN_ONCE));
     if(uv_loop_close(main_loop))
         m_assert(0, "uv_loop_close() result not 0");
     freez(main_loop);
-
-    p_file_info_destroy_all();
 
     collector_info("logs management clean up done - exiting");
 

@@ -284,10 +284,8 @@ void stats_charts_init(void *arg){
     heartbeat_init(&hb);
     usec_t step_ut = g_logs_manag_config.update_every * USEC_PER_SEC;
 
-    while (1) {
+    while (0 == __atomic_load_n(&logsmanagement_should_exit, __ATOMIC_RELAXED)) {
         heartbeat_next(&hb, step_ut);
-        if (__atomic_load_n(&logsmanagement_should_exit, __ATOMIC_RELAXED)) 
-            break;
 
         netdata_mutex_lock(p_stdout_mut);
         stats_charts_update();

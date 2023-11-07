@@ -83,7 +83,8 @@ char *get_cache_dir(void){
  * @brief Cleanup p_file_info struct
  * @param p_file_info The struct of File_info type to be cleaned up.
  * @todo  Pass p_file_info by reference, so that it can be set to NULL. */
-static void p_file_info_destroy(struct File_info *p_file_info){
+static void p_file_info_destroy(void *arg){
+    struct File_info *p_file_info = (struct File_info *) arg;
 
     // TODO: Clean up rrd / chart stuff.
     // p_file_info->chart_meta
@@ -218,8 +219,13 @@ static void p_file_info_destroy(struct File_info *p_file_info){
 
 void p_file_info_destroy_all(void){
     if(p_file_infos_arr){
-        for(int i = 0; i < p_file_infos_arr->count; i++) 
-            p_file_info_destroy(p_file_infos_arr->data[i]);
+        uv_thread_t thread_id[p_file_infos_arr->count];
+        for(int i = 0; i < p_file_infos_arr->count; i++){
+            uv_thread_create(&thread_id[i], p_file_info_destroy, p_file_infos_arr->data[i]);
+        }
+        for(int i = 0; i < p_file_infos_arr->count; i++){
+            uv_thread_join(&thread_id[i]);
+        }
         freez(p_file_infos_arr);
         p_file_infos_arr = NULL;
     }
