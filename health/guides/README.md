@@ -1,5 +1,7 @@
 # Alert Guides
 
+> This directory contains outdated guides on our alerts, and should be revisited and updated.
+
 # Review process
 
 Each guide must pass one technical review and one phrasal/grammatical review. Technical reviews will be equally assigned to the senior staff - considering the team's priorities.
