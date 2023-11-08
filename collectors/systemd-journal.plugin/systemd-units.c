@@ -676,8 +676,6 @@ static void update_freezer_state(UnitInfo *u, UnitAttribute *ua) {
 // ----------------------------------------------------------------------------
 // common helpers
 
-#define _cleanup_(x) __attribute__((__cleanup__(x)))
-
 static void log_dbus_error(int r, const char *msg) {
     netdata_log_error("SYSTEMD_UNITS: %s failed with error %d (%s)", msg, r, strerror(-r));
 }

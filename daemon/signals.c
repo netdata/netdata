@@ -203,28 +203,28 @@ void signals_handle(void) {
 
                         switch (signals_waiting[i].action) {
                             case NETDATA_SIGNAL_RELOAD_HEALTH:
-                                error_log_limit_unlimited();
+                                nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
-                                error_log_limit_reset();
+                                nd_log_limits_reset();
                                 execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_SAVE_DATABASE:
-                                error_log_limit_unlimited();
+                                nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Saving databases...", name);
-                                error_log_limit_reset();
+                                nd_log_limits_reset();
                                 execute_command(CMD_SAVE_DATABASE, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_REOPEN_LOGS:
-                                error_log_limit_unlimited();
+                                nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Reopening all log files...", name);
-                                error_log_limit_reset();
+                                nd_log_limits_reset();
                                 execute_command(CMD_REOPEN_LOGS, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_EXIT_CLEANLY:
-                                error_log_limit_unlimited();
+                                nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
                                 commands_exit();
                                 netdata_cleanup_and_exit(0);

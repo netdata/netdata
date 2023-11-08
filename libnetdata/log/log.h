@@ -10,22 +10,112 @@ extern "C" {
 #include "../libnetdata.h"
 
 typedef enum {
-    ND_LOG_INPUT,
-    ND_LOG_ACCESS,
-    ND_LOG_ACLK,
-    ND_LOG_COLLECTORS,
-    ND_LOG_DEBUG,
-    ND_LOG_ERROR,
-    ND_LOG_HEALTH,
+    NDLS_INPUT = 0,   // internal use only
+    NDLS_ACCESS,      // access.log
+    NDLS_ACLK,        // aclk.log
+    NDLS_COLLECTORS,  // collectors.log
+    NDLS_DAEMON,      // error.log
+    NDLS_HEALTH,      // health.log
+    NDLS_DEBUG,       // debug.log
 
     // terminator
-    ND_LOG_TYPES_MAX,
-} ND_LOG_TYPE;
+    _NDLS_MAX,
+} ND_LOG_SOURCES;
 
-void nd_log_set_output(ND_LOG_TYPE type, const char *setting);
+typedef enum {
+    NDLP_ALERT      = LOG_ALERT,
+    NDLP_CRIT       = LOG_CRIT,
+    NDLP_EMERG      = LOG_EMERG,
+    NDLP_ERR        = LOG_ERR,
+    NDLP_WARNING    = LOG_WARNING,
+    NDLP_INFO       = LOG_INFO,
+    NDLP_NOTICE     = LOG_NOTICE,
+    NDLP_DEBUG      = LOG_DEBUG,
+} ND_LOG_FIELD_PRIORITY;
+
+typedef enum {
+    NDF_STOP = 0,
+    NDF_TIMESTAMP_REALTIME_USEC,
+    NDF_SYSLOG_IDENTIFIER,
+    NDF_LINE,
+    NDF_FILE,
+    NDF_FUNC,
+    NDF_ERRNO,
+    NDF_PRIORITY,
+    NDF_SESSION,
+    NDF_TID,
+    NDF_THREAD,
+    NDF_PLUGIN,
+    NDF_MODULE,
+    NDF_JOB,
+    NDF_NIDL_NODE,
+    NDF_NIDL_INSTANCE,
+    NDF_NIDL_DIMENSION,
+    NDF_MESSAGE,
+
+    // terminator
+    _NDF_MAX,
+} ND_LOG_FIELD_ID;
+
+typedef enum {
+    NDFT_UNSET = 0,
+    NDFT_TXT,
+    NDFT_U32,
+    NDFT_I32,
+    NDFT_U64,
+    NDFT_I64,
+    NDFT_PRIORITY,
+    NDFT_TIMESTAMP,
+} ND_LOG_STACK_FIELD_TYPE;
+
+void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_initialize(void);
 void nd_log_reopen_log_files(void);
+void chown_open_file(int fd, uid_t uid, gid_t gid);
+void nd_log_chown_log_files(uid_t uid, gid_t gid);
+
+struct log_stack_entry {
+    int id;
+    ND_LOG_STACK_FIELD_TYPE type;
+    bool set;
+    union {
+        const char *str;
+        uint32_t u32;
+        uint64_t u64;
+        int32_t i32;
+        int64_t i64;
+        ND_LOG_FIELD_PRIORITY priority;
+    };
+    struct log_stack_entry *prev, *next;
+};
+
+#define ND_LOG_STACK _cleanup_(log_stack_pop) struct log_stack_entry
+#define ND_LOG_STACK_PUSH(lgs) log_stack_push(lgs)
+
+#define ND_LOG_FIELD_STR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TXT, .str = (value), .set = true, }
+#define ND_LOG_FIELD_U64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U64, .u64 = (value), .set = true, }
+#define ND_LOG_FIELD_U32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U32, .u32 = (value), .set = true, }
+#define ND_LOG_FIELD_I64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I64, .i64 = (value), .set = true, }
+#define ND_LOG_FIELD_I32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I32, .i32 = (value), .set = true, }
+#define ND_LOG_FIELD_PRI(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_PRIORITY, .priority = (value), .set = true, }
+#define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP, .u64 = (value), .set = true, }
+#define ND_LOG_FIELD_END() { .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
+
+void log_stack_pop(void *ptr);
+void log_stack_push(struct log_stack_entry *lgs);
+
+//void example(void) {
+//    ND_LOG_STACK lgs[] = {
+//            ND_LOG_FIELD_STR(NDF_HOST, "hostname"),
+//            ND_LOG_FIELD_END(),
+//    };
+//    ND_LOG_STACK_PUSH(lgs);
+//
+//    netdata_log(NDLS_DAEMON, NDLP_CRITICAL, "%s", "blabla");
+//}
+
+
 
 #define D_WEB_BUFFER        0x0000000000000001
 #define D_WEB_CLIENT        0x0000000000000002
@@ -94,10 +184,11 @@ void log_date(char *buffer, size_t len, time_t now);
 
 static inline void debug_dummy(void) {}
 
-void error_log_limit_reset(void);
-void error_log_limit_unlimited(void);
+void nd_log_limits_reset(void);
+void nd_log_limits_unlimited(void);
 
 typedef struct error_with_limit {
+    SPINLOCK spinlock;
     time_t log_every;
     size_t count;
     time_t last_logged;

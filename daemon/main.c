@@ -313,7 +313,7 @@ void netdata_cleanup_and_exit(int ret) {
     const char *prev_msg = NULL;
     bool timeout = false;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     netdata_log_info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
@@ -664,7 +664,7 @@ static void set_nofile_limit(struct rlimit *rl) {
 }
 
 void cancel_main_threads() {
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
 
     int i, found = 0;
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
@@ -845,25 +845,29 @@ static void security_init(){
 static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    nd_log_set_output(ND_LOG_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug",  filename));
+    nd_log_set_destination_output(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
 
+#ifdef HAVE_SYSTEMD
+    snprintfz(filename, FILENAME_MAX, "journal");
+#else
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    nd_log_set_output(ND_LOG_ERROR, config_get(CONFIG_SECTION_LOGS, "error",  filename));
+#endif
+    nd_log_set_destination_output(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "error", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    nd_log_set_output(ND_LOG_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
+    nd_log_set_destination_output(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    nd_log_set_output(ND_LOG_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
+    nd_log_set_destination_output(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    nd_log_set_output(ND_LOG_ACCESS, config_get(CONFIG_SECTION_LOGS, "health", filename));
+    nd_log_set_destination_output(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-        nd_log_set_output(ND_LOG_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
+        nd_log_set_destination_output(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 #endif
 
@@ -1899,7 +1903,7 @@ int main(int argc, char **argv) {
         // get log filenames and settings
 
         log_init();
-        error_log_limit_unlimited();
+        nd_log_limits_unlimited();
 
         // initialize the log files
         nd_log_initialize();
@@ -2083,7 +2087,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // enable log flood protection
 
-    error_log_limit_reset();
+    nd_log_limits_reset();
 
     // Load host labels
     delta_startup_time("collect host labels");

@@ -323,11 +323,11 @@ static bool check_claim_param(const char *s) {
 }
 
 void claim_reload_all(void) {
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     load_claiming_state();
     registry_update_cloud_base_url();
     rrdpush_send_claimed_id(localhost);
-    error_log_limit_reset();
+    nd_log_limits_reset();
 }
 
 int api_v2_claim(struct web_client *w, char *url) {

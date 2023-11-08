@@ -201,6 +201,8 @@ extern "C" {
 // ----------------------------------------------------------------------------
 // netdata common definitions
 
+#define _cleanup_(x) __attribute__((__cleanup__(x)))
+
 #ifdef __GNUC__
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif // __GNUC__
