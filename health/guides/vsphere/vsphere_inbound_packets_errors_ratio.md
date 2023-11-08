@@ -1,48 +1,33 @@
-# vsphere_inbound_packets_errors_ratio
+### Understand the alert
 
-## Virtual Machine | Network
+The `vsphere_inbound_packets_errors_ratio` alert presents the ratio of inbound packet errors for the network interface of a virtual machine (VM) in VMware vSphere. If the ratio is equal to or greater than 2% and there are at least 10k packets within a 10 minute period, the alert switches to the warning state.
 
-This alert presents the ratio of inbound packet errors for the network interface over the last 10
-minutes.
+### What are packet errors?
 
-The percentage of dropped packets is calculated over the last 10 minutes. To raise the alert, the minimum number of packets must be at least 10k within the last 10 minutes; otherwise the alert is never raised.
+Packet errors occur when there's an issue with the packet during transmission. Common reasons include:
 
-If the value is >= 2% the alarm gets raised into the warning state.
+1. Transmission errors, where a packet is damaged on its way to its destination.
+2. Format errors, where the packet's format doesn't match what the receiving device was expecting.
 
-<details><summary>What are Packet Errors?</summary>
+Damaged packets can occur due to bad cables, bad ports, broken fiber cables, dirty fiber connectors, or high radio frequency interference.
 
-A packet error means there’s something wrong with the packet. There are two types of packet
-errors that usually occur:
-- Transmission errors, where a packet is damaged on its way to its destination – like a fragile Amazon order that gets dinged up en route.
-- Format errors, where a packet’s format isn’t what the receiving device was expecting (or wanting). Think ordering a Coca-Cola in a restaurant and getting a Pepsi instead.
+### Troubleshoot the alert
 
-Packets can easily become damaged on their way through a network. Common reasons for damaged packages are if a device is connected to Ethernet through a:
-- Bad cable 
-- Bad port 
-- Broken fiber cable
-- Dirty fiber connector
+1. Identify the affected virtual machine and its corresponding network interface by checking the alert details.
 
-Access points are also susceptible to packet errors. Offices often have multiple sources of
-high radio frequency interference thanks to Bluetooth devices, unmanaged access points,
-microwaves, and more. So packets traveling wirelessly are easily damaged.
+2. Inspect the network hardware by checking for any visible damage or loose connections related to the affected network interface. This may include Ethernet cables, fiber cables, and connectors. Replace or repair any damaged components.
 
-If a packet error occurs, TCP (Transmission Control Protocol) will resend the same information
-repeatedly, in hopes the data will eventually reach the destination without any problems.
-UDP (User Datagram Protocol) will keep trucking forward even when packets fail to reach
-their destination.<sup>[1](https://www.auvik.com/franklyit/blog/packet-errors-packet-discards-packet-loss/) </sup>
-</details>
+3. Check for radio frequency interference from nearby devices, such as Bluetooth devices or microwaves. If interference is suspected, move or disable the interfering devices, or consider using shielded cables for network connections.
 
-For further information, please have a look at the *References and Sources* section.
+4. Monitor vSphere network performance and error metrics by using VMware vSphere's monitoring tools or other third-party monitoring software, such as Netdata. This can help pinpoint which network devices, interfaces, or protocols are causing packet errors.
 
-<details><summary>References and Sources</summary>
+5. Verify that network devices and virtual machines are configured correctly to ensure optimal network performance. This may include checking Quality of Service (QoS) settings, VLAN configurations, or network resource allocation.
 
-1. [Packet Errors](https://www.auvik.com/franklyit/blog/packet-errors-packet-discards-packet-loss/)
+6. Update VMware vSphere to the latest version, as well as the network drivers and firmware of the physical host, to ensure compatibility and bug fixes are applied.
 
-2. [VMware Documentation](
-   https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-6DB73F20-C99A-43D4-9EE0-3277974EF8BF.html)
-</details>
+7. If the issue persists, consider reaching out to VMware support for further assistance.
 
-### Troubleshooting Section
+### Useful resources
 
-To find out why the alert was raised, follow the steps in the [VMware Documentation](
-https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-6DB73F20-C99A-43D4-9EE0-3277974EF8BF.html).
+1. [Packet Errors, Packet Discards & Packet Loss](https://www.auvik.com/franklyit/blog/packet-errors-packet-discards-packet-loss/)
+2. [VMware vSphere Networking Guide](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.networking.doc/GUID-6DB73F20-C99A-43D4-9EE0-3277974EF8BF.html)

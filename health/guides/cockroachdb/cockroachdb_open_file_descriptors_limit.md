@@ -1,33 +1,57 @@
-# cockroachdb_open_file_descriptors_limit
+### Understand the alert
 
-## Database | CockroachDB
+This alert indicates that the usage of file descriptors in your CockroachDB is reaching a high percentage against the soft-limit. High file descriptor utilization can cause issues, such as failures to open new files or establish network connections.
 
-This alert presents the percentage of used file descriptors for CockroachDB.  
-If you  receive this, it means that there is high file descriptor utilization against the 
-soft-limit.
+### Troubleshoot the alert
 
-This alert is raised in a warning state when the metric exceeds 80%.
+1. Check the current file descriptor limit and usage for CockroachDB:
 
-> In Unix and Unix-like computer operating systems, a file descriptor (FD, less frequently 
-> fildes) is a unique identifier (handle) for a file or other input/output resource, such as a 
-> pipe or network socket.
->
-> File descriptors typically have non-negative integer values, with negative values being 
-> reserved to indicate "no value" or error conditions.<sup>[1](
-> https://en.wikipedia.org/wiki/File_descriptor) </sup>
+   Use the `lsof` command to display information about all open file descriptors associated with the process running CockroachDB:
 
-<details><summary>References and Sources</summary>
+   ```
+   lsof -p <PID>
+   ```
 
-1. [CockroachDB documentation](
-   https://www.cockroachlabs.com/docs/v21.2/recommended-production-settings#file-descriptors-limit)
+   Replace `<PID>` with the process ID of CockroachDB.
 
-</details>
+   To display only the total number of open file descriptors, you can use this command:
 
-### Troubleshooting Section
+   ```
+   lsof -p <PID> | wc -l
+   ```
 
-<details><summary>Adjust the file descriptors limit for the process or system-wide</summary>
+2. Monitor file descriptor usage:
 
-Check out the [CockroachDB  documentation](
-https://www.cockroachlabs.com/docs/v21.2/recommended-production-settings#file-descriptors-limit) for troubleshooting advice.
+   Regularly monitoring file descriptor usage can help you identify patterns and trends, making it easier to determine if adjustments are needed. You can use tools like `lsof` or `sar` to monitor file descriptor usage on your system.
 
-</details>
+3. Adjust the file descriptors limit for the process:
+
+   You can raise the soft-limit for the CockroachDB process by modifying the `ulimit` configuration:
+
+   ```
+   ulimit -n <new_limit>
+   ```
+
+   Replace `<new_limit>` with the desired value, which must be less than or equal to the system-wide hard limit.
+
+   Note that changes made using `ulimit` only apply to the current shell session. To make the changes persistent, you should add the `ulimit` command to the CockroachDB service startup script or modify the system-wide limits in `/etc/security/limits.conf`.
+
+4. Adjust the system-wide file descriptors limit:
+
+   If necessary, you can also adjust the system-wide limits for file descriptors in `/etc/security/limits.conf`. Edit this file as a root user, and add or modify the following lines:
+
+   ```
+   * soft nofile <new_soft_limit>
+   * hard nofile <new_hard_limit>
+   ```
+
+   Replace `<new_soft_limit>` and `<new_hard_limit>` with the desired values. You must restart the system or CockroachDB for the changes to take effect.
+
+5. Optimize CockroachDB configuration:
+
+   Review the CockroachDB configuration and ensure that it's optimized for your workload. If appropriate, adjust settings such as cache size, query optimization, and memory usage to reduce the number of file descriptors needed.
+
+### Useful resources
+
+1. [CockroachDB recommended production settings](https://www.cockroachlabs.com/docs/v21.2/recommended-production-settings#file-descriptors-limit)
+2. [Increasing file descriptor limits on Linux](https://www.tecmint.com/increase-set-open-file-limits-in-linux/)

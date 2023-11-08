@@ -1,79 +1,64 @@
-# mysql_replication
+### Understand the alert
 
-## Database | MySQL, MariaDB
+This alert is triggered when the replication status of a MySQL server is indicating a problem or failure. Replication is important for redundancy, data backup, or load balancing. Issues with replication threads can lead to data inconsistencies or potential loss of data.
 
-This alert monitors the replication status of the MySQL server.  
-If you receive this, either both or one of the I/O and SQL threads are not running.
+### Troubleshoot the alert
 
-This alert is raised into critical if replication has stopped.
+1. Identify the failing thread:
 
+   As mentioned above, use the appropriate command for your MySQL or MariaDB version to check the status of replication threads and determine which of them (I/O or SQL) is not running.
 
-> In MySQL, replication involves the source database writing down every change made to the data
-> held within one or more databases in a special file known as the binary log. Once the replica
-> instance has been initialized, it creates two threaded processes. The first, called the IO
-> thread, connects to the source MySQL instance and reads the binary log events line by line,
-> and then copies them over to a local file on the replica’s server called the relay log. The
-> second thread, called the SQL thread, reads events from the relay log and then applies them
-> to the replica instance as fast as possible.
->
-> Recent versions of MySQL support two methods for replicating data. The difference between these
-> replication methods has to do with how replicas track which database events from the source
-> they’ve already processed.<sup>[1](
-> https://www.digitalocean.com/community/tutorials/how-to-set-up-replication-in-mysql) </sup>
+   For MySQL and MariaDB before v10.2.0, use:
 
-For further information, please have a look at the _References and Sources_ section.
+   ```
+   SHOW SLAVE STATUS\G
+   ```
 
+   For MariaDB v10.2.0+, use:
 
-<details><summary>References and Sources</summary>
+   ```
+   SHOW ALL SLAVES STATUS\G
+   ```
 
-1. [Replication in MySQL](
-   https://www.digitalocean.com/community/tutorials/how-to-set-up-replication-in-mysql)
-2. [MySQL documentation](
-   https://dev.mysql.com/doc/refman/5.7/en/replication-administration-status.html)
-3. [Section 8.14.6, “Replication Replica I/O
-   Thread States”](https://dev.mysql.com/doc/refman/5.7/en/replica-io-thread-states.html)
-4. [Section 8.14.7, “Replication Replica SQL Thread
-   States”](https://dev.mysql.com/doc/refman/5.7/en/replica-sql-thread-states.html)
-</details>
+2. Inspect the MySQL error log:
 
-### Troubleshooting Section
+   The MySQL error log can provide valuable information about the possible cause of the replication issues. Check the log for any replication-related error messages:
 
-<details><summary>Check which thread is not running</summary>
+   ```
+   tail -f /path/to/mysql/error.log
+   ```
 
-From the MySQL command line you can run:
+   Replace `/path/to/mysql/error.log` with the correct path to the MySQL error log file.
 
-- For MySQL and MariaDB before v10.2.0: 
-   
-  ```
-  SHOW SLAVE STATUS\G
-  ```
-- For MariaDB v10.2.0+:
-  
-  ```
-  SHOW ALL SLAVES STATUS\G
-  ```
-   
-This will show you three important rows among other info:
+3. Check the source MySQL server:
 
-> - Slave_IO_State:  
-    The current status of the replica. See [Section 8.14.6, “Replication Replica I/O
-    Thread States”](https://dev.mysql.com/doc/refman/5.7/en/replica-io-thread-states.html), and
-    [Section 8.14.7, “Replication Replica SQL Thread 
-    States”](https://dev.mysql.com/doc/refman/5.7/en/replica-sql-thread-states.html), for more
-    information.
->
->
-> - Slave_IO_Running:  
-    Whether the I/O thread for reading the source's binary log is running.
-    Normally, you want this to be **Yes** unless you have not yet started replication or have
-    explicitly stopped it with STOP SLAVE.
->
->
-> - Slave_SQL_Running:  
-    Whether the SQL thread for executing events in the relay log is running. As
-    with the I/O thread, this should normally be **Yes**.<sup> [2](
-    https://dev.mysql.com/doc/refman/5.7/en/replication-administration-status.html) </sup>
+   Replication issues can also originate from the source MySQL server. Make sure that the source server is properly configured and running, and that the binary logs are being written and flushed correctly.
 
-For more info you can refer to the [MySQL documentation](
-https://dev.mysql.com/doc/refman/5.7/en/replication-administration-status.html).
-</details>
+   Refer to the [MySQL documentation](https://dev.mysql.com/doc/refman/5.7/en/replication-howto.html) for more information on configuring replication.
+
+4. Restart the replication threads:
+
+   After identifying and resolving any issues found in the previous steps, you can try restarting the replication threads:
+
+   ```
+   STOP SLAVE;
+   START SLAVE;
+   ```
+
+   For MariaDB v10.2.0+ with multi-source replication, you may need to specify the connection name:
+
+   ```
+   STOP ALL SLAVES;
+   START ALL SLAVES;
+   ```
+
+5. Verify the replication status:
+
+   After restarting the replication threads, use the appropriate command from step 1 to verify that the threads are running, and that the replication is working as expected.
+
+### Useful resources
+
+1. [How To Set Up Replication in MySQL](https://www.digitalocean.com/community/tutorials/how-to-set-up-replication-in-mysql)
+2. [MySQL Replication Administration and Status](https://dev.mysql.com/doc/refman/5.7/en/replication-administration-status.html)
+3. [Replication Replica I/O Thread States](https://dev.mysql.com/doc/refman/5.7/en/replica-io-thread-states.html)
+4. [Replication Replica SQL Thread States](https://dev.mysql.com/doc/refman/5.7/en/replica-sql-thread-states.html)

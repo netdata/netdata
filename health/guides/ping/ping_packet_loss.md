@@ -1,40 +1,44 @@
-# fping_packet_loss
+### Understand the alert
 
-## OS: Any
+This alert calculates the `ping packet loss` percentage to the network host over the last 10 minutes. If you receive this alert, it means that your network is experiencing increased packet loss.
 
-`fping` is a command line tool to send ICMP (Internet Control Message Protocol) echo requests to
-network hosts, similar to ping, but performing much better when pinging multiple hosts. The Netdata
-Agent utilizes `fping` to monitor latency, packet loss, uptime and reachability of any number of
-network endpoints.
+### What does ping packet loss mean?
 
-For `fping_packet_loss`, the Netdata Agent calculates the packet loss ratio to a network host
-over the last 10 minutes. Receiving this alert indicates high packet loss towards a network host.
-This could be caused by link congestion, link node faults, high server load, or incorrect system
-settings.
+Ping is a command used to test the reachability of a host on a network. It measures the round-trip-time (RTT) for packets sent from the source host to the destination host. Packet loss occurs when these packets are not successfully delivered to their destination.
 
-### Troubleshooting
+### Troubleshoot the alert
 
-<details>
-    <summary>Prioritize important traffic on your endpoint (linux based endpoints)</summary>
+1. Check for network congestion:
 
-Quality of service (QoS) is the use of mechanisms or technologies to control traffic and ensure the
-performance of critical applications. QoS works best when low-priority traffic exists that can be
-dropped when congestion occurs. The higher-priority traffic must fit within the bandwidth
-limitations of the link or path. The following are two open source solutions to apply QoS policies
-to your network interfaces.
+   Excessive network traffic can cause packet loss. Use tools like `iftop`, `nload`, or `bmon` to monitor your network bandwidth usage and identify possible congestion sources.
 
-- `FireQOS`:
+2. Inspect the network hardware:
 
-  FireQOS is a traffic shaping helper. It has a very simple shell scripting language to express
-  traffic shaping.
+   Faulty network hardware like routers, switches, and cables can lead to packet loss. Examine the physical network hardware for possible issues and ensure that all devices are functioning properly.
 
-  [See more on FireQOS](https://firehol.org/tutorial/fireqos-new-user/)
+3. Test the connection to the destination host:
 
-- `tcconfig`:
+   Use the `ping` command to test the connection to the destination host:
 
-  Tcconfig is a command wrapper that makes it easy to set up traffic control of network bandwidth,
-  latency, packet-loss, packet-corruption, etc.
+   ```
+   ping <destination_host>
+   ```
 
-  [See more on tcconfig](https://tcconfig.readthedocs.io/en/latest/index.html)
+   If you experience consistent packet loss, it may indicate an issue with the destination host or the network path leading to it.
 
-</details>
+4. Check the destination host:
+
+   If the destination host is under heavy load or experiencing issues, it may cause packet loss. Check the host's resources, such as CPU usage, memory usage, and disk space, and resolve any issues if necessary.
+
+5. Investigate possible packet loss causes:
+
+   Some factors that can cause packet loss include network congestion, poor network equipment performance, corrupt data packets, or interference from other devices. Analyze your network traffic and pinpoint the cause of the packet loss.
+
+6. Rectify any identified issues:
+
+   Once you've identified the cause of the packet loss, take appropriate measures to resolve it. This may involve updating network hardware, optimizing network traffic, or fixing issues with the destination host.
+
+### Useful resources
+
+1. [How to Troubleshoot Packet Loss](https://www.lifewire.com/how-to-troubleshoot-packet-loss-on-your-network-4685249)
+2. [Diagnosing Network Issues with MTR](https://www.linode.com/community/questions/17967/diagnosing-network-issues-with-mtr)

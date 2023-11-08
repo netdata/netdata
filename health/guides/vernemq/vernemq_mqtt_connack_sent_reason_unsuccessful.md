@@ -1,50 +1,20 @@
-# vernemq_mqtt_connack_sent_reason_unsuccessful
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert is triggered when there is a significant increase in the number of unsuccessful v3/v5 CONNACK packets sent by the VerneMQ broker within the last minute. A higher-than-normal rate of unsuccessful CONNACKs indicates that clients are experiencing difficulties establishing a connection with the MQTT broker.
 
-In the MQTT protocol, the CONNACK packet is the packet sent by the server in response to a CONNECT
-attempt from a client. The first packet sent from the server to the client must be a CONNACK packet.
-If the client does not receive a CONNACK packet from the server within a reasonable amount of time,
-the client should close the Network Connection. The "reasonable" amount of time depends on the type
-of application and the communications infrastructure.
+### What is a CONNACK packet?
 
-For various scenarios, there are specific CONNACK responses for both MQTT v3 and v5 . You can find
-the detailed response codes and descriptions for each protocol in the official documentation of
-MQTT,
-for [v3 (subsection 3.2.2.3 Connect Return code)](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718035)
-and
-for [v5 (subsection 3.2.2.2 Connect Reason Code)](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901074)
+A CONNACK packet is an acknowledgment packet sent by the MQTT broker to a client in response to a CONNECT command. The CONNACK packet informs the client if the connection has been accepted or rejected, which is indicated by the return code. An unsuccessful CONNACK packet indicates a rejected connection.
 
-MQTT v5 supports a wider variety of negative acknowledgements (unsuccessful CONNACK packets ), which
-makes it a lot easier for both the client and the VerneMQ admin to understand what's happening.
+### Troubleshoot the alert
 
-The Netdata Agent monitors the number of sent unsuccessful v3/v5 CONNACK packets over the last
-minute. This alert is raised into warning when your VerneMQ server sends more than 5 unsuccessful
-packets in the last minute.
+1. **Check VerneMQ logs**: Inspect the VerneMQ logs for error messages or reasons why the connections are being rejected. By default, these logs are located at `/var/log/vernemq/console.log` and `/var/log/vernemq/error.log`. Look for entries with "CONNACK" and discern the cause of the unsuccessful connections.
 
-<details>
-<summary>References and Sources</summary>
+2. **Diagnose client configuration issues**: Analyze the rejected connection attempts' client configurations, such as incorrect credentials, unsupported protocol versions, or security settings. Debug the client-side applications, fix the configurations, and try reconnecting to the MQTT broker.
 
-1. [MQTT v3 docs, CONNACK description](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033)
-2. [MQTT v5 docs, CONNACK description](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901074)
+3. **Evaluate broker capacity**: Check the system resources and settings of the VerneMQ broker. An overloaded broker or insufficient system resources, such as CPU and memory, can cause connection rejections. Optimize the VerneMQ configuration, upgrade the broker's hardware, or distribute the load between multiple brokers to resolve the issue.
 
-</details>
+4. **Assess network issues**: Verify the network topology, firewalls, and router settings to ensure clients can reach the MQTT broker. Network latency or misconfigurations can lead to unsuccessful CONNACKs. Use monitoring tools such as `ping`, `traceroute`, or `netstat` to diagnose network issues and assess connectivity between clients and the broker.
 
-### Troubleshooting Section
+5. **Verify security settings and permissions**: Check the VerneMQ broker's security settings, including access control lists (ACL), user permissions, and authentication/authorization settings. Restricted access or incorrect permissions can lead to connection rejections. Update the security settings accordingly and test the connection again.
 
-<details>
-<summary>General approach</summary>
-
-Open the alerts Dashboard, and locate the chart of this alert (`mqtt_connack_sent_reason`). Inspect
-which CONNACK packets (by reason) triggered this alert. As soon as you inspect the reason (by
-consulting the subsections: _connect reason code_ which we mentioned above for your protocol ), you
-will have to examine
-your [logs](https://docs.vernemq.com/configuring-vernemq/logging#console-logging) to check which
-client(s) are raising these issues. These kinds of issues appear in the warning log level, so you
-may have to set your log level appropriately.
-
-```
-root@netdata # cat /var/log/vernemq/console.log | grep "due to <keywords: error> "
-```
-
-</details>

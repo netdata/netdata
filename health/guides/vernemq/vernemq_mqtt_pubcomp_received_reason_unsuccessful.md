@@ -1,76 +1,26 @@
-# vernemq_mqtt_pubcomp_received_reason_unsuccessful
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert indicates that the VerneMQ broker has received an increased number of unsuccessful MQTT v5 PUBCOMP (Publish Complete) packets in the last minute. The PUBCOMP packet is the fourth and final packet in the QoS 2 publish flow. It means that there are issues in the MQTT message delivery process at Quality of Service (QoS) level 2, which could lead to message loss or duplicated messages.
 
-The PUBCOMP packet is the response to a PUBREL packet. It is the fourth and final packet of the QoS
-2 protocol exchange.
+### What does an unsuccessful PUBCOMP mean?
 
-The Netdata Agent monitors the number of received unsuccessful v5 PUBCOMP packets in the last
-minute.
+An unsuccessful PUBCOMP occurs when the recipient of a PUBLISH message (subscriber) acknowledges reception but encounters a problem while processing the message. The PUBCOMP packet contains a Reason Code, indicating the outcome of processing the PUBLISH message. In a successful case, the code would be 0x00 (Success); otherwise, it would be one of the following: 0x80 (Unspecified Error), 0x83 (Implementation Specific Error), 0x87 (Not Authorized), 0xD0 (Packet Identifier in Use), or 0xD2 (Packet Identifier Not Found).
 
-For various scenarios, there are specific DISCONNECT responses for MQTT protocol v5. You can find
-Message. This is not something abnormal.
+### Troubleshoot the alert
 
+1. Check the VerneMQ error logs: VerneMQ logs can provide valuable information on encountered errors or any misconfiguration that leads to unsuccessful PUBCOMP messages. Generally, their location is `/var/log/vernemq/console.log`, `/var/log/vernemq/error.log`, and `/var/log/vernemq/crash.log`.
 
-<details>
-<summary>MQTT basic concepts and more</summary>
+2. Review MQTT clients' logs: Inspect the logs of the MQTT clients that are publishing or subscribing to the messages on the VerneMQ broker. This may help you identify specific clients causing the problem or any pattern associated with unsuccessful PUBCOMP messages.
 
-Basic concepts in every MQTT
-architecture <sup>[1](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all) </sup>:
+3. Verify the Quality of Service (QoS) level: Check if the QoS level for PUBCOMP packets is set to 2, as required. If necessary, adjust the settings for the MQTT clients to match the expected QoS level.
 
-- _Broker_ - The broker is the server that distributes the information to the interested clients
-  connected to the server.
-- _Client_ - The device that connects to broker to send or receive information.
-- _Topic_ - The name that the message is about. Clients publish, subscribe, or do both to a topic.
-- _Publish_ - Clients that send information to the broker to distribute to interested clients based
-  on the topic name.
-- _Subscribe_ - Clients tell the broker which topic(s) they're interested in. When a client
-  subscribes to a topic, any message published to the broker is distributed to the subscribers of
-  that topic. Clients can also unsubscribe to stop receiving messages from the broker about that
-  topic.
-- _QoS_ - Quality of Service. Each connection can specify a quality of service to the broker with an
-  integer value ranging from 0-2. The QoS does not affect the handling of the TCP data
-  transmissions, only between the MQTT clients. Note: In the examples later on, we'll only be using
-  QoS 0.
+4. Investigate authorization and access control: If the Reason Code is related to authorization (0x87), verify that the MQTT clients involved have the correct permissions to publish and subscribe to the topics in question. Make sure that the VerneMQ Access Control List (ACL) or external authentication mechanisms are correctly configured.
 
-    - _QoS 0_ specifies at most once, or once and only once without requiring an acknowledgment of
-      delivery. This is often referred to as fire and forget.
-    - _QoS 1_ specifies at least once. The message is sent multiple times until an acknowledgment is
-      received, known otherwise as acknowledged delivery.
-    - _QoS 2_ specifies exactly once. The sender and receiver clients use a two level handshake to
-      ensure only one copy of the message is received, known as assured delivery.
+5. Monitor network connectivity: Unsuccessful PUBCOMP messages could be due to network issues between the MQTT clients and the VerneMQ broker. Monitor and analyze network latency or packet loss between clients and the VerneMQ server to identify any potential issues.
 
-- _VerneMQ WebSockets_ - WebSocket is a computer communications protocol, providing full-duplex
-  communication channels over a single TCP connection. VerneMQ supports the WebSocket protocol out
-  of the box. To be able to open a WebSocket connection to VerneMQ, you have to configure a
-  WebSocket listener or Secure WebSocket listener in the `vernemq.conf`. See more in the official
-  documentation in
-  the [how to configure WebSocket](https://docs.vernemq.com/configuring-vernemq/websockets)
-  section
+### Useful resources
 
-</details>
-
-<details>
-<summary>References and sources</summary>
-
-1. [Introduction to MQTT](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all)
-2. [MQTT v5 docs, PUBCOMP reason codes](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901154)
-
-</details>
-
-### Troubleshooting Section
-
-<details>
-<summary>General approach</summary>
-
-Open the alerts Dashboard and locate the chart of this alert (`mqtt_pubcomp_received_reason`). Inspect
-which PUBCOMP packets (by reason) triggered this alert. Inspect the reason why your server received
-those responses by consulting the subsection _OPERATION REASON
-CODE_ <sup>[2](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901154) </sup>
-which we mentioned above.
-
-For example, your server may respond to a client `QoS: packet identifier not found`, This is not an
-error during recovery, but at other times indicates a mismatch between the Session State on the
-Client and Server.
-
-</details>
+1. [VerneMQ Documentation](https://vernemq.com/docs/)
+2. [MQTT v5 Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
+3. [Troubleshooting VerneMQ](https://vernemq.com/docs/guide/introduction/troubleshooting/)
+4. [VerneMQ ACL Configuration](https://vernemq.com/docs/configuration/acl.html)

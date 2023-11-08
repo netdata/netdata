@@ -1,29 +1,36 @@
-# vcsa_mem_health
+### Understand the alert
 
-## Virtual Machine | VMware vCenter
+The `vcsa_mem_health` alert indicates the memory health status of a virtual machine within the VMware vCenter. If you receive this alert, it means that the system's memory health could be compromised, and might lead to degraded performance, serious problems, or stop functioning.
 
-This alert presents the memory health status.  
-The values for every component's health can be:
+### Troubleshoot the alert
 
-| Code |                              Color                              | Description                                                 | Alert Status |
-|:----:|:---------------------------------------------------------------:|:------------------------------------------------------------|:------------:|
-| `-1` |                            no color                             | Unknown.                                                    |    Clear     |
-| `0`  | ![#00FF00](https://via.placeholder.com/18/00FF00/000000?text=+) | The component is healthy.                                   |    Clear     |
-| `1`  | ![#ffea00](https://via.placeholder.com/18/ffea00/000000?text=+) | The component is healthy but may have some problems.        |   Warning    |
-| `2`  | ![#ffa500](https://via.placeholder.com/18/ffa500/000000?text=+) | The component is degraded, and may have serious problems.   |   Critical   |
-| `3`  | ![#f03c15](https://via.placeholder.com/18/f03c15/000000?text=+) | The component is unavailable or will stop functioning soon. |   Critical   |
-| `4`  | ![#808080](https://via.placeholder.com/18/808080/000000?text=+) | No health data is available.                                |    Clear     |
+1. **Check the vCenter Server Appliance health**:
+   - Log in to the vSphere Client and select the vCenter Server instance.
+   - Navigate to the Monitor tab > Health section.
+   - Check the Memory Health status, and take note of any concerning warnings or critical issues.
 
-For further information, please have a look at the *References and Sources* section.
+2. **Analyze the memory usage**:
+   - Log in to the vSphere Client and select the virtual machine.
+   - Navigate to the Monitor tab > Performance section > Memory.
+   - Evaluate the memory usage trends and look for any unusual spikes or prolonged high memory usage.
 
-<details><summary>References and Sources</summary>
+3. **Identify processes consuming high memory**:
+   - Log in to the affected virtual machine.
+   - Use the appropriate task manager or command, depending on the OS, to list processes and their memory usage.
+   - Terminate any unnecessary processes that are consuming high memory, but ensure that the process is not critical to system operation.
 
-1. [VMware Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)
+4. **Optimize the virtual machine's memory allocation**:
+   - If the virtual machine consistently experiences high memory usage, consider increasing the allocated memory or optimizing applications running on the virtual machine to consume less memory.
 
-</details>
+5. **Update VMware tools**:
+   - Ensuring that the VMware tools are up to date can help in better memory management and improve overall system health.
 
-### Troubleshooting Section
+6. **Check hardware issues**:
+   - If the problem persists, check hardware components such as memory sticks, processors, and data stores for any faults that could be causing the problem.
 
-To find out why the alert was raised, follow the steps in
-the [vmware vCenter Server documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)
-.
+7. **Contact VMware Support**:
+   - If you can't resolve the `vcsa_mem_health` alert or are unable to identify the root cause, contact VMware Support for further assistance.
+
+### Useful resources
+
+1. [VMware vCenter Server Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)

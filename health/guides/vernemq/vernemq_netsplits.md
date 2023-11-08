@@ -1,25 +1,44 @@
-# vernemq_netsplits
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert indicates that your VerneMQ cluster has experienced a netsplit (split-brain) situation within the last minute. This can lead to inconsistencies in the cluster, and you need to troubleshoot the problem to maintain proper cluster operation.
 
-A netsplit (also known as split-brain) is mostly the result of a failure of one or more network devices resulting in a cluster
-where nodes can no longer reach each other.
+### What is a netsplit?
 
-The VerneMQ documentation explains how VerneMQ [deals with netsplits](https://docs.vernemq.com/v/master/vernemq-clustering/netsplits).
+In distributed systems, a netsplit occurs when a cluster of nodes loses connectivity to one or more nodes due to a network failure, leaving the cluster to operate in a degraded state. In the context of VerneMQ, a netsplit can lead to inconsistencies in the subscription data and retained messages.
 
-The Netdata Agent monitors the number of detected netsplits within the last minute. This alert indicates a split-brain situation.
+### Troubleshoot the alert
 
-### Troubleshooting section
+- Confirm the alert issue
 
-<details>
-<summary>Check connectivity between nodes</summary>
+  Review the VerneMQ logs to check for any signs of network partitioning or netsplits.
 
-You must ensure that the connectivity between your cluster nodes is valid. As soon as the partition
-is healed, and connectivity reestablished, the VerneMQ nodes replicate the latest changes made to
-the subscription data. This includes all the changes 'accidentally' made during the window of
-uncertainty. VerneMQ uses dotted version vectors to ensure that convergence regarding subscription
-data and retained messages is eventually reached.
+- Check connectivity between nodes
 
-</details>
+  Ensure that the network connectivity between your cluster nodes is restored. You can use tools like `ping` and `traceroute` to verify network connectivity.
 
+- Inspect node status
 
+  Use the `vmq-admin cluster show` command to inspect the current status of the nodes in the VerneMQ cluster, and check for any disconnected nodes:
+
+  ```
+  vmq-admin cluster show
+  ```
+
+- Reestablish connections and heal partitions
+
+  If a node is disconnected, reconnect it using the `vmq-admin cluster join` command:
+
+  ```
+  vmq-admin cluster join discovery-node=IP_ADDRESS_OF_ANOTHER_NODE
+  ```
+
+  As soon as the partition is healed, and connectivity is reestablished, the VerneMQ nodes will replicate the latest changes made to the subscription data.
+
+- Ensure node connectivity remains active
+
+  Monitor the cluster and network to maintain consistent connectivity between the nodes. Set up monitoring tools and consider using an auto-healing or auto-scaling framework to help maintain node connectivity.
+
+### Useful resources
+
+1. [VerneMQ Clustering Guide: Netsplits](https://docs.vernemq.com/v/master/vernemq-clustering/netsplits)
+2. [VerneMQ Documentation](https://docs.vernemq.com/)

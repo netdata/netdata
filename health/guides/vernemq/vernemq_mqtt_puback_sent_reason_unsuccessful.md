@@ -1,43 +1,32 @@
-# vernemq_mqtt_puback_sent_reason_unsuccessful
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert is related to VerneMQ, an MQTT message broker. If you receive this alert, it means that an increasing number of unsuccessful v5 PUBACK packets have been sent in the last minute.
 
-A PUBACK packet is the response to a PUBLISH packet with QoS 1. The Netdata Agent monitors the
-number of sent unsuccessful v5 PUBACK packets in the last minute. For various scenarios, there are
-specific PUBACK responses for MQTT protocol v5. You can find the detailed response codes which were
-sent by a client or a server and their descriptions in the official documentation of MQTT in
-the [MQTT v5 docs, PUBACK Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901124)
-. The Client or Server sending the PUBACK packet must always use one of the PUBACK Reason Codes.
+### What does "unsuccessful v5 PUBACK" mean?
 
-<details>
-<summary>See more about QoS 1 </summary>
+In the MQTT protocol, when a client sends a Publish message with a Quality of Service (QoS) level 1, the message broker sends a PUBACK packet to acknowledge receipt of the message. However, MQTT v5 has added a reason code field in the PUBACK packet, allowing brokers to report any issues or errors that occurred during message delivery. An "unsuccessful v5 PUBACK" refers to a PUBACK packet that reports a delivery problem or issue.
 
-The Quality of Service (QoS) level is an agreement between the sender of a message and the receiver
-of a message that defines the guarantee of delivery for a specific message. In QoS 1, a client will
-receive a confirmation message from the broker upon receipt. If the expected confirmation is not
-received within a certain time frame, the client has to retry the message. A message received by a
-client must be acknowledged on time as well, otherwise the broker will re-deliver the
-message. <sup>[1](https://vernemq.com/intro/mqtt-primer/quality_of_service.html) </sup>
+### Troubleshoot the alert
 
-</details>
+1. Check VerneMQ logs for possible errors or warnings: VerneMQ logs can provide valuable insights into the broker's runtime behavior, including connection issues or problems with authentication/authorization. Look for errors or warnings in the logs that could indicate the cause of the unsuccessful PUBACK packets.
 
-<details>
-<summary>References and sources</summary>
+   ```
+   sudo journalctl -u vernemq
+   ```
 
-1. [Quality of service explained, VerneMQ docs](https://vernemq.com/intro/mqtt-primer/quality_of_service.html)
-2. [MQTT v5 docs, PUBACK description](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901100)
+2. Verify client connections: Connection issues can be a possible cause of unsuccessful PUBACK packets. Use the `vmq-admin session show` command to view the client connections, and check for any abnormal behavior (e.g., frequent disconnects and reconnects).
 
-</details>
+   ```
+   sudo vmq-admin session show
+   ```
 
-### Troubleshooting Section
+3. Check MQTT client logs: Review the logs from the devices that connect to your VerneMQ broker instance to verify if they encounter any issues or errors when sending messages.
 
-<details>
-<summary>General approach</summary>
+4. Monitor the broker's resources usage: High system load or insufficient resources may affect VerneMQ's performance and prevent it from processing PUBACK packets as expected. Use monitoring tools like `top` and `iotop` to observe CPU and I/O usage, and assess whether the broker has enough resources to handle the MQTT traffic.
 
-Open the alerts Dashboard and locate the chart of this alert (`mqtt_puback_sent_reason`). Identify
-which PUBACK packets (by reason) triggered this alert. Inspect the reason why you server sent those
-responses by consulting the subsection _PUBACK Reason
-Code  <sup>[1](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901124)_ </sup>
-mentioned above.
+5. Update VerneMQ configuration: Double-check your VerneMQ settings for any misconfiguration related to QoS, message storage, or security policies that could prevent PUBACK packets from being sent or processed successfully.
 
-</details>
+### Useful resources
+
+1. [VerneMQ Documentation](https://vernemq.com/docs/)
+2. [MQTT Version 5 Features](https://www.hivemq.com/blog/mqtt-5-foundational-changes-in-the-protocol/)

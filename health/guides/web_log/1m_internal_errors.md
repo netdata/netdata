@@ -1,99 +1,24 @@
-# 1m_internal_errors
+### Understand the alert
 
-**Web Server | Web log**
+This alert indicates that there has been an increase in the number of HTTP 5XX server errors in the last minute. These errors typically indicate a problem with the server's ability to process requests, such as misconfigurations, overloaded resources, or other server-side issues.
 
-HTTP response status codes indicate whether a specific HTTP request has been successfully completed
-or not.
+### Troubleshoot the alert
 
-Response status codes beginning with the digit "5" indicate cases in which the server is aware that
-it has erred or is incapable of performing the request. Except when responding to a HEAD request,
-the server should include an entity containing an explanation of the error situation, and whether it
-is a temporary or permanent condition. User agents should display any included entity to the user.
-These response codes are applicable to any request
-method.<sup>[1](https://datatracker.ietf.org/doc/html/rfc2616#section-10.5) </sup>
+1. **Inspect server logs**: Check the server error logs for any error messages, warnings, or unusual patterns. For Apache and Nginx, the error logs are usually found under `/var/log/{apache2, nginx}/error.log`. Analyze the logs to identify potential issues with the server, such as misconfigurations or resource limitations.
 
-The Netdata Agent calculates the ratio of server error HTTP requests over the last minute.
+2. **Check .htaccess file**: If you're using Apache, examine the `.htaccess` file for any misconfigurations or incorrect settings. Ensure that the directives in the file are valid and properly formatted. If necessary, temporarily disable the `.htaccess` file to see if it resolves the issue.
 
-<details>
-  <summary>Server error responses (5XX)</summary>
+3. **Review server resources**: Monitor the server's CPU, RAM, and disk usage to determine if the server is experiencing resource limitations. High resource usage can lead to server errors, as the server may be unable to handle incoming requests. Consider upgrading your server resources or optimizing the server for better performance.
 
-The error codes below contain the descriptions as provided by
-Mozilla. <sup>[2](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses) </sup>
+4. **Examine server software**: Check for any issues with the server software, such as outdated versions, security vulnerabilities, or software bugs. Update your server software to the latest version and apply any necessary patches to resolve potential issues.
 
-- _500 Internal Server Error_: The server has encountered a situation it does not know how to
-  handle.
+5. **Monitor third-party services**: If your server relies on third-party services or APIs, verify that these services are functioning correctly. Server errors may occur if your server is unable to communicate with these services or if they are experiencing downtime.
 
-- _501 Not Implemented_: The request method is not supported by the server and cannot be handled.
-  The only methods that servers are required to support (and therefore that must not return this
-  code)
-  are GET and HEAD.
+6. **Test server functionality**: Use tools such as `curl` or web browser developer tools to send HTTP requests to your server and examine the responses. This can help you identify specific issues with the server, such as incorrect response headers or missing resources.
 
-- _502 Bad Gateway_: This error response means that the server, while working as a gateway to get a
-  response needed to handle the request, got an invalid response.
+### Useful resources
 
-- _503 Service Unavailable_: The server is not ready to handle the request. Common causes are a
-  server that is down for maintenance or that is overloaded. Note that together with this response,
-  a user-friendly page explaining the problem should be sent. This response should be used for
-  temporary conditions and the Retry-After HTTP header should, if possible, contain the estimated
-  time before the recovery of the service. The webmaster must also take care about the
-  caching-related headers that are sent along with this response, as these temporary condition
-  responses should usually not be cached.
+1. [Apache HTTP Server Documentation](https://httpd.apache.org/docs/)
+2. [Nginx Documentation](https://nginx.org/en/docs/)
+3. [Mozilla Developer Network - HTTP Status Codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
 
-- _504 Gateway Timeout_: This error response is given when the server is acting as a gateway and
-  cannot get a response in time.
-
-- _505 HTTP Version Not Supported_: The HTTP version used in the request is not supported by the
-  server.
-
-- _506 Variant Also Negotiates_: The server has an internal configuration error: the chosen variant
-  resource is configured to engage in transparent content negotiation itself, and is therefore not a
-  proper end point in the negotiation process.
-
-- _507 Insufficient Storage (WebDAV)_:
-  The method could not be performed on the resource because the server is unable to store the
-  representation needed to successfully complete the request.
-
-- _508 Loop Detected (WebDAV)_:
-  The server detected an infinite loop while processing the request.
-
-- _510 Not Extended_: Further extensions to the request are required for the server to fulfill it.
-
-- _511 Network Authentication_: Required Indicates that the client needs to authenticate to gain
-  network access.
-
-Source: [https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses)
-
-</details>
-
-<details>
-  <summary>References and sources</summary>
-
-1. [Server errors on Datatracker](https://datatracker.ietf.org/doc/html/rfc2616#section-10.5)
-
-2. [HTTP server errors on Mozilla](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses)
-
-</details>
-
-### Troubleshooting section:
-
-<details>
-<summary>General approach</summary>
-
-To identify the HTTP response code your web server sends back: 
-
-1. Open the Netdata dashboard.
-2. Inspect the `detailed_response_codes` chart for your web server. This chart keeps
-track of exactly what error codes your web server sends out.
-
-You should also check the server error logs. For example, web servers such as Apache or Nginx
-produce and error logs, by default under `/var/log/{nginx, apache2}/{access.log, error.log}`
-
-</details>
-
-<details>
-<summary>Troubleshoot 500 error code </summary>
-
-One of the things that can cause HTTP 500 response errors is a misconfiguration in the `.htaccess`
-file of your web server.
-
-</details>

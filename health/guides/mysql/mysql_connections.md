@@ -1,36 +1,74 @@
-# mysql_connections
+### Understand the alert
 
-## Database | MySQL, MariaDB
+The `mysql_connections` alert indicates the percentage of used client connections compared to the maximum configured connections. When you receive this alert, it means your MySQL or MariaDB server is reaching its connection limit, which could lead to performance issues or failed connections for clients.
 
-This alert presents the percentage of used client connections.  
-Receiving this alert means that there is a high client connection utilization 
-compared to the limit.
+### Troubleshoot the alert
 
-This alert is raised to warning when the percentage exceeds 70%.  
-If the metric exceeds 90%, then the alert is escalated to critical.
+1. **Check the current connection usage**
 
-<details><summary>References and Sources</summary>
+   Use the following command to see the current used and total connections:
 
-1. [MySQL max connections](https://ubiq.co/database-blog/how-to-increase-max-connections-in-mysql/)
+   ```
+   mysql -u root -p -e "SHOW STATUS LIKE 'max_used_connections'; SHOW VARIABLES LIKE 'max_connections';"
+   ```
 
-</details>
+   This will display the maximum number of connections used since the server was started and the maximum allowed number of connections (`max_connections`).
 
-### Troubleshooting Section
+2. **Monitor connections over time**
 
-<details><summary>Increase the Connection Limit</summary>
+   You can monitor the connection usage over time using the following command:
 
-To increase the connection limit, log into MySQL form the terminal and use the following code:  
-`show variables like "max_connections";`  
-to see the current limit.
+   ```
+   watch -n 1 "mysql -u root -p -e 'SHOW STATUS LIKE \"Threads_connected\";'"
+   ```
 
-Using:  
-`set global max_connections = "LIMIT";`  
-Where "LIMIT" is the new limit you will choose, you can alter the limit without restarting the
-server.
+   This will update the number of currently connected threads every second.
 
-To increase the limit permanently, locate the `my.cnf` file (typically under `/etc` but depends on
-installation) and append `max_connections = 200` under the `mysqld` section.
+3. **Identify connection-consuming processes**
 
-You can read more in our References and Sources section.
+   If connection usage is high, check which processes or clients are using connections:
 
-</details>
+   ```
+   mysql -u root -p -e "SHOW PROCESSLIST;"
+   ```
+
+   This gives you an overview of the currently connected clients, their states, and queries being executed.
+
+4. **Optimize client connections**
+
+   Analyze the processes using connections and ensure they close their connections properly when done, utilize connection pooling, and reduce the number of connections where possible.
+
+5. **Increase the connection limit (if necessary)**
+
+   If you need to increase the `max_connections` value, follow these steps:
+
+   - Log into MySQL from the terminal as shown in the troubleshooting section:
+
+   ```
+   mysql -u root -p
+   ```
+
+   - Check the current limit:
+
+   ```
+   show variables like "max_connections";
+   ```
+
+   - Set a new limit temporarily:
+
+   ```
+   set global max_connections = "LIMIT";
+   ```
+
+   Replace "LIMIT" with the desired new limit.
+
+   - To set the limit permanently, locate the `my.cnf` file (typically under `/etc`, but it may vary depending on your installation) and append `max_connections = LIMIT` under the `[mysqld]` section.
+
+   Replace "LIMIT" with the desired new limit, then restart the MySQL/MariaDB service.
+
+### Useful resources
+
+1. [How to Increase Max Connections in MySQL](https://ubiq.co/database-blog/how-to-increase-max-connections-in-mysql/)
+2. [MySQL 5.7 Reference Manual: SHOW STATUS Syntax](https://dev.mysql.com/doc/refman/5.7/en/show-status.html)
+3. [MySQL 5.7 Reference Manual: SHOW PROCESSLIST Syntax](https://dev.mysql.com/doc/refman/5.7/en/show-processlist.html)
+4. [MySQL 5.7 Reference Manual: mysqld – The MySQL Server](https://dev.mysql.com/doc/refman/5.7/en/mysqld.html)

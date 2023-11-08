@@ -1,29 +1,35 @@
-# vcsa_swap_health
+### Understand the alert
 
-## Virtual Machine | VMware vCenter
+The vcsa_swap_health alert presents the swap health status of the VMware vCenter virtual machine. It is an indicator of the overall health of memory swapping on the vCenter virtual machine.
 
-This alert presents the swap health status.  
-The values for every component's health can be:
+### Troubleshoot the alert
 
+1. First, identify the health status of the alert by checking the color and its corresponding description in the table above.
 
-| Code |                              Color                              | Description                                                 | Alert Status |
-|:----:|:---------------------------------------------------------------:|:------------------------------------------------------------|:------------:|
-| `-1` |                            no color                             | Unknown.                                                    |    Clear     |
-| `0`  | ![#00FF00](https://via.placeholder.com/18/00FF00/000000?text=+) | The component is healthy.                                   |    Clear     |
-| `1`  | ![#ffea00](https://via.placeholder.com/18/ffea00/000000?text=+) | The component is healthy but may have some problems.        |   Warning    |
-| `2`  | ![#ffa500](https://via.placeholder.com/18/ffa500/000000?text=+) | The component is degraded, and may have serious problems.   |   Critical   |
-| `3`  | ![#f03c15](https://via.placeholder.com/18/f03c15/000000?text=+) | The component is unavailable or will stop functioning soon. |   Critical   |
-| `4`  | ![#808080](https://via.placeholder.com/18/808080/000000?text=+) | No health data is available.                                |    Clear     |
+2. Log in to the VMware vSphere Web Client:
+   - Navigate to `https://<vCenter-IP-address-or-domain-name>:<port>/vsphere-client`, where `<vCenter-IP-address-or-domain-name>` is your vCenter Server system IP or domain name, and `<port>` is the port number over which to access the vSphere Web Client.
+   - Enter the username and password, and click Login.
 
-For further information, please have a look at the *References and Sources* section.
+3. Navigate to the vCenter virtual machine, and select the Monitor tab.
 
-<details><summary>References and Sources</summary>
+4. Verify the swap file size by selecting the `Performance` tab, and choosing `Advanced` view.
 
-1. [VMware Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)
+5. Monitor the swap usage on the virtual machine:
+   - On the `Performance` tab, look for high swap usage (`200 MB` or above). If necessary, consider increasing the swap file size.
+   - On the `Summary` tab, check for any warning or error messages related to the swap file or its usage.
 
-</details>
+6. Check if there are any leading processes consuming an unreasonable amount of memory:
+   - If running a Linux-based virtual machine, use command-line utilities like `free`, `top`, `vmstat`, or `htop`. Look out for processes with high `%MEM` or `RES` values.
+   - If running a Windows-based virtual machine, use Task Manager or Performance Monitor to check for memory usage.
 
+7. Optimize the virtual machine memory settings:
+   - Verify if the virtual machine has sufficient memory allocation.
+   - Check the virtual machine's memory reservation and limit settings.
+   - Consider enabling memory ballooning for a better utilization of available memory.
 
-### Troubleshooting Section
+8. If the swap health status does not improve or you are unsure how to proceed, consult VMware documentation or contact VMware support for further assistance.
 
-To find out why the alert was raised, follow the steps in the [vmware vCenter Server documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html).
+### Useful resources
+
+1. [Configuring VMware vCenter 7.0](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)
+2. [Virtual Machine Memory Management Concepts](https://www.vmware.com/content/dam/digitalmarketing/vmware/en/pdf/techpaper/perf-vsphere-memory_management.pdf)

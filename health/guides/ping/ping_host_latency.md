@@ -1,50 +1,48 @@
-# fping_host_latency
+### Understand the alert
 
-**Other | Network**
+This alert calculates the average latency (`ping round-trip time`) to a network host (${label:host}) over the last 10 seconds. If you receive this alert, it means there might be issues with your network connectivity or host responsiveness.
 
-`fping` is a command line tool to send ICMP (Internet Control Message Protocol) echo requests to
-network hosts, similar to ping, but performing much better when pinging multiple hosts. The Netdata
-Agent utilizes `fping` to monitor latency, packet loss, uptime and reachability of any number of
-network endpoints.
+### What does latency mean?
 
-For the `fping_host_latency` alert, the Netdata Agent monitors the average latency to the network
-host over the last 10 seconds. Receiving this alert indicates high latency to the network host. It is
-likely you are experiencing networking issues or the host is overloaded.
+Latency is the time it takes for a packet of data to travel from the sender to the receiver, and back from the receiver to the sender. In this case, we're measuring the latency using the `ping` command, which sends an ICMP echo request to the host and then waits for the ICMP echo reply.
 
-### Troubleshooting section
+### Troubleshoot the alert
 
-<details>
-    <summary>Customize the ICMP requests for each endpoint</summary>
+1. Double-check the network connection:
 
-Different endpoints could be in different networks. For example, a server in your intra network
-would require less time to be accessed than your cloud infrastructures in terms of latency. You
-should always consider not to use a global approach for checking every endpoint of yours. You can
-find more information about how to configure every endpoint separately in
-the [fping.plugin alarm guide](https://learn.netdata.cloud/docs/agent/collectors/fping.plugin/#additional-tips).
+   Verify the network connectivity between your system and the target host. Check if the host is accessible via other tools such as `traceroute` or `mtr`.
 
-</details>
+   ```
+   traceroute ${label:host}
+   mtr ${label:host}
+   ```
 
-<details>
-    <summary>Prioritize traffic on your endpoints</summary>
+2. Check for packet loss:
 
-Quality of service (QoS) is the use of mechanisms or technologies to control traffic and ensure the
-performance of critical applications. QoS works best when low-priority traffic exists that can be
-dropped when congestion occurs. The higher-priority traffic must fit within the bandwidth
-limitations of the link or path. The following are two open source solutions to apply QoS policies
-to your network interfaces.
+   Packet loss can make latency appear higher than it actually is. Use the `ping` command to check for packet loss:
 
-- `FireQOS`:
+   ```
+   ping -c 10 ${label:host}
+   ```
 
-  FireQOS is a traffic shaping helper. It has a very simple shell scripting language to express
-  traffic shaping.
+   Look for the percentage of packet loss in the output.
 
-  [See more on FireQOS](https://firehol.org/tutorial/fireqos-new-user/)
+3. Investigate the host:
 
-- `tcconfig`:
+   If no packet loss is detected and the network connection is stable, the problem might be related to the host itself. Check the host for overloaded resources, such as high CPU usage, disk I/O, or network traffic.
 
-  Tcconfig is a command wrapper that makes it easy to set up traffic control of network bandwidth,
-  latency, packet-loss, packet-corruption, etc.
+4. Check DNS resolution:
 
-  [See more on tcconfig](https://tcconfig.readthedocs.io/en/latest/index.html)
+   If the alert's `${label:host}` is a domain name, make sure that DNS resolution is working properly:
 
-</details>
+   ```
+   nslookup ${label:host}
+   ```
+
+5. Verify firewall and routing:
+
+   Check if any firewall rules or routing policies might be affecting the network traffic between your system and the target host.
+
+### Useful resources
+
+1. [Using Ping and Traceroute to troubleshoot network connectivity](https://support.cloudflare.com/hc/en-us/articles/200169336-Using-Ping-and-Traceroute-to-troubleshoot-network-connectivity)

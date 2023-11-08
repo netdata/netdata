@@ -1,79 +1,58 @@
-# zfs_pool_state_crit
+### Understand the alert
 
-## OS: Any
+The `zfs_pool_state_crit` alert indicates that your ZFS pool is faulted or unavailable, which can cause access and data loss problems. It is important to identify the current state of the pool and take corrective actions to remedy the situation.
 
-ZFS is a local file system and logical volume manager created by Sun Microsystems Inc. to direct and
-control the placement, storage, and retrieval of data in enterprise-class computing systems. ZFS is 
-scalable, suitable for high storage capacities, and includes extensive protection against data corruption.
+### Troubleshoot the alert
 
-The Netdata Agent monitors the state of the ZFS pool. Receiving this alert means that the ZFS pool
-is faulted or unavailable.
+1. **Check the current ZFS pool state**
 
-<details>
-<summary>ZFS pool health status</summary>
+   Run the `zpool status` command to view the status of all ZFS pools:
+   
+   ```
+   zpool status
+   ```
+   
+   This will display the pool state, device states, and any errors that occurred. Take note of any devices that are in DEGRADED, FAULTED, UNAVAIL, or OFFLINE states.
 
-The ZFS pool health status as described in the Oracle's
-website <sup>[1](https://docs.oracle.com/cd/E19253-01/819-5461/gamno/index.html) </sup>
+2. **Assess the problematic devices**
 
-ZFS provides an integrated method of examining pool and device health. The health of a pool is
-determined from the state of all its devices. This state information is displayed by using the `zpool
-status` command. In addition, potential pool and device failures are reported by fmd, displayed on
-the system console, and logged in the /var/adm/messages file.
+   Check for any hardware issues or file system errors on the affected devices. For example, if a device is FAULTED due to a hardware failure, replace the device. If a device is UNAVAIL or OFFLINE, check the connectivity and make sure it's properly accessible.
 
-Each device can fall into one of the following states:
+3. **Repair the pool**
 
-- ONLINE, the device or virtual device is in normal working order. Although some transient errors
-  might still occur, the device is otherwise in working order.
+   Depending on the root cause of the problem, you may need to take different actions:
 
-- DEGRADED, the virtual device has experienced a failure but can still function. This state is most
-  common when a mirror or RAID-Z device has lost one or more constituent devices. The fault
-  tolerance of the pool might be compromised, as a subsequent fault in another device might be
-  unrecoverable.
+   - Repair file system errors using the `zpool scrub` command. This will initiate a scrub, which attempts to fix any errors in the pool.
+   
+      ```
+      zpool scrub [pool_name]
+      ```
 
-- FAULTED, the device or virtual device is completely inaccessible. This status typically indicates
-  total failure of the device, such that ZFS is incapable of sending data to it or receiving data
-  from it. If a top-level virtual device is in this state, then the pool is completely inaccessible.
+   - Replace a failed device using the `zpool replace` command. For example, if you have a new device `/dev/sdb` that will replace `/dev/sda`, run the following command:
 
-- OFFLINE, the device has been explicitly taken offline by the administrator.
+      ```
+      zpool replace [pool_name] /dev/sda /dev/sdb
+      ```
 
-- UNAVAIL, the device or virtual device cannot be opened. In some cases, pools with UNAVAIL devices
-  appear in DEGRADED mode. If a top-level virtual device is UNAVAIL, then nothing in the pool can be
-  accessed.
+   - Bring an OFFLINE device back ONLINE using the `zpool online` command:
 
-- REMOVED, the device was physically removed while the system was running. Device removal detection
-  is hardware-dependent and might not be supported on all platforms.
+      ```
+      zpool online [pool_name] [device]
+      ```
 
-The health of a pool is determined from the health of all its top-level virtual devices. If all
-virtual devices are ONLINE, then the pool is also ONLINE. If any one of the virtual devices is
-DEGRADED or UNAVAIL, then the pool is also DEGRADED. If a top-level virtual device is FAULTED or
-OFFLINE, then the pool is also FAULTED. A pool in the FAULTED state is completely inaccessible. No
-data can be recovered until the necessary devices are attached or repaired. A pool in the DEGRADED
-state continues to run, but you might not achieve the same level of data redundancy or data
-throughput than if the pool were online. <sup>[1](https://docs.oracle.com/cd/E19253-01/819-5461/gamno/index.html) </sup>
+   Note: Make sure to replace `[pool_name]` and `[device]` with the appropriate values for your system.
 
-</details>
+4. **Verify the pool state**
 
-<details>
-<summary>References and source</summary>
+   After taking the necessary corrective actions, run the `zpool status` command again to verify that the pool state has improved.
+
+5. **Monitor pool health**
+
+   Continuously monitor the health of your ZFS pools to avoid future issues. Consider setting up periodic scrubs and reviewing system logs to catch any hardware or file system errors.
+
+### Useful resources
 
 1. [Determining the Health Status of ZFS Storage Pools](https://docs.oracle.com/cd/E19253-01/819-5461/gamno/index.html)
-1. [Chapter 11, Oracle Solaris ZFS Troubleshooting and Pool Recovery](https://docs.oracle.com/cd/E53394_01/html/E54801/gavwg.html)
-1. [ZFS on FreeBSD documentation](https://docs.freebsd.org/en/books/handbook/zfs/)
-1. [OpenZFS documentation](https://openzfs.github.io/openzfs-docs/)
-
-</details>
-
-### Troubleshooting section
-
-<details>
-<summary>Migrate ZFS Storage Pools</summary>
-
-If the state of the ZFS pool is UNAVAIL, then you should consider migrating your ZFS pool. To do so follow the
-workflow at the [official troubleshooting section in Oracle's website](https://docs.oracle.com/cd/E53394_01/html/E54801/gbchy.html#scrolltoc).
-
-In this workflow, there are no notable changes in the commands for FreeBSD.
-<sup>[3](https://docs.freebsd.org/en/books/handbook/zfs/) </sup> or ZFS on
-linux <sup>[4](https://openzfs.github.io/openzfs-docs/) </sup>, for completeness you can refer to
-individual guides.
-
-</details>
+2. [Chapter 11, Oracle Solaris ZFS Troubleshooting and Pool Recovery](https://docs.oracle.com/cd/E53394_01/html/E54801/gavwg.html)
+3. [ZFS on FreeBSD documentation](https://docs.freebsd.org/en/books/handbook/zfs/)
+4. [OpenZFS documentation](https://openzfs.github.io/openzfs-docs/)

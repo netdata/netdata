@@ -1,35 +1,41 @@
-# cockroachdb_underreplicated_ranges
+### Understand the alert
 
-## Database | CockroachDB
+This alert is related to CockroachDB, a scalable and distributed SQL database. When you receive this alert, it means that there are under-replicated ranges in your database cluster. Under-replicated ranges can impact the availability and fault tolerance of your database, leading to potential data loss or unavailability in case of node failures.
 
-This alert presents the number of under-replicated ranges.
+### What are under-replicated ranges?
 
-This alert is raised in a warning state when under-replicated ranges start to exist.
+In a CockroachDB cluster, data is split into small chunks called ranges. These ranges are then replicated across multiple nodes to ensure fault tolerance and high availability. The desired replication factor determines the number of replicas for each range.
 
-> Under-replicated ranges: When a cluster is first initialized, the few default starting ranges
-> will only have a single replica, but as soon as other nodes are available, they will
-> replicate to them until they've reached their desired replication factor. If a range does not
-> have enough replicas, the range is said to be "under-replicated".
->
-> CockroachDB uses consensus replication and requires a quorum of the replicas to
-> be available in order to allow both writes and reads to the range. The number of failures
-> that can be tolerated is equal to (Replication factor - 1)/2. Thus, CockroachDB requires (n-1)
-> /2 nodes to achieve quorum. For example, with 3x replication, one failure can be tolerated;
-> with 5x replication, two failures, and so on.<sup>[1](
-> https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges) </sup>
+When a range has fewer replicas than the desired replication factor, it is considered as "under-replicated". This situation can occur if nodes are unavailable or if the cluster is in the process of recovering from failures.
 
-<details><summary>References and Sources</summary>
+### Troubleshoot the alert
 
-1. [CockroachDB documentation](
-   https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges)
+1. Access the CockroachDB Admin UI
 
-</details>
+   Access the Admin UI by navigating to the URL `http://<any-node-ip>:8080` on any of your cluster nodes.
 
-### Troubleshooting Section
+2. Check the 'Replication Status' in the dashboard
 
-<details><summary>Identify under-replicated ranges</summary>
+   In the Admin UI, check the 'Under-replicated Ranges' metric on the main 'Dashboard' or 'Metrics' page.
 
-Check out the [CockroachDB documentation](
-https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges)
-for troubleshooting advice.
-</details>
+3. Inspect the logs of your CockroachDB nodes
+
+   Look for any error messages or issues that could be causing under-replication. For example, you may see errors related to node failures or network issues.
+
+4. Check cluster health and capacity
+
+   Make sure that all nodes in the cluster are running and healthy. You can do this by running the command `cockroach node status`. Consider adding more nodes or increasing the capacity if your nodes are overworked.
+
+5. Verify replication factor configuration
+
+   Check your cluster's replication factor configuration to ensure it is set to an appropriate value. The default replication factor is 3, which can tolerate one failure. You can view and change it using the [`zone configurations`](https://www.cockroachlabs.com/docs/stable/configure-replication-zones.html).
+
+6. Consider decommissioning problematic nodes
+
+   If specific nodes are causing under-replication, consider decommissioning them to allow the cluster to automatically rebalance the ranges. Follow the [decommissioning guide](https://www.cockroachlabs.com/docs/stable/remove-nodes.html) in the CockroachDB documentation.
+
+### Useful resources
+
+1. [CockroachDB: Troubleshoot Under-replicated and Unavailable Ranges](https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges)
+2. [CockroachDB: Configuring Replication Zones](https://www.cockroachlabs.com/docs/stable/configure-replication-zones.html)
+3. [CockroachDB: Decommission a Node](https://www.cockroachlabs.com/docs/stable/remove-nodes.html)

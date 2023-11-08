@@ -1,67 +1,35 @@
-# vernemq_mqtt_pubcomp_sent_reason_unsuccessful
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert indicates that the number of unsuccessful v5 PUBCOMP (Publish Complete) packets sent within the last minute has increased. VerneMQ is an MQTT broker, which plays a crucial role in managing and processing the message flow between MQTT clients. If you receive this alert, it implies that there are issues in the message flow, which might affect the communication between MQTT clients and the broker.
 
-The PUBCOMP packet is the response to a PUBREL packet. It is the fourth and final packet of the QoS
-2 protocol exchange. The Netdata Agent monitors the number of sent unsuccessful v5 PUBCOMP packets
-in the last minute.
+### What does PUBCOMP mean?
 
-<details>
-<summary>MQTT basic concepts and more</summary>
+In MQTT protocol, PUBCOMP is the fourth and final packet in the Quality of Service (QoS) 2 protocol exchange. The flow consists of PUBLISH, PUBREC (Publish Received), PUBREL (Publish Release), and PUBCOMP packets. PUBCOMP is sent by the receiver (MQTT client or broker) to confirm that it has received and processed the PUBREL packet. Unsuccessful PUBCOMP packets indicate that the receiver was not able to process the message properly.
 
-Basic concepts in every MQTT
-architecture <sup>[1](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all) </sup>:
+### Troubleshoot the alert
 
-- _Broker_ - The broker is the server that distributes the information to the interested clients
-  connected to the server.
-- _Client_ - The device that connects to broker to send or receive information.
-- _Topic_ - The name that the message is about. Clients publish, subscribe, or do both to a topic.
-- _Publish_ - Clients that send information to the broker to distribute to interested clients based
-  on the topic name.
-- _Subscribe_ - Clients tell the broker which topic(s) they're interested in. When a client
-  subscribes to a topic, any message published to the broker is distributed to the subscribers of
-  that topic. Clients can also unsubscribe to stop receiving messages from the broker about that
-  topic.
-- _QoS_ - Quality of Service. Each connection can specify a quality of service to the broker with an
-  integer value ranging from 0-2. The QoS does not affect the handling of the TCP data
-  transmissions, only between the MQTT clients. Note: In the examples later on, we'll only be using
-  QoS 0.
+- Check VerneMQ logs for errors or warnings
 
-    - _QoS 0_ specifies at most once, or once and only once without requiring an acknowledgment of
-      delivery. This is often referred to as fire and forget.
-    - _QoS 1_ specifies at least once. The message is sent multiple times until an acknowledgment is
-      received, known otherwise as acknowledged delivery.
-    - _QoS 2_ specifies exactly once. The sender and receiver clients use a two level handshake to
-      ensure only one copy of the message is received, known as assured delivery.
+  VerneMQ logs can provide valuable information about issues with the message flow. Locate the log file (usually at `/var/log/vernemq/console.log`) and inspect it for any error messages or warnings related to the PUBCOMP packet or its predecessors (PUBLISH, PUBREC, PUBREL) in the QoS 2 flow.
 
-- _VerneMQ WebSockets_ - WebSocket is a computer communications protocol, providing full-duplex
-  communication channels over a single TCP connection. VerneMQ supports the WebSocket protocol out
-  of the box. To be able to open a WebSocket connection to VerneMQ, you have to configure a
-  WebSocket listener or Secure WebSocket listener in the `vernemq.conf`. See more in the official
-  documentation in
-  the [how to configure WebSocket](https://docs.vernemq.com/configuring-vernemq/websockets)
-  section
+- Identify problematic MQTT clients
 
-</details>
+  Analyze the logs to identify the MQTT clients that are frequently involved in unsuccessful PUBCOMP packets exchange. These clients might have connection or configuration issues that lead to unsuccessful PUBCOMP packets.
 
-<details>
-<summary>References and sources</summary>
+- Validate MQTT clients configurations
 
-1. [Introduction to MQTT](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all)
-2. [MQTT v5 docs, PUBCOMP reason codes](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901154)
+  Ensure that the MQTT clients involved in unsuccessful PUBCOMP packets have valid configurations and that they are compatible with the broker (VerneMQ). Check parameters such as QoS level, protocol version, authentication, etc.
 
-</details>
+- Monitor VerneMQ metrics
 
-### Troubleshooting Section
+  Use Netdata or other monitoring tools to observe VerneMQ metrics and identify unusual patterns in the broker's performance. Increased load on the broker, high memory or CPU usage, slow response times, or network hiccups might contribute to unsuccessful PUBCOMP packets.
 
-<details>
-<summary>General approach</summary>
+- Ensure proper MQTT payload size
 
-Open the alerts Dashboard and locate the chart of this alert (`mqtt_pubcomp_sent_reason`). Inspect
-which PUBCOMP packets (by reason) triggered this alert. Inspect the reason why your server sent
-those responses by consulting the subsection _OPERATION REASON
-CODE_ <sup>[2](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901154) </sup>
-which we mentioned above.
+  Unsuccessful PUBCOMP packets can be caused by oversized payload or incorrect Message ID. Verify that the payload size respects the Maximum Transmission Unit (MTU) and that the Message ID follows the MQTT protocol specifications.
 
-</details>
+### Useful resources
 
+1. [VerneMQ - Troubleshooting](https://vernemq.com/docs/troubleshooting/)
+2. [MQTT Protocol Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
+3. [VerneMQ - Monitoring](https://vernemq.com/docs/monitoring/)

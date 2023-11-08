@@ -1,85 +1,27 @@
-# fping_host_reachable
+### Understand the alert
 
-**Other | Network**
+This `ping_host_reachable` alert checks the network reachability status of a specific host. When you receive this alert, it means that the host is either `up` (reachable) or `down` (unreachable).
 
-`fping` is a command line tool to send ICMP (Internet Control Message Protocol) echo requests to
-network hosts, similar to ping, but performing much better when pinging multiple hosts. The Netdata
-Agent utilizes `fping` to monitor latency, packet loss, uptime and reachability of any number of
-network endpoints.
+### What is network reachability?
 
-The `fping_host_reachable` alert in the Netdata Agent checks the reachability of a network
-host (0: unreachable, 1: reachable). Receiving a critical alert indicates that your
-endpoints are unreachable. It is likely that the host is down or your system is experiencing 
-networking issues.
+Network reachability refers to the ability of a particular host to communicate with other devices or systems within a network. In this alert, the reachability is monitored using the `ping` command, which sends packets to the host and checks for the response. The alert evaluates the packet loss percentage over a 30-second period.
 
-### Troubleshooting
+### Troubleshoot the alert
 
-<details>
-<summary>Check network connectivity</summary>
+1. Verify if the alert is accurate: Check if there are transient network issues or if there is a problem with the particular host. You can run the `ping` command manually to see if the packet loss percentage is consistent over time. 
 
-Verify that your system has access to the particular endpoint. Check for basic connectivity to known
-hosts from both your host and the endpoint.
+   ```
+   ping -c 10 <host IP or domain>
+   ```
 
-</details>
+2. Check the network connectivity: Ensure there are no issues with the local network or the physical connections (switches, routers, etc.). Look for potential network bottlenecks, high traffic, and hardware failures that can affect reachability.
 
-<details>
-<summary>DNS settings</summary>
+3. Check the host's health: If the host is reachable, log in to the system and examine its performance, stability, and resource usage. Look for indicators of high system load, resource constraints, or unresponsive processes.
 
-If you are using DNS resolution to check your endpoint, you should always consider check your DNS
-settings. To troubleshoot this issue, verify that your DNS can resolve your endpoints.
+4. Examine network security policies and firewalls: Network reachability can be affected by misconfigured firewalls or security policies. Ensure there are no restrictions blocking the communication between the monitoring system and the host.
 
-1. Check your current DNS (for example in linux you can use the host command):
+5. Analyze logs for any relevant information: Check system logs (e.g., `/var/log/syslog`) and application logs on both the monitoring system and the target host. Look for error messages, timeouts, or connectivity problems.
 
-      ```
-      root@netdata # host -v <your_endpoint>
-      ```
+### Useful resources
 
-2. If the HTTP endpoint is supposed to be public facing endpoint, try an alternative DNS (for
-      example Cloudflare's DNS):
-
-      ```
-      root@netdata # host -v <your_endpoint> 1.1.1.1
-      ```
-</details>
-    
-<details>
-<summary>Verify access restrictions in the remote host</summary>
-
-If the remote host is a Linux-based machine and you have access to it, you can check the followings.
-  
-**Check the ICMP settings** 
-
-In most linux distributions you can restrict the ICMP echo operations.
-    
-    1. Check your current setting.
-
-          ```
-          root@netdata # systemctl net.ipv4.icmp_echo_ignore_all
-          ```
-    
-
-        If this value is set to 1 your system ignore incoming ICMP echo requests.
-    
-    2. To change this, bump this `net.ipv4.icmp_echo_ignore_all=0` entry under `/etc/sysctl.conf`.
-    
-    3. Reload the sysctl settings.
-
-          ```
-          root@netdata # sysctl -p
-          ```
-
- **Check your firewall rules** 
- 
- Depending on what firewall you use, the commands might differ from what's shown below. For example, if you are using 
-    IP tables you can check for restriction rules upon `icmp`.
-    
-      ```
-      root@netdata # iptables -L | grep ICMP
-      ```
-    
-    For futher investigation or changes in your firewall settings we **strongly** advise you to consult
-    your firewall's documentation and guidelines.
-
-    
-</details>
-
+1. [Understanding High Packet Loss in Networking](https://www.fiberplex.com/blog/understanding-high-packet-loss-in-networking)

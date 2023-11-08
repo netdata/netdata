@@ -1,31 +1,35 @@
-# vcsa_software_updates_health
+### Understand the alert
 
-## Virtual Machine | VMware vCenter
+The `vcsa_software_updates_health` alert monitors the software updates availability status for a VMware vCenter Server Appliance (VCSA). The alert can have different statuses depending on the software updates state, with critical indicating that security updates are available.
 
-This alert presents the software updates availability status.  
-The values can be:
+### Troubleshoot the alert
 
-| Code |                              Color                              | Description                                          | Alert Status |
-|:----:|:---------------------------------------------------------------:|:-----------------------------------------------------|:------------:|
-| `-1` |                            no color                             | Unknown.                                             |    Clear     |
-| `0`  | ![#00FF00](https://via.placeholder.com/18/00FF00/000000?text=+) | no updates available.                                |    Clear     |
-| `2`  | ![#ffa500](https://via.placeholder.com/18/ffa500/000000?text=+) | non-security updates are available.                  |    Clear     |
-| `3`  | ![#f03c15](https://via.placeholder.com/18/f03c15/000000?text=+) | security updates are available.                      |   Critical   |
-| `4`  | ![#808080](https://via.placeholder.com/18/808080/000000?text=+) | an error retrieving information on software updates. |   Warning    |
+Follow these troubleshooting steps according to the alert status:
 
-For further information, please have a look at the *References and Sources* section.
+1. **Critical (security updates available):**
 
-<details><summary>References and Sources</summary>
+   - Access the vCenter Server Appliance Management Interface (VAMI) by browsing to `https://<vcsa-address>:5480`.
+   - Log in with the appropriate user credentials (typically `root` user).
+   - Click on the `Update` menu item.
+   - Review the available patches and updates, especially those related to security.
+   - Click `Stage and Install` to download and install the security updates.
+   - Monitor the progress of the update installation and, if needed, address any issues that might occur during the process.
 
-1. [VMware Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-52AF3379-8D78-437F-96EF-25D1A1100BEE.html)
+2. **Warning (error retrieving information on software updates):**
 
-</details>
+   - Access the vCenter Server Appliance Management Interface (VAMI) by browsing to `https://<vcsa-address>:5480`.
+   - Log in with the appropriate user credentials (typically `root` user).
+   - Click on the `Update` menu item.
+   - Check for any error messages in the `Update` section.
+   - Ensure that the VCSA has access to the internet and can reach the VMware update repositories.
+   - Verify that there are no issues with the system time or SSL certificates.
+   - If the issue persists, consider searching for relevant information in the VMware Knowledge Base or contacting VMware Support.
 
+3. **Clear (no updates available, non-security updates available, or unknown status):**
 
-### Troubleshooting Section
+   - No immediate action is required. However, it's a good practice to periodically check for updates to ensure the VMware vCenter Server Appliance remains up-to-date and secure.
 
-If the alert was raised into critical, proceed by installing the security updates that are 
-available. If the alert was raised into warning, consider viewing the details in the Health Messages 
-pane.
+### Useful resources
 
-You can also find more details in the [VMware vCenter Server documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-52AF3379-8D78-437F-96EF-25D1A1100BEE.html).
+1. [VMware vCenter Server Appliance Management](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-52AF3379-8D78-437F-96EF-25D1A1100BEE.html)
+2. [VMware Knowledge Base](https://kb.vmware.com/)

@@ -1,43 +1,66 @@
-# vernemq_average_scheduler_utilization
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert is related to VerneMQ, which is an MQTT broker. The Netdata Agent calculates the average VerneMQ's scheduler utilization over the last 10 minutes. If you receive this alert, it means your VerneMQ scheduler's utilization is high, which may indicate performance issues or resource constraints.
 
-VerneMQ is implemented in Erlang and therefore runs on top of the BEAM runtime environment (roughly equivalent to
-the JRE for Java applications).
-For performance reasons, BEAM utilizes it’s own intenral scheduler that operates largely independently of the operating
-system’s process scheduling.
+### What does scheduler utilization mean?
 
-The Netdata Agent calculates the average VerneMQ's scheduler utilization over the last 10 minutes.
-This alert indicates high scheduler utilization.
+VerneMQ uses schedulers to manage its tasks and processes. In this context, scheduler utilization represents the degree to which the VerneMQ schedulers are being used. High scheduler utilization may cause delays in processing tasks, leading to performance degradation and possibly affecting the proper functioning of the MQTT broker.
 
-This alert is raised into warning when the scheduler's utilization is between 75-85% and in critical
-when it is between 85-95%.
+### Troubleshoot the alert
 
-### Troubleshooting section:
+- Verify the VerneMQ scheduler utilization
 
-<details>
-<summary>Check for CPU throttling issues </summary>
-
-If you are receiving this alert often, it means that your node is running at maximum CPU utilization.
-You should consider upgrading your system (instance in your cloud) to provide more or faster CPUs.
-
-**Important**:
-
-By default, the VerneMQ broker deploys its Erlang VM architecture into 4 cores. If you already
-run VerneMQ in a multicore machine (for example, an 8-core machine) you should consider changing
-the `vmq_bcrypt.nif_pool_size` parameter:
-
-1. In the `vernemq.conf`, update the `vmq_bcrypt.nif_pool_size` parameter to `auto`. The value `auto`
-detect all cores (n) and set the value to n-1. 
-
-
-2. Restart the VerneMQ service.
+1. To check the scheduler utilization, you can use the `vmq-admin` command like this:
 
    ```
-   root@netdata # systemctl restart vernemq.service
+   vmq-admin metrics show | grep scheduler
    ```
 
-3. Open the Netdata dashboard, and locate the `scheduler_utilization` chart. See if VerneMQ utilizes
-   the preferred number of cores.
+   This command will display the scheduler utilization percentage.
 
-</details>
+- Analyze the VerneMQ MQTT traffic
+
+1. To analyze the MQTT traffic, use the `vmq-admin` `session` and `client` subcommands. These can give you insights into the current subscription and client status:
+
+   ```
+   vmq-admin session show
+   vmq-admin client show
+   ```
+
+   This can help you identify if there is any abnormal activity or an increase in the number of clients or subscriptions that may be affecting the scheduler's performance.
+
+- Evaluate VerneMQ system resources
+
+1. Assess CPU and memory usage of the VerneMQ process using the `top` or `htop` commands:
+
+   ```
+   top -p $(pgrep -f vernemq)
+   ```
+
+   This will show you the CPU and memory usage for the VerneMQ process. If the process is consuming too many resources, it might be affecting the scheduler's utilization.
+
+2. Evaluate the system's available resources (CPU, memory, and I/O) using commands like `vmstat`, `free`, and `iostat`.
+
+   ```
+   vmstat
+   free
+   iostat
+   ```
+
+   These commands can help you understand if your system's resources are nearing their limits or if there are any bottlenecks affecting the overall performance.
+
+3. Check the VerneMQ logs for any errors or warnings. The default location for VerneMQ logs is `/var/log/vernemq`. Look for messages that may indicate issues affecting the scheduler's performance.
+
+- Optimize VerneMQ performance or adjust resources
+
+1. If the MQTT traffic is high or has increased recently, consider scaling up your VerneMQ instance by adding more resources (CPU or memory) or by distributing the load across multiple nodes.
+
+2. If your system resources are limited, consider optimizing your VerneMQ configuration to improve performance. Some example options include adjusting the `max_online_messages`, `max_inflight_messages`, or `queue_deliver_mode`.
+
+3. If the alert persists even after evaluating and making changes to the above steps, consult the VerneMQ documentation or community for further assistance.
+
+### Useful resources
+
+1. [VerneMQ Documentation](https://vernemq.com/docs/)
+2. [VerneMQAdministration Guide](https://vernemq.com/docs/administration/)
+3. [VerneMQ Configuration Guide](https://vernemq.com/docs/configuration/)

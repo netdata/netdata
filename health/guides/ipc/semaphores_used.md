@@ -1,72 +1,48 @@
-# semaphores_used
+### Understand the alert
 
-## OS: Linux
+This alert monitors the percentage of allocated `System V IPC semaphores`. If you receive this alert, it means that your system is experiencing high IPC semaphore utilization, and a lack of available semaphores can affect application performance.
 
-This alarm presents the percentage of allocated `System V IPC semaphores`.  \
-If you receive this alarm, it means that your system is experiencing high `IPC semaphore` utilization and a lack of
-available `semaphores` can affect application performance.
+### Troubleshoot the alert
 
-<details>
-<summary>What is an "IPC Semaphore"</summary>
+1. Identify processes using IPC semaphores
 
-`IPC` stands for `Interprocess Communication`. IPC messages are a counterpart to UNIX pipes for IPC operations. \
-The
-fastest way to communicate through processes is with shared memory. `semaphores`, help synchronise shared memory access
-across processes.<sup> [1](https://docs.oracle.com/cd/E19455-01/806-4750/6jdqdfltn/index.html) </sup>
+   You can use the `ipcs` command to display information about allocated semaphores. Run the following command to display a list of active semaphores:
+  
+   ```
+   ipcs -s
+   ```
 
-As illustrated by E. W. Dijkstra, semaphores can be better understood using his railroad model <sup> [2](
-https://users.cs.cf.ac.uk/Dave.Marshall/C/node26.html) </sup>.
+   The output will show the key, ID, owner's UID, permissions, and other related information for each semaphore.
 
-- Imagine a railroad, where only a single train at a time is allowed to pass. Responsible for the traffic is a
-  `semaphore`. Each train that wants to enter the single track must wait for the `semaphore` to be in a state that
-  allows access to the railroad. When a train enters the track, the `semaphore` changes the state to prevent all other
-  traffic in the track. When the train leaves the railroad, it must change the state of the `semaphore` to allow another
-  train to enter.
+2. Analyze process usage of IPC semaphores
 
+   You can use `ps` or `top` commands to analyze which processes are using the IPC semaphores. This can help you identify if any process is causing high semaphore usage.
 
-- In the computer world, a `semaphore` is an integer and the train is a process (or a thread). For a process to proceed,
-  it has to wait for the semaphore's value to become 0. If it proceeds, it increments this value by 1. Upon finishing
-  the task, the process decrements the same value by 1.
+   ```
+   ps -eo pid,cmd | grep [process-name]
+   ```
 
-> `semaphores` let processes query or alter status information. They are often used to monitor and control the
-> availability of system resources such as shared memory segments.
-> <sup> [2](https://users.cs.cf.ac.uk/Dave.Marshall/C/node26.html) </sup>
+   Replace `[process-name]` with the name of the process you suspect is related to the semaphore usage.
 
-</details>
+3. Adjust semaphore limits if necessary
 
-<br>
+   If you determine that the high semaphore usage is a result of an inadequately configured limit, you can update the limits using the following steps:
 
-<details>
-<summary>References</summary>
+   - Check the current semaphore limits as mentioned earlier, using the `ipcs -ls` command.
+   - To increase the limit to a more appropriate value, edit the `/proc/sys/kernel/sem` file. The second field in the file represents the maximum number of semaphores that can be allocated per array.
+   
+   ```
+   echo "32000 64000 1024000000 500" > /proc/sys/kernel/sem
+   ```
 
-[[1] Interprocess Communication](https://docs.oracle.com/cd/E19455-01/806-4750/6jdqdfltn/index.html)  \
-[[2] IPC:Semaphores](https://users.cs.cf.ac.uk/Dave.Marshall/C/node26.html)
+   This command doubles the number of semaphores per array. Make sure to adjust the value according to your system requirements.
 
-</details>
+4. Monitor semaphore usage after changes
 
-### Troubleshooting Section
+   After making the necessary changes, continue to monitor semaphore usage to ensure that the changes were effective in resolving the issue. If the issue persists, further investigation may be required to identify the root cause.
 
-<details>
-    <summary>Adjust the semaphore limit on your system</summary>
+### Useful resources
 
-You can check current `semaphore` limit on your machine, by running:
-
-```
-root@netdata~ # ipcs -ls
-```
-
-The output will be similar to this:
-
-```
------- Semaphore Limits --------
-max number of arrays = 32000
-max semaphores per array = 32000
-max semaphores system wide = 1024000000
-max ops per semop call = 500
-semaphore max value = 32767
-```
-
-To adjust the limit of the max semaphores,you can go to the `/proc/sys/kernel/sem` file and adjust the second field
-accordingly.
-
-</details>
+1. [Interprocess Communication](https://docs.oracle.com/cd/E19455-01/806-4750/6jdqdfltn/index.html)
+2. [IPC: Semaphores](https://users.cs.cf.ac.uk/Dave.Marshall/C/node26.html)
+3. [Linux Kernel Documentation - IPC Semaphores](https://www.kernel.org/doc/Documentation/ipc/semaphore.txt)

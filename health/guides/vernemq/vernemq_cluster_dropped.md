@@ -1,51 +1,49 @@
-# vernemq_cluster_dropped
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert indicates that VerneMQ, an MQTT broker, is experiencing issues with inter-node message delivery within a clustered environment. The Netdata agent calculates the amount of traffic dropped during communication with cluster nodes in the last minute. If you receive this alert, it means that the outgoing cluster buffer is full and some messages cannot be delivered.
 
-VerneMQ is a MQTT publish/subscribe message broker which implements the OASIS industry standard MQTT
-protocol.
+### What does dropped messages mean?
 
-The Netdata agent calculates the amount of traffic dropped during communication with the cluster
-nodes in the last minute. This alert indicates that the outgoing cluster buffer is full.
+Dropped messages occur when the outgoing cluster buffer becomes full, and VerneMQ cannot deliver messages between its nodes. This can happen due to a remote node being down or unreachable, causing the buffer to fill up and preventing efficient message delivery.
 
-Receiving this alert most likely means that a remote node is down or unreachable, but it could also
-indicate that the VerneMQ is experiencing problems with inter-node message delivery. The
-non-dispatched messages are queued in this buffer.
+### Troubleshoot the alert
 
-### Troubleshooting section:
+1. Check the connectivity and status of cluster nodes
 
-<details>
-<summary>Increase the cluster buffer </summary>
-
-To make your cluster more tolerant to disconnections of nodes, you can increase the size of the
-`outgoing_clustering_buffer_size` buffer.
-
-1. Edit the VerneMQ configuration file. By default it is located under `/etc/vernemq` folder.
-
-    ```
-    root@netdata # vim /etc/vernemq/vernemq.conf 
-    ```
-
-2. Append the `outgoing_clustering_buffer_size` value, the default value is 10000 bytes. Try to
-   increase it to 15000
-
-    ```
-    # vim /etc/vernemq/vernemq.conf
-    . . .  
-    outgoing_clustering_buffer_size = 15000
-    . . .
-    ```
-
-3. Restart the VerneMQ service
+   Verify that all cluster nodes are up, running and reachable. Use `vmq-admin cluster show` to get an overview of the cluster nodes and their connectivity status.
 
    ```
-   root@netdata # systemctl restart vernemq.service
+   vmq-admin cluster show
    ```
 
-4. Test with the same workload that triggered the alarm originally. If this alert still occurs, try
-   to double this value and re-test.
+2. Investigate logs for any errors or warnings
 
-5. In case the problem still exists, you must check for issues in the nodes that are unavailable.
+   Inspect the logs of the VerneMQ node(s) for any errors or warning messages. This can provide insight into any potential problems related to the cluster or network.
 
-</details>
+   ```
+   sudo journalctl -u vernemq
+   ```
 
+3. Increase the buffer size
+
+   If the issue persists, consider increasing the buffer size. Adjust the `outgoing_clustering_buffer_size` value in the `vernemq.conf` file.
+
+   ```
+   outgoing_clustering_buffer_size = <new_buffer_size>
+   ```
+
+   Replace `<new_buffer_size>` with a larger value, for example, doubling the current buffer size. After updating the configuration, restart the VerneMQ service to apply the changes.
+
+   ```
+   sudo systemctl restart vernemq
+   ```
+
+4. Monitor the dropped messages
+
+   Continue to monitor the dropped messages using Netdata, and check if the issue is resolved after increasing the buffer size.
+
+### Useful resources
+
+1. [VerneMQ Documentation - Clustering](https://vernemq.com/docs/clustering/)
+2. [VerneMQ Logging and Monitoring](https://docs.vernemq.com/monitoring-vernemq/logging)
+3. [Managing VerneMQ Configuration](https://docs.vernemq.com/configuration/)

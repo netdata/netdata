@@ -1,29 +1,40 @@
-# vcsa_applmgmt_health
+### Understand the alert
 
-## Virtual Machine | VMware vCenter
+The `vcsa_applmgmt_health` alert is related to the health of VMware vCenter Server Appliance (VCSA) components. This alert is triggered when the health of one or more components is in a degraded or critical state, meaning that your VMware vCenter Server Appliance may be experiencing issues.
 
+### Troubleshoot the alert
 
-This alert presents the appliance management component health status.  
-The values for every component's health can be:
+1. Access the vSphere Client for the affected vCenter Server Appliance
 
-| Code |                              Color                              | Description                                                 | Alert Status |
-|:----:|:---------------------------------------------------------------:|:------------------------------------------------------------|:------------:|
-| `-1` |                            no color                             | Unknown.                                                    |    Clear     |
-| `0`  | ![#00FF00](https://via.placeholder.com/18/00FF00/000000?text=+) | The component is healthy.                                   |    Clear     |
-| `1`  | ![#ffea00](https://via.placeholder.com/18/ffea00/000000?text=+) | The component is healthy but may have some problems.        |   Warning    |
-| `2`  | ![#ffa500](https://via.placeholder.com/18/ffa500/000000?text=+) | The component is degraded, and may have serious problems.   |   Critical   |
-| `3`  | ![#f03c15](https://via.placeholder.com/18/f03c15/000000?text=+) | The component is unavailable or will stop functioning soon. |   Critical   |
-| `4`  | ![#808080](https://via.placeholder.com/18/808080/000000?text=+) | No health data is available.                                |    Clear     |
+   Log in to the vSphere Client to check detailed health information and manage your VCSA.
 
-For more information, please see the [VMware vCenter Server documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-52AF3379-8D78-437F-96EF-25D1A1100BEE.html).
+2. Check the health status of VCSA components
 
-### Troubleshooting Section
+   In the vSphere Client, navigate to `Administration` > `System Configuration` > `Services` and `Nodes` tab. The component health status will be shown in the `Health` column.
 
-To find out why the alert was raised, follow the steps in
-the [VMware vCenter Server documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-52AF3379-8D78-437F-96EF-25D1A1100BEE.html).
+3. Inspect the affected component(s)
 
-<details><summary>References and Sources</summary>
+   If any components show a status other than "green" (healthy), click on the component to view more details and understand the issue.
 
-[VMware Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-52AF3379-8D78-437F-96EF-25D1A1100BEE.html)
+4. Check logs related to the affected component(s)
 
-</details>
+   Access the vCenter Server Appliance Management Interface (VAMI) by navigating to `https://<appliance-IP-address-or-FQDN>:5480` and logging in with the administrator account.
+
+   In the VAMI, click on the `Monitoring` tab > `Logs`. Download and inspect the logs to identify the root cause of the issue.
+
+5. Take appropriate actions
+
+   Depending on the nature of the issue identified, perform the necessary actions or modifications to resolve it. Consult the VMware documentation for recommended solutions for specific component health issues.
+
+6. Monitor the component health
+
+   After performing appropriate actions, continue to monitor the VCSA component health in the vSphere Client to ensure they return to a healthy status.
+
+7. Contact VMware support
+
+   If you are unable to resolve the issue, contact VMware support for further assistance.
+
+### Useful resources
+
+1. [VMware vCenter Server 7.0 Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-52AF3379-8D78-437F-96EF-25D1A1100BEE.html)
+2. [VMware Support](https://www.vmware.com/support.html)

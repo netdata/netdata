@@ -1,10 +1,6 @@
-# ram_available
+### Understand the alert
 
-## OS: Linux, FreeBSD
-
-This alarm shows the percentage of an estimated amount of RAM that is available for use in userspace processes without causing
-swapping. If this alarm gets raised it means that your system has low amount of available RAM memory, and it may affect the
-performance of running applications.
+This alarm shows the percentage of an estimated amount of RAM that is available for use in userspace processes without causing swapping. If this alarm gets raised it means that your system has low amount of available RAM memory, and it may affect the performance of running applications.
 
 - If there is no `swap` space available, the OOM Killer can start killing processes.
 
@@ -15,46 +11,20 @@ main drive). The borrowed space is called `swap` or "swap space".
 RAM. As the name suggests, it has the duty to review all running processes and kill one or more of them in order
 to free up RAM memory and keep the system running.<sup>[1](https://neo4j.com/developer/kb/linux-out-of-memory-killer/)</sup>
 
-<br>
+### Troubleshoot the alert
 
-<details>
-<summary>References and Sources</summary>
+- Check per-process RAM usage to find the top consumers
 
-[[1] Linux Out of Memory Killer](https://neo4j.com/developer/kb/linux-out-of-memory-killer/)
-</details>
-
-### Troubleshooting section:
-
-<details>
-<summary>Check per-process RAM usage to find the top consumers</summary>
-
-<details>
-<summary>Linux</summary>
-
-Use `top`:
-
+Linux:
 ```
-root@netdata~ # top -b -o +%MEM | head -n 22
+top -b -o +%MEM | head -n 22
+```
+FreeBSD:
+```
+top -b -o res | head -n 22
 ```
 
-here, you can see which processes are the main RAM consumers on the `%MEM` column (it is calculated in percentage).
+It would be helpful to close any of the main consumer processes, but Netdata strongly suggests knowing exactly what processes you are closing and being certain that they are not necessary.
 
-It would be helpful to close any of the main consumer processes, but Netdata strongly suggests knowing exactly what
-processes you are closing and being certain that they are not necessary.
-</details>
-
-<details>
-<summary>FreeBSD</summary>
-
-Use `top`:
-
-```
-root@netdata~ # top -b -o res | head -n 22
-```
-
-Here, you can see which processes are the main RAM consumers on the `RES` column (calculated in percentage).
-
-It would be helpful to close any of the main consumer processes, but Netdata strongly suggests knowing exactly what
-processes you are closing and being certain that they are not necessary.
-</details>
-</details>
+### Useful resources
+[Linux Out of Memory Killer](https://neo4j.com/developer/kb/linux-out-of-memory-killer/)

@@ -1,48 +1,40 @@
-# vernemq_mqtt_disconnect_received_reason_not_normal
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert is triggered when the number of not normal v5 DISCONNECT packets received by VerneMQ in the last minute is above a certain threshold. This indicates that there is an issue with MQTT clients connecting to your VerneMQ MQTT broker that requires attention.
 
-_The DISCONNECT packet is the final MQTT Control Packet sent from the Client or the Server. It
-indicates the reason why the Network Connection is being closed. The Client or Server may send a
-DISCONNECT packet before closing the Network Connection. If the Network Connection is closed without
-the Client first sending a DISCONNECT packet with Reason Code 0x00 (Normal disconnection) and the
-Connection has a Will Message, the Will Message is
-published. <sup>[1](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205) </sup>_
+### What does not normal mean?
 
-The Netadata agent monitors the number of received not normal v5 DISCONNECT packets over the last
-minute. This alert is raised into warning when your VerneMQ server receive more than 5 DISCONNECT
-packets over the last minute.
+In the context of this alert, "not normal" refers to v5 DISCONNECT packets that were received with a reason code other than "normal disconnection", as specified in the MQTT v5 protocol. Normal disconnection refers to clients disconnecting gracefully without any issues.
 
-For various scenarios, there are specific DISCONNECT responses for MQTT protocol v5. You can find
-the detailed response codes which were sent by a client and their descriptions in the official
-documentation of MQTT in
-the [MQTT v5 docs, subsection 3.14.2.1: Disconnect reason code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205)
+### Troubleshoot the alert
 
-<details>
-<summary>References and sources</summary>
+1. Inspect VerneMQ logs
 
-1. [MQTT v5 docs DISCONNECT notification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205)
+   Check the VerneMQ logs for any relevant information about the MQTT clients that are experiencing not normal disconnects. This can provide important context to identify the root cause of the issue.
 
-</details>
+   ```
+   sudo journalctl -u vernemq
+   ```
 
-### Troubleshooting Section
+2. Check the MQTT clients
 
-<details>
-<summary>General approach</summary>
+   Investigate the MQTT clients that are experiencing not normal disconnects. This may involve inspecting client logs or usage patterns, as well as verifying that the clients are using the correct MQTT version (v5) and have the appropriate configurations.
 
-Open the alerts Dashboard and locate the chart of this alert (`mqtt_disconnect_received_reason`).
-Inspect which DISCONNECT packets (by reason) triggered this alert. You can clarify why your server
-received those responses from a client by consulting the subsection _Disconnect reason
-code <sup>[1](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205) </sup>_
-which we mentioned above.
+3. Monitor VerneMQ metrics
 
-For example: your server may receive some DISCONNECT packets with the reason: "Disconnect with Will
-Message." This is not abnormal except in the case in which the network connection is closed
-abruptly. This may indicate problems in the connectivity with your clients.
+   Use the VerneMQ metrics to monitor the broker's performance and identify any sudden spikes in abnormal disconnects or other relevant metrics.
 
-</details>
+   To view the VerneMQ metrics, access the VerneMQ admin interface, usually available at `http://<your_vernemq_address>:8888/metrics`.
 
+4. Review network conditions
 
+   Verify that there are no networking issues between the MQTT clients and the VerneMQ MQTT broker, as these issues could cause MQTT clients to disconnect unexpectedly.
 
+5. Review VerneMQ configuration
 
+   Review your VerneMQ configuration to ensure it is correctly set up to handle the expected MQTT client load and usage patterns.
 
+### Useful resources
+
+1. [VerneMQ documentation](https://vernemq.com/docs/)
+2. [MQTT v5 specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)

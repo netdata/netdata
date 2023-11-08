@@ -1,72 +1,44 @@
-# vernemq_mqtt_publish_errors
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert monitors the number of failed v3/v5 PUBLISH operations in the last minute for VerneMQ, an MQTT broker. If you receive this alert, it means that there is an issue with the MQTT message publishing process in your VerneMQ broker.
 
-A PUBLISH Control Packet is sent from a Client to a Server or from Server to a Client to transport
-an Application Message. The Netdata Agent monitors the number of failed v3/v5 PUBLISH operations in
-the last minute.
+### What is MQTT?
 
-<details>
-<summary>MQTT basic concepts and more</summary>
+MQTT (Message Queuing Telemetry Transport) is a lightweight messaging protocol designed for constrained devices and low-bandwidth, high latency, or unreliable networks. It is based on the publish-subscribe model, where clients (devices or applications) can subscribe and publish messages to topics.
 
-Basic concepts in every MQTT
-architecture <sup>[1](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all) </sup>:
+### What is VerneMQ?
 
-- _Broker_ - The broker is the server that distributes the information to the interested clients
-  connected to the server.
-- _Client_ - The device that connects to broker to send or receive information.
-- _Topic_ - The name that the message is about. Clients publish, subscribe, or do both to a topic.
-- _Publish_ - Clients that send information to the broker to distribute to interested clients based
-  on the topic name.
-- _Subscribe_ - Clients tell the broker which topic(s) they're interested in. When a client
-  subscribes to a topic, any message published to the broker is distributed to the subscribers of
-  that topic. Clients can also unsubscribe to stop receiving messages from the broker about that
-  topic.
-- _QoS_ - Quality of Service. Each connection can specify a quality of service to the broker with an
-  integer value ranging from 0-2. The QoS does not affect the handling of the TCP data
-  transmissions, only between the MQTT clients. Note: In the examples later on, we'll only be using
-  QoS 0.
+VerneMQ is a high-performance, distributed MQTT message broker. It is designed to handle thousands of concurrent clients while providing low latency and high throughput.
 
-    - _QoS 0_ specifies at most once, or once and only once without requiring an acknowledgment of
-      delivery. This is often refered to as fire and forget.
-    - _QoS 1_ specifies at least once. The message is sent multiple times until an acknowledgment is
-      received, known otherwise as acknowledged delivery.
-    - _QoS 2_ specifies exactly once. The sender and receiver clients use a two level handshake to
-      ensure only one copy of the message is received, known as assured delivery.
+### Troubleshoot the alert
 
-- _VerneMQ WebSockets_ - WebSocket is a computer communications protocol, providing full-duplex
-  communication channels over a single TCP connection. VerneMQ supports the WebSocket protocol out
-  of the box. To be able to open a WebSocket connection to VerneMQ, you have to configure a
-  WebSocket listener or Secure WebSocket listener in the `vernemq.conf`. See more in the official
-  documentation in
-  the [how to configure WebSocket](https://docs.vernemq.com/configuring-vernemq/websockets)
-  section
+1. Check the VerneMQ log files for any error messages or warnings related to the MQTT PUBLISH operation failures. The log files are usually located in the `/var/log/vernemq` directory.
 
-</details>
+   ```
+   sudo tail -f /var/log/vernemq/vernemq.log
+   ```
 
-<details>
-<summary>References and sources</summary>
+2. Check VerneMQ metrics to identify any bottlenecks in the system's performance. You can do this by using the `vmq-admin` tool, which comes with VerneMQ. Run the following command to get an overview of the broker's performance:
 
-1. [MQTT basic concepts](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all)
-2. [MQTT v5 docs PUBLISH packets](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901100)
-3. [Dealing with netsplits](https://docs.vernemq.com/vernemq-clustering/netsplits)
+   ```
+   sudo vmq-admin metrics show
+   ```
 
-</details>
+   Pay attention to the metrics related to PUBLISH operation failures, such as `mqtt.publish.error_code.*`.
 
-### Troubleshooting Section
+3. Assess the performance of connected clients. Use the `vmq-admin` tool to list client connections along with details like the client's state and the number of published messages:
 
-These kinds of errors can appear in cases of a network partition in your cluster (aka netsplit)
+   ```
+   sudo vmq-admin session show --client_id --is_online --is_authenticated --session_publish_errors
+   ```
 
-<details>
-<summary>Check connectivity between nodes</summary>
+   Investigate the clients with `session_publish_errors` to find out if there's an issue with specific clients.
 
-You must ensure that the connectivity between your cluster nodes is valid. As soon as the partition
-is healed, and connectivity reestablished, the VerneMQ nodes replicate the latest changes made to
-the subscription data. This includes all the changes 'accidentally' made during the Window of
-Uncertainty. Using Dotted Version Vectors VerneMQ ensures that convergence regarding subscription
-data and retained messages is eventually reached.
+4. Review your MQTT topic configuration, such as the retained flag, QoS levels, and the permissions for publishing to ensure your setup aligns with the intended behavior.
 
-</details>
+5. If the issue persists or requires further investigation, consider examining the network conditions, such as latency or connection issues, which might hinder the MQTT PUBLISH operation's efficiency.
 
+### Useful resources
 
-
+1. [VerneMQ documentation](https://vernemq.com/docs/)
+2. [An introduction to MQTT](https://www.hivemq.com/mqtt-essentials/)

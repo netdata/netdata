@@ -1,29 +1,28 @@
-# vcsa_storage_health
+### Understand the alert
 
-## Virtual Machine | VMware vCenter
+The `vcsa_storage_health` alert indicates the health status of the storage components in your VMware vCenter Server Appliance (vCSA). It notifies you when the storage components are experiencing issues or are at risk of failure.
 
-This alert presents the storage health status.  
-The values for every component's health can be:
+### Troubleshoot the alert
 
-| Code |                              Color                              | Description                                                 | Alert Status  |
-|:----:|:---------------------------------------------------------------:|:------------------------------------------------------------|:-------------:|
-| `-1` |                            no color                             | Unknown.                                                    |   Clear  |
-| `0`  | ![#00FF00](https://via.placeholder.com/18/00FF00/000000?text=+) | The component is healthy.                                   |     Clear     |
-| `1`  | ![#ffea00](https://via.placeholder.com/18/ffea00/000000?text=+) | The component is healthy but may have some problems.        |    Warning    |
-| `2`  | ![#ffa500](https://via.placeholder.com/18/ffa500/000000?text=+) | The component is degraded, and may have serious problems.   |   Critical    |
-| `3`  | ![#f03c15](https://via.placeholder.com/18/f03c15/000000?text=+) | The component is unavailable or will stop functioning soon. |   Critical    |
-| `4`  | ![#808080](https://via.placeholder.com/18/808080/000000?text=+) | No health data is available.                                | Clear |
+1. Identify the affected component(s): Check the alert details and note the component(s) with the corresponding health codes to determine their status.
 
-For further information, please have a look at the *References and Sources* section.
+2. Access the vCenter Server Appliance Management Interface (VAMI): Open a supported browser and enter the URL: `https://<appliance-IP-address-or-FQDN>:5480`. Log in with the administrator or root credentials.
 
-<details><summary>References and Sources</summary>
+3. Navigate to the Storage tab: In the VAMI, click on the 'Monitor' tab and then click on 'Storage.'
 
-1. [VMware Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)
+4. Analyze the storage health: Review the reported storage health status for each component, match the health status with the information in the alert, and identify any issues.
 
-</details>
+5. Remediate the issue: Depending on the identified problem, take the necessary actions to resolve the issue. Examples include:
 
-### Troubleshooting Section
+   - Check for any hardware faults and replace faulty components.
+   - Investigate possible disk space issues and free up space or increase the storage capacity.
+   - Verify that the storage subsystem is properly configured, and no misconfigurations are causing the issue.
+   - Look for software issues, such as failed updates, and resolve them or rollback changes.
+   - Consult VMware support if further assistance is needed.
 
-To find out why the alert was raised, follow the steps in
-the [vmware vCenter Server documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)
-.
+6. Verify resolution: After resolving the issue, verify that the storage health status has improved by checking the current status in the VAMI Storage tab.
+
+### Useful resources
+
+1. [VMware vCenter Server Appliance Management Interface](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vcenter.configuration.doc/GUID-ACEC0944-EFA7-482B-84DF-6A084C0868B3.html)
+2. [VMware vSphere Documentation](https://docs.vmware.com/en/VMware-vSphere/index.html)

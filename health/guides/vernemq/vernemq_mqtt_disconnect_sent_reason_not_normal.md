@@ -1,43 +1,45 @@
-# vernemq_mqtt_disconnect_sent_reason_not_normal
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert indicates that VerneMQ, a high-performance, distributed MQTT message broker, is sending an abnormal number of v5 DISCONNECT packets in the last minute. This may signify an issue in the MQTT messaging system and impact the functioning of IoT devices or other MQTT clients connected to VerneMQ.
 
-_The DISCONNECT packet is the final MQTT Control Packet sent from the Client or the Server. It
-indicates the reason why the Network Connection is being closed. The Client or Server may send a
-DISCONNECT packet before closing the Network
-Connection. <sup>[1](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205) </sup>_
+### What does an abnormal v5 DISCONNECT packet mean?
 
-The Netdata Agent monitors the number of sent _not normal_ v5 DISCONNECT packets over the last
-minute. This alert is raised into warning when your VerneMQ server sends more than 5 DISCONNECT
-packets over the last minute.
+In MQTT v5, the DISCONNECT packet is sent by a client or server to indicate the end of a session. A "not normal" DISCONNECT packet, generally refers to a DISCONNECT packet sent with a reason code other than "Normal Disconnection" (0x00). These reason codes might include:
 
-For various scenarios, there are specific DISCONNECT responses for MQTT protocol v5. You can find
-the detailed response codes which were sent by the Server and their descriptions in the official
-documentation of MQTT in
-the [MQTT v5 docs, subsection 3.14.2.1: Disconnect reason code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205)
+- Protocol errors
+- Invalid DISCONNECT payloads
+- Authorization or authentication violations
+- Exceeded keep-alive timers
+- Server/connection errors
+- User-triggered disconnects
 
-<details>
-<summary>References and sources</summary>
+A high number of not normal DISCONNECT packets, might indicate an issue in your MQTT infrastructure, misconfigured clients, or security breaches.
 
-1. [MQTT v5 docs DISCONNECT notification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205)
+### Troubleshoot the alert
 
-</details>
+1. **Inspect VerneMQ logs**: VerneMQ logs can provide detailed information about connections, disconnections, and possible issues. Check the VerneMQ logs for errors and information about unusual disconnects.
 
-### Troubleshooting Section
+   ```
+   cat /var/log/vernemq/console.log
+   cat /var/log/vernemq/error.log
+   ```
 
-<details>
-<summary>General approach</summary>
+2. **Monitor VerneMQ status**: Use the `vmq-admin` command-line tool to monitor VerneMQ and view its runtime status. Check the number of connected clients, subscriptions, and sessions.
 
-Open the alerts Dashboard and locate the chart of this alert (`mqtt_disconnect_sent_reason`).
-Inspect which DISCONNECT packets (by reason) triggered this alert. Inspect the reason why your
-server sent those responses by consulting the subsection _Disconnect reason
-code <sup>[1](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901205) </sup>_
-mentioned above.
+   ```
+   sudo vmq-admin cluster show
+   sudo vmq-admin session show
+   sudo vmq-admin listener show
+   ```
 
-For example, your server may respond to a client with `QoS not supported`. In that case, the client must
-change the QoS settings.
+3. **Check clients and configurations**: Review client configurations for potential errors, like incorrect authentication credentials, misconfigured keep-alive timers, or invalid packet formats. If possible, isolate problematic clients and test their behavior.
 
-</details>
+4. **Consider resource limitations**: If your VerneMQ instance is reaching resource limitations (CPU, memory, network), it might automatically terminate some connections to maintain performance. Monitor system resources using the `top` command or tools like Netdata.
 
+5. **Evaluate security**: If the issue persists, consider checking the security of your MQTT infrastructure. Investigate possible cyber threats, such as a DDoS attack or unauthorized clients attempting to connect.
 
+### Useful resources
 
+1. [VerneMQ Documentation](https://docs.vernemq.com/)
+2. [MQTT v5 Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
+3. [Debugging MQTT Connections](https://www.hivemq.com/blog/mqtt-essentials-part-9-last-will-and-testament/)

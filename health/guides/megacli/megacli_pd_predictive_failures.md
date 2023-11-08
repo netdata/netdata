@@ -1,47 +1,29 @@
-# megacli_pd_predictive_failures
+### Understand the alert
 
-## OS: Any
+This alert indicates that one or more physical disks attached to the MegaCLI controller are experiencing predictive failures. A predictive failure is a warning that a hard disk may fail in the near future, even if it's still working normally. The failure prediction relies on the self-monitoring and analysis technology (S.M.A.R.T.) built into the disk drive.
 
-A disk array controller is a device that manages the physical disk drives and presents them to the
-computer as logical units. It almost always implements hardware RAID, thus it is sometimes referred
-to as RAID controller. It also often provides additional disk cache.
+### Troubleshoot the alert
 
-A predictive drive failure (self-monitoring analysis and reporting
-technology [S.M.A.R.T.](https://en.wikipedia.org/wiki/S.M.A.R.T.#:~:text=(Self%2DMonitoring%2C%20Analysis%20and,SSDs)%2C%20and%20eMMC%20drives)
-error).
+**Make sure you have taken necessary backup steps before performing any action. Netdata is not liable for any loss or corruption of data, databases, or software.**
 
-This is an alert about the physical disks attached to the MegaCLI controller. The Netdata Agent
-calculates the number of physical drive predictive failures. The failure prediction function for the
-hard disk drives determines the risk of a failure in advance and issues a warning when the risk is
-high. A hard disk can still operate normally but may fail in the near future. You might want to
-consider replacing the disk.
+1. Identify the problematic drives:
 
-<details>
-<summary>References and source</summary>
+   Use the following command to gather information about your virtual drives in all adapters:
 
-1. [MegaRAID SAS Software User Guide \[pdf download\]](https://docs.broadcom.com/docs/12353236)
+   ```
+   megacli –LDInfo -Lall -aALL
+   ```
+
+2. Determine the virtual drive and adapter reporting media errors.
+
+3. Consult the MegaRAID SAS Software User Guide [1]:
+
+   1. Refer to Section 2.1.16 to check for issues with your drives.
+   2. Refer to Section 7.18 to perform any appropriate actions on drives. Focus on Sections 7.18.2, 7.18.6, 7.18.7, 7.18.8, 7.18.11, and 7.18.14.
+
+4. Consider replacing the problematic disk(s) to prevent imminent failures and potential data loss.
+
+### Useful resources
+
+1. [MegaRAID SAS Software User Guide (PDF download)](https://docs.broadcom.com/docs/12353236)
 2. [MegaCLI commands cheatsheet](https://www.broadcom.com/support/knowledgebase/1211161496959/megacli-commands)
-
-</details>
-
-### Troubleshooting section:
-
-Data is priceless. Before you perform any action, make sure that you have taken any necessary backup
-steps. Netdata is not liable for any loss or corruption of any data, database, or software.
-
-<details>
- <summary>General approach</summary>
-
-1. Gather more information about your virtual drives in all adapters
-
-      ```
-      root@netdata # megacli –LDInfo -Lall -aALL
-      ```
-
-2. Check which virtual drive is reporting media errors and in which adapter
-
-
-3. Consult the manual's <sup>[1](https://docs.broadcom.com/docs/12353236) </sup>
-    1. section `2.1.16` to check what is going wrong with your drives.
-    2. section `7.18` to perform any action in drives. Focus on {`7.18.2`,`7.18.6`,`7.18.7`,`7.18.8`
-       ,`7.18.11`,`7.18.14`}

@@ -1,61 +1,49 @@
-# docker_containers_unhealthy
+### Understand the alert
 
-**Containers | Docker**
+This alert, `docker_container_unhealthy`, is triggered when the health status of a Docker container is marked as unhealthy. If you receive this alert, it means that one of your Docker containers is not functioning properly, which can affect the services or applications running inside the container.
 
-_Docker is an open source containerization platform. It enables developers to package applications
-into containers—standardized executable components combining application source code with the
-operating system (OS) libraries and dependencies required to run that code in any environment_
+### What does container health status mean?
 
-Sometimes while our container is running, the application inside may have crashed. To foresee those
-events, container runtimes (CR) and orchestrators perform health checks to endpoints inside the
-functional units of the container. A container marked as unhealthy by the CR, is malfunctioning and
-should be stopped. Those health checks are defined by the creator of the container with the
-HEALTHCHECK
-instructions. <sup>[1](https://docs.docker.com/engine/reference/builder/#healthcheck) </sup>
+The container health status is a Docker feature that allows you to define custom health checks to verify the proper functioning of your containers. If a container has a health check defined, Docker will execute it at regular intervals to monitor the container's health. If the health check fails a specific number of times in a row, Docker will mark the container as unhealthy, and this alert will be triggered.
 
-The Netdata Agent monitors the average number of unhealthy docker containers over the last 10
-seconds. This alert indicates that some containers are not running due to failed health checks.
+### Troubleshoot the alert
 
-This alert is raised into warning when at least one container is unhealthy in your Docker engine.
+1. Identify the affected container:
 
-<details>
-<summary>References and sources</summary>
+   Find the container name in the alert's info field: `${label:container_name} docker container health status is unhealthy`. Use this container name in the following steps.
 
-1. [HEALTHCHECK instruction in Docker docs](https://docs.docker.com/engine/reference/builder/#healthcheck)
+2. Check the logs of the affected container:
 
-</details>
+   Use the `docker logs` command to view the logs of the unhealthy container. This may provide information on what caused the container to become unhealthy.
 
-### Troubleshooting section
+   ```
+   docker logs <container_name>
+   ```
 
-<details>
-<summary>Inspect and restart the UNHEALTY container</summary>
+3. Inspect the container's health check configuration:
 
-1. Check all the containers in the system.
+   Use the `docker inspect` command to view the health check settings for the affected container. Look for any misconfigurations that could lead to the container being marked as unhealthy.
 
-    ```
-    root@netdata # docker ps -a
-    ```
+   ```
+   docker inspect <container_name> --format='{{json .Config.Healthcheck}}'
+   ```
 
-2. Find the NAME of the container that is marked as UNHEALTHY.
+4. Check the container's health status history:
 
-3. Check the logs of this container to get some insights into what's going wrong
+   Use the `docker inspect` command again to review the health check history for the affected container.
 
-    ```
-    root@netdata # docker logs <UNHEALTHY_CONTAINER>
-    ```
-   In many cases, your app's logs may not appear in docker log collector. A simple workaround is
-   something like
-   this, [redirect your apps's logs into stderr](https://github.com/nginxinc/docker-nginx/blob/master/Dockerfile-debian.template#L90)
-   . Use this workaround purposefully. Another workaround is to redirect any log attempt to log
-   directly into the `/proc/self/fd/2`.
+   ```
+   docker inspect <container_name> --format='{{json .State.Health}}'
+   ```
 
+5. Investigate and fix container issues:
 
-4. Restart the container and see if this fixes the problem.
+   Based on the information gathered from the previous steps, investigate and fix any issues with the container's service, configuration, or resources. You might need to restart the container or reconfigure its health check settings.
 
-    ```
-    root@netdata # docker logs <UNHEALTHY_CONTAINER>
-    ```
+   ```
+   docker restart <container_name>
+   ```
 
-5. If you receive this alert often, you may have to do further investigation on why this event occurs
+### Useful resources
 
-</details>
+1. [Docker's HEALTHCHECK instruction](https://stackoverflow.com/questions/38546755/how-to-use-dockers-healthcheck-instruction)

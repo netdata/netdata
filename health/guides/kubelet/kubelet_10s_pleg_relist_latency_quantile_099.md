@@ -1,77 +1,58 @@
-# kubelet_10s_pleg_relist_latency_quantile_099
+### Understand the alert
 
-**Kubernetes | Kubelet**
+This alert is related to the Kubernetes Kubelet, which is the primary node agent responsible for ensuring containers run in a Pod. The alert specifically relates to the Pod Lifecycle Event Generator (PLEG) module, which is responsible for adjusting the container runtime state and maintaining the Pod's cache. When there is a significant increase in the relisting time for PLEG, you'll receive a `kubelet_10s_pleg_relist_latency_quantile_099` alert.
 
-_The kubelet is the primary "node agent" that runs on each node. It makes sure that containers are
-running in a Pod. The kubelet takes a set of PodSpecs that are provided through various mechanisms
-and ensures that the containers described in those PodSpecs are running and healthy and doesn't
-manage containers that were not created by Kubernetes._
+### Troubleshoot the alert
 
-The PLEG (Pod Lifecycle Event Generator) module in Kubelet adjusts the container runtime state with
-each matched pod-level event and keeps the Pod's cache up to date. Big delays in the relist process
-of pods will eventually cause a "PLEG is not healthy" event which will make the node unavailable (
-NotReady).
+Follow the steps below to troubleshoot this alert:
 
-The Netadata Agent calculates the ratio of average Pod Lifecycle Event Generator relisting latency
-over the last 10 seconds, compared to the last minute (quantile 0.99). Receiving this alert means
-that the relisting time has increased significantly.
+1. Check the container runtime health status
 
-> Different pods have different relisting latencies, more quantiles help you reduce the error rate in those metrics.
+   If you are using Docker as the container runtime, run the following command:
 
+   ```
+   sudo docker info
+   ```
 
-<details>
-<summary>See more about the kubelet </summary>
+   Check for any reported errors or issues.
 
-As we said before, the kubelet works in terms of a PodSpec. A PodSpec is a YAML or a JSON object
-that describes a pod. The PodSpec contains all information a kubelet needs to know to run the pod in
-the corresponding cluster node.
+   If you are using a different container runtime like containerd or CRI-O, refer to the respective documentation for health check commands.
 
-Beside the PodSpecs provided from the Kubernetes APIserver, there are three ways to provide a
-kubelet with a container manifest:
+2. Check Kubelet logs for any errors.
 
-- File: Path passed as a flag on the command line. Files under this path will be monitored
-  periodically for updates. The monitoring period is 20s by default and is configurable via a flag.
-- HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint is checked
-  every 20 seconds (also configurable with a flag).
-- HTTP server: The kubelet can also listen for HTTP and respond to a simple API (underspec'd
-  currently) to submit a new manifest.
+   You can do this by running the following command:
 
-See more about Kubelet in
-the [Kubernetes official docs](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
+   ```
+   sudo journalctl -u kubelet -n 1000
+   ```
 
-</details>
+   Look for any relevant error messages or warnings in the output.
 
+3. Validate that the node is not overloaded with too many Pods.
 
-<details>
-<summary>See more about PLEG and the relist process</summary>
+   Run the following commands:
 
-A kubelet keeps track of all the Pods that are about to run in the node. The node could have any
-kind of Container Runtime Interface (CRI) always compatible with Kubernetes. A Pod lifecycle event
-interprets the underlying container state change at the pod-level abstraction, making it
-container-runtime-agnostic. This abstraction shields a kubelet from the runtime specifics.
+   ```
+   kubectl get nodes
+   kubectl describe node <node_name>
+   ```
 
-In order to generate pod lifecycle events, PLEG needs to detect changes in container states. The
-PLEG module periodically relisting all containers (even then stopped ones) and compare then with
-their Kubelet's PodSpecs. The relist process takes longer when there are problems with the
-underlying CRI or overloading of a Node with too many pods.
+   Adjust the max number of Pods per node if needed, by editing the Kubelet configuration file `/etc/systemd/system/kubelet.service.d/10-kubeadm.conf`, adding the `--max-pods=<NUMBER>` flag, and restarting Kubelet:
 
-See more about the PLEG's mechanism in
-the [Redhat's blogspot](https://developers.redhat.com/blog/2019/11/13/pod-lifecycle-event-generator-understanding-the-pleg-is-not-healthy-issue-in-kubernetes#)
+   ```
+   sudo systemctl daemon-reload
+   sudo systemctl restart kubelet
+   ```
 
-</details>
+4. Check for issues related to the underlying storage or network.
 
-<details>
-<summary>References and Sources</summary>
+   Inspect the Node's storage and ensure there are no I/O limitations or bottlenecks causing the increased latency. Also, check for network-related issues that could affect the communication between the Kubelet and the container runtime.
+
+5. Verify the performance and health of the Kubernetes API server.
+
+   High workload on the API server could affect the Kubelet's ability to communicate and process Pod updates. Check the API server logs and metrics to find any performance bottlenecks or errors.
+
+### Useful resources
 
 1. [Kubelet CLI in Kubernetes official docs](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
 2. [PLEG mechanism explained in Redhat's blogspot](https://developers.redhat.com/blog/2019/11/13/pod-lifecycle-event-generator-understanding-the-pleg-is-not-healthy-issue-in-kubernetes#)
-
-</details>
-
-### Troubleshooting
-
-Most cloud providers address this issue by limiting the Pods that can run in particular nodes in
-their managed Kubernetes services. They often implement health checks into the underlying container
-runtime. However, you may encounter this issue in high-end nodes which can run hundreds of
-containers. If you have configured your cluster by yourself (let's say with `kubeadm`), you can
-update the value of max Pods.

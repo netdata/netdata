@@ -1,36 +1,46 @@
-# ioping_disk_latency
+### Understand the alert
 
-## OS: Any
+This alert presents the average `I/O latency` over the last 10 seconds. `I/O latency` is the time that is required to complete a single I/O operation on a block device.
 
-This alarm presents the average `I/O latency` over the last 10 seconds.
+This alert might indicate that your disk is under high load, or that the disk is slow.
 
-> `I/O latency` is the time that is required to complete a single I/O operation on a block device.
+### Troubleshoot the alert
 
-If this alarm is raised, it might indicate that your disk is under high load, or that the disk is slow.
+1. Check per-process I/O usage:
+   
+   Use `iotop` to see the processes that are the main I/O consumers:
 
-### Troubleshooting Section
+   ```
+   sudo iotop
+   ```
 
-<details>
-<summary>Check related charts to find your case</summary>
+   If you don't have `iotop` installed, then [install it](https://www.tecmint.com/iotop-monitor-linux-disk-io-activity-per-process/)
 
-- First, you need to identify whether your disk is under high load or not.
+2. Analyze the running processes:
 
-    <br>
+   Investigate the top I/O consumers and determine if these processes are expected to consume that much I/O, or if there might be an issue with these processes.
 
-    1. Go to your node on the Netdata Cloud, on the `Disks` section, and select the disk you want to
-       investigate.
+3. Minimize the load by closing any unnecessary main consumer processes:
 
-    <br>
+   If you find that any unnecessary or unexpected processes are heavily utilizing your disk, try stopping or closing those processes to reduce the load on the disk. Always double-check if the process you want to close is necessary.
 
-    2. On the top of the page you can see the utilization of the disk, and you can also go to the `Disk I/O Bandwidth`
-       chart. There you can see the amount of transferred data `to` and `from` the particular disk.
+4. Verify your disk health:
 
-    <br>
+   Make sure your disk is not facing any hardware issues or failures. For this, you can use the `smartmontools` package, which contains the `smartctl` utility. If it's not installed, you can [install it](https://www.smartmontools.org/wiki/Download).
 
-- If the utilization is low and there isn't a significant amount of data being transferred, your
-  drive's latency is slow, so you need to upgrade that drive. (If it is an HDD, then an SSD would be a significant upgrade
-  for latency issues.)
+   To check the disk health, run:
 
+   ```
+   sudo smartctl -a /dev/sdX
+   ```
 
-- If there is a high load on the drive, it usually means that one or more processes are heavily utilizing the drive.
-</details>
+   Replace `/dev/sdX` with the correct disk device identifier (for example, `/dev/sda`).
+
+5. Consider upgrading your disk:
+
+   If your disk consistently experiences high latency and you have already addressed any performance issues with the running processes, consider upgrading your disk to a faster drive (e.g., replace an HDD with an SSD).
+
+### Useful resources
+
+1. [iotop - Monitor Linux Disk I/O Activity](https://www.tecmint.com/iotop-monitor-linux-disk-io-activity-per-process/)
+2. [smartmontools - SMART monitoring tools](https://www.smartmontools.org/)

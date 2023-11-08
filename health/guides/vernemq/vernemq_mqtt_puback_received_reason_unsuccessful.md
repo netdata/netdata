@@ -1,46 +1,33 @@
-# vernemq_mqtt_puback_received_reason_unsuccessful
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert tracks the number of `unsuccessful v5 PUBACK packets` received by the VerneMQ broker within the last minute. If you receive this alert, there might be an issue with your MQTT clients or the packets they send to the VerneMQ broker.
 
-A PUBACK packet is the response to a PUBLISH packet with QoS 1. The Netdata Agent monitors the
-number of received unsuccessful v5 PUBACK packets in the last minute. For various scenarios, there
-are specific PUBACK responses for MQTT protocol v5. You can find the detailed response codes which
-were sent by a client or a server and their descriptions in the official documentation of MQTT in
-the [MQTT v5 docs, PUBACK Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901124)
-. The Client or Server sending the PUBACK packet must always use one of the PUBACK Reason Codes.
+### What are v5 PUBACK packets?
 
+In MQTT v5, the `PUBACK` packet is sent by the server or subscriber client to acknowledge the receipt of a `PUBLISH` packet. In the MQTT v5 protocol, the `PUBACK` packet can contain a reason code indicating whether the message was successfully processed or if there was an error.
 
+### Troubleshoot the alert
 
-<details>
-<summary>See more about QoS 1 </summary>
+1. Check the VerneMQ logs: Analyze the logs to check for any errors or issues related to the MQTT clients or the incoming messages. VerneMQ's logs are usually located at `/var/log/vernemq/` directory, or you can check the log location in the VerneMQ configuration files.
 
-The Quality of Service (QoS) level is an agreement between the sender of a message and the receiver
-of a message that defines the guarantee of delivery for a specific message. In QoS 1, a client will
-receive a confirmation message from the broker upon receipt. If the expected confirmation is not
-received within a certain time frame, the client has to retry the message. A message received by a
-client must be acknowledged on time as well, otherwise the broker will re-deliver the
-message. <sup>[1](https://vernemq.com/intro/mqtt-primer/quality_of_service.html) </sup>
+   ```
+   less /var/log/vernemq/console.log
+   less /var/log/vernemq/error.log
+   ```
 
-</details>
+2. Verify MQTT clients' configurations: Review your MQTT clients' settings to ensure that they are configured correctly, especially the protocol version, QoS levels, and any MQTT v5 specific settings. Make any necessary adjustments and restart the clients.
 
-<details>
-<summary>References and sources</summary>
+3. Monitor VerneMQ performance: Use the VerneMQ `vmq-admin` tool to monitor the broker's performance, check connections, subscriptions, and session information. This can help you identify potential issues affecting the processing of incoming messages.
 
-1. [Quality of service explained, VerneMQ docs](https://vernemq.com/intro/mqtt-primer/quality_of_service.html)
-2. [MQTT v5 docs, PUBACK description](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901100)
+   ```
+   vmq-admin metrics show
+   vmq-admin session list
+   vmq-admin listener show
+   ```
 
-</details>
+4. Check the `PUBLISH` messages: Inspect the contents of `PUBLISH` messages being sent by the MQTT clients to ensure they are correctly formatted and adhere to the MQTT v5 protocol specifications. If necessary, correct any issues and send test messages to confirm the problem is resolved.
 
-### Troubleshooting Section
+### Useful resources
 
-<details>
-<summary>General approach</summary>
-
-Open the alerts Dashboard and locate the chart of this alert (`mqtt_puback_received_reason`).
-Identify which PUBACK packets (by reason) triggered this alert. Inspect the reason why a client sent
-those responses by consulting the subsection _PUBACK Reason
-Code  <sup>[1](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901124)_ </sup> 
-mentioned above.
-
-</details>
-
+1. [VerneMQ documentation](https://vernemq.com/docs/)
+2. [MQTT v5.0 Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html)

@@ -1,120 +1,36 @@
-# interface_inbound_errors
+- Troubleshoot errors related to network congestion
 
-## OS: FreeBSD
+Network congestion can cause packets to be dropped, leading to interface inbound errors. To determine if congestion is the issue, you can monitor the network for any signs of excessive workload or high utilization rates.
 
-When a packet is received by your system, it can be processed in one of four ways:
+1. Use `ifconfig` to check the network interface utilization:
+   ```
+   ifconfig <your_interface>
+   ```
 
-- It can be passed as input to a higher-level protocol.
+2. Check the network switch/router logs for any indication of high utilization, errors or warnings.
 
-- It can encounter an error which is reported back to the source.
+3. Use monitoring tools like `iftop`, `nload`, or `iptraf` to monitor network traffic and identify any bottle-necks or usage spikes.
 
-- It can be dropped due to an error.
+If you find that congestion is causing the inbound errors, consider ways to alleviate the issue including upgrading your network infrastructure or load balancing the traffic.
 
-- It can be forwarded to the next hop on its path to its destination.
+- Troubleshoot errors caused by faulty network equipment
 
-There are mechanisms to identify packets with errors and verify the integrity of the packet such as the Cyclic
-Redundancy Check (CRC), the Frame check sequence (FCS), the header checksum (IPv4), and length checks. The Netdata agent
-monitors the number of inbound errors for a specific network interface in the last 10 minutes.
+Faulty network devices, such as switches and routers, can introduce errors in packets. To identify the cause, you should review the logs and statistics of any network devices in the path of the communication between the sender and this system.
 
+1. Check the logs of the network equipment for any indications of errors, problems or unusual behavior.
 
-<details>
-<summary>The life of a packet</summary>
+2. Review the error counters and statistics of the network equipment to identify any trends or issues.
 
-The following list from "Design and Implementation of the FreeBSD Operating System, The, 2nd Edition" (McKusick,
-Neville-Neil and Watson) [[1]](https://www.pearson.com/us/higher-education/program/Mc-Kusick-Design-and-Implementation-of-the-Free-BSD-Operating-System-The-2nd-Edition/PGM224032.html) 
-provides a brief description of every action taken by your system for every packet it receives:
+3. Consider replacing or upgrading faulty equipment if it is found to be responsible for inbound errors.
 
-1. Verifies that the packet is at least as long as an IPv4 or IPv6 header and ensures that the header is contiguous.
+- Troubleshoot errors caused by software or configuration issues
 
-2. For IPv4, checksums the header of the packet, and discards the packet if there is an error.
+Incorrect configurations or software issues can also contribute to interface inbound errors. Some steps to troubleshoot these potential causes are:
 
-3. Verifies that the packet is at least as long as the header indicates, and drops the packet if it is not.
+1. Review the system logs for any errors or warnings related to the network subsystem.
 
-4. Does any filtering or security functions (ipfw, IPSec).
+2. Ensure that the network interface is configured correctly, and proper drivers are installed and up-to-date.
 
-5. Processes any options associated with the header.
+3. Examine the system's firewall and security settings to verify that there are no inappropriate blockings or restrictions that may be causing the errors.
 
-6. Checks whether the packet is for this host. If it is, continues processing the packet. If it is not, and if the
-   system is acting as a router, your system will try to forward the packet. Otherwise, the packet is dropped.
-
-7. If the packet has been fragmented, keeps it until all its fragments are received and reassembled, If the reassemble
-   process takes a significant amount of time, the system drops it.
-
-8. Passes the packet to the input routine of the next-higher-level protocol.
-
-</details>
-
-<details>
-<summary>See more on CRC</summary>
-
-> A cyclic redundancy check (CRC) is an error-detecting code commonly used in digital networks and storage devices to 
-> detect accidental changes to raw data. Blocks of data entering these systems get a short check value attached, based 
-> on the remainder of a polynomial division of their contents. On retrieval, the calculation is repeated and, in the 
-> event the check values do not match, corrective action can be taken against data 
-> corruption. [[2]](https://en.wikipedia.org/wiki/Cyclic_redundancy_check)
-
-</details>
-
-<details>
-<summary>See more on FCS</summary>
-
-> A frame check sequence (FCS) is an error-detecting code added to a frame in a communication protocol. All frames and 
-> the bits, bytes, and fields contained within them, are susceptible to errors from a variety of sources. The FCS field 
-> contains a number that is calculated by the source node based on the data in the frame. This number is added to the 
-> end of a frame that is sent. When the destination node receives the frame the FCS number is recalculated and compared 
-> with the FCS number included in the frame. If the two numbers are different, an error is assumed and the frame 
-> is discarded. [[3]](https://en.wikipedia.org/wiki/Frame_check_sequence)
-
-</details>
-
-<details>
-<summary>See more on header checksum</summary>
-
-> The IPv4 header checksum is a checksum used in version 4 of the Internet Protocol (IPv4) to detect corruption in the 
-> header of IPv4 packets. It is carried in the IP packet header and represents the 16-bit result of summation of the 
-> header words. [[4]](https://en.wikipedia.org/wiki/IPv4_header_checksum)
-
-</details>
-
-<details>
-<summary>References and sources</summary>
-
-1. [Book: Design and Implementation of the FreeBSD Operating System (2nd-Edition)](https://www.pearson.com/us/higher-education/program/Mc-Kusick-Design-and-Implementation-of-the-Free-BSD-Operating-System-The-2nd-Edition/PGM224032.html)
-
-1. [Cyclic redundancy check protocol](https://en.wikipedia.org/wiki/Cyclic_redundancy_check)
-
-1. [Frame check sequence protocol](https://en.wikipedia.org/wiki/Frame_check_sequence)
-
-1. [IPv4 header checksum protocol](https://en.wikipedia.org/wiki/IPv4_header_checksum)
-
-
-</details>
-
-### Troubleshooting section:
-
-<details>
-<summary>General approach</summary>
-
-In any case, a good starting point is to get more information about the nature of your errors.
-
-- Netdata dashboard provides an overview of these errors. You can see more in the `errors` chart under the IPv4 (or
-  IPv6) section.
-
-- `netstat` (network statistics) is a command-line network utility that displays network connections for Transmission
-  Control Protocol, routing tables and network protocol statistics for any interface in your system.
-
-    ```
-    root@netdata~ # netstat -sI <your_interface>
-    ```
-
-</details>
-
-<details>
-<summary>Troubleshoot hardware errors in the link of the interface</summary>
-
-You must identify which part of your topology causes these errors. Some actions you can take.
-
-- Remove and re-install the optical fibers and optical modules and check whether the fiber connectors are damaged or
-  contaminated. For ethernet interfaces check for damaged cables and/or for damages in the interfaces themselves.
-
-  
+In conclusion, by following these troubleshooting steps, you should be able to identify and resolve the cause of interface inbound errors on your FreeBSD system. Remember to monitor the situation regularly and address any new issues that may arise to ensure a stable and efficient networking environment.

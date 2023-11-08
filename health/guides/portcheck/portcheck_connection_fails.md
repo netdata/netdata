@@ -1,31 +1,32 @@
-# portcheck_connection_fails
+### Understand the alert
 
-**Other | TCP endpoint**
+This alert indicates that too many connections are failing to a specific TCP endpoint in the last 5 minutes. It suggests that the monitored service on that endpoint is most likely down, unreachable, or access is being denied by firewall/security rules.
 
-The Netdata Agent calculates the average ratio of failed connections over the last 5 minutes. This
-alert indicates that too many connections failed. Receiving this alert means that your endpoint is
-unreachable due to: 
+### Troubleshoot the alert
 
-1. The service is no longer running or not working properly.
-2. Access to this port is denied by a firewall.
-3. Port forwarding rile is incorrectly configured
-4. The IP of the node you want to access is set to a private IP address
+1. Check the service
+   Investigate if the service at the endpoint (specific IP and port) is running as expected. Inspect service logs for issues, error messages, or indications of a shutdown event.
 
-This alert is triggered in warning state when the ratio of failed connections is between 10-40% and
-in critical state when it is greater than 40%.
+2. Test the endpoint
+   Try to establish a connection to the flagged endpoint using tools like `telnet`, `curl`, or `nc`. These tools provide real-time feedback that can help identify problems with the endpoint:
 
-### Troubleshooting section
+   Example using `telnet`:
+   ```
+   telnet IP_ADDRESS PORT_NUMBER
+   ```
 
-<details>
-<summary>Check the firewall rules in the remote</summary>
+3. Examine firewall and security group rules
+   Verify if there are any recent changes or newly added firewall/security group rules that might be causing the connectivity issues. Look for any rules that could be blocking the monitored port specifically or the IP range.
 
-Check the INPUT chain rules, verify that you have allowed access from the host (Agent configured in it)
-to the remote node.
+4. Inspect network connectivity
+   Check the network connectivity between the Netdata Agent and the monitored endpoint. Ensure there are no intermittent network failures or high latency affecting the communication between the two.
 
-**IPtables**
+5. Examine the alert configuration
+   Validate the alert configuration in the `netdata.conf` file to confirm that the alert thresholds and monitored percentage of failed connections are set appropriately.
 
-    ```
-    root@netdata # iptables -L INPUT
-    ```
+6. Check resource utilization
+   High resource utilization might affect the availability of the monitored endpoint. Check if the system hosting the service has enough resources available (CPU, memory, and storage) to serve incoming requests.
 
-</details>
+### Useful resources
+
+1. [How to use netcat (nc) command: Examples for network testing/debugging](https://www.nixcraft.com/t/how-to-use-netcat-nc-command-examples-for-network-testing-debugging/3332)

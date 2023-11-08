@@ -1,120 +1,35 @@
-# x509check_revocation_status
+### Understand the alert
 
-**Certificates | x509 certificates**
+This alert indicates that the X.509 certificate has been revoked, meaning that it is no longer valid or trusted. The certificate can be revoked for various reasons, such as key compromise, errors within the certificate, change of usage, or the certificate owner no longer being deemed trustworthy.
 
-_An X.509 certificate is a digital certificate based on the widely accepted International
-Telecommunications Union (ITU) X.509 standard, which defines the format of public key
-infrastructure (PKI) certificates. They are used to manage identity and security in internet
-communications and computer networking. They are unobtrusive and ubiquitous, and we encounter them
-every day when using websites, mobile apps, online documents, and connected
-devices._ <sup>[1](https://sectigo.com/resource-library/what-is-x509-certificate#:~:text=Share%20this-,An%20X.,internet%20communications%20and%20computer%20networking.) </sup>
+### Troubleshoot the alert
 
-The certificate is also a confirmation or validation by an trusted Certificate Authority (CA) that the public 
-key contained in the certificate belongs to the person, organization, server or other entity noted in the 
-certificate.
+1. **Identify the affected certificate**: The alert should provide information about the affected X.509 certificate. Take note of the certificate's details, such as the domain name, subject, issuer, and serial number.
 
-For many reasons, primary, security reasons, we may want to revoke the validity of an X.509
-certificate. In a nutshell, an X.509 certificate should be revoked when:
+2. **Verify the revocation status**: You can use the `openssl` command to verify the revocation status of the affected certificate. Use the following command to check the certificate against the Certificate Revocation List (CRL) provided by the CA:
 
-- Encryption keys of the certificate have been compromised.
-- Errors occur within an issued certificate.
-- We want to change the usage of the certificate.
-- Certificate owner is no longer deemed trusted.
+   ```
+   openssl verify -crl_check -CAfile CA_certificate.pem -CRLfile CRL.pem certificate.pem
+   ```
 
-The Netdata Agent checks the X.509 certificate revocation status (0: revoked, 1: valid). This alert
-indicates that the X.509 certificate has been revoked. Check more about
-the [x509 certificate monitoring with Netdata](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check)
+   Replace `CA_certificate.pem`, `CRL.pem`, and `certificate.pem` with the appropriate file names of the CA certificate, CRL file, and the target X.509 certificate.
 
-This alert is triggered in critical state when the X.509 certificate is available and not valid.
+   Alternatively, you can use online tools such as [SSL Shopper's SSL Checker](https://www.sslshopper.com/ssl-checker.html) to verify the revocation status. Be sure to input the domain and port associated with the revoked certificate.
 
-<details>
-<summary>Where and why we need X.509 certificates</summary>
+3. **Remove or replace the revoked certificate**: If you have confirmed that the certificate is indeed revoked, you should stop using it immediately. Remove the revoked certificate from your server or application, and replace it with a valid one.
 
-The following provides a comprehensive explanation from  the sectigo's
-website <sup> [1](https://sectigo.com/resource-library/what-is-x509-certificate#:~:text=Share%20this-,An%20X.,internet%20communications%20and%20computer%20networking.) </sup>
+   - If the certificate was issued by a commercial CA, you can request a new certificate from the CA. The CA might provide you with a free replacement or require you to purchase a new one.
+   - If the certificate was issued by [Let's Encrypt](https://letsencrypt.org/), you can renew the certificate using [Certbot](https://certbot.eff.org/) or another ACME client.
+   - If the certificate was self-signed, you can create a new self-signed certificate using the `openssl` command or another certificate management tool.
 
-Common Applications of X.509 Public Key Infrastructure Many internet protocols rely on X.509, and
-there are many applications of the PKI technology that are used every day, including Web server
-security, digital signatures and document signing, and digital identities.
+4. **Update server or application configuration**: After obtaining a new certificate, update your server or application configuration to use the new certificate. Make sure to restart the server or application for the changes to take effect.
 
-- **Web Server Security with TLS/SSL Certificates:**
-  PKI is the basis for the secure sockets layer (SSL)
-  and transport layer security (TLS) protocols that are the foundation of HTTPS secure browser
-  connections. Without SSL certificates or TLS to establish secure connections, cybercriminals could
-  exploit the Internet or other IP networks using a variety of attack vectors, such as
-  man-in-the-middle attacks, to intercept messages and access their contents.
+5. **Monitor the new certificate**: Keep an eye on the new certificate's status using the X.509 monitoring tools provided by Netdata. Regularly check for any new alerts or changes in the certificate's status.
 
-- **Digital Signatures and Document Signing:**
-  In addition to being used to secure messages, PKI-based certificates can be used for digital
-  signatures and document signing. Digital signatures are a specific type of electronic signature
-  that leverages PKI to authenticate the identity of the signer and the integrity of the signature
-  and the document. Digital signatures cannot be altered or duplicated in any way, as the signature
-  is created by generating a hash, which is encrypted using a sender's private key. This
-  cryptographic verification mathematically binds the signature to the original message to ensure
-  that the sender is authenticated and the message itself has not been altered.
+### Useful resources
 
-- **Code Signing:**
-  Code Signing enables application developers to add a layer of assurance by digitally signing
-  applications, drivers, and software programs so that end users can verify that a third party has
-  not altered or compromised the code they receive. To verify the code is safe and trusted, these
-  digital certificates include the software developer's signature, the company name, and
-  timestamping.
-
-- **Email Certificates:**
-  S/MIME certificates validate email senders and encrypt email contents to protect against
-  increasingly sophisticated social engineering and spear phishing attacks. By encrypting/decrypting
-  email messages and attachments and by validating identity, S/MIME email certificates assure users
-  that emails are authentic and unmodified.
-
-- **SSH Keys:**
-  SSH keys are a form of X.509 certificate that provides a secure access credential used in the
-  Secure Shell (SSH) protocol. As the SSH protocol is widely used for communication in cloud
-  services, network environments, file transfer tools, and configuration management tools, most
-  organizations use SSH keys to authenticate identity and protect those services from unintended use
-  or malicious attacks. SSH keys not only improve security, but also enable the automation of
-  connected processes, single sign-on (SSO), and identity and access management at the scale that
-  today's businesses require.
-
-- **Digital Identities:**
-  X.509 digital certificates also provide effective digital identity authentication. As data and
-  applications expand beyond traditional networks to mobile devices, public clouds, private clouds,
-  and Internet of Things devices, securing identities becomes more important than ever. And digital
-  identities don't have to be restricted to devices; they can also be used to authenticate people,
-  data, or applications. Digital identity certificates based on this standard enable organizations
-  to improve security by replacing passwords, which attackers have become increasingly adept at
-  stealing.
-
-</details>
-
-<details>
-<summary>See more about the Certificate Authorities</summary>
-  
-A certification authority (CA) is an entity that issues digital certificates. A digital certificate
-certifies the ownership of a public key by the named subject of the certificate. This allows
-others (relying parties) to rely upon signatures or on assertions made about the private key that
-corresponds to the certified public key. A CA acts as a trusted third party—trusted both by the
-subject (owner) of the certificate and by the party relying upon the certificate. The format of
-these certificates is specified by the X.509 or EMV standard.
-
-**Popular CAs** 
-
-  1. https://letsencrypt.org/
-  2. https://securitycloud.symantec.com/cc/landing
-  3. https://www.geotrust.com/
-  4. https://sectigo.com/
-  5. https://www.digicert.com/
-
-</details>
-
-<details>
-<summary>References and source </summary>
-
-1. [X.509 explained](https://sectigo.com/resource-library/what-is-x509-certificate#:~:text=Share%20this-,An%20X.,internet%20communications%20and%20computer%20networking.)
-
-</details>
-
-
-### Troubleshooting section
-
-A revocation of a certificate is irreversible. That means that this certificate is no longer
-useful. You must stop using it in any way.
+1. [X.509 Certificate Monitoring with Netdata](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check)
+2. [How to use OpenSSL to verify a certificate against a CRL](https://raymii.org/s/tutorials/OpenSSL_command_line_Root_and_Intermediate_CA_including_OCSP_CRL_Signed_Certs.html)
+3. [SSL Shopper's SSL Checker](https://www.sslshopper.com/ssl-checker.html)
+4. [Renewing certificates with Certbot](https://certbot.eff.org/docs/using.html#renewing-certificates)
+5. [Creating a Self-Signed SSL Certificate](https://www.akadia.com/services/ssh_test_certificate.html)

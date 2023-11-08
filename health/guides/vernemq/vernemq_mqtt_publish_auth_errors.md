@@ -1,72 +1,36 @@
-# vernemq_mqtt_publish_auth_errors
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert is triggered when the Netdata Agent detects a spike in unauthorized MQTT v3/v5 `PUBLISH` attempts in the last minute on your VerneMQ broker. If you receive this alert, it means that there might be clients attempting to publish messages without the proper authentication, which could indicate a misconfiguration or potential security risk.
 
-A PUBLISH Control Packet is sent from a Client to a Server or from Server to a Client to transport
-an Application Message. The Netdata Agent monitors the number of unauthorized v3/v5 PUBLISH attempts
-in the last minute.
+### What are MQTT and VerneMQ?
 
-<details>
-<summary>MQTT basic concepts and more</summary>
+MQTT (Message Queuing Telemetry Transport) is a lightweight, publish-subscribe protocol designed for low-bandwidth, high-latency, or unreliable networks. VerneMQ is a high-performance, distributed MQTT broker that supports a wide range of industry standards and can handle millions of clients.
 
-Basic concepts in every MQTT
-architecture <sup>[1](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all) </sup>:
+### Troubleshoot the alert
 
-- _Broker_ - The broker is the server that distributes the information to the interested clients
-  connected to the server.
-- _Client_ - The device that connects to broker to send or receive information.
-- _Topic_ - The name that the message is about. Clients publish, subscribe, or do both to a topic.
-- _Publish_ - Clients that send information to the broker to distribute to interested clients based
-  on the topic name.
-- _Subscribe_ - Clients tell the broker which topic(s) they're interested in. When a client
-  subscribes to a topic, any message published to the broker is distributed to the subscribers of
-  that topic. Clients can also unsubscribe to stop receiving messages from the broker about that
-  topic.
-- _QoS_ - Quality of Service. Each connection can specify a quality of service to the broker with an
-  integer value ranging from 0-2. The QoS does not affect the handling of the TCP data
-  transmissions, only between the MQTT clients. Note: In the examples later on, we'll only be using
-  QoS 0.
+1. Verify the clients' credentials
 
-    - _QoS 0_ specifies at most once, or once and only once without requiring an acknowledgment of
-      delivery. This is often refered to as fire and forget.
-    - _QoS 1_ specifies at least once. The message is sent multiple times until an acknowledgment is
-      received, known otherwise as acknowledged delivery.
-    - _QoS 2_ specifies exactly once. The sender and receiver clients use a two level handshake to
-      ensure only one copy of the message is received, known as assured delivery.
+   To check if the clients are using the correct credentials while connecting and publishing to the VerneMQ broker, inspect their log files or debug messages to find authentication-related issues.
 
-- _VerneMQ WebSockets_ - WebSocket is a computer communications protocol, providing full-duplex
-  communication channels over a single TCP connection. VerneMQ supports the WebSocket protocol out
-  of the box. To be able to open a WebSocket connection to VerneMQ, you have to configure a
-  WebSocket listener or Secure WebSocket listener in the `vernemq.conf`. See more in the official
-  documentation in
-  the [how to configure WebSocket](https://docs.vernemq.com/configuring-vernemq/websockets)
-  section
+2. Review VerneMQ broker configuration
 
-</details>
+   Ensure that the VerneMQ configuration allows for proper authentication of clients. Verify that the correct authentication plugins and settings are enabled. The configuration file is usually located at `/etc/vernemq/vernemq.conf`. For more information on VerneMQ config, please refer to [VerneMQ documentation](https://vernemq.com/docs/configuration/index.html).
 
-<details>
-<summary>References and sources</summary>
+3. Analyze VerneMQ logs
 
-1. [MQTT basic concepts](https://learn.sparkfun.com/tutorials/introduction-to-mqtt/all)
-2. [MQTT v5 docs PUBLISH packets](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901100)
+   Inspect the VerneMQ logs to identify unauthorized attempts and assess any potential risks. The logs typically reside in the `/var/log/vernemq` directory, and you can tail the logs using the following command:
 
-</details>
+   ```
+   tail -f /var/log/vernemq/console.log
+   ```
 
-### Troubleshooting Section
+4. Configure firewall rules
 
-<details>
-<summary>General approach </summary>
+   If you find unauthorized or suspicious IP addresses attempting to connect to your VerneMQ broker, consider blocking those addresses using firewall rules to prevent unauthorized access. 
 
-You may encounter authorization errors either from a misconfigured MQTT client or from a server side
-error (for example a misconfigured web hook.)
+### Useful resources
 
-In any case you should inspect
-your [logs](https://docs.vernemq.com/configuring-vernemq/logging#console-logging) to check with which
-client(s) these issues are raised. These kinds of issues appear in the warning log level,
-so you may have to set your log level appropriately.
-
-```
-root@netdata # cat /var/log/vernemq/console.log | grep "auth_on_publish"
-```
-
-</details>
+1. [VerneMQ documentation](https://vernemq.com/docs/index.html)
+2. [Getting started with MQTT](https://mqtt.org/getting-started/)
+3. [MQTT Security Fundamentals](https://www.hivemq.com/mqtt-security-fundamentals/)
+4. [VerneMQ configuration options](https://vernemq.com/docs/configuration/)

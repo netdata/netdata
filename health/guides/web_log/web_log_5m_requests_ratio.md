@@ -1,24 +1,34 @@
-# web_log_5m_requests_ratio
+### Understand the alert
 
-**Web Server | Web log**
+The `web_log_5m_requests_ratio` alert indicates that there is a significant increase in the number of successful HTTP requests to your web server in the last 5 minutes compared to the previous 5 minutes. This alert is important for monitoring sudden traffic surges, which can potentially overload your server.
 
-HTTP response status codes indicate whether a specific HTTP request has been successfully completed
-or not.
+### Troubleshoot the alert
 
-The Netdata Agent calculates the ratio of successful HTTP requests over the last 5 minutes, compared
-with the previous 5 minutes. These requests consist of 1xx, 2xx, 304, 401 response codes.
+1. Check the source of the increased traffic
+   Use web server logs to determine the source of the increased traffic. Identify if the requests are coming from a specific IP address, group of IP addresses, or even bots.
 
-There is a warning alert when the percentage of requests is increased more than 25% in the
-last 5 minutes compared with the previous 5 minutes and in critical when it increased more than 50%.
-A clear notification for this alert **will not be sent** when the ratio becomes normal again.
+   For example, for Nginx, you can check the log files at `/var/log/nginx/access.log`. For Apache, the logs can be found at `/var/log/apache2/access.log`.
 
-### Troubleshooting section:
+2. Analyze the requests
+   Look at the type of requests (GET, POST, etc.) and the requested resources (URLs). This analysis can help you understand if the increase in traffic is legitimate or if it's due to an issue like a DDoS attack or a web crawler.
 
-This alert is not always a bad thing. It means that there is a slight increase in the
-requests towards to your Web server. You should just keep an eye on this metrics. If you receive
-this alert regularly you should consider take action in advance to avoid server overload.
+3. Monitor server performance
+   Use monitoring tools like `top`, `iotop`, or Netdata itself to check your server's performance metrics. Keep an eye on CPU, RAM, and disk usage to ensure that the server is not getting overloaded.
 
-You can find an interesting article on actions you can take
-to [manage sudden traffic](https://www.nginx.com/blog/how-to-manage-sudden-traffic-surges-server-overload/)
-on a web server (this article is produced by the NGINX associates, but nearly same principles
-applied in any case)
+4. Optimize server resources and configuration
+   If you find that the traffic increase is legitimate and your server is struggling to handle the load, consider optimizing your server resources and configuration. Techniques include:
+
+   - Increasing server resources (CPU, RAM, disk)
+   - Using a caching mechanism
+   - Load balancing and scaling out your infrastructure
+   - User connection rate limiting and request throttling
+
+5. Mitigate potential attacks
+   If the analysis reveals that the increase in traffic is due to a DDoS attack, implement mitigation strategies like firewalls, IP blocking, or using a web application firewall (WAF). Ensure that you have a robust security system in place to protect your server from such attacks.
+
+### Useful resources
+
+1. [How to Manage Sudden Traffic Surges and Server Overload](https://www.nginx.com/blog/how-to-manage-sudden-traffic-surges-server-overload/)
+2. [Attacks on Network Infrastructure](https://www.cloudflare.com/learning/ddos/ddos-attacks/)
+3. [Using Nginx to Rate Limit IP Addresses](https://calomel.org/nginx.html)
+4. [Setting up a Super Fast Apache Server with Cache](https://hostadvice.com/how-to/how-to-configure-apache-web-server-cache-on-ubuntu/)

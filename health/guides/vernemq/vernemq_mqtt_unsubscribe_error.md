@@ -1,42 +1,39 @@
-# vernemq_mqtt_unsubscribe_error
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert monitors the number of failed v3/v5 `UNSUBSCRIBE` operations in VerneMQ in the last minute. If you receive this alert, it means that there is a significant number of failed `UNSUBSCRIBE` operations, which may impact the MQTT messaging on your system.
 
-Publish/Subscribe is a messaging pattern that aims to decouple the sending (Publisher) and
-receiving (Subscriber) party. A real world example could be a sport mobile app that shows you
-up-to-date information of a particular football game you're interested in. In this case you are the
-subscriber, as you express interest in this specific game. On the other side sits the publisher,
-which is an online reporter that feeds a system with the actual match data. This system, which is
-often referred as the message broker brings the two parties together by sending the new data to all
-interested subscribers.
-<sup>[1](https://vernemq.com/intro/mqtt-primer/publish-subscribe.html) <sup>
+### What is VerneMQ?
 
-An UNSUBSCRIBE packet is sent by the Client to the Server, to unsubscribe from topics. The Netdata
-Agent monitors the number of failed v3/v5 UNSUBSCRIBE operations in the last minute.
+VerneMQ is a high-performance, distributed MQTT message broker. It provides scalable and reliable communication for Internet of Things (IoT) systems and applications.
 
-MQTT v5 protocol provides detailed UNSUBSCRIBE reasons codes as opposed to MQTT v3. You can find the
-detailed response codes which was sent by a client or a server and their descriptions in the
-official documentation of MQTT in
-the [MQTT v5 docs, UNSUBSCRIBE Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901194)
+### What is an MQTT UNSUBSCRIBE operation?
 
+An `UNSUBSCRIBE` operation in MQTT protocol is a request sent by a client to the server to remove one or more topics from the subscription list. It allows clients to stop receiving messages for particular topics.
 
-<details>
-<summary>References and sources</summary>
+### Troubleshoot the alert
 
-1. [Pub/Sub process explained on VerneMQ site](https://vernemq.com/intro/mqtt-primer/publish-subscribe.html)
-2. [MQTT v3 docs UNSUBSCRIBE request](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718072)
-3. [MQTT v5 docs UNSUBSCRIBE request](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901179)
+1. Check VerneMQ logs for any error messages or indications of issues with the `UNSUBSCRIBE` operation:
 
-</details>
+   ```
+   sudo journalctl -u vernemq
+   ```
 
-### Troubleshooting Section
+   Alternatively, you may find the logs in `/var/log/vernemq/` directory, if using the default configuration:
 
-<details>
-<summary>General approach</summary>
+   ```
+   cat /var/log/vernemq/console.log
+   cat /var/log/vernemq/error.log
+   ```
 
-Open the alerts Dashboard and locate the chart of this alert (`mqtt_unsubscribe_error`). Inspect the
-error log of your VerneMQ cluster in the timestamp of this alert.
+2. Review the VerneMQ configuration to ensure it is properly set up. The default configuration file is located at `/etc/vernemq/vernemq.conf`. Make sure that the settings are correct, especially those related to the MQTT protocol version and the supported QoS levels.
 
-</details>
+3. Monitor the VerneMQ metrics using the `vmq-admin metrics show` command. This will provide you with an overview of the broker's performance and help you identify any abnormal metrics that could be related to the failed `UNSUBSCRIBE` operations:
 
+   ```
+   sudo vmq-admin metrics show
+   ```
+
+   Pay attention to the `mqtt.unsubscribe_error` metric, which indicates the number of failed `UNSUBSCRIBE` operations.
+
+4. Check the MQTT clients that are sending the `UNSUBSCRIBE` requests. It is possible that the client itself is misconfigured or has some faulty logic in its communication with the MQTT broker. Review the client's logs and configuration to identify any issues.
 

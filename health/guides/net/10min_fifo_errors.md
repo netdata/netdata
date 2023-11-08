@@ -1,25 +1,14 @@
-# 10min_fifo_errors
+### Understand the alert
 
-## OS: Linux
+Between the IP stack and the Network Interface Controller (NIC) lies the driver queue. This queue is typically implemented as a FIFO ring buffer into the memory space allocated by the driver. The NIC receive frames and place them into memory as skb_buff data structures (SocKet Buffer). We can have queues (ingress queues) and transmitted (egress queues) but these queues do not contain any actual packet data. Each queue has a pointer to the devices associated with it, and to the skb_buff data structures that store the ingress/egress packets. The number of frames this queue can handle is limited. Queues fill up when an interface receives packets faster than kernel can process them.
 
-Between the IP stack and the Network Interface Controller (NIC) lies the driver queue. This queue is typically
-implemented as a FIFO ring buffer into the memory space allocated by the driver. The NIC receive frames and place them into
-memory as skb_buff data structures (SocKet Buffer). We can have queues (ingress queues) and transmitted (egress queues)
-but these queues do not contain any actual packet data. Each queue has a pointer to the devices associated with it, and
-to the skb_buff data structures that store the ingress/egress packets. The number of frames this queue can handle is
-limited. Queues fill up when an interface receives packets faster than kernel can process them.
-
-The Netdata agent monitors the number of FIFO errors (number of times an overflow occurs in the ring buffer) for a specific
-network interface in the last 10 minutes. This alarm is triggered when the NIC is not able to handle the peak load of
-incoming/outgoing packets with the current ring buffer size.
+Netdata monitors the number of FIFO errors (number of times an overflow occurs in the ring buffer) for a specific network interface in the last 10 minutes. This alarm is triggered when the NIC is not able to handle the peak load of incoming/outgoing packets with the current ring buffer size.
 
 Not all NICs support FIFO queue operations.
 
-<details>
-<summary>See more on SKB</summary>
-The SocKet Buffer (SKB), is the most fundamental data structure in the Linux networking code. Every packet sent or 
-received is handled using this data structure. This is a large struct containing all the control information required 
-for the packet (datagram, cell, etc).
+### More about SKB
+
+The SocKet Buffer (SKB), is the most fundamental data structure in the Linux networking code. Every packet sent or received is handled using this data structure. This is a large struct containing all the control information required for the packet (datagram, cell, etc).
 
 The struct sk_buff has the following fields to point to the specific network layer headers:
 
@@ -33,39 +22,21 @@ The struct sk_buff has the following fields to point to the specific network lay
 
 - skb_network_header(skb), skb_transport_header(skb) and skb_mac_header(skb) - These return pointer to the header.
 
-</details>
+### Troubleshoot the alert
 
-### Troubleshooting section:
-
-<details>
-<summary>Update the ring buffer size</summary>
+- Update the ring buffer size
 
 1. To view the maximum RX ring buffer size:
 
-    ```
-    root@netdata ~ # ethtool -g enp1s0
-    Ring parameters for enp1s0:
-    Pre-set maximums:
-    RX:             4080
-    RX Mini:        0
-    RX Jumbo:       16320
-    TX:             255
-    Current hardware settings:
-    RX:             255
-    RX Mini:        0
-    RX Jumbo:       0
-    TX:             255
-    ```
-
-2. If the values in the Pre-set maximums section are higher than in the Current hardware settings section, increase RX (
-   or TX) ring buffer:
-
    ```
-   root@netdata ~ # enp1s0 rx 4080
+   ethtool -g enp1s0
    ```
 
-3. Verify the change to make sure that you no longer receive the alarm when running the same workload. To 
-   make this permanently, you must consult your distribution guides.
+2. If the values in the Pre-set maximums section are higher than in the Current hardware settings section, increase RX (or TX) ring buffer:
+
+   ```
+   enp1s0 rx 4080
+   ```
+
+3. Verify the change to make sure that you no longer receive the alarm when running the same workload. To make this permanently, you must consult your distribution guides.
    
-</details>
-

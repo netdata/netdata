@@ -1,50 +1,36 @@
-# megacli_bbu_relative_charge
+### Understand the alert
 
-## OS: Any
+This alert is related to the disk array controller's battery backup unit (BBU) relative state of charge. If you receive this alert, it means that the battery backup unit's charge is low, which may affect your RAID controller's performance or lead to data loss in case of a power failure.
 
-A disk array controller is a device that manages the physical disk drives and presents them to the
-computer as logical units. It almost always implements hardware RAID, thus it is sometimes referred
-to as RAID controller. It also often provides additional disk cache.
+### What does low BBU relative charge mean?
 
-The Netdata Agent calculates the average battery backup unit relative state of charge over the last
-10 seconds. This alert indicates that the state of charge is low. The relative state of charge is an
-indication of full charge capacity percentage in relation to the design capacity. A constantly low
-value may indicate that the battery is worn out. You might want to consider changing the battery.
+A low BBU relative charge indicates that the state of charge is low compared to its design capacity. The relative state of charge is a percentage indication of the full charge capacity compared to its designed capacity. If the relative charge is constantly low, it may suggest that the battery is worn out and needs replacement.
 
-This alert is raised into warning when the relative state of charge of a battery is below 80% and in
-critical when it is below 50%.
+### Troubleshoot the alert
 
+1. Gather information about your battery units for all controllers:
 
-<details>
-<summary>References and source</summary>
+   ```
+   sudo megacli -AdpBbuCmd -GetBbuStatus -aALL
+   ```
 
-1. [MegaRAID SAS Software User Guide \[pdf download\]](https://docs.broadcom.com/docs/12353236)
+   This command will provide you with detailed information about the BBU status for each controller.
+
+2. Perform a manual battery calibration (learning cycle) on the battery with a low relative charge:
+
+   ```
+   sudo megacli -AdpBbuCmd -BbuLearn -aX
+   ```
+
+   Replace `X` with the controller's number. Please consult the [MegaRAID SAS Software User Guide](https://docs.broadcom.com/docs/12353236), section 7.14, before performing this action.
+
+   A learning cycle discharges and recharges the battery, which can help recalibrate the battery and improve its relative state of charge. However, it may temporarily disable the write cache during this process.
+
+3. Monitor the BBU relative charge after the learning cycle. If the relative charge remains low, consider replacing the battery in question. Consult your hardware vendor's documentation for guidance on replacing the BBU.
+
+### Useful resources
+
+1. [MegaRAID SAS Software User Guide [pdf download]](https://docs.broadcom.com/docs/12353236)
 2. [MegaCLI commands cheatsheet](https://www.broadcom.com/support/knowledgebase/1211161496959/megacli-commands)
 
-</details>
-
-### Troubleshooting section:
-
-Data is priceless. Before you perform any action, make sure that you have taken any necessary backup
-steps. Netdata is not liable for any loss or corruption of any data, database, or software.
-
-<details>
- <summary>General approach</summary>
-
-1. Gather more information about your battery units in all of your adapters
-
-      ```
-      root@netdata # megacli -AdpBbuCmd -GetBbuStatus -aALL
-      ```
-
-2. Perform a battery check in the battery which had low relative charge. **Before perform any
-   action, consult the manual's <sup>[1](https://docs.broadcom.com/docs/12353236) </sup>
-   section {`7.14`}**
-
-      ```
-      root@netdata # megacli -AdpBbuCmd -BbuLearn -aX // X is the adaptor's number
-      ```
-
-3. Replace the battery in question if needed.
-
-</details>
+**Note**: Data is priceless. Before you perform any action, make sure that you have taken any necessary backup steps. Netdata is not liable for any loss or corruption of any data, database, or software.

@@ -1,85 +1,46 @@
-# haproxy_backend_server_status
+### Understand the alert
 
-**Web Proxy | HAProxy**
+The `haproxy_backend_server_status` alert is triggered when one or more backend servers that are managed by HAProxy are inaccessible or offline. HAProxy is a reverse-proxy that provides high availability, load balancing, and proxying for TCP and HTTP-based applications. If you receive this alert, it means that there may be a problem with your backend server(s), and incoming requests could face delays or not be processed correctly.
 
-HAProxy is a free, fast and reliable reverse-proxy offering high availability, load balancing,
-and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic
-web sites and powers a significant portion of the world's most visited ones. Over the years it has
-become the de-facto standard opensource load balancer, is now shipped with most mainstream Linux
-distributions, and is often deployed by default in cloud platforms.
+### Troubleshoot the alert
 
-The Netdata Agent monitors the average number of failed HAProxy backend servers over the last 10
-seconds. Receiving this alert (in critical state) means that one or more HAProxy backend servers are
-inaccessible or offline.
+1. **Check the HAProxy backend server status**
 
-_There are four essential sections to an HAProxy configuration file. They are global, defaults,
-frontend, and backend. These four sections define how the server as a whole performs, what your
-default settings are, and how client requests are received and routed to your backend
-servers._ <sup> [1](https://www.haproxy.com/blog/the-four-essential-sections-of-an-haproxy-configuration/) </sup>
+   You can check the status of each individual backend server by accessing the HAProxy Statistics Report. By default, this report can be accessed on the HAProxy server using the URL:
 
-<details>
-<summary>HA Proxy Backend Servers</summary>
+   ```
+   http://<Your-HAProxy-Server-IP>:9000/haproxy_stats
+   ```
 
-Backend servers are the cornerstone of the HA proxy architecture. HA proxy organizes multiple
-servers to `Backends` (a pool of servers) and implements different (defined by you) Layer 4 or Layer
-7 load balancing algorithms to assign the incoming requests to each individual server.
+   Replace `<Your-HAProxy-Server-IP>` with the IP address of your HAProxy server. If you have configured a different port for the statistics report, use that instead of `9000`.
 
-> You can define a new server with the `server` setting or use the `default-server` configuration
-which is configured once. Its first argument is a name, followed by the IP address and port of the
-backend server. You can specify a domain name instead of an IP address. In that case, it will be
-resolved at startup or, if you add a `resolvers` argument, it will be updated during runtime. If the
-DNS entry contains an SRV record, the port and weight will be filled in from it too. If the port
-isn’t specified, then HAProxy will use the same port that the client connected on, which is useful
-for randomly used ports such as for active-mode FTP.
->
-> Every `server` line should have a `maxconn` setting that limits the maximum number of concurrent
-requests that the server will be given. Even if it’s just a guess, having a value here puts you on
-the right foot for avoiding saturating your servers with requests and gives a baseline that can be
-adjusted later.  <sup> [1](https://www.haproxy.com/blog/the-four-essential-sections-of-an-haproxy-configuration/) </sup>
+   In the report, look for any backend server(s) with a `DOWN` status.
 
-</details>
+2. **Investigate the problematic backend server(s)**
 
-<details>
-<summary>References and sources</summary>
+   For each of the backend servers that are in a `DOWN` status, check the availability and health of the server. Make sure that the server is running, and check its resources (CPU, memory, disk space, network) to identify any potential issues.
 
-1. [The Four Essential Sections of an HAProxy Configuration](https://www.haproxy.com/blog/the-four-essential-sections-of-an-haproxy-configuration/)
+3. **Validate the HAProxy configuration**
 
-</details>
+   As mentioned in the provided guide, it is essential to validate the correctness of the HAProxy configuration file. If you haven't already, follow the steps in the guide to check for any configuration errors or warnings.
 
-### Troubleshooting section
+4. **Check for recent changes**
 
-<details>
-<summary>Check the HA proxy's configuration file for errors</summary>
+   If the backend servers were previously working correctly, inquire about any recent changes to the infrastructure, such as software updates or configuration changes.
 
-Making changes in the configuration file may introduce errors. Make sure your always validate the
-correctness of the configuration file.
+5. **Restart the HAProxy service**
 
-1. In most Linux distros you can run the following check:
+   If the backend server(s) seem to be healthy, but the alert still persists, try restarting the HAProxy service:
 
-```
-root@netadata # haproxy -c -f /etc/haproxy/haproxy.cfg
-```
-</details>
+   ```
+   sudo systemctl restart haproxy
+   ```
 
-<details>
-<summary>Check the HA proxy service for errors</summary>
+6. **Monitor the alert and backend server status**
 
-1. Use `journalctl` and inspect the log:
+   After applying any changes or restarting the HAProxy service, monitor the alert and the backend server status in the HAProxy Statistics Report to see if the issue has been resolved.
 
-```
-root@netdata # journalctl -u haproxy.service  --reverse
-```
-</details>
+### Useful resources
 
-<details>
-<summary>Check the HA proxy's log</summary>
-
-1. By default HA proxy logs under `/var/log/haproxy.log`:
-
-```
-root@netdata # cat /var/log/haproxy.log | grep 'emerg\|alert\|crit\|err\|warning\|notice'
-```
-
-You can also search for log messages with `info` and  `debug` tags.
-
-</details>
+1. [HAProxy Configuration Manual](https://cbonte.github.io/haproxy-dconv/2.0/configuration.html)
+2. [HAProxy Log Customization](https://www.haproxy.com/blog/introduction-to-haproxy-logging/)

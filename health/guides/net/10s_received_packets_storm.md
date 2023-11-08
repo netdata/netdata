@@ -1,80 +1,23 @@
-# 10s_received_packets_storm
+### Understand the alert
 
-## OS: Linux, FreeBSD
+This alert is triggered when there is a significant increase in the number of received packets within a 10-second interval. It indicates a potential packet storm, which may cause network congestion, dropped packets, and reduced performance.
 
-A packet storm is defined as an unusually high amount of traffic on a specific interface. In a sliding window of one minute
-Netdata agent monitors for significant increases of packets (ratio of an average number of received packets) in the last
-10 seconds. If this system is expected to have spikes, you can cautiously ignore this alarm, but should continue to monitor as this 
-alarm may also indicate a broadcast/multicast storm or DoS attack.
+### Troubleshoot the alert
 
-<details>
-<summary>See more on broadcast storms.</summary>
+1. **Check network utilization**: Monitor network utilization on the affected interface to identify potential bottlenecks, high bandwidth usage, or network saturation.
 
-A broadcast storm is the accumulation of broadcast and multicast traffic on a computer network. Extreme amounts of
-broadcast traffic constitute a "broadcast storm". It can consume sufficient network resources so as to render the
-network unable to transport normal traffic. Most commonly the cause is a switching loop in the Ethernet wiring topology.
-As broadcasts and multicasts are forwarded by switches out of every port, the switch or switches will repeatedly
-rebroadcast broadcast messages and flood the network. Since the Layer 2 header does not support a time to live (TTL)
-value, if a frame is sent into a looped topology, it can loop forever.
+2. **Identify the source**: Determine the source of the increased packet rate. This may be caused by a misconfigured application, a faulty network device, or a Denial of Service (DoS) attack.
 
-</details>
+3. **Inspect network devices**: Check network devices such as routers, switches, and firewalls for potential issues, misconfigurations, or firmware updates that may resolve the problem.
 
+4. **Verify application behavior**: Ensure that the applications running on your network are behaving as expected and not generating excessive traffic.
 
-<details>
-<summary>See more on DoS attacks.</summary>
+5. **Implement rate limiting**: If the packet storm is caused by a specific application or service, consider implementing rate limiting to control the number of packets being sent.
 
-A Denial-of-Service (DoS) attack is an attack meant to shut down a machine or network, making it inaccessible to its
-intended users. DoS attacks accomplish this by flooding the target with traffic, or sending it information that triggers
-a crash. We can categorize the attacks into two types.
+6. **Monitor network security**: Check for signs of a DoS attack or other security threats, and take appropriate action to mitigate the risk.
 
-- Infrastructure Layer Attacks:
+### Useful resources
 
-  Attacks at Layer 3 and 4 of the OSI model are typically categorized as Infrastructure layer attacks. The most common
-  type of DDoS attack include vectors, like synchronized (SYN) floods, and other reflection attacks, like User Datagram
-  Packet (UDP) floods. These attacks are usually large in volume and aim to overload the capacity of the network or the
-  application servers. Fortunately, these are also the type of attacks that have clear signatures and are easier to
-  detect.
-
-- Application Layer Attacks:
-
-  Attacks at Layer 6 and 7 of the OSI model, are often categorized as Application layer attacks. While these attacks are
-  less common, they also tend to be more complex. These attacks are typically small in volume compared to the
-  Infrastructure layer attacks, but tend to focus on particular expensive parts of the application, thereby making it
-  unavailable for real users. Common examples of this type of attack include a flood of HTTP requests to a login page, or an expensive search API, or
-  even Wordpress XML-RPC floods.
-  
-</details>
-
-
-### Troubleshooting section:
-
-</details>
-
-<details>
-<summary>Counter measures on DoS and DDoS attacks</summary>
-
-- Use a service like Cloudflare. Cloudflare DDoS protection secures websites, applications, and entire networks while
-  ensuring the performance of legitimate traffic is not compromised.
-
-- Limit broadcasting. Often attacks will send requests to every device on the network, amplifying the attack. Limiting
-  or turning off broadcast forwarding where possible can disrupt attacks. Users can also disable echo and chargen
-  services where possible.
-
-</details>
-
-
-</details>
-
-<details>
-
-<summary>Counter measures on broadcast storms</summary>
-
-- Switching loops are largely addressed through link aggregation, shortest path bridging, or spanning tree protocol. In
-  Metro Ethernet rings, it is prevented using the Ethernet Ring Protection Switching (ERPS) or Ethernet Automatic
-  Protection System (EAPS) protocols.
-
-- You can filter broadcasts by Layer 3 equipment, most typically routers or even switches that employ advanced filtering.
-
-- Routers and firewalls can be configured to detect and prevent maliciously inducted broadcast storms
-
-</details>
+1. [Wireshark User's Guide](https://www.wireshark.org/docs/wsug_html_chunked/)
+2. [Tcpdump Manual Page](https://www.tcpdump.org/manpages/tcpdump.1.html)
+3. [Iperf - Network Bandwidth Measurement Tool](https://iperf.fr/)

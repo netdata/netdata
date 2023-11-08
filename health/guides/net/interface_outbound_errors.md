@@ -1,75 +1,42 @@
-# interface_outbound_errors
+### Understand the alert
 
-## OS: FreeBSD
+This alert is triggered when there is a high number of outbound errors on a specific network interface in the last 10 minutes on a FreeBSD system. When you receive this alert, it means that the network interface is facing transmission-related issues, such as aborted, carrier, FIFO, heartbeat, or window errors.
 
-When we want to investigate the outbound traffic, the journey of a network packet starts at the application layer. Data
-are written (commonly) to a socket by a user program. The programmer may (raw sockets) or may not (datagram and stream
-sockets) have the possibility of absolute control over the data which is being sent through the network. The kernel will
-take the data which is written in a socket queue and allocate the necessary socket buffers. The kernel will try to
-forward the packets to their destination encapsulating the routing metadata (headers, checksums, fragmentation
-information) for each packet through a network interface. The Netdata agent monitors the number of outbound errors for a
-specific network interface in the last 10 minutes. Some of the errors that may occur in this process include:
+### Troubleshoot the alert
 
-- Errors due to aborted connections
+1. Identify the network interface with the problem
+   Use `ifconfig` to get a list of all network interfaces and their error count:
+   ```
+   ifconfig -a
+   ```
+   Check the "Oerrs" (Outbound errors) field for each interface to find the one with the issue.
 
-- Carrier sense errors
+2. Check the interface speed and duplex settings
+   The speed and duplex settings may mismatch between the network interface and the network equipment (like switches and routers) that it is connected to. Use `ifconfig` or `ethtool` to check these settings.
 
-- FIFO errors
+   With `ifconfig`:
+   ```
+   ifconfig <interface_name>
+   ```
 
-- Heartbeat errors
+   If required, adjust the speed and duplex settings using `ifconfig`:
+   ```
+   ifconfig <interface_name> media <media_type>
+   ```
+   `<media_type>` can be one of the following: 10baseT/UTP, 100baseTX, 1000baseTX, etc., and can include half-duplex or full-duplex.
+   Example:
+   ```
+   ifconfig em0 media 1000baseTX mediaopt full-duplex
+   ```
+   Ensure both the network interface and the connected device use the same settings.
 
-- Window errors
+3. Check network cables and devices
+   Check the physical connections of the network cable to both the network interface and the network equipment it connects to. Replace the network cable if necessary. Additionally, verify if the issue is related to the connected network equipment (switches and routers).
 
-<details>
-   <summary>See more on Carrier Sense Errors</summary>
+4. Analyze network traffic
+   Use tools like `tcpdump` or `Wireshark` to analyze the network traffic on the affected interface. This can give you insights into the root cause of the errors and help in troubleshooting device or network-related issues.
 
-Carrier Sense Errors occur when an interface attempts to transmit a frame, but no carrier is detected. In that case if
-the frame cannot be transmitted, it is discarded.
+### Useful resources
 
-</details>
-
-
-<details>
-   <summary>See more about heartbeat </summary>
-
-> A heartbeat protocol is generally used to negotiate and monitor the availability of a resource, such as a floating IP
-> address, and the procedure involves sending network packets to all the nodes in the culture to verify its
-> reachability. Typically when a heartbeat starts on a machine, it will perform an election process with other machines
-> on the heartbeat network to determine which machine, if any, owns the resource. On heartbeat networks of more than two
-> machines, it is important to take into account partitioning, where two halves of the network could be functioning but
-> not able to communicate with each other. In a situation such as this, it is important that the resource is only owned
-> by one machine, not one machine in each partition.
->
-> As a heartbeat is intended to be used to indicate the health of a machine, it is important that the heartbeat protocol
-> and the transport that it runs on are as reliable as possible. Causing a failover because of a false alarm may
-> depending on the resource, be highly undesirable. It is also important to react quickly to an actual failure, further
-> signifig the reliability of the heartbeat messages. For this reason, it is often desirable to have a heartbeat running
-> over more than one transport; for instance, an Ethernet segment using UDP/IP, and a serial
-> link. <sup> [1](https://en.wikipedia.org/wiki/Heartbeat_(computing)</sup>
-
-</details>
-
-
-<details>
-<summary>References and sources:</summary>
-
-1. [Heartbeat definition on Wikipedia](https://en.wikipedia.org/wiki/Heartbeat_(computing))
-
-</details>
-
-### Troubleshooting section:
-
-<details>
-<summary>General approach</summary>
-
-In any case, a good starting point is to get more information about the nature of your errors.
-
-- `netstat` (network statistics) is a command-line network utility that displays, network connections for Transmission
-  Control Protocol, routing tables and network protocol statistics for any interface in your system.
-
-    ```
-    root@netdata~ # netstat -sI <your_interface>
-    ```
-
-</details>
-
+1. [FreeBSD ifconfig man page](https://www.freebsd.org/cgi/man.cgi?ifconfig(8))
+2. [FreeBSD Handbook - Configuring the Network](https://www.freebsd.org/doc/handbook/config-network-setup.html)

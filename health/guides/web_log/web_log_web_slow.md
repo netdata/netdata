@@ -1,54 +1,48 @@
-# web_log_web_slow
+### Understand the alert
 
-**Web Server | Web log**
+The `web_log_web_slow` alert is triggered when the average HTTP response time of your web server (NGINX, Apache) has increased over the last minute. It indicates that your web server's performance might be affected, resulting in slow response times for client requests.
 
-When a client sends a request to your web server, there are many independent phases for this request
-that can introduce delay. Some of them may be:
+### Troubleshoot the alert
 
-- DNS lookup
-- Establish a TCP connection
-- Perform a TLS handshake
-- The server to process the request
-- Transfer the actual content
+There are several factors that can cause slow web server performance. To troubleshoot the `web_log_web_slow` alert, examine the following areas:
 
-The Netdata Agent calculates the average HTTP response time over the last minute for your web server
-(NGINX, Apache). You receive this alert when your web server's average response time has increased. 
-The alert is raised in warning when the average HTTP response time is twice as much. When the average HTTP response time is four times as much, you receive a critical alert.
+1. **Monitor web server utilization:**
 
-### Troubleshooting section 
+   Use monitoring tools like `top`, `htop`, or `glances` to check the CPU, memory, and traffic utilization of your web server. If you find high resource usage, consider taking action to address the issue:
+   - Increase your server's resources (CPU, memory) or move to a more powerful machine.
+   - Adjust the web server configuration to use more worker processes or threads.
+   - Implement load balancing across multiple web servers to distribute the traffic load.
 
-The causes of a slow request response may vary. Some options you can explore are:
+2. **Optimize databases:**
 
-<details>
-<summary>Your web server utilization is high </summary>
+   Slow database performance can directly impact web server response times. Monitor and optimize your database to improve response speeds:
+   - Check for slow or inefficient queries and optimize them.
+   - Regularly clean and optimize your database by removing outdated or unnecessary data, and by using tools like `mysqlcheck` or `pg_dump`.
+   - Enable database caching for faster results on recurring queries.
 
-This problem could be addressed on many levels:
-- Check if your host machine can handle the traffic: Check the CPU, memory and traffic utilization. 
-  If this is not an issue:
-- Consider raising the resource limitations for your web server (for example add more worker processes). 
-  Please consult your web server docs. If this also doesn't resolve the issue:
-- Set up an architecture with multiple web servers and load balancer to handle the traffic for your site.
+3. **Configure caching:**
 
-</details>
+   Implement browser or server-side caching to reduce the load on your web server and speed up content delivery:
+   - Enable browser caching using proper cache-control headers in your server configuration.
+   - Implement server-side caching with tools like Varnish or use full-page caching in your web server (NGINX FastCGI cache, Apache mod_cache).
 
-<details>
-<summary>Optimize Databases </summary>
+4. **Examine web server logs:**
 
-The response speed is dependent on database optimization. As you first set up a website, the
-database responds quickly to queries. As time passes, the database accumulates information. The
-compilation results in massive amounts of stored data and might slow down response times.
+   Analyze your web server logs to identify specific requests or resources that may be causing slow responses. Tools like `goaccess` or `awstats` can help you analyze web server logs and identify issues:
+   - Check for slow request URIs or resources and optimize them.
+   - Identify slow third-party services, such as CDNs, external APIs, or database connections, and troubleshoot these connections as needed.
 
-If you manage your database with MySQL, this blogpost proposes ways to [tune MySQL operations](https://www.cloudways.com/blog/mysql-performance-tuning/).
-</details>
+5. **Optimize web server configuration:**
 
-<details>
-<summary>Configure Caching </summary>
+   Review your web server's configuration settings to ensure optimal performance:
+   - Ensure that your web server is using the latest stable version for performance improvements and security updates.
+   - Disable unnecessary modules or features to reduce resource usage.
+   - Review and optimize settings related to timeouts, buffer sizes, and compression for better performance.
 
-Caching ensures fast delivery to visitors. Without caching, a browser requests assets from the
-server each time a page loads instead of accessing them from a local or intermediary cache.
+### Useful resources
 
-To enable caching on your server, refer to the respective documentation:
-- [NGINX caching guide](https://www.nginx.com/blog/nginx-caching-guide/)
-- [Apache caching guide](https://httpd.apache.org/docs/2.4/caching.html)
-
-</details>
+1. [Optimizing NGINX for Performance](https://easyengine.io/tutorials/nginx/performance/)
+2. [Apache Performance Tuning](https://httpd.apache.org/docs/2.4/misc/perf-tuning.html)
+3. [Top 10 MySQL Performance Tuning Tips](https://www.databasejournal.com/features/mysql/top-10-mysql-performance-tuning-tips.html)
+4. [10 Tips for Optimal PostgreSQL Performance](https://www.digitalocean.com/community/tutorials/10-tips-for-optimizing-postgresql-performance-on-a-digitalocean-droplet)
+5. [A Beginner's Guide to HTTP Cache Headers](https://www.keycdn.com/blog/http-cache-headers)

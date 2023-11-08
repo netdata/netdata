@@ -1,39 +1,51 @@
-# cockroachdb_unavailable_ranges
+### Understand the alert
 
-## Database | CockroachDB
+This alert indicates that there are unavailable ranges in your CockroachDB cluster. Unavailable ranges occur when a majority of a range's replicas are on nodes that are unavailable. This can cause the entire range to be unable to process queries.
 
-This alert presents the number of unavailable ranges. If you receive this, it indicates that there
-are ranges with fewer live replicas than needed for quorum.
+### Troubleshoot the alert
 
-This alert is raised in a warning state when unavailable ranges start to exist.
+1. Check for dead or unavailable nodes
 
-<details><summary>What are unavailable ranges?</summary>
-   
-> Unavailable ranges: If a majority of a range's replicas are on nodes that are unavailable,
-> then the entire range is unavailable and will be unable to process queries.
->
-> CockroachDB uses consensus replication and requires a quorum of the replicas to
-> be available in order to allow both writes and reads to the range. The number of failures
-> that can be tolerated is equal to (Replication factor - 1)/2. Thus, CockroachDB requires (n-1)
-> /2 nodes to achieve quorum. For example, with 3x replication, one failure can be tolerated;
-> with 5x replication, two failures, and so on.<sup>[1](
-> https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges) </sup>
+   Use the `./cockroach node status` command to list the status of all nodes in your cluster. Look for nodes that are marked as dead or unavailable and try to bring them back online.
 
-</details>
+   ```
+   ./cockroach node status --certs-dir=<your_cert_directory>
+   ```
 
-<details><summary>References and Sources</summary>
+2. Inspect the logs
 
-1. [CockroachDB docs](
-   https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges)
+   CockroachDB logs can provide valuable information about issues that may be affecting your cluster. Check the logs for errors or warnings related to unavailable ranges using `grep`:
 
-</details>
+   ```
+   grep -i 'unavailable range' /path/to/cockroachdb/logs
+   ```
 
-### Troubleshooting Section
+3. Check replication factor
 
-<details><summary>Identify unavailable ranges</summary>
+   Make sure your cluster's replication factor is set to an appropriate value. A higher replication factor can help tolerate node failures and prevent unavailable ranges. You can check the replication factor by running the following SQL query:
 
-Check out the [CockroachDB documentation](
-https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges) for troubleshooting advice.
+   ```
+   SHOW CLUSTER SETTING kv.range_replicas;
+   ```
 
+   To set the replication factor, run the following SQL command:
 
-</details>
+   ```
+   SET CLUSTER SETTING kv.range_replicas=<desired_replication_factor>;
+   ```
+
+4. Investigate and resolve network issues
+
+   Network issues can cause nodes to become unavailable and lead to unavailable ranges. Check the status of your network and any firewalls, load balancers, or other network components that may be affecting connectivity between nodes.
+
+5. Monitor and manage hardware resources
+
+   Insufficient hardware resources, such as CPU, memory, or disk space, can cause nodes to become unavailable. Monitor your nodes' resource usage and ensure that they have adequate resources to handle the workload.
+
+6. Consider rebalancing the cluster
+
+   Rebalancing the cluster can help distribute the load more evenly across nodes and reduce the number of unavailable ranges. See the [CockroachDB documentation](https://www.cockroachlabs.com/docs/stable/training/manual-rebalancing.html) for more information on manual rebalancing.
+
+### Useful resources
+
+1. [CockroachDB troubleshooting guide](https://www.cockroachlabs.com/docs/stable/cluster-setup-troubleshooting.html#db-console-shows-under-replicated-unavailable-ranges)

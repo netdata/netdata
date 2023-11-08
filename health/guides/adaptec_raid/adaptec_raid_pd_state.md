@@ -1,50 +1,66 @@
-# adaptec_raid_pd_state
+### Understand the Alert
 
-## OS: Any
+A RAID controller is a card or chip located between the operating system and a storage drive (usually a hard drive). This is an alert about the Adaptec raid controller. The Netdata Agent checks the physical device statuses which are managed by your raid controller.
 
-A RAID controller is a card or chip located between the operating system and a storage drive (usually a hard drive). This is an alert about the Adaptec raid controller. The Netdata Agent checks
-the physical device statuses which are managed by your raid controller.
+This alert is triggered in critical state when the physical device is offline. 
 
-This alert is triggered in critical state when the physical device is offline. Below you can
-find how tolerant each RAID configuration is in cases of disk failures.
+### Troubleshoot the Alert
 
-<details>
-<summary>Fault tolerance for the most popular raid configurations </summary>
+- Check the Offline Disk
 
-- _RAID 0_ provides no fault tolerance. Any drive failures will cause data loss, so do not use this
-  on a mission critical server.
+Use the `arcconf` CLI tool to identify which drive or drives are offline:
 
-- _RAID 1_ configuration is best used for situations where capacity isn't a requirement but data
-  protection is. This set up mirrors two disks so you can have 1 drive fail and still be able to
-  recover your data.
+```
+root@netdata # arcconf GETCONFIG 1 AL
+```
 
-- _RAID 5_  can withstand a single drive failure with a tradeoff in performance.
+This command will display the configuration of all the managed Adaptec RAID controllers in your system. Check the "DEVICE #" and "DEVICE_DEFINITION" fields for details about the offline devices.
 
-- _RAID 6_ can withstand two disk failures at one time.
+- Examine RAID Array Health
 
-- _RAID 10_  can survive a single drive failure per array.
+Check the array health status to better understand the overall array's stability and functionality:
 
-</details>
+```
+root@netdata # arcconf GETSTATUS 1
+```
 
-Your system manages your Adaptec raid controller via the ARCCONF command line tool. You can find
-more information about this utility in
-the [user's guide for the ARCCONF](https://download.adaptec.com/pdfs/user_guides/microsemi_cli_smarthba_smartraid_v3_00_23484_ug.pdf).
+This will provide an overview of your RAID controller's health status, including the operational mode, failure state, and rebuild progress (if applicable).
 
-### Troubleshooting section
+- Replace the Offline Disk
 
-Data is priceless. Before you perform any action, make sure that you have taken any necessary backup
-steps. Netdata is not liable for any loss or corruption of any data, database, or software.
+Before replacing an offline disk, ensure that you have a current backup of your data. Follow these steps to replace the drive:
 
+1. Power off your system.
+2. Remove the offline drive.
+3. Insert the new drive.
+4. Power on your system.
 
-<details>
-<summary>Verify a bad disk </summary>
+After the drive replacement, the Adaptec RAID card should automatically start rebuilding the faulty disk drive using the new disk. You can check the progress of the rebuild process with the `arcconf` command:
 
-Check the smart report for the drives in your RAID controller:
+```
+root@netdata # arcconf GETSTATUS 1
+```
 
-    ```
-    root@netdata # arcconf GETSMARTSTATS 1
-    ```
+- Monitor Rebuild Progress
 
-If a disk is degraded, you should consider replacing it. Your Adaptec RAID card will
-   automatically start to rebuild a faulty hard drive when you replace it with a healthy one.
+It's essential to monitor the RAID array's rebuild process to ensure it completes successfully. Use the `arcconf` command to verify the rebuild status:
 
+```
+root@netdata # arcconf GETSTATUS 1
+```
+
+This command will display the progress and status of the rebuild process. Keep an eye on it until it's completed.
+
+- Verify RAID Array Health
+
+After the rebuild is complete, use the `arcconf` command again to verify the health status of the RAID array:
+
+```
+root@netdata # arcconf GETSTATUS 1
+```
+
+Make sure that the RAID array's status is "Optimal" or "Ready" and that the replaced disk drive is now online.
+
+### Useful Resources
+
+1. [Adaptec Command Line Interface User’s Guide](https://download.adaptec.com/pdfs/user_guides/microsemi_cli_smarthba_smartraid_v3_00_23484_ug.pdf)

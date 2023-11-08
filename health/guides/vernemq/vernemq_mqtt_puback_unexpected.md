@@ -1,51 +1,34 @@
-# vernemq_mqtt_puback_unexpected
+### Understand the alert
 
-**Messaging | VerneMQ**
+This alert is related to VerneMQ, a high-performance MQTT broker. It monitors the number of unexpected v3/v5 PUBACK packets received in the last minute. If you receive this alert, it means that there are more PUBACK packets received than expected, which could indicate an issue with your MQTT broker or your MQTT client application(s).
 
-A PUBACK packet is the response to a PUBLISH packet with QoS 1. The Netdata Agent monitors the
-number of received unexpected v3/v5 PUBACK packets in the last minute.
+### What are PUBACK packets?
 
-MQTT v5 protocol provides detailed PUBACK reasons codes as opposed to MQTT v3. You can find the
-detailed response codes which were sent by a client or a server and their descriptions in the
-official documentation of MQTT in
-the [MQTT v5 docs, PUBACK Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901124)
-. The Client or Server sending the PUBACK packet must always use one of the PUBACK Reason Codes.
+In MQTT (Message Queuing Telemetry Transport) protocol, PUBACK packets are acknowledgement packets sent by the MQTT broker to confirm the receipt of a PUBLISH message with QoS (Quality of Service) level 1. The MQTT client will wait for this acknowledgment packet before it can continue with the next transaction.
 
+### Troubleshoot the alert
 
-<details>
-<summary>See more about QoS 1 </summary>
+1. Check VerneMQ logs for any unusual events, errors, or issues that could be related to the PUBACK packets. The VerneMQ logs can be found in `/var/log/vernemq` by default, or any custom location defined in the configuration file.
 
-The Quality of Service (QoS) level is an agreement between the sender of a message and the receiver
-of a message that defines the guarantee of delivery for a specific message. In QoS 1, a client will
-receive a confirmation message from the broker upon receipt. If the expected confirmation is not
-received within a certain time frame, the client has to retry the message. A message received by a
-client must be acknowledged on time as well, otherwise the broker will re-deliver the
-message. <sup>[1](https://vernemq.com/intro/mqtt-primer/quality_of_service.html) </sup>
+   ```
+   sudo tail -f /var/log/vernemq/console.log
+   ```
 
-</details>
+2. Investigate your MQTT client application(s) to ensure they are handling the PUBLISH messages correctly and not causing duplicate or unexpected PUBACK packets. You can use an MQTT client library that supports QoS level 1 to eliminate the possibility of custom code not following the MQTT protocol properly.
 
+3. Monitor your MQTT broker and client application(s) for any network connectivity issues that could cause unexpected PUBACK packets. You can use tools like `ping` and `traceroute` to check the network connectivity between the MQTT broker and client application(s).
 
-<details>
-<summary>References and sources</summary>
+4. Analyze the load and performance of your MQTT broker using the various metrics provided by VerneMQ. You can access the VerneMQ status and metrics using the `vmq-admin` command:
 
-1. [Quality of service explained, VerneMQ docs](https://vernemq.com/intro/mqtt-primer/quality_of_service.html)
-2. [MQTT v5 docs, PUBACK description](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901100)
-3. [MQTT v3 docs, PUBACK description](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718043)
+   ```
+   sudo vmq-admin metrics show
+   ```
 
-</details>
+   Look for any unusual spikes or bottlenecks that could cause unexpected PUBACK packets in the output.
 
-### Troubleshooting Section
+5. If none of the above steps resolve the issue, consider reaching out to the VerneMQ community or opening a GitHub issue to seek further assistance.
 
-<details>
-<summary>General approach</summary>
+### Useful resources
 
-This alert monitors the PUBACK packets for both v3 and v5 MQTT protocol. In case you didn't receive
-any other alerts (`vernemq_mqtt_puback_received_reason_unsuccessful`
-, `vernemq_mqtt_puback_sent_unsuccessful`) (in which you can consult their troubleshooting
-sections), that means that the unexpected PUBACK packets was came(sent) from(to) clients which are
-using the MQTT v3 protocol. In that case you can inspect your MQTT server access log for further
-investigation.
-
-
-</details>
-
+1. [VerneMQ Documentation](https://vernemq.com/docs/)
+2. [Understanding MQTT QoS Levels](https://www.hivemq.com/blog/mqtt-essentials-part-6-mqtt-quality-of-service-levels/)
