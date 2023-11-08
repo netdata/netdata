@@ -1386,6 +1386,8 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, false);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
@@ -1417,7 +1419,7 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY| RRDF_FIELD_OPTS_UNIQUE_KEY,
                                     NULL);
 
         buffer_rrdf_table_add_field(wb,
@@ -1454,18 +1456,17 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-
         buffer_rrdf_table_add_field(wb,
                                     fields_id++,
                                     "HitRatio",
                                     "Hit Ratio",
-                                    RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     0,
                                     NULL,
                                     NAN,
-                                    RRDF_FIELD_SORT_ASCENDING,
+                                    RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_MAX,
                                     RRDF_FIELD_FILTER_RANGE,
@@ -1476,13 +1477,13 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     fields_id++,
                                     "Dirties",
                                     "Dirty pages since last reload.",
-                                    RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     0,
                                     NULL,
                                     NAN,
-                                    RRDF_FIELD_SORT_ASCENDING,
+                                    RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
@@ -1493,13 +1494,13 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     fields_id++,
                                     "Hits",
                                     "Page Access since last reload.",
-                                    RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     0,
                                     NULL,
                                     NAN,
-                                    RRDF_FIELD_SORT_ASCENDING,
+                                    RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
@@ -1510,13 +1511,13 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
                                     fields_id++,
                                     "Misses",
                                     "Page outside memory",
-                                    RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     0,
                                     NULL,
                                     NAN,
-                                    RRDF_FIELD_SORT_ASCENDING,
+                                    RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
@@ -1620,7 +1621,7 @@ void ebpf_function_cachestat_manipulation(const char *transaction,
         buffer_json_array_close(wb);
 
         buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "CachestatMisses");
+        buffer_json_add_array_item_string(wb, "CachestatHits");
         buffer_json_add_array_item_string(wb, "PName");
         buffer_json_array_close(wb);
     }
