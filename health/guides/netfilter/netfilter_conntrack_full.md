@@ -37,9 +37,6 @@ sysctl -w net.netfilter.nf_conntrack_max=<YOUR DESIRED LIMIT HERE>
 echo "net.netfilter.nf_conntrack_max=<YOUR DESIRED LIMIT HERE>" >> /etc/sysctl.conf
 ```
 
-</details>
-
-
 ### Useful resources
 
 1. [Netfilter](https://en.wikipedia.org/wiki/Netfilter)
