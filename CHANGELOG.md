@@ -6,10 +6,19 @@
 
 **Merged pull requests:**
 
+- update bundle UI to v6.58.5 [\#16354](https://github.com/netdata/netdata/pull/16354) ([ilyam8](https://github.com/ilyam8))
+- Update CODEOWNERS [\#16353](https://github.com/netdata/netdata/pull/16353) ([Ancairon](https://github.com/Ancairon))
+- Copy outdated alert guides to health/guides [\#16352](https://github.com/netdata/netdata/pull/16352) ([Ancairon](https://github.com/Ancairon))
+- Replace rrdset\_is\_obsolete & rrdset\_isnot\_obsolete [\#16351](https://github.com/netdata/netdata/pull/16351) ([MrZammler](https://github.com/MrZammler))
+- fix zstd in static build [\#16349](https://github.com/netdata/netdata/pull/16349) ([ilyam8](https://github.com/ilyam8))
+- add rrddim\_get\_last\_stored\_value to simplify function code in internal collectors [\#16348](https://github.com/netdata/netdata/pull/16348) ([ilyam8](https://github.com/ilyam8))
 - change defaults for functions [\#16347](https://github.com/netdata/netdata/pull/16347) ([ktsaou](https://github.com/ktsaou))
 - give the streaming function to nightly users [\#16346](https://github.com/netdata/netdata/pull/16346) ([ktsaou](https://github.com/ktsaou))
 - diskspace: add mount-points function [\#16345](https://github.com/netdata/netdata/pull/16345) ([ilyam8](https://github.com/ilyam8))
 - Update packaging instructions [\#16344](https://github.com/netdata/netdata/pull/16344) ([tkatsoulas](https://github.com/tkatsoulas))
+- Better database corruption detention during runtime [\#16343](https://github.com/netdata/netdata/pull/16343) ([stelfrag](https://github.com/stelfrag))
+- Improve agent to cloud status update process [\#16342](https://github.com/netdata/netdata/pull/16342) ([stelfrag](https://github.com/stelfrag))
+- h2o add api/v2 support [\#16340](https://github.com/netdata/netdata/pull/16340) ([underhood](https://github.com/underhood))
 - proc/diskstats: add block-devices function [\#16338](https://github.com/netdata/netdata/pull/16338) ([ilyam8](https://github.com/ilyam8))
 - network-interfaces function: add UsedBy field to  [\#16337](https://github.com/netdata/netdata/pull/16337) ([ilyam8](https://github.com/ilyam8))
 - Network-interfaces function small improvements [\#16336](https://github.com/netdata/netdata/pull/16336) ([ilyam8](https://github.com/ilyam8))
@@ -62,6 +71,7 @@
 - local\_listeners: add cmd args for reading specific files [\#16273](https://github.com/netdata/netdata/pull/16273) ([ilyam8](https://github.com/ilyam8))
 - DYNCFG fix REPORT\_JOB\_STATUS streaming [\#16272](https://github.com/netdata/netdata/pull/16272) ([underhood](https://github.com/underhood))
 - fix sources match [\#16271](https://github.com/netdata/netdata/pull/16271) ([ktsaou](https://github.com/ktsaou))
+- Add an obsoletion time for statsd private charts [\#16269](https://github.com/netdata/netdata/pull/16269) ([MrZammler](https://github.com/MrZammler))
 - ZSTD and GZIP/DEFLATE streaming support [\#16268](https://github.com/netdata/netdata/pull/16268) ([ktsaou](https://github.com/ktsaou))
 - journal minor updates [\#16267](https://github.com/netdata/netdata/pull/16267) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16266](https://github.com/netdata/netdata/pull/16266) ([netdatabot](https://github.com/netdatabot))
@@ -111,6 +121,7 @@
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 - shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
+- Docs: getting started with netdata cloud onprem [\#15954](https://github.com/netdata/netdata/pull/15954) ([M4itee](https://github.com/M4itee))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -387,8 +398,6 @@
 - Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
 - don't return `-1` if the socket was closed [\#15771](https://github.com/netdata/netdata/pull/15771) ([moonbreon](https://github.com/moonbreon))
-- Increase alert snapshot chunk size [\#15748](https://github.com/netdata/netdata/pull/15748) ([MrZammler](https://github.com/MrZammler))
-- Added CentOS-Stream to distros [\#15742](https://github.com/netdata/netdata/pull/15742) ([k0ste](https://github.com/k0ste))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
@@ -429,11 +438,6 @@
 - Regenerate integrations.js [\#15760](https://github.com/netdata/netdata/pull/15760) ([netdatabot](https://github.com/netdatabot))
 - fix nvidia\_smi power\_readings for new drivers [\#15759](https://github.com/netdata/netdata/pull/15759) ([ilyam8](https://github.com/ilyam8))
 - update bundled UI to v2.26.2 [\#15758](https://github.com/netdata/netdata/pull/15758) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#15751](https://github.com/netdata/netdata/pull/15751) ([netdatabot](https://github.com/netdatabot))
-- ci labeler: remove integrations from area/docs [\#15750](https://github.com/netdata/netdata/pull/15750) ([ilyam8](https://github.com/ilyam8))
-- meta: align left metrics, alerts, and config options [\#15749](https://github.com/netdata/netdata/pull/15749) ([ilyam8](https://github.com/ilyam8))
-- Add dependencies for systemd journal plugin. [\#15747](https://github.com/netdata/netdata/pull/15747) ([Ferroin](https://github.com/Ferroin))
-- prefer cap over setuid for sysetmd-journal in installer [\#15741](https://github.com/netdata/netdata/pull/15741) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
