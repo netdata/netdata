@@ -1,13 +1,397 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <daemon/main.h>
 #include "../libnetdata.h"
+#include <daemon/main.h>
 
 #ifdef HAVE_BACKTRACE
 #include <execinfo.h>
 #endif
 
-int web_server_is_multithreaded = 1;
+// ----------------------------------------------------------------------------
+// facilities
+//
+// sys/syslog.h (Linux)
+// sys/sys/syslog.h (FreeBSD)
+// bsd/sys/syslog.h (darwin-xnu)
+
+static struct {
+    int facility;
+    const char *name;
+} facilities[] = {
+        { LOG_AUTH, "auth" },
+        { LOG_AUTHPRIV, "authpriv" },
+        { LOG_CRON, "cron" },
+        { LOG_DAEMON, "daemon" },
+        { LOG_FTP, "ftp" },
+        { LOG_KERN, "kern" },
+        { LOG_LPR, "lpr" },
+        { LOG_MAIL, "mail" },
+        { LOG_NEWS, "news" },
+        { LOG_SYSLOG, "syslog" },
+        { LOG_USER, "user" },
+        { LOG_UUCP, "uucp" },
+        { LOG_LOCAL0, "local0" },
+        { LOG_LOCAL1, "local1" },
+        { LOG_LOCAL2, "local2" },
+        { LOG_LOCAL3, "local3" },
+        { LOG_LOCAL4, "local4" },
+        { LOG_LOCAL5, "local5" },
+        { LOG_LOCAL6, "local6" },
+        { LOG_LOCAL7, "local7" },
+
+#ifdef __FreeBSD__
+        { LOG_CONSOLE, "console" },
+        { LOG_NTP, "ntp" },
+
+        // FreeBSD does not consider 'security' as deprecated.
+        { LOG_SECURITY, "security" },
+#else
+        // For all other O/S 'security' is mapped to 'auth'.
+        { LOG_AUTH, "security" },
+#endif
+
+#ifdef __APPLE__
+        { LOG_INSTALL, "install" },
+        { LOG_NETINFO, "netinfo" },
+        { LOG_RAS,     "ras" },
+        { LOG_REMOTEAUTH, "remoteauth" },
+        { LOG_LAUNCHD, "launchd" },
+
+#endif
+};
+
+static int nd_log_facility2id(const char *facility) {
+    size_t entries = sizeof(facilities) / sizeof(facilities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(facilities[i].name, facility) == 0)
+            return facilities[i].facility;
+    }
+
+    return LOG_DAEMON;
+}
+
+// ----------------------------------------------------------------------------
+
+typedef enum {
+    ND_LOG_METHOD_DISABLED,
+    ND_LOG_METHOD_DEVNULL,
+    ND_LOG_METHOD_DEFAULT,
+    ND_LOG_METHOD_JOURNAL,
+    ND_LOG_METHOD_SYSLOG,
+    ND_LOG_METHOD_STDOUT,
+    ND_LOG_METHOD_STDERR,
+    ND_LOG_METHOD_FILE,
+} ND_LOG_METHOD;
+
+struct nd_log_entry {
+    SPINLOCK spinlock;
+    ND_LOG_METHOD method;
+    const char *filename;
+    int fd;
+    FILE *fp;
+    FILE **fp_set;
+};
+
+static struct {
+    struct nd_log_entry types[ND_LOG_TYPES_MAX];
+
+    struct {
+        bool initialized;
+        int facility;
+    } syslog;
+
+    struct {
+        bool initialized;
+    } stdin;
+
+    struct {
+        bool initialized;
+    } stdout;
+
+    struct {
+        bool initialized;
+    } stderr;
+
+} nd_log = {
+        .syslog = {
+                .initialized = false,
+                .facility = LOG_DAEMON,
+        },
+        .stdin = {
+                .initialized = false,
+        },
+        .stdout = {
+                .initialized = false,
+        },
+        .stderr = {
+                .initialized = false,
+        },
+        .types = {
+                [ND_LOG_INPUT] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = ND_LOG_METHOD_DEVNULL,
+                        .filename = "/dev/null",
+                        .fd = STDIN_FILENO,
+                        .fp_set = &stdin,
+                        .fp = NULL,
+                },
+                [ND_LOG_ACCESS] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = ND_LOG_METHOD_DEFAULT,
+                        .filename = LOG_DIR "/access.log",
+                        .fd = -1,
+                        .fp_set = NULL,
+                        .fp = NULL,
+                },
+                [ND_LOG_ACLK] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = ND_LOG_METHOD_FILE,
+                        .filename = LOG_DIR "/aclk.log",
+                        .fd = -1,
+                        .fp_set = NULL,
+                        .fp = NULL,
+                },
+                [ND_LOG_COLLECTORS] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = ND_LOG_METHOD_DEFAULT,
+                        .filename = LOG_DIR "/collectors.log",
+                        .fd = -1,
+                        .fp_set = NULL,
+                        .fp = NULL,
+                },
+                [ND_LOG_DEBUG] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = ND_LOG_METHOD_DISABLED,
+                        .filename = LOG_DIR "/debug.log",
+                        .fd = STDOUT_FILENO,
+                        .fp_set = &stdout,
+                        .fp = NULL,
+                },
+                [ND_LOG_ERROR] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = ND_LOG_METHOD_DEFAULT,
+                        .filename = LOG_DIR "/error.log",
+                        .fd = STDERR_FILENO,
+                        .fp_set = &stderr,
+                        .fp = NULL,
+                },
+                [ND_LOG_HEALTH] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = ND_LOG_METHOD_DEFAULT,
+                        .filename = LOG_DIR "/health.log",
+                        .fd = -1,
+                        .fp_set = NULL,
+                        .fp = NULL,
+                },
+        },
+};
+
+static inline void nd_log_lock(ND_LOG_TYPE type) {
+    spinlock_lock(&nd_log.types[type].spinlock);
+}
+
+static inline void nd_log_unlock(ND_LOG_TYPE type) {
+    spinlock_unlock(&nd_log.types[type].spinlock);
+}
+
+void nd_log_set_output(ND_LOG_TYPE type, const char *setting) {
+    if(!setting || !*setting || strcmp(setting, "none") == 0) {
+        nd_log.types[type].method = ND_LOG_METHOD_DISABLED;
+        nd_log.types[type].filename = "/dev/null";
+    }
+    else if(strcmp(setting, "journal") == 0) {
+        nd_log.types[type].method = ND_LOG_METHOD_JOURNAL;
+        nd_log.types[type].filename = "/dev/null";
+    }
+    else if(strcmp(setting, "syslog") == 0) {
+        nd_log.types[type].method = ND_LOG_METHOD_SYSLOG;
+        nd_log.types[type].filename = "/dev/null";
+    }
+    else if(strcmp(setting, "/dev/null") == 0) {
+        nd_log.types[type].method = ND_LOG_METHOD_DEVNULL;
+        nd_log.types[type].filename = "/dev/null";
+    }
+    else if(strcmp(setting, "system") == 0) {
+        if(nd_log.types[type].fp_set == &stderr) {
+            nd_log.types[type].method = ND_LOG_METHOD_STDERR;
+            nd_log.types[type].filename = "stderr";
+            nd_log.types[type].fd = STDERR_FILENO;
+        }
+        else {
+            nd_log.types[type].method = ND_LOG_METHOD_STDOUT;
+            nd_log.types[type].filename = "stdout";
+            nd_log.types[type].fd = STDOUT_FILENO;
+        }
+    }
+    else if(strcmp(setting, "stderr") == 0) {
+        nd_log.types[type].method = ND_LOG_METHOD_STDERR;
+        nd_log.types[type].filename = "stderr";
+        nd_log.types[type].fd = STDERR_FILENO;
+    }
+    else if(strcmp(setting, "stdout") == 0) {
+        nd_log.types[type].method = ND_LOG_METHOD_STDOUT;
+        nd_log.types[type].filename = "stdout";
+        nd_log.types[type].fd = STDOUT_FILENO;
+    }
+    else {
+        nd_log.types[type].method = ND_LOG_METHOD_FILE;
+        nd_log.types[type].filename = setting;
+    }
+}
+
+void nd_log_set_facility(const char *facility) {
+    nd_log.syslog.facility = nd_log_facility2id(facility);
+}
+
+static void nd_log_syslog_init() {
+    if(nd_log.syslog.initialized)
+        return;
+
+    openlog(program_name, LOG_PID, nd_log.syslog.facility);
+    nd_log.syslog.initialized = true;
+}
+
+static bool nd_log_set_system_fd(struct nd_log_entry *e, int new_fd) {
+    if(new_fd == -1 || e->fd == -1 ||
+            (e->fd == STDIN_FILENO && nd_log.stdin.initialized) ||
+            (e->fd == STDOUT_FILENO && nd_log.stdout.initialized) ||
+            (e->fd == STDERR_FILENO && nd_log.stderr.initialized) ||
+            (e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO))
+        return false;
+
+    if(new_fd != e->fd) {
+        int t = dup2(new_fd, e->fd);
+
+        bool ret = true;
+        if (t == -1) {
+            netdata_log_error("Cannot dup2() new fd %d to old fd %d for '%s'", new_fd, e->fd, e->filename);
+            ret = false;
+        }
+        else
+            close(new_fd);
+
+        if(e->fd == STDIN_FILENO)
+            nd_log.stdin.initialized = true;
+        else if(e->fd == STDOUT_FILENO)
+            nd_log.stdout.initialized = true;
+        else if(e->fd == STDERR_FILENO)
+            nd_log.stderr.initialized = true;
+
+        return ret;
+    }
+
+    return false;
+}
+
+static void nd_log_open(struct nd_log_entry *e, ND_LOG_TYPE type) {
+    if(e->method == ND_LOG_METHOD_DEFAULT)
+        nd_log_set_output(type, e->filename);
+
+    if((e->method == ND_LOG_METHOD_FILE && !e->filename) ||
+       (e->method == ND_LOG_METHOD_DEVNULL && !e->fp_set))
+        e->method = ND_LOG_METHOD_DISABLED;
+
+    if(e->fp)
+        fflush(e->fp);
+
+    switch(e->method) {
+        case ND_LOG_METHOD_SYSLOG:
+            nd_log_syslog_init();
+            break;
+
+        case ND_LOG_METHOD_JOURNAL:
+            break;
+
+        case ND_LOG_METHOD_STDOUT:
+            e->fp = stdout;
+            e->fd = STDOUT_FILENO;
+            break;
+
+        default:
+        case ND_LOG_METHOD_DEFAULT:
+        case ND_LOG_METHOD_STDERR:
+            e->method = ND_LOG_METHOD_STDERR;
+            e->fp = stderr;
+            e->fd = STDERR_FILENO;
+            break;
+
+        case ND_LOG_METHOD_DEVNULL:
+        case ND_LOG_METHOD_FILE: {
+            int fd = open(e->filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+            if(fd == -1) {
+                // we cannot open the file, fallback to stderr
+
+                if(e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
+                    e->fd = STDERR_FILENO;
+                    e->method = ND_LOG_METHOD_STDERR;
+                }
+
+                netdata_log_error("Cannot open file '%s'. Leaving %d to its default.", e->filename, e->fd);
+            }
+            else {
+                if (!nd_log_set_system_fd(e, fd)) {
+                    if(e->fd == STDIN_FILENO || e->fd == STDOUT_FILENO || e->fd == STDERR_FILENO) {
+                        if(e->fd == STDOUT_FILENO)
+                            e->method = ND_LOG_METHOD_STDOUT;
+                        else if(e->fd == STDERR_FILENO)
+                            e->method = ND_LOG_METHOD_STDERR;
+
+                        close(fd);
+                    }
+                    else
+                        e->fd = fd;
+                }
+            }
+
+            // at this point we have e->fd set properly
+
+            if(e->fd == STDIN_FILENO)
+                e->fp = stdin;
+            else if(e->fd == STDOUT_FILENO)
+                e->fp = stdout;
+            else if(e->fd == STDERR_FILENO)
+                e->fp = stderr;
+            else if(e->fp == stdin || e->fp == stdout || e->fp == stderr)
+                e->fp = NULL;
+
+            if(!e->fp) {
+                e->fp = fdopen(e->fd, "a");
+                if (!e->fp) {
+                    netdata_log_error("Cannot fdopen() fd %d ('%s')", e->fd, e->filename);
+
+                    if(e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO)
+                        close(e->fd);
+
+                    e->fp = stderr;
+                    e->fd = STDOUT_FILENO;
+                }
+            }
+
+            // at this point we have e->fp set properly
+
+            if(e->fp && e->fp != stdin) {
+                if (setvbuf(e->fp, NULL, _IOLBF, 0) != 0)
+                    netdata_log_error("Cannot set line buffering on fd %d ('%s')", e->fd, e->filename);
+            }
+        }
+        break;
+    }
+}
+
+void nd_log_initialize(void) {
+    for(int i = 0 ; i < ND_LOG_TYPES_MAX ;i++)
+        nd_log_open(&nd_log.types[i], i);
+}
+
+void nd_log_reopen_log_files(void) {
+    netdata_log_info("Reopening all log files.");
+
+    nd_log.stdout.initialized = false;
+    nd_log.stderr.initialized = false;
+    nd_log_initialize();
+
+    netdata_log_info("Log files re-opened.");
+}
 
 const char *program_name = "";
 uint64_t debug_flags = 0;
@@ -20,452 +404,17 @@ int health_log_syslog = 0;
 
 int stdaccess_fd = -1;
 FILE *stdaccess = NULL;
-
-int stdhealth_fd = -1;
 FILE *stdhealth = NULL;
-
-int stdcollector_fd = -1;
 FILE *stderror = NULL;
-
-const char *stdaccess_filename = NULL;
-const char *stderr_filename = NULL;
-const char *stdout_filename = NULL;
-const char *facility_log = NULL;
-const char *stdhealth_filename = NULL;
-const char *stdcollector_filename = NULL;
 
 netdata_log_level_t global_log_severity_level = NETDATA_LOG_LEVEL_INFO;
 
 #ifdef ENABLE_ACLK
-const char *aclklog_filename = NULL;
-int aclklog_fd = -1;
 FILE *aclklog = NULL;
-int aclklog_syslog = 1;
 int aclklog_enabled = 0;
 #endif
 
 // ----------------------------------------------------------------------------
-// Log facility(https://tools.ietf.org/html/rfc5424)
-//
-// The facilities accepted in the Netdata are in according with the following
-// header files for their respective operating system:
-// sys/syslog.h (Linux )
-// sys/sys/syslog.h (FreeBSD)
-// bsd/sys/syslog.h (darwin-xnu)
-
-#define LOG_AUTH_KEY "auth"
-#define LOG_AUTHPRIV_KEY "authpriv"
-#ifdef __FreeBSD__
-# define LOG_CONSOLE_KEY "console"
-#endif
-#define LOG_CRON_KEY "cron"
-#define LOG_DAEMON_KEY "daemon"
-#define LOG_FTP_KEY "ftp"
-#ifdef __APPLE__
-# define LOG_INSTALL_KEY "install"
-#endif
-#define LOG_KERN_KEY "kern"
-#define LOG_LPR_KEY "lpr"
-#define LOG_MAIL_KEY "mail"
-//#define LOG_INTERNAL_MARK_KEY "mark"
-#ifdef __APPLE__
-# define LOG_NETINFO_KEY "netinfo"
-# define LOG_RAS_KEY "ras"
-# define LOG_REMOTEAUTH_KEY "remoteauth"
-#endif
-#define LOG_NEWS_KEY "news"
-#ifdef __FreeBSD__
-# define LOG_NTP_KEY "ntp"
-#endif
-#define LOG_SECURITY_KEY "security"
-#define LOG_SYSLOG_KEY "syslog"
-#define LOG_USER_KEY "user"
-#define LOG_UUCP_KEY "uucp"
-#ifdef __APPLE__
-# define LOG_LAUNCHD_KEY "launchd"
-#endif
-#define LOG_LOCAL0_KEY "local0"
-#define LOG_LOCAL1_KEY "local1"
-#define LOG_LOCAL2_KEY "local2"
-#define LOG_LOCAL3_KEY "local3"
-#define LOG_LOCAL4_KEY "local4"
-#define LOG_LOCAL5_KEY "local5"
-#define LOG_LOCAL6_KEY "local6"
-#define LOG_LOCAL7_KEY "local7"
-
-static int log_facility_id(const char *facility_name)
-{
-    static int
-        hash_auth = 0,
-        hash_authpriv = 0,
-#ifdef __FreeBSD__
-        hash_console = 0,
-#endif
-        hash_cron = 0,
-        hash_daemon = 0,
-        hash_ftp = 0,
-#ifdef __APPLE__
-        hash_install = 0,
-#endif
-        hash_kern = 0,
-        hash_lpr = 0,
-        hash_mail = 0,
-//      hash_mark = 0,
-#ifdef __APPLE__
-        hash_netinfo = 0,
-        hash_ras = 0,
-        hash_remoteauth = 0,
-#endif
-        hash_news = 0,
-#ifdef __FreeBSD__
-        hash_ntp = 0,
-#endif
-        hash_security = 0,
-        hash_syslog = 0,
-        hash_user = 0,
-        hash_uucp = 0,
-#ifdef __APPLE__
-        hash_launchd = 0,
-#endif
-        hash_local0 = 0,
-        hash_local1 = 0,
-        hash_local2 = 0,
-        hash_local3 = 0,
-        hash_local4 = 0,
-        hash_local5 = 0,
-        hash_local6 = 0,
-        hash_local7 = 0;
-
-    if(unlikely(!hash_auth))
-    {
-        hash_auth = simple_hash(LOG_AUTH_KEY);
-        hash_authpriv = simple_hash(LOG_AUTHPRIV_KEY);
-#ifdef __FreeBSD__
-        hash_console = simple_hash(LOG_CONSOLE_KEY);
-#endif
-        hash_cron = simple_hash(LOG_CRON_KEY);
-        hash_daemon = simple_hash(LOG_DAEMON_KEY);
-        hash_ftp = simple_hash(LOG_FTP_KEY);
-#ifdef __APPLE__
-        hash_install = simple_hash(LOG_INSTALL_KEY);
-#endif
-        hash_kern = simple_hash(LOG_KERN_KEY);
-        hash_lpr = simple_hash(LOG_LPR_KEY);
-        hash_mail = simple_hash(LOG_MAIL_KEY);
-//        hash_mark = simple_uhash();
-#ifdef __APPLE__
-        hash_netinfo = simple_hash(LOG_NETINFO_KEY);
-        hash_ras = simple_hash(LOG_RAS_KEY);
-        hash_remoteauth = simple_hash(LOG_REMOTEAUTH_KEY);
-#endif
-        hash_news = simple_hash(LOG_NEWS_KEY);
-#ifdef __FreeBSD__
-        hash_ntp = simple_hash(LOG_NTP_KEY);
-#endif
-        hash_security = simple_hash(LOG_SECURITY_KEY);
-        hash_syslog = simple_hash(LOG_SYSLOG_KEY);
-        hash_user = simple_hash(LOG_USER_KEY);
-        hash_uucp = simple_hash(LOG_UUCP_KEY);
-#ifdef __APPLE__
-        hash_launchd = simple_hash(LOG_LAUNCHD_KEY);
-#endif
-        hash_local0 = simple_hash(LOG_LOCAL0_KEY);
-        hash_local1 = simple_hash(LOG_LOCAL1_KEY);
-        hash_local2 = simple_hash(LOG_LOCAL2_KEY);
-        hash_local3 = simple_hash(LOG_LOCAL3_KEY);
-        hash_local4 = simple_hash(LOG_LOCAL4_KEY);
-        hash_local5 = simple_hash(LOG_LOCAL5_KEY);
-        hash_local6 = simple_hash(LOG_LOCAL6_KEY);
-        hash_local7 = simple_hash(LOG_LOCAL7_KEY);
-    }
-
-    int hash = simple_hash(facility_name);
-    if ( hash == hash_auth )
-    {
-        return LOG_AUTH;
-    }
-    else if  ( hash == hash_authpriv )
-    {
-        return LOG_AUTHPRIV;
-    }
-#ifdef __FreeBSD__
-    else if ( hash == hash_console )
-    {
-        return LOG_CONSOLE;
-    }
-#endif
-    else if ( hash == hash_cron )
-    {
-        return LOG_CRON;
-    }
-    else if ( hash == hash_daemon )
-    {
-        return LOG_DAEMON;
-    }
-    else if ( hash == hash_ftp )
-    {
-        return LOG_FTP;
-    }
-#ifdef __APPLE__
-    else if ( hash == hash_install )
-    {
-        return LOG_INSTALL;
-    }
-#endif
-    else if ( hash == hash_kern )
-    {
-        return LOG_KERN;
-    }
-    else if ( hash == hash_lpr )
-    {
-        return LOG_LPR;
-    }
-    else if ( hash == hash_mail )
-    {
-        return LOG_MAIL;
-    }
-    /*
-    else if ( hash == hash_mark )
-    {
-        //this is internal for all OS
-        return INTERNAL_MARK;
-    }
-    */
-#ifdef __APPLE__
-    else if ( hash == hash_netinfo )
-    {
-        return LOG_NETINFO;
-    }
-    else if ( hash == hash_ras )
-    {
-        return LOG_RAS;
-    }
-    else if ( hash == hash_remoteauth )
-    {
-        return LOG_REMOTEAUTH;
-    }
-#endif
-    else if ( hash == hash_news )
-    {
-        return LOG_NEWS;
-    }
-#ifdef __FreeBSD__
-    else if ( hash == hash_ntp )
-    {
-        return LOG_NTP;
-    }
-#endif
-    else if ( hash == hash_security )
-    {
-        //FreeBSD is the unique that does not consider
-        //this facility deprecated. We are keeping
-        //it for other OS while they are kept in their headers.
-#ifdef __FreeBSD__
-        return LOG_SECURITY;
-#else
-        return LOG_AUTH;
-#endif
-    }
-    else if ( hash == hash_syslog )
-    {
-        return LOG_SYSLOG;
-    }
-    else if ( hash == hash_user )
-    {
-        return LOG_USER;
-    }
-    else if ( hash == hash_uucp )
-    {
-        return LOG_UUCP;
-    }
-    else if ( hash == hash_local0 )
-    {
-        return LOG_LOCAL0;
-    }
-    else if ( hash == hash_local1 )
-    {
-        return LOG_LOCAL1;
-    }
-    else if ( hash == hash_local2 )
-    {
-        return LOG_LOCAL2;
-    }
-    else if ( hash == hash_local3 )
-    {
-        return LOG_LOCAL3;
-    }
-    else if ( hash == hash_local4 )
-    {
-        return LOG_LOCAL4;
-    }
-    else if ( hash == hash_local5 )
-    {
-        return LOG_LOCAL5;
-    }
-    else if ( hash == hash_local6 )
-    {
-        return LOG_LOCAL6;
-    }
-    else if ( hash == hash_local7 )
-    {
-        return LOG_LOCAL7;
-    }
-#ifdef __APPLE__
-    else if ( hash == hash_launchd )
-    {
-        return LOG_LAUNCHD;
-    }
-#endif
-
-    return LOG_DAEMON;
-}
-
-//we do not need to use this now, but I already created this function to be
-//used case necessary.
-/*
-char *log_facility_name(int code)
-{
-    char *defvalue = { "daemon" };
-    switch(code)
-    {
-        case LOG_AUTH:
-            {
-                return "auth";
-            }
-        case LOG_AUTHPRIV:
-            {
-                return "authpriv";
-            }
-#ifdef __FreeBSD__
-        case LOG_CONSOLE:
-            {
-                return "console";
-            }
-#endif
-        case LOG_CRON:
-            {
-                return "cron";
-            }
-        case LOG_DAEMON:
-            {
-                return defvalue;
-            }
-        case LOG_FTP:
-            {
-                return "ftp";
-            }
-#ifdef __APPLE__
-        case LOG_INSTALL:
-            {
-                return "install";
-            }
-#endif
-        case LOG_KERN:
-            {
-                return "kern";
-            }
-        case LOG_LPR:
-            {
-                return "lpr";
-            }
-        case LOG_MAIL:
-            {
-                return "mail";
-            }
-#ifdef __APPLE__
-        case LOG_NETINFO:
-            {
-                return "netinfo" ;
-            }
-        case LOG_RAS:
-            {
-                return "ras";
-            }
-        case LOG_REMOTEAUTH:
-            {
-                return "remoteauth";
-            }
-#endif
-        case LOG_NEWS:
-            {
-                return "news";
-            }
-#ifdef __FreeBSD__
-        case LOG_NTP:
-            {
-                return "ntp" ;
-            }
-        case LOG_SECURITY:
-            {
-                return "security";
-            }
-#endif
-        case LOG_SYSLOG:
-            {
-                return "syslog";
-            }
-        case LOG_USER:
-            {
-                return "user";
-            }
-        case LOG_UUCP:
-            {
-                return "uucp";
-            }
-        case LOG_LOCAL0:
-            {
-                return "local0";
-            }
-        case LOG_LOCAL1:
-            {
-                return "local1";
-            }
-        case LOG_LOCAL2:
-            {
-                return "local2";
-            }
-        case LOG_LOCAL3:
-            {
-                return "local3";
-            }
-        case LOG_LOCAL4:
-            {
-                return "local4" ;
-            }
-        case LOG_LOCAL5:
-            {
-                return "local5";
-            }
-        case LOG_LOCAL6:
-            {
-                return "local6";
-            }
-        case LOG_LOCAL7:
-            {
-                return "local7" ;
-            }
-#ifdef __APPLE__
-        case LOG_LAUNCHD:
-            {
-                return "launchd";
-            }
-#endif
-    }
-
-    return defvalue;
-}
-*/
-
-// ----------------------------------------------------------------------------
-
-void syslog_init() {
-    static int i = 0;
-
-    if(!i) {
-        openlog(program_name, LOG_PID,log_facility_id(facility_log));
-        i = 1;
-    }
-}
 
 void log_date(char *buffer, size_t len, time_t now) {
     if(unlikely(!buffer || !len))
@@ -485,144 +434,6 @@ void log_date(char *buffer, size_t len, time_t now) {
         buffer[0] = '\0';
 
     buffer[len - 1] = '\0';
-}
-
-static netdata_mutex_t log_mutex = NETDATA_MUTEX_INITIALIZER;
-static inline void log_lock() {
-    netdata_mutex_lock(&log_mutex);
-}
-static inline void log_unlock() {
-    netdata_mutex_unlock(&log_mutex);
-}
-
-static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_syslog, int is_stdaccess, int *fd_ptr) {
-    int f, devnull = 0;
-
-    if(!filename || !*filename || !strcmp(filename, "none") ||  !strcmp(filename, "/dev/null")) {
-        filename = "/dev/null";
-        devnull = 1;
-    }
-
-    if(!strcmp(filename, "syslog")) {
-        filename = "/dev/null";
-        devnull = 1;
-
-    syslog_init();
-        if(enabled_syslog) *enabled_syslog = 1;
-    }
-    else if(enabled_syslog) *enabled_syslog = 0;
-
-    // don't do anything if the user is willing
-    // to have the standard one
-    if(!strcmp(filename, "system")) {
-        if(fd != -1 && !is_stdaccess) {
-            if(fd_ptr) *fd_ptr = fd;
-            return fp;
-        }
-
-        filename = "stderr";
-    }
-
-    if(!strcmp(filename, "stdout"))
-        f = STDOUT_FILENO;
-
-    else if(!strcmp(filename, "stderr"))
-        f = STDERR_FILENO;
-
-    else {
-        f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
-        if(f == -1) {
-            netdata_log_error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
-            if(fd_ptr) *fd_ptr = fd;
-            return fp;
-        }
-    }
-
-    // if there is a level-2 file pointer
-    // flush it before switching the level-1 fds
-    if(fp)
-        fflush(fp);
-
-    if(devnull && is_stdaccess) {
-        fd = -1;
-        fp = NULL;
-    }
-
-    if(fd != f && fd != -1) {
-        // it automatically closes
-        int t = dup2(f, fd);
-        if (t == -1) {
-            netdata_log_error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
-            close(f);
-            if(fd_ptr) *fd_ptr = fd;
-            return fp;
-        }
-        // netdata_log_info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
-        close(f);
-    }
-    else fd = f;
-
-    if(!fp) {
-        fp = fdopen(fd, "a");
-        if (!fp)
-            netdata_log_error("Cannot fdopen() fd %d ('%s')", fd, filename);
-        else {
-            if (setvbuf(fp, NULL, _IOLBF, 0) != 0)
-                netdata_log_error("Cannot set line buffering on fd %d ('%s')", fd, filename);
-        }
-    }
-
-    if(fd_ptr) *fd_ptr = fd;
-    return fp;
-}
-
-void reopen_all_log_files() {
-    if(stdout_filename)
-        open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
-
-    if(stdcollector_filename)
-        open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
-
-    if(stderr_filename) {
-        // Netdata starts using stderr and if it has success to open file it redirects
-        FILE *fp = open_log_file(stdcollector_fd, stderror, stderr_filename,
-                                 &error_log_syslog, 1, &stdcollector_fd);
-        if (fp)
-            stderror = fp;
-    }
-
-#ifdef ENABLE_ACLK
-    if (aclklog_enabled)
-        aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
-#endif
-
-    if(stdaccess_filename)
-        stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
-
-    if(stdhealth_filename)
-        stdhealth = open_log_file(stdhealth_fd, stdhealth, stdhealth_filename, &health_log_syslog, 1, &stdhealth_fd);
-}
-
-void open_all_log_files() {
-    // disable stdin
-    open_log_file(STDIN_FILENO, stdin, "/dev/null", NULL, 0, NULL);
-
-    open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
-    open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
-
-    // Netdata starts using stderr and if it has success to open file it redirects
-    FILE *fp = open_log_file(stdcollector_fd, NULL, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
-    if (fp)
-        stderror = fp;
-
-#ifdef ENABLE_ACLK
-    if(aclklog_enabled)
-        aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
-#endif
-
-    stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
-
-    stdhealth = open_log_file(stdhealth_fd, stdhealth, stdhealth_filename, &health_log_syslog, 1, &stdhealth_fd);
 }
 
 // ----------------------------------------------------------------------------
@@ -734,23 +545,23 @@ int error_log_limit(int reset) {
 }
 
 void error_log_limit_reset(void) {
-    log_lock();
+    nd_log_lock(ND_LOG_ERROR);
 
     error_log_errors_per_period = error_log_errors_per_period_backup;
     error_log_limit(1);
 
-    log_unlock();
+    nd_log_unlock(ND_LOG_ERROR);
 }
 
 void error_log_limit_unlimited(void) {
-    log_lock();
+    nd_log_lock(ND_LOG_ERROR);
 
     error_log_errors_per_period = error_log_errors_per_period_backup;
     error_log_limit(1);
 
     error_log_errors_per_period = ((error_log_errors_per_period_backup * 10) < 10000) ? 10000 : (error_log_errors_per_period_backup * 10);
 
-    log_unlock();
+    nd_log_unlock(ND_LOG_ERROR);
 }
 
 // ----------------------------------------------------------------------------
@@ -790,11 +601,11 @@ void info_int( int is_collector, const char *file __maybe_unused, const char *fu
     va_list args;
     FILE *fp = (is_collector || !stderror) ? stderr : stderror;
 
-    log_lock();
+    nd_log_lock(ND_LOG_ERROR);
 
     // prevent logging too much
     if (error_log_limit(0)) {
-        log_unlock();
+        nd_log_unlock(ND_LOG_ERROR);
         return;
     }
 
@@ -819,7 +630,7 @@ void info_int( int is_collector, const char *file __maybe_unused, const char *fu
 
     fputc('\n', fp);
 
-    log_unlock();
+    nd_log_unlock(ND_LOG_ERROR);
 }
 
 // ----------------------------------------------------------------------------
@@ -858,18 +669,18 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 
     va_list args;
 
-    log_lock();
+    nd_log_lock(ND_LOG_ERROR);
 
     erl->count++;
     time_t now = now_boottime_sec();
     if(now - erl->last_logged < erl->log_every) {
-        log_unlock();
+        nd_log_unlock(ND_LOG_ERROR);
         return;
     }
 
     // prevent logging too much
     if (error_log_limit(0)) {
-        log_unlock();
+        nd_log_unlock(ND_LOG_ERROR);
         return;
     }
 
@@ -911,7 +722,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
     erl->last_logged = now;
     erl->count = 0;
 
-    log_unlock();
+    nd_log_unlock(ND_LOG_ERROR);
 }
 
 void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
@@ -926,11 +737,11 @@ void error_int(int is_collector, const char *prefix, const char *file __maybe_un
 
     va_list args;
 
-    log_lock();
+    nd_log_lock(ND_LOG_ERROR);
 
     // prevent logging too much
     if (error_log_limit(0)) {
-        log_unlock();
+        nd_log_unlock(ND_LOG_ERROR);
         return;
     }
 
@@ -962,7 +773,7 @@ void error_int(int is_collector, const char *prefix, const char *file __maybe_un
     else
         fputc('\n', fp);
 
-    log_unlock();
+    nd_log_unlock(ND_LOG_ERROR);
 }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1012,7 +823,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
 
-    log_lock();
+    nd_log_lock(ND_LOG_ERROR);
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1027,7 +838,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     perror(" # ");
     fputc('\n', fp);
 
-    log_unlock();
+    nd_log_unlock(ND_LOG_ERROR);
 
     char action_data[70+1];
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
@@ -1068,10 +879,7 @@ void netdata_log_access( const char *fmt, ... ) {
     }
 
     if(stdaccess) {
-        static netdata_mutex_t access_mutex = NETDATA_MUTEX_INITIALIZER;
-
-        if(web_server_is_multithreaded)
-            netdata_mutex_lock(&access_mutex);
+        nd_log_lock(ND_LOG_ACCESS);
 
         char date[LOG_DATE_LENGTH];
         log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
@@ -1082,8 +890,7 @@ void netdata_log_access( const char *fmt, ... ) {
         va_end( args );
         fputc('\n', stdaccess);
 
-        if(web_server_is_multithreaded)
-            netdata_mutex_unlock(&access_mutex);
+        nd_log_unlock(ND_LOG_ACCESS);
     }
 }
 
@@ -1100,10 +907,7 @@ void netdata_log_health( const char *fmt, ... ) {
     }
 
     if(stdhealth) {
-        static netdata_mutex_t health_mutex = NETDATA_MUTEX_INITIALIZER;
-
-        if(web_server_is_multithreaded)
-            netdata_mutex_lock(&health_mutex);
+        nd_log_lock(ND_LOG_HEALTH);
 
         char date[LOG_DATE_LENGTH];
         log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
@@ -1114,16 +918,14 @@ void netdata_log_health( const char *fmt, ... ) {
         va_end( args );
         fputc('\n', stdhealth);
 
-        if(web_server_is_multithreaded)
-            netdata_mutex_unlock(&health_mutex);
+        nd_log_unlock(ND_LOG_HEALTH);
     }
 }
 
 #ifdef ENABLE_ACLK
 void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name) {
     if (aclklog) {
-        static netdata_mutex_t aclklog_mutex = NETDATA_MUTEX_INITIALIZER;
-        netdata_mutex_lock(&aclklog_mutex);
+        nd_log_lock(ND_LOG_ACLK);
 
         char date[LOG_DATE_LENGTH];
         log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
@@ -1133,7 +935,7 @@ void log_aclk_message_bin( const char *data, const size_t data_len, int tx, cons
 
         fputc('\n', aclklog);
 
-        netdata_mutex_unlock(&aclklog_mutex);
+        nd_log_unlock(ND_LOG_ACLK);
     }
 }
 #endif

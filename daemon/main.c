@@ -845,31 +845,29 @@ static void security_init(){
 static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  filename);
+    nd_log_set_output(ND_LOG_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug",  filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
+    nd_log_set_output(ND_LOG_ERROR, config_get(CONFIG_SECTION_LOGS, "error",  filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    stdcollector_filename = config_get(CONFIG_SECTION_LOGS, "collector", filename);
+    nd_log_set_output(ND_LOG_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
+    nd_log_set_output(ND_LOG_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    stdhealth_filename = config_get(CONFIG_SECTION_LOGS, "health", filename);
+    nd_log_set_output(ND_LOG_ACCESS, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-        aclklog_filename = config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename);
+        nd_log_set_output(ND_LOG_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 #endif
 
-    char deffacility[8];
-    snprintfz(deffacility,7,"%s","daemon");
-    facility_log = config_get(CONFIG_SECTION_LOGS, "facility",  deffacility);
+    nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
 
     error_log_throttle_period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", error_log_throttle_period);
     error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
@@ -1904,7 +1902,7 @@ int main(int argc, char **argv) {
         error_log_limit_unlimited();
 
         // initialize the log files
-        open_all_log_files();
+        nd_log_initialize();
         netdata_log_info("Netdata agent version \""VERSION"\" is starting");
 
         ieee754_doubles = is_system_ieee754_double();

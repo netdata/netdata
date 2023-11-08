@@ -170,8 +170,7 @@ static cmd_status_t cmd_reopen_logs_execute(char *args, char **message)
     (void)message;
 
     error_log_limit_unlimited();
-    netdata_log_info("COMMAND: Reopening all log files.");
-    reopen_all_log_files();
+    nd_log_reopen_log_files();
     error_log_limit_reset();
 
     return CMD_STATUS_SUCCESS;

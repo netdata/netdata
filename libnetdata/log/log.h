@@ -9,6 +9,24 @@ extern "C" {
 
 #include "../libnetdata.h"
 
+typedef enum {
+    ND_LOG_INPUT,
+    ND_LOG_ACCESS,
+    ND_LOG_ACLK,
+    ND_LOG_COLLECTORS,
+    ND_LOG_DEBUG,
+    ND_LOG_ERROR,
+    ND_LOG_HEALTH,
+
+    // terminator
+    ND_LOG_TYPES_MAX,
+} ND_LOG_TYPE;
+
+void nd_log_set_output(ND_LOG_TYPE type, const char *setting);
+void nd_log_set_facility(const char *facility);
+void nd_log_initialize(void);
+void nd_log_reopen_log_files(void);
+
 #define D_WEB_BUFFER        0x0000000000000001
 #define D_WEB_CLIENT        0x0000000000000002
 #define D_LISTENER          0x0000000000000004
@@ -46,8 +64,6 @@ extern "C" {
 #define D_REPLICATION       0x0000002000000000
 #define D_SYSTEM            0x8000000000000000
 
-extern int web_server_is_multithreaded;
-
 extern uint64_t debug_flags;
 
 extern const char *program_name;
@@ -55,22 +71,11 @@ extern const char *program_name;
 extern int stdaccess_fd;
 extern FILE *stdaccess;
 
-extern int stdhealth_fd;
 extern FILE *stdhealth;
 
-extern int stdcollector_fd;
 extern FILE *stderror;
 
-extern const char *stdaccess_filename;
-extern const char *stderr_filename;
-extern const char *stdout_filename;
-extern const char *stdhealth_filename;
-extern const char *stdcollector_filename;
-extern const char *facility_log;
-
 #ifdef ENABLE_ACLK
-extern const char *aclklog_filename;
-extern int aclklog_fd;
 extern FILE *aclklog;
 extern int aclklog_enabled;
 #endif
@@ -83,9 +88,6 @@ extern int health_log_syslog;
 extern time_t error_log_throttle_period;
 extern unsigned long error_log_errors_per_period, error_log_errors_per_period_backup;
 int error_log_limit(int reset);
-
-void open_all_log_files();
-void reopen_all_log_files();
 
 #define LOG_DATE_LENGTH 26
 void log_date(char *buffer, size_t len, time_t now);

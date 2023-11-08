@@ -538,8 +538,6 @@ void *socket_listen_main_static_threaded(void *ptr) {
     static_workers_private_data = callocz((size_t)static_threaded_workers_count,
                                           sizeof(struct web_server_static_threaded_worker));
 
-    web_server_is_multithreaded = (static_threaded_workers_count > 1);
-
     int i;
     for (i = 1; i < static_threaded_workers_count; i++) {
         static_workers_private_data[i].id = i;
