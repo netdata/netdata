@@ -1097,35 +1097,36 @@ cleanup:
 
 // ----------------------------------------------------------------------------
 
-static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident, const char *kq, const char *sq) {
+static void functions2json(DICTIONARY *functions, BUFFER *wb)
+{
     struct rrd_host_function *t;
-    dfe_start_read(functions, t) {
-        if(!rrd_collector_running(t->collector)) continue;
+    dfe_start_read(functions, t)
+    {
+        if (!rrd_collector_running(t->collector))
+            continue;
 
-        if(t_dfe.counter)
-            buffer_strcat(wb, ",\n");
+        buffer_json_member_add_object(wb, t_dfe.name);
+        buffer_json_member_add_string_or_empty(wb, "help", string2str(t->help));
+        buffer_json_member_add_int64(wb, "timeout", (int64_t)t->timeout);
 
-        buffer_sprintf(wb, "%s%s%s%s: {", ident, kq, t_dfe.name, kq);
-        buffer_sprintf(wb, "\n\t%s%shelp%s: %s%s%s", ident, kq, kq, sq, string2str(t->help), sq);
-        buffer_sprintf(wb, ",\n\t%s%stimeout%s: %d", ident, kq, kq, t->timeout);
-        buffer_sprintf(wb, ",\n\t%s%soptions%s: \"%s%s\"", ident, kq, kq
-                       , (t->options & RRD_FUNCTION_LOCAL)?"LOCAL ":""
-                       , (t->options & RRD_FUNCTION_GLOBAL)?"GLOBAL ":""
-                       );
-        buffer_sprintf(wb, "\n%s}", ident);
+        char options[65];
+        snprintfz(
+            options,
+            64,
+            "%s%s",
+            (t->options & RRD_FUNCTION_LOCAL) ? "LOCAL " : "",
+            (t->options & RRD_FUNCTION_GLOBAL) ? "GLOBAL" : "");
+
+        buffer_json_member_add_string_or_empty(wb, "options", options);
+        buffer_json_object_close(wb);
     }
     dfe_done(t);
-    buffer_strcat(wb, "\n");
 }
 
-void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, const char *sq) {
+void chart_functions2json(RRDSET *st, BUFFER *wb) {
     if(!st || !st->functions_view) return;
 
-    char ident[tabs + 1];
-    ident[tabs] = '\0';
-    while(tabs) ident[--tabs] = '\t';
-
-    functions2json(st->functions_view, wb, ident, kq, sq);
+    functions2json(st->functions_view, wb);
 }
 
 void host_functions2json(RRDHOST *host, BUFFER *wb) {

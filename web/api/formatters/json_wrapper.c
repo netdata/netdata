@@ -874,7 +874,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
         sq[0] = '"';
     }
 
-    buffer_json_initialize(wb, kq, sq, 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_initialize(
+        wb, kq, sq, 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
     buffer_json_member_add_uint64(wb, "api", 1);
     buffer_json_member_add_string(wb, "id", qt->id);
@@ -1289,7 +1290,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         sq[0] = '\'';
     }
 
-    buffer_json_initialize(wb, kq, sq, 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_initialize(
+        wb, kq, sq, 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
     buffer_json_member_add_uint64(wb, "api", 2);
 
     if(options & RRDR_OPTION_DEBUG) {
