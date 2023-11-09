@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Switch charts / chart to use buffer json functions [\#16359](https://github.com/netdata/netdata/pull/16359) ([stelfrag](https://github.com/stelfrag))
+- health: put guides into subdirs [\#16358](https://github.com/netdata/netdata/pull/16358) ([ilyam8](https://github.com/ilyam8))
+- Import alert guides from Netdata Assistant [\#16355](https://github.com/netdata/netdata/pull/16355) ([ralphm](https://github.com/ralphm))
 - update bundle UI to v6.58.5 [\#16354](https://github.com/netdata/netdata/pull/16354) ([ilyam8](https://github.com/ilyam8))
 - Update CODEOWNERS [\#16353](https://github.com/netdata/netdata/pull/16353) ([Ancairon](https://github.com/Ancairon))
 - Copy outdated alert guides to health/guides [\#16352](https://github.com/netdata/netdata/pull/16352) ([Ancairon](https://github.com/Ancairon))
