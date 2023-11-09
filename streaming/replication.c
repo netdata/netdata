@@ -758,7 +758,7 @@ static void replicate_log_request(struct replication_request_details *r, const c
 #ifdef NETDATA_INTERNAL_CHECKS
     internal_error(true,
 #else
-    error_limit_static_global_var(erl, 1, 0);
+    nd_log_limit_static_global_var(erl, 1, 0);
     nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
 #endif
                 "REPLAY ERROR: 'host:%s/chart:%s' child sent: "

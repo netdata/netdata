@@ -389,7 +389,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
 #ifdef NETDATA_INTERNAL_CHECKS
         internal_error(true,
 #else
-        error_limit_static_global_var(erl, 1, 0);
+        nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
 #endif
               "DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "

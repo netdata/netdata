@@ -734,7 +734,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 
     if(unlikely(!vd.is_valid || updated)) {
 #ifndef NETDATA_INTERNAL_CHECKS
-        error_limit_static_global_var(erl, 1, 0);
+        nd_log_limit_static_global_var(erl, 1, 0);
 #endif
         char uuid_str[UUID_STR_LEN + 1];
         uuid_unparse(*uuid, uuid_str);
@@ -750,7 +750,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 #ifdef NETDATA_INTERNAL_CHECKS
             internal_error(true,
 #else
-            error_limit(&erl,
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
 #endif
                         "DBENGINE: metric '%s' %s invalid page of type %u "
                         "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu (flags: %s)",
@@ -770,7 +770,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 #ifdef NETDATA_INTERNAL_CHECKS
             internal_error(true,
 #else
-            error_limit(&erl,
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
 #endif
                         "DBENGINE: metric '%s' %s page of type %u "
                         "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu (flags: %s), "
