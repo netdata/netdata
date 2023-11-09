@@ -4076,8 +4076,7 @@ int main(int argc, char **argv)
     error_log_syslog = 0;
 
     // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
+    nd_log_set_flood_protection(3600, 100);
 
     if (ebpf_adjust_memory_limit())
         return 3;

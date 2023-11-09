@@ -873,9 +873,10 @@ static void log_init(void) {
 
     nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
 
-    error_log_throttle_period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", error_log_throttle_period);
-    error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
-    error_log_errors_per_period_backup = error_log_errors_per_period;
+    usec_t period = 1200, logs = 200;
+    period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", period);
+    logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)logs);
+    nd_log_set_flood_protection(period, logs);
 
     setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
     setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);

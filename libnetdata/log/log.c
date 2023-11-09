@@ -110,6 +110,29 @@ static int nd_log_facility2id(const char *facility) {
 }
 
 // ----------------------------------------------------------------------------
+// format dates
+
+void log_date(char *buffer, size_t len, time_t now) {
+    if(unlikely(!buffer || !len))
+        return;
+
+    time_t t = now;
+    struct tm *tmp, tmbuf;
+
+    tmp = localtime_r(&t, &tmbuf);
+
+    if (tmp == NULL) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
+        buffer[0] = '\0';
+
+    buffer[len - 1] = '\0';
+}
+
+// ----------------------------------------------------------------------------
 
 typedef enum {
     ND_LOG_METHOD_DISABLED,
@@ -170,16 +193,16 @@ static struct {
     } stderr;
 
     struct {
-        usec_t throttle_period;
-        usec_t logs_per_period;
-        usec_t logs_per_period_backup;
+        unsigned long throttle_period;
+        unsigned long logs_per_period;
+        unsigned long logs_per_period_backup;
     } limits;
 
 } nd_log = {
         .limits = {
                 .throttle_period = 1200,
                 .logs_per_period = 200,
-                .logs_per_period_backup = 0,
+                .logs_per_period_backup = 200,
         },
         .journal = {
                 .initialized = false,
@@ -321,6 +344,11 @@ void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting) {
 
 void nd_log_set_facility(const char *facility) {
     nd_log.syslog.facility = nd_log_facility2id(facility);
+}
+
+void nd_log_set_flood_protection(time_t period, size_t logs) {
+    nd_log.limits.throttle_period = period;
+    nd_log.limits.logs_per_period = nd_log.limits.logs_per_period_backup = logs;
 }
 
 static void nd_log_syslog_init() {
@@ -578,7 +606,7 @@ bool nd_log_limit_reached(struct nd_log_source *source, bool reset, FILE *fp) {
                     program_name,
                     program_name,
                     source->limits.prevented,
-                    (int64_t)error_log_throttle_period);
+                    (int64_t)nd_log.limits.throttle_period);
         }
 
         // restart the period accounting
@@ -602,8 +630,8 @@ bool nd_log_limit_reached(struct nd_log_source *source, bool reset, FILE *fp) {
                     program_name,
                     source->limits.counter,
                     (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC),
-                    error_log_errors_per_period,
-                    (int64_t)error_log_throttle_period,
+                    nd_log.limits.logs_per_period,
+                    (int64_t)nd_log.limits.throttle_period,
                     program_name,
                     (int64_t)((source->limits.started_monotonic_ut + (nd_log.limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
         }
@@ -1057,7 +1085,6 @@ uint64_t debug_flags = 0;
 int access_log_syslog = 0;
 int error_log_syslog = 0;
 int collector_log_syslog = 0;
-int output_log_syslog = 0;  // debug log
 int health_log_syslog = 0;
 
 int stdaccess_fd = -1;
@@ -1071,136 +1098,6 @@ netdata_log_level_t global_log_severity_level = NETDATA_LOG_LEVEL_INFO;
 FILE *aclklog = NULL;
 int aclklog_enabled = 0;
 #endif
-
-// ----------------------------------------------------------------------------
-
-void log_date(char *buffer, size_t len, time_t now) {
-    if(unlikely(!buffer || !len))
-        return;
-
-    time_t t = now;
-    struct tm *tmp, tmbuf;
-
-    tmp = localtime_r(&t, &tmbuf);
-
-    if (tmp == NULL) {
-        buffer[0] = '\0';
-        return;
-    }
-
-    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
-        buffer[0] = '\0';
-
-    buffer[len - 1] = '\0';
-}
-
-// ----------------------------------------------------------------------------
-// error log throttling
-
-time_t error_log_throttle_period = 1200;
-unsigned long error_log_errors_per_period = 200;
-unsigned long error_log_errors_per_period_backup = 0;
-
-int error_log_limit(int reset) {
-    static time_t start = 0;
-    static unsigned long counter = 0, prevented = 0;
-
-    FILE *fp = stderror ? stderror : stderr;
-
-    // fprintf(fp, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
-
-    // do not throttle if the period is 0
-    if(error_log_throttle_period == 0)
-        return 0;
-
-    // prevent all logs if the errors per period is 0
-    if(error_log_errors_per_period == 0)
-#ifdef NETDATA_INTERNAL_CHECKS
-        return 0;
-#else
-        return 1;
-#endif
-
-    time_t now = now_monotonic_sec();
-    if(!start) start = now;
-
-    if(reset) {
-        if(prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                fp,
-                "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
-                "(prevented %lu logs in the last %"PRId64" seconds).\n",
-                date,
-                program_name,
-                program_name,
-                prevented,
-                (int64_t)(now - start));
-        }
-
-        start = now;
-        counter = 0;
-        prevented = 0;
-    }
-
-    // detect if we log too much
-    counter++;
-
-    if(now - start > error_log_throttle_period) {
-        if(prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                fp,
-                "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
-                "(prevented %lu logs in the last %"PRId64" seconds).\n",
-                date,
-                program_name,
-                program_name,
-                prevented,
-                (int64_t)error_log_throttle_period);
-        }
-
-        // restart the period accounting
-        start = now;
-        counter = 1;
-        prevented = 0;
-
-        // log this error
-        return 0;
-    }
-
-    if(counter > error_log_errors_per_period) {
-        if(!prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                fp,
-                "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
-                "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
-                date,
-                program_name,
-                counter,
-                (int64_t)(now - start),
-                error_log_errors_per_period,
-                (int64_t)error_log_throttle_period,
-                program_name,
-                (int64_t)(start + error_log_throttle_period - now));
-        }
-
-        prevented++;
-
-        // prevent logging this error
-#ifdef NETDATA_INTERNAL_CHECKS
-        return 0;
-#else
-        return 1;
-#endif
-    }
-
-    return 0;
-}
 
 // ----------------------------------------------------------------------------
 // error log

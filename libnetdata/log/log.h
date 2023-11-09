@@ -74,6 +74,7 @@ void nd_log_initialize(void);
 void nd_log_reopen_log_files(void);
 void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
+void nd_log_set_flood_protection(time_t period, size_t logs);
 
 struct log_stack_entry {
     int id;
@@ -158,11 +159,8 @@ extern uint64_t debug_flags;
 
 extern const char *program_name;
 
-extern int stdaccess_fd;
 extern FILE *stdaccess;
-
 extern FILE *stdhealth;
-
 extern FILE *stderror;
 
 #ifdef ENABLE_ACLK
@@ -172,12 +170,7 @@ extern int aclklog_enabled;
 
 extern int access_log_syslog;
 extern int error_log_syslog;
-extern int output_log_syslog;
 extern int health_log_syslog;
-
-extern time_t error_log_throttle_period;
-extern unsigned long error_log_errors_per_period, error_log_errors_per_period_backup;
-int error_log_limit(int reset);
 
 #define LOG_DATE_LENGTH 26
 void log_date(char *buffer, size_t len, time_t now);
