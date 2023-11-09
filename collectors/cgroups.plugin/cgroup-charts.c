@@ -1518,7 +1518,7 @@ void update_pids_current_chart(struct cgroup *cg) {
             RRDSET_TYPE_LINE);
 
         rrdset_update_rrdlabels(chart, cg->chart_labels);
-        cg->st_pids_rd_pids_current = rrddim_add(chart, "pids_current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        cg->st_pids_rd_pids_current = rrddim_add(chart, "pids", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(chart, cg->st_pids_rd_pids_current, (collected_number)cg->pids.pids_current);
