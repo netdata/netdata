@@ -1288,7 +1288,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
 
         /* If exceeding quota or timeout is reached and new timestamp 
          * is different than previous, terminate query. */
-        if((res_buff->len >= p_query_params->quota || now_monotonic_usec() > p_query_params->stop_monotonic_ut) && 
+        if((res_buff->len >= p_query_params->quota || terminate_logs_manag_query(p_query_params)) && 
                 tmp_itm.timestamp != res_hdr.timestamp){
             p_query_params->act_to_ts = res_hdr.timestamp;
             break;

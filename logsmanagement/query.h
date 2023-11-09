@@ -29,7 +29,9 @@ typedef struct {
                 LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR,
                 LOGS_QRY_RES_ERR_CODE_NOT_INIT_ERR,
                 LOGS_QRY_RES_ERR_CODE_SERVER_ERR,
-                LOGS_QRY_RES_ERR_CODE_UNMODIFIED } err_code;
+                LOGS_QRY_RES_ERR_CODE_UNMODIFIED,
+                LOGS_QRY_RES_ERR_CODE_CANCELLED,
+                LOGS_QRY_RES_ERR_CODE_TIMEOUT } err_code;
     char const *const err_str;
     const int http_code;
 } logs_qry_res_err_t;
@@ -40,7 +42,9 @@ static const logs_qry_res_err_t logs_qry_res_err[] = {
     { LOGS_QRY_RES_ERR_CODE_NOT_FOUND_ERR,  "no results found",                     HTTP_RESP_OK                    },
     { LOGS_QRY_RES_ERR_CODE_NOT_INIT_ERR,   "logs management engine not running",   HTTP_RESP_SERVICE_UNAVAILABLE   },
     { LOGS_QRY_RES_ERR_CODE_SERVER_ERR,     "server error",                         HTTP_RESP_INTERNAL_SERVER_ERROR },
-    { LOGS_QRY_RES_ERR_CODE_UNMODIFIED,     "not modified",                         HTTP_RESP_NOT_MODIFIED }
+    { LOGS_QRY_RES_ERR_CODE_UNMODIFIED,     "not modified",                         HTTP_RESP_NOT_MODIFIED          },
+    { LOGS_QRY_RES_ERR_CODE_CANCELLED,      "cancelled",                            HTTP_RESP_CLIENT_CLOSED_REQUEST },
+    { LOGS_QRY_RES_ERR_CODE_TIMEOUT,        "query timed out",                      HTTP_RESP_OK                    }
 };
 
 const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb);
@@ -108,6 +112,7 @@ typedef struct logs_query_params {
     msec_t act_to_ts;
     int order_by_asc;
     unsigned long quota;
+    bool *cancelled;
     usec_t stop_monotonic_ut;
     char *chartname[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *filename[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
@@ -129,10 +134,16 @@ typedef struct logs_query_res_hdr {
     char chartname[20];
 } logs_query_res_hdr_t;
 
+/**
+ * @brief Check if query should be terminated.
+ * @param p_query_params See documentation of logs_query_params_t struct.
+ * @return true if query should be terminated of false otherwise.
+*/
+bool terminate_logs_manag_query(logs_query_params_t *p_query_params);
+
 /** 
  * @brief Primary query API. 
- * @param p_query_params See documentation of logs_query_params_t struct on how 
- * to use argument.
+ * @param p_query_params See documentation of logs_query_params_t struct.
  * @return enum of LOGS_QRY_RES_ERR_CODE with result of query
  * @todo Cornercase if filename not found in DB? Return specific message?
  */

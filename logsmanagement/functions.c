@@ -121,7 +121,6 @@ typedef struct function_query_status {
     usec_t started_monotonic_ut;
 
     // request
-    // SD_JOURNAL_FILE_SOURCE_TYPE source_type;
     STRING *source;
     usec_t after_ut;
     usec_t before_ut;
@@ -249,7 +248,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     const char *chart = NULL;
     const char *source = NULL;
     const char *progress_id = NULL;
-    // SD_JOURNAL_FILE_SOURCE_TYPE source_type = SDJF_ALL;
     // size_t filters = 0;  
 
     buffer_json_member_add_object(wb, "_request");
@@ -444,7 +442,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     fqs->delta = (fqs->data_only) ? delta : false;
     fqs->tail = (fqs->data_only && fqs->if_modified_since) ? tail : false;
     fqs->source = string_strdupz(source);
-    // fqs->source_type = source_type;
     fqs->entries = last;
     fqs->last_modified = 0;
     // fqs->filters = filters;
@@ -516,7 +513,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     buffer_json_member_add_boolean(wb, LOGS_MANAG_FUNC_PARAM_TAIL, fqs->tail);
     buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_ID, progress_id);
     buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_SOURCE, string2str(fqs->source));
-    // buffer_json_member_add_uint64(wb, "source_type", fqs->source_type);
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_AFTER, fqs->after_ut / USEC_PER_SEC);
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_BEFORE, fqs->before_ut / USEC_PER_SEC);
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_IF_MODIFIED_SINCE, fqs->if_modified_since);
@@ -593,6 +589,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
             (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut / USEC_PER_MS : after_s * MSEC_PER_SEC;
     }
     
+    query_params.cancelled = cancelled;
     query_params.stop_monotonic_ut = now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC;
     query_params.results_buff = buffer_create(query_params.quota, NULL);
 
@@ -603,6 +600,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
             query_params.req_from_ts = query_params.act_to_ts - 1000;
 
         ret = execute_logs_manag_query(&query_params);
+
 
         size_t res_off = 0;
         logs_query_res_hdr_t *p_res_hdr;
@@ -680,7 +678,8 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     buffer_json_object_close(wb); // logs_management_meta
 
     buffer_json_member_add_uint64(wb, "status", ret->http_code);
-    buffer_json_member_add_boolean(wb, "partial", ret->http_code != HTTP_RESP_OK);
+    buffer_json_member_add_boolean(wb, "partial", ret->http_code != HTTP_RESP_OK || 
+                                                  ret->err_code == LOGS_QRY_RES_ERR_CODE_TIMEOUT);
     buffer_json_member_add_string(wb, "type", "table");
 
 
