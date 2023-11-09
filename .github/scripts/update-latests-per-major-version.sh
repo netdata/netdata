@@ -3,7 +3,7 @@
 version=$1
 
 if [[ $version =~ v([0-9]+)\.([0-9]+)\.([0-9]+)-([0-9]+)-nightly ]]; then
-    msb=${BASH_REMATCH[1]}}
+    msb=${BASH_REMATCH[1]}
     folder="packaging/agent-metadata/nightly"
     filename="latest_v${msb}"
 else
