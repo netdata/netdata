@@ -23,7 +23,7 @@
 #include "libnetdata/required_dummies.h"
 
 #define FREEIPMI_GLOBAL_FUNCTION_SENSORS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\"\n", 5, "IPMI Sensor statistics"); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\"\n", 5, "Displays current sensor state and readings"); \
     } while(0)
 
 // component names, based on our patterns
@@ -1478,7 +1478,7 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
-    buffer_json_member_add_string(wb, "help", "View IPMI sensor statistics");
+    buffer_json_member_add_string(wb, "help", "View IPMI sensor readings and its state");
     buffer_json_member_add_array(wb, "data");
 
     struct sensor *sn;
