@@ -46,7 +46,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to update stable Agent's metadata.
               Checkout: ${{ steps.checkout.outcome }}
-              Fetching latest stable releases: ${{ steps.fetch-latest-stable.outcome }}
+              Updating latest releases: ${{ steps.create-latest-versions-metadata.outcome }}
               Commit changes: ${{ steps.commit.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: failure()
