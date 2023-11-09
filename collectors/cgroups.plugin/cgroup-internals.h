@@ -25,6 +25,12 @@ struct blkio {
 */
 };
 
+struct pids {
+    char *pids_current_filename;
+    int pids_current_updated;
+    unsigned long long pids_current;
+};
+
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
 struct memory {
     ARL_BASE *arl_base;
@@ -218,6 +224,8 @@ struct cgroup {
     struct blkio io_merged;                     // operations
     struct blkio io_queued;                     // operations
 
+    struct pids pids;
+
     struct cgroup_network_interface *interfaces;
 
     struct pressure cpu_pressure;
@@ -225,7 +233,7 @@ struct cgroup {
     struct pressure memory_pressure;
     struct pressure irq_pressure;
 
-    // per cgroup charts
+    // Cpu
     RRDSET *st_cpu;
     RRDDIM *st_cpu_rd_user;
     RRDDIM *st_cpu_rd_system;
@@ -236,6 +244,7 @@ struct cgroup {
     RRDSET *st_cpu_throttled_time;
     RRDSET *st_cpu_shares;
 
+    // Memory
     RRDSET *st_mem;
     RRDDIM *st_mem_rd_ram;
     RRDDIM *st_mem_rd_swap;
@@ -248,6 +257,7 @@ struct cgroup {
     RRDSET *st_mem_usage_limit;
     RRDSET *st_mem_failcnt;
 
+    // Blkio
     RRDSET *st_io;
     RRDDIM *st_io_rd_read;
     RRDDIM *st_io_rd_written;
@@ -262,6 +272,10 @@ struct cgroup {
 
     RRDSET *st_queued_ops;
     RRDSET *st_merged_ops;
+
+    // Pids
+    RRDSET *st_pids;
+    RRDDIM *st_pids_rd_pids_current;
 
     // per cgroup chart variables
     char *filename_cpuset_cpus;
@@ -307,10 +321,6 @@ extern uv_mutex_t cgroup_root_mutex;
 
 void cgroup_discovery_worker(void *ptr);
 
-
-
-
-
 extern int is_inside_k8s;
 extern long system_page_size;
 extern int cgroup_enable_cpuacct_stat;
@@ -350,6 +360,7 @@ extern char *cgroup_cpuacct_base;
 extern char *cgroup_cpuset_base;
 extern char *cgroup_blkio_base;
 extern char *cgroup_memory_base;
+extern char *cgroup_pids_base;
 extern char *cgroup_devices_base;
 extern char *cgroup_unified_base;
 extern int cgroup_root_count;
@@ -478,18 +489,23 @@ void update_throttle_io_serviced_ops_chart(struct cgroup *cg);
 void update_io_queued_ops_chart(struct cgroup *cg);
 void update_io_merged_ops_chart(struct cgroup *cg);
 
+void update_pids_current_chart(struct cgroup *cg);
+
 void update_cpu_some_pressure_chart(struct cgroup *cg);
 void update_cpu_some_pressure_stall_time_chart(struct cgroup *cg);
 void update_cpu_full_pressure_chart(struct cgroup *cg);
 void update_cpu_full_pressure_stall_time_chart(struct cgroup *cg);
+
 void update_mem_some_pressure_chart(struct cgroup *cg);
 void update_mem_some_pressure_stall_time_chart(struct cgroup *cg);
 void update_mem_full_pressure_chart(struct cgroup *cg);
 void update_mem_full_pressure_stall_time_chart(struct cgroup *cg);
+
 void update_irq_some_pressure_chart(struct cgroup *cg);
 void update_irq_some_pressure_stall_time_chart(struct cgroup *cg);
 void update_irq_full_pressure_chart(struct cgroup *cg);
 void update_irq_full_pressure_stall_time_chart(struct cgroup *cg);
+
 void update_io_some_pressure_chart(struct cgroup *cg);
 void update_io_some_pressure_stall_time_chart(struct cgroup *cg);
 void update_io_full_pressure_chart(struct cgroup *cg);
