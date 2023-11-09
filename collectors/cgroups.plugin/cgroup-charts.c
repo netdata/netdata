@@ -142,7 +142,7 @@ void update_cpu_throttled_duration_chart(struct cgroup *cg) {
 
     if (unlikely(!cg->st_cpu_throttled_time)) {
         char *title = "CPU Throttled Time Duration";
-        char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.throttled" : "cgroup.throttled";
+        char *context = k8s_is_kubepod(cg) ? "k8s.cgroup.throttled_duration" : "cgroup.throttled_duration";
         int prio = cgroup_containers_chart_priority + 15;
 
         char buff[RRD_ID_LENGTH_MAX + 1];
