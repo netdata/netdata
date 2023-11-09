@@ -867,13 +867,13 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Checkout netdata main Repo # Checkout back to netdata/netdata repo to the update latest packaged versions
         id: checkout-netdata
-        if: steps.create-release.output.run == 'true'
+        if: steps.create-release.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Update latest packaged version
         id: create-latest-versions-metadata
-        if: steps.checkout-netdata.output.run == 'true'
+        if: steps.checkout-netdata.outputs.run == 'true'
         run: |
           sh .github/scripts/update-latests-per-major-version.sh "$(cat packaging/version)"
       - name: Commit Changes
