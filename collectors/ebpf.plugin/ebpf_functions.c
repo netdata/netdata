@@ -516,7 +516,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY| RRDF_FIELD_OPTS_UNIQUE_KEY,
                                     NULL);
 
         buffer_rrdf_table_add_field(wb,
@@ -650,13 +650,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     fields_id++,
                                     "IncomingBandwidth",
                                     "Bytes received.",
-                                    RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     0,
                                     NULL,
                                     NAN,
-                                    RRDF_FIELD_SORT_ASCENDING,
+                                    RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
@@ -665,15 +665,15 @@ static void ebpf_function_socket_manipulation(const char *transaction,
 
         buffer_rrdf_table_add_field(wb,
                                     fields_id++,
-                                    "Outgoing Bandwidth",
+                                    "OutgoingBandwidth",
                                     "Bytes sent.",
-                                    RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     0,
                                     NULL,
                                     NAN,
-                                    RRDF_FIELD_SORT_ASCENDING,
+                                    RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -684,13 +684,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     fields_id,
                                     "Connections",
                                     "Number of calls to tcp_vX_connections and udp_sendmsg, where X is the protocol version.",
-                                    RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE,
+                                    RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                    RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     0,
                                     NULL,
                                     NAN,
-                                    RRDF_FIELD_SORT_ASCENDING,
+                                    RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -714,6 +714,18 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "OutgoingConnections");
+        {
+            buffer_json_member_add_string(wb, "name", "TCP Outgoing Connection");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "OutgoingBandwidth");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb); // charts
 
@@ -721,6 +733,11 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     {
         buffer_json_add_array_item_array(wb);
         buffer_json_add_array_item_string(wb, "IncomingConnections");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "OutgoingConnections");
         buffer_json_add_array_item_string(wb, "PName");
         buffer_json_array_close(wb);
     }
