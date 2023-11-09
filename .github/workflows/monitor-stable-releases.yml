@@ -35,6 +35,7 @@ jobs:
           git config user.email "bot@netdata.cloud"
           git add packaging/agent-metadata/stable
           git commit -m "[ci skip] Update the latest major version published"
+          git push origin master
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
