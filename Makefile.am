@@ -1396,6 +1396,7 @@ if ENABLE_LOGSMANAGEMENT_TESTS
 endif
     logs_management_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_SYSTEMD_LIBS) \
         $(NULL)
 endif
 
