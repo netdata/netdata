@@ -7,7 +7,7 @@ name: Monitor-stable-releases
 
 
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
-  group: Monitor-stable-releases-${{ github.ref }}-${{ github.event_name }}
+  group: monitor-stable-releases-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
