@@ -281,7 +281,7 @@
 
 - id: 'notify-cloud-awssns'
   meta:
-    name: 'AwsSns
+    name: AwsSns
     link: 'https://aws.amazon.com/sns/'
     categories:
       - notify.cloud
