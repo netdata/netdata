@@ -319,10 +319,13 @@ void buffer_json_finalize(BUFFER *wb) {
     while(wb->json.depth >= 0) {
         switch(wb->json.stack[wb->json.depth].type) {
             case BUFFER_JSON_OBJECT:
-                if (wb->json.depth == 0 && !(wb->json.options & BUFFER_JSON_OPTIONS_NON_ANONYMOUS))
-                    buffer_json_object_close(wb);
+                if (wb->json.depth == 0)
+                    if (!(wb->json.options & BUFFER_JSON_OPTIONS_NON_ANONYMOUS))
+                        buffer_json_object_close(wb);
+                    else
+                        _buffer_json_depth_pop(wb);
                 else
-                    _buffer_json_depth_pop(wb);
+                    buffer_json_object_close(wb);
                 break;
             case BUFFER_JSON_ARRAY:
                 buffer_json_array_close(wb);
