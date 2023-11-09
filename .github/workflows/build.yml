@@ -875,7 +875,7 @@ jobs:
         id: create-latest-versions-metadata
         if: steps.checkout-netdata.output.run == 'true'
         run: |
-          sh .github/scripts/update-latests-per-major-version.sh $(cat packaging/version)
+          sh .github/scripts/update-latests-per-major-version.sh "$(cat packaging/version)"
       - name: Commit Changes
         id: commit-latest-releases
         if: steps.create-latest-versions-metadata.outputs.run == 'true'
