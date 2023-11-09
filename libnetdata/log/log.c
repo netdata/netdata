@@ -956,7 +956,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
     return method;
 }
 
-static void nd_logger_daemon(const char *file, const char *function, const unsigned long line,
+static void nd_logger(const char *file, const char *function, const unsigned long line,
                ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit,
                const char *fmt, va_list ap) {
 
@@ -1203,48 +1203,19 @@ int error_log_limit(int reset) {
 }
 
 // ----------------------------------------------------------------------------
-// debug log
+// error log
 
-void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    va_list args;
-
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    va_start( args, fmt );
-    printf("%s: %s DEBUG : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
-    vprintf(fmt, args);
-    va_end( args );
-    putchar('\n');
-
-    if(output_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_ERR,  fmt, args );
-        va_end( args );
-    }
-
-    fflush(stdout);
-}
-
-// ----------------------------------------------------------------------------
-// info log
-
-void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (NETDATA_LOG_LEVEL_INFO > global_log_severity_level)
+    if (NETDATA_LOG_LEVEL_ERROR > global_log_severity_level)
         return;
 #endif
 
-    ND_LOG_SOURCES source = (is_collector) ? NDLS_COLLECTORS : NDLS_DAEMON;
-
     va_list args;
     va_start(args, fmt);
-    nd_logger_daemon(file, function, line, source, NDLP_INFO, true, fmt, args);
+    nd_logger(file, function, line, source, priority, true, fmt, args);
     va_end(args);
 }
-
-// ----------------------------------------------------------------------------
-// error log
 
 void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     if(erl->sleep_ut)
@@ -1265,21 +1236,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 
     va_list args;
     va_start(args, fmt);
-    nd_logger_daemon(file, function, line, source, NDLP_ERR, true, fmt, args);
-    va_end(args);
-}
-
-void error_int(int is_collector, const char *prefix __maybe_unused, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-#if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (NETDATA_LOG_LEVEL_ERROR > global_log_severity_level)
-        return;
-#endif
-
-    ND_LOG_SOURCES source = (is_collector) ? NDLS_COLLECTORS : NDLS_DAEMON;
-
-    va_list args;
-    va_start(args, fmt);
-    nd_logger_daemon(file, function, line, source, NDLP_ERR, true, fmt, args);
+    nd_logger(file, function, line, source, NDLP_ERR, true, fmt, args);
     va_end(args);
 }
 

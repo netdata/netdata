@@ -1023,7 +1023,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
-            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
+            netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
