@@ -49,8 +49,9 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         if(descr->page_length > entries_array[Index].size) {
             descr->page_length = entries_array[Index].size;
 
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
+                         "DBENGINE: page exceeds the maximum size, adjusting it to max.");
         }
 
         descr->page = pgc_page_data(pages_array[Index]);

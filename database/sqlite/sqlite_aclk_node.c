@@ -169,8 +169,9 @@ void aclk_check_node_info_and_collectors(void)
     dfe_done(host);
 
     if (context_loading || replicating) {
-        error_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
-        error_limit(&erl, "%zu nodes loading contexts, %zu replicating data", context_loading, replicating);
+        nd_log_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                     "%zu nodes loading contexts, %zu replicating data", context_loading, replicating);
     }
 }
 

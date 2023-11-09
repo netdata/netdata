@@ -869,8 +869,8 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
     if(end_time_s)
         log_date(end_time_str, LOG_DATE_LENGTH, end_time_s);
 
-    error_limit_static_global_var(erl, 1, 0);
-    error_limit(&erl,
+    nd_log_limit_static_global_var(erl, 1, 0);
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                 "DBENGINE: error while reading extent from datafile %u of tier %d, at offset %" PRIu64 " (%u bytes) "
                 "%s from %ld (%s) to %ld (%s) %s%s: "
                 "%s",

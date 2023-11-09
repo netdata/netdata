@@ -180,14 +180,6 @@ static inline void debug_dummy(void) {}
 void nd_log_limits_reset(void);
 void nd_log_limits_unlimited(void);
 
-typedef struct error_with_limit {
-    SPINLOCK spinlock;
-    time_t log_every;
-    size_t count;
-    time_t last_logged;
-    usec_t sleep_ut;
-} ERROR_LIMIT;
-
 typedef enum netdata_log_level {
     NETDATA_LOG_LEVEL_ERROR,
     NETDATA_LOG_LEVEL_INFO,
@@ -205,9 +197,6 @@ char *log_severity_level_to_severity_string(netdata_log_level_t level);
 void log_set_global_severity_level(netdata_log_level_t value);
 void log_set_global_severity_for_external_plugins();
 
-#define error_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
-#define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
-
 #ifdef NETDATA_INTERNAL_CHECKS
 #define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) netdata_logger(NDLS_DAEMON, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
@@ -218,9 +207,11 @@ void log_set_global_severity_for_external_plugins();
 #define internal_fatal(args...) debug_dummy()
 #endif
 
-#define error_limit(erl, args...)   error_limit_int(erl, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal_assert(expr) ((expr) ? (void)(0) : fatal_int(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
+
+// ----------------------------------------------------------------------------
+// normal logging
 
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);
 #define nd_log(NDLS, NDLP, args...) netdata_logger(NDLS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
@@ -232,9 +223,25 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)    netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 
+// ----------------------------------------------------------------------------
+// logging with limits
+
+typedef struct error_with_limit {
+    SPINLOCK spinlock;
+    time_t log_every;
+    size_t count;
+    time_t last_logged;
+    usec_t sleep_ut;
+} ERROR_LIMIT;
+
+#define nd_log_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
+#define nd_log_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
+void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(7, 8);;
+#define nd_log_limit(erl, NDLS, NDLP, args...)   netdata_logger_with_limit(erl, NDLS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
+
+// ----------------------------------------------------------------------------
 
 void send_statistics(const char *action, const char *action_result, const char *action_data);
-void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);;
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 void netdata_log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
 void netdata_log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);

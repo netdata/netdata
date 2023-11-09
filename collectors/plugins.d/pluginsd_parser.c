@@ -153,11 +153,12 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
 
     if(unlikely(old_collector_tid)) {
         if(old_collector_tid != my_collector_tid) {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "PLUGINSD: keyword %s: 'host:%s/chart:%s' is collected twice (my tid %d, other collector tid %d)",
-                        keyword ? keyword : "UNKNOWN",
-                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                        my_collector_tid, old_collector_tid);
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_WARNING,
+                         "PLUGINSD: keyword %s: 'host:%s/chart:%s' is collected twice (my tid %d, other collector tid %d)",
+                         keyword ? keyword : "UNKNOWN",
+                         rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                         my_collector_tid, old_collector_tid);
 
             return false;
         }
@@ -389,8 +390,9 @@ static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyw
     parser->user.enabled = 0;
 
     if(keyword && msg) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "PLUGINSD: keyword %s: %s", keyword, msg);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_INFO,
+                     "PLUGINSD: keyword %s: %s", keyword, msg);
     }
 
     return PARSER_RC_ERROR;
@@ -1626,9 +1628,10 @@ static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(!parser->user.replay.rset_enabled) {
-        error_limit_static_thread_var(erl, 1, 0);
-        error_limit(&erl, "PLUGINSD: 'host:%s/chart:%s' got a %s but it is disabled by %s errors",
-                    rrdhost_hostname(host), rrdset_id(st), PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+        nd_log_limit_static_thread_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
+                     "PLUGINSD: 'host:%s/chart:%s' got a %s but it is disabled by %s errors",
+                     rrdhost_hostname(host), rrdset_id(st), PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
         // we have to return OK here
         return PARSER_RC_OK;
@@ -1675,8 +1678,10 @@ static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
             rd->collector.counter++;
         }
         else {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "PLUGINSD: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. Ignoring data.",
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_WARNING,
+                         "PLUGINSD: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. "
+                         "Ignoring data.",
                         rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_name(rd));
         }
     }

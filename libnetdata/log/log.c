@@ -254,8 +254,8 @@ static struct {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                         .method = ND_LOG_METHOD_DEFAULT,
                         .filename = LOG_DIR "/collectors.log",
-                        .fd = -1,
-                        .fp_set = NULL,
+                        .fd = STDERR_FILENO,
+                        .fp_set = &stderr,
                         .fp = NULL,
                         .limits = ND_LOG_LIMITS_DEFAULT,
                 },
@@ -272,8 +272,8 @@ static struct {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                         .method = ND_LOG_METHOD_DEFAULT,
                         .filename = LOG_DIR "/error.log",
-                        .fd = STDERR_FILENO,
-                        .fp_set = &stderr,
+                        .fd = -1,
+                        .fp_set = NULL,
                         .fp = NULL,
                         .limits = ND_LOG_LIMITS_DEFAULT,
                 },
@@ -696,7 +696,7 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
         },
         [NDF_PRIORITY] = {
                 .journal = "PRIORITY",
-                .logfmt = "priority",
+                .logfmt = "prio",
                 .logfmt_annotator = priority_annotator,
         },
         [NDF_SESSION] = {
@@ -709,7 +709,7 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
         },
         [NDF_THREAD] = {
                 .journal = "THREAD_TAG",
-                .logfmt = "thread",
+                .logfmt = "th",
         },
         [NDF_PLUGIN] = {
                 .journal = "ND_PLUGIN",
@@ -1114,7 +1114,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     va_end(args);
 }
 
-void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
 
@@ -1129,11 +1129,9 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 
     spinlock_unlock(&erl->spinlock);
 
-    ND_LOG_SOURCES source = NDLS_DAEMON;
-
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, NDLP_ERR, true, fmt, args);
+    nd_logger(file, function, line, source, priority, true, fmt, args);
     va_end(args);
 }
 

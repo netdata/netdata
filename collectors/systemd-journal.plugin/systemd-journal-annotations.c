@@ -436,7 +436,7 @@ void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BU
 
                 usec_t t_ut = 0;
                 if(sd_journal_get_realtime_usec(j, &t_ut) < 0 || !t_ut) {
-                    internal_error(true, "JOURNAL: cannot get realtime_usec of file '%s'", jf_dfe.name);
+                    internal_error(true, "JOURNAL: cannot get latest realtime_usec of file '%s'", jf_dfe.name);
                     sd_journal_close(j);
                     continue;
                 }
