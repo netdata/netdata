@@ -315,7 +315,6 @@ int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result
 
 struct variable2json_helper {
     BUFFER *buf;
-    size_t counter;
     RRDVAR_FLAGS options;
 };
 
@@ -326,47 +325,54 @@ static int single_variable2json_callback(const DICTIONARY_ITEM *item __maybe_unu
 
     if (helper->options == RRDVAR_FLAG_NONE || rrdvar_flags(rva) & helper->options) {
         if(unlikely(isnan(value) || isinf(value)))
-            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rrdvar_name(rva));
+            buffer_json_member_add_string(helper->buf, rrdvar_name(rva), NULL);
         else
-            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" NETDATA_DOUBLE_MODIFIER, helper->counter?",":"", rrdvar_name(rva), (NETDATA_DOUBLE)value);
-
-        helper->counter++;
+            buffer_json_member_add_double(helper->buf, rrdvar_name(rva), (NETDATA_DOUBLE)value);
     }
 
     return 0;
 }
 
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf) {
-    struct variable2json_helper helper = {
-            .buf = buf,
-            .counter = 0,
-            .options = RRDVAR_FLAG_CUSTOM_CHART_VAR};
+    struct variable2json_helper helper = {.buf = buf, .options = RRDVAR_FLAG_CUSTOM_CHART_VAR};
 
-    buffer_sprintf(buf, "{");
     rrdvar_walkthrough_read(st->rrdvars, single_variable2json_callback, &helper);
-    buffer_strcat(buf, "\n\t\t\t}");
 }
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     RRDHOST *host = st->rrdhost;
 
-    struct variable2json_helper helper = {
-            .buf = buf,
-            .counter = 0,
-            .options = RRDVAR_FLAG_NONE};
+    struct variable2json_helper helper = {.buf = buf, .options = RRDVAR_FLAG_NONE};
 
-    buffer_sprintf(buf, "{\n\t\"chart\": \"%s\",\n\t\"chart_name\": \"%s\",\n\t\"chart_context\": \"%s\",\n\t\"chart_variables\": {", rrdset_id(st), rrdset_name(st), rrdset_context(st));
-    rrdvar_walkthrough_read(st->rrdvars, single_variable2json_callback, &helper);
+    buffer_json_initialize(buf, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", rrdset_family(st));
-    helper.counter = 0;
-    rrdvar_walkthrough_read(rrdfamily_rrdvars_dict(st->rrdfamily), single_variable2json_callback, &helper);
+    buffer_json_member_add_string(buf, "chart", rrdset_id(st));
+    buffer_json_member_add_string(buf, "chart_name", rrdset_name(st));
+    buffer_json_member_add_string(buf, "chart_context", rrdset_context(st));
 
-    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", rrdhost_hostname(host));
-    helper.counter = 0;
-    rrdvar_walkthrough_read(host->rrdvars, single_variable2json_callback, &helper);
+    {
+        buffer_json_member_add_object(buf, "chart_variables");
+        rrdvar_walkthrough_read(st->rrdvars, single_variable2json_callback, &helper);
+        buffer_json_object_close(buf);
+    }
 
-    buffer_strcat(buf, "\n\t}\n}\n");
+    buffer_json_member_add_string(buf, "family", rrdset_family(st));
+
+    {
+        buffer_json_member_add_object(buf, "family_variables");
+        rrdvar_walkthrough_read(rrdfamily_rrdvars_dict(st->rrdfamily), single_variable2json_callback, &helper);
+        buffer_json_object_close(buf);
+    }
+
+    buffer_json_member_add_string(buf, "host", rrdhost_hostname(host));
+
+    {
+        buffer_json_member_add_object(buf, "host_variables");
+        rrdvar_walkthrough_read(host->rrdvars, single_variable2json_callback, &helper);
+        buffer_json_object_close(buf);
+    }
+
+    buffer_json_finalize(buf);
 }
 
 // ----------------------------------------------------------------------------

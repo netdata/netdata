@@ -10,9 +10,16 @@ exclude_paths:
   - web/gui/lib/**
   - web/gui/old/**
   - web/gui/src/**
+  - web/gui/v1/**
   - web/gui/v2/**
   - web/gui/main.js
   - tests/**
   - aclk/tests/**
   - libnetdata/libjudy/**
-
+  - database/sqlite/sqlite3.c
+  - ml/dlib/**
+  - web/server/h2o/libh2o/**
+  - build/**
+  - build_external/**
+  - libnetdata/dyn_conf/tests/**
+  - packaging/**

@@ -7,6 +7,7 @@
 #include "../../aclk/aclk_capas.h"
 
 #ifdef ENABLE_ACLK
+
 DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     RRDSET *st;
     char name[500];
@@ -26,17 +27,9 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
     return dict;
 }
 
-static void build_node_collectors(char *node_id __maybe_unused)
+static void build_node_collectors(RRDHOST *host)
 {
-
-    RRDHOST *host = find_host_by_node_id(node_id);
-
-    if (unlikely(!host))
-        return;
-
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
-    if (unlikely(!wc))
-        return;
 
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
@@ -50,28 +43,14 @@ static void build_node_collectors(char *node_id __maybe_unused)
     dictionary_destroy(dict);
     freez(upd_node_collectors.claim_id);
 
-    netdata_log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", node_id, rrdhost_hostname(host));
-
-    freez(node_id);
+    netdata_log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(host));
 }
 
-static void build_node_info(char *node_id __maybe_unused)
+static void build_node_info(RRDHOST *host)
 {
     struct update_node_info node_info;
 
-    RRDHOST *host = find_host_by_node_id(node_id);
-
-    if (unlikely((!host))) {
-        freez(node_id);
-        return;
-    }
-
     struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
-
-    if (unlikely(!wc)) {
-        freez(node_id);
-        return;
-    }
 
     rrd_rdlock();
     node_info.node_id = wc->node_id;
@@ -132,10 +111,21 @@ static void build_node_info(char *node_id __maybe_unused)
     freez(host_version);
 
     wc->node_collectors_send = now_realtime_sec();
-    freez(node_id);
-
 }
 
+bool host_is_replicating(RRDHOST *host)
+{
+    bool replicating = false;
+    RRDSET *st;
+    rrdset_foreach_reentrant(st, host) {
+        if (rrdset_is_replicating(st)) {
+            replicating = true;
+            break;
+        }
+    }
+    rrdset_foreach_done(st);
+    return replicating;
+}
 
 void aclk_check_node_info_and_collectors(void)
 {
@@ -144,35 +134,44 @@ void aclk_check_node_info_and_collectors(void)
     if (unlikely(!aclk_connected))
         return;
 
-    size_t pending = 0;
-    dfe_start_reentrant(rrdhost_root_index, host) {
-
+    size_t context_loading = 0;
+    size_t replicating = 0;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
         if (unlikely(!wc))
             continue;
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             internal_error(true, "ACLK SYNC: Context still pending for %s", rrdhost_hostname(host));
-            pending++;
+            context_loading++;
+            continue;
+        }
+
+        if (unlikely(host_is_replicating(host))) {
+            internal_error(true, "ACLK SYNC: Host %s is still replicating", rrdhost_hostname(host));
+            replicating++;
             continue;
         }
 
         if (wc->node_info_send_time && wc->node_info_send_time + 30 < now_realtime_sec()) {
             wc->node_info_send_time = 0;
-            build_node_info(strdupz(wc->node_id));
+            build_node_info(host);
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
         }
 
         if (wc->node_collectors_send && wc->node_collectors_send + 30 < now_realtime_sec()) {
-            build_node_collectors(strdupz(wc->node_id));
+            build_node_collectors(host);
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
             wc->node_collectors_send = 0;
         }
     }
     dfe_done(host);
 
-    if(pending)
-        netdata_log_info("ACLK: %zu nodes are pending for contexts to load, skipped sending node info for them", pending);
+    if (context_loading || replicating) {
+        error_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
+        error_limit(&erl, "%zu nodes loading contexts, %zu replicating data", context_loading, replicating);
+    }
 }
 
 #endif

@@ -580,7 +580,7 @@ AC_CHECK_LIB(
 # -----------------------------------------------------------------------------
 # zstd
 
-AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_compressStream, ZSTD_decompressStream, ZSTD_createDStream],
+AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_createDStream],
              [LIBZSTD_FOUND=yes],
              [LIBZSTD_FOUND=no])
 
@@ -969,9 +969,6 @@ if test "${enable_h2o}" != "no"; then
     else
         can_build_h2o="no"
     fi
-    if test "${with_zlib}" != "yes"; then
-        can_build_h2o="no"
-    fi
     AC_MSG_RESULT([${can_build_h2o}])
 
     if test "${can_build_h2o}" = "no" -a "${enable_h2o}" = "yes"; then
@@ -1214,6 +1211,14 @@ fi
 AC_CHECK_LIB([systemd], [sd_journal_restart_fields], [have_sd_journal_restart_fields=yes], [have_sd_journal_restart_fields=no])
 if test "${have_sd_journal_restart_fields}" = "yes"; then
     AC_DEFINE([HAVE_SD_JOURNAL_RESTART_FIELDS], [1], [sd_journal_restart_fields usability])
+fi
+
+AC_CHECK_LIB([systemd], [sd_bus_default_system, sd_bus_call_method, sd_bus_message_enter_container, sd_bus_message_read, sd_bus_message_exit_container],
+             [SYSTEMD_DBUS_FOUND=yes],
+             [SYSTEMD_DBUS_FOUND=no])
+
+if test "x$SYSTEMD_DBUS_FOUND" = "xyes"; then
+    AC_DEFINE([ENABLE_SYSTEMD_DBUS], [1], [libsystemd dbus usability])
 fi
 
 AC_MSG_NOTICE([OPTIONAL_SYSTEMD_LIBS is set to: ${OPTIONAL_SYSTEMD_LIBS}])

@@ -137,6 +137,7 @@ typedef enum {
     STREAM_HANDSHAKE_DISCONNECT_SOCKET_EOF = -24,
     STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED = -25,
     STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT = -26,
+    STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE = -27,
 
 } STREAM_HANDSHAKE;
 
@@ -247,6 +248,8 @@ struct sender_state {
         usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
         time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
+
+    int parent_using_h2o;
 };
 
 #define sender_lock(sender) spinlock_lock(&(sender)->spinlock)
@@ -378,7 +381,16 @@ struct receiver_state {
         STREAM_NODE_INSTANCE *array;
     } instances;
 */
+
+#ifdef ENABLE_H2O
+    void *h2o_ctx;
+#endif
 };
+
+#ifdef ENABLE_H2O
+#define is_h2o_rrdpush(x) ((x)->h2o_ctx != NULL)
+#define unless_h2o_rrdpush(x) if(!is_h2o_rrdpush(x))
+#endif
 
 struct rrdpush_destinations {
     STRING *destination;
@@ -436,7 +448,7 @@ void rrdpush_send_dyncfg(RRDHOST *host);
 #define THREAD_TAG_STREAM_RECEIVER "RCVR" // "[host]" is appended
 #define THREAD_TAG_STREAM_SENDER "SNDR" // "[host]" is appended
 
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string);
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);
 void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
