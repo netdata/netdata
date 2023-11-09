@@ -1504,9 +1504,9 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
         buffer_json_add_array_item_string(wb, sn->sensor_name);
         buffer_json_add_array_item_string(wb, sn->type);
         buffer_json_add_array_item_string(wb, sn->component);
-        buffer_json_add_array_item_string(wb, get_sensor_state_string(sn));
         buffer_json_add_array_item_double(wb, reading);
         buffer_json_add_array_item_string(wb, sn->units);
+        buffer_json_add_array_item_string(wb, get_sensor_state_string(sn));
 
         buffer_json_add_array_item_object(wb);
         buffer_json_member_add_string(wb, "severity", get_sensor_function_priority(sn));
@@ -1539,19 +1539,19 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                 RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
                 NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "State", "Sensor State",
+        buffer_rrdf_table_add_field(wb, field_id++, "Reading", "Sensor Current Reading",
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, NULL, 0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Units", "Sensor Reading Units",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                 RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
                 NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Reading", "Sensor Current Reading",
-                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "value", 0, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Units", "Sensor Reading Units",
+        buffer_rrdf_table_add_field(wb, field_id++, "State", "Sensor State",
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
