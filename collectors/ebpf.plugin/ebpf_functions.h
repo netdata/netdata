@@ -31,17 +31,6 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_FUNCTION_SWAP "eBPF-swap"
 #define EBPF_FUNCTION_DC "eBPF-dc"
 
-// thread constants
-#define EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION "Detailed information about eBPF threads."
-#define EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND "ebpf.plugin does not have thread named "
-
-#define EBPF_THREADS_SELECT_THREAD "thread:"
-#define EBPF_THREADS_ENABLE_CATEGORY "enable:"
-#define EBPF_THREADS_DISABLE_CATEGORY "disable:"
-
-#define EBPF_THREAD_STATUS_RUNNING "running"
-#define EBPF_THREAD_STATUS_STOPPED "stopped"
-
 // socket constants
 #define EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION "Detailed information about open sockets."
 #define EBPF_FUNCTION_SOCKET_FAMILY "family:"
