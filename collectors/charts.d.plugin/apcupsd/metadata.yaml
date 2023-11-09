@@ -124,6 +124,14 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
         metric: apcupsd.load
         info: number of seconds since the last successful data collection
+        name: apcupsd_selftest_warning
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+        metric: apcupsd.selftest
+        info: self-test failed due to insufficient battery capacity or due to overload.
+        name: apcupsd_status_warning
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+        metric: apcupsd.status
+        info: status code is one of the following: ONBATT,OVERLOAD,LOWBATT,REPLACEBATT,NOBATT,COMMLOST
     metrics:
       folding:
         title: Metrics
@@ -199,3 +207,15 @@ modules:
               chart_type: line
               dimensions:
                 - name: online
+            - name: apcupsd.selftest
+              description: UPS Self-Test status
+              unit: "boolean"
+              chart_type: line
+              dimensions:
+                - name: selftest
+            - name: apcupsd.status
+              description: UPS STATUS code
+              unit: "boolean"
+              chart_type: line
+              dimensions:
+                - name: status
