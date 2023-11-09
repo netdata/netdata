@@ -1028,7 +1028,18 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     if(!thread_log_fields_daemon[NDF_TID].entry.set) {
         thread_log_fields_daemon[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid());
-        thread_log_fields_daemon[NDF_THREAD].entry = ND_LOG_FIELD_STR(NDF_THREAD, netdata_thread_tag());
+
+        char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
+        const char *thread_tag = netdata_thread_tag();
+        if(!netdata_thread_tag_exists()) {
+            if (!netdata_thread_tag_exists()) {
+                os_thread_get_current_name_np(os_threadname);
+                if ('\0' != os_threadname[0])
+                    /* If it is not an empty string replace "MAIN" thread_tag */
+                    thread_tag = os_threadname;
+            }
+        }
+        thread_log_fields_daemon[NDF_THREAD].entry = ND_LOG_FIELD_STR(NDF_THREAD, thread_tag);
     }
 
     if(!thread_log_fields_daemon[NDF_TIMESTAMP_REALTIME_USEC].entry.set) {
@@ -1135,77 +1146,24 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     va_end(args);
 }
 
-
-
-
-
-#ifdef NETDATA_INTERNAL_CHECKS
-static void crash_netdata(void) {
-    // make Netdata core dump
-    abort();
-}
-#endif
-
-#ifdef HAVE_BACKTRACE
-#define BT_BUF_SIZE 100
-static void print_call_stack(void) {
-    FILE *fp = (!stderror) ? stderr : stderror;
-
-    int nptrs;
-    void *buffer[BT_BUF_SIZE];
-
-    nptrs = backtrace(buffer, BT_BUF_SIZE);
-    if(nptrs)
-        backtrace_symbols_fd(buffer, nptrs, fileno(fp));
-}
-#endif
-
-void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    FILE *fp = stderror ? stderror : stderr;
-
-    // save a copy of errno - just in case this function generates a new error
+void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     int __errno = errno;
+
     va_list args;
-    const char *thread_tag;
-    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
-
-    if(collector_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_CRIT,  fmt, args );
-        va_end( args );
-    }
-
-    thread_tag = netdata_thread_tag();
-    if (!netdata_thread_tag_exists()) {
-        os_thread_get_current_name_np(os_threadname);
-        if ('\0' != os_threadname[0]) { /* If it is not an empty string replace "MAIN" thread_tag */
-            thread_tag = os_threadname;
-        }
-    }
+    va_start(args, fmt);
+    nd_logger(file, function, line, NDLS_DAEMON, NDLP_CRIT, true, fmt, args);
+    va_end(args);
 
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
 
-    nd_log_lock(NDLS_DAEMON);
-
-    va_start( args, fmt );
-#ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(fp,
-            "%s: %s FATAL : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
-#else
-    fprintf(fp, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
-#endif
-    vfprintf(fp, fmt, args );
-    va_end( args );
-
-    perror(" # ");
-    fputc('\n', fp);
-
-    nd_log_unlock(NDLS_DAEMON);
-
     char action_data[70+1];
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
     char action_result[60+1];
+
+    const char *thread_tag = thread_log_fields_daemon[NDF_THREAD].entry.str;
+    if(!thread_tag)
+        thread_tag = "UNKNOWN";
 
     const char *tag_to_send =  thread_tag;
 
@@ -1219,11 +1177,20 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     send_statistics("FATAL", action_result, action_data);
 
 #ifdef HAVE_BACKTRACE
-    print_call_stack();
+    int fd = nd_log.sources[NDLS_DAEMON].fd;
+    if(fd == -1)
+        fd = STDERR_FILENO;
+
+    int nptrs;
+    void *buffer[10000];
+
+    nptrs = backtrace(buffer, sizeof(buffer));
+    if(nptrs)
+        backtrace_symbols_fd(buffer, nptrs, fd);
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    crash_netdata();
+    abort();
 #endif
 
     netdata_cleanup_and_exit(1);

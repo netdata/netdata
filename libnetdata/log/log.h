@@ -200,15 +200,15 @@ void log_set_global_severity_for_external_plugins();
 #ifdef NETDATA_INTERNAL_CHECKS
 #define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #define internal_error(condition, args...) do { if(unlikely(condition)) netdata_logger(NDLS_DAEMON, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
-#define internal_fatal(condition, args...) do { if(unlikely(condition)) fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define internal_fatal(condition, args...) do { if(unlikely(condition)) netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define netdata_log_debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
 #define internal_fatal(args...) debug_dummy()
 #endif
 
-#define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
-#define fatal_assert(expr) ((expr) ? (void)(0) : fatal_int(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
+#define fatal(args...)   netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, ##args)
+#define fatal_assert(expr) ((expr) ? (void)(0) : netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
 
 // ----------------------------------------------------------------------------
 // normal logging
@@ -242,7 +242,7 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 // ----------------------------------------------------------------------------
 
 void send_statistics(const char *action, const char *action_result, const char *action_data);
-void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
+void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 void netdata_log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
 void netdata_log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
 

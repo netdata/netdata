@@ -19,7 +19,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 
 uint64_t debug_flags;
 
-void fatal_int( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
+void netdata_logger_fatal( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
 {
     abort();
 };
