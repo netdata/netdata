@@ -865,6 +865,26 @@ jobs:
           makeLatest: true
           tag: ${{ steps.version.outputs.version }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Checkout netdata main Repo # Checkout back to netdata/netdata repo to the update latest packaged versions
+        id: checkout-netdata
+        if: steps.create-release.output.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Update latest packaged version
+        id: create-latest-versions-metadata
+        if: steps.checkout-netdata.output.run == 'true'
+        run: |
+          sh .github/scripts/update-latests-per-major-version.sh $(cat packaging/version)
+      - name: Commit Changes
+        id: commit-latest-releases
+        if: steps.create-latest-versions-metadata.outputs.run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+        run: |
+          git config user.name "netdatabot"
+          git config user.email "bot@netdata.cloud"
+          git add packaging/agent-metadata/nightly      
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -880,6 +900,9 @@ jobs:
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Prepare version info: ${{ steps.version.outcome }}
               Create release: ${{ steps.create-release.outcome }}
+              Checkout back netdata/netdata: ${{ steps.checkout-netdata.outcome }}
+              Update latest packaged versions: ${{ steps.create-latest-versions-metadata.outcome }}
+              Commit latest packaged versions: ${{ steps.commit-latest-releases.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
