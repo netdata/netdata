@@ -1484,3 +1484,43 @@ void update_io_full_pressure_stall_time_chart(struct cgroup *cg) {
     rrddim_set_by_pointer(chart, pcs->total_time.rdtotal, (collected_number)(pcs->total_time.value_total));
     rrdset_done(chart);
 }
+
+void update_pids_current_chart(struct cgroup *cg) {
+    RRDSET *chart = cg->st_pids;
+
+    if (unlikely(!cg->st_pids)) {
+        char *title;
+        char *context;
+        int prio;
+        if (is_cgroup_systemd_service(cg)) {
+            title = "Systemd Services Number of Processes";
+            context = "systemd.service.pids.current";
+            prio = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 70;
+        } else {
+            title = "Number of processes";
+            context = k8s_is_kubepod(cg) ? "k8s.cgroup.pids_current" : "cgroup.pids_current";
+            prio = cgroup_containers_chart_priority + 2150;
+        }
+
+        char buff[RRD_ID_LENGTH_MAX + 1];
+        chart = cg->st_pids = rrdset_create_localhost(
+            cgroup_chart_type(buff, cg),
+            "pids_current",
+            NULL,
+            "pids",
+            context,
+            title,
+            "pids",
+            PLUGIN_CGROUPS_NAME,
+            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
+            prio,
+            cgroup_update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdset_update_rrdlabels(chart, cg->chart_labels);
+        cg->st_pids_rd_pids_current = rrddim_add(chart, "pids", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(chart, cg->st_pids_rd_pids_current, (collected_number)cg->pids.pids_current);
+    rrdset_done(chart);
+}
