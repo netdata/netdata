@@ -626,6 +626,7 @@ bool nd_log_limit_reached(struct nd_log_source *source, bool reset, FILE *fp) {
 
 struct log_field;
 static void errno_annotator(BUFFER *wb, struct log_field *lf);
+static void priority_annotator(BUFFER *wb, struct log_field *lf);
 
 // ----------------------------------------------------------------------------
 
@@ -668,6 +669,7 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
         [NDF_PRIORITY] = {
                 .journal = "PRIORITY",
                 .logfmt = "priority",
+                .logfmt_annotator = priority_annotator,
         },
         [NDF_SESSION] = {
                 .journal = "ND_SESSION",
@@ -711,8 +713,8 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
         },
 };
 
-void log_stack_pop(void *ptr) {
-    struct log_stack_entry *lgs = ptr;
+void log_stack_pop(void **ptr) {
+    struct log_stack_entry *lgs = (struct log_stack_entry *)(*ptr);
 
     if(!lgs || !lgs->prev || !lgs->next)
         return;
@@ -798,6 +800,25 @@ static void errno_annotator(BUFFER *wb, struct log_field *lf) {
     buffer_fast_strcat(wb, "\"", 1);
 }
 
+static void priority_annotator(BUFFER *wb, struct log_field *lf) {
+    static char *priorities[] = {
+            [NDLP_ALERT] = "ALERT",
+            [NDLP_CRIT] = "CRITICAL",
+            [NDLP_EMERG] = "EMERGENCY",
+            [NDLP_ERR] = "ERROR",
+            [NDLP_WARNING] = "WARNING",
+            [NDLP_INFO] = "INFO",
+            [NDLP_NOTICE] = "NOTICE",
+            [NDLP_DEBUG] = "DEBUG",
+    };
+
+    size_t entries = sizeof(priorities) / sizeof(priorities[0]);
+    if(lf->entry.u64 < entries)
+        buffer_strcat(wb, priorities[lf->entry.u64]);
+    else
+        buffer_print_uint64(wb, lf->entry.u64);
+}
+
 static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max) {
     for (size_t i = 0; i < fields_max; i++) {
         if (!fields[i].entry.set || !fields[i].logfmt)
@@ -859,7 +880,7 @@ static bool nd_logger_file(FILE *fp, struct log_field *fields, size_t fields_max
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
     buffer_strcat(wb, date);
-    buffer_strcat(wb, ": ");
+    buffer_fast_strcat(wb, ":", 1);
 
     nd_logger_logfmt(wb, fields, fields_max);
     int r = fprintf(fp, "%s\n", buffer_tostring(wb));
@@ -916,6 +937,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
             *spinlock = &nd_log.stdout.spinlock;
             break;
 
+        default:
         case ND_LOG_METHOD_DEFAULT:
         case ND_LOG_METHOD_STDERR:
             method = ND_LOG_METHOD_FILE;
