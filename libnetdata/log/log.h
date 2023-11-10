@@ -101,6 +101,7 @@ void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(time_t period, size_t logs);
 void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_set_thread_source(ND_LOG_SOURCES source);
+bool nd_log_is_stderr_journal(void);
 
 struct log_stack_entry {
     int id;

@@ -25,6 +25,28 @@ int aclklog_enabled = 0;
 
 // ----------------------------------------------------------------------------
 
+bool nd_log_is_stderr_journal(void) {
+    const char *journal_stream = getenv("JOURNAL_STREAM");
+    if (!journal_stream)
+        return false; // JOURNAL_STREAM is not set
+
+    struct stat stderr_stat;
+    if (fstat(STDERR_FILENO, &stderr_stat) < 0)
+        return false; // Error in getting stderr info
+
+    // Parse device and inode from JOURNAL_STREAM
+    char *endptr;
+    long journal_dev = strtol(journal_stream, &endptr, 10);
+    if (*endptr != ':')
+        return false; // Format error in JOURNAL_STREAM
+
+    long journal_ino = strtol(endptr + 1, NULL, 10);
+
+    return (stderr_stat.st_dev == (dev_t)journal_dev) && (stderr_stat.st_ino == (ino_t)journal_ino);
+}
+
+// ----------------------------------------------------------------------------
+
 typedef enum  __attribute__((__packed__)) {
     ND_LOG_METHOD_DISABLED,
     ND_LOG_METHOD_DEVNULL,
