@@ -10,7 +10,7 @@ extern "C" {
 #include "../libnetdata.h"
 
 typedef enum  __attribute__((__packed__)) {
-    NDLS_STDIN = 0,   // internal use only
+    NDLS_UNSET = 0,   // internal use only
     NDLS_ACCESS,      // access.log
     NDLS_ACLK,        // aclk.log
     NDLS_COLLECTORS,  // collectors.log

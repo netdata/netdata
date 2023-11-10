@@ -186,7 +186,7 @@ static const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
 // log sources
 
 const char *log_sources_str[] = {
-        [NDLS_STDIN] = "INPUT",
+        [NDLS_UNSET] = "UNSET",
         [NDLS_ACCESS] = "ACCESS",
         [NDLS_ACLK] = "ACLK",
         [NDLS_COLLECTORS] = "COLLECTORS",
@@ -345,10 +345,6 @@ static struct {
     } syslog;
 
     struct {
-        bool initialized;
-    } std_input;
-
-    struct {
         SPINLOCK spinlock;
         bool initialized;
     } std_output;
@@ -378,9 +374,6 @@ static struct {
                 .initialized = false,
                 .facility = LOG_DAEMON,
         },
-        .std_input = {
-                .initialized = false,
-        },
         .std_output = {
                 .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                 .initialized = false,
@@ -390,13 +383,13 @@ static struct {
                 .initialized = false,
         },
         .sources = {
-                [NDLS_STDIN] = {
+                [NDLS_UNSET] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_DEVNULL,
-                        .filename = "/dev/null",
-                        .fd = STDIN_FILENO,
+                        .method = ND_LOG_METHOD_DISABLED,
+                        .filename = NULL,
+                        .fd = -1,
                         .fp = NULL,
-                        .min_priority = 0,
+                        .min_priority = NDLP_EMERG,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_ACCESS] = {
@@ -405,7 +398,7 @@ static struct {
                         .filename = LOG_DIR "/access.log",
                         .fd = -1,
                         .fp = NULL,
-                        .min_priority = 0,
+                        .min_priority = NDLP_DEBUG,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_ACLK] = {
@@ -414,7 +407,7 @@ static struct {
                         .filename = LOG_DIR "/aclk.log",
                         .fd = -1,
                         .fp = NULL,
-                        .min_priority = 0,
+                        .min_priority = NDLP_DEBUG,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_COLLECTORS] = {
@@ -432,7 +425,7 @@ static struct {
                         .filename = LOG_DIR "/debug.log",
                         .fd = STDOUT_FILENO,
                         .fp = NULL,
-                        .min_priority = 0,
+                        .min_priority = NDLP_DEBUG,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_DAEMON] = {
@@ -450,7 +443,7 @@ static struct {
                         .filename = LOG_DIR "/health.log",
                         .fd = -1,
                         .fp = NULL,
-                        .min_priority = 0,
+                        .min_priority = NDLP_DEBUG,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
         },
@@ -550,21 +543,11 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     nd_log_set_flood_protection(period, logs);
 
-    nd_log.sources[NDLS_ACCESS].method = ND_LOG_METHOD_FILE;
-    nd_log.sources[NDLS_ACCESS].fd = STDERR_FILENO;
-    nd_log.sources[NDLS_ACCESS].fp = stderr;
-
-    nd_log.sources[NDLS_ACLK].method = ND_LOG_METHOD_FILE;
-    nd_log.sources[NDLS_ACLK].fd = STDERR_FILENO;
-    nd_log.sources[NDLS_ACLK].fp = stderr;
-
-    nd_log.sources[NDLS_DAEMON].method = ND_LOG_METHOD_FILE;
-    nd_log.sources[NDLS_DAEMON].fd = STDERR_FILENO;
-    nd_log.sources[NDLS_DAEMON].fp = stderr;
-
-    nd_log.sources[NDLS_HEALTH].method = ND_LOG_METHOD_FILE;
-    nd_log.sources[NDLS_HEALTH].fd = STDERR_FILENO;
-    nd_log.sources[NDLS_HEALTH].fp = stderr;
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        nd_log.sources[i].method = ND_LOG_METHOD_STDERR;
+        nd_log.sources[i].fd = -1;
+        nd_log.sources[i].fp = NULL;
+    }
 
     nd_log.overwrite_process_source = NDLS_COLLECTORS;
 }
@@ -577,12 +560,10 @@ static void nd_log_syslog_init() {
     nd_log.syslog.initialized = true;
 }
 
-static bool nd_log_set_system_fd(struct nd_log_source *e, int new_fd) {
+static bool nd_log_replace_existing_fd(struct nd_log_source *e, int new_fd) {
     if(new_fd == -1 || e->fd == -1 ||
-            (e->fd == STDIN_FILENO && nd_log.std_input.initialized) ||
             (e->fd == STDOUT_FILENO && nd_log.std_output.initialized) ||
-            (e->fd == STDERR_FILENO && nd_log.std_error.initialized) ||
-            (e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO))
+            (e->fd == STDERR_FILENO && nd_log.std_error.initialized))
         return false;
 
     if(new_fd != e->fd) {
@@ -596,9 +577,7 @@ static bool nd_log_set_system_fd(struct nd_log_source *e, int new_fd) {
         else
             close(new_fd);
 
-        if(e->fd == STDIN_FILENO)
-            nd_log.std_input.initialized = true;
-        else if(e->fd == STDOUT_FILENO)
+        if(e->fd == STDOUT_FILENO)
             nd_log.std_output.initialized = true;
         else if(e->fd == STDERR_FILENO)
             nd_log.std_error.initialized = true;
@@ -646,9 +625,7 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
         case ND_LOG_METHOD_FILE: {
             int fd = open(e->filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
             if(fd == -1) {
-                // we cannot open the file, fallback to stderr
-
-                if(e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
+                if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
                     e->fd = STDERR_FILENO;
                     e->method = ND_LOG_METHOD_STDERR;
                     netdata_log_error("Cannot open log file '%s'. Falling back to stderr.", e->filename);
@@ -657,15 +634,16 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                     netdata_log_error("Cannot open log file '%s'. Leaving fd %d as-is.", e->filename, e->fd);
             }
             else {
-                if (!nd_log_set_system_fd(e, fd)) {
-                    if(e->fd == STDIN_FILENO || e->fd == STDOUT_FILENO || e->fd == STDERR_FILENO) {
+                if (!nd_log_replace_existing_fd(e, fd)) {
+                    if(e->fd == STDOUT_FILENO || e->fd == STDERR_FILENO) {
                         if(e->fd == STDOUT_FILENO)
                             e->method = ND_LOG_METHOD_STDOUT;
                         else if(e->fd == STDERR_FILENO)
                             e->method = ND_LOG_METHOD_STDERR;
 
                         // we have dup2() fd, so we can close the one we opened
-                        close(fd);
+                        if(fd != STDOUT_FILENO && fd != STDERR_FILENO)
+                            close(fd);
                     }
                     else
                         e->fd = fd;
@@ -674,9 +652,7 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 
             // at this point we have e->fd set properly
 
-            if(e->fd == STDIN_FILENO)
-                e->fp = stdin;
-            else if(e->fd == STDOUT_FILENO)
+            if(e->fd == STDOUT_FILENO)
                 e->fp = stdout;
             else if(e->fd == STDERR_FILENO)
                 e->fp = stderr;
@@ -686,17 +662,14 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                 if (!e->fp) {
                     netdata_log_error("Cannot fdopen() fd %d ('%s')", e->fd, e->filename);
 
-                    if(e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO)
+                    if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO)
                         close(e->fd);
 
                     e->fp = stderr;
-                    e->fd = STDOUT_FILENO;
+                    e->fd = STDERR_FILENO;
                 }
             }
-
-            // at this point we have e->fp set properly
-
-            if(e->fp && e->fp != stdin) {
+            else {
                 if (setvbuf(e->fp, NULL, _IOLBF, 0) != 0)
                     netdata_log_error("Cannot set line buffering on fd %d ('%s')", e->fd, e->filename);
             }
@@ -705,7 +678,20 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
     }
 }
 
+static void nd_log_stdin_init(int fd, const char *filename) {
+    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+    if(f == -1)
+        return;
+
+    if(f != fd) {
+        dup2(f, fd);
+        close(f);
+    }
+}
+
 void nd_log_initialize(void) {
+    nd_log_stdin_init(STDIN_FILENO, "/dev/null");
+
     for(size_t i = 0 ; i < _NDLS_MAX ; i++)
         nd_log_open(&nd_log.sources[i], i);
 }
@@ -1420,7 +1406,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     source = nd_log_validate_source(source);
 
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority < nd_log.sources[source].min_priority)
+    if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority > nd_log.sources[source].min_priority)
         return;
 #endif
 
