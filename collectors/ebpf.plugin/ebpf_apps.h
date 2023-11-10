@@ -212,8 +212,6 @@ size_t zero_all_targets(struct ebpf_target *root);
 
 int am_i_running_as_root();
 
-void cleanup_exited_pids();
-
 int ebpf_read_hash_table(void *ep, int fd, uint32_t pid);
 
 int get_pid_comm(pid_t pid, size_t n, char *dest);
