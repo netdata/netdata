@@ -124,14 +124,14 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
         metric: apcupsd.load
         info: number of seconds since the last successful data collection
-        name: apcupsd_selftest_warning
+      - name: apcupsd_selftest_warning
         link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
         metric: apcupsd.selftest
         info: self-test failed due to insufficient battery capacity or due to overload.
-        name: apcupsd_status_warning
+      - name: apcupsd_status_warning
         link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
         metric: apcupsd.status
-        info: status code is one of the following: ONBATT,OVERLOAD,LOWBATT,REPLACEBATT,NOBATT,COMMLOST
+        info: 'status code is one of the following: ONBATT,OVERLOAD,LOWBATT,REPLACEBATT,NOBATT,COMMLOST'
     metrics:
       folding:
         title: Metrics
@@ -209,13 +209,28 @@ modules:
                 - name: online
             - name: apcupsd.selftest
               description: UPS Self-Test status
-              unit: "boolean"
+              unit: status
               chart_type: line
               dimensions:
-                - name: selftest
+                - name: OK
+                - name: NO
+                - name: BT
+                - name: NG
             - name: apcupsd.status
-              description: UPS STATUS code
-              unit: "boolean"
+              description: UPS Status
+              unit: status
               chart_type: line
               dimensions:
-                - name: status
+                - name: ONLINE
+                - name: ONBATT
+                - name: OVERLOAD
+                - name: LOWBATT
+                - name: REPLACEBATT
+                - name: NOBATT
+                - name: SLAVE
+                - name: SLAVEDOWN
+                - name: COMMLOST
+                - name: CAL
+                - name: TRIM
+                - name: BOOST
+                - name: SHUTTING_DOWN
