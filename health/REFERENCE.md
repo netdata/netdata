@@ -234,7 +234,6 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`plugin`](#alert-line-plugin)                      | no              | Restrict an alert or template to only a certain plugin.                               |
 | [`module`](#alert-line-module)                      | no              | Restrict an alert or template to only a certain module.                               |
 | [`charts`](#alert-line-charts)                      | no              | Restrict an alert or template to only certain charts.                                 |
-| [`families`](#alert-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
 | [`every`](#alert-line-every)                        | no              | The frequency of the alert.                                                           |
@@ -437,23 +436,6 @@ template: disk_svctm_alert
       on: disk.svctm
   charts: !*sdb* *
 ```
-
-#### Alert line `families`
-
-The `families` line, used only alongside templates, filters which families within the context this alert should apply
-to. The value is a space-separated list.
-
-The value is a space-separate list of simple patterns. See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for
-some examples.
-
-For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
-
-```yaml
-families: sda sdb
-```
-
-Please note that the use of the `families` filter is planned to be deprecated in upcoming Netdata releases. 
-Please use [`chart labels`](#alert-line-chart-labels) instead.
 
 #### Alert line `lookup`
 
@@ -882,13 +864,11 @@ registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
-<details markdown="1"><summary>The variables below can be used in both chart alerts and context templates.</summary>
+<details><summary>The variables below can be used in both chart alerts and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
 templates for charts belonging to a given [context](https://github.com/netdata/netdata/blob/master/web/README.md#contexts). The reason is that all charts of a given
-context are essentially identical, with the only difference being the [family](https://github.com/netdata/netdata/blob/master/web/README.md#families) that
-identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway,
-unless if you explicitly limit an alert with the [alert line `families`](#alert-line-families).
+context are essentially identical, with the only difference being the family that identifies a particular hardware or software instance.
 
 </details>
 
