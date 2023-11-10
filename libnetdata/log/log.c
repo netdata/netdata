@@ -318,7 +318,6 @@ struct nd_log_source {
     const char *filename;
     int fd;
     FILE *fp;
-    FILE **fp_set;
 
     ND_LOG_FIELD_PRIORITY min_priority;
     const char *pending_msg;
@@ -396,7 +395,6 @@ static struct {
                         .method = ND_LOG_METHOD_DEVNULL,
                         .filename = "/dev/null",
                         .fd = STDIN_FILENO,
-                        .fp_set = &stdin,
                         .fp = NULL,
                         .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
@@ -406,7 +404,6 @@ static struct {
                         .method = ND_LOG_METHOD_DEFAULT,
                         .filename = LOG_DIR "/access.log",
                         .fd = -1,
-                        .fp_set = NULL,
                         .fp = NULL,
                         .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
@@ -416,7 +413,6 @@ static struct {
                         .method = ND_LOG_METHOD_FILE,
                         .filename = LOG_DIR "/aclk.log",
                         .fd = -1,
-                        .fp_set = NULL,
                         .fp = NULL,
                         .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
@@ -426,7 +422,6 @@ static struct {
                         .method = ND_LOG_METHOD_DEFAULT,
                         .filename = LOG_DIR "/collectors.log",
                         .fd = STDERR_FILENO,
-                        .fp_set = &stderr,
                         .fp = NULL,
                         .min_priority = NDLP_INFO,
                         .limits = ND_LOG_LIMITS_DEFAULT,
@@ -436,7 +431,6 @@ static struct {
                         .method = ND_LOG_METHOD_DISABLED,
                         .filename = LOG_DIR "/debug.log",
                         .fd = STDOUT_FILENO,
-                        .fp_set = &stdout,
                         .fp = NULL,
                         .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
@@ -446,7 +440,6 @@ static struct {
                         .method = ND_LOG_METHOD_DEFAULT,
                         .filename = LOG_DIR "/error.log",
                         .fd = -1,
-                        .fp_set = NULL,
                         .fp = NULL,
                         .min_priority = NDLP_INFO,
                         .limits = ND_LOG_LIMITS_DEFAULT,
@@ -456,7 +449,6 @@ static struct {
                         .method = ND_LOG_METHOD_DEFAULT,
                         .filename = LOG_DIR "/health.log",
                         .fd = -1,
-                        .fp_set = NULL,
                         .fp = NULL,
                         .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
@@ -471,36 +463,36 @@ void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting) {
     }
     else if(strcmp(setting, "journal") == 0) {
         nd_log.sources[type].method = ND_LOG_METHOD_JOURNAL;
-        nd_log.sources[type].filename = "/dev/null";
+        nd_log.sources[type].filename = NULL;
     }
     else if(strcmp(setting, "syslog") == 0) {
         nd_log.sources[type].method = ND_LOG_METHOD_SYSLOG;
-        nd_log.sources[type].filename = "/dev/null";
+        nd_log.sources[type].filename = NULL;
     }
     else if(strcmp(setting, "/dev/null") == 0) {
         nd_log.sources[type].method = ND_LOG_METHOD_DEVNULL;
         nd_log.sources[type].filename = "/dev/null";
     }
     else if(strcmp(setting, "system") == 0) {
-        if(nd_log.sources[type].fp_set == &stderr) {
+        if(nd_log.sources[type].fd == STDERR_FILENO) {
             nd_log.sources[type].method = ND_LOG_METHOD_STDERR;
-            nd_log.sources[type].filename = "stderr";
+            nd_log.sources[type].filename = NULL;
             nd_log.sources[type].fd = STDERR_FILENO;
         }
         else {
             nd_log.sources[type].method = ND_LOG_METHOD_STDOUT;
-            nd_log.sources[type].filename = "stdout";
+            nd_log.sources[type].filename = NULL;
             nd_log.sources[type].fd = STDOUT_FILENO;
         }
     }
     else if(strcmp(setting, "stderr") == 0) {
         nd_log.sources[type].method = ND_LOG_METHOD_STDERR;
-        nd_log.sources[type].filename = "stderr";
+        nd_log.sources[type].filename = NULL;
         nd_log.sources[type].fd = STDERR_FILENO;
     }
     else if(strcmp(setting, "stdout") == 0) {
         nd_log.sources[type].method = ND_LOG_METHOD_STDOUT;
-        nd_log.sources[type].filename = "stdout";
+        nd_log.sources[type].filename = NULL;
         nd_log.sources[type].fd = STDOUT_FILENO;
     }
     else {
@@ -622,7 +614,7 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
         nd_log_set_destination_output(source, e->filename);
 
     if((e->method == ND_LOG_METHOD_FILE && !e->filename) ||
-       (e->method == ND_LOG_METHOD_DEVNULL && !e->fp_set))
+       (e->method == ND_LOG_METHOD_DEVNULL && e->fd == -1))
         e->method = ND_LOG_METHOD_DISABLED;
 
     if(e->fp)
@@ -659,9 +651,10 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                 if(e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
                     e->fd = STDERR_FILENO;
                     e->method = ND_LOG_METHOD_STDERR;
+                    netdata_log_error("Cannot open log file '%s'. Falling back to stderr.", e->filename);
                 }
-
-                netdata_log_error("Cannot open file '%s'. Leaving %d to its default.", e->filename, e->fd);
+                else
+                    netdata_log_error("Cannot open log file '%s'. Leaving fd %d as-is.", e->filename, e->fd);
             }
             else {
                 if (!nd_log_set_system_fd(e, fd)) {
@@ -671,6 +664,7 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                         else if(e->fd == STDERR_FILENO)
                             e->method = ND_LOG_METHOD_STDERR;
 
+                        // we have dup2() fd, so we can close the one we opened
                         close(fd);
                     }
                     else
@@ -686,8 +680,6 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                 e->fp = stdout;
             else if(e->fd == STDERR_FILENO)
                 e->fp = stderr;
-            else if(e->fp == stdin || e->fp == stdout || e->fp == stderr)
-                e->fp = NULL;
 
             if(!e->fp) {
                 e->fp = fdopen(e->fd, "a");
