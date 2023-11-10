@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#16373](https://github.com/netdata/netdata/pull/16373) ([netdatabot](https://github.com/netdatabot))
+- docs: remove unused cloud notification methods mds [\#16372](https://github.com/netdata/netdata/pull/16372) ([ilyam8](https://github.com/ilyam8))
+- Add configuration documentation for Cloud AWS SNS [\#16371](https://github.com/netdata/netdata/pull/16371) ([car12o](https://github.com/car12o))
+- pacakging: add zstd dev to install-required-packages [\#16370](https://github.com/netdata/netdata/pull/16370) ([ilyam8](https://github.com/ilyam8))
+- cgroups: collect pids/pids.current [\#16369](https://github.com/netdata/netdata/pull/16369) ([ilyam8](https://github.com/ilyam8))
+- docs: Correct time unit for tier 2 explanation [\#16368](https://github.com/netdata/netdata/pull/16368) ([sepek](https://github.com/sepek))
+- cgroups: fix throttle\_duration chart context [\#16367](https://github.com/netdata/netdata/pull/16367) ([ilyam8](https://github.com/ilyam8))
+- fix system.net when inside lxc  [\#16364](https://github.com/netdata/netdata/pull/16364) ([ilyam8](https://github.com/ilyam8))
+- collectors/freeipmi: add ipmi-sensors function [\#16363](https://github.com/netdata/netdata/pull/16363) ([ilyam8](https://github.com/ilyam8))
 - Switch charts / chart to use buffer json functions [\#16359](https://github.com/netdata/netdata/pull/16359) ([stelfrag](https://github.com/stelfrag))
 - health: put guides into subdirs [\#16358](https://github.com/netdata/netdata/pull/16358) ([ilyam8](https://github.com/ilyam8))
 - Import alert guides from Netdata Assistant [\#16355](https://github.com/netdata/netdata/pull/16355) ([ralphm](https://github.com/ralphm))
@@ -431,16 +440,6 @@
 - extend the trimming window to avoid empty points at the end of queries [\#15773](https://github.com/netdata/netdata/pull/15773) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#15772](https://github.com/netdata/netdata/pull/15772) ([netdatabot](https://github.com/netdatabot))
 - Change FreeBSD / macOS system.swap\(io\) to mem.swap\(io\) [\#15769](https://github.com/netdata/netdata/pull/15769) ([Dim-P](https://github.com/Dim-P))
-- update ui to v6.26.3 [\#15767](https://github.com/netdata/netdata/pull/15767) ([ilyam8](https://github.com/ilyam8))
-- Fix CID 398318 [\#15766](https://github.com/netdata/netdata/pull/15766) ([underhood](https://github.com/underhood))
-- Fix coverity issues introduced via drm proc module [\#15765](https://github.com/netdata/netdata/pull/15765) ([Dim-P](https://github.com/Dim-P))
-- Regenerate integrations.js [\#15764](https://github.com/netdata/netdata/pull/15764) ([netdatabot](https://github.com/netdatabot))
-- meta update proc drm icon [\#15763](https://github.com/netdata/netdata/pull/15763) ([ilyam8](https://github.com/ilyam8))
-- Update metadata.yaml [\#15762](https://github.com/netdata/netdata/pull/15762) ([ktsaou](https://github.com/ktsaou))
-- Update metadata.yaml [\#15761](https://github.com/netdata/netdata/pull/15761) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#15760](https://github.com/netdata/netdata/pull/15760) ([netdatabot](https://github.com/netdatabot))
-- fix nvidia\_smi power\_readings for new drivers [\#15759](https://github.com/netdata/netdata/pull/15759) ([ilyam8](https://github.com/ilyam8))
-- update bundled UI to v2.26.2 [\#15758](https://github.com/netdata/netdata/pull/15758) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
