@@ -9,10 +9,6 @@
 ARAL *ebpf_aral_apps_pid_stat = NULL;
 ARAL *ebpf_aral_vfs_pid = NULL;
 
-// ----------------------------------------------------------------------------
-// Global vectors used with apps
-netdata_publish_vfs_t **vfs_pid = NULL;
-
 /**
  * eBPF ARAL Init
  *
@@ -1059,20 +1055,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
 }
 
 /**
- * Cleanup variable from other threads
- *
- * @param pid current pid.
- */
-void cleanup_variables_from_other_threads(uint32_t pid)
-{
-    // Clean vfs structure
-    if (vfs_pid) {
-        ebpf_vfs_release(vfs_pid[pid]);
-        vfs_pid[pid] = NULL;
-    }
-}
-
-/**
  * Remove PIDs when they are not running more.
  */
 void cleanup_exited_pids()
@@ -1086,8 +1068,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-
-            cleanup_variables_from_other_threads(r);
 
             del_pid_entry(r);
         } else {

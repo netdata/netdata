@@ -1047,64 +1047,54 @@ static void ebpf_vfs_read_global_table(netdata_idx_t *stats, int maps_per_core)
  * @param swap output structure
  * @param root link list with structure to be used
  */
-static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_target *root)
+static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, Pvoid_t JudyLArray, RW_SPINLOCK *rw_spinlock)
 {
-    netdata_publish_vfs_t accumulator;
-    memset(&accumulator, 0, sizeof(accumulator));
-
-    while (root) {
-        int32_t pid = root->pid;
-        netdata_publish_vfs_t *w = vfs_pid[pid];
-        if (w) {
-            accumulator.write_call += w->write_call;
-            accumulator.writev_call += w->writev_call;
-            accumulator.read_call += w->read_call;
-            accumulator.readv_call += w->readv_call;
-            accumulator.unlink_call += w->unlink_call;
-            accumulator.fsync_call += w->fsync_call;
-            accumulator.open_call += w->open_call;
-            accumulator.create_call += w->create_call;
-
-            accumulator.write_bytes += w->write_bytes;
-            accumulator.writev_bytes += w->writev_bytes;
-            accumulator.read_bytes += w->read_bytes;
-            accumulator.readv_bytes += w->readv_bytes;
-
-            accumulator.write_err += w->write_err;
-            accumulator.writev_err += w->writev_err;
-            accumulator.read_err += w->read_err;
-            accumulator.readv_err += w->readv_err;
-            accumulator.unlink_err += w->unlink_err;
-            accumulator.fsync_err += w->fsync_err;
-            accumulator.open_err += w->open_err;
-            accumulator.create_err += w->create_err;
-        }
-        root = root->next;
+    rw_spinlock_read_lock(rw_spinlock);
+    if (!JudyLArray) {
+        rw_spinlock_read_unlock(rw_spinlock);
+        return;
     }
 
-    // These conditions were added, because we are using incremental algorithm
-    vfs->write_call = (accumulator.write_call >= vfs->write_call) ? accumulator.write_call : vfs->write_call;
-    vfs->writev_call = (accumulator.writev_call >= vfs->writev_call) ? accumulator.writev_call : vfs->writev_call;
-    vfs->read_call = (accumulator.read_call >= vfs->read_call) ? accumulator.read_call : vfs->read_call;
-    vfs->readv_call = (accumulator.readv_call >= vfs->readv_call) ? accumulator.readv_call : vfs->readv_call;
-    vfs->unlink_call = (accumulator.unlink_call >= vfs->unlink_call) ? accumulator.unlink_call : vfs->unlink_call;
-    vfs->fsync_call = (accumulator.fsync_call >= vfs->fsync_call) ? accumulator.fsync_call : vfs->fsync_call;
-    vfs->open_call = (accumulator.open_call >= vfs->open_call) ? accumulator.open_call : vfs->open_call;
-    vfs->create_call = (accumulator.create_call >= vfs->create_call) ? accumulator.create_call : vfs->create_call;
+    memset(vfs, 0, sizeof(netdata_publish_vfs_t));
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
 
-    vfs->write_bytes = (accumulator.write_bytes >= vfs->write_bytes) ? accumulator.write_bytes : vfs->write_bytes;
-    vfs->writev_bytes = (accumulator.writev_bytes >= vfs->writev_bytes) ? accumulator.writev_bytes : vfs->writev_bytes;
-    vfs->read_bytes = (accumulator.read_bytes >= vfs->read_bytes) ? accumulator.read_bytes : vfs->read_bytes;
-    vfs->readv_bytes = (accumulator.readv_bytes >= vfs->readv_bytes) ? accumulator.readv_bytes : vfs->readv_bytes;
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                               local_pid,
+                                                                               NULL,
+                                                                               NETDATA_EBPF_MODULE_NAME_VFS);
+        if (pid_ptr) {
+            netdata_publish_vfs_t *w = &pid_ptr->vfs;
+            vfs->write_call += w->write_call;
+            vfs->writev_call += w->writev_call;
+            vfs->read_call += w->read_call;
+            vfs->readv_call += w->readv_call;
+            vfs->unlink_call += w->unlink_call;
+            vfs->fsync_call += w->fsync_call;
+            vfs->open_call += w->open_call;
+            vfs->create_call += w->create_call;
 
-    vfs->write_err = (accumulator.write_err >= vfs->write_err) ? accumulator.write_err : vfs->write_err;
-    vfs->writev_err = (accumulator.writev_err >= vfs->writev_err) ? accumulator.writev_err : vfs->writev_err;
-    vfs->read_err = (accumulator.read_err >= vfs->read_err) ? accumulator.read_err : vfs->read_err;
-    vfs->readv_err = (accumulator.readv_err >= vfs->readv_err) ? accumulator.readv_err : vfs->readv_err;
-    vfs->unlink_err = (accumulator.unlink_err >= vfs->unlink_err) ? accumulator.unlink_err : vfs->unlink_err;
-    vfs->fsync_err = (accumulator.fsync_err >= vfs->fsync_err) ? accumulator.fsync_err : vfs->fsync_err;
-    vfs->open_err = (accumulator.open_err >= vfs->open_err) ? accumulator.open_err : vfs->open_err;
-    vfs->create_err = (accumulator.create_err >= vfs->create_err) ? accumulator.create_err : vfs->create_err;
+            vfs->write_bytes += w->write_bytes;
+            vfs->writev_bytes += w->writev_bytes;
+            vfs->read_bytes += w->read_bytes;
+            vfs->readv_bytes += w->readv_bytes;
+
+            vfs->write_err += w->write_err;
+            vfs->writev_err += w->writev_err;
+            vfs->read_err += w->read_err;
+            vfs->readv_err += w->readv_err;
+            vfs->unlink_err += w->unlink_err;
+            vfs->fsync_err += w->fsync_err;
+            vfs->open_err += w->open_err;
+            vfs->create_err += w->create_err;
+        }
+    }
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+    rw_spinlock_read_unlock(rw_spinlock);
 }
 
 /**
@@ -1330,31 +1320,46 @@ void *ebpf_read_vfs_thread(void *ptr)
 static void read_update_vfs_cgroup(int maps_per_core)
 {
     ebpf_cgroup_target_t *ect ;
-    netdata_publish_vfs_t *vv = vfs_vector;
-    int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
-    size_t length = sizeof(netdata_publish_vfs_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
+        netdata_publish_vfs_t *vfs = &ect->publish_systemd_vfs;
+        memset(vfs, 0, sizeof(netdata_publish_vfs_t));
+        rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+        PPvoid_t judy_array = &ebpf_judy_pid.index.JudyLArray;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
-            netdata_publish_vfs_t *out = &pids->vfs;
-            if (likely(vfs_pid) && vfs_pid[pid]) {
-                netdata_publish_vfs_t *in = vfs_pid[pid];
+            netdata_ebpf_judy_pid_stats_t *pid_ptr = ebpf_get_pid_from_judy_unsafe(judy_array,
+                                                                                   pid,
+                                                                                   NULL,
+                                                                                   NETDATA_EBPF_MODULE_NAME_VFS);
+            if (pid_ptr) {
+                netdata_publish_vfs_t *w = &pid_ptr->vfs;
+                vfs->write_call += w->write_call;
+                vfs->writev_call += w->writev_call;
+                vfs->read_call += w->read_call;
+                vfs->readv_call += w->readv_call;
+                vfs->unlink_call += w->unlink_call;
+                vfs->fsync_call += w->fsync_call;
+                vfs->open_call += w->open_call;
+                vfs->create_call += w->create_call;
 
-                memcpy(out, in, sizeof(netdata_publish_vfs_t));
-            } else {
-                memset(vv, 0, length);
-                if (!bpf_map_lookup_elem(fd, &pid, vv)) {
-                    vfs_apps_accumulator(vv, maps_per_core);
+                vfs->write_bytes += w->write_bytes;
+                vfs->writev_bytes += w->writev_bytes;
+                vfs->read_bytes += w->read_bytes;
+                vfs->readv_bytes += w->readv_bytes;
 
-                    memcpy(out, vv, sizeof(netdata_publish_vfs_t));
-                }
+                vfs->write_err += w->write_err;
+                vfs->writev_err += w->writev_err;
+                vfs->read_err += w->read_err;
+                vfs->readv_err += w->readv_err;
+                vfs->unlink_err += w->unlink_err;
+                vfs->fsync_err += w->fsync_err;
+                vfs->open_err += w->open_err;
+                vfs->create_err += w->create_err;
             }
         }
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
@@ -2449,11 +2454,8 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_vfs_allocate_global_vectors(int apps)
 {
-    if (apps) {
-        ebpf_vfs_aral_init();
-        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
-        vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
-    }
+    ebpf_vfs_aral_init();
+    vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
 
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
     memset(vfs_publish_aggregated, 0, sizeof(vfs_publish_aggregated));
