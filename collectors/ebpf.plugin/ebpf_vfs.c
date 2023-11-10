@@ -1097,6 +1097,16 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, Pvoid_t JudyLArray, RW
     rw_spinlock_read_unlock(rw_spinlock);
 }
 
+static void ebpf_vfs_update_apps(struct ebpf_target *root)
+{
+    struct ebpf_target *w;
+    for (w = root; w; w = w->next) {
+        if (unlikely(w->exposed)) {
+            ebpf_vfs_sum_pids(&w->vfs, w->pid_list.JudyLArray, &w->pid_list.rw_spinlock);
+        }
+    }
+}
+
 /**
  * Send data to Netdata calling auxiliary functions.
  *
@@ -2004,6 +2014,11 @@ static void vfs_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_vfs_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
+
+        if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
+            ebpf_vfs_update_apps(ebpf_apps_groups_root_target);
+
+        pthread_mutex_unlock(&collect_data_mutex);
 
         if (cgroups)
             read_update_vfs_cgroup(maps_per_core);
