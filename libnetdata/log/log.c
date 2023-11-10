@@ -892,10 +892,13 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
 
 #define THREAD_FIELDS_MAX (sizeof(thread_log_fields_daemon) / sizeof(thread_log_fields_daemon[0]))
 
-void log_stack_pop(struct log_stack_entry (*ptr)[]) {
-    struct log_stack_entry *lgs = &((*ptr)[0]);
+void log_stack_pop(void *ptr) {
+    if(!ptr)
+        return;
 
-    if(!lgs || !lgs->prev)
+    struct log_stack_entry *lgs = *(struct log_stack_entry (*)[])ptr;
+
+    if(!lgs->prev)
         return;
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(thread_log_stack_base, lgs, prev, next);

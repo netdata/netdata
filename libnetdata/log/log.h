@@ -134,7 +134,7 @@ struct log_stack_entry {
 #define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP_USEC, .u64 = (value), .set = true, }
 #define ND_LOG_FIELD_END() { .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
 
-void log_stack_pop(struct log_stack_entry (*ptr)[]);
+void log_stack_pop(void *ptr);
 void log_stack_push(struct log_stack_entry *lgs);
 
 #define D_WEB_BUFFER        0x0000000000000001
