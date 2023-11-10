@@ -1,6 +1,6 @@
 ### Understand the alert
 
-The `nut_ups_charge` alert indicates that the average UPS charge over the last minute has dropped below a predefined threshold. This might be due to a power outage, a UPS malfunction, or a sudden surge in power demands that the UPS can't handle.
+The `upsd_ups_battery_charge` alert indicates that the average UPS charge over the last minute has dropped below a predefined threshold. This might be due to a power outage, a UPS malfunction, or a sudden surge in power demands that the UPS can't handle.
 
 ### Troubleshoot the alert
 
