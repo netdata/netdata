@@ -92,11 +92,13 @@ typedef enum {
 
 void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting);
 void nd_log_set_facility(const char *facility);
+void nd_log_set_severity_level(const char *severity);
 void nd_log_initialize(void);
 void nd_log_reopen_log_files(void);
 void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(time_t period, size_t logs);
+void nd_log_initialize_for_external_plugins(void);
 
 struct log_stack_entry {
     int id;
@@ -132,18 +134,6 @@ struct log_stack_entry {
 
 void log_stack_pop(struct log_stack_entry (*ptr)[]);
 void log_stack_push(struct log_stack_entry *lgs);
-
-//void example(void) {
-//    ND_LOG_STACK lgs[] = {
-//            ND_LOG_FIELD_STR(NDF_HOST, "hostname"),
-//            ND_LOG_FIELD_END(),
-//    };
-//    ND_LOG_STACK_PUSH(lgs);
-//
-//    netdata_log(NDLS_DAEMON, NDLP_CRITICAL, "%s", "blabla");
-//}
-
-
 
 #define D_WEB_BUFFER        0x0000000000000001
 #define D_WEB_CLIENT        0x0000000000000002
@@ -186,16 +176,9 @@ extern uint64_t debug_flags;
 
 extern const char *program_name;
 
-extern FILE *stdaccess;
-extern FILE *stdhealth;
-
 #ifdef ENABLE_ACLK
-extern FILE *aclklog;
 extern int aclklog_enabled;
 #endif
-
-extern int access_log_syslog;
-extern int health_log_syslog;
 
 #define LOG_DATE_LENGTH 26
 void log_date(char *buffer, size_t len, time_t now);
@@ -205,22 +188,7 @@ static inline void debug_dummy(void) {}
 void nd_log_limits_reset(void);
 void nd_log_limits_unlimited(void);
 
-typedef enum netdata_log_level {
-    NETDATA_LOG_LEVEL_ERROR,
-    NETDATA_LOG_LEVEL_INFO,
-
-    NETDATA_LOG_LEVEL_END
-} netdata_log_level_t;
-
-#define NETDATA_LOG_LEVEL_INFO_STR "info"
-#define NETDATA_LOG_LEVEL_ERROR_STR "error"
-#define NETDATA_LOG_LEVEL_ERROR_SHORT_STR "err"
-
-extern netdata_log_level_t global_log_severity_level;
-netdata_log_level_t log_severity_string_to_severity_level(char *level);
-char *log_severity_level_to_severity_string(netdata_log_level_t level);
-void log_set_global_severity_level(netdata_log_level_t value);
-void log_set_global_severity_for_external_plugins();
+#define NDLP_INFO_STR "info"
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
@@ -248,6 +216,12 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)    netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define netdata_log_access(args...) netdata_logger(NDLS_ACCESS,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_health(args...) netdata_logger(NDLS_HEALTH,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
+
+#define log_aclk_message_bin(__data, __data_len, __tx, __mqtt_topic, __message_name) \
+    nd_log(NDLS_ACLK, NDLP_INFO, \
+        "direction:%s message:'%s' topic:'%s' json:'%.*s'", \
+        (__tx) ? "OUTGOING" : "INCOMING", __message_name, __mqtt_topic, __data_len, __data)
 
 // ----------------------------------------------------------------------------
 // logging with limits
@@ -268,12 +242,7 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 // ----------------------------------------------------------------------------
 
 void send_statistics(const char *action, const char *action_result, const char *action_data);
-void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
-void netdata_log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
-
-#ifdef ENABLE_ACLK
-void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
-#endif
+void netdata_logger_fatal( const char *file, const char *function, unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 
 # ifdef __cplusplus
 }

@@ -1290,10 +1290,7 @@ int main(int argc, char **argv) {
 
     program_name = "perf.plugin";
 
-    // set errors flood protection to 100 logs per hour
-    nd_log_set_flood_protection(3600, 100);
-
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins();
 
     parse_command_line(argc, argv);
 

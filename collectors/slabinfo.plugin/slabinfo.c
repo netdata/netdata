@@ -341,7 +341,7 @@ int main(int argc, char **argv) {
     program_name = argv[0];
     program_version = "0.1";
 
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins();
 
     int update_every = 1, i, n, freq = 0;
 

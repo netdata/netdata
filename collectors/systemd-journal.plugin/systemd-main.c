@@ -13,10 +13,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     program_name = "systemd-journal.plugin";
 
-    // set errors flood protection to 100 logs per hour
-    nd_log_set_flood_protection(3600, 100);
-
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins();
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);

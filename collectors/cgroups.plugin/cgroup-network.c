@@ -685,8 +685,8 @@ int main(int argc, char **argv) {
 
     if(argc != 3)
         usage();
-    
-    log_set_global_severity_for_external_plugins();
+
+    nd_log_initialize_for_external_plugins();
 
     int arg = 1;
     int helper = 1;

@@ -164,7 +164,7 @@ int main(int argc, char **argv)
     // set the name for logging
     program_name = "debugfs.plugin";
 
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins();
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if (verify_netdata_host_prefix() == -1)

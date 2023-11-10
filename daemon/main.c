@@ -874,17 +874,13 @@ static void log_init(void) {
 
     nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
 
-    usec_t period = 1200, logs = 200;
+    time_t period = 1200;
+    size_t logs = 200;
     period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", period);
     logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)logs);
     nd_log_set_flood_protection(period, logs);
 
-    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
-    setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
-
-    char *selected_level = config_get(CONFIG_SECTION_LOGS, "severity level", NETDATA_LOG_LEVEL_INFO_STR);
-    global_log_severity_level = log_severity_string_to_severity_level(selected_level);
-    setenv("NETDATA_LOG_SEVERITY_LEVEL", selected_level , 1);
+    nd_log_set_severity_level(config_get(CONFIG_SECTION_LOGS, "severity level", NDLP_INFO_STR));
 }
 
 char *initialize_lock_directory_path(char *prefix)

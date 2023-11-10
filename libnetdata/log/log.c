@@ -17,6 +17,12 @@
 
 const char *program_name = "";
 
+uint64_t debug_flags = 0;
+
+#ifdef ENABLE_ACLK
+int aclklog_enabled = 0;
+#endif
+
 // ----------------------------------------------------------------------------
 
 typedef enum {
@@ -72,7 +78,7 @@ static const char *errno2str(int errnum, char *buf, size_t size) {
 static struct {
     int facility;
     const char *name;
-} facilities[] = {
+} nd_log_facilities[] = {
         { LOG_AUTH, "auth" },
         { LOG_AUTHPRIV, "authpriv" },
         { LOG_CRON, "cron" },
@@ -116,13 +122,64 @@ static struct {
 };
 
 static int nd_log_facility2id(const char *facility) {
-    size_t entries = sizeof(facilities) / sizeof(facilities[0]);
+    size_t entries = sizeof(nd_log_facilities) / sizeof(nd_log_facilities[0]);
     for(size_t i = 0; i < entries ;i++) {
-        if(strcmp(facilities[i].name, facility) == 0)
-            return facilities[i].facility;
+        if(strcmp(nd_log_facilities[i].name, facility) == 0)
+            return nd_log_facilities[i].facility;
     }
 
     return LOG_DAEMON;
+}
+
+static const char *nd_log_id2facility(int facility) {
+    size_t entries = sizeof(nd_log_facilities) / sizeof(nd_log_facilities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(nd_log_facilities[i].facility == facility)
+            return nd_log_facilities[i].name;
+    }
+
+    return "daemon";
+}
+
+// ----------------------------------------------------------------------------
+// priorities
+
+static struct {
+    ND_LOG_FIELD_PRIORITY priority;
+    const char *name;
+} nd_log_priorities[] = {
+        { .priority = NDLP_EMERG, .name = "emergency" },
+        { .priority = NDLP_EMERG, .name = "emerg" },
+        { .priority = NDLP_ALERT, .name = "alert" },
+        { .priority = NDLP_CRIT, .name = "critical" },
+        { .priority = NDLP_CRIT, .name = "crit" },
+        { .priority = NDLP_ERR, .name = "error" },
+        { .priority = NDLP_ERR, .name = "err" },
+        { .priority = NDLP_WARNING, .name = "warning" },
+        { .priority = NDLP_WARNING, .name = "warn" },
+        { .priority = NDLP_NOTICE, .name = "notice" },
+        { .priority = NDLP_INFO, .name = NDLP_INFO_STR },
+        { .priority = NDLP_DEBUG, .name = "debug" },
+};
+
+static int nd_log_priority2id(const char *priority) {
+    size_t entries = sizeof(nd_log_priorities) / sizeof(nd_log_priorities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(nd_log_priorities[i].name, priority) == 0)
+            return nd_log_priorities[i].priority;
+    }
+
+    return NDLP_INFO;
+}
+
+static const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
+    size_t entries = sizeof(nd_log_priorities) / sizeof(nd_log_priorities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(priority == nd_log_priorities[i].priority)
+            return nd_log_priorities[i].name;
+    }
+
+    return NDLP_INFO_STR;
 }
 
 // ----------------------------------------------------------------------------
@@ -242,6 +299,7 @@ struct nd_log_source {
     FILE *fp;
     FILE **fp_set;
 
+    ND_LOG_FIELD_PRIORITY min_priority;
     const char *pending_msg;
     struct nd_log_limit limits;
 };
@@ -310,6 +368,7 @@ static struct {
                         .fd = STDIN_FILENO,
                         .fp_set = &stdin,
                         .fp = NULL,
+                        .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_ACCESS] = {
@@ -319,6 +378,7 @@ static struct {
                         .fd = -1,
                         .fp_set = NULL,
                         .fp = NULL,
+                        .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_ACLK] = {
@@ -328,6 +388,7 @@ static struct {
                         .fd = -1,
                         .fp_set = NULL,
                         .fp = NULL,
+                        .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_COLLECTORS] = {
@@ -337,6 +398,7 @@ static struct {
                         .fd = STDERR_FILENO,
                         .fp_set = &stderr,
                         .fp = NULL,
+                        .min_priority = NDLP_INFO,
                         .limits = ND_LOG_LIMITS_DEFAULT,
                 },
                 [NDLS_DEBUG] = {
@@ -346,6 +408,7 @@ static struct {
                         .fd = STDOUT_FILENO,
                         .fp_set = &stdout,
                         .fp = NULL,
+                        .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
                 [NDLS_DAEMON] = {
@@ -355,6 +418,7 @@ static struct {
                         .fd = -1,
                         .fp_set = NULL,
                         .fp = NULL,
+                        .min_priority = NDLP_INFO,
                         .limits = ND_LOG_LIMITS_DEFAULT,
                 },
                 [NDLS_HEALTH] = {
@@ -364,18 +428,11 @@ static struct {
                         .fd = -1,
                         .fp_set = NULL,
                         .fp = NULL,
+                        .min_priority = 0,
                         .limits = ND_LOG_LIMITS_UNLIMITED,
                 },
         },
 };
-
-static inline void nd_log_lock(ND_LOG_SOURCES type) {
-    spinlock_lock(&nd_log.sources[type].spinlock);
-}
-
-static inline void nd_log_unlock(ND_LOG_SOURCES type) {
-    spinlock_unlock(&nd_log.sources[type].spinlock);
-}
 
 void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting) {
     if(!setting || !*setting || strcmp(setting, "none") == 0) {
@@ -422,13 +479,59 @@ void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting) {
     }
 }
 
+void nd_log_set_severity_level(const char *severity) {
+    if(!severity || !*severity)
+        severity = "info";
+
+    ND_LOG_FIELD_PRIORITY priority = nd_log_priority2id(severity);
+    nd_log.sources[NDLS_DAEMON].min_priority = priority;
+    nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
+    setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
+}
+
 void nd_log_set_facility(const char *facility) {
+    if(!facility || !*facility)
+        facility = "daemon";
+
     nd_log.syslog.facility = nd_log_facility2id(facility);
+    setenv("NETDATA_SYSLOG_FACILITY", nd_log_id2facility(nd_log.syslog.facility), 1);
 }
 
 void nd_log_set_flood_protection(time_t period, size_t logs) {
     nd_log.limits.throttle_period = period;
     nd_log.limits.logs_per_period = nd_log.limits.logs_per_period_backup = logs;
+
+    char buf[100];
+    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )period);
+    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", buf, 1);
+    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )logs);
+    setenv("NETDATA_ERRORS_PER_PERIOD", buf, 1);
+}
+
+void nd_log_initialize_for_external_plugins(void) {
+    nd_log_set_severity_level(getenv("NETDATA_LOG_SEVERITY_LEVEL"));
+    nd_log_set_facility(getenv("NETDATA_SYSLOG_FACILITY"));
+
+    time_t period = 1200;
+    size_t logs = 200;
+    const char *s = getenv("NETDATA_ERRORS_THROTTLE_PERIOD");
+    if(s && *s) {
+        period = str2l(s);
+        if(period < 0) period = 0;
+    }
+
+    s = getenv("NETDATA_ERRORS_PER_PERIOD");
+    if(s && *s)
+        logs = str2u(s);
+
+    nd_log_set_flood_protection(period, logs);
+
+
+    nd_log.sources[NDLS_ACCESS] = nd_log.sources[NDLS_COLLECTORS];
+    nd_log.sources[NDLS_ACLK]   = nd_log.sources[NDLS_COLLECTORS];
+    nd_log.sources[NDLS_DEBUG]  = nd_log.sources[NDLS_COLLECTORS];
+    nd_log.sources[NDLS_DAEMON] = nd_log.sources[NDLS_COLLECTORS];
+    nd_log.sources[NDLS_HEALTH] = nd_log.sources[NDLS_COLLECTORS];
 }
 
 static void nd_log_syslog_init() {
@@ -1256,7 +1359,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (NETDATA_LOG_LEVEL_ERROR > global_log_severity_level)
+    if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority < nd_log.sources[source].min_priority)
         return;
 #endif
 
@@ -1435,107 +1538,4 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
     }
 
     return false;
-}
-
-
-
-
-
-
-
-// ----------------------------------------------------------------------------
-
-uint64_t debug_flags = 0;
-
-int access_log_syslog = 0;
-int health_log_syslog = 0;
-
-FILE *stdaccess = NULL;
-FILE *stdhealth = NULL;
-
-netdata_log_level_t global_log_severity_level = NETDATA_LOG_LEVEL_INFO;
-
-#ifdef ENABLE_ACLK
-FILE *aclklog = NULL;
-int aclklog_enabled = 0;
-#endif
-
-// ----------------------------------------------------------------------------
-// health log
-
-void netdata_log_health( const char *fmt, ... ) {
-    va_list args;
-
-    if(health_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_INFO,  fmt, args );
-        va_end( args );
-    }
-
-    if(stdhealth) {
-        nd_log_lock(NDLS_HEALTH);
-
-        char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-        fprintf(stdhealth, "%s: ", date);
-
-        va_start( args, fmt );
-        vfprintf( stdhealth, fmt, args );
-        va_end( args );
-        fputc('\n', stdhealth);
-
-        nd_log_unlock(NDLS_HEALTH);
-    }
-}
-
-#ifdef ENABLE_ACLK
-void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name) {
-    if (aclklog) {
-        nd_log_lock(NDLS_ACLK);
-
-        char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-        fprintf(aclklog, "%s: %s Msg:\"%s\", MQTT-topic:\"%s\": ", date, tx ? "OUTGOING" : "INCOMING", message_name, mqtt_topic);
-
-        fwrite(data, data_len, 1, aclklog);
-
-        fputc('\n', aclklog);
-
-        nd_log_unlock(NDLS_ACLK);
-    }
-}
-#endif
-
-void log_set_global_severity_level(netdata_log_level_t value)
-{
-    global_log_severity_level = value;
-}
-
-netdata_log_level_t log_severity_string_to_severity_level(char *level)
-{
-    if (!strcmp(level, NETDATA_LOG_LEVEL_INFO_STR))
-        return NETDATA_LOG_LEVEL_INFO;
-    if (!strcmp(level, NETDATA_LOG_LEVEL_ERROR_STR) || !strcmp(level, NETDATA_LOG_LEVEL_ERROR_SHORT_STR))
-        return NETDATA_LOG_LEVEL_ERROR;
-
-    return NETDATA_LOG_LEVEL_INFO;
-}
-
-char *log_severity_level_to_severity_string(netdata_log_level_t level)
-{
-    switch (level) {
-        case NETDATA_LOG_LEVEL_ERROR:
-            return NETDATA_LOG_LEVEL_ERROR_STR;
-        case NETDATA_LOG_LEVEL_INFO:
-        default:
-            return NETDATA_LOG_LEVEL_INFO_STR;
-    }
-}
-
-void log_set_global_severity_for_external_plugins() {
-    char *s = getenv("NETDATA_LOG_SEVERITY_LEVEL");
-    if (!s)
-        return;
-    netdata_log_level_t level = log_severity_string_to_severity_level(s);
-    log_set_global_severity_level(level);
 }
