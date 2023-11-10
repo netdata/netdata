@@ -5235,17 +5235,12 @@ static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
-    stderror = stderr;
-
     clocks_init();
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
 
     // set the name for logging
     program_name = "apps.plugin";
-
-    // disable syslog for apps.plugin
-    error_log_syslog = 0;
 
     // set errors flood protection to 100 logs per hour
     nd_log_set_flood_protection(3600, 100);

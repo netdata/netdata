@@ -23,13 +23,13 @@ typedef enum {
 } ND_LOG_SOURCES;
 
 typedef enum {
+    NDLP_EMERG      = LOG_EMERG,
     NDLP_ALERT      = LOG_ALERT,
     NDLP_CRIT       = LOG_CRIT,
-    NDLP_EMERG      = LOG_EMERG,
     NDLP_ERR        = LOG_ERR,
     NDLP_WARNING    = LOG_WARNING,
-    NDLP_INFO       = LOG_INFO,
     NDLP_NOTICE     = LOG_NOTICE,
+    NDLP_INFO       = LOG_INFO,
     NDLP_DEBUG      = LOG_DEBUG,
 } ND_LOG_FIELD_PRIORITY;
 
@@ -51,6 +51,25 @@ typedef enum {
     NDF_NIDL_NODE,
     NDF_NIDL_INSTANCE,
     NDF_NIDL_DIMENSION,
+    NDF_CONNECTION_ID,
+    NDF_SRC_TRANSPORT,
+    NDF_SRC_IP,
+    NDF_SRC_PORT,
+    NDF_SRC_METHOD,
+    NDF_HANDLER,
+    NDF_REQUEST_MODE,
+    NDF_STATUS,
+    NDF_RESPONSE_CODE,
+    NDF_RESPONSE_BYTES,
+    NDF_RESPONSE_SIZE_BYTES,
+    NDF_RESPONSE_PREPARATION_TIME_USEC,
+    NDF_RESPONSE_SENT_TIME_USEC,
+    NDF_RESPONSE_TOTAL_TIME_USEC,
+
+    // put new items here
+    // leave the request URL and the message last
+
+    NDF_REQUEST_URL,
     NDF_MESSAGE,
 
     // terminator
@@ -60,10 +79,13 @@ typedef enum {
 typedef enum {
     NDFT_UNSET = 0,
     NDFT_TXT,
+    NDFT_STR,
+    NDFT_BFR,
     NDFT_U32,
     NDFT_I32,
     NDFT_U64,
     NDFT_I64,
+    NDFT_DBL,
     NDFT_PRIORITY,
     NDFT_TIMESTAMP,
 } ND_LOG_STACK_FIELD_TYPE;
@@ -81,11 +103,14 @@ struct log_stack_entry {
     ND_LOG_STACK_FIELD_TYPE type;
     bool set;
     union {
-        const char *str;
+        const char *txt;
+        struct netdata_string *str;
+        BUFFER *bfr;
         uint32_t u32;
         uint64_t u64;
         int32_t i32;
         int64_t i64;
+        double dbl;
         ND_LOG_FIELD_PRIORITY priority;
     };
     struct log_stack_entry *prev, *next;
@@ -94,16 +119,18 @@ struct log_stack_entry {
 #define ND_LOG_STACK _cleanup_(log_stack_pop) struct log_stack_entry
 #define ND_LOG_STACK_PUSH(lgs) log_stack_push(lgs)
 
-#define ND_LOG_FIELD_STR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TXT, .str = (value), .set = true, }
+#define ND_LOG_FIELD_TXT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TXT, .txt = (value), .set = true, }
+#define ND_LOG_FIELD_BFR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_BFR, .bfr = (value), .set = true, }
 #define ND_LOG_FIELD_U64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U64, .u64 = (value), .set = true, }
 #define ND_LOG_FIELD_U32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U32, .u32 = (value), .set = true, }
 #define ND_LOG_FIELD_I64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I64, .i64 = (value), .set = true, }
 #define ND_LOG_FIELD_I32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I32, .i32 = (value), .set = true, }
+#define ND_LOG_FIELD_DBL(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_DBL, .dbl = (value), .set = true, }
 #define ND_LOG_FIELD_PRI(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_PRIORITY, .priority = (value), .set = true, }
 #define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP, .u64 = (value), .set = true, }
 #define ND_LOG_FIELD_END() { .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
 
-void log_stack_pop(void **ptr);
+void log_stack_pop(struct log_stack_entry (*ptr)[]);
 void log_stack_push(struct log_stack_entry *lgs);
 
 //void example(void) {
@@ -161,7 +188,6 @@ extern const char *program_name;
 
 extern FILE *stdaccess;
 extern FILE *stdhealth;
-extern FILE *stderror;
 
 #ifdef ENABLE_ACLK
 extern FILE *aclklog;
@@ -169,7 +195,6 @@ extern int aclklog_enabled;
 #endif
 
 extern int access_log_syslog;
-extern int error_log_syslog;
 extern int health_log_syslog;
 
 #define LOG_DATE_LENGTH 26
@@ -222,6 +247,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #define netdata_log_info(args...)   netdata_logger(NDLS_DAEMON,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)    netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_access(args...) netdata_logger(NDLS_ACCESS,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 
 // ----------------------------------------------------------------------------
 // logging with limits
@@ -243,7 +269,6 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
-void netdata_log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
 void netdata_log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
 
 #ifdef ENABLE_ACLK

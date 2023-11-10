@@ -4055,8 +4055,6 @@ static void ebpf_manage_pid(pid_t pid)
  */
 int main(int argc, char **argv)
 {
-    stderror = stderr;
-
     log_set_global_severity_for_external_plugins();
 
     clocks_init();
@@ -4071,9 +4069,6 @@ int main(int argc, char **argv)
 
     // set name
     program_name = "ebpf.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
 
     // set errors flood protection to 100 logs per hour
     nd_log_set_flood_protection(3600, 100);

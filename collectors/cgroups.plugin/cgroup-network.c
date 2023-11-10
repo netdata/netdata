@@ -649,12 +649,10 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
-    stderror = stderr;
     pid_t pid = 0;
 
     program_name = argv[0];
     program_version = VERSION;
-    error_log_syslog = 0;
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;

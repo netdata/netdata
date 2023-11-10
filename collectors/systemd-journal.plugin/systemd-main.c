@@ -9,13 +9,9 @@ netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    stderror = stderr;
     clocks_init();
 
     program_name = "systemd-journal.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
 
     // set errors flood protection to 100 logs per hour
     nd_log_set_flood_protection(3600, 100);

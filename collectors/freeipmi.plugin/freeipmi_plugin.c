@@ -1431,7 +1431,6 @@ static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state)
 int main (int argc, char **argv) {
     bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
 
-    stderror = stderr;
     clocks_init();
 
     int update_every = IPMI_SENSORS_MIN_UPDATE_EVERY; // this is the minimum update frequency
@@ -1442,9 +1441,6 @@ int main (int argc, char **argv) {
     // initialization of netdata plugin
 
     program_name = "freeipmi.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
 
     // set errors flood protection to 100 logs per hour
     nd_log_set_flood_protection(3600, 100);

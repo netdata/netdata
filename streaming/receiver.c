@@ -557,25 +557,30 @@ static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *r
 }
 
 void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status) {
+    // this function may be called BEFORE we spawn the receiver thread
+    // so, we need to add the fields again (it does not harm)
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""),
+            ND_LOG_FIELD_TXT(NDF_STATUS, status),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, "STREAM RECEIVE"),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-    log_stream_connection(rpt->client_ip, rpt->client_port,
-                          (rpt->key && *rpt->key)? rpt->key : "-",
-                          (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : "-",
-                          (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-",
-                          status);
+    netdata_log_access("api_key:'%s' machine_guid:'%s' msg:'%s'"
+                       , (rpt->key && *rpt->key)? rpt->key : ""
+                       , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
+                       , msg);
 
-    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
-          "%s. "
-          "STATUS: %s%s%s%s"
-          , rpt->hostname
-          , rpt->client_ip, rpt->client_port
-          , msg
-          , status
-          , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
-          , stream_handshake_error_to_string(rpt->exit.reason)
-          , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
-    );
-
+    netdata_log_info("STREAM_RECEIVER for '%s': %s %s%s%s"
+                     , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
+                     , msg
+                     , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
+                     , stream_handshake_error_to_string(rpt->exit.reason)
+                     , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
+                     );
 }
 
 static void rrdpush_receive(struct receiver_state *rpt)
@@ -883,7 +888,17 @@ void *rrdpush_receiver_thread(void *ptr) {
 
     struct receiver_state *rpt = (struct receiver_state *)ptr;
     rpt->tid = gettid();
-    netdata_log_info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->tid);
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, "STREAM_RECEIVE"),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    netdata_log_info("STREAM %s [%s]:%s: receive thread started", rpt->hostname, rpt->client_ip, rpt->client_port);
 
     rrdpush_receive(rpt);
 

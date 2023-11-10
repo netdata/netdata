@@ -452,7 +452,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
-void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 int connect_to_one_of_destinations(
     RRDHOST *host,
     int default_port,

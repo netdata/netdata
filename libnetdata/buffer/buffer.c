@@ -89,8 +89,7 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
     // the buffer is \0 terminated by vsnprintfz
 }
 
-void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
-{
+void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args) {
     if(unlikely(!fmt || !*fmt)) return;
 
     size_t wrote = 0, need = 2, space_remaining = 0;
@@ -98,12 +97,15 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
     do {
         need += space_remaining * 2;
 
-        netdata_log_debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
         buffer_need_bytes(wb, need);
 
         space_remaining = wb->size - wb->len - 1;
 
-        wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], space_remaining, fmt, args);
+        // Use the copy of va_list for vsnprintf
+        va_list args_copy;
+        va_copy(args_copy, args);
+        wrote = (size_t) vsnprintf(&wb->buffer[wb->len], space_remaining, fmt, args_copy);
+        va_end(args_copy);
 
     } while(wrote >= space_remaining);
 

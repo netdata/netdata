@@ -57,12 +57,12 @@ static void load_stream_conf() {
     errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
     if(!appconfig_load(&stream_config, filename, 0, NULL)) {
-        netdata_log_info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
+        nd_log_daemon(NDLP_NOTICE, "CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
         if(!appconfig_load(&stream_config, filename, 0, NULL))
-            netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
+            nd_log_daemon(NDLP_NOTICE, "CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
 }
@@ -128,7 +128,7 @@ int rrdpush_init() {
             rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP]);
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
-        netdata_log_error("STREAM [send]: cannot enable sending thread - information is missing.");
+        nd_log_daemon(NDLP_WARNING, "STREAM [send]: cannot enable sending thread - information is missing.");
         default_rrdpush_enabled = 0;
     }
 
@@ -136,7 +136,7 @@ int rrdpush_init() {
     netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
-        netdata_log_info("SSL: streaming senders will skip SSL certificates verification.");
+        nd_log_daemon(NDLP_NOTICE, "SSL: streaming senders will skip SSL certificates verification.");
 
     netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
     netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);
@@ -542,13 +542,13 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
-            netdata_log_error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
+            nd_log_daemon(NDLP_NOTICE, "STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
     }
     else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
-        netdata_log_info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
+        nd_log_daemon(NDLP_INFO, "STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
 
@@ -798,7 +798,7 @@ bool destinations_init_add_one(char *entry, void *data) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
     t->count++;
-    netdata_log_info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
+    nd_log_daemon(NDLP_INFO, "STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
 
     return false; // we return false, so that we will get all defined destinations
 }
@@ -867,11 +867,6 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
 // ----------------------------------------------------------------------------
 // rrdpush receiver thread
 
-void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg) {
-    netdata_log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
-}
-
-
 static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     sender_lock(host->sender);
 
@@ -880,7 +875,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "[%s]", rrdhost_hostname(host));
 
         if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_sender_thread, (void *) host->sender))
-            netdata_log_error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
+            nd_log_daemon(NDLP_ERR, "STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
         else
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
     }
@@ -1040,7 +1035,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
 
             if (unlikely(rrdhost_set_system_info_variable(rpt->system_info, name, value))) {
-                netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
+                nd_log_daemon(NDLP_NOTICE, "STREAM '%s' [receive from [%s]:%s]: "
                      "request has parameter '%s' = '%s', which is not used."
                      , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
                      , rpt->client_ip, rpt->client_port
@@ -1233,11 +1228,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 #endif
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
-            netdata_log_error("STREAM '%s' [receive from [%s]:%s]: "
-                  "failed to reply."
-                  , rpt->hostname
-                  , rpt->client_ip, rpt->client_port
-            );
+            nd_log_daemon(NDLP_ERR, "STREAM '%s' [receive from [%s]:%s]: "
+                                    "failed to reply."
+                                    , rpt->hostname
+                                    , rpt->client_ip, rpt->client_port
+                                    );
         }
 
         receiver_state_free(rpt);
@@ -1313,11 +1308,11 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             // we can proceed with this connection
             receiver_stale = false;
 
-            netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
-                 "stopped previous stale receiver to accept this one."
-                 , rpt->hostname
-                 , rpt->client_ip, rpt->client_port
-            );
+            nd_log_daemon(NDLP_NOTICE, "STREAM '%s' [receive from [%s]:%s]: "
+                                       "stopped previous stale receiver to accept this one."
+                                       , rpt->hostname
+                                       , rpt->client_ip, rpt->client_port
+                                       );
         }
 
         if (receiver_working || receiver_stale) {
@@ -1344,8 +1339,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             return HTTP_RESP_CONFLICT;
         }
     }
-
-    netdata_log_debug(D_SYSTEM, "starting STREAM receive thread.");
 
     rrdpush_receiver_takeover_web_connection(w, rpt);
 
@@ -1479,8 +1472,8 @@ void log_receiver_capabilities(struct receiver_state *rpt) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, rpt->capabilities);
 
-    netdata_log_info("STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
-         rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
+    nd_log_daemon(NDLP_INFO, "STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
+                  rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
 
     buffer_free(wb);
 }
@@ -1489,8 +1482,8 @@ void log_sender_capabilities(struct sender_state *s) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, s->capabilities);
 
-    netdata_log_info("STREAM %s [send to %s]: established link with negotiated capabilities: %s",
-         rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
+    nd_log_daemon(NDLP_INFO, "STREAM %s [send to %s]: established link with negotiated capabilities: %s",
+                  rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
 
     buffer_free(wb);
 }

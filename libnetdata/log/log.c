@@ -18,6 +18,22 @@
 const char *program_name = "";
 
 // ----------------------------------------------------------------------------
+
+typedef enum {
+    ND_LOG_METHOD_DISABLED,
+    ND_LOG_METHOD_DEVNULL,
+    ND_LOG_METHOD_DEFAULT,
+    ND_LOG_METHOD_JOURNAL,
+    ND_LOG_METHOD_SYSLOG,
+    ND_LOG_METHOD_STDOUT,
+    ND_LOG_METHOD_STDERR,
+    ND_LOG_METHOD_FILE,
+} ND_LOG_METHOD;
+
+struct nd_log_source;
+static bool nd_log_limit_reached(struct nd_log_source *source);
+
+// ----------------------------------------------------------------------------
 // workaround strerror_r()
 
 #if defined(STRERROR_R_CHAR_P)
@@ -121,7 +137,7 @@ void log_date(char *buffer, size_t len, time_t now) {
 
     tmp = localtime_r(&t, &tmbuf);
 
-    if (tmp == NULL) {
+    if (unlikely(!tmp)) {
         buffer[0] = '\0';
         return;
     }
@@ -132,18 +148,81 @@ void log_date(char *buffer, size_t len, time_t now) {
     buffer[len - 1] = '\0';
 }
 
-// ----------------------------------------------------------------------------
+#define ISO8601_MAX_LENGTH 64
 
-typedef enum {
-    ND_LOG_METHOD_DISABLED,
-    ND_LOG_METHOD_DEVNULL,
-    ND_LOG_METHOD_DEFAULT,
-    ND_LOG_METHOD_JOURNAL,
-    ND_LOG_METHOD_SYSLOG,
-    ND_LOG_METHOD_STDOUT,
-    ND_LOG_METHOD_STDERR,
-    ND_LOG_METHOD_FILE,
-} ND_LOG_METHOD;
+void iso8601_datetime_utc(char *buffer, size_t len, usec_t now_ut) {
+    if(unlikely(!buffer || !len))
+        return;
+
+    time_t t = (time_t)(now_ut / USEC_PER_SEC);
+    struct tm *tmp, tmbuf;
+
+    // Use gmtime_r for UTC time conversion.
+    tmp = gmtime_r(&t, &tmbuf);
+
+    if (unlikely(!tmp)) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    // Format the date and time according to the ISO 8601 format with a 'Z' designator for UTC.
+    if (unlikely(strftime(buffer, len, "%Y-%m-%dT%H:%M:%SZ", tmp) == 0))
+        buffer[0] = '\0';
+
+    buffer[len - 1] = '\0';
+}
+
+void iso8601_datetime_with_local_timezone(char *buffer, size_t len, usec_t now_ut) {
+    if(unlikely(!buffer || len == 0))
+        return;
+
+    time_t t = (time_t)(now_ut / USEC_PER_SEC);
+    struct tm *tmp, tmbuf;
+
+    // Use localtime_r for local time conversion.
+    tmp = localtime_r(&t, &tmbuf);
+
+    if (unlikely(!tmp)) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    // Format the date and time according to the ISO 8601 format.
+    size_t used_length = strftime(buffer, len, "%Y-%m-%dT%H:%M:%S", tmp);
+    if (unlikely(used_length == 0)) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    // Calculate the timezone offset in hours and minutes from UTC.
+    long offset = tmbuf.tm_gmtoff;
+    int hours = (int)(offset / 3600); // Convert offset seconds to hours.
+    int minutes = (int)((offset % 3600) / 60); // Convert remainder to minutes (keep the sign for minutes).
+
+    // Check if timezone is UTC.
+    if (hours == 0 && minutes == 0) {
+        // For UTC, append 'Z' to the timestamp.
+        if (used_length + 1 < len) {
+            buffer[used_length] = 'Z';
+            buffer[used_length + 1] = '\0'; // null-terminate the string.
+        }
+    }
+    else {
+        // For non-UTC, format the timezone offset. Omit minutes if they are zero.
+        if (minutes == 0) {
+            // Check enough space is available for the timezone offset string.
+            if (used_length + 3 < len) // "+hh\0"
+                snprintf(buffer + used_length, len - used_length, "%+03d", hours);
+        }
+        else {
+            // Check enough space is available for the timezone offset string.
+            if (used_length + 6 < len) // "+hh:mm\0"
+                snprintf(buffer + used_length, len - used_length, "%+03d:%02d", hours, abs(minutes));
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
 
 struct nd_log_limit {
     usec_t started_monotonic_ut;
@@ -163,6 +242,7 @@ struct nd_log_source {
     FILE *fp;
     FILE **fp_set;
 
+    const char *pending_msg;
     struct nd_log_limit limits;
 };
 
@@ -526,139 +606,15 @@ void nd_log_chown_log_files(uid_t uid, gid_t gid) {
 }
 
 // ----------------------------------------------------------------------------
-// log limits
-
-void nd_log_limits_reset(void) {
-    nd_log.limits.logs_per_period = nd_log.limits.logs_per_period_backup;
-
-    spinlock_lock(&nd_log.stdout.spinlock);
-    spinlock_lock(&nd_log.stderr.spinlock);
-
-    for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        spinlock_lock(&nd_log.sources[i].spinlock);
-        nd_log.sources[i].limits.prevented = 0;
-        nd_log.sources[i].limits.counter = 0;
-        nd_log.sources[i].limits.started_monotonic_ut = 0;
-        spinlock_unlock(&nd_log.sources[i].spinlock);
-    }
-
-    spinlock_unlock(&nd_log.stdout.spinlock);
-    spinlock_unlock(&nd_log.stderr.spinlock);
-}
-
-void nd_log_limits_unlimited(void) {
-    nd_log_limits_reset();
-    nd_log.limits.logs_per_period = ((nd_log.limits.logs_per_period_backup * 10) < 10000) ? 10000 : (nd_log.limits.logs_per_period_backup * 10);
-}
-
-bool nd_log_limit_reached(struct nd_log_source *source, bool reset, FILE *fp) {
-    // do not throttle if the period is 0
-    if(nd_log.limits.throttle_period == 0)
-        return 0;
-
-    // prevent all logs if the errors per period is 0
-    if(nd_log.limits.logs_per_period == 0)
-#ifdef NETDATA_INTERNAL_CHECKS
-        return false;
-#else
-        return true;
-#endif
-
-    if(!fp)
-        fp = stderr;
-
-    usec_t now_ut = now_monotonic_usec();
-    if(!source->limits.started_monotonic_ut)
-        source->limits.started_monotonic_ut = now_ut;
-
-    if(reset) {
-        if(source->limits.prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                    fp,
-                    "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
-                    "(prevented %lu logs in the last %"PRId64" seconds).\n",
-                    date,
-                    program_name,
-                    program_name,
-                    source->limits.prevented,
-                    (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC));
-        }
-
-        source->limits.started_monotonic_ut = now_ut;
-        source->limits.counter = 0;
-        source->limits.prevented = 0;
-    }
-
-    // detect if we log too much
-    source->limits.counter++;
-
-    if(now_ut - source->limits.started_monotonic_ut > nd_log.limits.throttle_period) {
-        if(source->limits.prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                    fp,
-                    "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
-                    "(prevented %lu logs in the last %"PRId64" seconds).\n",
-                    date,
-                    program_name,
-                    program_name,
-                    source->limits.prevented,
-                    (int64_t)nd_log.limits.throttle_period);
-        }
-
-        // restart the period accounting
-        source->limits.started_monotonic_ut = now_ut;
-        source->limits.counter = 1;
-        source->limits.prevented = 0;
-
-        // log this error
-        return false;
-    }
-
-    if(source->limits.counter > nd_log.limits.logs_per_period) {
-        if(!source->limits.prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                    fp,
-                    "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
-                    "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
-                    date,
-                    program_name,
-                    source->limits.counter,
-                    (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC),
-                    nd_log.limits.logs_per_period,
-                    (int64_t)nd_log.limits.throttle_period,
-                    program_name,
-                    (int64_t)((source->limits.started_monotonic_ut + (nd_log.limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
-        }
-
-        source->limits.prevented++;
-
-        // prevent logging this error
-#ifdef NETDATA_INTERNAL_CHECKS
-        return false;
-#else
-        return true;
-#endif
-    }
-
-    return false;
-}
-
-// ----------------------------------------------------------------------------
 // annotators
-
 struct log_field;
-static void errno_annotator(BUFFER *wb, struct log_field *lf);
-static void priority_annotator(BUFFER *wb, struct log_field *lf);
+static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+static void timestamp_annotator(BUFFER *wb, const char *key, struct log_field *lf);
 
 // ----------------------------------------------------------------------------
 
-typedef void (*annotator_t)(BUFFER *wb, struct log_field *lf);
+typedef void (*annotator_t)(BUFFER *wb, const char *key, struct log_field *lf);
 
 struct log_field {
     const char *journal;
@@ -669,13 +625,14 @@ struct log_field {
 
 static __thread struct log_stack_entry *thread_log_stack_base = NULL;
 static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
-        [NDF_SYSLOG_IDENTIFIER] = {
-                .journal = "SYSLOG_IDENTIFIER",
-                .logfmt = "app",
-        },
         [NDF_TIMESTAMP_REALTIME_USEC] = {
                 .journal = NULL,
-                .logfmt = "ts",
+                .logfmt = "timestamp",
+                .logfmt_annotator = timestamp_annotator,
+        },
+        [NDF_SYSLOG_IDENTIFIER] = {
+                .journal = "SYSLOG_IDENTIFIER",
+                .logfmt = "comm",
         },
         [NDF_LINE] = {
                 .journal = "CODE_LINE",
@@ -696,7 +653,7 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
         },
         [NDF_PRIORITY] = {
                 .journal = "PRIORITY",
-                .logfmt = "prio",
+                .logfmt = "level",
                 .logfmt_annotator = priority_annotator,
         },
         [NDF_SESSION] = {
@@ -709,7 +666,7 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
         },
         [NDF_THREAD] = {
                 .journal = "THREAD_TAG",
-                .logfmt = "th",
+                .logfmt = "thread",
         },
         [NDF_PLUGIN] = {
                 .journal = "ND_PLUGIN",
@@ -735,16 +692,80 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
                 .journal = "NIDL_DIMENSION",
                 .logfmt = "rd",
         },
+        [NDF_CONNECTION_ID] = {
+                .journal = "ND_CONNECTION_ID",
+                .logfmt = "conn",
+        },
+        [NDF_SRC_TRANSPORT] = {
+                .journal = "ND_SRC_TRANSPORT",
+                .logfmt = "src_transport",
+        },
+        [NDF_SRC_IP] = {
+                .journal = "ND_SRC_IP",
+                .logfmt = "src_ip",
+        },
+        [NDF_SRC_PORT] = {
+                .journal = "ND_SRC_PORT",
+                .logfmt = "src_port",
+        },
+        [NDF_SRC_METHOD] = {
+                .journal = "ND_SRC_METHOD",
+                .logfmt = "src_method",
+        },
+        [NDF_HANDLER] = {
+                .journal = "ND_HANDLER",
+                .logfmt = "handler",
+        },
+        [NDF_REQUEST_MODE] = {
+                .journal = "ND_REQUEST_MODE",
+                .logfmt = "mode",
+        },
+        [NDF_STATUS] = {
+                .journal = "ND_STATUS",
+                .logfmt = "status",
+        },
+        [NDF_RESPONSE_CODE] = {
+                .journal = "ND_RESPONSE_CODE",
+                .logfmt = "code",
+        },
+        [NDF_RESPONSE_BYTES] = {
+                .journal = "ND_RESPONSE_SENT_BYTES",
+                .logfmt = "sent_bytes",
+        },
+        [NDF_RESPONSE_SIZE_BYTES] = {
+                .journal = "ND_RESPONSE_SIZE_BYTES",
+                .logfmt = "size_bytes",
+        },
+        [NDF_RESPONSE_PREPARATION_TIME_USEC] = {
+                .journal = "ND_RESPONSE_PREP_TIME_USEC",
+                .logfmt = "prep_ut",
+        },
+        [NDF_RESPONSE_SENT_TIME_USEC] = {
+                .journal = "ND_RESPONSE_SENT_TIME_USEC",
+                .logfmt = "sent_ut",
+        },
+        [NDF_RESPONSE_TOTAL_TIME_USEC] = {
+                .journal = "ND_RESPONSE_TOTAL_TIME_USEC",
+                .logfmt = "total_ut",
+        },
+
+        // put new items here
+        // leave the request URL and the message last
+
+        [NDF_REQUEST_URL] = {
+                .journal = "ND_REQUEST_URL",
+                .logfmt = "url",
+        },
         [NDF_MESSAGE] = {
                 .journal = "MESSAGE",
                 .logfmt = "msg",
         },
 };
 
-void log_stack_pop(void **ptr) {
-    struct log_stack_entry *lgs = (struct log_stack_entry *)(*ptr);
+void log_stack_pop(struct log_stack_entry (*ptr)[]) {
+    struct log_stack_entry *lgs = &((*ptr)[0]);
 
-    if(!lgs || !lgs->prev || !lgs->next)
+    if(!lgs || !lgs->prev)
         return;
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(thread_log_stack_base, lgs, prev, next);
@@ -756,6 +777,151 @@ void log_stack_push(struct log_stack_entry *lgs) {
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(thread_log_stack_base, lgs, prev, next);
 }
+
+// ----------------------------------------------------------------------------
+// logfmt formatter
+
+static void timestamp_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+    usec_t ut = lf->entry.u64;
+
+    if(!ut)
+        return;
+
+    char datetime[ISO8601_MAX_LENGTH];
+    iso8601_datetime_utc(datetime, sizeof(datetime), ut);
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
+
+    buffer_strcat(wb, key);
+    buffer_fast_strcat(wb, "=", 1);
+    buffer_json_strcat(wb, datetime);
+}
+
+static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+    int errnum = lf->entry.i32;
+
+    if(errnum == 0)
+        return;
+
+    char buf[1024];
+    const char *s = errno2str(errnum, buf, sizeof(buf));
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
+
+    buffer_strcat(wb, key);
+    buffer_fast_strcat(wb, "=\"", 2);
+    buffer_print_int64(wb, errnum);
+    buffer_fast_strcat(wb, ", ", 2);
+    buffer_json_strcat(wb, s);
+    buffer_fast_strcat(wb, "\"", 1);
+}
+
+static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+    static char *priorities[] = {
+            [NDLP_ALERT] = "alert",
+            [NDLP_CRIT] = "critical",
+            [NDLP_EMERG] = "emergency",
+            [NDLP_ERR] = "error",
+            [NDLP_WARNING] = "warning",
+            [NDLP_INFO] = "info",
+            [NDLP_NOTICE] = "notice",
+            [NDLP_DEBUG] = "debug",
+    };
+
+    uint64_t pri = lf->entry.u64;
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
+
+    buffer_strcat(wb, key);
+    buffer_fast_strcat(wb, "=", 1);
+
+    size_t entries = sizeof(priorities) / sizeof(priorities[0]);
+    if(pri < entries)
+        buffer_strcat(wb, priorities[pri]);
+    else
+        buffer_print_uint64(wb, pri);
+}
+
+static bool string_has_spaces(const char *s) {
+    while(*s) {
+        if(isspace(*s))
+            return true;
+
+        s++;
+    }
+
+    return false;
+}
+
+static void string_to_logfmt(BUFFER *wb, const char *s) {
+    bool spaces = string_has_spaces(s);
+
+    if(spaces)
+        buffer_fast_strcat(wb, "\"", 1);
+
+    buffer_json_strcat(wb, s);
+
+    if(spaces)
+        buffer_fast_strcat(wb, "\"", 1);
+}
+
+static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max) {
+    for (size_t i = 0; i < fields_max; i++) {
+        if (!fields[i].entry.set || !fields[i].logfmt)
+            continue;
+
+        const char *key = fields[i].logfmt;
+
+        if(fields[i].logfmt_annotator)
+            fields[i].logfmt_annotator(wb, key, &fields[i]);
+        else {
+            if(buffer_strlen(wb))
+                buffer_fast_strcat(wb, " ", 1);
+
+            buffer_strcat(wb, key);
+            buffer_fast_strcat(wb, "=", 1);
+            switch(fields[i].entry.type) {
+                case NDFT_TXT:
+                    string_to_logfmt(wb, fields[i].entry.txt);
+                    break;
+                case NDFT_STR:
+                    string_to_logfmt(wb, string2str(fields[i].entry.str));
+                    break;
+                case NDFT_BFR:
+                    string_to_logfmt(wb, buffer_tostring(fields[i].entry.bfr));
+                    break;
+                case NDFT_U32:
+                    buffer_print_uint64(wb, fields[i].entry.u32);
+                    break;
+                case NDFT_I32:
+                    buffer_print_int64(wb, fields[i].entry.i32);
+                    break;
+                case NDFT_U64:
+                case NDFT_TIMESTAMP:
+                    buffer_print_uint64(wb, fields[i].entry.u64);
+                    break;
+                case NDFT_I64:
+                    buffer_print_int64(wb, fields[i].entry.i64);
+                    break;
+                case NDFT_DBL:
+                    buffer_print_netdata_double(wb, fields[i].entry.dbl);
+                    break;
+                case NDFT_PRIORITY:
+                    buffer_print_uint64(wb, fields[i].entry.priority);
+                    break;
+                default:
+                    // Handle other types as needed
+                    break;
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// journal logger
 
 static bool nd_logger_journal(struct log_field *fields, size_t fields_max) {
 #ifdef HAVE_SYSTEMD
@@ -772,7 +938,13 @@ static bool nd_logger_journal(struct log_field *fields, size_t fields_max) {
         char *value = NULL;
         switch (fields[i].entry.type) {
             case NDFT_TXT:
-                asprintf(&value, "%s=%s", key, fields[i].entry.str);
+                asprintf(&value, "%s=%s", key, fields[i].entry.txt);
+                break;
+            case NDFT_STR:
+                asprintf(&value, "%s=%s", key, string2str(fields[i].entry.str));
+                break;
+            case NDFT_BFR:
+                asprintf(&value, "%s=%s", key, buffer_tostring(fields[i].entry.bfr));
                 break;
             case NDFT_U32:
                 asprintf(&value, "%s=%u", key, fields[i].entry.u32);
@@ -786,6 +958,9 @@ static bool nd_logger_journal(struct log_field *fields, size_t fields_max) {
                 break;
             case NDFT_I64:
                 asprintf(&value, "%s=%" PRId64, key, fields[i].entry.i64);
+                break;
+            case NDFT_DBL:
+                asprintf(&value, "%s=%f", key, fields[i].entry.dbl);
                 break;
             case NDFT_PRIORITY:
                 asprintf(&value, "%s=%d", key, (int)fields[i].entry.priority);
@@ -817,83 +992,11 @@ static bool nd_logger_journal(struct log_field *fields, size_t fields_max) {
 #endif
 }
 
-static void errno_annotator(BUFFER *wb, struct log_field *lf) {
-    char buf[1024];
-    const char *s = errno2str(lf->entry.i32, buf, sizeof(buf));
-
-    buffer_fast_strcat(wb, "\"", 1);
-    buffer_print_int64(wb, lf->entry.i32);
-    buffer_fast_strcat(wb, ", ", 2);
-    buffer_json_strcat(wb, s);
-    buffer_fast_strcat(wb, "\"", 1);
-}
-
-static void priority_annotator(BUFFER *wb, struct log_field *lf) {
-    static char *priorities[] = {
-            [NDLP_ALERT] = "ALERT",
-            [NDLP_CRIT] = "CRITICAL",
-            [NDLP_EMERG] = "EMERGENCY",
-            [NDLP_ERR] = "ERROR",
-            [NDLP_WARNING] = "WARNING",
-            [NDLP_INFO] = "INFO",
-            [NDLP_NOTICE] = "NOTICE",
-            [NDLP_DEBUG] = "DEBUG",
-    };
-
-    size_t entries = sizeof(priorities) / sizeof(priorities[0]);
-    if(lf->entry.u64 < entries)
-        buffer_strcat(wb, priorities[lf->entry.u64]);
-    else
-        buffer_print_uint64(wb, lf->entry.u64);
-}
-
-static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max) {
-    for (size_t i = 0; i < fields_max; i++) {
-        if (!fields[i].entry.set || !fields[i].logfmt)
-            continue;
-
-        if(buffer_strlen(wb))
-            buffer_fast_strcat(wb, " ", 1);
-
-        const char *key = fields[i].logfmt;
-        buffer_strcat(wb, key);
-        buffer_fast_strcat(wb, "=", 1);
-
-        if(fields[i].logfmt_annotator)
-            fields[i].logfmt_annotator(wb, &fields[i]);
-        else {
-            switch(fields[i].entry.type) {
-                case NDFT_TXT:
-                    buffer_fast_strcat(wb, "\"", 1);
-                    buffer_json_strcat(wb, fields[i].entry.str);
-                    buffer_fast_strcat(wb, "\"", 1);
-                    break;
-                case NDFT_U32:
-                    buffer_print_uint64(wb, fields[i].entry.u32);
-                    break;
-                case NDFT_I32:
-                    buffer_print_int64(wb, fields[i].entry.i32);
-                    break;
-                case NDFT_U64:
-                case NDFT_TIMESTAMP:
-                    buffer_print_uint64(wb, fields[i].entry.u64);
-                    break;
-                case NDFT_I64:
-                    buffer_print_int64(wb, fields[i].entry.i64);
-                    break;
-                case NDFT_PRIORITY:
-                    buffer_print_uint64(wb, fields[i].entry.priority);
-                    break;
-                default:
-                    // Handle other types as needed
-                    break;
-            }
-        }
-    }
-}
+// ----------------------------------------------------------------------------
+// syslog logger - uses logfmt
 
 static bool nd_logger_syslog(int priority, struct log_field *fields, size_t fields_max) {
-    BUFFER *wb = buffer_create(256, NULL);
+    BUFFER *wb = buffer_create(1024, NULL);
 
     nd_logger_logfmt(wb, fields, fields_max);
     syslog(priority, "%s", buffer_tostring(wb));
@@ -902,13 +1005,11 @@ static bool nd_logger_syslog(int priority, struct log_field *fields, size_t fiel
     return true;
 }
 
-static bool nd_logger_file(FILE *fp, struct log_field *fields, size_t fields_max) {
-    BUFFER *wb = buffer_create(256, NULL);
+// ----------------------------------------------------------------------------
+// file logger - uses logfmt
 
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-    buffer_strcat(wb, date);
-    buffer_fast_strcat(wb, ":", 1);
+static bool nd_logger_file(FILE *fp, struct log_field *fields, size_t fields_max) {
+    BUFFER *wb = buffer_create(1024, NULL);
 
     nd_logger_logfmt(wb, fields, fields_max);
     int r = fprintf(fp, "%s\n", buffer_tostring(wb));
@@ -916,6 +1017,9 @@ static bool nd_logger_file(FILE *fp, struct log_field *fields, size_t fields_max
     buffer_free(wb);
     return r > 0;
 }
+
+// ----------------------------------------------------------------------------
+// logger router
 
 static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
     *spinlock = NULL;
@@ -984,6 +1088,46 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
     return method;
 }
 
+// ----------------------------------------------------------------------------
+// high level logger
+
+static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+                                 ND_LOG_METHOD method, struct nd_log_source *source,
+                                 struct log_field *fields, size_t fields_max) {
+    if(spinlock)
+        spinlock_lock(spinlock);
+
+    // check the limits
+    if(limit && nd_log_limit_reached(source))
+        goto cleanup;
+
+    if(method == ND_LOG_METHOD_JOURNAL) {
+        if(!nd_logger_journal(fields, fields_max)) {
+            // we can't log to journal, let's log to stderr
+            if(spinlock)
+                spinlock_unlock(spinlock);
+
+            method = ND_LOG_METHOD_FILE;
+            spinlock = &nd_log.stderr.spinlock;
+            fp = stderr;
+
+            if(spinlock)
+                spinlock_lock(spinlock);
+        }
+    }
+
+    if(method == ND_LOG_METHOD_SYSLOG)
+        nd_logger_syslog(priority, fields, fields_max);
+
+    if(method == ND_LOG_METHOD_FILE)
+        nd_logger_file(fp, fields, fields_max);
+
+
+cleanup:
+    if(spinlock)
+        spinlock_unlock(spinlock);
+}
+
 static void nd_logger(const char *file, const char *function, const unsigned long line,
                ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit,
                const char *fmt, va_list ap) {
@@ -1013,13 +1157,13 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     // set the common fields that are automatically set by the logging subsystem
 
     if(!thread_log_fields_daemon[NDF_SYSLOG_IDENTIFIER].entry.set) {
-        thread_log_fields_daemon[NDF_SYSLOG_IDENTIFIER].entry = ND_LOG_FIELD_STR(NDF_SYSLOG_IDENTIFIER, program_name);
+        thread_log_fields_daemon[NDF_SYSLOG_IDENTIFIER].entry = ND_LOG_FIELD_TXT(NDF_SYSLOG_IDENTIFIER, program_name);
     }
 
     if(!thread_log_fields_daemon[NDF_LINE].entry.set) {
         thread_log_fields_daemon[NDF_LINE].entry = ND_LOG_FIELD_U64(NDF_LINE, line);
-        thread_log_fields_daemon[NDF_FILE].entry = ND_LOG_FIELD_STR(NDF_FILE, file);
-        thread_log_fields_daemon[NDF_FUNC].entry = ND_LOG_FIELD_STR(NDF_FUNC, function);
+        thread_log_fields_daemon[NDF_FILE].entry = ND_LOG_FIELD_TXT(NDF_FILE, file);
+        thread_log_fields_daemon[NDF_FUNC].entry = ND_LOG_FIELD_TXT(NDF_FUNC, function);
     }
 
     if(!thread_log_fields_daemon[NDF_PRIORITY].entry.set) {
@@ -1039,7 +1183,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
                     thread_tag = os_threadname;
             }
         }
-        thread_log_fields_daemon[NDF_THREAD].entry = ND_LOG_FIELD_STR(NDF_THREAD, thread_tag);
+        thread_log_fields_daemon[NDF_THREAD].entry = ND_LOG_FIELD_TXT(NDF_THREAD, thread_tag);
     }
 
     if(!thread_log_fields_daemon[NDF_TIMESTAMP_REALTIME_USEC].entry.set) {
@@ -1050,68 +1194,65 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields_daemon[NDF_ERRNO].entry = ND_LOG_FIELD_I32(NDF_ERRNO, errno);
     }
 
-    BUFFER *wb = buffer_create(0, NULL);
-    buffer_vsprintf(wb, fmt, ap);
-    thread_log_fields_daemon[NDF_MESSAGE].entry = ND_LOG_FIELD_STR(NDF_MESSAGE, buffer_tostring(wb));
-
-    if(spinlock)
-        spinlock_lock(spinlock);
-
-    // check the limits
-    if(limit && nd_log_limit_reached(&nd_log.sources[source], false, fp))
-        goto cleanup;
-
-    if(method == ND_LOG_METHOD_JOURNAL) {
-        if(!nd_logger_journal(thread_log_fields_daemon, fields_max)) {
-            // we can't log to journal, let's log to stderr
-            method = ND_LOG_METHOD_FILE;
-            spinlock = &nd_log.stderr.spinlock;
-            fp = stderr;
-        }
+    BUFFER *wb = NULL;
+    if(fmt) {
+        wb = buffer_create(0, NULL);
+        buffer_vsprintf(wb, fmt, ap);
+        thread_log_fields_daemon[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
     }
 
-    if(method == ND_LOG_METHOD_SYSLOG)
-        nd_logger_syslog(priority, thread_log_fields_daemon, fields_max);
-
-    if(method == ND_LOG_METHOD_FILE)
-        nd_logger_file(fp, thread_log_fields_daemon, fields_max);
-
-
-cleanup:
-    if(spinlock)
-        spinlock_unlock(spinlock);
+    nd_logger_log_fields(spinlock, fp, limit, priority, method, &nd_log.sources[source],
+                         thread_log_fields_daemon , fields_max);
 
     buffer_free(wb);
+
+    if(nd_log.sources[source].pending_msg) {
+        // log a pending message
+
+        struct log_field fields[] = {
+                {
+                        .journal = NULL,
+                        .logfmt = "timestamp",
+                        .logfmt_annotator = timestamp_annotator,
+                        .entry = {
+                                .set = true,
+                                .type = NDFT_TIMESTAMP,
+                                .u64 = now_realtime_usec(),
+                        }
+                },
+                {
+                        .journal = "SYSLOG_IDENTIFIER",
+                        .logfmt = "comm",
+                        .entry = {
+                                .set = true,
+                                .type = NDFT_TXT,
+                                .txt = program_name,
+                        }
+                },
+                {
+                        .journal = "MESSAGE",
+                        .logfmt = "msg",
+                        .entry = {
+                                .set = true,
+                                .type = NDFT_TXT,
+                                .txt = nd_log.sources[source].pending_msg,
+                        }
+                },
+        };
+
+        nd_logger_log_fields(spinlock, fp, false, priority, method,
+                             &nd_log.sources[source],
+                             fields , sizeof(fields) / sizeof(fields[0]));
+
+        freez((void *)nd_log.sources[source].pending_msg);
+        nd_log.sources[source].pending_msg = NULL;
+    }
 
     errno = 0;
 }
 
-
-
-
 // ----------------------------------------------------------------------------
-
-uint64_t debug_flags = 0;
-
-int access_log_syslog = 0;
-int error_log_syslog = 0;
-int collector_log_syslog = 0;
-int health_log_syslog = 0;
-
-int stdaccess_fd = -1;
-FILE *stdaccess = NULL;
-FILE *stdhealth = NULL;
-FILE *stderror = NULL;
-
-netdata_log_level_t global_log_severity_level = NETDATA_LOG_LEVEL_INFO;
-
-#ifdef ENABLE_ACLK
-FILE *aclklog = NULL;
-int aclklog_enabled = 0;
-#endif
-
-// ----------------------------------------------------------------------------
-// error log
+// public API for loggers
 
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
@@ -1121,7 +1262,9 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, priority, true, fmt, args);
+    nd_logger(file, function, line, source, priority,
+              source == NDLS_DAEMON || source == NDLS_COLLECTORS,
+              fmt, args);
     va_end(args);
 }
 
@@ -1161,7 +1304,7 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
     char action_result[60+1];
 
-    const char *thread_tag = thread_log_fields_daemon[NDF_THREAD].entry.str;
+    const char *thread_tag = thread_log_fields_daemon[NDF_THREAD].entry.txt;
     if(!thread_tag)
         thread_tag = "UNKNOWN";
 
@@ -1197,32 +1340,125 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
 }
 
 // ----------------------------------------------------------------------------
-// access log
+// log limits
 
-void netdata_log_access( const char *fmt, ... ) {
-    va_list args;
+void nd_log_limits_reset(void) {
+    usec_t now_ut = now_monotonic_usec();
 
-    if(access_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_INFO,  fmt, args );
-        va_end( args );
+    nd_log.limits.logs_per_period = nd_log.limits.logs_per_period_backup;
+
+    spinlock_lock(&nd_log.stdout.spinlock);
+    spinlock_lock(&nd_log.stderr.spinlock);
+
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        spinlock_lock(&nd_log.sources[i].spinlock);
+        nd_log.sources[i].limits.prevented = 0;
+        nd_log.sources[i].limits.counter = 0;
+        nd_log.sources[i].limits.started_monotonic_ut = now_ut;
+        spinlock_unlock(&nd_log.sources[i].spinlock);
     }
 
-    if(stdaccess) {
-        nd_log_lock(NDLS_ACCESS);
-
-        char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-        fprintf(stdaccess, "%s: ", date);
-
-        va_start( args, fmt );
-        vfprintf( stdaccess, fmt, args );
-        va_end( args );
-        fputc('\n', stdaccess);
-
-        nd_log_unlock(NDLS_ACCESS);
-    }
+    spinlock_unlock(&nd_log.stdout.spinlock);
+    spinlock_unlock(&nd_log.stderr.spinlock);
 }
+
+void nd_log_limits_unlimited(void) {
+    nd_log_limits_reset();
+    nd_log.limits.logs_per_period = ((nd_log.limits.logs_per_period_backup * 10) < 10000) ? 10000 : (nd_log.limits.logs_per_period_backup * 10);
+}
+
+static bool nd_log_limit_reached(struct nd_log_source *source) {
+    if(nd_log.limits.throttle_period == 0 || nd_log.limits.logs_per_period == 0)
+        return false;
+
+    usec_t now_ut = now_monotonic_usec();
+    if(!source->limits.started_monotonic_ut)
+        source->limits.started_monotonic_ut = now_ut;
+
+    source->limits.counter++;
+
+    if(now_ut - source->limits.started_monotonic_ut > nd_log.limits.throttle_period) {
+        if(source->limits.prevented) {
+            BUFFER *wb = buffer_create(1024, NULL);
+            buffer_sprintf(wb,
+                           "LOG FLOOD PROTECTION: resuming logging "
+                           "(prevented %lu logs in the last %"PRId64" seconds).",
+                           source->limits.prevented,
+                           (int64_t)nd_log.limits.throttle_period);
+
+            if(source->pending_msg)
+                freez((void *)source->pending_msg);
+
+            source->pending_msg = strdupz(buffer_tostring(wb));
+
+            buffer_free(wb);
+        }
+
+        // restart the period accounting
+        source->limits.started_monotonic_ut = now_ut;
+        source->limits.counter = 1;
+        source->limits.prevented = 0;
+
+        // log this error
+        return false;
+    }
+
+    if(source->limits.counter > nd_log.limits.logs_per_period) {
+        if(!source->limits.prevented) {
+            BUFFER *wb = buffer_create(1024, NULL);
+            buffer_sprintf(wb,
+                    "LOG FLOOD PROTECTION: too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
+                    "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.",
+                    source->limits.counter,
+                    (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC),
+                    nd_log.limits.logs_per_period,
+                    (int64_t)nd_log.limits.throttle_period,
+                    program_name,
+                    (int64_t)((source->limits.started_monotonic_ut + (nd_log.limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
+
+            if(source->pending_msg)
+                freez((void *)source->pending_msg);
+
+            source->pending_msg = strdupz(buffer_tostring(wb));
+
+            buffer_free(wb);
+        }
+
+        source->limits.prevented++;
+
+        // prevent logging this error
+#ifdef NETDATA_INTERNAL_CHECKS
+        return false;
+#else
+        return true;
+#endif
+    }
+
+    return false;
+}
+
+
+
+
+
+
+
+// ----------------------------------------------------------------------------
+
+uint64_t debug_flags = 0;
+
+int access_log_syslog = 0;
+int health_log_syslog = 0;
+
+FILE *stdaccess = NULL;
+FILE *stdhealth = NULL;
+
+netdata_log_level_t global_log_severity_level = NETDATA_LOG_LEVEL_INFO;
+
+#ifdef ENABLE_ACLK
+FILE *aclklog = NULL;
+int aclklog_enabled = 0;
+#endif
 
 // ----------------------------------------------------------------------------
 // health log

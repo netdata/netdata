@@ -1283,16 +1283,12 @@ void parse_command_line(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-    stderror = stderr;
     clocks_init();
 
     // ------------------------------------------------------------------------
     // initialization of netdata plugin
 
     program_name = "perf.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
 
     // set errors flood protection to 100 logs per hour
     nd_log_set_flood_protection(3600, 100);

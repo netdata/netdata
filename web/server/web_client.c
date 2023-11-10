@@ -217,22 +217,31 @@ void web_client_request_done(struct web_client *w) {
                 break;
         }
 
+        usec_t prep_ut = w->timings.tv_ready.tv_sec ? dt_usec(&w->timings.tv_ready, &w->timings.tv_in) : 0;
+        usec_t sent_ut = w->timings.tv_ready.tv_sec ? dt_usec(&tv, &w->timings.tv_ready) : 0;
+        usec_t total_ut = dt_usec(&tv, &w->timings.tv_in);
+        strip_control_characters((char *)buffer_tostring(w->url_as_received));
+
+        ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
+                ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, SSL_connection(&w->ssl) ? "https" : "http"),
+                ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+                ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
+                ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+                ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, mode),
+                ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
+                ND_LOG_FIELD_U64(NDF_RESPONSE_BYTES, sent),
+                ND_LOG_FIELD_U64(NDF_RESPONSE_SIZE_BYTES, size),
+                ND_LOG_FIELD_U64(NDF_RESPONSE_PREPARATION_TIME_USEC, prep_ut),
+                ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_TIME_USEC, sent_ut),
+                ND_LOG_FIELD_U64(NDF_RESPONSE_TOTAL_TIME_USEC, total_ut),
+                ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
         // access log
-        netdata_log_access("%llu: %d '[%s]:%s' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
-                   w->id
-                   , gettid()
-                   , w->client_ip
-                   , w->client_port
-                   , mode
-                   , sent
-                   , size
-                   , -((size > 0) ? ((double)(size - sent) / (double) size * 100.0) : 0.0)
-                   , (double)dt_usec(&w->timings.tv_ready, &w->timings.tv_in) / 1000.0
-                   , (double)dt_usec(&tv, &w->timings.tv_ready) / 1000.0
-                   , (double)dt_usec(&tv, &w->timings.tv_in) / 1000.0
-                   , w->response.code
-                   , strip_control_characters((char *)buffer_tostring(w->url_as_received))
-        );
+        netdata_log_access(NULL);
     }
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
@@ -1730,6 +1739,16 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 }
 
 void web_client_process_request(struct web_client *w) {
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, SSL_connection(&w->ssl) ? "https" : "http"),
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
+            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+            ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     // start timing us
     web_client_timeout_checkpoint_init(w);
