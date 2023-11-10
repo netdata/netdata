@@ -321,10 +321,10 @@
       To enable the webhook integration on AWS SNS you need:
       1. [Setting up access for Amazon SNS](https://docs.aws.amazon.com/sns/latest/dg/sns-setting-up.html)
       2. Create a topic
-        - On AWS SNS management console click on **Create topic**
-        - On the **Details** section, the standard type and provide the topic name
-        - On the **Access policy** section, change the **Publishers** option to **Only the specified AWS accounts** and provide the Netdata AWS account **(123269920060)** that will be used to publish notifications to the topic being created
-        - Finally, click on **Create topic** on the bottom of the page
+          - On AWS SNS management console click on **Create topic**
+          - On the **Details** section, the standard type and provide the topic name
+          - On the **Access policy** section, change the **Publishers** option to **Only the specified AWS accounts** and provide the Netdata AWS account **(123269920060)** that will be used to publish notifications to the topic being created
+          - Finally, click on **Create topic** on the bottom of the page
       3. Now, use the new **Topic ARN** while adding AWS SNS integration on your space.
 
 - id: 'notify-cloud-webhook'
