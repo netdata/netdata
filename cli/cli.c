@@ -4,11 +4,6 @@
 #include "daemon/pipename.h"
 
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
-#if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (NETDATA_LOG_LEVEL_ERROR > global_log_severity_level)
-        return;
-#endif
-
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args );

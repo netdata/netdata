@@ -1429,23 +1429,15 @@ static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state)
 // main, command line arguments parsing
 
 int main (int argc, char **argv) {
-    bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
-
     clocks_init();
+    nd_log_initialize_for_external_plugins("freeipmi.plugin");
+    netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
+
+    bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
 
     int update_every = IPMI_SENSORS_MIN_UPDATE_EVERY; // this is the minimum update frequency
     int update_every_sel = IPMI_SEL_MIN_UPDATE_EVERY; // this is the minimum update frequency for SEL events
     bool debug = false;
-
-    // ------------------------------------------------------------------------
-    // initialization of netdata plugin
-
-    program_name = "freeipmi.plugin";
-
-    nd_log_initialize_for_external_plugins();
-
-    // initialize the threads
-    netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
 
     // ------------------------------------------------------------------------
     // parse command line parameters

@@ -4055,9 +4055,9 @@ static void ebpf_manage_pid(pid_t pid)
  */
 int main(int argc, char **argv)
 {
-    nd_log_initialize_for_external_plugins();
-
     clocks_init();
+    nd_log_initialize_for_external_plugins("ebpf.plugin");
+
     main_thread_id = gettid();
 
     set_global_variables();
@@ -4066,9 +4066,6 @@ int main(int argc, char **argv)
 
     if (ebpf_check_conditions())
         return 2;
-
-    // set name
-    program_name = "ebpf.plugin";
 
     if (ebpf_adjust_memory_limit())
         return 3;

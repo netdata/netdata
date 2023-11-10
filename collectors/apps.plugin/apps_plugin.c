@@ -5234,15 +5234,10 @@ static void function_processes(const char *transaction, char *function __maybe_u
 static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
-    // debug_flags = D_PROCFILE;
     clocks_init();
+    nd_log_initialize_for_external_plugins("apps.plugin");
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
-
-    // set the name for logging
-    program_name = "apps.plugin";
-
-    nd_log_initialize_for_external_plugins();
 
     bool send_resource_usage = true;
     {

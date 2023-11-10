@@ -10,7 +10,7 @@ extern "C" {
 #include "../libnetdata.h"
 
 typedef enum {
-    NDLS_INPUT = 0,   // internal use only
+    NDLS_STDIN = 0,   // internal use only
     NDLS_ACCESS,      // access.log
     NDLS_ACLK,        // aclk.log
     NDLS_COLLECTORS,  // collectors.log
@@ -36,6 +36,7 @@ typedef enum {
 typedef enum {
     NDF_STOP = 0,
     NDF_TIMESTAMP_REALTIME_USEC,
+    NDF_LOG_SOURCE,
     NDF_SYSLOG_IDENTIFIER,
     NDF_LINE,
     NDF_FILE,
@@ -98,7 +99,7 @@ void nd_log_reopen_log_files(void);
 void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(time_t period, size_t logs);
-void nd_log_initialize_for_external_plugins(void);
+void nd_log_initialize_for_external_plugins(const char *name);
 
 struct log_stack_entry {
     int id;

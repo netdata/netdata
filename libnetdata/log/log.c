@@ -183,6 +183,27 @@ static const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
 }
 
 // ----------------------------------------------------------------------------
+// log sources
+
+const char *log_sources_str[] = {
+        [NDLS_STDIN] = "INPUT",
+        [NDLS_ACCESS] = "ACCESS",
+        [NDLS_ACLK] = "ACLK",
+        [NDLS_COLLECTORS] = "COLLECTORS",
+        [NDLS_DAEMON] = "DAEMON",
+        [NDLS_HEALTH] = "HEALTH",
+        [NDLS_DEBUG] = "DEBUG",
+};
+
+static const char *nd_log_source2str(ND_LOG_SOURCES source) {
+    size_t entries = sizeof(log_sources_str) / sizeof(log_sources_str[0]);
+    if(source < entries)
+        return log_sources_str[source];
+
+    return "UNKNOWN";
+}
+
+// ----------------------------------------------------------------------------
 // format dates
 
 void log_date(char *buffer, size_t len, time_t now) {
@@ -361,7 +382,7 @@ static struct {
                 .initialized = false,
         },
         .sources = {
-                [NDLS_INPUT] = {
+                [NDLS_STDIN] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                         .method = ND_LOG_METHOD_DEVNULL,
                         .filename = "/dev/null",
@@ -508,7 +529,9 @@ void nd_log_set_flood_protection(time_t period, size_t logs) {
     setenv("NETDATA_ERRORS_PER_PERIOD", buf, 1);
 }
 
-void nd_log_initialize_for_external_plugins(void) {
+void nd_log_initialize_for_external_plugins(const char *name) {
+    program_name = name;
+
     nd_log_set_severity_level(getenv("NETDATA_LOG_SEVERITY_LEVEL"));
     nd_log_set_facility(getenv("NETDATA_SYSLOG_FACILITY"));
 
@@ -526,12 +549,21 @@ void nd_log_initialize_for_external_plugins(void) {
 
     nd_log_set_flood_protection(period, logs);
 
+    nd_log.sources[NDLS_ACCESS].method = ND_LOG_METHOD_FILE;
+    nd_log.sources[NDLS_ACCESS].fd = STDERR_FILENO;
+    nd_log.sources[NDLS_ACCESS].fp = stderr;
 
-    nd_log.sources[NDLS_ACCESS] = nd_log.sources[NDLS_COLLECTORS];
-    nd_log.sources[NDLS_ACLK]   = nd_log.sources[NDLS_COLLECTORS];
-    nd_log.sources[NDLS_DEBUG]  = nd_log.sources[NDLS_COLLECTORS];
-    nd_log.sources[NDLS_DAEMON] = nd_log.sources[NDLS_COLLECTORS];
-    nd_log.sources[NDLS_HEALTH] = nd_log.sources[NDLS_COLLECTORS];
+    nd_log.sources[NDLS_ACLK].method = ND_LOG_METHOD_FILE;
+    nd_log.sources[NDLS_ACLK].fd = STDERR_FILENO;
+    nd_log.sources[NDLS_ACLK].fp = stderr;
+
+    nd_log.sources[NDLS_DAEMON].method = ND_LOG_METHOD_FILE;
+    nd_log.sources[NDLS_DAEMON].fd = STDERR_FILENO;
+    nd_log.sources[NDLS_DAEMON].fp = stderr;
+
+    nd_log.sources[NDLS_HEALTH].method = ND_LOG_METHOD_FILE;
+    nd_log.sources[NDLS_HEALTH].fd = STDERR_FILENO;
+    nd_log.sources[NDLS_HEALTH].fp = stderr;
 }
 
 static void nd_log_syslog_init() {
@@ -733,21 +765,25 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
                 .logfmt = "timestamp",
                 .logfmt_annotator = timestamp_annotator,
         },
+        [NDF_LOG_SOURCE] = {
+                .journal = "ND_LOG_SOURCE",
+                .logfmt = "source",
+        },
         [NDF_SYSLOG_IDENTIFIER] = {
                 .journal = "SYSLOG_IDENTIFIER",
                 .logfmt = "comm",
         },
         [NDF_LINE] = {
                 .journal = "CODE_LINE",
-                .logfmt = "line",
+                .logfmt = NULL,
         },
         [NDF_FILE] = {
                 .journal = "CODE_FILE",
-                .logfmt = "file",
+                .logfmt = NULL,
         },
         [NDF_FUNC] = {
                 .journal = "CODE_FUNC",
-                .logfmt = "func",
+                .logfmt = NULL,
         },
         [NDF_ERRNO] = {
                 .journal = "ERRNO",
@@ -1259,9 +1295,11 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     // set the common fields that are automatically set by the logging subsystem
 
-    if(!thread_log_fields_daemon[NDF_SYSLOG_IDENTIFIER].entry.set) {
+    if(!thread_log_fields_daemon[NDF_LOG_SOURCE].entry.set)
+        thread_log_fields_daemon[NDF_LOG_SOURCE].entry = ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, nd_log_source2str(source));
+
+    if(!thread_log_fields_daemon[NDF_SYSLOG_IDENTIFIER].entry.set)
         thread_log_fields_daemon[NDF_SYSLOG_IDENTIFIER].entry = ND_LOG_FIELD_TXT(NDF_SYSLOG_IDENTIFIER, program_name);
-    }
 
     if(!thread_log_fields_daemon[NDF_LINE].entry.set) {
         thread_log_fields_daemon[NDF_LINE].entry = ND_LOG_FIELD_U64(NDF_LINE, line);

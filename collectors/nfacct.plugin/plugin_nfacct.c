@@ -748,13 +748,7 @@ void nfacct_signals()
 
 int main(int argc, char **argv) {
     clocks_init();
-
-    // ------------------------------------------------------------------------
-    // initialization of netdata plugin
-
-    program_name = "nfacct.plugin";
-
-    nd_log_initialize_for_external_plugins();
+    nd_log_initialize_for_external_plugins("nfacct.plugin");
 
     // ------------------------------------------------------------------------
     // parse command line parameters

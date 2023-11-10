@@ -227,13 +227,7 @@ void reset_metrics() {
 
 int main(int argc, char **argv) {
     clocks_init();
-
-    // ------------------------------------------------------------------------
-    // initialization of netdata plugin
-
-    program_name = "cups.plugin";
-
-    nd_log_initialize_for_external_plugins();
+    nd_log_initialize_for_external_plugins("cups.plugin");
 
     parse_command_line(argc, argv);
 
