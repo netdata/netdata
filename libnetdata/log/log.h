@@ -9,7 +9,7 @@ extern "C" {
 
 #include "../libnetdata.h"
 
-typedef enum {
+typedef enum  __attribute__((__packed__)) {
     NDLS_STDIN = 0,   // internal use only
     NDLS_ACCESS,      // access.log
     NDLS_ACLK,        // aclk.log
@@ -22,7 +22,7 @@ typedef enum {
     _NDLS_MAX,
 } ND_LOG_SOURCES;
 
-typedef enum {
+typedef enum __attribute__((__packed__)) {
     NDLP_EMERG      = LOG_EMERG,
     NDLP_ALERT      = LOG_ALERT,
     NDLP_CRIT       = LOG_CRIT,
@@ -33,7 +33,7 @@ typedef enum {
     NDLP_DEBUG      = LOG_DEBUG,
 } ND_LOG_FIELD_PRIORITY;
 
-typedef enum {
+typedef enum __attribute__((__packed__)) {
     NDF_STOP = 0,
     NDF_TIMESTAMP_REALTIME_USEC,
     NDF_LOG_SOURCE,
@@ -77,7 +77,7 @@ typedef enum {
     _NDF_MAX,
 } ND_LOG_FIELD_ID;
 
-typedef enum {
+typedef enum __attribute__((__packed__)) {
     NDFT_UNSET = 0,
     NDFT_TXT,
     NDFT_STR,
@@ -88,7 +88,7 @@ typedef enum {
     NDFT_I64,
     NDFT_DBL,
     NDFT_PRIORITY,
-    NDFT_TIMESTAMP,
+    NDFT_TIMESTAMP_USEC,
 } ND_LOG_STACK_FIELD_TYPE;
 
 void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting);
@@ -100,6 +100,7 @@ void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(time_t period, size_t logs);
 void nd_log_initialize_for_external_plugins(const char *name);
+void nd_log_set_thread_source(ND_LOG_SOURCES source);
 
 struct log_stack_entry {
     int id;
@@ -130,7 +131,7 @@ struct log_stack_entry {
 #define ND_LOG_FIELD_I32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I32, .i32 = (value), .set = true, }
 #define ND_LOG_FIELD_DBL(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_DBL, .dbl = (value), .set = true, }
 #define ND_LOG_FIELD_PRI(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_PRIORITY, .priority = (value), .set = true, }
-#define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP, .u64 = (value), .set = true, }
+#define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP_USEC, .u64 = (value), .set = true, }
 #define ND_LOG_FIELD_END() { .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
 
 void log_stack_pop(struct log_stack_entry (*ptr)[]);

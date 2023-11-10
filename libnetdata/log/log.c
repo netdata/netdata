@@ -25,7 +25,7 @@ int aclklog_enabled = 0;
 
 // ----------------------------------------------------------------------------
 
-typedef enum {
+typedef enum  __attribute__((__packed__)) {
     ND_LOG_METHOD_DISABLED,
     ND_LOG_METHOD_DEVNULL,
     ND_LOG_METHOD_DEFAULT,
@@ -325,7 +325,15 @@ struct nd_log_source {
     struct nd_log_limit limits;
 };
 
+static __thread ND_LOG_SOURCES overwrite_thread_source = 0;
+
+void nd_log_set_thread_source(ND_LOG_SOURCES source) {
+    overwrite_thread_source = source;
+}
+
 static struct {
+    ND_LOG_SOURCES overwrite_process_source;
+
     struct nd_log_source sources[_NDLS_MAX];
 
     struct {
@@ -339,17 +347,17 @@ static struct {
 
     struct {
         bool initialized;
-    } stdin;
+    } std_input;
 
     struct {
         SPINLOCK spinlock;
         bool initialized;
-    } stdout;
+    } std_output;
 
     struct {
         SPINLOCK spinlock;
         bool initialized;
-    } stderr;
+    } std_error;
 
     struct {
         uint32_t throttle_period;
@@ -358,6 +366,7 @@ static struct {
     } limits;
 
 } nd_log = {
+        .overwrite_process_source = 0,
         .limits = {
                 .throttle_period = 1200,
                 .logs_per_period = 200,
@@ -370,14 +379,14 @@ static struct {
                 .initialized = false,
                 .facility = LOG_DAEMON,
         },
-        .stdin = {
+        .std_input = {
                 .initialized = false,
         },
-        .stdout = {
+        .std_output = {
                 .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                 .initialized = false,
         },
-        .stderr = {
+        .std_error = {
                 .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                 .initialized = false,
         },
@@ -564,6 +573,8 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     nd_log.sources[NDLS_HEALTH].method = ND_LOG_METHOD_FILE;
     nd_log.sources[NDLS_HEALTH].fd = STDERR_FILENO;
     nd_log.sources[NDLS_HEALTH].fp = stderr;
+
+    nd_log.overwrite_process_source = NDLS_COLLECTORS;
 }
 
 static void nd_log_syslog_init() {
@@ -576,9 +587,9 @@ static void nd_log_syslog_init() {
 
 static bool nd_log_set_system_fd(struct nd_log_source *e, int new_fd) {
     if(new_fd == -1 || e->fd == -1 ||
-            (e->fd == STDIN_FILENO && nd_log.stdin.initialized) ||
-            (e->fd == STDOUT_FILENO && nd_log.stdout.initialized) ||
-            (e->fd == STDERR_FILENO && nd_log.stderr.initialized) ||
+            (e->fd == STDIN_FILENO && nd_log.std_input.initialized) ||
+            (e->fd == STDOUT_FILENO && nd_log.std_output.initialized) ||
+            (e->fd == STDERR_FILENO && nd_log.std_error.initialized) ||
             (e->fd != STDIN_FILENO && e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO))
         return false;
 
@@ -594,11 +605,11 @@ static bool nd_log_set_system_fd(struct nd_log_source *e, int new_fd) {
             close(new_fd);
 
         if(e->fd == STDIN_FILENO)
-            nd_log.stdin.initialized = true;
+            nd_log.std_input.initialized = true;
         else if(e->fd == STDOUT_FILENO)
-            nd_log.stdout.initialized = true;
+            nd_log.std_output.initialized = true;
         else if(e->fd == STDERR_FILENO)
-            nd_log.stderr.initialized = true;
+            nd_log.std_error.initialized = true;
 
         return ret;
     }
@@ -710,8 +721,8 @@ void nd_log_initialize(void) {
 void nd_log_reopen_log_files(void) {
     netdata_log_info("Reopening all log files.");
 
-    nd_log.stdout.initialized = false;
-    nd_log.stderr.initialized = false;
+    nd_log.std_output.initialized = false;
+    nd_log.std_error.initialized = false;
     nd_log_initialize();
 
     netdata_log_info("Log files re-opened.");
@@ -901,6 +912,8 @@ static __thread struct log_field thread_log_fields_daemon[_NDF_MAX] = {
         },
 };
 
+#define THREAD_FIELDS_MAX (sizeof(thread_log_fields_daemon) / sizeof(thread_log_fields_daemon[0]))
+
 void log_stack_pop(struct log_stack_entry (*ptr)[]) {
     struct log_stack_entry *lgs = &((*ptr)[0]);
 
@@ -1039,7 +1052,7 @@ static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields
                     buffer_print_int64(wb, fields[i].entry.i32);
                     break;
                 case NDFT_U64:
-                case NDFT_TIMESTAMP:
+                case NDFT_TIMESTAMP_USEC:
                     buffer_print_uint64(wb, fields[i].entry.u64);
                     break;
                 case NDFT_I64:
@@ -1092,7 +1105,7 @@ static bool nd_logger_journal(struct log_field *fields, size_t fields_max) {
                 asprintf(&value, "%s=%d", key, fields[i].entry.i32);
                 break;
             case NDFT_U64:
-            case NDFT_TIMESTAMP:
+            case NDFT_TIMESTAMP_USEC:
                 asprintf(&value, "%s=%" PRIu64, key, fields[i].entry.u64);
                 break;
             case NDFT_I64:
@@ -1170,7 +1183,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
             if(unlikely(!nd_log.journal.initialized)) {
                 method = ND_LOG_METHOD_FILE;
                 *fpp = stderr;
-                *spinlock = &nd_log.stderr.spinlock;
+                *spinlock = &nd_log.std_error.spinlock;
             }
             else {
                 *fpp = NULL;
@@ -1182,7 +1195,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
         case ND_LOG_METHOD_SYSLOG:
             if(unlikely(!nd_log.syslog.initialized)) {
                 method = ND_LOG_METHOD_FILE;
-                *spinlock = &nd_log.stderr.spinlock;
+                *spinlock = &nd_log.std_error.spinlock;
                 *fpp = stderr;
             }
             else {
@@ -1194,7 +1207,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
         case ND_LOG_METHOD_FILE:
             if(!nd_log.sources[source].fp) {
                 *fpp = stderr;
-                *spinlock = &nd_log.stderr.spinlock;
+                *spinlock = &nd_log.std_error.spinlock;
             }
             else {
                 *fpp = nd_log.sources[source].fp;
@@ -1205,7 +1218,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
         case ND_LOG_METHOD_STDOUT:
             method = ND_LOG_METHOD_FILE;
             *fpp = stdout;
-            *spinlock = &nd_log.stdout.spinlock;
+            *spinlock = &nd_log.std_output.spinlock;
             break;
 
         default:
@@ -1213,7 +1226,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
         case ND_LOG_METHOD_STDERR:
             method = ND_LOG_METHOD_FILE;
             *fpp = stderr;
-            *spinlock = &nd_log.stderr.spinlock;
+            *spinlock = &nd_log.std_error.spinlock;
             break;
 
         case ND_LOG_METHOD_DISABLED:
@@ -1247,7 +1260,7 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
                 spinlock_unlock(spinlock);
 
             method = ND_LOG_METHOD_FILE;
-            spinlock = &nd_log.stderr.spinlock;
+            spinlock = &nd_log.std_error.spinlock;
             fp = stderr;
 
             if(spinlock)
@@ -1267,6 +1280,24 @@ cleanup:
         spinlock_unlock(spinlock);
 }
 
+static void nd_logger_unset_all_thread_fields(void) {
+    size_t fields_max = THREAD_FIELDS_MAX;
+    for(size_t i = 0; i < fields_max ; i++)
+        thread_log_fields_daemon[i].entry.set = false;
+}
+
+static void nd_logger_merge_log_stack_to_thread_fields(void) {
+    for(struct log_stack_entry *l = thread_log_stack_base; l ; l = l->next) {
+        for(size_t i = 0; l[i].id != NDF_STOP ;i++) {
+            if(l[i].id >= _NDF_MAX)
+                continue;
+
+            thread_log_fields_daemon[l[i].id].entry = l[i];
+            thread_log_fields_daemon[l[i].id].entry.set = true;
+        }
+    }
+}
+
 static void nd_logger(const char *file, const char *function, const unsigned long line,
                ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit,
                const char *fmt, va_list ap) {
@@ -1278,20 +1309,10 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         return;
 
     // mark all fields as unset
-    size_t fields_max = sizeof(thread_log_fields_daemon) / sizeof(thread_log_fields_daemon[0]);
-    for(size_t i = 0; i < fields_max ; i++)
-        thread_log_fields_daemon[i].entry.set = false;
+    nd_logger_unset_all_thread_fields();
 
     // flatten the log stack into the fields
-    for(struct log_stack_entry *l = thread_log_stack_base; l ; l = l->next) {
-        for(size_t i = 0; l[i].id != NDF_STOP ;i++) {
-            if(l[i].id >= _NDF_MAX)
-                continue;
-
-            thread_log_fields_daemon[l[i].id].entry = l[i];
-            thread_log_fields_daemon[l[i].id].entry.set = true;
-        }
-    }
+    nd_logger_merge_log_stack_to_thread_fields();
 
     // set the common fields that are automatically set by the logging subsystem
 
@@ -1343,47 +1364,42 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     }
 
     nd_logger_log_fields(spinlock, fp, limit, priority, method, &nd_log.sources[source],
-                         thread_log_fields_daemon , fields_max);
+                         thread_log_fields_daemon , THREAD_FIELDS_MAX);
 
     buffer_free(wb);
 
     if(nd_log.sources[source].pending_msg) {
         // log a pending message
 
-        struct log_field fields[] = {
-                {
-                        .journal = NULL,
-                        .logfmt = "timestamp",
-                        .logfmt_annotator = timestamp_annotator,
-                        .entry = {
-                                .set = true,
-                                .type = NDFT_TIMESTAMP,
-                                .u64 = now_realtime_usec(),
-                        }
-                },
-                {
-                        .journal = "SYSLOG_IDENTIFIER",
-                        .logfmt = "comm",
-                        .entry = {
-                                .set = true,
-                                .type = NDFT_TXT,
-                                .txt = program_name,
-                        }
-                },
-                {
-                        .journal = "MESSAGE",
-                        .logfmt = "msg",
-                        .entry = {
-                                .set = true,
-                                .type = NDFT_TXT,
-                                .txt = nd_log.sources[source].pending_msg,
-                        }
-                },
+        nd_logger_unset_all_thread_fields();
+
+        thread_log_fields_daemon[NDF_TIMESTAMP_REALTIME_USEC].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_TIMESTAMP_USEC,
+                .u64 = now_realtime_usec(),
+        };
+
+        thread_log_fields_daemon[NDF_LOG_SOURCE].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_TXT,
+                .txt = nd_log_source2str(source),
+        };
+
+        thread_log_fields_daemon[NDF_SYSLOG_IDENTIFIER].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_TXT,
+                .txt = program_name,
+        };
+
+        thread_log_fields_daemon[NDF_MESSAGE].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_TXT,
+                .txt = nd_log.sources[source].pending_msg,
         };
 
         nd_logger_log_fields(spinlock, fp, false, priority, method,
                              &nd_log.sources[source],
-                             fields , sizeof(fields) / sizeof(fields[0]));
+                             thread_log_fields_daemon , THREAD_FIELDS_MAX);
 
         freez((void *)nd_log.sources[source].pending_msg);
         nd_log.sources[source].pending_msg = NULL;
@@ -1392,10 +1408,25 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     errno = 0;
 }
 
+static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
+    if(source >= _NDLS_MAX)
+        source = NDLS_DAEMON;
+
+    if(overwrite_thread_source)
+        source = overwrite_thread_source;
+
+    if(nd_log.overwrite_process_source)
+        source = overwrite_thread_source;
+
+    return source;
+}
+
 // ----------------------------------------------------------------------------
 // public API for loggers
 
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
+    source = nd_log_validate_source(source);
+
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
     if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority < nd_log.sources[source].min_priority)
         return;
@@ -1410,6 +1441,8 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 }
 
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+    source = nd_log_validate_source(source);
+
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
 
@@ -1426,16 +1459,21 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, priority, true, fmt, args);
+    nd_logger(file, function, line, source, priority,
+            source == NDLS_DAEMON || source == NDLS_COLLECTORS,
+            fmt, args);
     va_end(args);
 }
 
 void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+    ND_LOG_SOURCES source = NDLS_DAEMON;
+    source = nd_log_validate_source(source);
+
     int __errno = errno;
 
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, NDLS_DAEMON, NDLP_CRIT, true, fmt, args);
+    nd_logger(file, function, line, source, NDLP_CRIT, true, fmt, args);
     va_end(args);
 
     char date[LOG_DATE_LENGTH];
@@ -1488,8 +1526,8 @@ void nd_log_limits_reset(void) {
 
     nd_log.limits.logs_per_period = nd_log.limits.logs_per_period_backup;
 
-    spinlock_lock(&nd_log.stdout.spinlock);
-    spinlock_lock(&nd_log.stderr.spinlock);
+    spinlock_lock(&nd_log.std_output.spinlock);
+    spinlock_lock(&nd_log.std_error.spinlock);
 
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
         spinlock_lock(&nd_log.sources[i].spinlock);
@@ -1499,8 +1537,8 @@ void nd_log_limits_reset(void) {
         spinlock_unlock(&nd_log.sources[i].spinlock);
     }
 
-    spinlock_unlock(&nd_log.stdout.spinlock);
-    spinlock_unlock(&nd_log.stderr.spinlock);
+    spinlock_unlock(&nd_log.std_output.spinlock);
+    spinlock_unlock(&nd_log.std_error.spinlock);
 }
 
 void nd_log_limits_unlimited(void) {
