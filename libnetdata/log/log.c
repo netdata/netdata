@@ -1555,7 +1555,7 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
                            "LOG FLOOD PROTECTION: resuming logging "
                            "(prevented %"PRIu32" logs in the last %"PRIu32" seconds).",
                            source->limits.prevented,
-                           (int64_t)nd_log.limits.throttle_period);
+                           nd_log.limits.throttle_period);
 
             if(source->pending_msg)
                 freez((void *)source->pending_msg);
@@ -1579,11 +1579,11 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
             BUFFER *wb = buffer_create(1024, NULL);
             buffer_sprintf(wb,
                     "LOG FLOOD PROTECTION: too many logs (%"PRIu32" logs in %"PRId64" seconds, threshold is set to %"PRIu32" logs "
-                    "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.",
+                    "in %"PRIu32" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.",
                     source->limits.counter,
                     (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC),
                     nd_log.limits.logs_per_period,
-                    (int64_t)nd_log.limits.throttle_period,
+                    nd_log.limits.throttle_period,
                     program_name,
                     (int64_t)((source->limits.started_monotonic_ut + (nd_log.limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
 
