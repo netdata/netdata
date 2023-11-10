@@ -51,7 +51,8 @@
 #define SYSTEMD_ALWAYS_VISIBLE_KEYS             NULL
 
 #define SYSTEMD_KEYS_EXCLUDED_FROM_FACETS       \
-    "*MESSAGE*"                                 \
+    "!MESSAGE_ID"                               \
+    "|*MESSAGE*"                                \
     "|*_RAW"                                    \
     "|*_USEC"                                   \
     "|*_NSEC"                                   \
@@ -66,7 +67,7 @@
     /* --- USER JOURNAL FIELDS --- */           \
                                                 \
     /* "|MESSAGE" */                            \
-    /* "|MESSAGE_ID" */                         \
+    "|MESSAGE_ID"                               \
     "|PRIORITY"                                 \
     "|CODE_FILE"                                \
     /* "|CODE_LINE" */                          \
@@ -1104,6 +1105,11 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
 
     facets_register_key_name(facets, "USER_UNIT",
                              FACET_KEY_OPTION_FACET);
+
+    facets_register_key_name_transformation(facets, "MESSAGE_ID",
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW |
+                                            FACET_KEY_OPTION_EXPANDED_FILTER,
+                                            netdata_systemd_journal_transform_message_id, NULL);
 
     facets_register_key_name_transformation(facets, "_BOOT_ID",
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW,
