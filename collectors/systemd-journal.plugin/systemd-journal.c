@@ -1107,8 +1107,9 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
                              FACET_KEY_OPTION_FACET);
 
     facets_register_key_name_transformation(facets, "MESSAGE_ID",
-            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW,
-            netdata_systemd_journal_transform_message_id, NULL);
+                                            FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW |
+                                            FACET_KEY_OPTION_EXPANDED_FILTER,
+                                            netdata_systemd_journal_transform_message_id, NULL);
 
     facets_register_key_name_transformation(facets, "_BOOT_ID",
                                             FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_TRANSFORM_VIEW,
