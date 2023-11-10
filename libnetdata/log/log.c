@@ -547,13 +547,13 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     time_t period = 1200;
     size_t logs = 200;
     const char *s = getenv("NETDATA_ERRORS_THROTTLE_PERIOD");
-    if(s && *s) {
+    if(s && *s >= '0' && *s <= '9') {
         period = str2l(s);
         if(period < 0) period = 0;
     }
 
     s = getenv("NETDATA_ERRORS_PER_PERIOD");
-    if(s && *s)
+    if(s && *s >= '0' && *s <= '9')
         logs = str2u(s);
 
     nd_log_set_flood_protection(period, logs);

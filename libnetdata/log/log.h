@@ -223,7 +223,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #define log_aclk_message_bin(__data, __data_len, __tx, __mqtt_topic, __message_name) \
     nd_log(NDLS_ACLK, NDLP_INFO, \
         "direction:%s message:'%s' topic:'%s' json:'%.*s'", \
-        (__tx) ? "OUTGOING" : "INCOMING", __message_name, __mqtt_topic, __data_len, __data)
+        (__tx) ? "OUTGOING" : "INCOMING", __message_name, __mqtt_topic, (int)(__data_len), __data)
 
 // ----------------------------------------------------------------------------
 // logging with limits
