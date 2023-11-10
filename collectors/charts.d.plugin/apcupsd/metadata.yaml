@@ -128,10 +128,30 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
         metric: apcupsd.selftest
         info: self-test failed due to insufficient battery capacity or due to overload.
-      - name: apcupsd_status_warning
+      - name: apcupsd_status_onbatt
         link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
         metric: apcupsd.status
-        info: 'status code is one of the following: ONBATT,OVERLOAD,LOWBATT,REPLACEBATT,NOBATT,COMMLOST'
+        info: APC UPS has switched to battery power because the input power has failed
+      - name: apcupsd_status_overload
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+        metric: apcupsd.status
+        info: APC UPS is overloaded and cannot supply enough power to the load
+      - name: apcupsd_status_lowbatt
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+        metric: apcupsd.status
+        info: APC UPS battery is low and needs to be recharged
+      - name: apcupsd_status_replacebatt
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+        metric: apcupsd.status
+        info: APC UPS battery has reached the end of its lifespan and needs to be replaced
+      - name: apcupsd_status_nobatt
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+        metric: apcupsd.status
+        info: APC UPS has no battery
+      - name: apcupsd_status_commlost
+        link: https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf
+        metric: apcupsd.status
+        info: APC UPS communication link is lost
     metrics:
       folding:
         title: Metrics
