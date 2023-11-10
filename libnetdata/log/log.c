@@ -352,9 +352,9 @@ static struct {
     } stderr;
 
     struct {
-        unsigned long throttle_period;
-        unsigned long logs_per_period;
-        unsigned long logs_per_period_backup;
+        uint32_t throttle_period;
+        uint32_t logs_per_period;
+        uint32_t logs_per_period_backup;
     } limits;
 
 } nd_log = {
@@ -1518,12 +1518,12 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
 
     source->limits.counter++;
 
-    if(now_ut - source->limits.started_monotonic_ut > nd_log.limits.throttle_period) {
+    if(now_ut - source->limits.started_monotonic_ut > (usec_t)nd_log.limits.throttle_period) {
         if(source->limits.prevented) {
             BUFFER *wb = buffer_create(1024, NULL);
             buffer_sprintf(wb,
                            "LOG FLOOD PROTECTION: resuming logging "
-                           "(prevented %lu logs in the last %"PRId64" seconds).",
+                           "(prevented %"PRIu32" logs in the last %"PRIu32" seconds).",
                            source->limits.prevented,
                            (int64_t)nd_log.limits.throttle_period);
 
@@ -1548,7 +1548,7 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
         if(!source->limits.prevented) {
             BUFFER *wb = buffer_create(1024, NULL);
             buffer_sprintf(wb,
-                    "LOG FLOOD PROTECTION: too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
+                    "LOG FLOOD PROTECTION: too many logs (%"PRIu32" logs in %"PRId64" seconds, threshold is set to %"PRIu32" logs "
                     "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.",
                     source->limits.counter,
                     (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC),
