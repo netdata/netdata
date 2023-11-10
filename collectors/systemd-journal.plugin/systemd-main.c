@@ -29,6 +29,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
     // initialization
 
+    netdata_systemd_journal_message_ids_init();
     journal_init_query_status();
     journal_init_files_and_directories();
 

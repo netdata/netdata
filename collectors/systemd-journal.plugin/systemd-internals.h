@@ -101,6 +101,9 @@ void journal_init_query_status(void);
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled);
 void journal_files_registry_update(void);
 
+void netdata_systemd_journal_message_ids_init(void);
+void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused);
+
 #ifdef ENABLE_SYSTEMD_DBUS
 void function_systemd_units(const char *transaction, char *function, int timeout, bool *cancelled);
 #endif
