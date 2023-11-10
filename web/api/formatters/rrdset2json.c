@@ -2,154 +2,104 @@
 
 #include "rrdset2json.h"
 
-void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
+static int process_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+    BUFFER *wb = data;
+    buffer_json_member_add_string_or_empty(wb, name,  value);
+    return 1;
+}
+
+void chart_labels2json(RRDSET *st, BUFFER *wb)
 {
     if(unlikely(!st->rrdlabels))
         return;
 
-    char tabs[11];
-
-    if (indentation > 10)
-        indentation = 10;
-
-    tabs[0] = '\0';
-    while (indentation) {
-        strcat(tabs, "\t\t");
-        indentation--;
-    }
-
-    rrdlabels_to_buffer(st->rrdlabels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
-    buffer_strcat(wb, "\n");
+    rrdlabels_walkthrough_read(st->rrdlabels, process_label_callback, wb);
 }
 
 // generate JSON for the /api/v1/chart API call
-
-void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
+void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used)
+{
     time_t first_entry_t = rrdset_first_entry_s(st);
     time_t last_entry_t  = rrdset_last_entry_s(st);
 
-    buffer_sprintf(
-        wb,
-        "\t\t{\n"
-        "\t\t\t\"id\": \"%s\",\n"
-        "\t\t\t\"name\": \"%s\",\n"
-        "\t\t\t\"type\": \"%s\",\n"
-        "\t\t\t\"family\": \"%s\",\n"
-        "\t\t\t\"context\": \"%s\",\n"
-        "\t\t\t\"title\": \"%s (%s)\",\n"
-        "\t\t\t\"priority\": %d,\n"
-        "\t\t\t\"plugin\": \"%s\",\n"
-        "\t\t\t\"module\": \"%s\",\n"
-        "\t\t\t\"units\": \"%s\",\n"
-        "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
-        "\t\t\t\"chart_type\": \"%s\",\n",
-        rrdset_id(st),
-        rrdset_name(st),
-        rrdset_parts_type(st),
-        rrdset_family(st),
-        rrdset_context(st),
-        rrdset_title(st),
-        rrdset_name(st),
-        st->priority,
-        rrdset_plugin_name(st),
-        rrdset_module_name(st),
-        rrdset_units(st),
-        rrdset_name(st),
-        rrdset_type_name(st->chart_type));
+    buffer_json_member_add_string(wb, "id", rrdset_id(st));
+    buffer_json_member_add_string(wb, "name", rrdset_name(st));
+    buffer_json_member_add_string(wb, "type", rrdset_parts_type(st));
+    buffer_json_member_add_string(wb, "family", rrdset_family(st));
+    buffer_json_member_add_string(wb, "context", rrdset_context(st));
+    buffer_json_member_add_string(wb, "title", rrdset_title(st));
+    buffer_json_member_add_int64(wb, "priority", st->priority);
+    buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
+    buffer_json_member_add_string(wb, "module", rrdset_module_name(st));
+    buffer_json_member_add_string(wb, "units", rrdset_units(st));
 
-    if (likely(!skip_volatile))
-        buffer_sprintf(
-            wb,
-            "\t\t\t\"duration\": %"PRId64",\n",
-            (int64_t)(last_entry_t - first_entry_t + st->update_every) //st->entries * st->update_every
-        );
+    char data_url[RRD_ID_LENGTH_MAX + 16];
+    snprintfz(data_url, RRD_ID_LENGTH_MAX + 15, "/api/v1/chart=%s", rrdset_name(st));
+    buffer_json_member_add_string(wb, "data_url", data_url);
 
-    buffer_sprintf(
-        wb,
-        "\t\t\t\"first_entry\": %"PRId64",\n",
-        (int64_t)first_entry_t //rrdset_first_entry_t(st)
-    );
-
-    if (likely(!skip_volatile))
-        buffer_sprintf(
-            wb,
-            "\t\t\t\"last_entry\": %"PRId64",\n",
-            (int64_t)last_entry_t //rrdset_last_entry_t(st)
-        );
-
-    buffer_sprintf(
-        wb,
-        "\t\t\t\"update_every\": %d,\n"
-        "\t\t\t\"dimensions\": {\n",
-        st->update_every);
+    buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(st->chart_type));
+    buffer_json_member_add_int64(wb, "duration", (int64_t)(last_entry_t - first_entry_t + st->update_every));
+    buffer_json_member_add_int64(wb, "first_entry", (int64_t)first_entry_t);
+    buffer_json_member_add_int64(wb, "last_entry", (int64_t)last_entry_t);
+    buffer_json_member_add_int64(wb, "update_every", (int64_t)st->update_every);
 
     unsigned long memory = sizeof(RRDSET);
 
     size_t dimensions = 0;
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        if(rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+    buffer_json_member_add_object(wb, "dimensions");
+    {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st)
+        {
+            if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
+                continue;
 
-        memory += rrddim_size() + rd->db.memsize;
+            memory += rrddim_size() + rd->db.memsize;
 
-        if (dimensions)
-            buffer_strcat(wb, ",\n\t\t\t\t\"");
-        else
-            buffer_strcat(wb, "\t\t\t\t\"");
-        buffer_json_strcat(wb, rrddim_id(rd));
-        buffer_strcat(wb, "\": { \"name\": \"");
-        buffer_json_strcat(wb, rrddim_name(rd));
-        buffer_strcat(wb, "\" }");
+            buffer_json_member_add_object(wb, rrddim_id(rd));
+            buffer_json_member_add_string(wb, "name", rrddim_name(rd));
+            buffer_json_object_close(wb);
 
-        dimensions++;
+            dimensions++;
+        }
+        rrddim_foreach_done(rd);
     }
-    rrddim_foreach_done(rd);
+    buffer_json_object_close(wb);
 
     if(dimensions_count) *dimensions_count += dimensions;
     if(memory_used) *memory_used += memory;
 
-    buffer_sprintf(wb, "\n\t\t\t},\n\t\t\t\"chart_variables\": ");
+    buffer_json_member_add_object(wb, "chart_variables");
     health_api_v1_chart_custom_variables2json(st, wb);
+    buffer_json_object_close(wb);
 
-    buffer_strcat(wb, ",\n\t\t\t\"green\": ");
-    buffer_print_netdata_double(wb, st->green);
-    buffer_strcat(wb, ",\n\t\t\t\"red\": ");
-    buffer_print_netdata_double(wb, st->red);
+    buffer_json_member_add_double(wb, "green", st->green);
+    buffer_json_member_add_double(wb, "red", st->red);
 
-    if (likely(!skip_volatile)) {
-        buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
-        size_t alarms = 0;
+    {
+        buffer_json_member_add_object(wb, "alarms");
         RRDCALC *rc;
         rw_spinlock_read_lock(&st->alerts.spinlock);
-        DOUBLE_LINKED_LIST_FOREACH_FORWARD(st->alerts.base, rc, prev, next) {
-            buffer_sprintf(
-                wb,
-                "%s"
-                "\t\t\t\t\"%s\": {\n"
-                "\t\t\t\t\t\"id\": %u,\n"
-                "\t\t\t\t\t\"status\": \"%s\",\n"
-                "\t\t\t\t\t\"units\": \"%s\",\n"
-                "\t\t\t\t\t\"update_every\": %d\n"
-                "\t\t\t\t}",
-                (alarms) ? ",\n" : "", rrdcalc_name(rc), rc->id, rrdcalc_status2string(rc->status), rrdcalc_units(rc),
-                rc->update_every);
-
-            alarms++;
+        DOUBLE_LINKED_LIST_FOREACH_FORWARD(st->alerts.base, rc, prev, next)
+        {
+            {
+                buffer_json_member_add_object(wb, rrdcalc_name(rc));
+                buffer_json_member_add_string_or_empty(wb, "id", rrdcalc_name(rc));
+                buffer_json_member_add_string_or_empty(wb, "status", rrdcalc_status2string(rc->status));
+                buffer_json_member_add_string_or_empty(wb, "units", rrdcalc_units(rc));
+                buffer_json_member_add_int64(wb, "duration", (int64_t)rc->update_every);
+                buffer_json_object_close(wb);
+            }
         }
         rw_spinlock_read_unlock(&st->alerts.spinlock);
-        buffer_sprintf(wb,
-                       "\n\t\t\t}"
-        );
+        buffer_json_object_close(wb);
     }
-    buffer_strcat(wb, ",\n\t\t\t\"chart_labels\": {\n");
-    chart_labels2json(st, wb, 2);
-    buffer_strcat(wb, "\t\t\t}");
 
-    buffer_strcat(wb, ",\n\t\t\t\"functions\": {\n");
-    chart_functions2json(st, wb, 4, "\"", "\"");
-    buffer_strcat(wb, "\t\t\t}");
+    buffer_json_member_add_object(wb, "chart_labels");
+    chart_labels2json(st, wb);
+    buffer_json_object_close(wb);
 
-    buffer_sprintf(wb,
-            "\n\t\t}"
-    );
+    buffer_json_member_add_object(wb, "functions");
+    chart_functions2json(st, wb);
+    buffer_json_object_close(wb);
 }

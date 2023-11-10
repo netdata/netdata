@@ -583,6 +583,153 @@ void netdata_systemd_journal_dynamic_row_id(FACETS *facets __maybe_unused, BUFFE
     buffer_json_add_array_item_string(json_array, buffer_tostring(rkv->wb));
 }
 
+
+// ----------------------------------------------------------------------------
+
+struct message_id_info {
+    const char *msg;
+};
+
+static DICTIONARY *known_journal_messages_ids = NULL;
+
+void netdata_systemd_journal_message_ids_init(void) {
+    known_journal_messages_ids = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+    struct message_id_info i = { 0 };
+    i.msg = "Journal start"; dictionary_set(known_journal_messages_ids, "f77379a8490b408bbe5f6940505a777b", &i, sizeof(i));
+    i.msg = "Journal stop"; dictionary_set(known_journal_messages_ids, "d93fb3c9c24d451a97cea615ce59c00b", &i, sizeof(i));
+    i.msg = "Journal dropped"; dictionary_set(known_journal_messages_ids, "a596d6fe7bfa4994828e72309e95d61e", &i, sizeof(i));
+    i.msg = "Journal missed"; dictionary_set(known_journal_messages_ids, "e9bf28e6e834481bb6f48f548ad13606", &i, sizeof(i));
+    i.msg = "Journal usage"; dictionary_set(known_journal_messages_ids, "ec387f577b844b8fa948f33cad9a75e6", &i, sizeof(i));
+    i.msg = "Coredump"; dictionary_set(known_journal_messages_ids, "fc2e22bc6ee647b6b90729ab34a250b1", &i, sizeof(i));
+    i.msg = "Truncated core"; dictionary_set(known_journal_messages_ids, "5aadd8e954dc4b1a8c954d63fd9e1137", &i, sizeof(i));
+    i.msg = "Backtrace"; dictionary_set(known_journal_messages_ids, "1f4e0a44a88649939aaea34fc6da8c95", &i, sizeof(i));
+    i.msg = "Session start"; dictionary_set(known_journal_messages_ids, "8d45620c1a4348dbb17410da57c60c66", &i, sizeof(i));
+    i.msg = "Session stop"; dictionary_set(known_journal_messages_ids, "3354939424b4456d9802ca8333ed424a", &i, sizeof(i));
+    i.msg = "Seat start"; dictionary_set(known_journal_messages_ids, "fcbefc5da23d428093f97c82a9290f7b", &i, sizeof(i));
+    i.msg = "Seat stop"; dictionary_set(known_journal_messages_ids, "e7852bfe46784ed0accde04bc864c2d5", &i, sizeof(i));
+    i.msg = "Machine start"; dictionary_set(known_journal_messages_ids, "24d8d4452573402496068381a6312df2", &i, sizeof(i));
+    i.msg = "Machine stop"; dictionary_set(known_journal_messages_ids, "58432bd3bace477cb514b56381b8a758", &i, sizeof(i));
+    i.msg = "Time change"; dictionary_set(known_journal_messages_ids, "c7a787079b354eaaa9e77b371893cd27", &i, sizeof(i));
+    i.msg = "Timezone change"; dictionary_set(known_journal_messages_ids, "45f82f4aef7a4bbf942ce861d1f20990", &i, sizeof(i));
+    i.msg = "Tainted"; dictionary_set(known_journal_messages_ids, "50876a9db00f4c40bde1a2ad381c3a1b", &i, sizeof(i));
+    i.msg = "Startup finished"; dictionary_set(known_journal_messages_ids, "b07a249cd024414a82dd00cd181378ff", &i, sizeof(i));
+    i.msg = "User startup finished"; dictionary_set(known_journal_messages_ids, "eed00a68ffd84e31882105fd973abdd1", &i, sizeof(i));
+    i.msg = "Sleep start"; dictionary_set(known_journal_messages_ids, "6bbd95ee977941e497c48be27c254128", &i, sizeof(i));
+    i.msg = "Sleep stop"; dictionary_set(known_journal_messages_ids, "8811e6df2a8e40f58a94cea26f8ebf14", &i, sizeof(i));
+    i.msg = "Shutdown"; dictionary_set(known_journal_messages_ids, "98268866d1d54a499c4e98921d93bc40", &i, sizeof(i));
+    i.msg = "Factory reset"; dictionary_set(known_journal_messages_ids, "c14aaf76ec284a5fa1f105f88dfb061c", &i, sizeof(i));
+    i.msg = "Crash exit"; dictionary_set(known_journal_messages_ids, "d9ec5e95e4b646aaaea2fd05214edbda", &i, sizeof(i));
+    i.msg = "Crash failed"; dictionary_set(known_journal_messages_ids, "3ed0163e868a4417ab8b9e210407a96c", &i, sizeof(i));
+    i.msg = "Crash freeze"; dictionary_set(known_journal_messages_ids, "645c735537634ae0a32b15a7c6cba7d4", &i, sizeof(i));
+    i.msg = "Crash no coredump"; dictionary_set(known_journal_messages_ids, "5addb3a06a734d3396b794bf98fb2d01", &i, sizeof(i));
+    i.msg = "Crash no fork"; dictionary_set(known_journal_messages_ids, "5c9e98de4ab94c6a9d04d0ad793bd903", &i, sizeof(i));
+    i.msg = "Crash unknown signal"; dictionary_set(known_journal_messages_ids, "5e6f1f5e4db64a0eaee3368249d20b94", &i, sizeof(i));
+    i.msg = "Crash systemd signal"; dictionary_set(known_journal_messages_ids, "83f84b35ee264f74a3896a9717af34cb", &i, sizeof(i));
+    i.msg = "Crash process signal"; dictionary_set(known_journal_messages_ids, "3a73a98baf5b4b199929e3226c0be783", &i, sizeof(i));
+    i.msg = "Crash waitpid failed"; dictionary_set(known_journal_messages_ids, "2ed18d4f78ca47f0a9bc25271c26adb4", &i, sizeof(i));
+    i.msg = "Crash coredump failed"; dictionary_set(known_journal_messages_ids, "56b1cd96f24246c5b607666fda952356", &i, sizeof(i));
+    i.msg = "Crash coredump pid"; dictionary_set(known_journal_messages_ids, "4ac7566d4d7548f4981f629a28f0f829", &i, sizeof(i));
+    i.msg = "Crash shell fork failed"; dictionary_set(known_journal_messages_ids, "38e8b1e039ad469291b18b44c553a5b7", &i, sizeof(i));
+    i.msg = "Crash execle failed"; dictionary_set(known_journal_messages_ids, "872729b47dbe473eb768ccecd477beda", &i, sizeof(i));
+    i.msg = "Selinux failed"; dictionary_set(known_journal_messages_ids, "658a67adc1c940b3b3316e7e8628834a", &i, sizeof(i));
+    i.msg = "Battery low warning"; dictionary_set(known_journal_messages_ids, "e6f456bd92004d9580160b2207555186", &i, sizeof(i));
+    i.msg = "Battery low poweroff"; dictionary_set(known_journal_messages_ids, "267437d33fdd41099ad76221cc24a335", &i, sizeof(i));
+    i.msg = "Core mainloop failed"; dictionary_set(known_journal_messages_ids, "79e05b67bc4545d1922fe47107ee60c5", &i, sizeof(i));
+    i.msg = "Core no xdgdir path"; dictionary_set(known_journal_messages_ids, "dbb136b10ef4457ba47a795d62f108c9", &i, sizeof(i));
+    i.msg = "Core capability bounding user"; dictionary_set(known_journal_messages_ids, "ed158c2df8884fa584eead2d902c1032", &i, sizeof(i));
+    i.msg = "Core capability bounding"; dictionary_set(known_journal_messages_ids, "42695b500df048298bee37159caa9f2e", &i, sizeof(i));
+    i.msg = "Core disable privileges"; dictionary_set(known_journal_messages_ids, "bfc2430724ab44499735b4f94cca9295", &i, sizeof(i));
+    i.msg = "Core start target failed"; dictionary_set(known_journal_messages_ids, "59288af523be43a28d494e41e26e4510", &i, sizeof(i));
+    i.msg = "Core isolate target failed"; dictionary_set(known_journal_messages_ids, "689b4fcc97b4486ea5da92db69c9e314", &i, sizeof(i));
+    i.msg = "Core fd set failed"; dictionary_set(known_journal_messages_ids, "5ed836f1766f4a8a9fc5da45aae23b29", &i, sizeof(i));
+    i.msg = "Core pid1 environment"; dictionary_set(known_journal_messages_ids, "6a40fbfbd2ba4b8db02fb40c9cd090d7", &i, sizeof(i));
+    i.msg = "Core manager allocate"; dictionary_set(known_journal_messages_ids, "0e54470984ac419689743d957a119e2e", &i, sizeof(i));
+    i.msg = "Smack failed write"; dictionary_set(known_journal_messages_ids, "d67fa9f847aa4b048a2ae33535331adb", &i, sizeof(i));
+    i.msg = "Shutdown error"; dictionary_set(known_journal_messages_ids, "af55a6f75b544431b72649f36ff6d62c", &i, sizeof(i));
+    i.msg = "Valgrind helper fork"; dictionary_set(known_journal_messages_ids, "d18e0339efb24a068d9c1060221048c2", &i, sizeof(i));
+    i.msg = "Unit starting"; dictionary_set(known_journal_messages_ids, "7d4958e842da4a758f6c1cdc7b36dcc5", &i, sizeof(i));
+    i.msg = "Unit started"; dictionary_set(known_journal_messages_ids, "39f53479d3a045ac8e11786248231fbf", &i, sizeof(i));
+    i.msg = "Unit failed"; dictionary_set(known_journal_messages_ids, "be02cf6855d2428ba40df7e9d022f03d", &i, sizeof(i));
+    i.msg = "Unit stopping"; dictionary_set(known_journal_messages_ids, "de5b426a63be47a7b6ac3eaac82e2f6f", &i, sizeof(i));
+    i.msg = "Unit stopped"; dictionary_set(known_journal_messages_ids, "9d1aaa27d60140bd96365438aad20286", &i, sizeof(i));
+    i.msg = "Unit reloading"; dictionary_set(known_journal_messages_ids, "d34d037fff1847e6ae669a370e694725", &i, sizeof(i));
+    i.msg = "Unit reloaded"; dictionary_set(known_journal_messages_ids, "7b05ebc668384222baa8881179cfda54", &i, sizeof(i));
+    i.msg = "Unit restart scheduled"; dictionary_set(known_journal_messages_ids, "5eb03494b6584870a536b337290809b3", &i, sizeof(i));
+    i.msg = "Unit resources"; dictionary_set(known_journal_messages_ids, "ae8f7b866b0347b9af31fe1c80b127c0", &i, sizeof(i));
+    i.msg = "Unit success"; dictionary_set(known_journal_messages_ids, "7ad2d189f7e94e70a38c781354912448", &i, sizeof(i));
+    i.msg = "Unit skipped"; dictionary_set(known_journal_messages_ids, "0e4284a0caca4bfc81c0bb6786972673", &i, sizeof(i));
+    i.msg = "Unit failure result"; dictionary_set(known_journal_messages_ids, "d9b373ed55a64feb8242e02dbe79a49c", &i, sizeof(i));
+    i.msg = "Spawn failed"; dictionary_set(known_journal_messages_ids, "641257651c1b4ec9a8624d7a40a9e1e7", &i, sizeof(i));
+    i.msg = "Unit process exit"; dictionary_set(known_journal_messages_ids, "98e322203f7a4ed290d09fe03c09fe15", &i, sizeof(i));
+    i.msg = "Forward syslog missed"; dictionary_set(known_journal_messages_ids, "0027229ca0644181a76c4e92458afa2e", &i, sizeof(i));
+    i.msg = "Overmounting"; dictionary_set(known_journal_messages_ids, "1dee0369c7fc4736b7099b38ecb46ee7", &i, sizeof(i));
+    i.msg = "Unit oomd kill"; dictionary_set(known_journal_messages_ids, "d989611b15e44c9dbf31e3c81256e4ed", &i, sizeof(i));
+    i.msg = "Unit out of memory"; dictionary_set(known_journal_messages_ids, "fe6faa94e7774663a0da52717891d8ef", &i, sizeof(i));
+    i.msg = "Lid opened"; dictionary_set(known_journal_messages_ids, "b72ea4a2881545a0b50e200e55b9b06f", &i, sizeof(i));
+    i.msg = "Lid closed"; dictionary_set(known_journal_messages_ids, "b72ea4a2881545a0b50e200e55b9b070", &i, sizeof(i));
+    i.msg = "System docked"; dictionary_set(known_journal_messages_ids, "f5f416b862074b28927a48c3ba7d51ff", &i, sizeof(i));
+    i.msg = "System undocked"; dictionary_set(known_journal_messages_ids, "51e171bd585248568110144c517cca53", &i, sizeof(i));
+    i.msg = "Power key"; dictionary_set(known_journal_messages_ids, "b72ea4a2881545a0b50e200e55b9b071", &i, sizeof(i));
+    i.msg = "Power key long press"; dictionary_set(known_journal_messages_ids, "3e0117101eb243c1b9a50db3494ab10b", &i, sizeof(i));
+    i.msg = "Reboot key"; dictionary_set(known_journal_messages_ids, "9fa9d2c012134ec385451ffe316f97d0", &i, sizeof(i));
+    i.msg = "Reboot key long press"; dictionary_set(known_journal_messages_ids, "f1c59a58c9d943668965c337caec5975", &i, sizeof(i));
+    i.msg = "Suspend key"; dictionary_set(known_journal_messages_ids, "b72ea4a2881545a0b50e200e55b9b072", &i, sizeof(i));
+    i.msg = "Suspend key long press"; dictionary_set(known_journal_messages_ids, "bfdaf6d312ab4007bc1fe40a15df78e8", &i, sizeof(i));
+    i.msg = "Hibernate key"; dictionary_set(known_journal_messages_ids, "b72ea4a2881545a0b50e200e55b9b073", &i, sizeof(i));
+    i.msg = "Hibernate key long press"; dictionary_set(known_journal_messages_ids, "167836df6f7f428e98147227b2dc8945", &i, sizeof(i));
+    i.msg = "Invalid configuration"; dictionary_set(known_journal_messages_ids, "c772d24e9a884cbeb9ea12625c306c01", &i, sizeof(i));
+    i.msg = "Dnssec failure"; dictionary_set(known_journal_messages_ids, "1675d7f172174098b1108bf8c7dc8f5d", &i, sizeof(i));
+    i.msg = "Dnssec trust anchor revoked"; dictionary_set(known_journal_messages_ids, "4d4408cfd0d144859184d1e65d7c8a65", &i, sizeof(i));
+    i.msg = "Dnssec downgrade"; dictionary_set(known_journal_messages_ids, "36db2dfa5a9045e1bd4af5f93e1cf057", &i, sizeof(i));
+    i.msg = "Unsafe user name"; dictionary_set(known_journal_messages_ids, "b61fdac612e94b9182285b998843061f", &i, sizeof(i));
+    i.msg = "Mount point path not suitable"; dictionary_set(known_journal_messages_ids, "1b3bb94037f04bbf81028e135a12d293", &i, sizeof(i));
+    i.msg = "Device path not suitable"; dictionary_set(known_journal_messages_ids, "010190138f494e29a0ef6669749531aa", &i, sizeof(i));
+    i.msg = "Nobody user unsuitable"; dictionary_set(known_journal_messages_ids, "b480325f9c394a7b802c231e51a2752c", &i, sizeof(i));
+    i.msg = "Systemd udev settle deprecated"; dictionary_set(known_journal_messages_ids, "1c0454c1bd2241e0ac6fefb4bc631433", &i, sizeof(i));
+    i.msg = "Time sync"; dictionary_set(known_journal_messages_ids, "7c8a41f37b764941a0e1780b1be2f037", &i, sizeof(i));
+    i.msg = "Time bump"; dictionary_set(known_journal_messages_ids, "7db73c8af0d94eeb822ae04323fe6ab6", &i, sizeof(i));
+    i.msg = "Shutdown scheduled"; dictionary_set(known_journal_messages_ids, "9e7066279dc8403da79ce4b1a69064b2", &i, sizeof(i));
+    i.msg = "Shutdown canceled"; dictionary_set(known_journal_messages_ids, "249f6fb9e6e2428c96f3f0875681ffa3", &i, sizeof(i));
+    i.msg = "TPM pcr extend"; dictionary_set(known_journal_messages_ids, "3f7d5ef3e54f4302b4f0b143bb270cab", &i, sizeof(i));
+    i.msg = "Memory trim"; dictionary_set(known_journal_messages_ids, "f9b0be465ad540d0850ad32172d57c21", &i, sizeof(i));
+    i.msg = "Sysv generator deprecated"; dictionary_set(known_journal_messages_ids, "a8fa8dacdb1d443e9503b8be367a6adb", &i, sizeof(i));
+
+    // gnome
+    // https://gitlab.gnome.org/GNOME/gnome-session/-/blob/main/gnome-session/gsm-manager.c
+    i.msg = "Gnome SM startup succeeded"; dictionary_set(known_journal_messages_ids, "0ce153587afa4095832d233c17a88001", &i, sizeof(i));
+    i.msg = "Gnome SM unrecoverable failure"; dictionary_set(known_journal_messages_ids, "10dd2dc188b54a5e98970f56499d1f73", &i, sizeof(i));
+
+    // gnome-shell
+    // https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/main.js#L56
+    i.msg = "Gnome shell started";dictionary_set(known_journal_messages_ids, "f3ea493c22934e26811cd62abe8e203a", &i, sizeof(i));
+}
+
+void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
+    const char *message_id = buffer_tostring(wb);
+    struct message_id_info *i = dictionary_get(known_journal_messages_ids, message_id);
+
+    if(!i)
+        return;
+
+    switch(scope) {
+        default:
+        case FACETS_TRANSFORM_DATA:
+        case FACETS_TRANSFORM_VALUE:
+            buffer_sprintf(wb, " (%s)", i->msg);
+            break;
+
+        case FACETS_TRANSFORM_FACET:
+        case FACETS_TRANSFORM_FACET_SORT:
+        case FACETS_TRANSFORM_HISTOGRAM:
+            buffer_flush(wb);
+            buffer_strcat(wb, i->msg);
+            break;
+    }
+}
+
+// ----------------------------------------------------------------------------
+
 static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row __maybe_unused, void *data __maybe_unused) {
     buffer_json_add_array_item_object(json_array);
     buffer_json_member_add_string(json_array, "value", buffer_tostring(rkv->wb));

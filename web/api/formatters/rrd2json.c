@@ -3,8 +3,11 @@
 #include "web/api/web_api_v1.h"
 #include "database/storage_engine.h"
 
-void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
-    rrdset2json(st, wb, NULL, NULL, 0);
+void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb)
+{
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    rrdset2json(st, wb, NULL, NULL);
+    buffer_json_finalize(wb);
 }
 
 const char *rrdr_format_to_string(DATASOURCE_FORMAT format)  {

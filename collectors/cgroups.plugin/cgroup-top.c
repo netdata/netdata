@@ -115,6 +115,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_CGTOP_HELP);
     buffer_json_member_add_array(wb, "data");
 
+    double max_pids = 0.0;
     double max_cpu = 0.0;
     double max_ram = 0.0;
     double max_disk_io_read = 0.0;
@@ -139,6 +140,8 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         else
             buffer_json_add_array_item_string(wb, "cgroup"); // Kind
 
+        double pids_current = rrddim_get_last_stored_value(cg->st_pids_rd_pids_current, &max_pids, 1.0);
+
         double cpu = NAN;
         if (cg->st_cpu_rd_user && cg->st_cpu_rd_system) {
             cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
@@ -152,7 +155,6 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
         rd = cg->st_throttle_io_rd_written ? cg->st_throttle_io_rd_written : cg->st_io_rd_written;
         double disk_io_written = rrddim_get_last_stored_value(rd, &max_disk_io_written, 1024.0);
 
-
         NETDATA_DOUBLE received, sent;
         cgroup_netdev_get_bandwidth(cg, &received, &sent);
         if (!isnan(received) && !isnan(sent)) {
@@ -162,6 +164,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
             max_net_sent = MAX(max_net_sent, sent);
         }
 
+        buffer_json_add_array_item_double(wb, pids_current);
         buffer_json_add_array_item_double(wb, cpu);
         buffer_json_add_array_item_double(wb, ram);
         buffer_json_add_array_item_double(wb, disk_io_read);
@@ -192,6 +195,14 @@ int cgroup_function_cgroup_top(BUFFER *wb, int timeout __maybe_unused, const cha
                 RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        // PIDs
+        buffer_rrdf_table_add_field(wb, field_id++, "PIDs", "Number of Processes Currently in the CGROUP",
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "pids", max_pids, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
@@ -349,6 +360,7 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_CGTOP_HELP);
     buffer_json_member_add_array(wb, "data");
 
+    double max_pids = 0.0;
     double max_cpu = 0.0;
     double max_ram = 0.0;
     double max_disk_io_read = 0.0;
@@ -366,6 +378,8 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
 
         buffer_json_add_array_item_string(wb, cg->name);
 
+        double pids_current = rrddim_get_last_stored_value(cg->st_pids_rd_pids_current, &max_pids, 1.0);
+
         double cpu = NAN;
         if (cg->st_cpu_rd_user && cg->st_cpu_rd_system) {
             cpu = cg->st_cpu_rd_user->collector.last_stored_value + cg->st_cpu_rd_system->collector.last_stored_value;
@@ -379,6 +393,7 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
         rd = cg->st_throttle_io_rd_written ? cg->st_throttle_io_rd_written : cg->st_io_rd_written;
         double disk_io_written = rrddim_get_last_stored_value(rd, &max_disk_io_written, 1024.0);
 
+        buffer_json_add_array_item_double(wb, pids_current);
         buffer_json_add_array_item_double(wb, cpu);
         buffer_json_add_array_item_double(wb, ram);
         buffer_json_add_array_item_double(wb, disk_io_read);
@@ -400,6 +415,14 @@ int cgroup_function_systemd_top(BUFFER *wb, int timeout __maybe_unused, const ch
                 0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                 RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                 RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
+                NULL);
+
+        // PIDs
+        buffer_rrdf_table_add_field(wb, field_id++, "PIDs", "Number of Processes Currently in the CGROUP",
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "pids", max_pids, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
                 NULL);
 
         // CPU

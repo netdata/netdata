@@ -75,6 +75,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_throttle_serviced_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_throttle_serviced_ops);
     if(cg->st_queued_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_queued_ops);
     if(cg->st_merged_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_merged_ops);
+    if(cg->st_pids) rrdset_is_obsolete___safe_from_collector_thread(cg->st_pids);
 
     freez(cg->filename_cpuset_cpus);
     freez(cg->filename_cpu_cfs_period);
@@ -105,6 +106,7 @@ static inline void cgroup_free(struct cgroup *cg) {
 
     freez(cg->io_merged.filename);
     freez(cg->io_queued.filename);
+    freez(cg->pids.pids_current_filename);
 
     free_pressure(&cg->cpu_pressure);
     free_pressure(&cg->io_pressure);
@@ -598,6 +600,14 @@ static inline void discovery_update_filenames_cgroup_v1(struct cgroup *cg) {
             }
         }
     }
+
+    // Pids
+    if (unlikely(!cg->pids.pids_current_filename)) {
+        snprintfz(filename, FILENAME_MAX, "%s%s/pids.current", cgroup_pids_base, cg->id);
+        if (likely(stat(filename, &buf) != -1)) {
+            cg->pids.pids_current_filename = strdupz(filename);
+        }
+    }
 }
 
 static inline void discovery_update_filenames_cgroup_v2(struct cgroup *cg) {
@@ -711,6 +721,14 @@ static inline void discovery_update_filenames_cgroup_v2(struct cgroup *cg) {
             cg->irq_pressure.filename = strdupz(filename);
             cg->irq_pressure.some.enabled = cgroup_enable_pressure_irq_some;
             cg->irq_pressure.full.enabled = cgroup_enable_pressure_irq_full;
+        }
+    }
+
+    // Pids
+    if (unlikely(!cg->pids.pids_current_filename)) {
+        snprintfz(filename, FILENAME_MAX, "%s%s/pids.current", cgroup_unified_base, cg->id);
+        if (likely(stat(filename, &buf) != -1)) {
+            cg->pids.pids_current_filename = strdupz(filename);
         }
     }
 }

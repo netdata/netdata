@@ -1149,16 +1149,20 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->enabled = !simple_pattern_matches(disabled_list, d->name);
 
             char buffer[FILENAME_MAX + 1];
-
             snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
-            if (likely(access(buffer, R_OK) == 0)) {
-                d->virtual = 1;
-                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO);
-            }
-            else {
+
+            d->virtual = likely(access(buffer, R_OK) == 0) ? 1 : 0;
+
+            // At least on Proxmox inside LXC: eth0 is virtual.
+            // Virtual interfaces are not taken into account in system.net calculations
+            if (inside_lxc_container && d->virtual && strncmp(d->name, "eth", 3) == 0)
                 d->virtual = 0;
+
+            if (d->virtual)
+                rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO);
+            else
                 rrdlabels_add(d->chart_labels, "interface_type", "real", RRDLABEL_SRC_AUTO);
-            }
+
             rrdlabels_add(d->chart_labels, "device", name, RRDLABEL_SRC_AUTO);
 
             if(likely(!d->virtual)) {

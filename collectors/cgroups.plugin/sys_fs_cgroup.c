@@ -50,6 +50,7 @@ char *cgroup_cpuset_base = NULL;
 char *cgroup_blkio_base = NULL;
 char *cgroup_memory_base = NULL;
 char *cgroup_devices_base = NULL;
+char *cgroup_pids_base = NULL;
 char *cgroup_unified_base = NULL;
 int cgroup_root_count = 0;
 int cgroup_root_max = 1000;
@@ -310,54 +311,70 @@ void read_cgroup_plugin_configuration() {
         cgroup_enable_pressure_memory_full = CONFIG_BOOLEAN_NO;
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
-        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
-        if(!mi) {
+        if (!mi)
+            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
+        if (!mi) {
             collector_error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
             s = "/sys/fs/cgroup/cpuacct";
-        }
-        else s = mi->mount_point;
+        } else
+            s = mi->mount_point;
         set_cgroup_base_path(filename, s);
         cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
-        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
-        if(!mi) {
+        if (!mi)
+            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
+        if (!mi) {
             collector_error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
             s = "/sys/fs/cgroup/cpuset";
-        }
-        else s = mi->mount_point;
+        } else
+            s = mi->mount_point;
         set_cgroup_base_path(filename, s);
         cgroup_cpuset_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuset", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
-        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
-        if(!mi) {
+        if (!mi)
+            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
+        if (!mi) {
             collector_error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
             s = "/sys/fs/cgroup/blkio";
-        }
-        else s = mi->mount_point;
+        } else
+            s = mi->mount_point;
         set_cgroup_base_path(filename, s);
         cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
-        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
-        if(!mi) {
+        if (!mi)
+            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
+        if (!mi) {
             collector_error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
             s = "/sys/fs/cgroup/memory";
-        }
-        else s = mi->mount_point;
+        } else
+            s = mi->mount_point;
         set_cgroup_base_path(filename, s);
         cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
 
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
-        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
-        if(!mi) {
+        if (!mi)
+            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
+        if (!mi) {
             collector_error("CGROUP: cannot find devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
             s = "/sys/fs/cgroup/devices";
-        }
-        else s = mi->mount_point;
+        } else
+            s = mi->mount_point;
         set_cgroup_base_path(filename, s);
         cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
+
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "pids");
+        if (!mi)
+            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "pids");
+        if (!mi) {
+            collector_error("CGROUP: cannot find pids mountinfo. Assuming default: /sys/fs/cgroup/pids");
+            s = "/sys/fs/cgroup/pids";
+        } else
+            s = mi->mount_point;
+        set_cgroup_base_path(filename, s);
+        cgroup_pids_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/pids", filename);
     }
     else {
         //cgroup_enable_cpuacct_stat =
@@ -377,22 +394,19 @@ void read_cgroup_plugin_configuration() {
         cgroup_used_memory = CONFIG_BOOLEAN_NO; //unified cgroups use different values
 
         //TODO: can there be more than 1 cgroup2 mount point?
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup2", "rw"); //there is no cgroup2 specific super option - for now use 'rw' option
-        if(mi)
-            netdata_log_debug(D_CGROUP, "found unified cgroup root using super options, with path: '%s'", mi->mount_point);
-        if(!mi) {
+        //there is no cgroup2 specific super option - for now use 'rw' option
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup2", "rw");
+        if (!mi) {
             mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup2", "cgroup");
-            if(mi)
-                netdata_log_debug(D_CGROUP, "found unified cgroup root using mountsource info, with path: '%s'", mi->mount_point);
         }
-        if(!mi) {
+        if (!mi) {
             collector_error("CGROUP: cannot find cgroup2 mountinfo. Assuming default: /sys/fs/cgroup");
             s = "/sys/fs/cgroup";
-        }
-        else s = mi->mount_point;
+        } else
+            s = mi->mount_point;
+
         set_cgroup_base_path(filename, s);
         cgroup_unified_base = config_get("plugin:cgroups", "path to unified cgroups", filename);
-        netdata_log_debug(D_CGROUP, "using cgroup root: '%s'", cgroup_unified_base);
     }
 
     cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
@@ -1146,6 +1160,15 @@ memory_next:
     }
 }
 
+static void cgroup_read_pids_current(struct pids *pids) {
+    pids->pids_current_updated = 0;
+
+    if (unlikely(!pids->pids_current_filename))
+        return;
+
+    pids->pids_current_updated = !read_single_signed_number_file(pids->pids_current_filename, &pids->pids_current);
+}
+
 static inline void read_cgroup(struct cgroup *cg) {
     netdata_log_debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
     if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
@@ -1160,6 +1183,7 @@ static inline void read_cgroup(struct cgroup *cg) {
         cgroup_read_blkio(&cg->throttle_io_serviced);
         cgroup_read_blkio(&cg->io_merged);
         cgroup_read_blkio(&cg->io_queued);
+        cgroup_read_pids_current(&cg->pids);
     }
     else {
         //TODO: io_service_bytes and io_serviced use same file merge into 1 function
@@ -1172,6 +1196,7 @@ static inline void read_cgroup(struct cgroup *cg) {
         cgroup2_read_pressure(&cg->memory_pressure);
         cgroup2_read_pressure(&cg->irq_pressure);
         cgroup_read_memory(&cg->memory, 1);
+        cgroup_read_pids_current(&cg->pids);
     }
 }
 
@@ -1347,6 +1372,10 @@ void update_cgroup_systemd_services_charts() {
             update_io_merged_ops_chart(cg);
         }
 
+        if (likely(cg->pids.pids_current_updated)) {
+            update_pids_current_chart(cg);
+        }
+
         cg->function_ready = true;
     }
 }
@@ -1483,6 +1512,10 @@ void update_cgroup_charts() {
 
         if (likely(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_BOOLEAN_YES)) {
                 update_io_merged_ops_chart(cg);
+        }
+
+        if (likely(cg->pids.pids_current_updated)) {
+                update_pids_current_chart(cg);
         }
 
         if (cg->options & CGROUP_OPTIONS_IS_UNIFIED) {
