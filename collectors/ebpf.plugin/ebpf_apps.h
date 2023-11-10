@@ -236,11 +236,6 @@ extern ebpf_process_stat_plus_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_plus_t *stat);
 extern ebpf_process_stat_t *process_stat_vector;
 
-extern ARAL *ebpf_aral_vfs_pid;
-void ebpf_vfs_aral_init();
-netdata_publish_vfs_t *ebpf_vfs_get(void);
-void ebpf_vfs_release(netdata_publish_vfs_t *stat);
-
 void ebpf_fd_aral_init();
 netdata_fd_stat_t *ebpf_fd_stat_get(void);
 void ebpf_fd_release(netdata_fd_stat_t *stat);

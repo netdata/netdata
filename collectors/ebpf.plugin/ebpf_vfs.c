@@ -903,11 +903,6 @@ static void ebpf_vfs_exit(void *ptr)
 
         ebpf_obsolete_vfs_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_vfs_pid)
-            ebpf_statistic_obsolete_aral_chart(em, vfs_disable_priority);
-#endif
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -2025,11 +2020,6 @@ static void vfs_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&lock);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_vfs_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
-#endif
-
         ebpf_vfs_send_data(em);
         fflush(stdout);
 
@@ -2469,7 +2459,6 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_vfs_allocate_global_vectors(int apps)
 {
-    ebpf_vfs_aral_init();
     vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
 
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
@@ -2564,10 +2553,6 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_create_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_vfs_pid)
-        vfs_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_VFS_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 
