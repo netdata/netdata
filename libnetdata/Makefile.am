@@ -11,6 +11,7 @@ SUBDIRS = \
     clocks \
     completion \
     config \
+    datetime \
     dictionary \
     ebpf \
     eval \
@@ -31,6 +32,7 @@ SUBDIRS = \
     string \
     threads \
     url \
+    uuid \
     worker_utilization \
     tests \
     $(NULL)
