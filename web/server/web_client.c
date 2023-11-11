@@ -1574,7 +1574,6 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     // entry point for all API requests
 
     ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "webrtc"),
             ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
