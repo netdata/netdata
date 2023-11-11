@@ -195,6 +195,8 @@ LIBNETDATA_FILES = \
     libnetdata/threads/threads.h \
     libnetdata/url/url.c \
     libnetdata/url/url.h \
+    libnetdata/uuid/uuid.c \
+    libnetdata/uuid/uuid.h \
     libnetdata/json/json.c \
     libnetdata/json/json.h \
     libnetdata/json/jsmn.c \

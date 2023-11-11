@@ -29,17 +29,6 @@ struct nd_log_source;
 static bool nd_log_limit_reached(struct nd_log_source *source);
 
 // ----------------------------------------------------------------------------
-
-void uuid_unparse_lower_compact(uuid_t uuid, char *out) {
-    static const char *hex_chars = "0123456789abcdef";
-    for (int i = 0; i < 16; i++) {
-        out[i * 2] = hex_chars[(uuid[i] >> 4) & 0x0F];
-        out[i * 2 + 1] = hex_chars[uuid[i] & 0x0F];
-    }
-    out[32] = '\0'; // Null-terminate the string
-}
-
-// ----------------------------------------------------------------------------
 // logging method
 
 typedef enum  __attribute__((__packed__)) {
@@ -1623,7 +1612,7 @@ static void nd_logger_merge_log_stack_to_thread_fields(void) {
 }
 
 static void nd_logger(const char *file, const char *function, const unsigned long line,
-               ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit,
+               ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit, int saved_errno,
                const char *fmt, va_list ap) {
 
     SPINLOCK *spinlock;
@@ -1676,8 +1665,8 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields_daemon[NDF_TIMESTAMP_REALTIME_USEC].entry = ND_LOG_FIELD_TMT(NDF_TIMESTAMP_REALTIME_USEC, now_realtime_usec());
     }
 
-    if(!thread_log_fields_daemon[NDF_ERRNO].entry.set) {
-        thread_log_fields_daemon[NDF_ERRNO].entry = ND_LOG_FIELD_I32(NDF_ERRNO, errno);
+    if(saved_errno != 0 && !thread_log_fields_daemon[NDF_ERRNO].entry.set) {
+        thread_log_fields_daemon[NDF_ERRNO].entry = ND_LOG_FIELD_I32(NDF_ERRNO, saved_errno);
     }
 
     BUFFER *wb = NULL;
@@ -1749,6 +1738,7 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
 // public API for loggers
 
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
+    int saved_errno = errno;
     source = nd_log_validate_source(source);
 
 #if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
@@ -1760,11 +1750,12 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     va_start(args, fmt);
     nd_logger(file, function, line, source, priority,
               source == NDLS_DAEMON || source == NDLS_COLLECTORS,
-              fmt, args);
+              saved_errno, fmt, args);
     va_end(args);
 }
 
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+    int saved_errno = errno;
     source = nd_log_validate_source(source);
 
     if(erl->sleep_ut)
@@ -1785,26 +1776,25 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     va_start(args, fmt);
     nd_logger(file, function, line, source, priority,
             source == NDLS_DAEMON || source == NDLS_COLLECTORS,
-            fmt, args);
+            saved_errno, fmt, args);
     va_end(args);
 }
 
 void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+    int saved_errno = errno;
     ND_LOG_SOURCES source = NDLS_DAEMON;
     source = nd_log_validate_source(source);
 
-    int __errno = errno;
-
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, NDLP_CRIT, true, fmt, args);
+    nd_logger(file, function, line, source, NDLP_CRIT, true, saved_errno, fmt, args);
     va_end(args);
 
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
 
     char action_data[70+1];
-    snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
+    snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
     char action_result[60+1];
 
     const char *thread_tag = thread_log_fields_daemon[NDF_THREAD].entry.txt;

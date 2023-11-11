@@ -805,6 +805,8 @@ extern char *netdata_configured_host_prefix;
 #define XXH_INLINE_ALL
 #include "xxhash.h"
 
+#include "uuid/uuid.h"
+
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
 #include "os.h"

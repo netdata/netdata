@@ -531,10 +531,6 @@ static inline int read_single_base64_or_hex_number_file(const char *filename, un
     }
 }
 
-static inline int uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {
-    return memcmp(uu1, uu2, sizeof(uuid_t));
-}
-
 static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {
     char *p = (char *)"";
     while (p && !p[0] && *ptr) p = strsep(ptr, s);
