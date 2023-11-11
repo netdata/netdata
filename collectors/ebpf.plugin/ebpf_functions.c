@@ -3273,7 +3273,7 @@ static void ebpf_fill_dc_function_buffer(BUFFER *wb,
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->curr.not_found);
 
     buffer_json_array_close(wb);
-                                           }
+}
 
 /**
  * Clean Judy array unsafe
@@ -3687,6 +3687,665 @@ void ebpf_function_dc_manipulation(const char *transaction,
 }
 
 /*****************************************************************
+ *  EBPF VFS FUNCTION
+ *****************************************************************/
+
+/**
+ * Thread Help
+ *
+ * Shows help with all options accepted by thread function.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+*/
+static inline void ebpf_function_vfs_help(const char *transaction) {
+    static char *vfs_message = {
+        "ebpf.plugin / vfs\n"
+        "\n"
+        "Function `swap` displays access to directory cache.\n"
+        "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+        "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+        "modified request.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   period:PERIOD\n"
+        "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"};
+    ebpf_function_help(transaction, vfs_message);
+}
+
+/**
+ * Clean Judy array unsafe
+ *
+ * Clean all Judy Array allocated to show table when a function is called.
+ * Before to call this function it is necessary to lock `ebpf_judy_pid.index.rw_spinlock`.
+ **/
+static void ebpf_vfs_clean_judy_array_unsafe()
+{
+    if (!ebpf_judy_pid.index.JudyLArray)
+        return;
+
+    Pvoid_t *pid_value;
+    Word_t local_pid = 0;
+    bool first_pid = true;
+    while ((pid_value = JudyLFirstThenNext(ebpf_judy_pid.index.JudyLArray, &local_pid, &first_pid))) {
+        netdata_ebpf_judy_pid_stats_t *pid_ptr = (netdata_ebpf_judy_pid_stats_t *)*pid_value;
+        if (pid_ptr) {
+            memset(&pid_ptr->vfs, 0, sizeof(netdata_publish_vfs_t));
+        }
+    }
+}
+
+/**
+ * Fill function buffer
+ *
+ * Fill buffer with data to be shown on cloud.
+ *
+ * @param wb          buffer where we store data.
+ * @param pid         the process PID
+ * @param values      data read from hash table
+ * @param name        the process name
+ * @param apps_group  the apps group name
+ */
+static void ebpf_fill_vfs_function_buffer(BUFFER *wb,
+                                         uint32_t pid,
+                                         netdata_publish_vfs_t *values,
+                                         char *name,
+                                         char *apps_group)
+{
+    buffer_json_add_array_item_array(wb);
+
+    // IMPORTANT!
+    // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
+
+    // PID
+    buffer_json_add_array_item_uint64(wb, (uint64_t)pid);
+
+    // NAME
+    buffer_json_add_array_item_string(wb, (name[0] != '\0') ? name : EBPF_NOT_IDENFIED);
+
+    // APPS Group
+    buffer_json_add_array_item_string(wb, (apps_group != NULL) ? apps_group : EBPF_APPS_GROUP_OTHER);
+
+    // Write
+    buffer_json_add_array_item_uint64(wb, ((uint64_t)values->writev_call + (uint64_t)values->write_call));
+
+    // Write Bytes
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->write_bytes);
+
+    // Write Error
+    buffer_json_add_array_item_uint64(wb, ((uint64_t)values->writev_err + (uint64_t)values->write_err));
+
+    // Read
+    buffer_json_add_array_item_uint64(wb, ((uint64_t)values->readv_call + (uint64_t)values->read_call));
+
+    // Reade Bytes
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->read_bytes);
+
+    // Reade Error
+    buffer_json_add_array_item_uint64(wb, ((uint64_t)values->readv_err + (uint64_t)values->read_err));
+
+    // Unlink call
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->unlink_call);
+
+    // Unlink error
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->unlink_err);
+
+    // Open call
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->open_call);
+
+    // Open error
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->open_err);
+
+    // Create call
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->create_call);
+
+    // Create error
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->create_err);
+
+    // Fsync call
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->fsync_call);
+
+    // Fsync error
+    buffer_json_add_array_item_uint64(wb, (uint64_t)values->fsync_err);
+
+    buffer_json_array_close(wb);
+}
+
+
+/**
+ * DC read judy
+ *
+ * Thread responsible to fill thread data.
+ *
+ * @param buf the buffer to store data;
+ * @param em  the module main structure.
+ *
+ * @return It always returns NULL.
+ */
+static void ebpf_vfs_read_judy(BUFFER *buf, struct ebpf_module *em)
+{
+    rw_spinlock_read_lock(&ebpf_judy_pid.index.rw_spinlock);
+    if (!em->maps || (em->maps[NETDATA_DCSTAT_PID_STATS].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED) ||
+        !ebpf_judy_pid.index.JudyLArray) {
+        rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+        netdata_publish_vfs_t fake_vfs = { };
+
+        ebpf_fill_vfs_function_buffer(buf, getpid(), &fake_vfs, EBPF_NOT_IDENFIED, NULL);
+        return;
+    }
+
+    ebpf_fill_dc_function_buffer_unsafe(buf);
+    rw_spinlock_read_unlock(&ebpf_judy_pid.index.rw_spinlock);
+}
+
+
+/**
+ * Function: SWAP
+ *
+ * Show information for sockets stored in hash tables.
+ *
+ * @param transaction  the transaction id that Netdata sent for this function execution
+ * @param function     function name and arguments given to thread.
+ * @param timeout      The function timeout
+ * @param cancelled    Variable used to store function status.
+ */
+void ebpf_function_vfs_manipulation(const char *transaction,
+                                   char *function __maybe_unused,
+                                   int timeout __maybe_unused,
+                                   bool *cancelled __maybe_unused)
+{
+    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_DCSTAT_IDX];
+    char *words[PLUGINSD_MAX_WORDS] = {NULL};
+    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
+    int period = -1;
+
+    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+        const char *keyword = get_word(words, num_words, i);
+        if (!keyword)
+            break;
+
+        if (strncmp(keyword, EBPF_FUNCTION_OPTION_PERIOD, sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1) == 0) {
+            const char *name = &keyword[sizeof(EBPF_FUNCTION_OPTION_PERIOD) - 1];
+            pthread_mutex_lock(&ebpf_exit_cleanup);
+            period = str2i(name);
+            if (period > 0) {
+                em->lifetime = period;
+            } else
+                em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+
+#ifdef NETDATA_DEV_MODE
+            collector_info("Lifetime modified for %u", em->lifetime);
+#endif
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+        } else if (strncmp(keyword, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, 4) == 0) {
+            ebpf_function_vfs_help(transaction);
+            return;
+        }
+    }
+
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+        // Cleanup when we already had a thread running
+        rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
+        ebpf_vfs_clean_judy_array_unsafe();
+        rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (period < 0)
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
+
+        if (ebpf_function_start_thread(em, period)) {
+            ebpf_function_error(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR, "Cannot start thread.");
+            pthread_mutex_unlock(&ebpf_exit_cleanup);
+            return;
+        }
+    } else {
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING && period < 0) {
+            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
+        } else {
+            em->lifetime = EBPF_DEFAULT_LIFETIME;
+        }
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", em->update_every);
+    buffer_json_member_add_string(wb, NETDATA_EBPF_FUNCTIONS_COMMON_HELP, EBPF_PLUGIN_SWAP_FUNCTION_DESCRIPTION);
+
+    // Collect data
+    buffer_json_member_add_array(wb, "data");
+    ebpf_vfs_read_judy(wb, em);
+    buffer_json_array_close(wb); // data
+
+    buffer_json_member_add_object(wb, "columns");
+    {
+        int fields_id = 0;
+
+        // IMPORTANT!
+        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PID",
+            "Process ID",
+            RRDF_FIELD_TYPE_INTEGER,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_UNIQUE_KEY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "PName",
+            "Process Name",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Apps Group",
+            "Apps Group",
+            RRDF_FIELD_TYPE_STRING,
+            RRDF_FIELD_VISUAL_VALUE,
+            RRDF_FIELD_TRANSFORM_NONE,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Write",
+            "Write",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "BytesWriten",
+            "Bytes writen trough VFS functions",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "WriteError",
+            "Errors to write data",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Read",
+            "Read",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "BytesRead",
+            "Bytes read trough VFS functions",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "ReadError",
+            "Errors to read data",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Unlink",
+            "Unlink",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "UnlinkError",
+            "Unlink Errors",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Open",
+            "Open",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "OpenError",
+            "Open Errors",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Create",
+            "Create",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "CreateError",
+            "Create Errors",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id++,
+            "Fsync",
+            "Fsync",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+
+        buffer_rrdf_table_add_field(
+            wb,
+            fields_id,
+            "FsyncError",
+            "Fsync Errors",
+            RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+            RRDF_FIELD_VISUAL_BAR,
+            RRDF_FIELD_TRANSFORM_NUMBER,
+            0,
+            NULL,
+            NAN,
+            RRDF_FIELD_SORT_ASCENDING,
+            NULL,
+            RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+            NULL);
+    }
+    buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "PName");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // VFS IO
+        buffer_json_member_add_object(wb, "VFSIOCalls");
+        {
+            buffer_json_member_add_string(wb, "name", "VFSIOCalls");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Write");
+                buffer_json_add_array_item_string(wb, "Read");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // VFS IO error
+        buffer_json_member_add_object(wb, "VFSIOBytes");
+        {
+            buffer_json_member_add_string(wb, "name", "VFSIOBytes");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "BytesWriten");
+                buffer_json_add_array_item_string(wb, "BytesRead");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_string(wb, "default_sort_column", "PID");
+
+    // Do we use only on fields that can be groupped?
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process ID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Process Name
+        buffer_json_member_add_object(wb, "PName");
+        {
+            buffer_json_member_add_string(wb, "name", "PName");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PName");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Apps Group Name
+        buffer_json_member_add_object(wb, "Apps Group");
+        {
+            buffer_json_member_add_string(wb, "name", "Apps Group");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Apps Group");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group by
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "VFSIOCalls");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "VFSIOBytes");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_string(wb, "default_sort_column", "PName");
+
+    time_t expires = now_realtime_sec() + em->update_every;
+
+    buffer_json_member_add_time_t(wb, "expires", expires);
+    buffer_json_finalize(wb);
+
+    // Lock necessary to avoid race condition
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+
+    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
+
+    pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+
+    buffer_free(wb);
+}
+
+/*****************************************************************
  *  EBPF FUNCTION THREAD
  *****************************************************************/
 
@@ -3739,6 +4398,11 @@ void *ebpf_function_thread(void *ptr)
     functions_evloop_add_function(wg,
                                   EBPF_FUNCTION_DC,
                                   ebpf_function_dc_manipulation,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+
+    functions_evloop_add_function(wg,
+                                  EBPF_FUNCTION_VFS,
+                                  ebpf_function_vfs_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
     heartbeat_t hb;

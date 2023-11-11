@@ -30,6 +30,7 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 #define EBPF_FUNCTION_SHM "eBPF-shm"
 #define EBPF_FUNCTION_SWAP "eBPF-swap"
 #define EBPF_FUNCTION_DC "eBPF-dc"
+#define EBPF_FUNCTION_VFS "eBPF-vfs"
 
 // socket constants
 #define EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION "Detailed information about open sockets."
@@ -57,6 +58,9 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
 
 // DC constants
 #define EBPF_PLUGIN_DC_FUNCTION_DESCRIPTION "Detailed information about directory cache access."
+
+// VFS constants
+#define EBPF_PLUGIN_VFS_FUNCTION_DESCRIPTION "Detailed information about Virtual File System access."
 
 void *ebpf_function_thread(void *ptr);
 

@@ -172,8 +172,12 @@ enum netdata_vfs_calls_name {
 
 void *ebpf_vfs_thread(void *ptr);
 void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_vfs_release(netdata_publish_vfs_t *stat);
 extern netdata_ebpf_targets_t vfs_targets[];
+
+void ebpf_function_vfs_manipulation(const char *transaction,
+                                    char *function __maybe_unused,
+                                    int timeout __maybe_unused,
+                                    bool *cancelled __maybe_unused);
 
 extern struct config vfs_config;
 
