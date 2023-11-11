@@ -1148,8 +1148,6 @@ static bool string_has_spaces(const char *s) {
 }
 
 static void string_to_logfmt(BUFFER *wb, const char *s) {
-    if(!s) s = "";
-
     bool spaces = string_has_spaces(s);
 
     if(spaces)
@@ -1257,7 +1255,7 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
         char *value = NULL;
         switch (fields[i].entry.type) {
             case NDFT_TXT:
-                asprintf(&value, "%s=%s", key, fields[i].entry.txt ? fields[i].entry.txt : "");
+                asprintf(&value, "%s=%s", key, fields[i].entry.txt);
                 break;
             case NDFT_STR:
                 asprintf(&value, "%s=%s", key, string2str(fields[i].entry.str));
@@ -1372,7 +1370,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
         const char *s = NULL;
         switch(fields[i].entry.type) {
             case NDFT_TXT:
-                s = fields[i].entry.txt ? fields[i].entry.txt : "";
+                s = fields[i].entry.txt;
                 break;
             case NDFT_STR:
                 s = string2str(fields[i].entry.str);
@@ -1590,11 +1588,21 @@ static void nd_logger_unset_all_thread_fields(void) {
 static void nd_logger_merge_log_stack_to_thread_fields(void) {
     for(struct log_stack_entry *l = thread_log_stack_base; l ; l = l->next) {
         for(size_t i = 0; l[i].id != NDF_STOP ;i++) {
-            if(l[i].id >= _NDF_MAX)
+            if(l[i].id >= _NDF_MAX || !l[i].set)
                 continue;
 
-            thread_log_fields_daemon[l[i].id].entry = l[i];
-            thread_log_fields_daemon[l[i].id].entry.set = true;
+            struct log_stack_entry *e = &l[i];
+            ND_LOG_STACK_FIELD_TYPE type = l[i].type;
+
+            // do not add empty / unset fields
+            if((type == NDFT_TXT && (!e->txt || !*e->txt)) ||
+                (type == NDFT_BFR && (!e->bfr || !buffer_strlen(e->bfr))) ||
+                (type == NDFT_STR && !e->str) ||
+                (type == NDFT_UUID && !e->uuid) ||
+                type == NDFT_UNSET)
+                continue;
+
+            thread_log_fields_daemon[l[i].id].entry = *e;
         }
     }
 }
