@@ -294,7 +294,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
         worker_is_busy(WORKER_JOB_PROCESS);
-        web_client_process_request(w);
+        web_client_process_request_from_web_server(w);
 
         if (unlikely(w->mode == WEB_CLIENT_MODE_STREAM)) {
             web_client_send(w);

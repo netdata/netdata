@@ -569,7 +569,7 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    netdata_log_access("api_key:'%s' machine_guid:'%s' msg:'%s'"
+    nd_log(NDLS_ACCESS, NDLP_INFO, "api_key:'%s' machine_guid:'%s' msg:'%s'"
                        , (rpt->key && *rpt->key)? rpt->key : ""
                        , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
                        , msg);

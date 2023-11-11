@@ -163,86 +163,94 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     web_client_reset_path_flags(w);
 }
 
-void web_client_request_done(struct web_client *w) {
-    web_client_uncork_socket(w);
+void web_client_log_completed_request(struct web_client *w, bool update_web_stats) {
+    struct timeval tv;
+    now_monotonic_high_precision_timeval(&tv);
 
-    netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
+    size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
+    size_t sent = size;
+    if(likely(w->response.zoutput)) sent = (size_t)w->response.zstream.total_out;
 
-    if(likely(buffer_strlen(w->url_as_received))) {
-        struct timeval tv;
-        now_monotonic_high_precision_timeval(&tv);
-
-        size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
-        size_t sent = size;
-        if(likely(w->response.zoutput)) sent = (size_t)w->response.zstream.total_out;
-
-        // --------------------------------------------------------------------
-        // global statistics
-
+    if(update_web_stats)
         global_statistics_web_request_completed(dt_usec(&tv, &w->timings.tv_in),
                                                 w->statistics.received_bytes,
                                                 w->statistics.sent_bytes,
                                                 size,
                                                 sent);
 
-        w->statistics.received_bytes = 0;
-        w->statistics.sent_bytes = 0;
+    const char *mode;
+    switch(w->mode) {
+        case WEB_CLIENT_MODE_FILECOPY:
+            mode = "FILECOPY";
+            break;
 
+        case WEB_CLIENT_MODE_OPTIONS:
+            mode = "OPTIONS";
+            break;
 
-        // --------------------------------------------------------------------
+        case WEB_CLIENT_MODE_STREAM:
+            mode = "STREAM";
+            break;
 
-        const char *mode;
-        switch(w->mode) {
-            case WEB_CLIENT_MODE_FILECOPY:
-                mode = "FILECOPY";
-                break;
+        case WEB_CLIENT_MODE_POST:
+        case WEB_CLIENT_MODE_PUT:
+        case WEB_CLIENT_MODE_GET:
+        case WEB_CLIENT_MODE_DELETE:
+            mode = "DATA";
+            break;
 
-            case WEB_CLIENT_MODE_OPTIONS:
-                mode = "OPTIONS";
-                break;
-
-            case WEB_CLIENT_MODE_STREAM:
-                mode = "STREAM";
-                break;
-
-            case WEB_CLIENT_MODE_POST:
-            case WEB_CLIENT_MODE_PUT:
-            case WEB_CLIENT_MODE_GET:
-            case WEB_CLIENT_MODE_DELETE:
-                mode = "DATA";
-                break;
-
-            default:
-                mode = "UNKNOWN";
-                break;
-        }
-
-        usec_t prep_ut = w->timings.tv_ready.tv_sec ? dt_usec(&w->timings.tv_ready, &w->timings.tv_in) : 0;
-        usec_t sent_ut = w->timings.tv_ready.tv_sec ? dt_usec(&tv, &w->timings.tv_ready) : 0;
-        usec_t total_ut = dt_usec(&tv, &w->timings.tv_in);
-        strip_control_characters((char *)buffer_tostring(w->url_as_received));
-
-        ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
-                ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, SSL_connection(&w->ssl) ? "https" : "http"),
-                ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
-                ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
-                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
-                ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
-                ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, mode),
-                ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
-                ND_LOG_FIELD_U64(NDF_RESPONSE_BYTES, sent),
-                ND_LOG_FIELD_U64(NDF_RESPONSE_SIZE_BYTES, size),
-                ND_LOG_FIELD_U64(NDF_RESPONSE_PREPARATION_TIME_USEC, prep_ut),
-                ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_TIME_USEC, sent_ut),
-                ND_LOG_FIELD_U64(NDF_RESPONSE_TOTAL_TIME_USEC, total_ut),
-                ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
-
-        // access log
-        netdata_log_access(NULL);
+        default:
+            mode = "UNKNOWN";
+            break;
     }
+
+    usec_t prep_ut = w->timings.tv_ready.tv_sec ? dt_usec(&w->timings.tv_ready, &w->timings.tv_in) : 0;
+    usec_t sent_ut = w->timings.tv_ready.tv_sec ? dt_usec(&tv, &w->timings.tv_ready) : 0;
+    usec_t total_ut = dt_usec(&tv, &w->timings.tv_in);
+    strip_control_characters((char *)buffer_tostring(w->url_as_received));
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
+            ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
+            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
+            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, mode),
+            ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
+            ND_LOG_FIELD_U64(NDF_RESPONSE_BYTES, sent),
+            ND_LOG_FIELD_U64(NDF_RESPONSE_SIZE_BYTES, size),
+            ND_LOG_FIELD_U64(NDF_RESPONSE_PREPARATION_TIME_USEC, prep_ut),
+            ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_TIME_USEC, sent_ut),
+            ND_LOG_FIELD_U64(NDF_RESPONSE_TOTAL_TIME_USEC, total_ut),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    ND_LOG_FIELD_PRIORITY prio = NDLP_INFO;
+    if(w->response.code >= 500)
+        prio = NDLP_EMERG;
+    else if(w->response.code >= 400)
+        prio = NDLP_WARNING;
+    else if(w->response.code >= 300)
+        prio = NDLP_NOTICE;
+
+    // access log
+    nd_log(NDLS_ACCESS, prio, NULL);
+}
+
+void web_client_request_done(struct web_client *w) {
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    web_client_uncork_socket(w);
+
+    netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
+
+    if(likely(buffer_strlen(w->url_as_received)))
+        web_client_log_completed_request(w, true);
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
         if(w->ifd != w->ofd) {
@@ -277,6 +285,9 @@ void web_client_request_done(struct web_client *w) {
     w->response.sent = 0;
     w->response.code = 0;
     w->response.zoutput = false;
+
+    w->statistics.received_bytes = 0;
+    w->statistics.sent_bytes = 0;
 }
 
 static struct {
@@ -719,8 +730,18 @@ static inline int UNUSED_FUNCTION(check_host_and_mgmt_acl_and_call)(RRDHOST *hos
     return check_host_and_call(host, w, url, func);
 }
 
-int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment)
-{
+int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment) {
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
+            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+            ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
+            ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     // get the api version
     char *tok = strsep_skip_consecutive_separators(&url_path_fragment, "/");
     if(tok && *tok) {
@@ -1550,6 +1571,20 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 }
 
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
+    // entry point for all API requests
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "webrtc"),
+            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+            ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
+            ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    // give a new transaction id to the request
+    uuid_generate_random(w->transaction);
+
     static uint32_t
             hash_api = 0,
             hash_host = 0,
@@ -1738,7 +1773,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     return mysendfile(w, filename);
 }
 
-void web_client_process_request(struct web_client *w) {
+void web_client_process_request_from_web_server(struct web_client *w) {
+    // entry point for web server requests
+
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, SSL_connection(&w->ssl) ? "https" : "http"),
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
@@ -1746,9 +1783,13 @@ void web_client_process_request(struct web_client *w) {
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
+            ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
+
+    // give a new transaction id to the request
+    uuid_generate_random(w->transaction);
 
     // start timing us
     web_client_timeout_checkpoint_init(w);

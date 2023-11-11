@@ -848,18 +848,25 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
     nd_log_set_destination_output(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
 
-//#ifdef HAVE_SYSTEMD
-//    snprintfz(filename, FILENAME_MAX, "journal");
-//#else
-    snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-//#endif
+    bool with_journal = nd_log_is_stderr_journal(); (void)with_journal;
+#ifdef HAVE_SYSTEMD
+    snprintfz(filename, FILENAME_MAX, "journal");
+#else
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
+#endif
     nd_log_set_destination_output(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "error", filename));
 
-//#ifdef HAVE_SYSTEMD
-//    snprintfz(filename, FILENAME_MAX, "journal");
-//#else
-    snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-//#endif
+#ifdef HAVE_SYSTEMD
+    snprintfz(filename, FILENAME_MAX, "journal");
+#else
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
+#endif
     nd_log_set_destination_output(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);

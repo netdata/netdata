@@ -9,6 +9,10 @@ extern "C" {
 
 #include "../libnetdata.h"
 
+#define ISO8601_MAX_LENGTH 64
+void iso8601_datetime_utc(char *buffer, size_t len, usec_t now_ut);
+void iso8601_datetime_with_local_timezone(char *buffer, size_t len, usec_t now_ut);
+
 typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only
     NDLS_ACCESS,      // access.log
@@ -53,6 +57,7 @@ typedef enum __attribute__((__packed__)) {
     NDF_NIDL_INSTANCE,
     NDF_NIDL_DIMENSION,
     NDF_CONNECTION_ID,
+    NDF_TRANSACTION_ID,
     NDF_SRC_TRANSPORT,
     NDF_SRC_IP,
     NDF_SRC_PORT,
@@ -87,11 +92,12 @@ typedef enum __attribute__((__packed__)) {
     NDFT_U64,
     NDFT_I64,
     NDFT_DBL,
+    NDFT_UUID,
     NDFT_PRIORITY,
     NDFT_TIMESTAMP_USEC,
 } ND_LOG_STACK_FIELD_TYPE;
 
-void nd_log_set_destination_output(ND_LOG_SOURCES type, const char *setting);
+void nd_log_set_destination_output(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_set_severity_level(const char *severity);
 void nd_log_initialize(void);
@@ -117,6 +123,7 @@ struct log_stack_entry {
         int64_t i64;
         double dbl;
         ND_LOG_FIELD_PRIORITY priority;
+        uuid_t *uuid;
     };
     struct log_stack_entry *prev, *next;
 };
@@ -133,6 +140,7 @@ struct log_stack_entry {
 #define ND_LOG_FIELD_DBL(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_DBL, .dbl = (value), .set = true, }
 #define ND_LOG_FIELD_PRI(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_PRIORITY, .priority = (value), .set = true, }
 #define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP_USEC, .u64 = (value), .set = true, }
+#define ND_LOG_FIELD_UUID(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_UUID, .uuid = (value), .set = true, }
 #define ND_LOG_FIELD_END() { .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
 
 void log_stack_pop(void *ptr);
@@ -218,7 +226,6 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #define netdata_log_info(args...)   netdata_logger(NDLS_DAEMON,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)    netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
-#define netdata_log_access(args...) netdata_logger(NDLS_ACCESS,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 #define netdata_log_health(args...) netdata_logger(NDLS_HEALTH,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 
 #define log_aclk_message_bin(__data, __data_len, __tx, __mqtt_topic, __message_name) \

@@ -1075,7 +1075,7 @@ void execute_commands(struct sender_state *s) {
             continue;
         }
 
-        netdata_log_access("STREAM: %d from '%s' for host '%s': %s",
+        nd_log(NDLS_ACCESS, NDLP_INFO, "STREAM: %d from '%s' for host '%s': %s",
                    gettid(), s->connected_to, rrdhost_hostname(s->host), start);
 
         // internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
