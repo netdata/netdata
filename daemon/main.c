@@ -1351,6 +1351,7 @@ int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_rrdpush_compressions(void);
+int uuid_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1507,6 +1508,8 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (ctx_unittest())
                                 return 1;
+                            if (uuid_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
@@ -1532,6 +1535,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
                             return buffer_unittest();
+                        }
+                        else if(strcmp(optarg, "uuidtest") == 0) {
+                            unittest_running = true;
+                            return uuid_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {

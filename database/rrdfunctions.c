@@ -1007,11 +1007,11 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
     // the function can only be executed in async mode
     // put the function into the inflight requests
 
-    char uuid_str[UUID_STR_LEN];
+    char uuid_str[UUID_COMPACT_STR_LEN];
     if(!transaction) {
         uuid_t uuid;
         uuid_generate_random(uuid);
-        uuid_unparse_lower(uuid, uuid_str);
+        uuid_unparse_lower_compact(uuid, uuid_str);
         transaction = uuid_str;
     }
 

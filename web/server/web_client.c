@@ -1008,7 +1008,7 @@ const char *web_response_code_to_string(int code) {
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
     static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
-                    hash_authorization = 0, hash_host = 0, hash_forwarded_host = 0;
+                    hash_authorization = 0, hash_host = 0, hash_forwarded_host = 0, hash_transaction_id = 0;
     static uint32_t hash_accept_encoding = 0;
 
     if(unlikely(!hash_origin)) {
@@ -1020,6 +1020,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_authorization = simple_uhash("X-Auth-Token");
         hash_host = simple_uhash("Host");
         hash_forwarded_host = simple_uhash("X-Forwarded-Host");
+        hash_transaction_id = simple_uhash("X-Transaction-ID");
     }
 
     char *e = s;
@@ -1086,6 +1087,11 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         char buffer[NI_MAXHOST];
         strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
         w->forwarded_host = strdupz(buffer);
+    }
+    else if(hash == hash_transaction_id && !strcasecmp(s, "X-Transaction-ID")) {
+        char buffer[UUID_STR_LEN * 2];
+        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
+        uuid_parse_flexi(buffer, w->transaction); // will not alter w->transaction if it fails
     }
 
     *e = ':';
