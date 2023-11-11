@@ -1060,25 +1060,6 @@ collected_number get_value_from_structure(char *basis, size_t offset)
 }
 
 /**
- * Write begin command on standard output
- *
- * @param family the chart family name
- * @param name   the chart name
- */
-void write_begin_chart(char *family, char *name)
-{
-    printf("BEGIN %s.%s\n", family, name);
-}
-
-/**
- * Write END command on stdout.
- */
-inline void write_end_chart()
-{
-    printf("END\n");
-}
-
-/**
  * Write set command on standard output
  *
  * @param dim    the dimension name
@@ -1101,7 +1082,7 @@ void write_chart_dimension(char *dim, long long value)
  */
 void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end)
 {
-    write_begin_chart(family, name);
+    ebpf_write_begin_chart(family, name, "");
 
     uint32_t i = 0;
     while (move && i < end) {
@@ -1111,7 +1092,7 @@ void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move
         i++;
     }
 
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -1124,7 +1105,7 @@ void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move
  */
 void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end)
 {
-    write_begin_chart(family, name);
+    ebpf_write_begin_chart(family, name, "");
 
     int i = 0;
     while (move && i < end) {
@@ -1134,7 +1115,7 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
         i++;
     }
 
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -1149,11 +1130,11 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
  */
 void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1)
 {
-    write_begin_chart(family, chart);
+    ebpf_write_begin_chart(family, chart, "");
 
     write_chart_dimension(dim, v1);
 
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -1170,19 +1151,20 @@ void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long 
  */
 void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, char *dread, long long vread)
 {
-    write_begin_chart(family, chart);
+    ebpf_write_begin_chart(family, chart, "");
 
     write_chart_dimension(dwrite, vwrite);
     write_chart_dimension(dread, vread);
 
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
  * Write chart cmd on standard output
  *
  * @param type          chart type
- * @param id            chart id
+ * @param id            chart id (the apps group name).
+ * @param suffix        suffix to differentiate charts
  * @param title         chart title
  * @param units         units label
  * @param family        group name used to attach the chart on dashboard
@@ -1192,12 +1174,13 @@ void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, c
  * @param update_every  update interval used by plugin
  * @param module        chart module name, this is the eBPF thread.
  */
-void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *family,
+void ebpf_write_chart_cmd(char *type, char *id, char *suffix, char *title, char *units, char *family,
                           char *charttype, char *context, int order, int update_every, char *module)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
+    printf("CHART %s.%s%s '' '%s' '%s' '%s' '%s' '%s' %d %d '' 'ebpf.plugin' '%s'\n",
            type,
            id,
+           suffix,
            title,
            units,
            (family)?family:"",
@@ -1213,6 +1196,7 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
  *
  * @param type      chart type
  * @param id        chart id
+ * @param suffix    add suffix to obsolete charts.
  * @param title     chart title
  * @param units     units label
  * @param family    group name used to attach the chart on dashboard
@@ -1221,12 +1205,13 @@ void ebpf_write_chart_cmd(char *type, char *id, char *title, char *units, char *
  * @param order     chart order
  * @param update_every value to overwrite the update frequency set by the server.
  */
-void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
+void ebpf_write_chart_obsolete(char *type, char *id, char *suffix, char *title, char *units, char *family,
                                char *charttype, char *context, int order, int update_every)
 {
-    printf("CHART %s.%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
+    printf("CHART %s.%s%s '' '%s' '%s' '%s' '%s' '%s' %d %d 'obsolete'\n",
            type,
            id,
+           suffix,
            title,
            units,
            (family)?family:"",
@@ -1298,37 +1283,10 @@ void ebpf_create_chart(char *type,
                        int update_every,
                        char *module)
 {
-    ebpf_write_chart_cmd(type, id, title, units, family, charttype, context, order, update_every, module);
+    ebpf_write_chart_cmd(type, id, "", title, units, family, charttype, context, order, update_every, module);
 
     if (ncd) {
         ncd(move, end);
-    }
-}
-
-/**
- * Create charts on apps submenu
- *
- * @param id   the chart id
- * @param title  the value displayed on vertical axis.
- * @param units  the value displayed on vertical axis.
- * @param family Submenu that the chart will be attached on dashboard.
- * @param charttype chart type
- * @param order  the chart order
- * @param algorithm the algorithm used by dimension
- * @param root   structure used to create the dimensions.
- * @param update_every  update interval used by plugin
- * @param module    chart module name, this is the eBPF thread.
- */
-void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                char *algorithm, struct ebpf_target *root, int update_every, char *module)
-{
-    struct ebpf_target *w;
-    ebpf_write_chart_cmd(NETDATA_APPS_FAMILY, id, title, units, family, charttype, NULL, order,
-                         update_every, module);
-
-    for (w = root; w; w = w->next) {
-        if (unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
     }
 }
 
@@ -1345,14 +1303,14 @@ void ebpf_create_charts_on_apps(char *id, char *title, char *units, char *family
  */
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end)
 {
-    write_begin_chart(family, name);
+    ebpf_write_begin_chart(family, name, "");
 
     uint32_t i;
     for (i = 0; i < end; i++) {
         write_chart_dimension(dimensions[i], (long long) hist[i]);
     }
 
-    write_end_chart();
+    ebpf_write_end_chart();
 
     fflush(stdout);
 }
@@ -1377,6 +1335,7 @@ int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          em->memory_usage,
+                         "",
                          "Bytes allocated for ARAL.",
                          "bytes",
                          NETDATA_EBPF_FAMILY,
@@ -1392,6 +1351,7 @@ int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          em->memory_allocations,
+                         "",
                          "Calls to allocate memory.",
                          "calls",
                          NETDATA_EBPF_FAMILY,
@@ -1421,6 +1381,7 @@ void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
 {
     ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
                               em->memory_allocations,
+                              "",
                               "Calls to allocate memory.",
                               "calls",
                               NETDATA_EBPF_FAMILY,
@@ -1431,6 +1392,7 @@ void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
 
     ebpf_write_chart_obsolete(NETDATA_MONITORING_FAMILY,
                               em->memory_allocations,
+                              "",
                               "Calls to allocate memory.",
                               "calls",
                               NETDATA_EBPF_FAMILY,
@@ -1455,13 +1417,13 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
 
     struct aral_statistics *stats = aral_statistics(memory);
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_usage);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_usage, "");
     write_chart_dimension(mem, (long long)stats->structures.allocated_bytes);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_allocations);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_allocations, "");
     write_chart_dimension(aral, (long long)stats->structures.allocations);
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /*****************************************************************
@@ -3442,7 +3404,7 @@ static char *hash_table_core[NETDATA_EBPF_LOAD_STAT_END] = {"per_core", "unique"
 static inline void ebpf_send_hash_table_pid_data(char *chart, uint32_t idx)
 {
     int i;
-    write_begin_chart(NETDATA_MONITORING_FAMILY, chart);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, chart, "");
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
         if (wem->functions.apps_routine)
@@ -3451,7 +3413,7 @@ static inline void ebpf_send_hash_table_pid_data(char *chart, uint32_t idx)
                                   wem->hash_table_stats[idx]:
                                   0);
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -3463,13 +3425,13 @@ static inline void ebpf_send_hash_table_pid_data(char *chart, uint32_t idx)
 static inline void ebpf_send_global_hash_table_data()
 {
     int i;
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS, "");
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
         write_chart_dimension((char *)wem->info.thread_name,
                               (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? NETDATA_CONTROLLER_END: 0);
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 }
 
 /**
@@ -3482,7 +3444,7 @@ void ebpf_send_statistic_data()
     if (!publish_internal_metrics)
         return;
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_THREADS, "");
     int i;
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
@@ -3491,9 +3453,9 @@ void ebpf_send_statistic_data()
 
         write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LIFE_TIME);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LIFE_TIME, "");
     for (i = 0; i < EBPF_MODULE_FUNCTION_IDX ; i++) {
         ebpf_module_t *wem = &ebpf_modules[i];
         // Threads like VFS is slow to load and this can create an invalid number, this is the motive
@@ -3506,25 +3468,25 @@ void ebpf_send_statistic_data()
                               (long long) (wem->lifetime - wem->running_time):
                               0) ;
     }
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LOAD_METHOD);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_LOAD_METHOD, "");
     write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_LEGACY], (long long)plugin_statistics.legacy);
     write_chart_dimension(load_event_stat[NETDATA_EBPF_LOAD_STAT_CORE], (long long)plugin_statistics.core);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_KERNEL_MEMORY);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_KERNEL_MEMORY, "");
     write_chart_dimension(memlock_stat, (long long)plugin_statistics.memlock_kern);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_LOADED);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_LOADED, "");
     write_chart_dimension(hash_table_stat, (long long)plugin_statistics.hash_tables);
-    write_end_chart();
+    ebpf_write_end_chart();
 
-    write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_PER_CORE);
+    ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, NETDATA_EBPF_HASH_TABLES_PER_CORE, "");
     write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_PER_CORE], (long long)plugin_statistics.hash_percpu);
     write_chart_dimension(hash_table_core[NETDATA_EBPF_THREAD_UNIQUE], (long long)plugin_statistics.hash_unique);
-    write_end_chart();
+    ebpf_write_end_chart();
 
     ebpf_send_global_hash_table_data();
 
@@ -3536,16 +3498,16 @@ void ebpf_send_statistic_data()
         if (!wem->functions.fnct_routine)
             continue;
 
-        write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_chart_name);
+        ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_chart_name, "");
         write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
-        write_end_chart();
+        ebpf_write_end_chart();
 
-        write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_lifetime_name);
+        ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, (char *)wem->functions.fcnt_thread_lifetime_name, "");
         write_chart_dimension((char *)wem->info.thread_name,
                               (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
                               (long long) (wem->lifetime - wem->running_time):
                               0) ;
-        write_end_chart();
+        ebpf_write_end_chart();
     }
 }
 
@@ -3586,6 +3548,7 @@ static void ebpf_create_thread_chart(char *name,
     // common call for specific and all charts.
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          name,
+                         "",
                          title,
                          units,
                          NETDATA_EBPF_FAMILY,
@@ -3625,6 +3588,7 @@ static inline void ebpf_create_statistic_load_chart(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_LOAD_METHOD,
+                         "",
                          "Load info.",
                          "methods",
                          NETDATA_EBPF_FAMILY,
@@ -3654,6 +3618,7 @@ static inline void ebpf_create_statistic_kernel_memory(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_KERNEL_MEMORY,
+                         "",
                          "Memory allocated for hash tables.",
                          "bytes",
                          NETDATA_EBPF_FAMILY,
@@ -3679,6 +3644,7 @@ static inline void ebpf_create_statistic_hash_tables(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_HASH_TABLES_LOADED,
+                         "",
                          "Number of hash tables loaded.",
                          "hash tables",
                          NETDATA_EBPF_FAMILY,
@@ -3704,6 +3670,7 @@ static inline void ebpf_create_statistic_hash_per_core(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_HASH_TABLES_PER_CORE,
+                         "",
                          "How threads are loading hash/array tables.",
                          "threads",
                          NETDATA_EBPF_FAMILY,
@@ -3733,6 +3700,7 @@ static void ebpf_create_statistic_hash_global_elements(int update_every)
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          NETDATA_EBPF_HASH_TABLES_GLOBAL_ELEMENTS,
+                         "",
                          "Controllers inside global table",
                          "rows",
                          NETDATA_EBPF_FAMILY,
@@ -3764,6 +3732,7 @@ static void ebpf_create_statistic_hash_pid_table(int update_every, char *id, cha
 {
     ebpf_write_chart_cmd(NETDATA_MONITORING_FAMILY,
                          id,
+                         "",
                          title,
                          "rows",
                          NETDATA_EBPF_FAMILY,

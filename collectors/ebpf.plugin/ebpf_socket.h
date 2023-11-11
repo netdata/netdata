@@ -318,10 +318,6 @@ typedef struct netata_socket_plus {
     } socket_string;
 } netdata_socket_plus_t;
 
-enum netdata_udp_ports {
-    NETDATA_EBPF_UDP_PORT = 53
-};
-
 extern ARAL *aral_socket_table;
 
 /**

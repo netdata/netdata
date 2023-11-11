@@ -196,32 +196,34 @@ modules:
                 - name: close
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.file_open
+            - name: app.ebpf_file_open
               description: Number of open files
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.file_open_error
+                - name: calls
+            - name: app.ebpf_file_open_error
               description: Fails to open files
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.file_closed
+                - name: calls
+            - name: app.ebpf_file_closed
               description: Files closed
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.file_close_error
+                - name: calls
+            - name: app.ebpf_file_close_error
               description: Fails to close files
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: calls
   - meta:
       plugin_name: ebpf.plugin
       module_name: processes
@@ -379,38 +381,40 @@ modules:
                 - name: task
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.process_create
+            - name: app.process_create
               description: Process started
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.thread_create
+                - name: calls
+            - name: app.thread_create
               description: Threads started
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.task_exit
+                - name: call
+            - name: app.task_exit
               description: Tasks starts exit process
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.task_close
+                - name: callp
+            - name: app.task_close
               description: Tasks closed
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.task_error
+                - name: call
+            - name: app.task_error
               description: Errors to create process or threads
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: app
         - name: cgroup
           description: "These Metrics show grouped information per cgroup/service."
           labels: []
@@ -841,32 +845,34 @@ modules:
                 - name: miss
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.cachestat_ratio
+            - name: app.ebpf_cachestat_hit_ratio
               description: Hit ratio
               unit: "%"
               chart_type: line
               dimensions:
-                - name: a dimension per app group
-            - name: apps.cachestat_dirties
+                - name: ratio
+            - name: app.ebpf_cachestat_dirty_pages
               description: Number of dirty pages
               unit: "page/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.cachestat_hits
+                - name: pages
+            - name: app.ebpf_cachestat_access
               description: Number of accessed files
               unit: "hits/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.cachestat_misses
+                - name: hits
+            - name: app.ebpf_cachestat_misses
               description: Files out of page cache
               unit: "misses/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: misses
         - name: cgroup
           description: ""
           labels: []
@@ -1076,27 +1082,27 @@ modules:
           labels: []
           metrics:
             - name: mem.file_sync
-              description: Monitor calls for <code>fsync(2)</code> and <code>fdatasync(2)</code>.
+              description: Monitor calls to fsync(2) and fdatasync(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: fsync
                 - name: fdatasync
             - name: mem.meory_map
-              description: Monitor calls for <code>msync(2)</code>.
+              description: Monitor calls to msync(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: msync
             - name: mem.sync
-              description: Monitor calls for <code>sync(2)</code> and <code>syncfs(2)</code>.
+              description: Monitor calls to sync(2) and syncfs(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: sync
                 - name: syncfs
             - name: mem.file_segment
-              description: Monitor calls for <code>sync_file_range(2)</code>.
+              description: Monitor calls to sync_file_range(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -1333,41 +1339,43 @@ modules:
           labels: []
           metrics:
             - name: cgroup.swap_read
-              description: Calls to function <code>swap_readpage</code>.
+              description: Calls to function swap_readpage.
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: read
             - name: cgroup.swap_write
-              description: Calls to function <code>swap_writepage</code>.
+              description: Calls to function swap_writepage.
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: write
             - name: services.swap_read
-              description: Calls to <code>swap_readpage</code>.
+              description: Calls to swap_readpage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.swap_write
-              description: Calls to function <code>swap_writepage</code>.
+              description: Calls to function swap_writepage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.swap_read_call
-              description: Calls to function <code>swap_readpage</code>.
+            - name: app.ebpf_call_swap_readpage
+              description: Calls to function swap_readpage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per app group
-            - name: apps.swap_write_call
-              description: Calls to function <code>swap_writepage</code>.
+            - name: app.ebpf_call_swap_writepage
+              description: Calls to function swap_writepage.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -1501,14 +1509,16 @@ modules:
                 - name: a dimension per systemd service
         - name: apps
           description: "These metrics show cgroup/service that reached OOM."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.oomkills
+            - name: app.oomkill
               description: OOM kills
               unit: "kills"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: kills
   - meta:
       plugin_name: ebpf.plugin
       module_name: socket
@@ -1713,68 +1723,64 @@ modules:
                 - name: send
         - name: apps
           description: "These metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.outbound_conn_v4
+            - name: app.ebpf_call_tcp_v4_connection
               description: Calls to tcp_v4_connection
               unit: "connections/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.outbound_conn_v6
+                - name: connections
+            - name: app.app.ebpf_call_tcp_v6_connection
               description: Calls to tcp_v6_connection
               unit: "connections/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.total_bandwidth_sent
+                - name: connections
+            - name: app.ebpf_sock_bytes_sent
               description: Bytes sent
               unit: "kilobits/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.total_bandwidth_recv
+                - name: bandwidth
+            - name: app.ebpf_sock_bytes_received
               description: bytes received
               unit: "kilobits/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_tcp_send
+                - name: bandwidth
+            - name: app.ebpf_call_tcp_sendmsg
               description: Calls for tcp_sendmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_tcp_recv
+                - name: calls
+            - name: app.ebpf_call_tcp_cleanup_rbuf
               description: Calls for tcp_cleanup_rbuf
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_tcp_retransmit
+                - name: calls
+            - name: app.ebpf_call_tcp_retransmit
               description: Calls for tcp_retransmit
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_udp_send
+                - name: calls
+            - name: app.ebpf_call_udp_sendmsg
               description: Calls for udp_sendmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.bandwidth_udp_recv
+                - name: calls
+            - name: app.ebpf_call_udp_recvmsg
               description: Calls for udp_recvmsg
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: services.net_conn_ipv4
-              description: Calls to tcp_v4_connection
-              unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per systemd service
+                - name: calls
         - name: cgroup
           description: ""
           labels: []
@@ -2005,32 +2011,34 @@ modules:
       scopes:
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.dc_ratio
+            - name: app.ebpf_dc_ratio
               description: Percentage of files inside directory cache
               unit: "%"
               chart_type: line
               dimensions:
-                - name: a dimension per app group
-            - name: apps.dc_reference
+                - name: ratio
+            - name: app.ebpf_dc_reference
               description: Count file access
               unit: "files"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.dc_not_cache
+                - name: files
+            - name: app.ebpf_dc_not_cache
               description: Files not present inside directory cache
               unit: "files"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.dc_not_found
+                - name: files
+            - name: app.ebpf_dc_not_found
               description: Files not found
               unit: "files"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: files
         - name: filesystem
           description: "These metrics show total number of calls to functions inside kernel."
           labels: []
@@ -2409,81 +2417,83 @@ modules:
           labels: []
           metrics:
             - name: cgroup.shmget
-              description: Calls to syscall <code>shmget(2)</code>.
+              description: Calls to syscall shmget(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: get
             - name: cgroup.shmat
-              description: Calls to syscall <code>shmat(2)</code>.
+              description: Calls to syscall shmat(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: at
             - name: cgroup.shmdt
-              description: Calls to syscall <code>shmdt(2)</code>.
+              description: Calls to syscall shmdt(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: dt
             - name: cgroup.shmctl
-              description: Calls to syscall <code>shmctl(2)</code>.
+              description: Calls to syscall shmctl(2).
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: ctl
             - name: services.shmget
-              description: Calls to syscall <code>shmget(2)</code>.
+              description: Calls to syscall shmget(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.shmat
-              description: Calls to syscall <code>shmat(2)</code>.
+              description: Calls to syscall shmat(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.shmdt
-              description: Calls to syscall <code>shmdt(2)</code>.
+              description: Calls to syscall shmdt(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
             - name: services.shmctl
-              description: Calls to syscall <code>shmctl(2)</code>.
+              description: Calls to syscall shmctl(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: a dimension per systemd service
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.shmget_call
-              description: Calls to syscall <code>shmget(2)</code>.
+            - name: app.ebpf_shmget_call
+              description: Calls to syscall shmget(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.shmat_call
-              description: Calls to syscall <code>shmat(2)</code>.
+                - name: calls
+            - name: app.ebpf_shmat_call
+              description: Calls to syscall shmat(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.shmdt_call
-              description: Calls to syscall <code>shmdt(2)</code>.
+                - name: calls
+            - name: app.ebpf_shmdt_call
+              description: Calls to syscall shmdt(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.shmctl_call
-              description: Calls to syscall <code>shmctl(2)</code>.
+                - name: calls
+            - name: app.ebpf_shmctl_call
+              description: Calls to syscall shmctl(2).
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: calls
         - name: global
           description: "These Metrics show number of calls for specified syscall."
           labels: []
@@ -2898,7 +2908,7 @@ modules:
               dimensions:
                 - name: read
             - name: cgroup.vfs_fsync
-              description: Calls for <code>vfs_fsync</code>
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -2910,7 +2920,7 @@ modules:
               dimensions:
                 - name: fsync
             - name: cgroup.vfs_open
-              description: Calls for <code>vfs_open</code>
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -2922,7 +2932,7 @@ modules:
               dimensions:
                 - name: open
             - name: cgroup.vfs_create
-              description: Calls for <code>vfs_create</code>
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -2976,7 +2986,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
             - name: services.vfs_fsync
-              description: Calls to <code>vfs_fsync</code>
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -2988,7 +2998,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
             - name: services.vfs_open
-              description: Calls to <code>vfs_open</code>
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -3000,7 +3010,7 @@ modules:
               dimensions:
                 - name: a dimension per systemd service
             - name: services.vfs_create
-              description: Calls to <code>vfs_create</code>
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
@@ -3043,7 +3053,7 @@ modules:
                 - name: read
                 - name: write
             - name: filesystem.vfs_fsync
-              description: Calls for <code>vfs_fsync</code>
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -3055,7 +3065,7 @@ modules:
               dimensions:
                 - name: fsync
             - name: filesystem.vfs_open
-              description: Calls for <code>vfs_open</code>
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -3067,7 +3077,7 @@ modules:
               dimensions:
                 - name: open
             - name: filesystem.vfs_create
-              description: Calls for <code>vfs_create</code>
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -3080,86 +3090,88 @@ modules:
                 - name: create
         - name: apps
           description: "These Metrics show grouped information per apps group."
-          labels: []
+          labels:
+            - name: app_group
+              description: The name of the group defined in the configuration.
           metrics:
-            - name: apps.file_deleted
+            - name: app.ebpf_call_vfs_unlink
               description: Files deleted
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_write_call
+                - name: calls
+            - name: app.ebpf_call_vfs_write
               description: Write to disk
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_write_error
+                - name: calls
+            - name: app.ebpf_call_vfs_write_error
               description: Fails to write
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_read_call
+                - name: calls
+            - name: app.ebpf_call_vfs_read
               description: Read from disk
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_read_error
+                - name: calls
+            - name: app.ebpf_call_vfs_read_error
               description: Fails to read
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_write_bytes
+                - name: calls
+            - name: app.ebpf_call_vfs_write_bytes
               description: Bytes written on disk
               unit: "bytes/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_read_bytes
+                - name: writes
+            - name: app.ebpf_call_vfs_read_bytes
               description: Bytes read on disk
               unit: "bytes/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_fsync
-              description: Calls for <code>vfs_fsync</code>
+                - name: reads
+            - name: app.ebpf_call_vfs_fsync
+              description: Calls to vfs_fsync.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_fsync_error
+                - name: calls
+            - name: app.ebpf_call_vfs_fsync_error
               description: Sync error
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_open
-              description: Calls for <code>vfs_open</code>
+                - name: calls
+            - name: app.ebpf_call_vfs_open
+              description: Calls to vfs_open.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_open_error
+                - name: calls
+            - name: app.ebpf_call_vfs_open_error
               description: Open error
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_create
-              description: Calls for <code>vfs_create</code>
+                - name: calls
+            - name: app.ebpf_call_vfs_create
+              description: Calls to vfs_create.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
-            - name: apps.vfs_create_error
+                - name: calls
+            - name: app.ebpf_call_vfs_create_error
               description: Create error
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: a dimension per app group
+                - name: calls
   - meta:
       plugin_name: ebpf.plugin
       module_name: process
