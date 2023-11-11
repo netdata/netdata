@@ -162,7 +162,7 @@ class Service(SocketService):
                     t = line[5:].split(' ')
                     data[t[0]] = t[1]
                 except (IndexError, ValueError):
-                    self.debug('invalid line received: ' + str(line))
+                    self.debug(f'invalid line received: {str(line)}')
 
         if not data:
             self.error("received data doesn't have any records")
@@ -192,6 +192,4 @@ class Service(SocketService):
         """
         self._parse_config()
         data = self._get_data()
-        if data is None:
-            return False
-        return True
+        return data is not None

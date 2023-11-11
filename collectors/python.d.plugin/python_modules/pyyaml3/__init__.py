@@ -134,10 +134,7 @@ def serialize_all(nodes, stream=None, Dumper=Dumper,
     """
     getvalue = None
     if stream is None:
-        if encoding is None:
-            stream = io.StringIO()
-        else:
-            stream = io.BytesIO()
+        stream = io.StringIO() if encoding is None else io.BytesIO()
         getvalue = stream.getvalue
     dumper = Dumper(stream, canonical=canonical, indent=indent, width=width,
             allow_unicode=allow_unicode, line_break=line_break,
@@ -172,10 +169,7 @@ def dump_all(documents, stream=None, Dumper=Dumper,
     """
     getvalue = None
     if stream is None:
-        if encoding is None:
-            stream = io.StringIO()
-        else:
-            stream = io.BytesIO()
+        stream = io.StringIO() if encoding is None else io.BytesIO()
         getvalue = stream.getvalue
     dumper = Dumper(stream, default_style=default_style,
             default_flow_style=default_flow_style,
@@ -276,11 +270,11 @@ class YAMLObjectMetaclass(type):
     """
     The metaclass for YAMLObject.
     """
-    def __init__(cls, name, bases, kwds):
-        super(YAMLObjectMetaclass, cls).__init__(name, bases, kwds)
+    def __init__(self, name, bases, kwds):
+        super(YAMLObjectMetaclass, self).__init__(name, bases, kwds)
         if 'yaml_tag' in kwds and kwds['yaml_tag'] is not None:
-            cls.yaml_loader.add_constructor(cls.yaml_tag, cls.from_yaml)
-            cls.yaml_dumper.add_representer(cls, cls.to_yaml)
+            self.yaml_loader.add_constructor(self.yaml_tag, self.from_yaml)
+            self.yaml_dumper.add_representer(self, self.to_yaml)
 
 class YAMLObject(metaclass=YAMLObjectMetaclass):
     """

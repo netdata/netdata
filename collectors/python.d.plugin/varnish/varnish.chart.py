@@ -206,17 +206,13 @@ class Parser:
 
     def init(self, data):
         data = ''.join(data)
-        parsed_main = Parser._default.findall(data)
-        if parsed_main:
+        if parsed_main := Parser._default.findall(data):
             self.re_default = Parser._default
 
-        parsed_backend = Parser._backend_new.findall(data)
-        if parsed_backend:
+        if parsed_backend := Parser._backend_new.findall(data):
             self.re_backend = Parser._backend_new
-        else:
-            parsed_backend = Parser._backend_old.findall(data)
-            if parsed_backend:
-                self.re_backend = Parser._backend_old
+        elif parsed_backend := Parser._backend_old.findall(data):
+            self.re_backend = Parser._backend_old
 
     def server_stats(self, data):
         return self.re_default.findall(''.join(data))
@@ -301,7 +297,7 @@ class Service(ExecutableService):
         if not server_stats:
             return None
 
-        stats = dict((param, value) for _, param, value in server_stats)
+        stats = {param: value for _, param, value in server_stats}
         data.update(stats)
 
         self.get_vbe_backends(data, raw)

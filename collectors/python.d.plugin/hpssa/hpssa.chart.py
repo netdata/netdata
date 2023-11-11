@@ -143,12 +143,11 @@ class HPSSA(object):
 
     @staticmethod
     def match_any(line, *regexes):
-        return any([regex.match(line) for regex in regexes])
+        return any(regex.match(line) for regex in regexes)
 
     def parse(self):
         for line in self:
-            match = adapter_regex.match(line)
-            if match:
+            if match := adapter_regex.match(line):
                 self.adapters.append(self.parse_adapter(**match.groupdict()))
 
     def parse_adapter(self, slot, adapter_type):
@@ -176,36 +175,34 @@ class HPSSA(object):
 
         for line in self:
             if error_match.match(line):
-                raise HPSSAException('Error: {}'.format(line))
+                raise HPSSAException(f'Error: {line}')
             elif adapter_regex.match(line):
                 self.rewind()
                 break
             elif array_regex.match(line):
                 self.parse_array(adapter)
-            elif line in ('Unassigned', 'unassigned') or line == 'HBA Drives':
+            elif line in ('Unassigned', 'unassigned', 'HBA Drives'):
                 self.parse_physical_drives(adapter)
             elif ignored_sections_regex.match(line):
                 self.parse_ignored_section()
+            elif match := key_value_regex.match(line):
+                key, value = match.group('key', 'value')
+                if key == 'Battery/Capacitor Count':
+                    adapter['battery']['count'] = int(value)
+                elif key == 'Battery/Capacitor Status':
+                    adapter['battery']['status'] = value == 'OK'
+                elif key == 'Cache Board Present':
+                    adapter['cache']['present'] = value == 'True'
+                elif key == 'Cache Module Temperature (C)':
+                    adapter['cache']['temperature'] = int(value)
+                elif key == 'Cache Status':
+                    adapter['cache']['status'] = value == 'OK'
+                elif key == 'Controller Status':
+                    adapter['controller']['status'] = value == 'OK'
+                elif key == 'Controller Temperature (C)':
+                    adapter['controller']['temperature'] = int(value)
             else:
-                match = key_value_regex.match(line)
-                if match:
-                    key, value = match.group('key', 'value')
-                    if key == 'Controller Status':
-                        adapter['controller']['status'] = value == 'OK'
-                    elif key == 'Controller Temperature (C)':
-                        adapter['controller']['temperature'] = int(value)
-                    elif key == 'Cache Board Present':
-                        adapter['cache']['present'] = value == 'True'
-                    elif key == 'Cache Status':
-                        adapter['cache']['status'] = value == 'OK'
-                    elif key == 'Cache Module Temperature (C)':
-                        adapter['cache']['temperature'] = int(value)
-                    elif key == 'Battery/Capacitor Count':
-                        adapter['battery']['count'] = int(value)
-                    elif key == 'Battery/Capacitor Status':
-                        adapter['battery']['status'] = value == 'OK'
-                else:
-                    raise HPSSAException('Cannot parse line: {}'.format(line))
+                raise HPSSAException(f'Cannot parse line: {line}')
 
         return adapter
 
@@ -215,8 +212,7 @@ class HPSSA(object):
                 self.rewind()
                 break
 
-            match = drive_regex.match(line)
-            if match:
+            if match := drive_regex.match(line):
                 data = match.groupdict()
                 if data['logical_drive_id']:
                     self.parse_logical_drive(adapter, int(data['logical_drive_id']))
@@ -228,8 +224,7 @@ class HPSSA(object):
 
     def parse_physical_drives(self, adapter):
         for line in self:
-            match = drive_regex.match(line)
-            if match:
+            if match := drive_regex.match(line):
                 self.parse_physical_drive(adapter, match.group('fqn'))
             else:
                 self.rewind()
@@ -247,14 +242,13 @@ class HPSSA(object):
                 self.parse_ignored_section()
                 continue
 
-            match = ld_status_regex.match(line)
-            if match:
+            if match := ld_status_regex.match(line):
                 ld['status'] = match.group('status') == 'OK'
 
                 if match.group('percentage'):
                     ld['status_complete'] = float(match.group('percentage')) / 100
             elif HPSSA.match_any(line, adapter_regex, array_regex, drive_regex, ignored_sections_regex) \
-                    or not key_value_regex.match(line):
+                        or not key_value_regex.match(line):
                 self.rewind()
                 break
 
@@ -272,8 +266,7 @@ class HPSSA(object):
                 self.rewind()
                 break
 
-            match = key_value_regex.match(line)
-            if match:
+            if match := key_value_regex.match(line):
                 key, value = match.group('key', 'value')
                 if key == 'Status':
                     pd['status'] = value == 'OK'
@@ -306,9 +299,7 @@ class Service(ExecutableService):
         try:
             adapters = HPSSA(self._get_raw_data(command=self.cmd)).adapters
             if not adapters:
-                # If no adapters are returned, run the command again but capture stderr
-                err = self._get_raw_data(command=self.cmd, stderr=True)
-                if err:
+                if err := self._get_raw_data(command=self.cmd, stderr=True):
                     raise HPSSAException('Error executing cmd {}: {}'.format(' '.join(self.cmd), '\n'.join(err)))
             return adapters
         except HPSSAException as ex:
@@ -317,32 +308,31 @@ class Service(ExecutableService):
 
     def check(self):
         if not os.path.isfile(self.ssacli_path):
-            ssacli_path = find_binary(self.ssacli_path)
-            if ssacli_path:
+            if ssacli_path := find_binary(self.ssacli_path):
                 self.ssacli_path = ssacli_path
             else:
-                self.error('Cannot locate "{}" binary'.format(self.ssacli_path))
+                self.error(f'Cannot locate "{self.ssacli_path}" binary')
                 return False
 
         if self.use_sudo:
             sudo = find_binary('sudo')
             if not sudo:
-                self.error('Cannot locate "{}" binary'.format('sudo'))
+                self.error('Cannot locate "sudo" binary')
                 return False
 
             allowed = self._get_raw_data(command=[sudo, '-n', '-l', self.ssacli_path])
             if not allowed or allowed[0].strip() != os.path.realpath(self.ssacli_path):
-                self.error('Not allowed to run sudo for command {}'.format(self.ssacli_path))
+                self.error(f'Not allowed to run sudo for command {self.ssacli_path}')
                 return False
 
             self.cmd = [sudo, '-n']
 
         self.cmd.extend([self.ssacli_path, 'ctrl', 'all', 'show', 'config', 'detail'])
-        self.info('Command: {}'.format(self.cmd))
+        self.info(f'Command: {self.cmd}')
 
         adapters = self.get_adapters()
 
-        self.info('Discovered adapters: {}'.format([adapter['type'] for adapter in adapters]))
+        self.info(f"Discovered adapters: {[adapter['type'] for adapter in adapters]}")
         if not adapters:
             self.error('No adapters discovered')
             return False
@@ -353,35 +343,37 @@ class Service(ExecutableService):
         netdata = {}
 
         for adapter in self.get_adapters():
-            status_key = '{}_status'.format(adapter['slot'])
-            temperature_key = '{}_temperature'.format(adapter['slot'])
-            ld_key = 'ld_{}_'.format(adapter['slot'])
+            status_key = f"{adapter['slot']}_status"
+            temperature_key = f"{adapter['slot']}_temperature"
+            ld_key = f"ld_{adapter['slot']}_"
 
             data = {
                 'ctrl_status': {
-                    'ctrl_' + status_key: adapter['controller']['status'],
-                    'cache_' + status_key: adapter['cache']['present'] and adapter['cache']['status'],
-                    'battery_' + status_key:
-                        adapter['battery']['status'] if adapter['battery']['count'] > 0 else None
+                    f'ctrl_{status_key}': adapter['controller']['status'],
+                    f'cache_{status_key}': adapter['cache']['present']
+                    and adapter['cache']['status'],
+                    f'battery_{status_key}': adapter['battery']['status']
+                    if adapter['battery']['count'] > 0
+                    else None,
                 },
-
                 'ctrl_temperature': {
-                    'ctrl_' + temperature_key: adapter['controller']['temperature'],
-                    'cache_' + temperature_key: adapter['cache']['temperature'],
+                    f'ctrl_{temperature_key}': adapter['controller'][
+                        'temperature'
+                    ],
+                    f'cache_{temperature_key}': adapter['cache']['temperature'],
                 },
-
                 'ld_status': {
-                    ld_key + '{}_status'.format(ld['id']): ld['status'] for ld in adapter['logical_drives']
+                    f"{ld_key}{ld['id']}_status": ld['status']
+                    for ld in adapter['logical_drives']
                 },
-
                 'pd_status': {},
                 'pd_temperature': {},
             }
 
             for pd in adapter['physical_drives']:
-                pd_key = 'pd_{}_{}'.format(adapter['slot'], pd['fqn'])
-                data['pd_status'][pd_key + '_status'] = pd['status']
-                data['pd_temperature'][pd_key + '_temperature'] = pd['temperature']
+                pd_key = f"pd_{adapter['slot']}_{pd['fqn']}"
+                data['pd_status'][f'{pd_key}_status'] = pd['status']
+                data['pd_temperature'][f'{pd_key}_temperature'] = pd['temperature']
 
             for chart, dimension_data in data.items():
                 for dimension_id, value in dimension_data.items():

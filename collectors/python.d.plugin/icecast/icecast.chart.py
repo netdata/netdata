@@ -87,8 +87,7 @@ class Service(UrlService):
             self.error('JSON decode error:', error)
             return None
 
-        sources = data['icestats'].get('source')
-        if not sources:
+        if sources := data['icestats'].get('source'):
+            return sources if isinstance(sources, list) else [sources]
+        else:
             return None
-
-        return sources if isinstance(sources, list) else [sources]

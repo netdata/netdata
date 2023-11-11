@@ -15,11 +15,7 @@ def _wait_for_io_events(socks, events, timeout=None):
         raise ValueError('Platform does not have a selector')
     if not isinstance(socks, list):
         # Probably just a single socket.
-        if hasattr(socks, "fileno"):
-            socks = [socks]
-        # Otherwise it might be a non-list iterable.
-        else:
-            socks = list(socks)
+        socks = [socks] if hasattr(socks, "fileno") else list(socks)
     with DefaultSelector() as selector:
         for sock in socks:
             selector.register(sock, events)

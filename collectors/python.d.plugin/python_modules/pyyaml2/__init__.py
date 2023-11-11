@@ -278,11 +278,11 @@ class YAMLObjectMetaclass(type):
     """
     The metaclass for YAMLObject.
     """
-    def __init__(cls, name, bases, kwds):
-        super(YAMLObjectMetaclass, cls).__init__(name, bases, kwds)
+    def __init__(self, name, bases, kwds):
+        super(YAMLObjectMetaclass, self).__init__(name, bases, kwds)
         if 'yaml_tag' in kwds and kwds['yaml_tag'] is not None:
-            cls.yaml_loader.add_constructor(cls.yaml_tag, cls.from_yaml)
-            cls.yaml_dumper.add_representer(cls, cls.to_yaml)
+            self.yaml_loader.add_constructor(self.yaml_tag, self.from_yaml)
+            self.yaml_dumper.add_representer(self, self.to_yaml)
 
 class YAMLObject(object):
     """
@@ -299,18 +299,19 @@ class YAMLObject(object):
     yaml_tag = None
     yaml_flow_style = None
 
-    def from_yaml(cls, loader, node):
+    def from_yaml(self, loader, node):
         """
         Convert a representation node to a Python object.
         """
-        return loader.construct_yaml_object(node, cls)
+        return loader.construct_yaml_object(node, self)
     from_yaml = classmethod(from_yaml)
 
-    def to_yaml(cls, dumper, data):
+    def to_yaml(self, dumper, data):
         """
         Convert a Python object to a representation node.
         """
-        return dumper.represent_yaml_object(cls.yaml_tag, data, cls,
-                flow_style=cls.yaml_flow_style)
+        return dumper.represent_yaml_object(
+            self.yaml_tag, data, self, flow_style=self.yaml_flow_style
+        )
     to_yaml = classmethod(to_yaml)
 

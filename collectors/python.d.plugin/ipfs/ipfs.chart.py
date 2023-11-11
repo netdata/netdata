@@ -121,23 +121,17 @@ class Service(UrlService):
                 ],
         }
         if self.do_repoapi:
-            cfg.update({
-                '/api/v0/stats/repo':
-                    [
-                        ('size', 'RepoSize', int),
-                        ('objects', 'NumObjects', int),
-                        ('avail', 'StorageMax', self._storagemax),
-                    ],
-            })
+            cfg['/api/v0/stats/repo'] = [
+                ('size', 'RepoSize', int),
+                ('objects', 'NumObjects', int),
+                ('avail', 'StorageMax', self._storagemax),
+            ]
 
         if self.do_pinapi:
-            cfg.update({
-                '/api/v0/pin/ls':
-                    [
-                        ('pinned', 'Keys', len),
-                        ('recursive_pins', 'Keys', self._recursive_pins),
-                    ]
-            })
+            cfg['/api/v0/pin/ls'] = [
+                ('pinned', 'Keys', len),
+                ('recursive_pins', 'Keys', self._recursive_pins),
+            ]
         r = dict()
         for suburl in cfg:
             in_json = self._get_json(suburl)

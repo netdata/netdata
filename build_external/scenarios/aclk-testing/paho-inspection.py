@@ -2,16 +2,16 @@ import ssl
 import paho.mqtt.client as mqtt
 
 def on_connect(mqttc, obj, flags, rc):
-    print("connected rc: "+str(rc), flush=True)
+    print(f"connected rc: {str(rc)}", flush=True)
     mqttc.subscribe("/agent/#",0)
 def on_disconnect(mqttc, obj, flags, rc):
-    print("disconnected rc: "+str(rc), flush=True)
+    print(f"disconnected rc: {str(rc)}", flush=True)
 def on_message(mqttc, obj, msg):
-    print(msg.topic+" "+str(msg.qos)+" "+str(msg.payload), flush=True)
+    print(f"{msg.topic} {str(msg.qos)} {str(msg.payload)}", flush=True)
 def on_publish(mqttc, obj, mid):
-    print("mid: "+str(mid), flush=True)
+    print(f"mid: {str(mid)}", flush=True)
 def on_subscribe(mqttc, obj, mid, granted_qos):
-    print("Subscribed: "+str(mid)+" "+str(granted_qos), flush=True)
+    print(f"Subscribed: {str(mid)} {str(granted_qos)}", flush=True)
 def on_log(mqttc, obj, level, string):
     print(string)
 print("Starting paho-inspection", flush=True)

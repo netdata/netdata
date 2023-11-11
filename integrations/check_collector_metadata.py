@@ -72,17 +72,19 @@ def main():
     failed = False
 
     for idx, module in enumerate(check_modules):
-        invalid_cats = set(module['meta']['monitored_instance']['categories']) - valid_categories
-
-        if invalid_cats:
+        if (
+            invalid_cats := set(
+                module['meta']['monitored_instance']['categories']
+            )
+            - valid_categories
+        ):
             print(f':error file={ check_path }:Invalid categories found in module { idx } in { check_path }: { ", ".joiin(invalid_cats) }.')
             failed = True
 
     if failed:
         return 1
-    else:
-        print('{ check_path } is a valid collector metadata file.')
-        return 0
+    print('{ check_path } is a valid collector metadata file.')
+    return 0
 
 
 if __name__ == '__main__':

@@ -378,10 +378,7 @@ class Service(SimpleService):
             self.error("one of these parameters is not specified: user, password, server, service")
             return False
 
-        if not self.connect():
-            return False
-
-        return bool(self.get_data())
+        return False if not self.connect() else bool(self.get_data())
 
     def get_data(self):
         if not self.alive and not self.reconnect():
@@ -438,7 +435,7 @@ class Service(SimpleService):
         else:
             for name, offline, size, used, used_in_percent in rv:
                 # TODO: skip offline?
-                if not (not offline and self.charts):
+                if offline or not self.charts:
                     continue
                 # TODO: remove inactive?
                 if name not in self.active_tablespaces:
@@ -458,7 +455,7 @@ class Service(SimpleService):
         else:
             for name, offline, size, used, used_in_percent in rv:
                 # TODO: skip offline?
-                if not (not offline and self.charts):
+                if offline or not self.charts:
                     continue
                 # TODO: remove inactive?
                 if name not in self.active_tablespaces:
@@ -638,11 +635,12 @@ class Service(SimpleService):
          ['VM out bytes Per Sec', 0]]
         """
 
-        metrics = list()
+        metrics = []
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_SYSTEM)
-            for metric_name, value in cursor.fetchall():
-                metrics.append([metric_name, value])
+            metrics.extend(
+                [metric_name, value] for metric_name, value in cursor.fetchall()
+            )
         return metrics
 
     def gather_tablespace_metrics(self):
@@ -654,7 +652,7 @@ class Service(SimpleService):
          ['TEMP', 0.0, 3233177600.0, 0.0, 0],
          ['USERS', 1048576.0, 3233169408.0, 0.03243182981397305, 0]]
         """
-        metrics = list()
+        metrics = []
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_TABLESPACE)
             for tablespace_name, used_bytes, max_bytes, used_percent in cursor.fetchall():
@@ -664,14 +662,8 @@ class Service(SimpleService):
                 else:
                     offline = False
                     used = float(used_bytes)
-                if max_bytes is None:
-                    size = 0
-                else:
-                    size = float(max_bytes)
-                if used_percent is None:
-                    used_percent = 0
-                else:
-                    used_percent = float(used_percent)
+                size = 0 if max_bytes is None else float(max_bytes)
+                used_percent = 0 if used_percent is None else float(used_percent)
                 metrics.append(
                     [
                         tablespace_name,
@@ -692,7 +684,7 @@ class Service(SimpleService):
          ['TEMP', 0.0, 3233177600.0, 0.0, 0],
          ['USERS', 1048576.0, 3233169408.0, 0.03243182981397305, 0]]
         """
-        metrics = list()
+        metrics = []
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_ALLOCATED)
             for tablespace_name, used_bytes, max_bytes, used_percent in cursor.fetchall():
@@ -702,14 +694,8 @@ class Service(SimpleService):
                 else:
                     offline = False
                     used = float(used_bytes)
-                if max_bytes is None:
-                    size = 0
-                else:
-                    size = float(max_bytes)
-                if used_percent is None:
-                    used_percent = 0
-                else:
-                    used_percent = float(used_percent)
+                size = 0 if max_bytes is None else float(max_bytes)
+                used_percent = 0 if used_percent is None else float(used_percent)
                 metrics.append(
                     [
                         tablespace_name,
@@ -736,11 +722,13 @@ class Service(SimpleService):
          ['System I/O', 0.002],
          ['Scheduler', 0]]
         """
-        metrics = list()
+        metrics = []
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_WAIT_TIME)
-            for wait_class_name, value in cursor.fetchall():
-                metrics.append([wait_class_name, value])
+            metrics.extend(
+                [wait_class_name, value]
+                for wait_class_name, value in cursor.fetchall()
+            )
         return metrics
 
     def gather_activities_count(self):

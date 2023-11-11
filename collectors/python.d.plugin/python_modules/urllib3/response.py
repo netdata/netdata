@@ -62,16 +62,11 @@ class GzipDecoder(object):
         return getattr(self._obj, name)
 
     def decompress(self, data):
-        if not data:
-            return data
-        return self._obj.decompress(data)
+        return data if not data else self._obj.decompress(data)
 
 
 def _get_decoder(mode):
-    if mode == 'gzip':
-        return GzipDecoder()
-
-    return DeflateDecoder()
+    return GzipDecoder() if mode == 'gzip' else DeflateDecoder()
 
 
 class HTTPResponse(io.IOBase):
@@ -224,7 +219,7 @@ class HTTPResponse(io.IOBase):
                 # (e.g. Content-Length: 42, 42). This line ensures the values
                 # are all valid ints and that as long as the `set` length is 1,
                 # all values are the same. Otherwise, the header is invalid.
-                lengths = set([int(val) for val in length.split(',')])
+                lengths = {int(val) for val in length.split(',')}
                 if len(lengths) > 1:
                     raise InvalidHeader("Content-Length contained multiple "
                                         "unmatching values (%s)" % length)
@@ -243,7 +238,7 @@ class HTTPResponse(io.IOBase):
             status = 0
 
         # Check for responses that shouldn't include a body
-        if status in (204, 304) or 100 <= status < 200 or request_method == 'HEAD':
+        if status in {204, 304} or 100 <= status < 200 or request_method == 'HEAD':
             length = 0
 
         return length
@@ -430,17 +425,14 @@ class HTTPResponse(io.IOBase):
             'content-encoding' header.
         """
         if self.chunked and self.supports_chunked_reads():
-            for line in self.read_chunked(amt, decode_content=decode_content):
-                yield line
+            yield from self.read_chunked(amt, decode_content=decode_content)
         else:
             while not is_fp_closed(self._fp):
-                data = self.read(amt=amt, decode_content=decode_content)
-
-                if data:
+                if data := self.read(amt=amt, decode_content=decode_content):
                     yield data
 
     @classmethod
-    def from_httplib(ResponseCls, r, **response_kw):
+    def from_httplib(cls, r, **response_kw):
         """
         Given an :class:`httplib.HTTPResponse` instance ``r``, return a
         corresponding :class:`urllib3.response.HTTPResponse` object.
@@ -450,23 +442,24 @@ class HTTPResponse(io.IOBase):
         """
         headers = r.msg
 
-        if not isinstance(headers, HTTPHeaderDict):
-            if PY3:  # Python 3
+        if not isinstance(headers, HTTPHeaderDict):  # Python 3
+            if PY3:
                 headers = HTTPHeaderDict(headers.items())
-            else:  # Python 2
+            else:
                 headers = HTTPHeaderDict.from_httplib(headers)
 
         # HTTPResponse objects in Python 3 don't have a .strict attribute
         strict = getattr(r, 'strict', 0)
-        resp = ResponseCls(body=r,
-                           headers=headers,
-                           status=r.status,
-                           version=r.version,
-                           reason=r.reason,
-                           strict=strict,
-                           original_response=r,
-                           **response_kw)
-        return resp
+        return cls(
+            body=r,
+            headers=headers,
+            status=r.status,
+            version=r.version,
+            reason=r.reason,
+            strict=strict,
+            original_response=r,
+            **response_kw
+        )
 
     # Backwards-compatibility methods for httplib.HTTPResponse
     def getheaders(self):
@@ -516,9 +509,8 @@ class HTTPResponse(io.IOBase):
         temp = self.read(len(b))
         if len(temp) == 0:
             return 0
-        else:
-            b[:len(temp)] = temp
-            return len(temp)
+        b[:len(temp)] = temp
+        return len(temp)
 
     def supports_chunked_reads(self):
         """
@@ -596,17 +588,13 @@ class HTTPResponse(io.IOBase):
                 if self.chunk_left == 0:
                     break
                 chunk = self._handle_chunk(amt)
-                decoded = self._decode(chunk, decode_content=decode_content,
-                                       flush_decoder=False)
-                if decoded:
+                if decoded := self._decode(
+                    chunk, decode_content=decode_content, flush_decoder=False
+                ):
                     yield decoded
 
             if decode_content:
-                # On CPython and PyPy, we should never need to flush the
-                # decoder. However, on Jython we *might* need to, so
-                # lets defensively do it anyway.
-                decoded = self._flush_decoder()
-                if decoded:  # Platform-specific: Jython.
+                if decoded := self._flush_decoder():
                     yield decoded
 
             # Chunk content ends with \r\n: discard it.

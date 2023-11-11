@@ -42,6 +42,7 @@ set the ``urllib3.contrib.pyopenssl.DEFAULT_SSL_CIPHER_LIST`` variable.
 .. _sni: https://en.wikipedia.org/wiki/Server_Name_Indication
 .. _crime attack: https://en.wikipedia.org/wiki/CRIME_(security_exploit)
 """
+
 from __future__ import absolute_import
 
 import OpenSSL.SSL
@@ -88,7 +89,7 @@ if hasattr(ssl, 'PROTOCOL_TLSv1_2') and hasattr(OpenSSL.SSL, 'TLSv1_2_METHOD'):
     _openssl_versions[ssl.PROTOCOL_TLSv1_2] = OpenSSL.SSL.TLSv1_2_METHOD
 
 try:
-    _openssl_versions.update({ssl.PROTOCOL_SSLv3: OpenSSL.SSL.SSLv3_METHOD})
+    _openssl_versions[ssl.PROTOCOL_SSLv3] = OpenSSL.SSL.SSLv3_METHOD
 except AttributeError:
     pass
 
@@ -98,9 +99,9 @@ _stdlib_to_openssl_verify = {
     ssl.CERT_REQUIRED:
         OpenSSL.SSL.VERIFY_PEER + OpenSSL.SSL.VERIFY_FAIL_IF_NO_PEER_CERT,
 }
-_openssl_to_stdlib_verify = dict(
-    (v, k) for k, v in _stdlib_to_openssl_verify.items()
-)
+_openssl_to_stdlib_verify = {
+    v: k for k, v in _stdlib_to_openssl_verify.items()
+}
 
 # OpenSSL will only write 16K at a time
 SSL_WRITE_BLOCKSIZE = 16384
@@ -270,11 +271,10 @@ class WrappedSocket(object):
             else:
                 raise
         except OpenSSL.SSL.WantReadError:
-            rd = util.wait_for_read(self.socket, self.socket.gettimeout())
-            if not rd:
-                raise timeout('The read operation timed out')
-            else:
+            if rd := util.wait_for_read(self.socket, self.socket.gettimeout()):
                 return self.recv(*args, **kwargs)
+            else:
+                raise timeout('The read operation timed out')
         else:
             return data
 
@@ -292,11 +292,10 @@ class WrappedSocket(object):
             else:
                 raise
         except OpenSSL.SSL.WantReadError:
-            rd = util.wait_for_read(self.socket, self.socket.gettimeout())
-            if not rd:
-                raise timeout('The read operation timed out')
-            else:
+            if rd := util.wait_for_read(self.socket, self.socket.gettimeout()):
                 return self.recv_into(*args, **kwargs)
+            else:
+                raise timeout('The read operation timed out')
 
     def settimeout(self, timeout):
         return self.socket.settimeout(timeout)
@@ -334,22 +333,17 @@ class WrappedSocket(object):
             self._makefile_refs -= 1
 
     def getpeercert(self, binary_form=False):
-        x509 = self.connection.get_peer_certificate()
-
-        if not x509:
+        if x509 := self.connection.get_peer_certificate():
+            return (
+                OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_ASN1, x509)
+                if binary_form
+                else {
+                    'subject': ((('commonName', x509.get_subject().CN),),),
+                    'subjectAltName': get_subj_alt_name(x509),
+                }
+            )
+        else:
             return x509
-
-        if binary_form:
-            return OpenSSL.crypto.dump_certificate(
-                OpenSSL.crypto.FILETYPE_ASN1,
-                x509)
-
-        return {
-            'subject': (
-                (('commonName', x509.get_subject().CN),),
-            ),
-            'subjectAltName': get_subj_alt_name(x509)
-        }
 
     def _reuse(self):
         self._makefile_refs += 1

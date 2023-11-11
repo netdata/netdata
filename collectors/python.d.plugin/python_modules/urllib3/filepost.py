@@ -27,11 +27,7 @@ def iter_field_objects(fields):
     :class:`~urllib3.fields.RequestField`.
 
     """
-    if isinstance(fields, dict):
-        i = six.iteritems(fields)
-    else:
-        i = iter(fields)
-
+    i = six.iteritems(fields) if isinstance(fields, dict) else iter(fields)
     for field in i:
         if isinstance(field, RequestField):
             yield field
@@ -90,6 +86,6 @@ def encode_multipart_formdata(fields, boundary=None):
 
     body.write(b('--%s--\r\n' % (boundary)))
 
-    content_type = str('multipart/form-data; boundary=%s' % boundary)
+    content_type = str(f'multipart/form-data; boundary={boundary}')
 
     return body.getvalue(), content_type

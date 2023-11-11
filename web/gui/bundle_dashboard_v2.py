@@ -104,7 +104,7 @@ def genfilelist(path):
     files = [f for f in path.iterdir() if f.is_file() and f.name != 'README.md']
     files = [Path(*f.parts[1:]) for f in files]
     files.sort()
-    return ' \\\n    '.join([("$(srcdir)/" + str(f)) for f in files])
+    return ' \\\n    '.join([f"$(srcdir)/{str(f)}" for f in files])
 
 
 def write_makefile():

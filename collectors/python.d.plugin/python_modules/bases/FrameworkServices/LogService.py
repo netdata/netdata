@@ -25,21 +25,20 @@ class LogService(SimpleService):
         Get log lines since last poll
         :return: list
         """
-        lines = list()
+        lines = []
         try:
             if self.__re_find['current'] == self.__re_find['run']:
                 self._find_recent_log_file()
             size = os.path.getsize(self.log_path)
             if size == self._last_position:
                 self.__re_find['current'] += 1
-                return list()  # return empty list if nothing has changed
+                return []
             elif size < self._last_position:
                 self._last_position = 0  # read from beginning if file has shrunk
 
             with open(self.log_path, **self.__open_args) as fp:
                 fp.seek(self._last_position)
-                for line in fp:
-                    lines.append(line)
+                lines.extend(iter(fp))
                 self._last_position = fp.tell()
                 self.__re_find['current'] = 0
         except (OSError, IOError) as error:
@@ -55,8 +54,7 @@ class LogService(SimpleService):
         self.__re_find['run'] = self.__re_find['maximum']
         self.__re_find['current'] = 0
         self.__glob_path = self.__glob_path or self.log_path  # workaround for modules w/o config files
-        path_list = glob(self.__glob_path)
-        if path_list:
+        if path_list := glob(self.__glob_path):
             self.log_path = max(path_list)
             return True
         return False
@@ -78,5 +76,4 @@ class LogService(SimpleService):
     def create(self):
         # set cursor at last byte of log file
         self._last_position = os.path.getsize(self.log_path)
-        status = SimpleService.create(self)
-        return status
+        return SimpleService.create(self)

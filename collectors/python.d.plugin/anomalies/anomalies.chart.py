@@ -58,7 +58,7 @@ class Service(SimpleService):
         self.collected_dims = {'probability': set(), 'anomaly': set()}
 
     def check(self):
-        if not (sys.version_info[0] >= 3 and sys.version_info[1] >= 6):
+        if sys.version_info[0] < 3 or sys.version_info[1] < 6:
             self.error("anomalies collector only works with Python>=3.6")
         if len(self.host_charts_dict[self.host]) > 0:
             _ = get_allmetrics_async(host_charts_dict=self.host_charts_dict, protocol=self.protocol, user=self.username, pwd=self.password)
@@ -84,7 +84,17 @@ class Service(SimpleService):
         """Do some initialisation of charts in scope related variables.
         """
         self.charts_regex = re.compile(self.configuration.get('charts_regex','None'))
-        self.charts_available = [c for c in list(requests.get(f'{self.protocol}://{self.host}/api/v1/charts', verify=self.tls_verify).json().get('charts', {}).keys())]
+        self.charts_available = list(
+            list(
+                requests.get(
+                    f'{self.protocol}://{self.host}/api/v1/charts',
+                    verify=self.tls_verify,
+                )
+                .json()
+                .get('charts', {})
+                .keys()
+            )
+        )
         self.charts_in_scope = list(filter(self.charts_regex.match, self.charts_available))
         self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
         if len(self.charts_to_exclude) > 0:
@@ -99,11 +109,24 @@ class Service(SimpleService):
             self.custom_models_names = [model['name'] for model in self.custom_models]
             self.custom_models_dims = [i for s in [model['dimensions'].split(',') for model in self.custom_models] for i in s]
             self.custom_models_dims = [dim if '::' in dim else f'{self.host}::{dim}' for dim in self.custom_models_dims]
-            self.custom_models_charts = list(set([dim.split('|')[0].split('::')[1] for dim in self.custom_models_dims]))
-            self.custom_models_hosts = list(set([dim.split('::')[0] for dim in self.custom_models_dims]))
+            self.custom_models_charts = list(
+                {
+                    dim.split('|')[0].split('::')[1]
+                    for dim in self.custom_models_dims
+                }
+            )
+            self.custom_models_hosts = list(
+                {dim.split('::')[0] for dim in self.custom_models_dims}
+            )
             self.custom_models_host_charts_dict = {}
             for host in self.custom_models_hosts:
-                self.custom_models_host_charts_dict[host] = list(set([dim.split('::')[1].split('|')[0] for dim in self.custom_models_dims if dim.startswith(host)]))
+                self.custom_models_host_charts_dict[host] = list(
+                    {
+                        dim.split('::')[1].split('|')[0]
+                        for dim in self.custom_models_dims
+                        if dim.startswith(host)
+                    }
+                )
             self.custom_models_dims_renamed = [f"{model['name']}|{dim}" for model in self.custom_models for dim in model['dimensions'].split(',')]
             self.models_in_scope = list(set([f'{self.host}::{c}' for c in self.charts_in_scope] + self.custom_models_names))
             self.charts_in_scope = list(set(self.charts_in_scope + self.custom_models_charts))

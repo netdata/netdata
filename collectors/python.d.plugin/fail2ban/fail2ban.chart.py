@@ -82,7 +82,7 @@ class Service(LogService):
         self.conf_path = self.configuration.get('conf_path', '/etc/fail2ban/jail.local')
         self.conf_dir = self.configuration.get('conf_dir', '/etc/fail2ban/jail.d/')
         self.exclude = self.configuration.get('exclude', str())
-        self.monitoring_jails = list()
+        self.monitoring_jails = []
         self.banned_ips = defaultdict(set)
         self.data = dict()
 
@@ -155,7 +155,7 @@ class Service(LogService):
         """
         if not os.path.isdir(dir_path):
             self.error('{0} is not a directory'.format(dir_path))
-            return list()
+            return []
 
         return glob('{0}/*.{1}'.format(self.conf_dir, suffix))
 
@@ -165,7 +165,7 @@ class Service(LogService):
         """
         if not os.access(file_path, os.R_OK):
             self.error('{0} is not readable or not exist'.format(file_path))
-            return list()
+            return []
 
         with open(file_path, 'rt') as f:
             lines = f.readlines()
@@ -176,7 +176,7 @@ class Service(LogService):
 
         if not match:
             self.debug('{0} parse failed'.format(file_path))
-            return list()
+            return []
 
         return match
 
@@ -191,7 +191,7 @@ class Service(LogService):
         * jail.local
         * jail.d/*.local (in alphabetical order)
         """
-        jails_files, all_jails, active_jails = list(), list(), list()
+        jails_files, all_jails, active_jails = [], [], []
 
         jails_files.append('{0}.conf'.format(self.conf_path.rsplit('.')[0]))
         jails_files.extend(self.get_files_from_dir(self.conf_dir, 'conf'))

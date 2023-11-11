@@ -10,7 +10,7 @@ class Token(object):
         attributes.sort()
         arguments = ', '.join(['%s=%r' % (key, getattr(self, key))
                 for key in attributes])
-        return '%s(%s)' % (self.__class__.__name__, arguments)
+        return f'{self.__class__.__name__}({arguments})'
 
 #class BOMToken(Token):
 #    id = '<byte order mark>'

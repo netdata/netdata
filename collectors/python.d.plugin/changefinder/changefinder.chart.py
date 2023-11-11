@@ -51,7 +51,7 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.protocol = self.configuration.get('protocol', DEFAULT_PROTOCOL)
         self.host = self.configuration.get('host', DEFAULT_HOST)
-        self.url = '{}://{}/api/v1/allmetrics?format=json'.format(self.protocol, self.host)
+        self.url = f'{self.protocol}://{self.host}/api/v1/allmetrics?format=json'
         self.charts_regex = re.compile(self.configuration.get('charts_regex', DEFAULT_CHARTS_REGEX))
         self.charts_to_exclude = self.configuration.get('charts_to_exclude', '').split(',')
         self.mode = self.configuration.get('mode', DEFAULT_MODE)
@@ -146,16 +146,13 @@ class Service(UrlService):
 
                 # average dims on chart and run changefinder on that average
                 x = [raw_data[chart]['dimensions'][dim]['value'] for dim in raw_data[chart]['dimensions']]
-                x = [x for x in x if x is not None]
-
-                if len(x) > 0:
-
+                if x := [x for x in x if x is not None]:
                     x = sum(x) / len(x)
                     x = self.diff(x, chart) if self.cf_diff else x
 
                     score, flag = self.get_score(x, chart)
                     if self.show_scores:
-                        data_score['{}_score'.format(chart)] = score * 100
+                        data_score[f'{chart}_score'] = score * 100
                     data_flag[chart] = flag
 
             else:
@@ -163,7 +160,7 @@ class Service(UrlService):
                 # run changefinder on each individual dim
                 for dim in raw_data[chart]['dimensions']:
 
-                    chart_dim = '{}|{}'.format(chart, dim)
+                    chart_dim = f'{chart}|{dim}'
 
                     x = raw_data[chart]['dimensions'][dim]['value']
                     x = x if x else 0
@@ -171,7 +168,7 @@ class Service(UrlService):
 
                     score, flag = self.get_score(x, chart_dim)
                     if self.show_scores:
-                        data_score['{}_score'.format(chart_dim)] = score * 100
+                        data_score[f'{chart_dim}_score'] = score * 100
                     data_flag[chart_dim] = flag
 
         self.validate_charts('flags', data_flag)
@@ -180,6 +177,4 @@ class Service(UrlService):
             data_score['average_score'] = sum(data_score.values()) / len(data_score)
             self.validate_charts('scores', data_score, divisor=100)
 
-        data = {**data_score, **data_flag}
-
-        return data
+        return data_score | data_flag

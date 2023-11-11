@@ -114,7 +114,7 @@ class Charts:
         return 'Charts({0})'.format(self)
 
     def __str__(self):
-        return str([chart for chart in self.charts])
+        return str(list(self.charts))
 
     def __contains__(self, item):
         return item in self.charts
@@ -165,7 +165,7 @@ class Chart:
         """
         if not isinstance(params, list):
             raise ItemTypeError("'chart' must be a list type")
-        if not len(params) >= 8:
+        if len(params) < 8:
             raise ItemValueError("invalid value for 'chart', must be {0}".format(CHART_PARAMS))
 
         self.params = dict(zip(CHART_PARAMS, (p or str() for p in params)))
@@ -176,7 +176,7 @@ class Chart:
         hidden = str(self.params.get('hidden', ''))
         self.params['hidden'] = 'hidden' if hidden == 'hidden' else ''
 
-        self.dimensions = list()
+        self.dimensions = []
         self.variables = set()
         self.flags = ChartFlags()
         self.penalty = 0
@@ -255,10 +255,7 @@ class Chart:
         safe_print(chart + labels + dimensions + variables)
 
     def can_be_updated(self, data):
-        for dim in self.dimensions:
-            if dim.get_value(data) is not None:
-                return True
-        return False
+        return any(dim.get_value(data) is not None for dim in self.dimensions)
 
     def update(self, data, interval):
         updated_dimensions, updated_variables = str(), str()
@@ -402,9 +399,7 @@ class ChartVariable:
         return self.id
 
     def __eq__(self, other):
-        if isinstance(other, ChartVariable):
-            return self.id == other.id
-        return False
+        return self.id == other.id if isinstance(other, ChartVariable) else False
 
     def __ne__(self, other):
         return not self == other

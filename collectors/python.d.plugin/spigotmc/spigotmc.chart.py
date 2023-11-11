@@ -134,8 +134,7 @@ class Service(SimpleService):
 
         try:
             raw = self.console.command(COMMAND_TPS)
-            match = _TPS_REGEX.match(raw)
-            if match:
+            if match := _TPS_REGEX.match(raw):
                 data['tps1'] = int(float(match.group(1)) * PRECISION)
                 data['tps5'] = int(float(match.group(2)) * PRECISION)
                 data['tps15'] = int(float(match.group(3)) * PRECISION)
@@ -164,10 +163,7 @@ class Service(SimpleService):
             if match:
                 users = int(match.group(1))
                 hidden_users = match.group(2)
-                if hidden_users:
-                    hidden_users = int(hidden_users)
-                else:
-                    hidden_users = 0
+                hidden_users = int(hidden_users) if hidden_users else 0
                 data['users'] = users + hidden_users
             else:
                 if not raw:

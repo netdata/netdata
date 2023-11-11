@@ -23,7 +23,7 @@ except ImportError:
     from third_party.ordereddict import OrderedDict
 
 
-DEFAULT_MAPPING_TAG = 'tag:yaml.org,2002:map' if PY_VERSION > (3, 1) else u'tag:yaml.org,2002:map'
+DEFAULT_MAPPING_TAG = u'tag:yaml.org,2002:map'
 
 
 def dict_constructor(loader, node):

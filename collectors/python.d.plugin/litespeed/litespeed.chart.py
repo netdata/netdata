@@ -131,7 +131,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.path = self.configuration.get('path', '/tmp/lshttpd/')
-        self.files = list()
+        self.files = []
 
     def check(self):
         if not self.path:

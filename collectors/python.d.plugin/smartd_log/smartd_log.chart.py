@@ -446,7 +446,7 @@ CHARTS = {
 #     return None, None, None, None
 
 
-CHARTED_ATTRS = dict((attr, k) for k, v in CHARTS.items() for attr in v['attrs'])
+CHARTED_ATTRS = {attr: k for k, v in CHARTS.items() for attr in v['attrs']}
 
 
 class BaseAtaSmartAttribute:
@@ -478,17 +478,13 @@ class Ata3(BaseAtaSmartAttribute):
         # 423 (Average 447)
         # 38684000679 & 0xFFF -> 423
         # (38684000679 & 0xFFF0000) >> 16 -> 447
-        if value > 1e6:
-            return value & 0xFFF
-        return value
+        return value & 0xFFF if value > 1e6 else value
 
 
 class Ata9(BaseAtaSmartAttribute):
     def value(self):
         value = int(self.raw_value)
-        if value > 1e6:
-            return value & 0xFFFF
-        return value
+        return value & 0xFFFF if value > 1e6 else value
 
 
 class Ata190(BaseAtaSmartAttribute):
@@ -594,7 +590,7 @@ class BaseDisk:
         self.raw_name = name
         self.name = re.sub(r'_+', '_', name)
         self.log_file = log_file
-        self.attrs = list()
+        self.attrs = []
         self.alive = True
         self.charted = False
 
@@ -614,11 +610,9 @@ class BaseDisk:
 
     @handle_error(TypeError)
     def populate_attrs(self):
-        self.attrs = list()
+        self.attrs = []
         line = self.log_file.read()
-        for value in self.parser(line):
-            self.attrs.append(attribute_factory(value))
-
+        self.attrs.extend(attribute_factory(value) for value in self.parser(line))
         return len(self.attrs)
 
     def data(self):
@@ -646,7 +640,7 @@ class Service(SimpleService):
         self.log_path = configuration.get('log_path', DEF_PATH)
         self.age = configuration.get('age', DEF_AGE)
         self.exclude = configuration.get('exclude_disks', str()).split()
-        self.disks = list()
+        self.disks = []
         self.runs = 0
         self.do_force_rescan = False
 
@@ -703,10 +697,8 @@ class Service(SimpleService):
         current_time = time()
 
         for full_name in os.listdir(self.log_path):
-            disk = self.create_disk_from_file(full_name, current_time)
-            if not disk:
-                continue
-            self.disks.append(disk)
+            if disk := self.create_disk_from_file(full_name, current_time):
+                self.disks.append(disk)
 
         return len(self.disks)
 

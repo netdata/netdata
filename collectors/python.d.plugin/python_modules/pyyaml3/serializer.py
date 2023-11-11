@@ -94,10 +94,8 @@ class Serializer:
                             == self.resolve(SequenceNode, node.value, True))
                 self.emit(SequenceStartEvent(alias, node.tag, implicit,
                     flow_style=node.flow_style))
-                index = 0
-                for item in node.value:
+                for index, item in enumerate(node.value):
                     self.serialize_node(item, node, index)
-                    index += 1
                 self.emit(SequenceEndEvent())
             elif isinstance(node, MappingNode):
                 implicit = (node.tag

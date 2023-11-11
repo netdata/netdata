@@ -129,16 +129,14 @@ class Server:
             'written_docs_total': qe['written_docs_total'],
         }
 
-        return dict(('{0}_{1}'.format(self.name, k), d[k]) for k in d)
+        return {'{0}_{1}'.format(self.name, k): d[k] for k in d}
 
 
 # https://pypi.org/project/rethinkdb/2.4.0/
 # rdb.RethinkDB() can be used as rdb drop in replacement.
 # https://github.com/rethinkdb/rethinkdb-python#quickstart
 def get_rethinkdb():
-    if hasattr(rdb, 'RethinkDB'):
-        return rdb.RethinkDB()
-    return rdb
+    return rdb.RethinkDB() if hasattr(rdb, 'RethinkDB') else rdb
 
 
 class Service(SimpleService):
@@ -233,14 +231,10 @@ class Service(SimpleService):
     def reconnect(self):
         # The connection is already closed after rdb.errors.ReqlError,
         #  so we do not need to call conn.close()
-        if self.connect():
-            return True
-        return False
+        return bool(self.connect())
 
     def is_alive(self):
-        if not self.alive:
-            return self.reconnect()
-        return True
+        return self.reconnect() if not self.alive else True
 
 
 def get_id(v):

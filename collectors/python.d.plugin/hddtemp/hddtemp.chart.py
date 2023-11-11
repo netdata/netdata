@@ -60,9 +60,7 @@ class Service(SocketService):
         rv = [Disk(*d) for d in m]
         self.debug('available disks: {0}'.format(rv))
 
-        if self.do_only:
-            return [v for v in rv if v.id in self.do_only]
-        return rv
+        return [v for v in rv if v.id in self.do_only] if self.do_only else rv
 
     def get_data(self):
         """
@@ -72,10 +70,7 @@ class Service(SocketService):
 
         disks = self.get_disks()
 
-        if not disks:
-            return None
-
-        return dict((d.id, d.temp) for d in disks)
+        return None if not disks else {d.id: d.temp for d in disks}
 
     def check(self):
         """

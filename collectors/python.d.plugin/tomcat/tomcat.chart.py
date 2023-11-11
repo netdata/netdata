@@ -107,7 +107,9 @@ class Service(UrlService):
         try:
             return ET.fromstring(data)
         except ET.ParseError:
-            self.debug('%s is not a valid XML page. Please add "?XML=true" to tomcat status page.' % self.url)
+            self.debug(
+                f'{self.url} is not a valid XML page. Please add "?XML=true" to tomcat status page.'
+            )
             return None
 
     def xml_single_quote_fix_parse(self, data):
@@ -134,13 +136,10 @@ class Service(UrlService):
         :return: dict
         """
         data = None
-        raw_data = self._get_raw_data()
-        if raw_data:
+        if raw_data := self._get_raw_data():
             xml = self.parse(raw_data)
             if xml is None:
                 return None
-
-            data = {}
 
             jvm = xml.find('jvm')
 
@@ -154,7 +153,7 @@ class Service(UrlService):
                 connector = xml.find('connector')
 
             memory = jvm.find('memory')
-            data['free'] = memory.get('free')
+            data = {'free': memory.get('free')}
             data['total'] = memory.get('total')
 
             for pool in jvm.findall('memorypool'):

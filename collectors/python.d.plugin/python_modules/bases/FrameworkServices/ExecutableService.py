@@ -30,7 +30,7 @@ class ExecutableService(SimpleService):
             self.error('Executing command {0} resulted in error: {1}'.format(command, error))
             return None
 
-        data = list()
+        data = []
         std = p.stderr if stderr else p.stdout
         for line in std:
             try:
@@ -50,7 +50,7 @@ class ExecutableService(SimpleService):
             self.command = self.configuration['command']
 
         # "command" must be: 1.not None 2. type <str>
-        if not (self.command and isinstance(self.command, str)):
+        if not self.command or not isinstance(self.command, str):
             self.error('Command is not defined or command type is not <str>')
             return False
 
@@ -59,8 +59,7 @@ class ExecutableService(SimpleService):
 
         # Check for "bad" symbols in options. No pipes, redirects etc.
         opts_list = ['&', '|', ';', '>', '<']
-        bad_opts = set(''.join(opts)) & set(opts_list)
-        if bad_opts:
+        if bad_opts := set(''.join(opts)) & set(opts_list):
             self.error("Bad command argument(s): {opts}".format(opts=bad_opts))
             return False
 
@@ -70,11 +69,9 @@ class ExecutableService(SimpleService):
             if not command:
                 self.error('Can\'t locate "{command}" binary'.format(command=self.command))
                 return False
-        # Check if binary exist and executable
-        else:
-            if not os.access(command, os.X_OK):
-                self.error('"{binary}" is not executable'.format(binary=command))
-                return False
+        elif not os.access(command, os.X_OK):
+            self.error('"{binary}" is not executable'.format(binary=command))
+            return False
 
         self.command = [command] + opts if opts else [command]
 

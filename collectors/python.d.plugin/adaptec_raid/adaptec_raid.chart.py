@@ -67,7 +67,7 @@ def find_lds(d):
 
 
 def find_pds(d):
-    pds = list()
+    pds = []
     pd = PD()
 
     for row in d:
@@ -170,8 +170,7 @@ class Service(ExecutableService):
             if not sudo:
                 self.error('can\'t locate "{0}" binary'.format(SUDO))
                 return False
-            err = self.execute([sudo, '-n', '-v'], True)
-            if err:
+            if err := self.execute([sudo, '-n', '-v'], True):
                 self.error(' '.join(err))
                 return False
 

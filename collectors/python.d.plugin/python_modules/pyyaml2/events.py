@@ -11,7 +11,7 @@ class Event(object):
                 if hasattr(self, key)]
         arguments = ', '.join(['%s=%r' % (key, getattr(self, key))
                 for key in attributes])
-        return '%s(%s)' % (self.__class__.__name__, arguments)
+        return f'{self.__class__.__name__}({arguments})'
 
 class NodeEvent(Event):
     def __init__(self, anchor, start_mark=None, end_mark=None):

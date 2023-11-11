@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 '''Generate the build matrix for the EOL check jobs.'''
 
+
 import json
 
 from ruamel.yaml import YAML
 
 yaml = YAML(typ='safe')
-entries = list()
+entries = []
 
 with open('.github/data/distros.yml') as f:
     data = yaml.load(f)

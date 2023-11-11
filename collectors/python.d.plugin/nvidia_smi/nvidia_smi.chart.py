@@ -58,7 +58,7 @@ ORDER = [
 ]
 
 # https://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpupstate.html
-POWER_STATES = ['P' + str(i) for i in range(0, 16)]
+POWER_STATES = [f'P{str(i)}' for i in range(0, 16)]
 
 # PCI Transfer data rate in gigabits per second (Gb/s) per generation
 PCI_SPEED = {
@@ -83,105 +83,211 @@ def gpu_charts(gpu):
 
     charts = {
         PCI_BANDWIDTH: {
-            'options': [None, 'PCI Express Bandwidth Utilization', 'KiB/s', fam, 'nvidia_smi.pci_bandwidth', 'area'],
+            'options': [
+                None,
+                'PCI Express Bandwidth Utilization',
+                'KiB/s',
+                fam,
+                'nvidia_smi.pci_bandwidth',
+                'area',
+            ],
             'lines': [
                 ['rx_util', 'rx', 'absolute', 1, 1],
                 ['tx_util', 'tx', 'absolute', 1, -1],
-            ]
+            ],
         },
         PCI_BANDWIDTH_PERCENT: {
-            'options': [None, 'PCI Express Bandwidth Percent', 'percentage', fam, 'nvidia_smi.pci_bandwidth_percent',
-                        'area'],
+            'options': [
+                None,
+                'PCI Express Bandwidth Percent',
+                'percentage',
+                fam,
+                'nvidia_smi.pci_bandwidth_percent',
+                'area',
+            ],
             'lines': [
                 ['rx_util_percent', 'rx_percent'],
                 ['tx_util_percent', 'tx_percent'],
-            ]
+            ],
         },
         FAN_SPEED: {
-            'options': [None, 'Fan Speed', 'percentage', fam, 'nvidia_smi.fan_speed', 'line'],
+            'options': [
+                None,
+                'Fan Speed',
+                'percentage',
+                fam,
+                'nvidia_smi.fan_speed',
+                'line',
+            ],
             'lines': [
                 ['fan_speed', 'speed'],
-            ]
+            ],
         },
         GPU_UTIL: {
-            'options': [None, 'GPU Utilization', 'percentage', fam, 'nvidia_smi.gpu_utilization', 'line'],
+            'options': [
+                None,
+                'GPU Utilization',
+                'percentage',
+                fam,
+                'nvidia_smi.gpu_utilization',
+                'line',
+            ],
             'lines': [
                 ['gpu_util', 'utilization'],
-            ]
+            ],
         },
         MEM_UTIL: {
-            'options': [None, 'Memory Bandwidth Utilization', 'percentage', fam, 'nvidia_smi.mem_utilization', 'line'],
+            'options': [
+                None,
+                'Memory Bandwidth Utilization',
+                'percentage',
+                fam,
+                'nvidia_smi.mem_utilization',
+                'line',
+            ],
             'lines': [
                 ['memory_util', 'utilization'],
-            ]
+            ],
         },
         ENCODER_UTIL: {
-            'options': [None, 'Encoder/Decoder Utilization', 'percentage', fam, 'nvidia_smi.encoder_utilization',
-                        'line'],
+            'options': [
+                None,
+                'Encoder/Decoder Utilization',
+                'percentage',
+                fam,
+                'nvidia_smi.encoder_utilization',
+                'line',
+            ],
             'lines': [
                 ['encoder_util', 'encoder'],
                 ['decoder_util', 'decoder'],
-            ]
+            ],
         },
         MEM_USAGE: {
-            'options': [None, 'Memory Usage', 'MiB', fam, 'nvidia_smi.memory_allocated', 'stacked'],
+            'options': [
+                None,
+                'Memory Usage',
+                'MiB',
+                fam,
+                'nvidia_smi.memory_allocated',
+                'stacked',
+            ],
             'lines': [
                 ['fb_memory_free', 'free'],
                 ['fb_memory_used', 'used'],
-            ]
+            ],
         },
         BAR_USAGE: {
-            'options': [None, 'Bar1 Memory Usage', 'MiB', fam, 'nvidia_smi.bar1_memory_usage', 'stacked'],
+            'options': [
+                None,
+                'Bar1 Memory Usage',
+                'MiB',
+                fam,
+                'nvidia_smi.bar1_memory_usage',
+                'stacked',
+            ],
             'lines': [
                 ['bar1_memory_free', 'free'],
                 ['bar1_memory_used', 'used'],
-            ]
+            ],
         },
         TEMPERATURE: {
-            'options': [None, 'Temperature', 'celsius', fam, 'nvidia_smi.temperature', 'line'],
+            'options': [
+                None,
+                'Temperature',
+                'celsius',
+                fam,
+                'nvidia_smi.temperature',
+                'line',
+            ],
             'lines': [
                 ['gpu_temp', 'temp'],
-            ]
+            ],
         },
         CLOCKS: {
-            'options': [None, 'Clock Frequencies', 'MHz', fam, 'nvidia_smi.clocks', 'line'],
+            'options': [
+                None,
+                'Clock Frequencies',
+                'MHz',
+                fam,
+                'nvidia_smi.clocks',
+                'line',
+            ],
             'lines': [
                 ['graphics_clock', 'graphics'],
                 ['video_clock', 'video'],
                 ['sm_clock', 'sm'],
                 ['mem_clock', 'mem'],
-            ]
+            ],
         },
         POWER: {
-            'options': [None, 'Power Utilization', 'Watts', fam, 'nvidia_smi.power', 'line'],
+            'options': [
+                None,
+                'Power Utilization',
+                'Watts',
+                fam,
+                'nvidia_smi.power',
+                'line',
+            ],
             'lines': [
                 ['power_draw', 'power', 'absolute', 1, 100],
-            ]
+            ],
         },
         POWER_STATE: {
-            'options': [None, 'Power State', 'state', fam, 'nvidia_smi.power_state', 'line'],
-            'lines': [['power_state_' + v.lower(), v, 'absolute'] for v in POWER_STATES]
+            'options': [
+                None,
+                'Power State',
+                'state',
+                fam,
+                'nvidia_smi.power_state',
+                'line',
+            ],
+            'lines': [
+                [f'power_state_{v.lower()}', v, 'absolute']
+                for v in POWER_STATES
+            ],
         },
         PROCESSES_MEM: {
-            'options': [None, 'Memory Used by Each Process', 'MiB', fam, 'nvidia_smi.processes_mem', 'stacked'],
-            'lines': []
+            'options': [
+                None,
+                'Memory Used by Each Process',
+                'MiB',
+                fam,
+                'nvidia_smi.processes_mem',
+                'stacked',
+            ],
+            'lines': [],
         },
         USER_MEM: {
-            'options': [None, 'Memory Used by Each User', 'MiB', fam, 'nvidia_smi.user_mem', 'stacked'],
-            'lines': []
+            'options': [
+                None,
+                'Memory Used by Each User',
+                'MiB',
+                fam,
+                'nvidia_smi.user_mem',
+                'stacked',
+            ],
+            'lines': [],
         },
         USER_NUM: {
-            'options': [None, 'Number of User on GPU', 'num', fam, 'nvidia_smi.user_num', 'line'],
+            'options': [
+                None,
+                'Number of User on GPU',
+                'num',
+                fam,
+                'nvidia_smi.user_num',
+                'line',
+            ],
             'lines': [
                 ['user_num', 'users'],
-            ]
+            ],
         },
     }
 
     idx = gpu.num
 
     order = ['gpu{0}_{1}'.format(idx, v) for v in ORDER]
-    charts = dict(('gpu{0}_{1}'.format(idx, k), v) for k, v in charts.items())
+    charts = {'gpu{0}_{1}'.format(idx, k): v for k, v in charts.items()}
 
     for chart in charts.values():
         for line in chart['lines']:
@@ -225,7 +331,7 @@ class NvidiaSMIPoller(threading.Thread):
         self.last_data = str()
         self.exit = False
         self.empty_rows = 0
-        self.rows = list()
+        self.rows = []
 
     def has_smi(self):
         return bool(self.smi.command)
@@ -252,7 +358,7 @@ class NvidiaSMIPoller(threading.Thread):
             self.last_data = '\n'.join(self.rows)
             self.lock.release()
 
-            self.rows = list()
+            self.rows = []
             self.empty_rows = 0
 
     def is_started(self):
@@ -321,7 +427,7 @@ def read_passwd_file_safe():
     try:
         if IS_INSIDE_DOCKER:
             return read_passwd_file()
-        return dict((k[2], k) for k in pwd.getpwall())
+        return {k[2]: k for k in pwd.getpwall()}
     except (OSError, IOError):
         return dict()
 
@@ -333,9 +439,7 @@ def get_username_by_pid_safe(pid, passwd_file):
     except (OSError, IOError):
         return ''
     try:
-        if IS_INSIDE_DOCKER:
-            return passwd_file[uid][0]
-        return pwd.getpwuid(uid)[0]
+        return passwd_file[uid][0] if IS_INSIDE_DOCKER else pwd.getpwuid(uid)[0]
     except KeyError:
         return str(uid)
 
@@ -456,10 +560,10 @@ class GPU:
     def processes(self):
         processes_info = self.root.find('processes').findall('process_info')
         if not processes_info:
-            return list()
+            return []
 
         passwd_file = read_passwd_file_safe()
-        processes = list()
+        processes = []
 
         for info in processes_info:
             pid = info.find('pid').text
@@ -493,19 +597,17 @@ class GPU:
         }
 
         if self.rx_util() != NOT_AVAILABLE and self.tx_util() != NOT_AVAILABLE:
-            pci_bw_max = self.pci_bw_max()
-            if not pci_bw_max:
-                data['rx_util_percent'] = 0
-                data['tx_util_percent'] = 0
-            else:
+            if pci_bw_max := self.pci_bw_max():
                 data['rx_util_percent'] = str(int(int(self.rx_util()) * 100 / self.pci_bw_max()))
                 data['tx_util_percent'] = str(int(int(self.tx_util()) * 100 / self.pci_bw_max()))
 
+            else:
+                data['rx_util_percent'] = 0
+                data['tx_util_percent'] = 0
         for v in POWER_STATES:
-            data['power_state_' + v.lower()] = 0
-        p_state = self.power_state()
-        if p_state:
-            data['power_state_' + p_state.lower()] = 1
+            data[f'power_state_{v.lower()}'] = 0
+        if p_state := self.power_state():
+            data[f'power_state_{p_state.lower()}'] = 1
 
         processes = self.processes() or []
         users = set()
@@ -522,13 +624,13 @@ class GPU:
                     data[key] = p['used_memory']
         data['user_num'] = len(users)
 
-        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items())
+        return {'gpu{0}_{1}'.format(self.num, k): v for k, v in data.items()}
 
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         super(Service, self).__init__(configuration=configuration, name=name)
-        self.order = list()
+        self.order = []
         self.definitions = dict()
         self.loop_mode = configuration.get('loop_mode', True)
         poll = int(configuration.get('poll_seconds', self.get_update_every()))
@@ -566,7 +668,7 @@ class Service(SimpleService):
             gpu = GPU(idx, root, self.exclude_zero_memory_users)
             gpu_data = gpu.data()
             # self.debug(gpu_data)
-            gpu_data = dict((k, v) for k, v in gpu_data.items() if is_gpu_data_value_valid(v))
+            gpu_data = {k: v for k, v in gpu_data.items() if is_gpu_data_value_valid(v)}
             data.update(gpu_data)
             self.update_processes_mem_chart(gpu)
             self.update_processes_user_mem_chart(gpu)

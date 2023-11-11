@@ -94,7 +94,7 @@ def _default_key_normalizer(key_class, request_context):
     # Map the kwargs to the names in the namedtuple - this is necessary since
     # namedtuples can't have fields starting with '_'.
     for key in list(context.keys()):
-        context['key_' + key] = context.pop(key)
+        context[f'key_{key}'] = context.pop(key)
 
     # Default to ``None`` for keys missing from the context
     for field in key_class._fields:
@@ -415,8 +415,7 @@ class ProxyManager(PoolManager):
         """
         headers_ = {'Accept': '*/*'}
 
-        netloc = parse_url(url).netloc
-        if netloc:
+        if netloc := parse_url(url).netloc:
             headers_['Host'] = netloc
 
         if headers:

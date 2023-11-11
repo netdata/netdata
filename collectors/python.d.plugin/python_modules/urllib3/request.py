@@ -83,7 +83,7 @@ class RequestMethods(object):
         extra_kw.update(urlopen_kw)
 
         if fields:
-            url += '?' + urlencode(fields)
+            url += f'?{urlencode(fields)}'
 
         return self.urlopen(method, url, **extra_kw)
 

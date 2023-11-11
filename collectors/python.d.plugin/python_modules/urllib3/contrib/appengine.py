@@ -173,36 +173,31 @@ class AppEngineManager(RequestMethods):
             raise SSLError(e)
 
         except urlfetch.InvalidMethodError as e:
-            raise AppEnginePlatformError(
-                "URLFetch does not support method: %s" % method, e)
+            raise AppEnginePlatformError(f"URLFetch does not support method: {method}", e)
 
         http_response = self._urlfetch_response_to_http_response(
             response, retries=retries, **response_kw)
 
-        # Handle redirect?
-        redirect_location = redirect and http_response.get_redirect_location()
-        if redirect_location:
-            # Check for redirect response
+        if redirect_location := redirect and http_response.get_redirect_location():
             if (self.urlfetch_retries and retries.raise_on_redirect):
                 raise MaxRetryError(self, url, "too many redirects")
-            else:
-                if http_response.status == 303:
-                    method = 'GET'
+            if http_response.status == 303:
+                method = 'GET'
 
-                try:
-                    retries = retries.increment(method, url, response=http_response, _pool=self)
-                except MaxRetryError:
-                    if retries.raise_on_redirect:
-                        raise MaxRetryError(self, url, "too many redirects")
-                    return http_response
+            try:
+                retries = retries.increment(method, url, response=http_response, _pool=self)
+            except MaxRetryError:
+                if retries.raise_on_redirect:
+                    raise MaxRetryError(self, url, "too many redirects")
+                return http_response
 
-                retries.sleep_for_retry(http_response)
-                log.debug("Redirecting %s -> %s", url, redirect_location)
-                redirect_url = urljoin(url, redirect_location)
-                return self.urlopen(
-                    method, redirect_url, body, headers,
-                    retries=retries, redirect=redirect,
-                    timeout=timeout, **response_kw)
+            retries.sleep_for_retry(http_response)
+            log.debug("Redirecting %s -> %s", url, redirect_location)
+            redirect_url = urljoin(url, redirect_location)
+            return self.urlopen(
+                method, redirect_url, body, headers,
+                retries=retries, redirect=redirect,
+                timeout=timeout, **response_kw)
 
         # Check if we should retry the HTTP response.
         has_retry_after = bool(http_response.getheader('Retry-After'))

@@ -81,10 +81,15 @@ def copy_dashboard(tag):
     shutil.rmtree(BASEPATH)
     BASEPATH.mkdir()
     print('::group::Fetching dashboard release tarball')
-    subprocess.check_call('curl -L -o dashboard.tar.gz ' + URLTEMPLATE.format(tag), shell=True)
+    subprocess.check_call(
+        f'curl -L -o dashboard.tar.gz {URLTEMPLATE.format(tag)}', shell=True
+    )
     print('::endgroup::')
     print('::group::Extracting dashboard release tarball')
-    subprocess.check_call('tar -xvzf dashboard.tar.gz -C ' + str(BASEPATH) + ' --strip-components=1', shell=True)
+    subprocess.check_call(
+        f'tar -xvzf dashboard.tar.gz -C {str(BASEPATH)} --strip-components=1',
+        shell=True,
+    )
     print('::endgroup::')
     print('Copying README.md')
     BASEPATH.joinpath('README.md').symlink_to('../.dashboard-notice.md')
@@ -97,7 +102,7 @@ def genfilelist(path):
     files = [f for f in path.iterdir() if f.is_file() and f.name != 'README.md']
     files = [Path(*f.parts[1:]) for f in files]
     files.sort()
-    return ' \\\n    '.join([("$(srcdir)/" + str(f)) for f in files])
+    return ' \\\n    '.join([f"$(srcdir)/{str(f)}" for f in files])
 
 
 def write_makefile():

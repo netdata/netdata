@@ -32,7 +32,7 @@ recursive(categories[1]['children'])
 def construct_dict(array, integration):
     for element in array:
         if element not in cat_dict:
-            cat_dict[element] = list()
+            cat_dict[element] = []
         cat_dict[element].append(integration)
 
 
@@ -58,7 +58,7 @@ for category_id, integrations in sorted(cat_dict.items()):
             "integrations/" + name.lower().replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")+".md"
         names.append(f"[{name}]({link})")
     for integration_name in sorted(names):
-        md += "- " + integration_name + "\n\n"
+        md += f"- {integration_name}" + "\n\n"
 
 
 outfile = pathlib.Path("./collectors/COLLECTORS.md")

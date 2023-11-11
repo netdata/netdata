@@ -91,34 +91,26 @@ class SOCKSConnection(HTTPConnection):
 
         except SocketTimeout as e:
             raise ConnectTimeoutError(
-                self, "Connection to %s timed out. (connect timeout=%s)" %
-                (self.host, self.timeout))
+                self,
+                f"Connection to {self.host} timed out. (connect timeout={self.timeout})",
+            )
 
         except socks.ProxyError as e:
-            # This is fragile as hell, but it seems to be the only way to raise
-            # useful errors here.
-            if e.socket_err:
-                error = e.socket_err
-                if isinstance(error, SocketTimeout):
-                    raise ConnectTimeoutError(
-                        self,
-                        "Connection to %s timed out. (connect timeout=%s)" %
-                        (self.host, self.timeout)
-                    )
-                else:
-                    raise NewConnectionError(
-                        self,
-                        "Failed to establish a new connection: %s" % error
-                    )
+            if not e.socket_err:
+                raise NewConnectionError(self, f"Failed to establish a new connection: {e}")
+
+            error = e.socket_err
+            if isinstance(error, SocketTimeout):
+                raise ConnectTimeoutError(
+                    self,
+                    f"Connection to {self.host} timed out. (connect timeout={self.timeout})",
+                )
             else:
                 raise NewConnectionError(
-                    self,
-                    "Failed to establish a new connection: %s" % e
+                    self, f"Failed to establish a new connection: {error}"
                 )
-
         except SocketError as e:  # Defensive: PySocks should catch all these.
-            raise NewConnectionError(
-                self, "Failed to establish a new connection: %s" % e)
+            raise NewConnectionError(self, f"Failed to establish a new connection: {e}")
 
         return conn
 
@@ -166,9 +158,7 @@ class SOCKSProxyManager(PoolManager):
             socks_version = socks.PROXY_TYPE_SOCKS4
             rdns = True
         else:
-            raise ValueError(
-                "Unable to determine SOCKS version from %s" % proxy_url
-            )
+            raise ValueError(f"Unable to determine SOCKS version from {proxy_url}")
 
         self.proxy_url = proxy_url
 

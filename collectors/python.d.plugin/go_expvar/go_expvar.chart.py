@@ -103,11 +103,9 @@ class Service(UrlService):
             self.order = list(MEMSTATS_ORDER)
         else:
             self.definitions = dict()
-            self.order = list()
+            self.order = []
 
-        # if extra charts are defined, parse their config
-        extra_charts = self.configuration.get('extra_charts')
-        if extra_charts:
+        if extra_charts := self.configuration.get('extra_charts'):
             self._parse_extra_charts_config(extra_charts)
 
     def check(self):
@@ -129,7 +127,7 @@ class Service(UrlService):
     def _parse_extra_charts_config(self, extra_charts_config):
 
         # a place to store the expvar keys and their types
-        self.expvars = list()
+        self.expvars = []
 
         for chart in extra_charts_config:
 
@@ -150,7 +148,7 @@ class Service(UrlService):
                 chart_opts.get('context', ''),
                 chart_opts.get('chart_type', 'line')
             ]
-            chart_dict['lines'] = list()
+            chart_dict['lines'] = []
 
             # add the lines to the chart
             for line in chart_lines:

@@ -90,7 +90,7 @@ TYPE_MAP = {
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.order = list()
+        self.order = []
         self.definitions = dict()
         self.chips = configuration.get('chips')
         self.priority = 60000
@@ -128,7 +128,7 @@ class Service(SimpleService):
                     if feat_limits and (v < feat_limits[0] or v > feat_limits[1]):
                         continue
 
-                    data[chip_name + '_' + feat_name] = int(v * 1000)
+                    data[f'{chip_name}_{feat_name}'] = int(v * 1000)
 
         except sensors.SensorsError as error:
             self.error(error)
@@ -140,14 +140,16 @@ class Service(SimpleService):
 
     def update_sensors_charts(self, seen):
         for chip_name, feat in seen.items():
-            if self.chips and not any([chip_name.startswith(ex) for ex in self.chips]):
+            if self.chips and not any(
+                chip_name.startswith(ex) for ex in self.chips
+            ):
                 continue
 
             for feat_type, sub_feat in feat.items():
                 if feat_type not in ORDER or feat_type not in CHARTS:
                     continue
 
-                chart_id = '{}_{}'.format(chip_name, feat_type)
+                chart_id = f'{chip_name}_{feat_type}'
                 if chart_id in self.charts:
                     continue
 
@@ -157,7 +159,7 @@ class Service(SimpleService):
 
                 for name, label in sub_feat:
                     lines = list(CHARTS[feat_type]['lines'][0])
-                    lines[0] = chip_name + '_' + name
+                    lines[0] = f'{chip_name}_{name}'
                     lines[1] = label
                     new_chart.add_dimension(lines)
 
@@ -173,7 +175,7 @@ class Service(SimpleService):
         return bool(self.get_data() and self.charts)
 
     def get_chart_priority(self, feat_type):
-        for i, v in enumerate(ORDER):
-            if v == feat_type:
-                return self.priority + i
-        return self.priority
+        return next(
+            (self.priority + i for i, v in enumerate(ORDER) if v == feat_type),
+            self.priority,
+        )

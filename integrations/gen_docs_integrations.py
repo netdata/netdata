@@ -25,7 +25,9 @@ def cleanup():
             if "integrations" in str(element):
                 shutil.rmtree(element)
         for element in Path("integrations/cloud-notifications").glob('**/*/'):
-            if "integrations" in str(element) and not "metadata.yaml" in str(element):
+            if "integrations" in str(element) and "metadata.yaml" not in str(
+                element
+            ):
                 shutil.rmtree(element)
 
 
@@ -42,12 +44,12 @@ def generate_category_from_name(category_fragment, category_array):
         for category in category_array:
 
             if dummy_id == category['id']:
-                category_name = category_name + "/" + category["name"]
+                category_name = f"{category_name}/" + category["name"]
                 try:
                     # print("equals")
                     # print(fragment, category_fragment[i+1])
-                    dummy_id = dummy_id + "." + category_fragment[i+1]
-                    # print(dummy_id)
+                    dummy_id = f"{dummy_id}.{category_fragment[i + 1]}"
+                                    # print(dummy_id)
                 except IndexError:
                     return category_name.split("/", 1)[1]
                 category_array = category['children']
@@ -83,11 +85,10 @@ def add_custom_edit_url(markdown_string, meta_yaml_link, sidebar_label_string, m
     elif mode == 'agent-notifications':
         path_to_md_file = meta_yaml_link.replace("metadata.yaml", "README")
 
-    output = markdown_string.replace(
+    return markdown_string.replace(
         "<!--startmeta",
-        f'<!--startmeta\ncustom_edit_url: \"{path_to_md_file}.md\"')
-
-    return output
+        f'<!--startmeta\ncustom_edit_url: \"{path_to_md_file}.md\"',
+    )
 
 
 def clean_string(string):

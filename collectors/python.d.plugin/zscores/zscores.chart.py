@@ -118,17 +118,19 @@ class Service(SimpleService):
 
         # aggregate to chart level if specified
         if self.mode == 'per_chart':
-            df_z_smooth['chart'] = ['.'.join(x[0:2]) + '_z' for x in df_z_smooth.index.str.split('.').to_list()]
+            df_z_smooth['chart'] = [
+                '.'.join(x[:2]) + '_z'
+                for x in df_z_smooth.index.str.split('.').to_list()
+            ]
             if self.per_chart_agg == 'absmax':
                 data_z = \
-                list(df_z_smooth.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
+                    list(df_z_smooth.groupby('chart').agg({'z': lambda x: max(x, key=abs)})['z'].to_dict().values())[0]
             else:
                 data_z = list(df_z_smooth.groupby('chart').agg({'z': [self.per_chart_agg]})['z'].to_dict().values())[0]
 
-        data_3stddev = {}
-        for k in data_z:
-            data_3stddev[k.replace('_z', '')] = 1 if abs(data_z[k]) > 300 else 0
-
+        data_3stddev = {
+            k.replace('_z', ''): 1 if abs(data_z[k]) > 300 else 0 for k in data_z
+        }
         return data_z, data_3stddev
 
     def get_data(self):

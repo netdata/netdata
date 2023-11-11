@@ -51,14 +51,14 @@ class SocketService(SimpleService):
         if self.unix_socket is not None:
             self.error('unix socket "{socket}": {message}'.format(socket=self.unix_socket,
                                                                   message=message))
+        elif self.__socket_config is None:
+            self.error('unknown socket: {0}'.format(message))
+
         else:
-            if self.__socket_config is not None:
-                _, _, _, _, sa = self.__socket_config
-                self.error('socket to "{address}" port {port}: {message}'.format(address=sa[0],
-                                                                                 port=sa[1],
-                                                                                 message=message))
-            else:
-                self.error('unknown socket: {0}'.format(message))
+            _, _, _, _, sa = self.__socket_config
+            self.error('socket to "{address}" port {port}: {message}'.format(address=sa[0],
+                                                                             port=sa[1],
+                                                                             message=message))
 
     def _connect2socket(self, res=None):
         """
@@ -67,9 +67,9 @@ class SocketService(SimpleService):
         """
         if res is None:
             res = self.__socket_config
-            if res is None:
-                self.error("Cannot create socket to 'None':")
-                return False
+        if res is None:
+            self.error("Cannot create socket to 'None':")
+            return False
 
         af, sock_type, proto, _, sa = res
         try:
@@ -164,18 +164,14 @@ class SocketService(SimpleService):
             if self.unix_socket is not None:
                 self._connect2unixsocket()
 
-            else:
-                if self.__socket_config is not None:
-                    self._connect2socket()
-                else:
-                    if self.dgram_socket:
-                        sock_type = socket.SOCK_DGRAM
-                    else:
-                        sock_type = socket.SOCK_STREAM
-                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, sock_type):
-                        if self._connect2socket(res):
-                            break
+            elif self.__socket_config is None:
+                sock_type = socket.SOCK_DGRAM if self.dgram_socket else socket.SOCK_STREAM
+                for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, sock_type):
+                    if self._connect2socket(res):
+                        break
 
+            else:
+                self._connect2socket()
         except Exception as error:
             self.error('unhandled exception during connect : {0}'.format(repr(error)))
             self._sock = None
@@ -235,7 +231,7 @@ class SocketService(SimpleService):
                 break
 
             if buf is None or len(buf) == 0:  # handle server disconnect
-                if data == "" or data == b"":
+                if data in ["", b""]:
                     self._socket_error('unexpectedly disconnected')
                 else:
                     self.debug('server closed the connection')
@@ -260,8 +256,8 @@ class SocketService(SimpleService):
         """
         if self._sock is None:
             self._connect()
-            if self._sock is None:
-                return None
+        if self._sock is None:
+            return None
 
         # Send request if it is needed
         if not self._send(request):

@@ -95,9 +95,7 @@ class Service(ExecutableService):
         if not lines:
             return None
 
-        stats = dict(
-            (k.replace('.', '_'), int(v)) for k, v in REGEX.findall(''.join(lines))
-        )
+        stats = {k.replace('.', '_'): int(v) for k, v in REGEX.findall(''.join(lines))}
         stats.setdefault('num_opcode_NOTIFY', 0)
         stats.setdefault('num_type_TYPE252', 0)
         stats.setdefault('num_type_TYPE255', 0)

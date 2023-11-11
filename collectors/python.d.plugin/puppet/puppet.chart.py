@@ -88,7 +88,7 @@ class Service(UrlService):
         #
         # For sake of simplicity and efficiency the status one is used..
 
-        raw_data = self._get_raw_data(self.url + '/status/v1/services?level=debug')
+        raw_data = self._get_raw_data(f'{self.url}/status/v1/services?level=debug')
 
         if raw_data is None:
             return None
@@ -106,8 +106,8 @@ class Service(UrlService):
             non_heap_mem = jvm_metrics['non-heap-memory']
 
             for k in ['max', 'committed', 'used', 'init']:
-                data['jvm_heap_' + k] = heap_mem[k]
-                data['jvm_nonheap_' + k] = non_heap_mem[k]
+                data[f'jvm_heap_{k}'] = heap_mem[k]
+                data[f'jvm_nonheap_{k}'] = non_heap_mem[k]
 
             fd_open = jvm_metrics['file-descriptors']
             data['fd_max'] = fd_open['max']

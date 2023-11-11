@@ -80,8 +80,6 @@ def debug(msg):
         print(f':debug:{ msg }')
     elif DEBUG:
         print(f'>>> { msg }')
-    else:
-        pass
 
 
 def warn(msg, path):
@@ -182,12 +180,12 @@ def get_collector_metadata_entries():
     ret = []
 
     for r, d, m in COLLECTOR_SOURCES:
-        if d.exists() and d.is_dir() and m:
-            for item in d.glob(METADATA_PATTERN):
-                ret.append((r, item))
-        elif d.exists() and d.is_file() and not m:
-            if d.match(METADATA_PATTERN):
-                ret.append(d)
+        if d.exists():
+            if d.is_dir() and m:
+                ret.extend((r, item) for item in d.glob(METADATA_PATTERN))
+            elif d.is_file() and not m:
+                if d.match(METADATA_PATTERN):
+                    ret.append(d)
 
     return ret
 

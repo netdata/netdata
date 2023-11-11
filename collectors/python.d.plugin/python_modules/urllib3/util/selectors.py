@@ -70,9 +70,7 @@ if sys.version_info >= (3, 5):
         try:
             return func(*args, **kwargs)
         except (OSError, IOError, select.error) as e:
-            errcode = None
-            if hasattr(e, "errno"):
-                errcode = e.errno
+            errcode = e.errno if hasattr(e, "errno") else None
             raise SelectorError(errcode)
 else:
     def _syscall_wrapper(func, recalc_timeout, *args, **kwargs):
@@ -85,11 +83,7 @@ else:
             recalc_timeout = False
         else:
             timeout = float(timeout)
-            if timeout < 0.0:  # Timeout less than 0 treated as no timeout.
-                expires = None
-            else:
-                expires = monotonic() + timeout
-
+            expires = None if timeout < 0.0 else monotonic() + timeout
         args = list(args)
         if recalc_timeout and "timeout" not in kwargs:
             raise ValueError(
@@ -99,10 +93,6 @@ else:
         while result is _SYSCALL_SENTINEL:
             try:
                 result = func(*args, **kwargs)
-            # OSError is thrown by select.select
-            # IOError is thrown by select.epoll.poll
-            # select.error is thrown by select.poll.poll
-            # Aren't we thankful for Python 3.x rework for exceptions?
             except (OSError, IOError, select.error) as e:
                 # select.error wasn't a subclass of OSError in the past.
                 errcode = None
@@ -111,11 +101,10 @@ else:
                 elif hasattr(e, "args"):
                     errcode = e.args[0]
 
-                # Also test for the Windows equivalent of EINTR.
-                is_interrupt = (errcode == errno.EINTR or (hasattr(errno, "WSAEINTR") and
-                                                           errcode == errno.WSAEINTR))
-
-                if is_interrupt:
+                if is_interrupt := (
+                    errcode == errno.EINTR
+                    or (hasattr(errno, "WSAEINTR") and errcode == errno.WSAEINTR)
+                ):
                     if expires is not None:
                         current_time = monotonic()
                         if current_time > expires:
@@ -217,17 +206,15 @@ class BaseSelector(object):
         except KeyError:
             raise KeyError("{0!r} is not registered".format(fileobj))
 
-        # Getting the fileno of a closed socket on Windows errors with EBADF.
         except socket.error as e:  # Platform-specific: Windows.
             if e.errno != errno.EBADF:
                 raise
+            for key in self._fd_to_key.values():
+                if key.fileobj is fileobj:
+                    self._fd_to_key.pop(key.fd)
+                    break
             else:
-                for key in self._fd_to_key.values():
-                    if key.fileobj is fileobj:
-                        self._fd_to_key.pop(key.fd)
-                        break
-                else:
-                    raise KeyError("{0!r} is not registered".format(fileobj))
+                raise KeyError("{0!r} is not registered".format(fileobj))
         return key
 
     def modify(self, fileobj, events, data=None):
@@ -334,8 +321,7 @@ if hasattr(select, "select"):
                 if fd in w:
                     events |= EVENT_WRITE
 
-                key = self._key_from_fd(fd)
-                if key:
+                if key := self._key_from_fd(fd):
                     ready.append((key, events & key.events))
             return ready
 
@@ -366,15 +352,8 @@ if hasattr(select, "poll"):
             """ Wrapper function for select.poll.poll() so that
             _syscall_wrapper can work with only seconds. """
             if timeout is not None:
-                if timeout <= 0:
-                    timeout = 0
-                else:
-                    # select.poll.poll() has a resolution of 1 millisecond,
-                    # round away from zero to wait *at least* timeout seconds.
-                    timeout = math.ceil(timeout * 1e3)
-
-            result = self._poll.poll(timeout)
-            return result
+                timeout = 0 if timeout <= 0 else math.ceil(timeout * 1e3)
+            return self._poll.poll(timeout)
 
         def select(self, timeout=None):
             ready = []
@@ -386,8 +365,7 @@ if hasattr(select, "poll"):
                 if event_mask & ~select.POLLOUT:
                     events |= EVENT_READ
 
-                key = self._key_from_fd(fd)
-                if key:
+                if key := self._key_from_fd(fd):
                     ready.append((key, events & key.events))
 
             return ready
@@ -424,13 +402,7 @@ if hasattr(select, "epoll"):
 
         def select(self, timeout=None):
             if timeout is not None:
-                if timeout <= 0:
-                    timeout = 0.0
-                else:
-                    # select.epoll.poll() has a resolution of 1 millisecond
-                    # but luckily takes seconds so we don't need a wrapper
-                    # like PollSelector. Just for better rounding.
-                    timeout = math.ceil(timeout * 1e3) * 1e-3
+                timeout = 0.0 if timeout <= 0 else math.ceil(timeout * 1e3) * 1e-3
                 timeout = float(timeout)
             else:
                 timeout = -1.0  # epoll.poll() must have a float.
@@ -450,8 +422,7 @@ if hasattr(select, "epoll"):
                 if event_mask & ~select.EPOLLOUT:
                     events |= EVENT_READ
 
-                key = self._key_from_fd(fd)
-                if key:
+                if key := self._key_from_fd(fd):
                     ready.append((key, events & key.events))
             return ready
 
@@ -528,8 +499,7 @@ if hasattr(select, "kqueue"):
                 if event_mask == select.KQ_FILTER_WRITE:
                     events |= EVENT_WRITE
 
-                key = self._key_from_fd(fd)
-                if key:
+                if key := self._key_from_fd(fd):
                     if key.fd not in ready_fds:
                         ready_fds[key.fd] = (key, events & key.events)
                     else:

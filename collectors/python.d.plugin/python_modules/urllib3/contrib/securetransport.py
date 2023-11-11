@@ -223,10 +223,7 @@ def _read_callback(connection_id, data_buffer, data_length_pointer):
 
         data_length_pointer[0] = read_count
 
-        if read_count != requested_length:
-            return SecurityConst.errSSLWouldBlock
-
-        return 0
+        return SecurityConst.errSSLWouldBlock if read_count != requested_length else 0
     except Exception as e:
         if wrapped_socket is not None:
             wrapped_socket._exception = e
@@ -273,10 +270,7 @@ def _write_callback(connection_id, data_buffer, data_length_pointer):
                 raise
 
         data_length_pointer[0] = sent
-        if sent != bytes_to_write:
-            return SecurityConst.errSSLWouldBlock
-
-        return 0
+        return SecurityConst.errSSLWouldBlock if sent != bytes_to_write else 0
     except Exception as e:
         if wrapped_socket is not None:
             wrapped_socket._exception = e
@@ -514,8 +508,7 @@ class WrappedSocket(object):
     def recv(self, bufsiz):
         buffer = ctypes.create_string_buffer(bufsiz)
         bytes_read = self.recv_into(buffer, bufsiz)
-        data = buffer[:bytes_read]
-        return data
+        return buffer[:bytes_read]
 
     def recv_into(self, buffer, nbytes=None):
         # Read short on EOF.
@@ -747,7 +740,7 @@ class SecureTransportContext(object):
 
     @verify_mode.setter
     def verify_mode(self, value):
-        self._verify = True if value == ssl.CERT_REQUIRED else False
+        self._verify = value == ssl.CERT_REQUIRED
 
     def set_default_verify_paths(self):
         # So, this has to do something a bit weird. Specifically, what it does

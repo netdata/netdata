@@ -65,7 +65,7 @@ class Service(UrlService):
         Get data from API
         :return: dict
         """
-        self.url = self.baseurl + '/api/v2/stats'
+        self.url = f'{self.baseurl}/api/v2/stats'
         data = self._get_stats()
         if data is None:
             return None

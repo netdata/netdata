@@ -138,7 +138,7 @@ class Service(SocketService):
             self.debug("Gearman returned no data")
             raise GearmanReadException()
 
-        workers = list()
+        workers = []
 
         for line in raw.splitlines()[:-1]:
             parts = line.split()
@@ -151,8 +151,7 @@ class Service(SocketService):
             except ValueError:
                 continue
 
-            w = [name]
-            w.extend(values)
+            w = [name, *values]
             workers.append(w)
 
         return workers

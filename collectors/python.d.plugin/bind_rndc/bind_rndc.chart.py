@@ -115,7 +115,7 @@ class Service(SimpleService):
             return False
 
         if not (os.path.isfile(self.named_stats_path) and os.access(self.named_stats_path, os.R_OK)):
-            self.error('Cannot access file %s' % self.named_stats_path)
+            self.error(f'Cannot access file {self.named_stats_path}')
             return False
 
         run_rndc = Popen([self.rndc, 'stats'], shell=False)
@@ -123,7 +123,7 @@ class Service(SimpleService):
 
         if not run_rndc.returncode:
             return True
-        self.error('Not enough permissions to run "%s stats"' % self.rndc)
+        self.error(f'Not enough permissions to run "{self.rndc} stats"')
         return False
 
     def _get_raw_data(self):

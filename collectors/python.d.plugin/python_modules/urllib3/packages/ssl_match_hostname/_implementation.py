@@ -44,7 +44,8 @@ def _dnsname_match(dn, hostname, max_wildcards=1):
         # policy among SSL implementations showed it to be a
         # reasonable choice.
         raise CertificateError(
-            "too many wildcards in certificate DNS name: " + repr(dn))
+            f"too many wildcards in certificate DNS name: {repr(dn)}"
+        )
 
     # speed up common case w/o wildcards
     if not wildcards:
@@ -68,9 +69,7 @@ def _dnsname_match(dn, hostname, max_wildcards=1):
         pats.append(re.escape(leftmost).replace(r'\*', '[^.]*'))
 
     # add the remaining fragments, ignore any wildcards
-    for frag in remainder:
-        pats.append(re.escape(frag))
-
+    pats.extend(re.escape(frag) for frag in remainder)
     pat = re.compile(r'\A' + r'\.'.join(pats) + r'\Z', re.IGNORECASE)
     return pat.match(hostname)
 
@@ -109,11 +108,6 @@ def match_hostname(cert, hostname):
         host_ip = ipaddress.ip_address(_to_unicode(hostname))
     except ValueError:
         # Not an IP address (common case)
-        host_ip = None
-    except UnicodeError:
-        # Divergence from upstream: Have to deal with ipaddress not taking
-        # byte strings.  addresses should be all ascii, so we consider it not
-        # an ipaddress in this case
         host_ip = None
     except AttributeError:
         # Divergence from upstream: Make ipaddress library optional

@@ -65,12 +65,14 @@ class Service(SocketService):
 
         data = dict()
         try:
-            raw = ''
-            for tmp in response.split('\r\n'):
-                if tmp.startswith('sample_time'):
-                    raw = tmp
-                    break
-
+            raw = next(
+                (
+                    tmp
+                    for tmp in response.split('\r\n')
+                    if tmp.startswith('sample_time')
+                ),
+                '',
+            )
             if raw.startswith('<'):
                 self.error('invalid data received')
                 return None
@@ -92,11 +94,7 @@ class Service(SocketService):
     def _check_raw_data(self, data):
         header = data[:1024].lower()
 
-        if 'connection: keep-alive' in header:
-            self._keep_alive = True
-        else:
-            self._keep_alive = False
-
+        self._keep_alive = 'connection: keep-alive' in header
         if data[-7:] == '\r\n0\r\n\r\n' and 'transfer-encoding: chunked' in header:  # HTTP/1.1 response
             self.debug('received full response from squid')
             return True
@@ -113,11 +111,8 @@ class Service(SocketService):
         # format request
         req = self.request.decode()
         if not req.startswith('GET'):
-            req = 'GET ' + req
+            req = f'GET {req}'
         if not req.endswith(' HTTP/1.1\r\n\r\n'):
             req += ' HTTP/1.1\r\n\r\n'
         self.request = req.encode()
-        if self._get_data() is not None:
-            return True
-        else:
-            return False
+        return self._get_data() is not None

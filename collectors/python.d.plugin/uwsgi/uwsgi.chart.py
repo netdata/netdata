@@ -123,7 +123,7 @@ class Service(SocketService):
         """
         for chart in DYNAMIC_CHARTS:
             for line in CHARTS[chart]['lines']:
-                dimension_id = '{}_{}'.format(line[0], key)
+                dimension_id = f'{line[0]}_{key}'
                 dimension_name = str(key)
 
                 dimension = [dimension_id, dimension_name] + line[2:]
@@ -158,16 +158,16 @@ class Service(SocketService):
                 self.add_worker_dimensions(key)
                 self.workers.append(key)
 
-            result['requests_{}'.format(key)] = worker['requests']
-            result['tx_{}'.format(key)] = worker['tx']
-            result['avg_rt_{}'.format(key)] = worker['avg_rt']
+            result[f'requests_{key}'] = worker['requests']
+            result[f'tx_{key}'] = worker['tx']
+            result[f'avg_rt_{key}'] = worker['avg_rt']
 
             # avg_rt is not reset by uwsgi, so reset here
-            if self.last_result.get('requests_{}'.format(key)) == worker['requests']:
-                result['avg_rt_{}'.format(key)] = 0
+            if self.last_result.get(f'requests_{key}') == worker['requests']:
+                result[f'avg_rt_{key}'] = 0
 
-            result['memory_rss_{}'.format(key)] = worker['rss']
-            result['memory_vsz_{}'.format(key)] = worker['vsz']
+            result[f'memory_rss_{key}'] = worker['rss']
+            result[f'memory_vsz_{key}'] = worker['vsz']
 
             result['exceptions'] += worker['exceptions']
             result['harakiri_count'] += worker['harakiri_count']

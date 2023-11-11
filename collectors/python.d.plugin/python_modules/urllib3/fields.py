@@ -15,9 +15,7 @@ def guess_content_type(filename, default='application/octet-stream'):
     :param default:
         If no "Content-Type" can be guessed, default to `default`.
     """
-    if filename:
-        return mimetypes.guess_type(filename)[0] or default
-    return default
+    return mimetypes.guess_type(filename)[0] or default if filename else default
 
 
 def format_header_param(name, value):
@@ -33,8 +31,8 @@ def format_header_param(name, value):
     :param value:
         The value of the parameter, provided as a unicode string.
     """
-    if not any(ch in value for ch in '"\\\r\n'):
-        result = '%s="%s"' % (name, value)
+    if all(ch not in value for ch in '"\\\r\n'):
+        result = f'{name}="{value}"'
         try:
             result.encode('ascii')
         except (UnicodeEncodeError, UnicodeDecodeError):
@@ -44,7 +42,7 @@ def format_header_param(name, value):
     if not six.PY3 and isinstance(value, six.text_type):  # Python 2:
         value = value.encode('utf-8')
     value = email.utils.encode_rfc2231(value, 'utf-8')
-    value = '%s*=%s' % (name, value)
+    value = f'{name}*={value}'
     return value
 
 
@@ -125,32 +123,31 @@ class RequestField(object):
             A sequence of (k, v) typles or a :class:`dict` of (k, v) to format
             as `k1="v1"; k2="v2"; ...`.
         """
-        parts = []
         iterable = header_parts
         if isinstance(header_parts, dict):
             iterable = header_parts.items()
 
-        for name, value in iterable:
-            if value is not None:
-                parts.append(self._render_part(name, value))
-
+        parts = [
+            self._render_part(name, value)
+            for name, value in iterable
+            if value is not None
+        ]
         return '; '.join(parts)
 
     def render_headers(self):
         """
         Renders the headers for this request field.
         """
-        lines = []
-
         sort_keys = ['Content-Disposition', 'Content-Type', 'Content-Location']
-        for sort_key in sort_keys:
-            if self.headers.get(sort_key, False):
-                lines.append('%s: %s' % (sort_key, self.headers[sort_key]))
-
+        lines = [
+            f'{sort_key}: {self.headers[sort_key]}'
+            for sort_key in sort_keys
+            if self.headers.get(sort_key, False)
+        ]
         for header_name, header_value in self.headers.items():
             if header_name not in sort_keys:
                 if header_value:
-                    lines.append('%s: %s' % (header_name, header_value))
+                    lines.append(f'{header_name}: {header_value}')
 
         lines.append('\r\n')
         return '\r\n'.join(lines)

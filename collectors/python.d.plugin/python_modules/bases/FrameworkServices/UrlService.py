@@ -64,20 +64,15 @@ class UrlService(SimpleService):
         header, proxy_header = self.__make_headers(**header_kw)
         if header is None or proxy_header is None:
             return None
-        proxy_url = header_kw.get('proxy_url') or self.proxy_url
-        if proxy_url:
+        if proxy_url := header_kw.get('proxy_url') or self.proxy_url:
             manager = urllib3.ProxyManager
             params = dict(proxy_url=proxy_url, headers=header, proxy_headers=proxy_header)
         else:
             manager = urllib3.PoolManager
             params = dict(headers=header)
-        tls_cert_file = self.tls_cert_file
-        if tls_cert_file:
+        if tls_cert_file := self.tls_cert_file:
             params['cert_file'] = tls_cert_file
-            # NOTE: key_file is useless without cert_file, but
-            #       cert_file may include the key as well.
-            tls_key_file = self.tls_key_file
-            if tls_key_file:
+            if tls_key_file := self.tls_key_file:
                 params['key_file'] = tls_key_file
         tls_ca_file = self.tls_ca_file
         if tls_ca_file:
@@ -107,12 +102,13 @@ class UrlService(SimpleService):
             return None
 
         if response.status == 200:
-            if isinstance(response.data, str):
-                return response.data
-            return response.data.decode(errors='ignore')
-        else:
-            self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=response.status))
-            return None
+            return (
+                response.data
+                if isinstance(response.data, str)
+                else response.data.decode(errors='ignore')
+            )
+        self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=response.status))
+        return None
 
     def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
         """
@@ -139,7 +135,7 @@ class UrlService(SimpleService):
         if self.body:
             kwargs['body'] = self.body
 
-        response = manager.request(
+        return manager.request(
             method=self.method,
             url=url,
             timeout=self.request_timeout,
@@ -148,7 +144,6 @@ class UrlService(SimpleService):
             redirect=redirect,
             **kwargs
         )
-        return response
 
     def check(self):
         """
@@ -183,6 +178,4 @@ def skip_tls_verify(is_https, tls_verify, tls_ca_file):
     #   - do not skip by default for http
     if tls_ca_file:
         return False
-    if is_https and not tls_verify:
-        return True
-    return tls_verify is False
+    return True if is_https and not tls_verify else tls_verify is False

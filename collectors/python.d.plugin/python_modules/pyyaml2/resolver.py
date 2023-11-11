@@ -23,16 +23,16 @@ class BaseResolver(object):
         self.resolver_exact_paths = []
         self.resolver_prefix_paths = []
 
-    def add_implicit_resolver(cls, tag, regexp, first):
-        if not 'yaml_implicit_resolvers' in cls.__dict__:
-            cls.yaml_implicit_resolvers = cls.yaml_implicit_resolvers.copy()
+    def add_implicit_resolver(self, tag, regexp, first):
+        if 'yaml_implicit_resolvers' not in self.__dict__:
+            self.yaml_implicit_resolvers = self.yaml_implicit_resolvers.copy()
         if first is None:
             first = [None]
         for ch in first:
-            cls.yaml_implicit_resolvers.setdefault(ch, []).append((tag, regexp))
+            self.yaml_implicit_resolvers.setdefault(ch, []).append((tag, regexp))
     add_implicit_resolver = classmethod(add_implicit_resolver)
 
-    def add_path_resolver(cls, tag, path, kind=None):
+    def add_path_resolver(self, tag, path, kind=None):
         # Note: `add_path_resolver` is experimental.  The API could be changed.
         # `new_path` is a pattern that is matched against the path from the
         # root to the node that is being considered.  `node_path` elements are
@@ -45,8 +45,8 @@ class BaseResolver(object):
         # a mapping value that corresponds to a scalar key which content is
         # equal to the `index_check` value.  An integer `index_check` matches
         # against a sequence value with the index equal to `index_check`.
-        if not 'yaml_path_resolvers' in cls.__dict__:
-            cls.yaml_path_resolvers = cls.yaml_path_resolvers.copy()
+        if 'yaml_path_resolvers' not in self.__dict__:
+            self.yaml_path_resolvers = self.yaml_path_resolvers.copy()
         new_path = []
         for element in path:
             if isinstance(element, (list, tuple)):
@@ -56,7 +56,7 @@ class BaseResolver(object):
                     node_check = element[0]
                     index_check = True
                 else:
-                    raise ResolverError("Invalid path element: %s" % element)
+                    raise ResolverError(f"Invalid path element: {element}")
             else:
                 node_check = None
                 index_check = element
@@ -67,12 +67,12 @@ class BaseResolver(object):
             elif node_check is dict:
                 node_check = MappingNode
             elif node_check not in [ScalarNode, SequenceNode, MappingNode]  \
-                    and not isinstance(node_check, basestring)  \
-                    and node_check is not None:
-                raise ResolverError("Invalid node checker: %s" % node_check)
+                        and not isinstance(node_check, basestring)  \
+                        and node_check is not None:
+                raise ResolverError(f"Invalid node checker: {node_check}")
             if not isinstance(index_check, (basestring, int))   \
-                    and index_check is not None:
-                raise ResolverError("Invalid index checker: %s" % index_check)
+                        and index_check is not None:
+                raise ResolverError(f"Invalid index checker: {index_check}")
             new_path.append((node_check, index_check))
         if kind is str:
             kind = ScalarNode
@@ -81,9 +81,9 @@ class BaseResolver(object):
         elif kind is dict:
             kind = MappingNode
         elif kind not in [ScalarNode, SequenceNode, MappingNode]    \
-                and kind is not None:
-            raise ResolverError("Invalid node kind: %s" % kind)
-        cls.yaml_path_resolvers[tuple(new_path), kind] = tag
+                    and kind is not None:
+            raise ResolverError(f"Invalid node kind: {kind}")
+        self.yaml_path_resolvers[tuple(new_path), kind] = tag
     add_path_resolver = classmethod(add_path_resolver)
 
     def descend_resolver(self, current_node, current_index):
@@ -118,16 +118,18 @@ class BaseResolver(object):
     def check_resolver_prefix(self, depth, path, kind,
             current_node, current_index):
         node_check, index_check = path[depth-1]
-        if isinstance(node_check, basestring):
-            if current_node.tag != node_check:
-                return
-        elif node_check is not None:
-            if not isinstance(current_node, node_check):
-                return
+        if (
+            isinstance(node_check, basestring)
+            and current_node.tag != node_check
+            or not isinstance(node_check, basestring)
+            and node_check is not None
+            and not isinstance(current_node, node_check)
+        ):
+            return
         if index_check is True and current_index is not None:
             return
         if (index_check is False or index_check is None)    \
-                and current_index is None:
+                    and current_index is None:
             return
         if isinstance(index_check, basestring):
             if not (isinstance(current_index, ScalarNode)

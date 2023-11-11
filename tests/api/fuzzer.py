@@ -18,11 +18,15 @@ def some(s):
 
 
 def not_some(s):
-    test_set = random.choice([string.ascii_uppercase + string.ascii_lowercase,
-                              string.digits,
-                              string.digits + ".E-",
-                              '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJK'
-                              'LMNOPQRSTUVWXYZ!"#$%\'()*+,-./:;<=>?@[\\]^_`{|}~ '])
+    test_set = random.choice(
+        [
+            string.ascii_uppercase + string.ascii_lowercase,
+            string.digits,
+            f"{string.digits}.E-",
+            '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJK'
+            'LMNOPQRSTUVWXYZ!"#$%\'()*+,-./:;<=>?@[\\]^_`{|}~ ',
+        ]
+    )
     test_len = random.choice([1, 2, 3, 37, 61, 121])
     while True:
         x = ''.join([random.choice(test_set) for _ in range(test_len)])
@@ -33,7 +37,7 @@ def not_some(s):
 def build_url(host_maybe_scheme, base_path):
     try:
         if '//' not in host_maybe_scheme:
-            host_maybe_scheme = '//' + host_maybe_scheme
+            host_maybe_scheme = f'//{host_maybe_scheme}'
         url_tuple = urllib.parse.urlparse(host_maybe_scheme)
         if base_path[0] == '/':
             base_path = base_path[1:]
@@ -124,7 +128,7 @@ def does_response_fit_schema(schema_path, schema, resp):
         if 'nullable' in schema and resp is None:
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable)")
             return True
-        if isinstance(resp, int) or isinstance(resp, float):
+        if isinstance(resp, (int, float)):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return True
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
@@ -226,22 +230,20 @@ class GetPath(object):
             return
         success_code = resp.status_code >= 200 and resp.status_code < 300
         if success_code and expect_success:
-            if self.success is not None:
-                if does_response_fit_schema(posixpath.join(self.url, str(resp.status_code)), self.success, resp_json):
-                    L.info(f"tested {test_url}")
-                else:
-                    L.error(f"tested {test_url}")
-            else:
+            if self.success is None:
                 L.error(f"Missing schema {test_url}")
+            elif does_response_fit_schema(posixpath.join(self.url, str(resp.status_code)), self.success, resp_json):
+                L.info(f"tested {test_url}")
+            else:
+                L.error(f"tested {test_url}")
         elif not success_code and not expect_success:
             schema = self.failures.get(str(resp.status_code), None)
-            if schema is not None:
-                if does_response_fit_schema(posixpath.join(self.url, str(resp.status_code)), schema, resp_json):
-                    L.info(f"tested {test_url}")
-                else:
-                    L.error(f"tested {test_url}")
-            else:
+            if schema is None:
                 L.error("Missing schema for {resp.status_code} from {test_url}")
+            elif does_response_fit_schema(posixpath.join(self.url, str(resp.status_code)), schema, resp_json):
+                L.info(f"tested {test_url}")
+            else:
+                L.error(f"tested {test_url}")
         else:
             L.error(f"Received incorrect status code {resp.status_code} against {test_url}")
 
@@ -261,9 +263,7 @@ def not_absolute(path):
 def find_ref(spec, path):
     if len(path) > 0 and path[0] == '#':
         return find_ref(spec, path[1:])
-    if len(path) == 1:
-        return spec[path[0]]
-    return find_ref(spec[path[0]], path[1:])
+    return spec[path[0]] if len(path) == 1 else find_ref(spec[path[0]], path[1:])
 
 
 def resolve_refs(spec, spec_root=None):
@@ -349,7 +349,7 @@ if not args.passes and not args.detail:
     L.setLevel(logging.ERROR)
 elif args.passes and not args.detail:
     L.setLevel(logging.INFO)
-elif args.detail:
+else:
     L.setLevel(logging.DEBUG)
 handler.setFormatter(logging.Formatter(fmt="%(levelname)s %(message)s"))
 L.addHandler(handler)
@@ -357,7 +357,7 @@ L.addHandler(handler)
 url_filter = re.compile(args.filter)
 
 if spec['swagger'] != '2.0':
-    L.error(f"Unexpected swagger version")
+    L.error("Unexpected swagger version")
     sys.exit(-1)
 L.info(f"Fuzzing {spec['info']['title']} / {spec['info']['version']}")
 
@@ -374,5 +374,5 @@ for name, p in inlined_spec['paths'].items():
 
 for s in inlined_spec['schemes']:
     for p in paths:
-        resp = p.generate_success(s + "://" + host)
-        resp = p.generate_failure(s+"://"+host)
+        resp = p.generate_success(f"{s}://{host}")
+        resp = p.generate_failure(f"{s}://{host}")

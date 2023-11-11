@@ -43,16 +43,14 @@ class PackageCloud:
             url = f"{self.base_url}/packages.json?page={page}"
             if page > self.MAX_PAGES and self.MAX_PAGES != 0:
                 break
-            else:
-                pkg_list = requests.get(url, auth=self.auth, headers=self.headers).json()
-                if len(pkg_list) == 0:
-                    break
-                else:
-                    print(f"Processing page: {page}")
-                    for element in pkg_list:
-                        self.is_pkg_older_than_days(element, 30)
-                        if element['name'] != 'netdata-repo' and element['name'] != 'netdata-repo-edge':
-                            all_pkg_list.append(element)
+            pkg_list = requests.get(url, auth=self.auth, headers=self.headers).json()
+            if len(pkg_list) == 0:
+                break
+            print(f"Processing page: {page}")
+            for element in pkg_list:
+                self.is_pkg_older_than_days(element, 30)
+                if element['name'] not in ['netdata-repo', 'netdata-repo-edge']:
+                    all_pkg_list.append(element)
             page += 1
         return all_pkg_list
 
@@ -65,9 +63,9 @@ class PackageCloud:
             response = requests.delete(url, auth=self.auth, headers=self.headers).json()
             response = None
             if not response:
-                print(f"           Package deleted successfully.")
+                print("           Package deleted successfully.")
             else:
-                print(f"           Failed deleting package!")
+                print("           Failed deleting package!")
 
     def get_destroy_url(self, pkg_url):
         url = f"https://packagecloud.io{pkg_url}"
@@ -76,25 +74,24 @@ class PackageCloud:
         return response.json()['destroy_url']
 
     def get_packages_for_distro(self, distro, all_pkg_list):
-        distro_pkg_list = [ pkg for pkg in all_pkg_list if pkg['distro_version'] == distro ]
-        return distro_pkg_list
+        return [ pkg for pkg in all_pkg_list if pkg['distro_version'] == distro ]
 
     def get_packages_for_arch(self, arch, all_pkg_list):
-        arch_pkg_list = [ pkg for pkg in all_pkg_list if pkg['package_url'].split('/')[11] == arch ]
-        return arch_pkg_list
+        return [
+            pkg
+            for pkg in all_pkg_list
+            if pkg['package_url'].split('/')[11] == arch
+        ]
 
     def get_arches(self, pkg_list):
-        arches = list(set([pkg['package_url'].split('/')[11] for pkg in pkg_list ]))
-        return arches
+        return list({pkg['package_url'].split('/')[11] for pkg in pkg_list})
 
     def get_pkg_list(self, pkg_name, pkg_list):
-        filtered_list = [ pkg for pkg in pkg_list if pkg['name'] == pkg_name ]
-        return filtered_list
+        return [ pkg for pkg in pkg_list if pkg['name'] == pkg_name ]
 
     def get_minor_versions(self, all_versions):
         minor_versions = ['.'.join(version.split('.')[:-1]) for version in all_versions ]
-        minor_versions = list(set(minor_versions))
-        minor_versions.sort()
+        minor_versions = sorted(set(minor_versions))
         return minor_versions
 
     def is_pkg_older_than_days(self, pkg, num_days):
@@ -127,7 +124,7 @@ class PackageCloud:
 
     def cleanup_stable_repo(self):
         all_pkg_list = self.get_all_packages()
-        all_distros = list(set([ pkg['distro_version'] for pkg in all_pkg_list ]))
+        all_distros = list({pkg['distro_version'] for pkg in all_pkg_list})
         all_distros = sorted(all_distros)
         print(f"<> Distributions list: {all_distros}")
 
@@ -168,16 +165,18 @@ def configure():
     try:
         token = os.environ['PKGCLOUD_TOKEN']
     except Exception as e:
-        print(f"FATAL: 'PKGCLOUD_TOKEN' environment variable is not set!", file=sys.stderr)
+        print(
+            "FATAL: 'PKGCLOUD_TOKEN' environment variable is not set!",
+            file=sys.stderr,
+        )
         sys.exit(1)
     repo_type = args.repo_type
     dry_run = args.dry_run
-    conf = {
+    return {
         'repo_type': args.repo_type,
         'dry_run': args.dry_run,
-        'token': token
+        'token': token,
     }
-    return conf
 
 
 def main():

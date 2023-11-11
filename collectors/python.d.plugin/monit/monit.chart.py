@@ -222,7 +222,7 @@ class Service(UrlService):
         self.definitions = CHARTS
         base_url = self.configuration.get('url', "http://localhost:2812")
         self.url = '{0}/_status?format=xml&level=full'.format(base_url)
-        self.active_services = list()
+        self.active_services = []
 
     def parse(self, raw):
         try:
@@ -256,7 +256,7 @@ class Service(UrlService):
         return data
 
     def get_services(self, root):
-        services = list()
+        services = []
 
         for typ in TYPES:
             if typ == TYPE_SYSTEM:

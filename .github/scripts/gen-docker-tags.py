@@ -12,8 +12,11 @@ QUAY = f'quay.io/{REPO}'
 tags = []
 
 for repo in [REPO, GHCR, QUAY]:
-    tags.append(':'.join([repo, version[0]]))
-    tags.append(':'.join([repo, '.'.join(version[0:2])]))
-    tags.append(':'.join([repo, '.'.join(version[0:3])]))
-
+    tags.extend(
+        (
+            ':'.join([repo, version[0]]),
+            ':'.join([repo, '.'.join(version[:2])]),
+            ':'.join([repo, '.'.join(version[:3])]),
+        )
+    )
 print(','.join(tags))

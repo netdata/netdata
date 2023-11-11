@@ -222,13 +222,11 @@ class Retry(object):
         else:
             retry_date_tuple = email.utils.parsedate(retry_after)
             if retry_date_tuple is None:
-                raise InvalidHeader("Invalid Retry-After header: %s" % retry_after)
+                raise InvalidHeader(f"Invalid Retry-After header: {retry_after}")
             retry_date = time.mktime(retry_date_tuple)
             seconds = retry_date - time.time()
 
-        if seconds < 0:
-            seconds = 0
-
+        seconds = max(seconds, 0)
         return seconds
 
     def get_retry_after(self, response):
@@ -236,14 +234,10 @@ class Retry(object):
 
         retry_after = response.getheader("Retry-After")
 
-        if retry_after is None:
-            return None
-
-        return self.parse_retry_after(retry_after)
+        return None if retry_after is None else self.parse_retry_after(retry_after)
 
     def sleep_for_retry(self, response=None):
-        retry_after = self.get_retry_after(response)
-        if retry_after:
+        if retry_after := self.get_retry_after(response):
             time.sleep(retry_after)
             return True
 
@@ -265,8 +259,7 @@ class Retry(object):
         """
 
         if response:
-            slept = self.sleep_for_retry(response)
-            if slept:
+            if slept := self.sleep_for_retry(response):
                 return
 
         self._sleep_backoff()
@@ -287,10 +280,7 @@ class Retry(object):
         """ Checks if a given HTTP method should be retried upon, depending if
         it is included on the method whitelist.
         """
-        if self.method_whitelist and method.upper() not in self.method_whitelist:
-            return False
-
-        return True
+        return not self.method_whitelist or method.upper() in self.method_whitelist
 
     def is_retry(self, method, status_code, has_retry_after=False):
         """ Is this method/status code retryable? (Based on whitelists and control
@@ -312,10 +302,7 @@ class Retry(object):
         """ Are we out of retries? """
         retry_counts = (self.total, self.connect, self.read, self.redirect, self.status)
         retry_counts = list(filter(None, retry_counts))
-        if not retry_counts:
-            return False
-
-        return min(retry_counts) < 0
+        return False if not retry_counts else min(retry_counts) < 0
 
     def increment(self, method=None, url=None, response=None, error=None,
                   _pool=None, _stacktrace=None):

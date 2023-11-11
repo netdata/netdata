@@ -20,7 +20,7 @@ class PoolError(HTTPError):
     "Base exception for errors caused within a pool."
     def __init__(self, pool, message):
         self.pool = pool
-        HTTPError.__init__(self, "%s: %s" % (pool, message))
+        HTTPError.__init__(self, f"{pool}: {message}")
 
     def __reduce__(self):
         # For pickling purposes.
@@ -87,7 +87,7 @@ class HostChangedError(RequestError):
     "Raised when an existing pool gets a request for a foreign host."
 
     def __init__(self, pool, url, retries=3):
-        message = "Tried to open a foreign host with url: %s" % url
+        message = f"Tried to open a foreign host with url: {url}"
         RequestError.__init__(self, pool, url, message)
         self.retries = retries
 
@@ -142,7 +142,7 @@ class LocationParseError(LocationValueError):
     "Raised when get_host or similar fails to parse the URL input."
 
     def __init__(self, location):
-        message = "Failed to parse: %s" % location
+        message = f"Failed to parse: {location}"
         HTTPError.__init__(self, message)
 
         self.location = location
@@ -231,7 +231,7 @@ class ProxySchemeUnknown(AssertionError, ValueError):
     # TODO(t-8ch): Stop inheriting from AssertionError in v2.0.
 
     def __init__(self, scheme):
-        message = "Not supported proxy scheme %s" % scheme
+        message = f"Not supported proxy scheme {scheme}"
         super(ProxySchemeUnknown, self).__init__(message)
 
 

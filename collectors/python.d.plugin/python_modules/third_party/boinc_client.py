@@ -56,7 +56,7 @@ class Rpc(object):
         self.port     = port     or GUI_RPC_PORT
         self.timeout  = timeout  or GUI_RPC_TIMEOUT
 
-        self.sock = socket.create_connection(self.sockargs[0:2], self.sockargs[2])
+        self.sock = socket.create_connection(self.sockargs[:2], self.sockargs[2])
 
     def disconnect(self):
         ''' Disconnect from host. Calling multiple times is OK (idempotent)
@@ -104,17 +104,14 @@ class Rpc(object):
             except socket.error:
                 raise
             n = buf.find(end)
-            if not n == -1: break
+            if n != -1: break
             req += buf
         req += buf[:n]
 
         # unpack reply (remove root tag, ie: first and last lines)
         req = '\n'.join(req.strip().rsplit('\n')[1:-1])
 
-        if text_output:
-            return req
-        else:
-            return ElementTree.fromstring(req)
+        return req if text_output else ElementTree.fromstring(req)
 
 def setattrs_from_xml(obj, xml, attrfuncdict={}):
     ''' Helper to set values for attributes of a class instance by mapping
@@ -138,9 +135,6 @@ def setattrs_from_xml(obj, xml, attrfuncdict={}):
                 elif isinstance(attr, list):  attrfunc = parse_list
                 else:                         attrfunc = lambda x: x
             setattr(obj, e.tag, attrfunc(e))
-        else:
-            pass
-            #print "class missing attribute '%s': %r" % (e.tag, obj)
     return obj
 
 
@@ -152,7 +146,7 @@ def parse_bool(e):
     if e.text is None:
         return True
     else:
-        return bool(e.text) and not e.text.strip().lower() in ('0', 'false')
+        return bool(e.text) and e.text.strip().lower() not in ('0', 'false')
 
 
 def parse_int(e):
@@ -470,10 +464,7 @@ class BoincClient(object):
         authhash = hashlib.md5('{0}{1}'.format(nonce, password).encode()).hexdigest().lower()
         reply = self.rpc.call('<auth2><nonce_hash>{0}</nonce_hash></auth2>'.format(authhash))
 
-        if reply.tag == 'authorized':
-            return True
-        else:
-            return False
+        return reply.tag == 'authorized'
 
     def exchange_versions(self):
         ''' Return VersionInfo instance with core client version info '''
@@ -491,14 +482,10 @@ class BoincClient(object):
             if it's not there, call get_state() again.
         '''
         reply = self.rpc.call("<get_results><active_only>{0}</active_only></get_results>".format(1 if active_only else 0))
-        if not reply.tag == 'results':
+        if reply.tag != 'results':
             return []
 
-        results = []
-        for item in list(reply):
-            results.append(Result.parse(item))
-
-        return results
+        return [Result.parse(item) for item in list(reply)]
 
 
 def read_gui_rpc_password():
@@ -508,8 +495,7 @@ def read_gui_rpc_password():
     try:
         with open(GUI_RPC_PASSWD_FILE, 'r') as f:
             buf = f.read()
-            if buf.endswith('\n'): return buf[:-1]  # trim last CR
-            else: return buf
+            return buf[:-1] if buf.endswith('\n') else buf
     except IOError:
         # Permission denied or File not found.
         pass

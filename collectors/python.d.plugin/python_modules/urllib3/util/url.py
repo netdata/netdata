@@ -23,7 +23,7 @@ class Url(namedtuple('Url', url_attrs)):
     def __new__(cls, scheme=None, auth=None, host=None, port=None, path=None,
                 query=None, fragment=None):
         if path and not path.startswith('/'):
-            path = '/' + path
+            path = f'/{path}'
         if scheme:
             scheme = scheme.lower()
         if host and scheme in NORMALIZABLE_SCHEMES:
@@ -42,16 +42,14 @@ class Url(namedtuple('Url', url_attrs)):
         uri = self.path or '/'
 
         if self.query is not None:
-            uri += '?' + self.query
+            uri += f'?{self.query}'
 
         return uri
 
     @property
     def netloc(self):
         """Network location including host and port"""
-        if self.port:
-            return '%s:%d' % (self.host, self.port)
-        return self.host
+        return '%s:%d' % (self.host, self.port) if self.port else self.host
 
     @property
     def url(self):
@@ -77,19 +75,19 @@ class Url(namedtuple('Url', url_attrs)):
 
         # We use "is not None" we want things to happen with empty strings (or 0 port)
         if scheme is not None:
-            url += scheme + '://'
+            url += f'{scheme}://'
         if auth is not None:
-            url += auth + '@'
+            url += f'{auth}@'
         if host is not None:
             url += host
         if port is not None:
-            url += ':' + str(port)
+            url += f':{str(port)}'
         if path is not None:
             url += path
         if query is not None:
-            url += '?' + query
+            url += f'?{query}'
         if fragment is not None:
-            url += '#' + fragment
+            url += f'#{fragment}'
 
         return url
 
@@ -160,7 +158,6 @@ def parse_url(url):
     auth = None
     host = None
     port = None
-    path = None
     fragment = None
     query = None
 
@@ -172,10 +169,7 @@ def parse_url(url):
     # (http://tools.ietf.org/html/rfc3986#section-3.2)
     url, path_, delim = split_first(url, ['/', '?', '#'])
 
-    if delim:
-        # Reassemble the path
-        path = delim + path_
-
+    path = delim + path_ if delim else None
     # Auth
     if '@' in url:
         # Last '@' denotes end of auth part

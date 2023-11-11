@@ -72,15 +72,12 @@ def _cf_string_to_unicode(value):
     )
     if string is None:
         buffer = ctypes.create_string_buffer(1024)
-        result = CoreFoundation.CFStringGetCString(
-            value_as_void_p,
-            buffer,
-            1024,
-            CFConst.kCFStringEncodingUTF8
-        )
-        if not result:
+        if result := CoreFoundation.CFStringGetCString(
+            value_as_void_p, buffer, 1024, CFConst.kCFStringEncodingUTF8
+        ):
+            string = buffer.value
+        else:
             raise OSError('Error copying C string from CFStringRef')
-        string = buffer.value
     if string is not None:
         string = string.decode('utf-8')
     return string
@@ -99,7 +96,7 @@ def _assert_no_error(error, exception_class=None):
     CoreFoundation.CFRelease(cf_error_string)
 
     if output is None or output == u'':
-        output = u'OSStatus %s' % error
+        output = f'OSStatus {error}'
 
     if exception_class is None:
         exception_class = ssl.SSLError
