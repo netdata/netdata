@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#16384](https://github.com/netdata/netdata/pull/16384) ([netdatabot](https://github.com/netdatabot))
+- use pre-configured message\_ids to identify common logs [\#16383](https://github.com/netdata/netdata/pull/16383) ([ktsaou](https://github.com/ktsaou))
+- docs: remove 'families' from health reference [\#16380](https://github.com/netdata/netdata/pull/16380) ([ilyam8](https://github.com/ilyam8))
+- fix cloud aws sns notification meta [\#16379](https://github.com/netdata/netdata/pull/16379) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16378](https://github.com/netdata/netdata/pull/16378) ([netdatabot](https://github.com/netdatabot))
+- add pids current to cgroups meta [\#16374](https://github.com/netdata/netdata/pull/16374) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16373](https://github.com/netdata/netdata/pull/16373) ([netdatabot](https://github.com/netdatabot))
 - docs: remove unused cloud notification methods mds [\#16372](https://github.com/netdata/netdata/pull/16372) ([ilyam8](https://github.com/ilyam8))
 - Add configuration documentation for Cloud AWS SNS [\#16371](https://github.com/netdata/netdata/pull/16371) ([car12o](https://github.com/car12o))
@@ -15,6 +21,7 @@
 - cgroups: fix throttle\_duration chart context [\#16367](https://github.com/netdata/netdata/pull/16367) ([ilyam8](https://github.com/ilyam8))
 - fix system.net when inside lxc  [\#16364](https://github.com/netdata/netdata/pull/16364) ([ilyam8](https://github.com/ilyam8))
 - collectors/freeipmi: add ipmi-sensors function [\#16363](https://github.com/netdata/netdata/pull/16363) ([ilyam8](https://github.com/ilyam8))
+- Add assorted improvements to the version policy draft. [\#16362](https://github.com/netdata/netdata/pull/16362) ([Ferroin](https://github.com/Ferroin))
 - Switch charts / chart to use buffer json functions [\#16359](https://github.com/netdata/netdata/pull/16359) ([stelfrag](https://github.com/stelfrag))
 - health: put guides into subdirs [\#16358](https://github.com/netdata/netdata/pull/16358) ([ilyam8](https://github.com/ilyam8))
 - Import alert guides from Netdata Assistant [\#16355](https://github.com/netdata/netdata/pull/16355) ([ralphm](https://github.com/ralphm))
@@ -408,8 +415,6 @@
 - mark integrations milestones as completed in README.md [\#15783](https://github.com/netdata/netdata/pull/15783) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
 - Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
-- fix: the cleanup was not performed during the kickstart.sh dry run [\#15775](https://github.com/netdata/netdata/pull/15775) ([ilyam8](https://github.com/ilyam8))
-- don't return `-1` if the socket was closed [\#15771](https://github.com/netdata/netdata/pull/15771) ([moonbreon](https://github.com/moonbreon))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
@@ -434,12 +439,6 @@
 **Merged pull requests:**
 
 - ci: codacy exclude web/gui/v2/ [\#15780](https://github.com/netdata/netdata/pull/15780) ([ilyam8](https://github.com/ilyam8))
-- update UI to v6.27.0 [\#15778](https://github.com/netdata/netdata/pull/15778) ([ilyam8](https://github.com/ilyam8))
-- ci: fix labeler area/docs [\#15776](https://github.com/netdata/netdata/pull/15776) ([ilyam8](https://github.com/ilyam8))
-- fix claiming via UI for static build [\#15774](https://github.com/netdata/netdata/pull/15774) ([ilyam8](https://github.com/ilyam8))
-- extend the trimming window to avoid empty points at the end of queries [\#15773](https://github.com/netdata/netdata/pull/15773) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#15772](https://github.com/netdata/netdata/pull/15772) ([netdatabot](https://github.com/netdatabot))
-- Change FreeBSD / macOS system.swap\(io\) to mem.swap\(io\) [\#15769](https://github.com/netdata/netdata/pull/15769) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
