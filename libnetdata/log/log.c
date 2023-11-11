@@ -29,6 +29,17 @@ struct nd_log_source;
 static bool nd_log_limit_reached(struct nd_log_source *source);
 
 // ----------------------------------------------------------------------------
+
+void uuid_unparse_lower_compact(uuid_t uuid, char *out) {
+    static const char *hex_chars = "0123456789abcdef";
+    for (int i = 0; i < 16; i++) {
+        out[i * 2] = hex_chars[(uuid[i] >> 4) & 0x0F];
+        out[i * 2 + 1] = hex_chars[uuid[i] & 0x0F];
+    }
+    out[32] = '\0'; // Null-terminate the string
+}
+
+// ----------------------------------------------------------------------------
 // logging method
 
 typedef enum  __attribute__((__packed__)) {
@@ -1204,9 +1215,9 @@ static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields
                     buffer_print_uint64(wb, fields[i].entry.priority);
                     break;
                 case NDFT_UUID: {
-                    char u[UUID_STR_LEN];
-                    uuid_unparse_lower(*fields[i].entry.uuid, u);
-                    string_to_logfmt(wb, u);
+                    char u[UUID_COMPACT_STR_LEN];
+                    uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                    buffer_fast_strcat(wb, u, sizeof(u) - 1);
                 }
                     break;
                 default:
@@ -1283,8 +1294,8 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
                 asprintf(&value, "%s=%d", key, (int)fields[i].entry.priority);
                 break;
             case NDFT_UUID: {
-                char u[UUID_STR_LEN];
-                uuid_unparse_lower(*fields[i].entry.uuid, u);
+                char u[UUID_COMPACT_STR_LEN];
+                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
                 asprintf(&value, "%s=%s", key, u);
             }
                 break;
@@ -1404,10 +1415,10 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
                 buffer_print_uint64(wb, fields[i].entry.priority);
                 break;
             case NDFT_UUID:{
-                char u[UUID_STR_LEN];
-                uuid_unparse_lower(*fields[i].entry.uuid, u);
+                char u[UUID_COMPACT_STR_LEN];
+                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
                 buffer_putc(wb, '=');
-                buffer_strcat(wb, u);
+                buffer_fast_strcat(wb, u, sizeof(u) - 1);
             }
                 break;
             default:

@@ -109,6 +109,9 @@ void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_set_thread_source(ND_LOG_SOURCES source);
 bool nd_log_is_stderr_journal(void);
 
+#define UUID_COMPACT_STR_LEN 33
+void uuid_unparse_lower_compact(uuid_t uuid, char *out);
+
 struct log_stack_entry {
     int id;
     ND_LOG_STACK_FIELD_TYPE type;

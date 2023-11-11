@@ -1428,6 +1428,11 @@ void web_client_build_http_header(struct web_client *w) {
         }
     }
 
+    char uuid[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(w->transaction, uuid);
+    buffer_sprintf(w->response.header_output,
+                   "X-Transaction-ID: %s\r\n", uuid);
+
     // end of HTTP header
     buffer_strcat(w->response.header_output, "\r\n");
 }
