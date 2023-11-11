@@ -817,6 +817,8 @@ extern char *netdata_configured_host_prefix;
 #include "avl/avl.h"
 #include "inlined.h"
 #include "clocks/clocks.h"
+#include "datetime/iso8601.h"
+#include "datetime/rfc7231.h"
 #include "completion/completion.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"

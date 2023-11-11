@@ -2070,6 +2070,7 @@ AC_CONFIG_FILES([
     libnetdata/clocks/Makefile
     libnetdata/completion/Makefile
     libnetdata/config/Makefile
+    libnetdata/datetime/Makefile
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile

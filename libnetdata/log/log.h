@@ -9,10 +9,6 @@ extern "C" {
 
 #include "../libnetdata.h"
 
-#define ISO8601_MAX_LENGTH 64
-void iso8601_datetime_utc(char *buffer, size_t len, usec_t now_ut);
-void iso8601_datetime_with_local_timezone(char *buffer, size_t len, usec_t now_ut);
-
 typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only
     NDLS_ACCESS,      // access.log

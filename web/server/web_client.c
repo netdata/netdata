@@ -1335,16 +1335,9 @@ void web_client_build_http_header(struct web_client *w) {
     const char *code_msg = web_response_code_to_string(w->response.code);
 
     // prepare the last modified and expiration dates
-    char date[32], edate[32];
-    {
-        struct tm tmbuf, *tm;
-
-        tm = gmtime_r(&w->response.data->date, &tmbuf);
-        strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
-
-        tm = gmtime_r(&w->response.data->expires, &tmbuf);
-        strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
-    }
+    char rfc7231_date[RFC7231_MAX_LENGTH], rfc7231_expires[RFC7231_MAX_LENGTH];
+    rfc7231_datetime(rfc7231_date, sizeof(rfc7231_date), w->response.data->date);
+    rfc7231_datetime(rfc7231_expires, sizeof(rfc7231_expires), w->response.data->expires);
 
     if (w->response.code == HTTP_RESP_HTTPS_UPGRADE) {
         buffer_sprintf(w->response.header_output,
@@ -1370,7 +1363,7 @@ void web_client_build_http_header(struct web_client *w) {
                        VERSION,
                        w->origin ? w->origin : "*",
                        content_type_string,
-                       date);
+                       rfc7231_date);
     }
 
     if(unlikely(web_x_frame_options))
@@ -1404,7 +1397,7 @@ void web_client_build_http_header(struct web_client *w) {
                 "Cache-Control: %s\r\n"
                         "Expires: %s\r\n",
                 (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache, no-store, must-revalidate\r\nPragma: no-cache":"public",
-                edate);
+                rfc7231_expires);
     }
 
     // copy a possibly available custom header

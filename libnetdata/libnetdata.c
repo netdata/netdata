@@ -1269,17 +1269,19 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     return s;
 }
 
+// vsnprintfz() returns the number of bytes actually written - after possible truncation
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
     if(unlikely(!n)) return 0;
 
     int size = vsnprintf(dst, n, fmt, args);
     dst[n - 1] = '\0';
 
-    if (unlikely((size_t) size > n)) size = (int)n;
+    if (unlikely((size_t) size >= n)) size = (int)(n - 1);
 
     return size;
 }
 
+// snprintfz() returns the number of bytes actually written - after possible truncation
 int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     va_list args;
 

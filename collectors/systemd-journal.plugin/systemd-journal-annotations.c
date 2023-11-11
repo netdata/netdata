@@ -470,7 +470,7 @@ void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BU
 
         if(ut != UINT64_MAX) {
             char buffer[ISO8601_MAX_LENGTH];
-            iso8601_datetime_utc(buffer, sizeof(buffer), ut);
+            iso8601_datetime_utc_ut(buffer, sizeof(buffer), ut);
 
             switch(scope) {
                 default:
@@ -548,13 +548,9 @@ void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unu
     if(*v && isdigit(*v)) {
         uint64_t ut = str2ull(buffer_tostring(wb), NULL);
         if(ut) {
-            time_t timestamp_sec = (time_t)(ut / USEC_PER_SEC);
-            struct tm tm;
-            char buffer[30];
-
-            gmtime_r(&timestamp_sec, &tm);
-            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
-            buffer_sprintf(wb, " (%s.%06llu UTC)", buffer, ut % USEC_PER_SEC);
+            char buffer[ISO8601_MAX_LENGTH];
+            iso8601_datetime_usec_utc_ut(buffer, sizeof(buffer), ut);
+            buffer_sprintf(wb, " (%s)", buffer);
         }
     }
 }

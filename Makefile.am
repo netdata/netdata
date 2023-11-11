@@ -151,6 +151,10 @@ LIBNETDATA_FILES = \
     libnetdata/clocks/clocks.h \
     libnetdata/completion/completion.c \
     libnetdata/completion/completion.h \
+    libnetdata/datetime/iso8601.c \
+    libnetdata/datetime/iso8601.h \
+    libnetdata/datetime/rfc7231.c \
+    libnetdata/datetime/rfc7231.h \
     libnetdata/dictionary/dictionary.c \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
