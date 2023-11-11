@@ -1009,7 +1009,7 @@ else
   NETDATA_USER="${USER}"
   ROOT_USER="${USER}"
 fi
-NETDATA_GROUP="$(id -g -n "${NETDATA_USER}" 2>&1)"
+NETDATA_GROUP="$(id -g -n "${NETDATA_USER}" 2> /dev/null)"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 

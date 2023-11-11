@@ -460,7 +460,6 @@ Commonly useful packages include:
 
 - `apcupsd`: For monitoring APC UPS devices.
 - `lm-sensors`: For monitoring hardware sensors.
-- `nut`: For monitoring various UPS devices.
 - `netcat-openbsd`: For IRC alert support.
 
 ## Health Checks
