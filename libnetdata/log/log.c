@@ -1327,6 +1327,7 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
 }
 
 static bool nd_log_journal_direct_with_memfd(int fd, const char *buffer, size_t buffer_len) {
+#if defined(MFD_ALLOW_SEALING) && defined(F_ADD_SEALS) && defined(F_SEAL_SHRINK) && defined(F_SEAL_GROW) && defined(F_SEAL_WRITE)
     // Create a memory file descriptor
     int memfd = (int)syscall(__NR_memfd_create, "journald", MFD_ALLOW_SEALING);
     if (memfd < 0) return false;
@@ -1363,6 +1364,9 @@ static bool nd_log_journal_direct_with_memfd(int fd, const char *buffer, size_t 
 
     close(memfd);
     return r >= 0;
+#else
+    return false;
+#endif
 }
 
 static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max) {
