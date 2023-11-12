@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- skip spaces when reading cpuset [\#16385](https://github.com/netdata/netdata/pull/16385) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16384](https://github.com/netdata/netdata/pull/16384) ([netdatabot](https://github.com/netdatabot))
 - use pre-configured message\_ids to identify common logs [\#16383](https://github.com/netdata/netdata/pull/16383) ([ktsaou](https://github.com/ktsaou))
 - docs: remove 'families' from health reference [\#16380](https://github.com/netdata/netdata/pull/16380) ([ilyam8](https://github.com/ilyam8))
@@ -135,6 +136,7 @@
 - docker install: support for Proxmox vms/containers name resolution [\#16193](https://github.com/netdata/netdata/pull/16193) ([ilyam8](https://github.com/ilyam8))
 - Introduce workflow to always update bundled packages \(static builds\) into their latest release \(part1\) [\#16191](https://github.com/netdata/netdata/pull/16191) ([tkatsoulas](https://github.com/tkatsoulas))
 - Improvements for labels handling [\#16172](https://github.com/netdata/netdata/pull/16172) ([stelfrag](https://github.com/stelfrag))
+- Split chars \(eBPF \<-\> Apps integration\) [\#16139](https://github.com/netdata/netdata/pull/16139) ([thiagoftsm](https://github.com/thiagoftsm))
 - Faster parents [\#16127](https://github.com/netdata/netdata/pull/16127) ([ktsaou](https://github.com/ktsaou))
 - Update info about custom dashboards [\#16121](https://github.com/netdata/netdata/pull/16121) ([elizabyte8](https://github.com/elizabyte8))
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
@@ -414,7 +416,6 @@
 - fix docker-compose example [\#15784](https://github.com/netdata/netdata/pull/15784) ([zhqu1148980644](https://github.com/zhqu1148980644))
 - mark integrations milestones as completed in README.md [\#15783](https://github.com/netdata/netdata/pull/15783) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update an oversight on the openSUSE 15.5 packages [\#15781](https://github.com/netdata/netdata/pull/15781) ([tkatsoulas](https://github.com/tkatsoulas))
-- Bump openssl version of static builds to 1.1.1v [\#15779](https://github.com/netdata/netdata/pull/15779) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
@@ -435,10 +436,6 @@
 ## [v1.42.0](https://github.com/netdata/netdata/tree/v1.42.0) (2023-08-09)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.41.0...v1.42.0)
-
-**Merged pull requests:**
-
-- ci: codacy exclude web/gui/v2/ [\#15780](https://github.com/netdata/netdata/pull/15780) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.41.0](https://github.com/netdata/netdata/tree/v1.41.0) (2023-07-19)
 
