@@ -1957,7 +1957,7 @@ void function_systemd_units(const char *transaction, char *function, int timeout
     buffer_json_finalize(wb);
 
     netdata_mutex_lock(&stdout_mutex);
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_realtime_sec() + 3600, wb);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_realtime_sec() + 1, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
     buffer_free(wb);
