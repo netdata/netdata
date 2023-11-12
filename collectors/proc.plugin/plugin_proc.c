@@ -153,53 +153,56 @@ void *proc_main(void *ptr)
 
     netdata_thread_cleanup_push(proc_main_cleanup, ptr);
 
-    config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
+            {
+                config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
 
-    // check the enabled status for each module
-    int i;
-    for (i = 0; proc_modules[i].name; i++) {
-        struct proc_module *pm = &proc_modules[i];
+                // check the enabled status for each module
+                int i;
+                for(i = 0; proc_modules[i].name; i++) {
+                    struct proc_module *pm = &proc_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
-        pm->rd = NULL;
+                    pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
+                    pm->rd = NULL;
 
-        worker_register_job_name(i, proc_modules[i].dim);
-    }
+                    worker_register_job_name(i, proc_modules[i].dim);
+                }
 
-    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
-    heartbeat_t hb;
-    heartbeat_init(&hb);
+                usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+                heartbeat_t hb;
+                heartbeat_init(&hb);
 
-    inside_lxc_container = is_lxcfs_proc_mounted();
+                inside_lxc_container = is_lxcfs_proc_mounted();
 
 #define LGS_MODULE_ID 0
-    ND_LOG_STACK lgs[] = {
-            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, NULL),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
 
-    while (service_running(SERVICE_COLLECTORS)) {
-        worker_is_idle();
-        usec_t hb_dt = heartbeat_next(&hb, step);
+                ND_LOG_STACK lgs[] = {
+                        [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, NULL),
+                        ND_LOG_FIELD_END(),
+                };
+                ND_LOG_STACK_PUSH(lgs);
 
-        if (unlikely(!service_running(SERVICE_COLLECTORS)))
-            break;
+                while(service_running(SERVICE_COLLECTORS)) {
+                    worker_is_idle();
+                    usec_t hb_dt = heartbeat_next(&hb, step);
 
-        for (i = 0; proc_modules[i].name; i++) {
-            if (unlikely(!service_running(SERVICE_COLLECTORS)))
-                break;
+                    if(unlikely(!service_running(SERVICE_COLLECTORS)))
+                        break;
 
-            struct proc_module *pm = &proc_modules[i];
-            if (unlikely(!pm->enabled))
-                continue;
+                    for(i = 0; proc_modules[i].name; i++) {
+                        if(unlikely(!service_running(SERVICE_COLLECTORS)))
+                            break;
 
-            worker_is_busy(i);
-            lgs[LGS_MODULE_ID].txt = pm->name;
-            pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-            lgs[LGS_MODULE_ID].txt = NULL;
-        }
-    }
+                        struct proc_module *pm = &proc_modules[i];
+                        if(unlikely(!pm->enabled))
+                            continue;
+
+                        worker_is_busy(i);
+                        lgs[LGS_MODULE_ID].txt = pm->name;
+                        pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
+                        lgs[LGS_MODULE_ID].txt = NULL;
+                    }
+                }
+            }
 
     netdata_thread_cleanup_pop(1);
     return NULL;

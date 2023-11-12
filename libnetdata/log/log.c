@@ -1710,7 +1710,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     CLEAN_BUFFER *wb = NULL;
     if(fmt) {
-        wb = buffer_create(0, NULL);
+        wb = buffer_create(1024, NULL);
         buffer_vsprintf(wb, fmt, ap);
         thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
     }

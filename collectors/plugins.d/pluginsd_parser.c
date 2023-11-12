@@ -2971,45 +2971,49 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
     size_t count = 0;
 
-    ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
-            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
-            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
-    buffered_reader_init(&parser->reader);
-    BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
-    while(likely(service_running(SERVICE_COLLECTORS))) {
-        if (unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
-            if(unlikely(!buffered_reader_read_timeout(&parser->reader, fileno((FILE *)parser->fp_input), 2 * 60 * MSEC_PER_SEC)))
-                break;
+            {
+                ND_LOG_STACK lgs[] = {
+                        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+                        ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+                        ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+                        ND_LOG_FIELD_END(),
+                };
+                ND_LOG_STACK_PUSH(lgs);
 
-            continue;
-        }
+                buffered_reader_init(&parser->reader);
+                BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
+                while(likely(service_running(SERVICE_COLLECTORS))) {
+                    if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
+                        if(unlikely(!buffered_reader_read_timeout(&parser->reader, fileno((FILE *) parser->fp_input),
+                                2 * 60 * MSEC_PER_SEC
+                                                                 )))
+                            break;
 
-        if(unlikely(parser_action(parser,  buffer->buffer)))
-            break;
+                        continue;
+                    }
 
-        buffer->len = 0;
-        buffer->buffer[0] = '\0';
-    }
-    buffer_free(buffer);
+                    if(unlikely(parser_action(parser, buffer->buffer)))
+                        break;
 
-    cd->unsafe.enabled = parser->user.enabled;
-    count = parser->user.data_collections_count;
+                    buffer->len = 0;
+                    buffer->buffer[0] = '\0';
+                }
+                buffer_free(buffer);
 
-    if (likely(count)) {
-        cd->successful_collections += count;
-        cd->serial_failures = 0;
-    }
-    else
-        cd->serial_failures++;
+                cd->unsafe.enabled = parser->user.enabled;
+                count = parser->user.data_collections_count;
+
+                if(likely(count)) {
+                    cd->successful_collections += count;
+                    cd->serial_failures = 0;
+                }
+                else
+                    cd->serial_failures++;
+            }
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);
