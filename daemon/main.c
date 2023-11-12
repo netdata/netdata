@@ -619,7 +619,8 @@ int killpid(pid_t pid) {
 
     int signal = SIGTERM;
 #ifdef NETDATA_INTERNAL_CHECKS
-    signal = SIGABRT;
+    if(service_running(SERVICE_COLLECTORS))
+        signal = SIGABRT;
 #endif
 
     errno = 0;
