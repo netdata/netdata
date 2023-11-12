@@ -564,7 +564,7 @@ static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *r
             5);
 }
 
-void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status) {
+void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority) {
     // this function may be called BEFORE we spawn the receiver thread
     // so, we need to add the fields again (it does not harm)
     ND_LOG_STACK lgs[] = {
@@ -572,16 +572,17 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""),
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_from_child_msgid),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_ACCESS, NDLP_INFO, "api_key:'%s' machine_guid:'%s' msg:'%s'"
+    nd_log(NDLS_ACCESS, priority, "api_key:'%s' machine_guid:'%s' msg:'%s'"
                        , (rpt->key && *rpt->key)? rpt->key : ""
                        , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
                        , msg);
 
-    netdata_log_info("STREAM_RECEIVER for '%s': %s %s%s%s"
+    nd_log(NDLS_DAEMON, priority, "STREAM_RECEIVER for '%s': %s %s%s%s"
                      , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
                      , msg
                      , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
@@ -700,13 +701,13 @@ static void rrdpush_receive(struct receiver_state *rpt)
         );
 
         if(!host) {
-            rrdpush_receive_log_status(rpt, "failed to find/create host structure", "INTERNAL ERROR DROPPING CONNECTION");
+            rrdpush_receive_log_status(rpt, "failed to find/create host structure, rejecting connection", "INTERNAL ERROR DROPPING CONNECTION", NDLP_ERR);
             rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
             goto cleanup;
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
-            rrdpush_receive_log_status(rpt, "host is initializing", "INITIALIZATION IN PROGRESS RETRY LATER");
+            rrdpush_receive_log_status(rpt, "host is initializing, retry later", "INITIALIZATION IN PROGRESS RETRY LATER", NDLP_NOTICE);
             rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
             goto cleanup;
         }
@@ -715,7 +716,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         rpt->system_info = NULL;
 
         if(!rrdhost_set_receiver(host, rpt)) {
-            rrdpush_receive_log_status(rpt, "host is already served by another receiver", "DUPLICATE RECEIVER DROPPING CONNECTION");
+            rrdpush_receive_log_status(rpt, "host is already served by another receiver", "DUPLICATE RECEIVER DROPPING CONNECTION", NDLP_INFO);
             rrdpush_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
             goto cleanup;
         }
@@ -796,7 +797,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
             if(bytes_sent != (ssize_t)strlen(initial_response)) {
                 internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
-                rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
+                rrdpush_receive_log_status(rpt, "cannot reply back, dropping connection", "CANT REPLY DROPPING CONNECTION", NDLP_ERR);
                 goto cleanup;
             }
 #ifdef ENABLE_H2O
@@ -827,7 +828,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
                   , rpt->fd);
     }
 
-    rrdpush_receive_log_status(rpt, "ready to receive data", "CONNECTED");
+    rrdpush_receive_log_status(rpt, "connected and ready to receive data", "CONNECTED", NDLP_INFO);
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud
@@ -854,7 +855,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     {
         char msg[100 + 1];
         snprintfz(msg, 100, "disconnected (completed %zu updates)", count);
-        rrdpush_receive_log_status(rpt, msg, "DISCONNECTED");
+        rrdpush_receive_log_status(rpt, msg, "DISCONNECTED", NDLP_WARNING);
     }
 
 #ifdef ENABLE_ACLK

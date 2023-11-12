@@ -388,7 +388,7 @@ struct {
     const char *error;
     int worker_job_id;
     int postpone_reconnect_seconds;
-    bool prevent_log;
+    ND_LOG_FIELD_PRIORITY priority;
 } stream_responses[] = {
     {
         .response = START_STREAMING_PROMPT_VN,
@@ -398,6 +398,7 @@ struct {
         .error = NULL,
         .worker_job_id = 0,
         .postpone_reconnect_seconds = 0,
+        .priority = NDLP_INFO,
     },
     {
         .response = START_STREAMING_PROMPT_V2,
@@ -407,6 +408,7 @@ struct {
         .error = NULL,
         .worker_job_id = 0,
         .postpone_reconnect_seconds = 0,
+        .priority = NDLP_INFO,
     },
     {
         .response = START_STREAMING_PROMPT_V1,
@@ -416,6 +418,7 @@ struct {
         .error = NULL,
         .worker_job_id = 0,
         .postpone_reconnect_seconds = 0,
+        .priority = NDLP_INFO,
     },
     {
         .response = START_STREAMING_ERROR_SAME_LOCALHOST,
@@ -425,7 +428,7 @@ struct {
         .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 60 * 60, // the IP may change, try it every hour
-        .prevent_log = true,
+        .priority = NDLP_DEBUG,
     },
     {
         .response = START_STREAMING_ERROR_ALREADY_STREAMING,
@@ -435,7 +438,7 @@ struct {
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 2 * 60, // 2 minutes
-        .prevent_log = true,
+        .priority = NDLP_DEBUG,
     },
     {
         .response = START_STREAMING_ERROR_NOT_PERMITTED,
@@ -445,6 +448,7 @@ struct {
         .error = "remote server denied access, probably we don't have the right API key?",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 1 * 60, // 1 minute
+        .priority = NDLP_ERR,
     },
     {
         .response = START_STREAMING_ERROR_BUSY_TRY_LATER,
@@ -454,6 +458,7 @@ struct {
         .error = "remote server is currently busy, we should try later",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 2 * 60, // 2 minutes
+        .priority = NDLP_NOTICE,
     },
     {
         .response = START_STREAMING_ERROR_INTERNAL_ERROR,
@@ -463,6 +468,7 @@ struct {
         .error = "remote server is encountered an internal error, we should try later",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 5 * 60, // 5 minutes
+        .priority = NDLP_CRIT,
     },
     {
         .response = START_STREAMING_ERROR_INITIALIZATION,
@@ -472,6 +478,7 @@ struct {
         .error = "remote server is initializing, we should try later",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 2 * 60, // 2 minute
+        .priority = NDLP_NOTICE,
     },
 
     // terminator
@@ -483,7 +490,7 @@ struct {
         .error = "remote node response is not understood, is it Netdata?",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 1 * 60, // 1 minute
-        .prevent_log = false,
+        .priority = NDLP_ERR,
     }
 };
 
@@ -513,7 +520,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
         return true;
     }
 
-    bool prevent_log = stream_responses[i].prevent_log;
+    ND_LOG_FIELD_PRIORITY priority = stream_responses[i].priority;
     const char *error = stream_responses[i].error;
     int worker_job_id = stream_responses[i].worker_job_id;
     int delay = stream_responses[i].postpone_reconnect_seconds;
@@ -523,15 +530,12 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     host->destination->reason = version;
     host->destination->postpone_reconnection_until = now_realtime_sec() + delay;
 
-    char buf[LOG_DATE_LENGTH];
-    log_date(buf, LOG_DATE_LENGTH, host->destination->postpone_reconnection_until);
+    char buf[ISO8601_MAX_LENGTH];
+    iso8601_datetime_ut(buf, sizeof(buf), host->destination->postpone_reconnection_until * USEC_PER_SEC, 0);
 
-    if(prevent_log)
-        internal_error(true, "STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
-                       rrdhost_hostname(host), s->connected_to, error, delay, buf);
-    else
-        netdata_log_error("STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
-                          rrdhost_hostname(host), s->connected_to, error, delay, buf);
+    nd_log(NDLS_DAEMON, priority,
+           "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
+           rrdhost_hostname(host), s->connected_to, error, delay, buf);
 
     return false;
 }
@@ -847,7 +851,11 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(bytes <= 0) { // timeout is 0
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(host);
-        netdata_log_error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", rrdhost_hostname(host), s->connected_to);
+
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM %s [send to %s]: failed to send HTTP header to remote netdata.",
+               rrdhost_hostname(host), s->connected_to);
+
         host->destination->reason = STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT;
         host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
         return false;
@@ -866,20 +874,27 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(bytes <= 0) { // timeout is 0
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(host);
-        netdata_log_error("STREAM %s [send to %s]: remote netdata does not respond.", rrdhost_hostname(host), s->connected_to);
+
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM %s [send to %s]: remote netdata does not respond.",
+               rrdhost_hostname(host), s->connected_to);
+
         host->destination->reason = STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT;
         host->destination->postpone_reconnection_until = now_realtime_sec() + 30;
         return false;
     }
 
     if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
-        netdata_log_error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", rrdhost_hostname(host), s->connected_to);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM %s [send to %s]: cannot set non-blocking mode for socket.",
+               rrdhost_hostname(host), s->connected_to);
 
     if(sock_enlarge_out(s->rrdpush_sender_socket) < 0)
-        netdata_log_error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", rrdhost_hostname(host), s->connected_to);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM %s [send to %s]: cannot enlarge the socket buffer.",
+               rrdhost_hostname(host), s->connected_to);
 
     http[bytes] = '\0';
-    netdata_log_debug(D_STREAM, "Response to sender from far end: %s", http);
     if(!rrdpush_sender_validate_response(host, s, http, bytes))
         return false;
 
@@ -892,8 +907,13 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     return true;
 }
 
-static bool attempt_to_connect(struct sender_state *state)
-{
+static bool attempt_to_connect(struct sender_state *state) {
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     state->send_attempts = 0;
 
     // reset the bytes we have sent for this session

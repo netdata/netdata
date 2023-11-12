@@ -49,6 +49,7 @@ typedef enum __attribute__((__packed__)) {
     NDF_FUNC,                                   // the source code function - added automatically
     NDF_TID,                                    // the thread ID of the thread logging - added automatically
     NDF_THREAD_TAG,                             // the thread tag of the thread logging - added automatically
+    NDF_MESSAGE_ID,                             // for specific events
     NDF_MODULE,                                 // for internal plugin module, all other get the NDF_THREAD_TAG
 
     NDF_NIDL_NODE,                              // the node / rrdhost currently being worked
@@ -137,7 +138,7 @@ struct log_stack_entry {
         int64_t i64;
         double dbl;
         ND_LOG_FIELD_PRIORITY priority;
-        uuid_t *uuid;
+        const uuid_t *uuid;
         struct {
             log_formatter_callback_t formatter;
             void *formatter_data;

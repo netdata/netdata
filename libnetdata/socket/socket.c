@@ -757,9 +757,23 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
 
     int ai_err = getaddrinfo(host, service, &hints, &ai_head);
     if (ai_err != 0) {
-        netdata_log_error("Cannot resolve host '%s', port '%s': %s", host, service, gai_strerror(ai_err));
+
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Cannot resolve host '%s', port '%s': %s",
+               host, service, gai_strerror(ai_err));
+
         return -1;
     }
+
+    char hostBfr[NI_MAXHOST + 1];
+    char servBfr[NI_MAXSERV + 1];
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_DST_IP, hostBfr),
+            ND_LOG_FIELD_TXT(NDF_DST_PORT, servBfr),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     int fd = -1;
     for (ai = ai_head; ai != NULL && fd == -1; ai = ai->ai_next) {
@@ -770,9 +784,6 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                 pSadrIn6->sin6_scope_id = scope_id;
             }
         }
-
-        char hostBfr[NI_MAXHOST + 1];
-        char servBfr[NI_MAXSERV + 1];
 
         getnameinfo(ai->ai_addr,
                     ai->ai_addrlen,
@@ -810,6 +821,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                       AF_INET6,
                       hostBfr,
                       servBfr);
+
                 break;
             }
 
@@ -825,6 +837,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                       servBfr,
                       pSadrIn6->sin6_flowinfo,
                       pSadrIn6->sin6_scope_id);
+
                 break;
             }
 
@@ -838,13 +851,17 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
         if(fd != -1) {
             if(timeout) {
                 if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
-                    netdata_log_error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "Failed to set timeout on the socket to ip '%s' port '%s'",
+                           hostBfr, servBfr);
             }
 
             errno = 0;
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 if(errno == EALREADY || errno == EINPROGRESS) {
-                    internal_error(true, "Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "Waiting for connection to ip %s port %s to be established",
+                           hostBfr, servBfr);
 
                     // Convert 'struct timeval' to milliseconds for poll():
                     int timeout_milliseconds = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
@@ -858,11 +875,19 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                         // poll() completed normally. We can check the revents to see what happened
                         if (fds[0].revents & POLLOUT) {
                             // connect() completed successfully, socket is writable.
-                            netdata_log_info("connect() to ip %s port %s completed successfully", hostBfr, servBfr);
+
+                            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                                   "connect() to ip %s port %s completed successfully",
+                                   hostBfr, servBfr);
+
                         }
                         else {
                             // This means that the socket is in error. We will close it and set fd to -1
-                            netdata_log_error("Failed to connect to '%s', port '%s'.", hostBfr, servBfr);
+
+                            nd_log(NDLS_DAEMON, NDLP_ERR,
+                                   "Failed to connect to '%s', port '%s'.",
+                                   hostBfr, servBfr);
+
                             close(fd);
                             fd = -1;
                         }
@@ -870,27 +895,38 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                     else if (ret == 0) {
                         // poll() timed out, the connection is not established within the specified timeout.
                         errno = 0;
-                        netdata_log_error("Timed out while connecting to '%s', port '%s'.", hostBfr, servBfr);
+
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "Timed out while connecting to '%s', port '%s'.",
+                               hostBfr, servBfr);
+
                         close(fd);
                         fd = -1;
                     }
-                    else {
+                    else { // ret < 0
                         // poll() returned an error.
-                        netdata_log_error("Failed to connect to '%s', port '%s'. poll() returned %d", hostBfr, servBfr, ret);
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "Failed to connect to '%s', port '%s'. poll() returned %d",
+                               hostBfr, servBfr, ret);
+
                         close(fd);
                         fd = -1;
                     }
                 }
                 else {
-                    netdata_log_error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "Failed to connect to '%s', port '%s'",
+                           hostBfr, servBfr);
+
                     close(fd);
                     fd = -1;
                 }
             }
-
-            if(fd != -1)
-                netdata_log_debug(D_CONNECT_TO, "Connected to '%s' on port '%s'.", hostBfr, servBfr);
         }
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Failed to socket() to '%s', port '%s'",
+                   hostBfr, servBfr);
     }
 
     freeaddrinfo(ai_head);
@@ -968,14 +1004,19 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     netdata_log_debug(D_CONNECT_TO, "Attempting connection to host = '%s', service = '%s', interface = '%s', protocol = %d (tcp = %d, udp = %d)", host, service, interface, protocol, IPPROTO_TCP, IPPROTO_UDP);
 
     if(!*host) {
-        netdata_log_error("Definition '%s' does not specify a host.", definition);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Definition '%s' does not specify a host.",
+               definition);
+
         return -1;
     }
 
     if(*interface) {
         scope_id = if_nametoindex(interface);
         if(!scope_id)
-            netdata_log_error("Cannot find a network interface named '%s'. Continuing with limiting the network interface", interface);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Cannot find a network interface named '%s'. Continuing with limiting the network interface",
+                   interface);
     }
 
     if(!*service)
@@ -1117,7 +1158,6 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 #endif
 
-    internal_error(true, "%s(): calling recv()", __FUNCTION__ );
     return recv(sockfd, buf, len, flags);
 }
 

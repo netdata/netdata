@@ -467,7 +467,7 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host);
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error);
 void stream_capabilities_to_json_array(BUFFER *wb, STREAM_CAPABILITIES caps, const char *key);
-void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status);
+void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority);
 void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDHOST *host, bool sender);

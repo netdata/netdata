@@ -741,11 +741,9 @@ int connect_to_one_of_destinations(
         if(d->postpone_reconnection_until > now)
             continue;
 
-        internal_error(true,
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
             "STREAM %s: connecting to '%s' (default port: %d)...",
-            rrdhost_hostname(host),
-            string2str(d->destination),
-            default_port);
+            rrdhost_hostname(host), string2str(d->destination), default_port);
 
         if (reconnects_counter)
             *reconnects_counter += 1;
@@ -1065,8 +1063,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     if(!rpt->key || !*rpt->key) {
         rrdpush_receive_log_status(
                 rpt,
-                "request without an API key",
-                "NO API KEY PERMISSION DENIED");
+                "request without an API key, rejecting connection",
+                "NO API KEY PERMISSION DENIED", NDLP_WARNING);
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -1075,8 +1073,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     if(!rpt->hostname || !*rpt->hostname) {
         rrdpush_receive_log_status(
                 rpt,
-                "request without a hostname",
-                "NO HOSTNAME PERMISSION DENIED");
+                "request without a hostname, rejecting connection",
+                "NO HOSTNAME PERMISSION DENIED",
+                NDLP_WARNING);
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -1088,8 +1087,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     if(!rpt->machine_guid || !*rpt->machine_guid) {
         rrdpush_receive_log_status(
                 rpt,
-                "request without a machine GUID",
-                "NO MACHINE GUID PERMISSION DENIED");
+                "request without a machine GUID, rejecting connection",
+                "NO MACHINE GUID PERMISSION DENIED", NDLP_WARNING);
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -1102,7 +1101,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             rrdpush_receive_log_status(
                     rpt,
                     "API key is not a valid UUID (use the command uuidgen to generate one)",
-                    "INVALID API KEY PERMISSION DENIED");
+                    "INVALID API KEY PERMISSION DENIED",
+                    NDLP_WARNING);
 
             receiver_state_free(rpt);
             return rrdpush_receiver_permission_denied(w);
@@ -1112,7 +1112,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             rrdpush_receive_log_status(
                     rpt,
                     "machine GUID is not a valid UUID",
-                    "INVALID MACHINE GUID PERMISSION DENIED");
+                    "INVALID MACHINE GUID PERMISSION DENIED",
+                    NDLP_WARNING);
 
             receiver_state_free(rpt);
             return rrdpush_receiver_permission_denied(w);
@@ -1125,7 +1126,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         rrdpush_receive_log_status(
                 rpt,
                 "API key is a machine GUID",
-                "INVALID API KEY PERMISSION DENIED");
+                "INVALID API KEY PERMISSION DENIED",
+                NDLP_WARNING);
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -1135,7 +1137,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         rrdpush_receive_log_status(
                 rpt,
                 "API key is not enabled",
-                "API KEY DISABLED PERMISSION DENIED");
+                "API KEY DISABLED PERMISSION DENIED",
+                NDLP_WARNING);
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -1153,7 +1156,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 rrdpush_receive_log_status(
                         rpt,
                         "API key is not allowed from this IP",
-                        "NOT ALLOWED IP PERMISSION DENIED");
+                        "NOT ALLOWED IP PERMISSION DENIED",
+                        NDLP_WARNING);
 
                 receiver_state_free(rpt);
                 return rrdpush_receiver_permission_denied(w);
@@ -1171,7 +1175,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             rrdpush_receive_log_status(
                     rpt,
                     "machine GUID is an API key",
-                    "INVALID MACHINE GUID PERMISSION DENIED");
+                    "INVALID MACHINE GUID PERMISSION DENIED",
+                    NDLP_WARNING);
 
             receiver_state_free(rpt);
             return rrdpush_receiver_permission_denied(w);
@@ -1182,7 +1187,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         rrdpush_receive_log_status(
                 rpt,
                 "machine GUID is not enabled",
-                "MACHINE GUID DISABLED PERMISSION DENIED");
+                "MACHINE GUID DISABLED PERMISSION DENIED",
+                NDLP_WARNING);
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -1200,7 +1206,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 rrdpush_receive_log_status(
                         rpt,
                         "machine GUID is not allowed from this IP",
-                        "NOT ALLOWED IP PERMISSION DENIED");
+                        "NOT ALLOWED IP PERMISSION DENIED",
+                        NDLP_WARNING);
 
                 receiver_state_free(rpt);
                 return rrdpush_receiver_permission_denied(w);
@@ -1217,7 +1224,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         rrdpush_receive_log_status(
                 rpt,
                 "machine GUID is my own",
-                "LOCALHOST PERMISSION DENIED");
+                "LOCALHOST PERMISSION DENIED",
+                NDLP_DEBUG);
 
         char initial_response[HTTP_HEADER_SIZE + 1];
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
@@ -1260,7 +1268,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             rrdpush_receive_log_status(
                     rpt,
                     msg,
-                    "RATE LIMIT TRY LATER");
+                    "RATE LIMIT TRY LATER",
+                    NDLP_NOTICE);
 
             receiver_state_free(rpt);
             return rrdpush_receiver_too_busy_now(w);
@@ -1319,18 +1328,17 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             // another receiver is already connected
             // try again later
 
-#ifdef NETDATA_INTERNAL_CHECKS
             char msg[200 + 1];
             snprintfz(msg, 200,
                       "multiple connections for same host, "
-                      "old connection was used %ld secs ago%s",
+                      "old connection was last used %ld secs ago%s",
                       age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
 
             rrdpush_receive_log_status(
                     rpt,
                     msg,
-                    "ALREADY CONNECTED");
-#endif
+                    "ALREADY CONNECTED",
+                    NDLP_DEBUG);
 
             // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
             buffer_flush(w->response.data);
@@ -1350,7 +1358,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         rrdpush_receive_log_status(
                 rpt,
                 "can't create receiver thread",
-                "INTERNAL SERVER ERROR");
+                "INTERNAL SERVER ERROR",
+                NDLP_ERR);
 
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Can't handle this request");

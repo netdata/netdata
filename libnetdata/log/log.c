@@ -900,6 +900,10 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
                 .journal = "THREAD_TAG",
                 .logfmt = "thread",
         },
+        [NDF_MESSAGE_ID] = {
+                .journal = "MESSAGE_ID",
+                .logfmt = "msg_id",
+        },
         [NDF_MODULE] = {
                 .journal = "ND_MODULE",
                 .logfmt = "module",
