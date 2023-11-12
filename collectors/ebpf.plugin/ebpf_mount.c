@@ -233,6 +233,7 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
                               NETDATA_EBPF_MOUNT_CALLS,
+                              "",
                               "Calls to mount and umount syscalls",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_EBPF_MOUNT_FAMILY,
@@ -243,6 +244,7 @@ static void ebpf_obsolete_mount_global(ebpf_module_t *em)
 
     ebpf_write_chart_obsolete(NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
                               NETDATA_EBPF_MOUNT_ERRORS,
+                              "",
                               "Errors to mount and umount file systems",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_EBPF_MOUNT_FAMILY,
