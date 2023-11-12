@@ -651,7 +651,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
     int order = 20130;
     struct ebpf_target *w;
     int update_every = em->update_every;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
 
@@ -1095,71 +1095,61 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 
     struct ebpf_target *w;
     // This algorithm is improved in https://github.com/netdata/netdata/pull/16030
-    collected_number values[9];
+    collected_number value;
 
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
 
-        struct ebpf_pid_on_target *move = w->root_pid;
-        // Simplify algorithm, but others will appear only in https://github.com/netdata/netdata/pull/16030
-        memset(values, 0, sizeof(values));
-        while (move) {
-            int32_t pid = move->pid;
-            ebpf_socket_publish_apps_t *ws = socket_bandwidth_curr[pid];
-            if (ws) {
-                values[0] += (collected_number) ws->call_tcp_v4_connection;
-                values[1] += (collected_number) ws->call_tcp_v6_connection;
-                values[2] += (collected_number) ws->bytes_sent;
-                values[3] += (collected_number) ws->bytes_received;
-                values[4] += (collected_number) ws->call_tcp_sent;
-                values[5] += (collected_number) ws->call_tcp_received;
-                values[6] += (collected_number) ws->retransmit;
-                values[7] += (collected_number) ws->call_udp_sent;
-                values[8] += (collected_number) ws->call_udp_received;
-            }
-
-            move = move->next;
-        }
+        ebpf_socket_sum_pid_values_from_kernel(w);
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_v4_connection");
-        write_chart_dimension("connections", values[0]);
+        value = (collected_number) w->socket.call_tcp_v4_connection;
+        write_chart_dimension("connections", value);
         ebpf_write_end_chart();
 
         if (tcp_v6_connect_address.type == 'T') {
             ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_tcp_v6_connection");
-            write_chart_dimension("calls", values[1]);
+            value = (collected_number) w->socket.call_tcp_v6_connection;
+            write_chart_dimension("calls", value);
             ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_sent");
         // We multiply by 0.008, because we read bytes, but we display bits
-        write_chart_dimension("bandwidth", ((values[2])*8)/1000);
+        value = (collected_number) w->socket.bytes_sent;
+        write_chart_dimension("bandwidth", ((value)*8)/1000);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_received");
         // We multiply by 0.008, because we read bytes, but we display bits
-        write_chart_dimension("bandwidth", ((values[3])*8)/1000);
+        value = (collected_number) w->socket.bytes_received;
+        write_chart_dimension("bandwidth", ((value)*8)/1000);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_sendmsg");
-        write_chart_dimension("calls", values[4]);
+        value = (collected_number) w->socket.call_tcp_sent;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_cleanup_rbuf");
-        write_chart_dimension("calls", values[5]);
+        value = (collected_number) w->socket.call_tcp_received;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_retransmit");
-        write_chart_dimension("calls", values[6]);
+        value = (collected_number) w->socket.retransmit;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_sendmsg");
-        write_chart_dimension("calls", values[7]);
+        value = (collected_number) w->socket.call_udp_sent;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_recvmsg");
-        write_chart_dimension("calls", values[8]);
+        value = (collected_number) w->socket.call_udp_received;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
     }
 }
