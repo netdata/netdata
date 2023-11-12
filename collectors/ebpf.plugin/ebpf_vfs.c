@@ -588,7 +588,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     int order = 20275;
     struct ebpf_target *w;
     int update_every = em->update_every;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_VFS_IDX))))
             continue;
 
@@ -1114,8 +1114,6 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_VFS_IDX))))
             continue;
-
-        ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_unlink");
         write_chart_dimension("calls", w->vfs.unlink_call);
