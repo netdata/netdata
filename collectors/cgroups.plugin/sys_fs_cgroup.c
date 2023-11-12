@@ -1166,7 +1166,7 @@ static void cgroup_read_pids_current(struct pids *pids) {
     if (unlikely(!pids->pids_current_filename))
         return;
 
-    pids->pids_current_updated = !read_single_signed_number_file(pids->pids_current_filename, &pids->pids_current);
+    pids->pids_current_updated = !read_single_number_file(pids->pids_current_filename, &pids->pids_current);
 }
 
 static inline void read_cgroup(struct cgroup *cg) {
