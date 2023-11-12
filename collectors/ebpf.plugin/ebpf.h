@@ -302,18 +302,6 @@ static inline void ebpf_create_chart_labels(char *name, char *value, int source)
 }
 
 /**
- * Create Chart labels
- *
- * @param name    the label name.
- * @param value   the label value.
- * @param origin  the labeel source.
- */
-static inline void ebpf_create_chart_labels(char *name, char *value, int source)
-{
-    fprintf(stdout, "CLABEL '%s' '%s' %d\n", name, value, source);
-}
-
-/**
  * Commit label
  *
  * Write commit label to stdout

@@ -466,7 +466,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_CACHESTAT_IDX))))
             continue;
 
@@ -867,13 +867,6 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
         w->charts_created |= 1<<EBPF_MODULE_CACHESTAT_IDX;
     }
 
-    struct ebpf_target *w;
-    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
-        if (unlikely(w->exposed)) {
-            w->charts_created |= (1<<EBPF_MODULE_CACHESTAT_IDX);
-        }
-    }
-
     fflush(stdout);
 }
 
@@ -1007,24 +1000,14 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_CACHESTAT_IDX))))
             continue;
 
-        ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
-        netdata_cachestat_pid_t *current = &w->cachestat.current;
-        netdata_cachestat_pid_t *prev = &w->cachestat.prev;
-
-        uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
-        uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
-        w->cachestat.dirty = mbd;
-        uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
-        uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
-
-        cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
+        cachestat_update_publish(&w->cachestat);
 
         value = (collected_number) w->cachestat.ratio;
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_hit_ratio");
         write_chart_dimension("ratio", value);
         ebpf_write_end_chart();
 
-        value = (collected_number) w->cachestat.dirty;
+        value = (collected_number) w->cachestat.plot.dirty;
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_cachestat_dirty_pages");
         write_chart_dimension("pages", value);
         ebpf_write_end_chart();
@@ -1173,7 +1156,7 @@ static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_caches
     ebpf_write_end_chart();
 
     ebpf_write_begin_chart(type, NETDATA_CACHESTAT_DIRTY_CHART, "");
-    write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY].name, (long long)npc->dirty);
+    write_chart_dimension(cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY].name, (long long)npc->plot.dirty);
     ebpf_write_end_chart();
 
     ebpf_write_begin_chart(type, NETDATA_CACHESTAT_HIT_CHART, "");
