@@ -214,40 +214,37 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
 {
     struct ebpf_target *w;
     // This algorithm is improved in https://github.com/netdata/netdata/pull/16030
-    collected_number values[5];
+    collected_number value;
 
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_PROCESS_IDX))))
             continue;
 
-        values[0] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_process));
-        values[1] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_thread));
-        values[2] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
-                                                                           exit_call));
-        values[3] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
-                                                                           release_call));
-        values[4] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
-                                                                           task_err));
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_process_start");
-        write_chart_dimension("calls", values[0]);
+        value = w->process.create_process;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_thread_start");
-        write_chart_dimension("calls", values[1]);
+        value = w->process.create_thread;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_exit");
-        write_chart_dimension("calls", values[2]);
+        value = w->process.exit_call;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_released");
-        write_chart_dimension("calls", values[3]);
+        value = w->process.release_call;
+        write_chart_dimension("calls", value);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_error");
-            write_chart_dimension("calls", values[4]);
+            value = w->process.task_err;
+            write_chart_dimension("calls", value);
             ebpf_write_end_chart();
         }
     }
@@ -762,7 +759,7 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_PROCESS_IDX))))
             continue;
 
