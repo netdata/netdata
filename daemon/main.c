@@ -617,8 +617,13 @@ int killpid(pid_t pid) {
     int ret;
     netdata_log_debug(D_EXIT, "Request to kill pid %d", pid);
 
+    int signal = SIGTERM;
+#ifdef NETDATA_INTERNAL_CHECKS
+    signal = SIGABRT;
+#endif
+
     errno = 0;
-    ret = kill(pid, SIGTERM);
+    ret = kill(pid, signal);
     if (ret == -1) {
         switch(errno) {
             case ESRCH:

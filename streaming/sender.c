@@ -353,8 +353,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     rrdpush_sender_charts_and_replication_reset(host);
 }
 
-void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
-{
+void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
     se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):strdupz("");
     se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):strdupz("");
     se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):strdupz("");
@@ -362,22 +361,31 @@ void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)
     se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):strdupz("");
 }
 
-void rrdpush_clean_encoded(stream_encoded_t *se)
-{
-    if (se->os_name)
+void rrdpush_clean_encoded(stream_encoded_t *se) {
+    if (se->os_name) {
         freez(se->os_name);
+        se->os_name = NULL;
+    }
 
-    if (se->os_id)
+    if (se->os_id) {
         freez(se->os_id);
+        se->os_id = NULL;
+    }
 
-    if (se->os_version)
+    if (se->os_version) {
         freez(se->os_version);
+        se->os_version = NULL;
+    }
 
-    if (se->kernel_name)
+    if (se->kernel_name) {
         freez(se->kernel_name);
+        se->kernel_name = NULL;
+    }
 
-    if (se->kernel_version)
+    if (se->kernel_version) {
         freez(se->kernel_version);
+        se->kernel_version = NULL;
+    }
 }
 
 struct {
@@ -1103,10 +1111,9 @@ void execute_commands(struct sender_state *s) {
 
         s->line.count++;
         s->line.num_words = quoted_strings_splitter_pluginsd(start, s->line.words, PLUGINSD_MAX_WORDS);
+        const char *command = get_word(s->line.words, s->line.num_words, 0);
 
-        const char *keyword = get_word(s->line.words, s->line.num_words, 0);
-
-        if(keyword && (strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0 || strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END) == 0)) {
+        if(command && (strcmp(command, PLUGINSD_KEYWORD_FUNCTION) == 0 || strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END) == 0)) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
 
@@ -1117,7 +1124,7 @@ void execute_commands(struct sender_state *s) {
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
                 netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                       rrdhost_hostname(s->host), s->connected_to,
-                      keyword,
+                      command,
                       transaction?transaction:"(unset)",
                       timeout_s?timeout_s:"(unset)",
                       function?function:"(unset)");
@@ -1155,11 +1162,12 @@ void execute_commands(struct sender_state *s) {
                 memset(&s->function_payload, 0, sizeof(struct function_payload_state));
             }
         }
-        else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0) {
+        else if (command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0) {
             nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
 
             if (s->receiving_function_payload) {
-                netdata_log_error("STREAM %s [send to %s] received %s command while already receiving function payload", rrdhost_hostname(s->host), s->connected_to, keyword);
+                netdata_log_error("STREAM %s [send to %s] received %s command while already receiving function payload",
+                                  rrdhost_hostname(s->host), s->connected_to, command);
                 s->receiving_function_payload = false;
                 buffer_free(s->function_payload.payload);
                 s->function_payload.payload = NULL;
@@ -1174,7 +1182,7 @@ void execute_commands(struct sender_state *s) {
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
                 netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                       rrdhost_hostname(s->host), s->connected_to,
-                      keyword,
+                      command,
                       transaction?transaction:"(unset)",
                       timeout_s?timeout_s:"(unset)",
                       function?function:"(unset)");
@@ -1187,7 +1195,7 @@ void execute_commands(struct sender_state *s) {
             s->function_payload.timeout = strdupz(get_word(s->line.words, s->line.num_words, 2));
             s->function_payload.fn_name = strdupz(get_word(s->line.words, s->line.num_words, 3));
         }
-        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
+        else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
@@ -1195,7 +1203,7 @@ void execute_commands(struct sender_state *s) {
             if(transaction && *transaction)
                 rrd_function_cancel(transaction);
         }
-        else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
+        else if (command && strcmp(command, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_REPLAY_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
@@ -1208,7 +1216,7 @@ void execute_commands(struct sender_state *s) {
                 netdata_log_error("STREAM %s [send to %s] %s command is incomplete"
                       " (chart=%s, start_streaming=%s, after=%s, before=%s)",
                       rrdhost_hostname(s->host), s->connected_to,
-                      keyword,
+                      command,
                       chart_id ? chart_id : "(unset)",
                       start_streaming ? start_streaming : "(unset)",
                       after ? after : "(unset)",
@@ -1226,9 +1234,11 @@ void execute_commands(struct sender_state *s) {
             netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, s->line.words[0]?s->line.words[0]:"(unset)");
         }
 
+        line_splitter_reset(&s->line);
         worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
         start = newline + 1;
     }
+
     if (start < end) {
         memmove(s->read_buffer, start, end-start);
         s->read_len = end - start;

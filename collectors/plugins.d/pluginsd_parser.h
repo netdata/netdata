@@ -205,13 +205,13 @@ static inline int parser_action(PARSER *parser, char *input) {
     }
 
     parser->line.num_words = quoted_strings_splitter_pluginsd(input, parser->line.words, PLUGINSD_MAX_WORDS);
-    parser->line.command = get_word(parser->line.words, parser->line.num_words, 0);
+    const char *command = get_word(parser->line.words, parser->line.num_words, 0);
 
-    if(unlikely(!parser->line.command))
+    if(unlikely(!command))
         return 0;
 
     PARSER_RC rc;
-    parser->keyword = parser_find_keyword(parser, parser->line.command);
+    parser->keyword = parser_find_keyword(parser, command);
     if(likely(parser->keyword)) {
         worker_is_busy(parser->keyword->worker_job_id);
 
@@ -231,9 +231,10 @@ static inline int parser_action(PARSER *parser, char *input) {
         CLEAN_BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
         line_splitter_reconstruct_line(wb, &parser->line);
         netdata_log_error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
-                parser->line.command, parser->line.count, buffer_tostring(wb));
+                command, parser->line.count, buffer_tostring(wb));
     }
 
+    line_splitter_reset(&parser->line);
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
 }
 

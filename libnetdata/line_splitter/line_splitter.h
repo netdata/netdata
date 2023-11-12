@@ -8,13 +8,16 @@
 #define PLUGINSD_MAX_WORDS 30
 
 struct line_splitter {
-    size_t count;
-    char *words[PLUGINSD_MAX_WORDS];
-    size_t num_words;
-    const char *command;
+    size_t count;                       // counts number of lines
+    char *words[PLUGINSD_MAX_WORDS];    // an array of pointers for the words in this line
+    size_t num_words;                   // the number of pointers used in this line
 };
 
 bool line_splitter_reconstruct_line(BUFFER *wb, void *ptr);
+
+static inline void line_splitter_reset(struct line_splitter *line) {
+    line->num_words = 0;
+}
 
 int pluginsd_isspace(char c);
 int config_isspace(char c);
