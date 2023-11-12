@@ -1062,6 +1062,12 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
 void execute_commands(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
 
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->line),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
     *end = 0;
     while( start < end && (newline = strchr(start, '\n')) ) {
@@ -1075,22 +1081,18 @@ void execute_commands(struct sender_state *s) {
             continue;
         }
 
-        nd_log(NDLS_ACCESS, NDLP_INFO, "STREAM: %d from '%s' for host '%s': %s",
-                   gettid(), s->connected_to, rrdhost_hostname(s->host), start);
+        s->line.count++;
+        s->line.num_words = quoted_strings_splitter_pluginsd(start, s->line.words, PLUGINSD_MAX_WORDS);
 
-        // internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
-
-        char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = quoted_strings_splitter_pluginsd(start, words, PLUGINSD_MAX_WORDS);
-
-        const char *keyword = get_word(words, num_words, 0);
+        const char *keyword = get_word(s->line.words, s->line.num_words, 0);
 
         if(keyword && (strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0 || strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END) == 0)) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
+            nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
 
-            char *transaction = s->receiving_function_payload ? s->function_payload.txid : get_word(words, num_words, 1);
-            char *timeout_s = s->receiving_function_payload ? s->function_payload.timeout : get_word(words, num_words, 2);
-            char *function = s->receiving_function_payload ? s->function_payload.fn_name : get_word(words, num_words, 3);
+            char *transaction = s->receiving_function_payload ? s->function_payload.txid : get_word(s->line.words, s->line.num_words, 1);
+            char *timeout_s = s->receiving_function_payload ? s->function_payload.timeout : get_word(s->line.words, s->line.num_words, 2);
+            char *function = s->receiving_function_payload ? s->function_payload.fn_name : get_word(s->line.words, s->line.num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
                 netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
@@ -1134,6 +1136,8 @@ void execute_commands(struct sender_state *s) {
             }
         }
         else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0) {
+            nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
+
             if (s->receiving_function_payload) {
                 netdata_log_error("STREAM %s [send to %s] received %s command while already receiving function payload", rrdhost_hostname(s->host), s->connected_to, keyword);
                 s->receiving_function_payload = false;
@@ -1143,9 +1147,9 @@ void execute_commands(struct sender_state *s) {
                 // TODO send error response
             }
 
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
+            char *transaction = get_word(s->line.words, s->line.num_words, 1);
+            char *timeout_s = get_word(s->line.words, s->line.num_words, 2);
+            char *function = get_word(s->line.words, s->line.num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
                 netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
@@ -1159,24 +1163,26 @@ void execute_commands(struct sender_state *s) {
             s->receiving_function_payload = true;
             s->function_payload.payload = buffer_create(4096, &netdata_buffers_statistics.buffers_functions);
 
-            s->function_payload.txid = strdupz(get_word(words, num_words, 1));
-            s->function_payload.timeout = strdupz(get_word(words, num_words, 2));
-            s->function_payload.fn_name = strdupz(get_word(words, num_words, 3));
+            s->function_payload.txid = strdupz(get_word(s->line.words, s->line.num_words, 1));
+            s->function_payload.timeout = strdupz(get_word(s->line.words, s->line.num_words, 2));
+            s->function_payload.fn_name = strdupz(get_word(s->line.words, s->line.num_words, 3));
         }
         else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
+            nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            char *transaction = get_word(words, num_words, 1);
+            char *transaction = get_word(s->line.words, s->line.num_words, 1);
             if(transaction && *transaction)
                 rrd_function_cancel(transaction);
         }
         else if (keyword && strcmp(keyword, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_REPLAY_REQUEST);
+            nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            const char *chart_id = get_word(words, num_words, 1);
-            const char *start_streaming = get_word(words, num_words, 2);
-            const char *after = get_word(words, num_words, 3);
-            const char *before = get_word(words, num_words, 4);
+            const char *chart_id = get_word(s->line.words, s->line.num_words, 1);
+            const char *start_streaming = get_word(s->line.words, s->line.num_words, 2);
+            const char *after = get_word(s->line.words, s->line.num_words, 3);
+            const char *before = get_word(s->line.words, s->line.num_words, 4);
 
             if (!chart_id || !start_streaming || !after || !before) {
                 netdata_log_error("STREAM %s [send to %s] %s command is incomplete"
@@ -1197,7 +1203,7 @@ void execute_commands(struct sender_state *s) {
             }
         }
         else {
-            netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, words[0]?words[0]:"(unset)");
+            netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s", rrdhost_hostname(s->host), s->connected_to, s->line.words[0]?s->line.words[0]:"(unset)");
         }
 
         worker_is_busy(WORKER_SENDER_JOB_EXECUTE);

@@ -20,6 +20,7 @@ SUBDIRS = \
     json \
     july \
     health \
+    line_splitter \
     locks \
     log \
     onewayalloc \

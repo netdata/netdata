@@ -437,7 +437,7 @@ __attribute__((constructor)) void initialize_invocation_id(void) {
 }
 
 void nd_log_set_destination_output(ND_LOG_SOURCES source, const char *setting) {
-    if(!setting || !*setting || strcmp(setting, "none") == 0) {
+    if(!setting || !*setting || strcmp(setting, "none") == 0 || strcmp(setting, "off") == 0) {
         nd_log.sources[source].method = ND_LOG_METHOD_DISABLED;
         nd_log.sources[source].filename = "/dev/null";
     }
@@ -840,7 +840,11 @@ struct log_field {
     struct log_stack_entry entry;
 };
 
-static __thread struct log_stack_entry *thread_log_stack_base = NULL;
+#define THREAD_LOG_STACK_MAX 50
+
+static __thread struct log_stack_entry *thread_log_stack_base[THREAD_LOG_STACK_MAX];
+static __thread size_t thread_log_stack_next = 0;
+
 static __thread struct log_field thread_log_fields[_NDF_MAX] = {
         // THE ORDER DEFINES THE ORDER FIELDS WILL APPEAR IN logfmt
 
@@ -851,7 +855,7 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
         },
         [NDF_TIMESTAMP_REALTIME_USEC] = {
                 .journal = NULL,
-                .logfmt = "timestamp",
+                .logfmt = "time",
                 .logfmt_annotator = timestamp_annotator,
         },
         [NDF_SYSLOG_IDENTIFIER] = {
@@ -934,7 +938,7 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
         },
         [NDF_DST_TRANSPORT] = {
                 .journal = "ND_DST_TRANSPORT",
-                .logfmt = "src_transport",
+                .logfmt = "dst_transport",
         },
         [NDF_DST_IP] = {
                 .journal = "ND_DST_IP",
@@ -947,6 +951,10 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
         [NDF_DST_CAPABILITIES] = {
                 .journal = "ND_DST_CAPABILITIES",
                 .logfmt = "dst_capabilities",
+        },
+        [NDF_REQUEST_METHOD] = {
+                .journal = "ND_REQUEST_METHOD",
+                .logfmt = "req_method",
         },
         [NDF_RESPONSE_CODE] = {
                 .journal = "ND_RESPONSE_CODE",
@@ -997,22 +1005,21 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
 #define THREAD_FIELDS_MAX (sizeof(thread_log_fields) / sizeof(thread_log_fields[0]))
 
 void log_stack_pop(void *ptr) {
-    if(!ptr)
-        return;
+    if(!ptr) return;
 
     struct log_stack_entry *lgs = *(struct log_stack_entry (*)[])ptr;
 
-    if(!lgs->prev)
+    if(unlikely(!thread_log_stack_next || lgs != thread_log_stack_base[thread_log_stack_next - 1])) {
+        internal_fatal(true, "you cannot pop in the middle of the stack, or an item not in the stack");
         return;
+    }
 
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(thread_log_stack_base, lgs, prev, next);
+    thread_log_stack_next--;
 }
 
 void log_stack_push(struct log_stack_entry *lgs) {
-    if(!lgs)
-        return;
-
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(thread_log_stack_base, lgs, prev, next);
+    if(!lgs || thread_log_stack_next >= THREAD_LOG_STACK_MAX) return;
+    thread_log_stack_base[thread_log_stack_next++] = lgs;
 }
 
 // ----------------------------------------------------------------------------
@@ -1025,7 +1032,7 @@ static void timestamp_annotator(BUFFER *wb, const char *key, struct log_field *l
         return;
 
     char datetime[ISO8601_MAX_LENGTH];
-    iso8601_datetime_utc_ut(datetime, sizeof(datetime), ut);
+    iso8601_datetime_ut(datetime, sizeof(datetime), ut, ISO8601_LOCAL_TIMEZONE | ISO8601_MILLISECONDS);
 
     if(buffer_strlen(wb))
         buffer_fast_strcat(wb, " ", 1);
@@ -1381,32 +1388,38 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_uint64(wb, fields[i].entry.u32);
+                buffer_putc(wb, '\n');
                 break;
             case NDFT_I32:
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_int64(wb, fields[i].entry.i32);
+                buffer_putc(wb, '\n');
                 break;
             case NDFT_U64:
             case NDFT_TIMESTAMP_USEC:
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_uint64(wb, fields[i].entry.u64);
+                buffer_putc(wb, '\n');
                 break;
             case NDFT_I64:
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_int64(wb, fields[i].entry.i64);
+                buffer_putc(wb, '\n');
                 break;
             case NDFT_DBL:
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_netdata_double(wb, fields[i].entry.dbl);
+                buffer_putc(wb, '\n');
                 break;
             case NDFT_PRIORITY:
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_uint64(wb, fields[i].entry.priority);
+                buffer_putc(wb, '\n');
                 break;
             case NDFT_UUID:{
                 char u[UUID_COMPACT_STR_LEN];
@@ -1414,6 +1427,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_fast_strcat(wb, u, sizeof(u) - 1);
+                buffer_putc(wb, '\n');
             }
                 break;
             case NDFT_CALLBACK: {
@@ -1437,6 +1451,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
             if(!strchr(s, '\n')) {
                 buffer_putc(wb, '=');
                 buffer_strcat(wb, s);
+                buffer_putc(wb, '\n');
             }
             else {
                 buffer_putc(wb, '\n');
@@ -1444,9 +1459,9 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
                 uint64_t le_size = htole64(size);
                 buffer_memcat(wb, &le_size, sizeof(le_size));
                 buffer_memcat(wb, s, size);
+                buffer_putc(wb, '\n');
             }
         }
-        buffer_putc(wb, '\n');
     }
 
     // Send the datagram
@@ -1603,13 +1618,15 @@ static void nd_logger_unset_all_thread_fields(void) {
 }
 
 static void nd_logger_merge_log_stack_to_thread_fields(void) {
-    for(struct log_stack_entry *l = thread_log_stack_base; l ; l = l->next) {
-        for(size_t i = 0; l[i].id != NDF_STOP ;i++) {
-            if(l[i].id >= _NDF_MAX || !l[i].set)
+    for(size_t c = 0; c < thread_log_stack_next ;c++) {
+        struct log_stack_entry *lgs = thread_log_stack_base[c];
+
+        for(size_t i = 0; lgs[i].id != NDF_STOP ; i++) {
+            if(lgs[i].id >= _NDF_MAX || !lgs[i].set)
                 continue;
 
-            struct log_stack_entry *e = &l[i];
-            ND_LOG_STACK_FIELD_TYPE type = l[i].type;
+            struct log_stack_entry *e = &lgs[i];
+            ND_LOG_STACK_FIELD_TYPE type = lgs[i].type;
 
             // do not add empty / unset fields
             if((type == NDFT_TXT && (!e->txt || !*e->txt)) ||
@@ -1620,7 +1637,7 @@ static void nd_logger_merge_log_stack_to_thread_fields(void) {
                 type == NDFT_UNSET)
                 continue;
 
-            thread_log_fields[l[i].id].entry = *e;
+            thread_log_fields[lgs[i].id].entry = *e;
         }
     }
 }

@@ -2077,6 +2077,7 @@ AC_CONFIG_FILES([
     libnetdata/facets/Makefile
     libnetdata/functions_evloop/Makefile
     libnetdata/july/Makefile
+    libnetdata/line_splitter/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile

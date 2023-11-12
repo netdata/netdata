@@ -1696,53 +1696,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
-inline int pluginsd_isspace(char c) {
-    switch(c) {
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-        case '=':
-            return 1;
-
-        default:
-            return 0;
-    }
-}
-
-inline int config_isspace(char c) {
-    switch (c) {
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-        case ',':
-            return 1;
-
-        default:
-            return 0;
-    }
-}
-
-inline int group_by_label_isspace(char c) {
-    if(c == ',' || c == '|')
-        return 1;
-
-    return 0;
-}
-
-bool isspace_map_pluginsd[256] = {};
-bool isspace_map_config[256] = {};
-bool isspace_map_group_by_label[256] = {};
-
-__attribute__((constructor)) void initialize_is_space_arrays(void) {
-    for(int c = 0; c < 256 ; c++) {
-        isspace_map_pluginsd[c] = pluginsd_isspace((char) c);
-        isspace_map_config[c] = config_isspace((char) c);
-        isspace_map_group_by_label[c] = group_by_label_isspace((char) c);
-    }
-}
-
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
     pid_t pid;
     FILE *fp = netdata_popen(command, &pid, NULL);

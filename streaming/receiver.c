@@ -370,7 +370,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 #endif
 
     ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_CB(NDF_REQUEST, parser_reconstruct_line, parser),
+            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
             ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
             ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
             ND_LOG_FIELD_END(),
@@ -902,7 +902,7 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
 #ifdef ENABLE_HTTPS
     buffer_strcat(wb, SSL_connection(&rpt->ssl) ? "https" : "http");
 #else
-    buffer_strcat(wb, http");
+    buffer_strcat(wb, "http");
 #endif
     return true;
 }

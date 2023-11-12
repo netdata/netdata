@@ -171,6 +171,8 @@ LIBNETDATA_FILES = \
     libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
     libnetdata/required_dummies.h \
+    libnetdata/line_splitter/line_splitter.c \
+    libnetdata/line_splitter/line_splitter.h \
     libnetdata/locks/locks.c \
     libnetdata/locks/locks.h \
     libnetdata/log/log.c \

@@ -71,6 +71,7 @@ typedef enum __attribute__((__packed__)) {
     NDF_DST_CAPABILITIES,                       // the destination streaming capabilities
 
     // web server, aclk and stream receiver
+    NDF_REQUEST_METHOD,                         // for http like requests, the http request method
     NDF_RESPONSE_CODE,                          // for http like requests, the http response code, otherwise a status string
 
     // web server (all), aclk (queries)
@@ -142,7 +143,6 @@ struct log_stack_entry {
             void *formatter_data;
         } cb;
     };
-    struct log_stack_entry *prev, *next;
 };
 
 #define ND_LOG_STACK _cleanup_(log_stack_pop) struct log_stack_entry
@@ -241,9 +241,9 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #define nd_log_daemon(NDLP, args...) netdata_logger(NDLS_DAEMON, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define nd_log_collector(NDLP, args...) netdata_logger(NDLS_COLLECTORS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
 
-#define netdata_log_error(args...)  netdata_logger(NDLS_DAEMON,     NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define netdata_log_info(args...)   netdata_logger(NDLS_DAEMON,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
-#define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_error(args...)  netdata_logger(NDLS_DAEMON,     NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
+#define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)    netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define netdata_log_health(args...) netdata_logger(NDLS_HEALTH,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 

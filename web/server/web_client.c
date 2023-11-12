@@ -163,6 +163,34 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     web_client_reset_path_flags(w);
 }
 
+const char *get_request_method(struct web_client *w) {
+    switch(w->mode) {
+        case WEB_CLIENT_MODE_FILECOPY:
+            return "FILECOPY";
+
+        case WEB_CLIENT_MODE_OPTIONS:
+            return "OPTIONS";
+
+        case WEB_CLIENT_MODE_STREAM:
+            return "STREAM";
+
+        case WEB_CLIENT_MODE_POST:
+            return "POST";
+
+        case WEB_CLIENT_MODE_PUT:
+            return "PUT";
+
+        case WEB_CLIENT_MODE_GET:
+            return "GET";
+
+        case WEB_CLIENT_MODE_DELETE:
+            return "DELETE";
+
+        default:
+            return "UNKNOWN";
+    }
+}
+
 void web_client_log_completed_request(struct web_client *w, bool update_web_stats) {
     struct timeval tv;
     now_monotonic_high_precision_timeval(&tv);
@@ -178,32 +206,6 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
                                                 size,
                                                 sent);
 
-    const char *mode;
-    switch(w->mode) {
-        case WEB_CLIENT_MODE_FILECOPY:
-            mode = "FILECOPY";
-            break;
-
-        case WEB_CLIENT_MODE_OPTIONS:
-            mode = "OPTIONS";
-            break;
-
-        case WEB_CLIENT_MODE_STREAM:
-            mode = "STREAM";
-            break;
-
-        case WEB_CLIENT_MODE_POST:
-        case WEB_CLIENT_MODE_PUT:
-        case WEB_CLIENT_MODE_GET:
-        case WEB_CLIENT_MODE_DELETE:
-            mode = "DATA";
-            break;
-
-        default:
-            mode = "UNKNOWN";
-            break;
-    }
-
     usec_t prep_ut = w->timings.tv_ready.tv_sec ? dt_usec(&w->timings.tv_ready, &w->timings.tv_in) : 0;
     usec_t sent_ut = w->timings.tv_ready.tv_sec ? dt_usec(&tv, &w->timings.tv_ready) : 0;
     usec_t total_ut = dt_usec(&tv, &w->timings.tv_in);
@@ -213,6 +215,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, get_request_method(w)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_BYTES, sent),
@@ -734,6 +737,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, get_request_method(w)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
@@ -1576,6 +1580,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     // entry point for all API requests
 
     ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, get_request_method(w)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
@@ -1774,14 +1779,28 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     return mysendfile(w, filename);
 }
 
+static bool web_server_log_transport(BUFFER *wb, void *ptr) {
+    struct web_client *w = ptr;
+    if(!w)
+        return false;
+
+#ifdef ENABLE_HTTPS
+    buffer_strcat(wb, SSL_connection(&w->ssl) ? "https" : "http");
+#else
+    buffer_strcat(wb, "http");
+#endif
+    return true;
+}
+
 void web_client_process_request_from_web_server(struct web_client *w) {
     // entry point for web server requests
 
     ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, SSL_connection(&w->ssl) ? "https" : "http"),
+            ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, web_server_log_transport, w),
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, get_request_method(w)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),

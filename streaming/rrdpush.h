@@ -214,6 +214,7 @@ struct sender_state {
 
     uint16_t hops;
 
+    struct line_splitter line;
     struct compressor_state compressor;
 
 #ifdef NETDATA_LOG_STREAM_SENDER
