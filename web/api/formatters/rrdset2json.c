@@ -34,7 +34,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     buffer_json_member_add_string(wb, "units", rrdset_units(st));
 
     char data_url[RRD_ID_LENGTH_MAX + 16];
-    snprintfz(data_url, RRD_ID_LENGTH_MAX + 15, "/api/v1/chart=%s", rrdset_name(st));
+    snprintfz(data_url, RRD_ID_LENGTH_MAX + 15, "/api/v1/data?chart=%s", rrdset_name(st));
     buffer_json_member_add_string(wb, "data_url", data_url);
 
     buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(st->chart_type));
