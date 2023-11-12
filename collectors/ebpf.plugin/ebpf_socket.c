@@ -647,7 +647,7 @@ static inline void ebpf_obsolete_socket_cgroup_charts(ebpf_module_t *em) {
  */
 void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
 {
-    int order = 20080;
+    int order = 20130;
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = apps_groups_root_target; w; w = w->next) {
@@ -1250,7 +1250,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     struct ebpf_target *root = ptr;
     struct ebpf_target *w;
-    int order = 20080;
+    int order = 20130;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
         if (unlikely(!w->exposed))
