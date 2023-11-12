@@ -356,53 +356,58 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
-    bool compressed_connection = rrdpush_decompression_initialize(rpt);
+            {
+                bool compressed_connection = rrdpush_decompression_initialize(rpt);
 
-    buffered_reader_init(&rpt->reader);
+                buffered_reader_init(&rpt->reader);
 
 #ifdef NETDATA_LOG_STREAM_RECEIVE
-    {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(rpt->host) : "unknown");
-        parser->user.stream_log_fp = fopen(filename, "w");
-        parser->user.stream_log_repertoire = PARSER_REP_METADATA;
-    }
+                {
+                    char filename[FILENAME_MAX + 1];
+                    snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(
+                                    rpt->host) : "unknown"
+                             );
+                    parser->user.stream_log_fp = fopen(filename, "w");
+                    parser->user.stream_log_repertoire = PARSER_REP_METADATA;
+                }
 #endif
 
-    ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
-            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
-            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
+                CLEAN_BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
 
-    BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
-    while(!receiver_should_stop(rpt)) {
+                ND_LOG_STACK lgs[] = {
+                        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+                        ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+                        ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+                        ND_LOG_FIELD_END(),
+                };
+                ND_LOG_STACK_PUSH(lgs);
 
-        if(!buffered_reader_next_line(&rpt->reader, buffer)) {
-            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+                while(!receiver_should_stop(rpt)) {
 
-            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason) : receiver_read_uncompressed(rpt, &reason);
+                    if(!buffered_reader_next_line(&rpt->reader, buffer)) {
+                        STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
 
-            if(unlikely(!have_new_data)) {
-                receiver_set_exit_reason(rpt, reason, false);
-                break;
+                        bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason)
+                                                                   : receiver_read_uncompressed(rpt, &reason);
+
+                        if(unlikely(!have_new_data)) {
+                            receiver_set_exit_reason(rpt, reason, false);
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    if(unlikely(parser_action(parser, buffer->buffer))) {
+                        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+                        break;
+                    }
+
+                    buffer->len = 0;
+                    buffer->buffer[0] = '\0';
+                }
+                result = parser->user.data_collections_count;
             }
-
-            continue;
-        }
-
-        if (unlikely(parser_action(parser,  buffer->buffer))) {
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-            break;
-        }
-
-        buffer->len = 0;
-        buffer->buffer[0] = '\0';
-    }
-    buffer_free(buffer);
-    result = parser->user.data_collections_count;
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);

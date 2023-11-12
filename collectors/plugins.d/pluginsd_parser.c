@@ -2987,10 +2987,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
                 buffered_reader_init(&parser->reader);
                 BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
                 while(likely(service_running(SERVICE_COLLECTORS))) {
+
                     if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
-                        if(unlikely(!buffered_reader_read_timeout(&parser->reader, fileno((FILE *) parser->fp_input),
-                                2 * 60 * MSEC_PER_SEC
-                                                                 )))
+
+                        if(unlikely(!buffered_reader_read_timeout(&parser->reader,
+                                                                  fileno((FILE *) parser->fp_input),
+                                                                  2 * 60 * MSEC_PER_SEC)))
                             break;
 
                         continue;

@@ -1014,7 +1014,7 @@ void log_stack_pop(void *ptr) {
     struct log_stack_entry *lgs = *(struct log_stack_entry (*)[])ptr;
 
     if(unlikely(!thread_log_stack_next || lgs != thread_log_stack_base[thread_log_stack_next - 1])) {
-        internal_fatal(true, "you cannot pop in the middle of the stack, or an item not in the stack");
+        fatal("You cannot pop in the middle of the stack, or an item not in the stack");
         return;
     }
 

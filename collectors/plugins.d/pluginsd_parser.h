@@ -207,8 +207,10 @@ static inline int parser_action(PARSER *parser, char *input) {
     parser->line.num_words = quoted_strings_splitter_pluginsd(input, parser->line.words, PLUGINSD_MAX_WORDS);
     const char *command = get_word(parser->line.words, parser->line.num_words, 0);
 
-    if(unlikely(!command))
+    if(unlikely(!command)) {
+        line_splitter_reset(&parser->line);
         return 0;
+    }
 
     PARSER_RC rc;
     parser->keyword = parser_find_keyword(parser, command);
