@@ -172,6 +172,13 @@ void *proc_main(void *ptr)
 
     inside_lxc_container = is_lxcfs_proc_mounted();
 
+#define LGS_MODULE_ID 0
+    ND_LOG_STACK lgs[] = {
+            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, NULL),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
@@ -187,10 +194,10 @@ void *proc_main(void *ptr)
             if (unlikely(!pm->enabled))
                 continue;
 
-            netdata_log_debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
-
             worker_is_busy(i);
+            lgs[LGS_MODULE_ID].txt = pm->name;
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
+            lgs[LGS_MODULE_ID].txt = NULL;
         }
     }
 

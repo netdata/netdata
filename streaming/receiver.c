@@ -369,6 +369,14 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     }
 #endif
 
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_CB(NDF_REQUEST, parser_reconstruct_line, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
     while(!receiver_should_stop(rpt)) {
 
@@ -563,8 +571,7 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
             ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""),
-            ND_LOG_FIELD_TXT(NDF_STATUS, status),
-            ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, "STREAM RECEIVE"),
+            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -878,6 +885,28 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
     rrdhost_set_is_parent_label();
 }
 
+static bool stream_receiver_log_capabilities(BUFFER *wb, void *ptr) {
+    struct receiver_state *rpt = ptr;
+    if(!rpt)
+        return false;
+
+    stream_capabilities_to_string(wb, rpt->capabilities);
+    return true;
+}
+
+static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
+    struct receiver_state *rpt = ptr;
+    if(!rpt)
+        return false;
+
+#ifdef ENABLE_HTTPS
+    buffer_strcat(wb, SSL_connection(&rpt->ssl) ? "https" : "http");
+#else
+    buffer_strcat(wb, http");
+#endif
+    return true;
+}
+
 void *rrdpush_receiver_thread(void *ptr) {
     netdata_thread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
 
@@ -893,7 +922,8 @@ void *rrdpush_receiver_thread(void *ptr) {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
-            ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, "STREAM_RECEIVE"),
+            ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+            ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);

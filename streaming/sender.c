@@ -1397,7 +1397,61 @@ void rrdpush_initialize_ssl_ctx(RRDHOST *host __maybe_unused) {
 #endif
 }
 
+static bool stream_sender_log_capabilities(BUFFER *wb, void *ptr) {
+    struct sender_state *state = ptr;
+    if(!state)
+        return false;
+
+    stream_capabilities_to_string(wb, state->capabilities);
+    return true;
+}
+
+static bool stream_sender_log_transport(BUFFER *wb, void *ptr) {
+    struct sender_state *state = ptr;
+    if(!state)
+        return false;
+
+#ifdef ENABLE_HTTPS
+    buffer_strcat(wb, SSL_connection(&state->ssl) ? "https" : "http");
+#else
+    buffer_strcat(wb, "http");
+#endif
+    return true;
+}
+
+static bool stream_sender_log_dst_ip(BUFFER *wb, void *ptr) {
+    struct sender_state *state = ptr;
+    if(!state || state->rrdpush_sender_socket == -1)
+        return false;
+
+    SOCKET_PEERS peers = socket_peers(state->rrdpush_sender_socket);
+    buffer_strcat(wb, peers.peer.ip);
+    return true;
+}
+
+static bool stream_sender_log_dst_port(BUFFER *wb, void *ptr) {
+    struct sender_state *state = ptr;
+    if(!state || state->rrdpush_sender_socket == -1)
+        return false;
+
+    SOCKET_PEERS peers = socket_peers(state->rrdpush_sender_socket);
+    buffer_print_uint64(wb, peers.peer.port);
+    return true;
+}
+
 void *rrdpush_sender_thread(void *ptr) {
+    struct sender_state *s = ptr;
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+            ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+            ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+            ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+            ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     worker_register("STREAMSND");
     worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
     worker_register_job_name(WORKER_SENDER_JOB_PIPE_READ, "pipe read");
@@ -1427,8 +1481,6 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
-
-    struct sender_state *s = ptr;
 
     if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->rrdpush_send_destination ||
        !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||

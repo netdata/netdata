@@ -29,6 +29,9 @@ inline int uuid_parse_compact(const char *in, uuid_t uuid) {
 }
 
 int uuid_parse_flexi(const char *in, uuid_t uu) {
+    if(!in || !*in)
+        return -1;
+
     size_t hexCharCount = 0;
     size_t hyphenCount = 0;
     const char *s = in;
@@ -42,7 +45,7 @@ int uuid_parse_flexi(const char *in, uuid_t uu) {
 
             if (unlikely(hyphenCount > 4))
                 // Too many hyphens
-                return -1;
+                return -2;
         }
 
         if (likely(isxdigit(*s))) {
@@ -57,24 +60,24 @@ int uuid_parse_flexi(const char *in, uuid_t uu) {
             }
             else
                 // Not a valid UUID (expected a pair of hex digits)
-                return -2;
+                return -3;
         }
         else
             // Not a valid UUID
-            return -3;
+            return -4;
     }
 
     if (unlikely(byteIndex < 16))
         // Not enough data to form a UUID
-        return -4;
+        return -5;
 
     if (unlikely(hexCharCount != 32))
         // wrong number of hex digits
-        return -5;
+        return -6;
 
     if(unlikely(hyphenCount != 0 && hyphenCount != 4))
         // wrong number of hyphens
-        return -6;
+        return -7;
 
     // copy the final value
     memcpy(uu, uuid, sizeof(uuid_t));

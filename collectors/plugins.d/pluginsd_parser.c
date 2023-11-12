@@ -2910,6 +2910,43 @@ void pluginsd_process_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
+bool parser_reconstruct_line(BUFFER *wb, void *ptr) {
+    PARSER *parser = ptr;
+    if(!parser)
+        return false;
+
+    size_t added = 0;
+    for(size_t i = 0; i < parser->current_line.num_words ;i++) {
+        if(i) buffer_fast_strcat(wb, " ", 1);
+
+        buffer_fast_strcat(wb, "'", 1);
+        const char *s = get_word(parser->current_line.words, parser->current_line.num_words, i);
+        buffer_strcat(wb, s?s:"");
+        buffer_fast_strcat(wb, "'", 1);
+        added++;
+    }
+
+    return added > 0;
+}
+
+bool parser_reconstruct_node(BUFFER *wb, void *ptr) {
+    PARSER *parser = ptr;
+    if(!parser || !parser->user.host)
+        return false;
+
+    buffer_strcat(wb, rrdhost_hostname(parser->user.host));
+    return true;
+}
+
+bool parser_reconstruct_instance(BUFFER *wb, void *ptr) {
+    PARSER *parser = ptr;
+    if(!parser || !parser->user.st)
+        return false;
+
+    buffer_strcat(wb, rrdset_name(parser->user.st));
+    return true;
+}
+
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
 {
     int enabled = cd->unsafe.enabled;
@@ -2952,6 +2989,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     rrd_collector_started();
 
     size_t count = 0;
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_CB(NDF_REQUEST, parser_reconstruct_line, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it

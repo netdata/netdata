@@ -160,6 +160,20 @@ static void *pluginsd_worker_thread(void *arg) {
         netdata_log_info("PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid);
 
+        const char *plugin = strrchr(cd->fullfilename, '/');
+        if(plugin)
+            plugin++;
+        else
+            plugin = cd->fullfilename;
+
+        ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_MODULE, plugin),
+                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(cd->host)),
+                ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "pluginsd"),
+                ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
         count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
 
         netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",

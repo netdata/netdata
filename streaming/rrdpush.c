@@ -1445,7 +1445,7 @@ static struct {
     {0 , NULL },
 };
 
-static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {
+void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) {
     for(size_t i = 0; capability_names[i].str ; i++) {
         if(caps & capability_names[i].cap) {
             buffer_strcat(wb, capability_names[i].str);

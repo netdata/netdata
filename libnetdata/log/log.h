@@ -34,45 +34,59 @@ typedef enum __attribute__((__packed__)) {
 } ND_LOG_FIELD_PRIORITY;
 
 typedef enum __attribute__((__packed__)) {
+    // KEEP THESE IN THE SAME ORDER AS in thread_log_fields (log.c)
+    // so that it easy to audit for missing fields
+
     NDF_STOP = 0,
-    NDF_TIMESTAMP_REALTIME_USEC,
-    NDF_LOG_SOURCE,
-    NDF_SYSLOG_IDENTIFIER,
-    NDF_LINE,
-    NDF_FILE,
-    NDF_FUNC,
-    NDF_ERRNO,
-    NDF_PRIORITY,
-    NDF_SESSION,
-    NDF_TID,
-    NDF_THREAD,
-    NDF_PLUGIN,
-    NDF_MODULE,
-    NDF_JOB,
-    NDF_NIDL_NODE,
-    NDF_NIDL_INSTANCE,
-    NDF_NIDL_DIMENSION,
-    NDF_CONNECTION_ID,
-    NDF_TRANSACTION_ID,
-    NDF_SRC_TRANSPORT,
-    NDF_SRC_IP,
-    NDF_SRC_PORT,
-    NDF_SRC_METHOD,
-    NDF_HANDLER,
-    NDF_REQUEST_MODE,
-    NDF_STATUS,
-    NDF_RESPONSE_CODE,
-    NDF_RESPONSE_BYTES,
-    NDF_RESPONSE_SIZE_BYTES,
-    NDF_RESPONSE_PREPARATION_TIME_USEC,
-    NDF_RESPONSE_SENT_TIME_USEC,
-    NDF_RESPONSE_TOTAL_TIME_USEC,
+    NDF_TIMESTAMP_REALTIME_USEC,                // the timestamp of the log message - added automatically
+    NDF_SYSLOG_IDENTIFIER,                      // the syslog identifier of the application - added automatically
+    NDF_LOG_SOURCE,                             // DAEMON, COLLECTORS, HEALTH, ACCESS, ACLK - set at the log call
+    NDF_PRIORITY,                               // the syslog priority (severity) - set at the log call
+    NDF_ERRNO,                                  // the ERRNO at the time of the log call - added automatically
+    NDF_INVOCATION_ID,                          // the INVOCATION_ID of Netdata - added automatically
+    NDF_LINE,                                   // the source code file line number - added automatically
+    NDF_FILE,                                   // the source code filename - added automatically
+    NDF_FUNC,                                   // the source code function - added automatically
+    NDF_TID,                                    // the thread ID of the thread logging - added automatically
+    NDF_THREAD_TAG,                             // the thread tag of the thread logging - added automatically
+    NDF_MODULE,                                 // for internal plugin module, all other get the NDF_THREAD_TAG
+
+    NDF_NIDL_NODE,                              // the node / rrdhost currently being worked
+    NDF_NIDL_INSTANCE,                          // the instance / rrdset currently being worked
+    NDF_NIDL_DIMENSION,                         // the dimension / rrddim currently being worked
+
+    // web server, aclk and stream receiver
+    NDF_SRC_TRANSPORT,                          // the transport we received the request, one of: http, https, pluginsd
+
+    // web server and stream receiver
+    NDF_SRC_IP,                                 // the streaming / web server source IP
+    NDF_SRC_PORT,                               // the streaming / web server source Port
+    NDF_SRC_METHOD,                             // the streaming receiver capabilities
+    NDF_SRC_CAPABILITIES,                       // the stream receiver capabilities
+
+    // stream sender (established links)
+    NDF_DST_TRANSPORT,                          // the transport we send the request, one of: http, https
+    NDF_DST_IP,                                 // the destination streaming IP
+    NDF_DST_PORT,                               // the destination streaming Port
+    NDF_DST_CAPABILITIES,                       // the destination streaming capabilities
+
+    // web server, aclk and stream receiver
+    NDF_RESPONSE_CODE,                          // for http like requests, the http response code, otherwise a status string
+
+    // web server (all), aclk (queries)
+    NDF_CONNECTION_ID,                          // the web server connection ID
+    NDF_TRANSACTION_ID,                         // the web server and API transaction ID
+    NDF_RESPONSE_SENT_BYTES,                    // for http like requests, the response bytes
+    NDF_RESPONSE_SIZE_BYTES,                    // for http like requests, the uncompressed response size
+    NDF_RESPONSE_PREPARATION_TIME_USEC,         // for http like requests, the preparation time
+    NDF_RESPONSE_SENT_TIME_USEC,                // for http like requests, the time to send the response back
+    NDF_RESPONSE_TOTAL_TIME_USEC,               // for http like requests, the total time to complete the response
 
     // put new items here
     // leave the request URL and the message last
 
-    NDF_REQUEST_URL,
-    NDF_MESSAGE,
+    NDF_REQUEST,                                // the request we are currently working on
+    NDF_MESSAGE,                                // the log message, if any
 
     // terminator
     _NDF_MAX,
@@ -91,6 +105,7 @@ typedef enum __attribute__((__packed__)) {
     NDFT_UUID,
     NDFT_PRIORITY,
     NDFT_TIMESTAMP_USEC,
+    NDFT_CALLBACK,
 } ND_LOG_STACK_FIELD_TYPE;
 
 void nd_log_set_destination_output(ND_LOG_SOURCES source, const char *setting);
@@ -105,6 +120,7 @@ void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_set_thread_source(ND_LOG_SOURCES source);
 bool nd_log_is_stderr_journal(void);
 
+typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 
 struct log_stack_entry {
     ND_LOG_FIELD_ID id;
@@ -121,6 +137,10 @@ struct log_stack_entry {
         double dbl;
         ND_LOG_FIELD_PRIORITY priority;
         uuid_t *uuid;
+        struct {
+            log_formatter_callback_t formatter;
+            void *formatter_data;
+        } cb;
     };
     struct log_stack_entry *prev, *next;
 };
@@ -129,6 +149,7 @@ struct log_stack_entry {
 #define ND_LOG_STACK_PUSH(lgs) log_stack_push(lgs)
 
 #define ND_LOG_FIELD_TXT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TXT, .txt = (value), .set = true, }
+#define ND_LOG_FIELD_STR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_STR, .str = (value), .set = true, }
 #define ND_LOG_FIELD_BFR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_BFR, .bfr = (value), .set = true, }
 #define ND_LOG_FIELD_U64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U64, .u64 = (value), .set = true, }
 #define ND_LOG_FIELD_U32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U32, .u32 = (value), .set = true, }
@@ -137,6 +158,7 @@ struct log_stack_entry {
 #define ND_LOG_FIELD_DBL(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_DBL, .dbl = (value), .set = true, }
 #define ND_LOG_FIELD_PRI(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_PRIORITY, .priority = (value), .set = true, }
 #define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP_USEC, .u64 = (value), .set = true, }
+#define ND_LOG_FIELD_CB(field, func, data) (struct log_stack_entry){ .id = (field), .type = NDFT_CALLBACK, .cb = { .formatter = (func), .formatter_data = (data) }, .set = true, }
 #define ND_LOG_FIELD_UUID(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_UUID, .uuid = (value), .set = true, }
 #define ND_LOG_FIELD_END() { .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
 

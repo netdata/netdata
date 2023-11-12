@@ -1600,7 +1600,14 @@ static void poll_events_cleanup(void *data) {
 }
 
 static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents) {
-    netdata_log_error("POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, pi->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, pi->client_port),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
           , revents & POLLERR  ? "POLLERR" : ""
           , revents & POLLHUP  ? "POLLHUP" : ""
           , revents & POLLNVAL ? "POLLNVAL" : ""

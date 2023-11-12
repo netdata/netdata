@@ -471,6 +471,7 @@ void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDHOST *host, bool sender);
 int32_t stream_capabilities_to_vn(uint32_t caps);
+void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps);
 
 void receiver_state_free(struct receiver_state *rpt);
 bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason);

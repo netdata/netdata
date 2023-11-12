@@ -213,10 +213,9 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
-            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
-            ND_LOG_FIELD_TXT(NDF_REQUEST_MODE, mode),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
-            ND_LOG_FIELD_U64(NDF_RESPONSE_BYTES, sent),
+            ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_BYTES, sent),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SIZE_BYTES, size),
             ND_LOG_FIELD_U64(NDF_RESPONSE_PREPARATION_TIME_USEC, prep_ut),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_TIME_USEC, sent_ut),
@@ -735,7 +734,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
-            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_END(),
@@ -745,7 +744,6 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     // get the api version
     char *tok = strsep_skip_consecutive_separators(&url_path_fragment, "/");
     if(tok && *tok) {
-        netdata_log_debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
         if(strcmp(tok, "v2") == 0)
             return web_client_api_request_v2(host, w, url_path_fragment);
         else if(strcmp(tok, "v1") == 0)
@@ -1578,7 +1576,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     // entry point for all API requests
 
     ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_END(),
@@ -1784,7 +1782,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
-            ND_LOG_FIELD_BFR(NDF_REQUEST_URL, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_END(),
