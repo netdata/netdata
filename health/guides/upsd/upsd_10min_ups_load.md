@@ -1,6 +1,6 @@
 ### Understand the alert
 
-This alert is based on the `nut_10min_ups_load` metric, which measures the average UPS load over the last 10 minutes. If you receive this alert, it means that the load on your UPS is higher than expected, which may lead to an unstable power supply and ungraceful system shutdowns.
+This alert is based on the `upsd_10min_ups_load` metric, which measures the average UPS load over the last 10 minutes. If you receive this alert, it means that the load on your UPS is higher than expected, which may lead to an unstable power supply and ungraceful system shutdowns.
 
 ### Troubleshoot the alert
 
