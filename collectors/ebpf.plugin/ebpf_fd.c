@@ -449,7 +449,7 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_FD_IDX))))
             continue;
 
@@ -857,13 +857,26 @@ void ebpf_update_apps_data(struct ebpf_target *root)
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_FD_IDX))))
             continue;
 
-        ebpf_fd_sum_pids(&w->fd, w->root_pid);
+        ebpf_fd_sum_pids(&w->fd,  w->pid_list.JudyLArray, &w->pid_list.rw_spinlock);
+    }
+}
 
+/**
+ * Send data to Netdata calling auxiliary functions.
+ *
+ * @param em   the structure with thread information
+ * @param root the target list.
+ * @param mode user selection
+*/
+void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root, int mode)
+{
+    struct ebpf_target *w;
+    for (w = root; w; w = w->next) {
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_file_open");
         write_chart_dimension("calls", w->fd.open_call);
         ebpf_write_end_chart();
 
-        if (em->mode < MODE_ENTRY) {
+        if (mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_file_open_error");
             write_chart_dimension("calls", w->fd.open_err);
             ebpf_write_end_chart();
@@ -873,7 +886,7 @@ void ebpf_update_apps_data(struct ebpf_target *root)
         write_chart_dimension("calls", w->fd.close_call);
         ebpf_write_end_chart();
 
-        if (em->mode < MODE_ENTRY) {
+        if (mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_file_close_error");
             write_chart_dimension("calls", w->fd.close_err);
             ebpf_write_end_chart();
@@ -1163,6 +1176,7 @@ static void fd_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
+    int mode = em->mode;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
@@ -1191,7 +1205,7 @@ static void fd_collector(ebpf_module_t *em)
 
         pthread_mutex_lock(&collect_data_mutex);
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_fd_send_apps_data(em, ebpf_apps_groups_root_target);
+            ebpf_fd_send_apps_data(em, ebpf_apps_groups_root_target, mode);
 
         if (cgroups)
             ebpf_fd_send_cgroup_data(em);
