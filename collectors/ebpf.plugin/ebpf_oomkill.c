@@ -101,7 +101,7 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
-    for (w = apps_groups_root_target; w; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_OOMKILL_IDX))))
             continue;
 
@@ -160,7 +160,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
 {
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
     struct ebpf_target *w;
-    for (w = apps_groups_root_target; w != NULL; w = w->next) {
+    for (w = ebpf_apps_groups_root_target; w != NULL; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_OOMKILL_IDX))))
             continue;
 
