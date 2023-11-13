@@ -781,8 +781,18 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     NULL
                 );
             }
-            else
+            else if(p_file_info->log_type == FLB_SERIAL){
+                Flb_serial_config_t *serial_config = (Flb_serial_config_t *) p_file_info->flb_config;
+                sd_journal_send(
+                    serial_config->bitrate && *serial_config->bitrate ? 
+                        "%sSERIAL_BITRATE=%s" : "_%s=%s", sd_journal_field_prefix, serial_config->bitrate,
+                    "MESSAGE=%.*s", (int) message_size, message, 
+                    NULL
+                );
+            }
+            else{
                 sd_journal_send("MESSAGE=%.*s", (int) message_size, message, NULL);
+            }
         }
     } /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
 
