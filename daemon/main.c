@@ -1074,6 +1074,9 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get the hostname
 
+    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
+    verify_netdata_host_prefix();
+
     char buf[HOSTNAME_MAX + 1];
 
     if (get_hostname(buf))
@@ -1178,9 +1181,6 @@ static void get_netdata_configured_variables() {
     }
 #endif
     // ------------------------------------------------------------------------
-
-    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
-    verify_netdata_host_prefix();
 
     // --------------------------------------------------------------------
     // get KSM settings
