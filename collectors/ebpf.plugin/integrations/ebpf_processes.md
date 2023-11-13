@@ -87,7 +87,7 @@ Metrics:
 |:------|:----------|:----|
 | app.process_create | calls | calls/s |
 | app.thread_create | call | calls/s |
-| app.task_exit | callp | calls/s |
+| app.task_exit | call | calls/s |
 | app.task_close | call | calls/s |
 | app.task_error | app | calls/s |
 
