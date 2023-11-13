@@ -79,16 +79,20 @@ Metrics:
 
 These Metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.shmget_call | a dimension per app group | calls/s |
-| apps.shmat_call | a dimension per app group | calls/s |
-| apps.shmdt_call | a dimension per app group | calls/s |
-| apps.shmctl_call | a dimension per app group | calls/s |
+| app.ebpf_shmget_call | calls | calls/s |
+| app.ebpf_shmat_call | calls | calls/s |
+| app.ebpf_shmdt_call | calls | calls/s |
+| app.ebpf_shmctl_call | calls | calls/s |
 
 ### Per eBPF SHM instance
 

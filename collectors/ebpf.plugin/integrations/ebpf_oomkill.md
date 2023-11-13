@@ -73,13 +73,17 @@ Metrics:
 
 These metrics show cgroup/service that reached OOM.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.oomkills | a dimension per app group | kills |
+| app.oomkill | kills | kills |
 
 
 

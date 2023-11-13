@@ -75,14 +75,18 @@ Metrics:
 
 These Metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.swap_read_call | a dimension per app group | calls/s |
-| apps.swap_write_call | a dimension per app group | calls/s |
+| app.ebpf_call_swap_readpage | a dimension per app group | calls/s |
+| app.ebpf_call_swap_writepage | a dimension per app group | calls/s |
 
 ### Per eBPF SWAP instance
 
