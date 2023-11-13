@@ -1060,7 +1060,7 @@ static int get_hostname(char *buf) {
         snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", netdata_configured_host_prefix);
 
         if (!read_file(filename, buf, HOSTNAME_MAX)) {
-            buf = trim(buf);
+            trim(buf);
             return 0;
         }
     }
