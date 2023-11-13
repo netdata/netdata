@@ -54,6 +54,8 @@ else
   AC_CHECK_TOOL([AR], [ar])
 fi
 
+CFLAGS="$CFLAGS -fexceptions"
+
 # -----------------------------------------------------------------------------
 # configurable options
 
