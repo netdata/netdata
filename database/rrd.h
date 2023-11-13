@@ -1273,7 +1273,7 @@ struct rrdhost {
     struct sender_state *sender;
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
-    void *aclk_sync_host_config;
+    struct aclk_sync_cfg_t *aclk_config;
 
     uint32_t rrdpush_receiver_connection_counter;   // the number of times this receiver has connected
     uint32_t rrdpush_sender_connection_counter;     // the number of times this sender has connected

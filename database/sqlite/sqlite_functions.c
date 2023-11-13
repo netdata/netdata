@@ -548,7 +548,7 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         return;
     }
 
-    struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
+    struct aclk_sync_cfg_t  *wc = host->aclk_config;
 
     if (unlikely(!host->node_id)) {
         uuid_t *t = mallocz(sizeof(*host->node_id));
