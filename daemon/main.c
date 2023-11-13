@@ -618,10 +618,10 @@ int killpid(pid_t pid) {
     netdata_log_debug(D_EXIT, "Request to kill pid %d", pid);
 
     int signal = SIGTERM;
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(service_running(SERVICE_COLLECTORS))
-        signal = SIGABRT;
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    if(service_running(SERVICE_COLLECTORS))
+//        signal = SIGABRT;
+//#endif
 
     errno = 0;
     ret = kill(pid, signal);
