@@ -75,17 +75,21 @@ Metrics:
 
 These Metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.process_create | a dimension per app group | calls/s |
-| apps.thread_create | a dimension per app group | calls/s |
-| apps.task_exit | a dimension per app group | calls/s |
-| apps.task_close | a dimension per app group | calls/s |
-| apps.task_error | a dimension per app group | calls/s |
+| app.process_create | calls | calls/s |
+| app.thread_create | call | calls/s |
+| app.task_exit | callp | calls/s |
+| app.task_close | call | calls/s |
+| app.task_error | app | calls/s |
 
 ### Per cgroup
 
