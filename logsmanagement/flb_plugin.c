@@ -414,295 +414,296 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
             p = x->via.map.ptr;
             pend = x->via.map.ptr + x->via.map.size;
-            do{              
-                
-                /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case */
-                if( p_file_info->log_type == FLB_TAIL || 
-                    p_file_info->log_type == FLB_WEB_LOG || 
-                    p_file_info->log_type == FLB_SERIAL){
-                    if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
-                        /* The following line is in case we collect systemd logs 
-                         * (tagged as "MESSAGE") or docker_events (tagged as
-                         * "message") via a "Forward" source to an FLB_TAIL 
-                         * parent. */
-                        !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
+            do{
+                switch(p_file_info->log_type){
 
-                        message = (char *) p->val.via.str.ptr;
-                        message_size = p->val.via.str.size;
+                    case FLB_TAIL:
+                    case FLB_WEB_LOG:
+                    case FLB_SERIAL: 
+                    {
+                        if( !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size) ||
+                            /* The following line is in case we collect systemd logs 
+                            * (tagged as "MESSAGE") or docker_events (tagged as
+                            * "message") via a "Forward" source to an FLB_TAIL parent. */
+                            !strncasecmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
 
-                        if(p_file_info->log_type == FLB_WEB_LOG){
-                            parse_web_log_line( (Web_log_parser_config_t *) p_file_info->parser_config->gen_config, 
-                                                message, message_size, &line_parsed);
+                            message = (char *) p->val.via.str.ptr;
+                            message_size = p->val.via.str.size;
 
-                            if(likely(p_file_info->use_log_timestamp)){
-                                timestamp = line_parsed.timestamp * MSEC_PER_SEC; // convert to msec from sec
+                            if(p_file_info->log_type == FLB_WEB_LOG){
+                                parse_web_log_line( (Web_log_parser_config_t *) p_file_info->parser_config->gen_config, 
+                                                    message, message_size, &line_parsed);
 
-                                { /* ------------------ FIXME ------------------------  
-                                   * Temporary kludge so that metrics don't break when
-                                   * a new record has timestamp before the current one. 
-                                   */
-                                    static msec_t previous_timestamp = 0;
-                                    if((((long long) timestamp - (long long) previous_timestamp) < 0))
-                                        timestamp = previous_timestamp;
-                                    
-                                    previous_timestamp = timestamp;
-                                }
-                            }
-                        }
+                                if(likely(p_file_info->use_log_timestamp)){
+                                    timestamp = line_parsed.timestamp * MSEC_PER_SEC; // convert to msec from sec
 
-                        new_tmp_text_size = message_size + 1; // +1 for '\n'
-
-                        m_assert(message_size, "message_size is 0");
-                        m_assert(message, "message is NULL");
-                    }
-                    ++p;
-                    continue;
-                } /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
-
-                /* FLB_KMSG case */
-                if(p_file_info->log_type == FLB_KMSG){
-                    if(unlikely(skip_kmsg_log_buffering)){
-                        static time_t netdata_start_time = 0;
-                        if (!netdata_start_time) netdata_start_time = now_boottime_sec();
-                        if(now_boottime_sec() - netdata_start_time < KERNEL_LOGS_COLLECT_INIT_WAIT) 
-                            goto skip_collect_and_drop_logs;
-                        else skip_kmsg_log_buffering = 0;
-                    }
-
-                    /* NOTE/WARNING: 
-                     * kmsg timestamps are tricky. The timestamp will be 
-                     * *wrong** if the system has gone into hibernation since 
-                     * last boot and "p_file_info->use_log_timestamp" is set. 
-                     * Even if "p_file_info->use_log_timestamp" is NOT set, we 
-                     * need to use now_realtime_msec() as Fluent Bit timestamp
-                     * will also be wrong. */
-                    if( !strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
-                        if(p_file_info->use_log_timestamp){
-                            timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
-                        }
-                        else if(!timestamp)
-                            timestamp = now_realtime_msec();
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size) && 
-                            p_file_info->use_log_timestamp){
-                        timestamp += p->val.via.i64 / USEC_PER_MS;
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
-                        message = (char *) p->val.via.str.ptr;
-                        message_size = p->val.via.str.size;
-
-                        m_assert(message, "message is NULL");
-                        m_assert(message_size, "message_size is 0");
-
-                        new_tmp_text_size += message_size + 1; // +1 for '\n'
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
-                        kmsg_sever = (int) p->val.via.u64;
-                    }
-                    ++p;
-                    continue;
-                } /* FLB_KMSG case end */
-
-                /* FLB_SYSTEMD or FLB_SYSLOG case */
-                if( p_file_info->log_type == FLB_SYSTEMD || 
-                    p_file_info->log_type == FLB_SYSLOG){
-                        
-                    if( p_file_info->use_log_timestamp && !strncmp( p->key.via.str.ptr, 
-                                                                    "SOURCE_REALTIME_TIMESTAMP", 
-                                                                    (size_t) p->key.via.str.size)){
-
-                        m_assert(p->val.via.str.size - 3 == TIMESTAMP_MS_STR_SIZE - 1, 
-                                "p->val.via.str.size - 3 != TIMESTAMP_MS_STR_SIZE");
-                        
-                        strncpyz(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-
-                        char *endptr = NULL;
-                        timestamp = str2ll(timestamp_str, &endptr);
-                        timestamp = *endptr ? 0 : timestamp / USEC_PER_MS;
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
-                        m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
-                        strncpyz(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                        syslog_prival_size = (size_t) p->val.via.str.size;
-                        
-                        m_assert(syslog_prival, "syslog_prival is NULL");
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "PRIORITY", (size_t) p->key.via.str.size)){
-                        m_assert(p->val.via.str.size <= 1, "p->val.via.str.size > 1");
-                        strncpyz(syslog_severity, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                        
-                        m_assert(syslog_severity, "syslog_severity is NULL");
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "SYSLOG_FACILITY", (size_t) p->key.via.str.size)){
-                        m_assert(p->val.via.str.size <= 2, "p->val.via.str.size > 2");
-                        strncpyz(syslog_facility, p->val.via.str.ptr, (size_t) p->val.via.str.size);
-                        
-                        m_assert(syslog_facility, "syslog_facility is NULL");
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "SYSLOG_TIMESTAMP", (size_t) p->key.via.str.size)){
-                        syslog_timestamp = (char *) p->val.via.str.ptr;
-                        syslog_timestamp_size = p->val.via.str.size;
-
-                        m_assert(syslog_timestamp, "syslog_timestamp is NULL");
-                        m_assert(syslog_timestamp_size, "syslog_timestamp_size is 0");
-                        
-                        new_tmp_text_size += syslog_timestamp_size;
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "HOSTNAME", (size_t) p->key.via.str.size)){
-                        hostname = (char *) p->val.via.str.ptr;
-                        hostname_size = p->val.via.str.size;
-
-                        m_assert(hostname, "hostname is NULL");
-                        m_assert(hostname_size, "hostname_size is 0");
-
-                        new_tmp_text_size += hostname_size + 1; // +1 for ' ' char
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "SYSLOG_IDENTIFIER", (size_t) p->key.via.str.size)){
-                        syslog_identifier = (char *) p->val.via.str.ptr;
-                        syslog_identifier_size = p->val.via.str.size;
-
-                        new_tmp_text_size += syslog_identifier_size;
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "PID", (size_t) p->key.via.str.size)){
-                        pid = (char *) p->val.via.str.ptr;
-                        pid_size = p->val.via.str.size;
-
-                        new_tmp_text_size += pid_size;
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
-                        
-                        message = (char *) p->val.via.str.ptr;
-                        message_size = p->val.via.str.size;
-
-                        m_assert(message, "message is NULL");
-                        m_assert(message_size, "message_size is 0");
-
-                        new_tmp_text_size += message_size;
-                    }
-                    ++p;
-                    continue;
-                } /* FLB_SYSTEMD or FLB_SYSLOG case end */
-
-                /* FLB_DOCKER_EV case */
-                if(p_file_info->log_type == FLB_DOCKER_EV){ 
-                    if(!strncmp(p->key.via.str.ptr, "time", (size_t) p->key.via.str.size)){
-                        docker_ev_time = p->val.via.i64;
-
-                        m_assert(docker_ev_time, "docker_ev_time is 0");
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "timeNano", (size_t) p->key.via.str.size)){
-                        docker_ev_timeNano = p->val.via.i64;
-
-                        m_assert(docker_ev_timeNano, "docker_ev_timeNano is 0");
-
-                        if(likely(p_file_info->use_log_timestamp))
-                            timestamp = docker_ev_timeNano / NSEC_PER_MSEC;
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "Type", (size_t) p->key.via.str.size)){
-                        docker_ev_type = (char *) p->val.via.str.ptr;
-                        docker_ev_type_size = p->val.via.str.size;
-
-                        m_assert(docker_ev_type, "docker_ev_type is NULL");
-                        m_assert(docker_ev_type_size, "docker_ev_type_size is 0");
-
-                        // debug_log("docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "Action", (size_t) p->key.via.str.size)){
-                        docker_ev_action = (char *) p->val.via.str.ptr;
-                        docker_ev_action_size = p->val.via.str.size;
-
-                        m_assert(docker_ev_action, "docker_ev_action is NULL");
-                        m_assert(docker_ev_action_size, "docker_ev_action_size is 0");
-
-                        // debug_log("docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "id", (size_t) p->key.via.str.size)){
-                        docker_ev_id = (char *) p->val.via.str.ptr;
-                        docker_ev_id_size = p->val.via.str.size;
-
-                        m_assert(docker_ev_id, "docker_ev_id is NULL");
-                        m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
-
-                        // debug_log("docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
-                    }
-                    else if(!strncmp(p->key.via.str.ptr, "Actor", (size_t) p->key.via.str.size)){
-                        // debug_log( "msg key:[%.*s]val:[%.*s]", (int)   p->key.via.str.size, 
-                        //                                                                     p->key.via.str.ptr, 
-                        //                                                             (int)   p->val.via.str.size, 
-                        //                                                                     p->val.via.str.ptr);
-                        if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
-                            msgpack_object_kv* ac = p->val.via.map.ptr;
-                            msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
-                            do{
-                                if(!strncmp(ac->key.via.str.ptr, "ID", (size_t) ac->key.via.str.size)){
-                                    docker_ev_id = (char *) ac->val.via.str.ptr;
-                                    docker_ev_id_size = ac->val.via.str.size;
-
-                                    m_assert(docker_ev_id, "docker_ev_id is NULL");
-                                    m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
-
-                                    // debug_log("docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
-                                }
-                                else if(!strncmp(ac->key.via.str.ptr, "Attributes", (size_t) ac->key.via.str.size)){
-                                    if(likely(ac->val.type == MSGPACK_OBJECT_MAP && ac->val.via.map.size != 0)){
-                                        msgpack_object_kv* att = ac->val.via.map.ptr;
-                                        msgpack_object_kv* const att_pend = ac->val.via.map.ptr + ac->val.via.map.size;
-                                        do{
-                                            if(unlikely(++docker_ev_attr.size > docker_ev_attr.max_size)){
-                                                docker_ev_attr.max_size = docker_ev_attr.size;
-                                                docker_ev_attr.key = reallocz(docker_ev_attr.key, 
-                                                                            docker_ev_attr.max_size * sizeof(char *));
-                                                docker_ev_attr.val = reallocz(docker_ev_attr.val, 
-                                                                            docker_ev_attr.max_size * sizeof(char *));
-                                                docker_ev_attr.key_size = reallocz(docker_ev_attr.key_size, 
-                                                                            docker_ev_attr.max_size * sizeof(size_t));
-                                                docker_ev_attr.val_size = reallocz(docker_ev_attr.val_size, 
-                                                                            docker_ev_attr.max_size * sizeof(size_t));
-                                            }
-
-                                            docker_ev_attr.key[docker_ev_attr.size - 1] =  (char *) att->key.via.str.ptr;
-                                            docker_ev_attr.val[docker_ev_attr.size - 1] =  (char *) att->val.via.str.ptr;
-                                            docker_ev_attr.key_size[docker_ev_attr.size - 1] = (size_t) att->key.via.str.size;
-                                            docker_ev_attr.val_size[docker_ev_attr.size - 1] = (size_t) att->val.via.str.size;
-
-                                            att++;
-                                            continue;
-                                        } while(att < att_pend);
+                                    { /* ------------------ FIXME ------------------------  
+                                    * Temporary kludge so that metrics don't break when
+                                    * a new record has timestamp before the current one. 
+                                    */
+                                        static msec_t previous_timestamp = 0;
+                                        if((((long long) timestamp - (long long) previous_timestamp) < 0))
+                                            timestamp = previous_timestamp;
+                                        
+                                        previous_timestamp = timestamp;
                                     }
                                 }
-                                ac++;
-                                continue;
-                            } while(ac < ac_pend);
+                            }
+
+                            new_tmp_text_size = message_size + 1; // +1 for '\n'
+
+                            m_assert(message_size, "message_size is 0");
+                            m_assert(message, "message is NULL");
                         }
+
+                        break;
                     }
-                    ++p;
-                    continue;
-                }
-                /* FLB_DOCKER_EV case end */
 
-                /* FLB_MQTT case */
-                if(p_file_info->log_type == FLB_MQTT){
-                    if(!strncmp(p->key.via.str.ptr, "topic", (size_t) p->key.via.str.size)){
-                        mqtt_topic = (char *) p->val.via.str.ptr;
-                        mqtt_topic_size = (size_t) p->val.via.str.size;
+                    case FLB_KMSG:
+                    {
+                        if(unlikely(skip_kmsg_log_buffering)){
+                            static time_t netdata_start_time = 0;
+                            if (!netdata_start_time) netdata_start_time = now_boottime_sec();
+                            if(now_boottime_sec() - netdata_start_time < KERNEL_LOGS_COLLECT_INIT_WAIT) 
+                                goto skip_collect_and_drop_logs;
+                            else skip_kmsg_log_buffering = 0;
+                        }
 
-                        while(0 == (message_size = dl_msgpack_object_print_buffer(mqtt_message, mqtt_message_size_max, *x)))
-                            mqtt_message = reallocz(mqtt_message, (mqtt_message_size_max += 10));
+                        /* NOTE/WARNING: 
+                        * kmsg timestamps are tricky. The timestamp will be 
+                        * *wrong** if the system has gone into hibernation since 
+                        * last boot and "p_file_info->use_log_timestamp" is set. 
+                        * Even if "p_file_info->use_log_timestamp" is NOT set, we 
+                        * need to use now_realtime_msec() as Fluent Bit timestamp
+                        * will also be wrong. */
+                        if( !strncmp(p->key.via.str.ptr, "sec", (size_t) p->key.via.str.size)){
+                            if(p_file_info->use_log_timestamp){
+                                timestamp += (now_realtime_sec() - now_boottime_sec() + p->val.via.i64) * MSEC_PER_SEC;
+                            }
+                            else if(!timestamp)
+                                timestamp = now_realtime_msec();
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "usec", (size_t) p->key.via.str.size) && 
+                                p_file_info->use_log_timestamp){
+                            timestamp += p->val.via.i64 / USEC_PER_MS;
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
+                            message = (char *) p->val.via.str.ptr;
+                            message_size = p->val.via.str.size;
 
-                        new_tmp_text_size = message_size + 1; // +1 for '\n'
+                            m_assert(message, "message is NULL");
+                            m_assert(message_size, "message_size is 0");
 
-                        m_assert(message_size, "message_size is 0");
-                        m_assert(mqtt_message, "mqtt_message is NULL");
+                            new_tmp_text_size += message_size + 1; // +1 for '\n'
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
+                            kmsg_sever = (int) p->val.via.u64;
+                        }
 
-                        break; // watch out, MQTT requires a 'break' here, as we parse the entire 'x' msgpack_object
+                        break;
                     }
-                    else m_assert(0, "missing mqtt topic");
 
-                    ++p;
-                    continue;
+                    case FLB_SYSTEMD:
+                    case FLB_SYSLOG:
+                    {
+                        if( p_file_info->use_log_timestamp && !strncmp( p->key.via.str.ptr, 
+                                                                        "SOURCE_REALTIME_TIMESTAMP", 
+                                                                        (size_t) p->key.via.str.size)){
+
+                            m_assert(p->val.via.str.size - 3 == TIMESTAMP_MS_STR_SIZE - 1, 
+                                    "p->val.via.str.size - 3 != TIMESTAMP_MS_STR_SIZE");
+                            
+                            strncpyz(timestamp_str, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+
+                            char *endptr = NULL;
+                            timestamp = str2ll(timestamp_str, &endptr);
+                            timestamp = *endptr ? 0 : timestamp / USEC_PER_MS;
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
+                            m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
+                            strncpyz(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                            syslog_prival_size = (size_t) p->val.via.str.size;
+                            
+                            m_assert(syslog_prival, "syslog_prival is NULL");
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "PRIORITY", (size_t) p->key.via.str.size)){
+                            m_assert(p->val.via.str.size <= 1, "p->val.via.str.size > 1");
+                            strncpyz(syslog_severity, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                            
+                            m_assert(syslog_severity, "syslog_severity is NULL");
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "SYSLOG_FACILITY", (size_t) p->key.via.str.size)){
+                            m_assert(p->val.via.str.size <= 2, "p->val.via.str.size > 2");
+                            strncpyz(syslog_facility, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                            
+                            m_assert(syslog_facility, "syslog_facility is NULL");
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "SYSLOG_TIMESTAMP", (size_t) p->key.via.str.size)){
+                            syslog_timestamp = (char *) p->val.via.str.ptr;
+                            syslog_timestamp_size = p->val.via.str.size;
+
+                            m_assert(syslog_timestamp, "syslog_timestamp is NULL");
+                            m_assert(syslog_timestamp_size, "syslog_timestamp_size is 0");
+                            
+                            new_tmp_text_size += syslog_timestamp_size;
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "HOSTNAME", (size_t) p->key.via.str.size)){
+                            hostname = (char *) p->val.via.str.ptr;
+                            hostname_size = p->val.via.str.size;
+
+                            m_assert(hostname, "hostname is NULL");
+                            m_assert(hostname_size, "hostname_size is 0");
+
+                            new_tmp_text_size += hostname_size + 1; // +1 for ' ' char
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "SYSLOG_IDENTIFIER", (size_t) p->key.via.str.size)){
+                            syslog_identifier = (char *) p->val.via.str.ptr;
+                            syslog_identifier_size = p->val.via.str.size;
+
+                            new_tmp_text_size += syslog_identifier_size;
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "PID", (size_t) p->key.via.str.size)){
+                            pid = (char *) p->val.via.str.ptr;
+                            pid_size = p->val.via.str.size;
+
+                            new_tmp_text_size += pid_size;
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY_SYSTEMD, (size_t) p->key.via.str.size)){
+                            
+                            message = (char *) p->val.via.str.ptr;
+                            message_size = p->val.via.str.size;
+
+                            m_assert(message, "message is NULL");
+                            m_assert(message_size, "message_size is 0");
+
+                            new_tmp_text_size += message_size;
+                        }
+                        
+                        break;
+                    }
+
+                    case FLB_DOCKER_EV:
+                    { 
+                        if(!strncmp(p->key.via.str.ptr, "time", (size_t) p->key.via.str.size)){
+                            docker_ev_time = p->val.via.i64;
+
+                            m_assert(docker_ev_time, "docker_ev_time is 0");
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "timeNano", (size_t) p->key.via.str.size)){
+                            docker_ev_timeNano = p->val.via.i64;
+
+                            m_assert(docker_ev_timeNano, "docker_ev_timeNano is 0");
+
+                            if(likely(p_file_info->use_log_timestamp))
+                                timestamp = docker_ev_timeNano / NSEC_PER_MSEC;
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "Type", (size_t) p->key.via.str.size)){
+                            docker_ev_type = (char *) p->val.via.str.ptr;
+                            docker_ev_type_size = p->val.via.str.size;
+
+                            m_assert(docker_ev_type, "docker_ev_type is NULL");
+                            m_assert(docker_ev_type_size, "docker_ev_type_size is 0");
+
+                            // debug_log("docker_ev_type: %.*s", docker_ev_type_size, docker_ev_type);
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "Action", (size_t) p->key.via.str.size)){
+                            docker_ev_action = (char *) p->val.via.str.ptr;
+                            docker_ev_action_size = p->val.via.str.size;
+
+                            m_assert(docker_ev_action, "docker_ev_action is NULL");
+                            m_assert(docker_ev_action_size, "docker_ev_action_size is 0");
+
+                            // debug_log("docker_ev_action: %.*s", docker_ev_action_size, docker_ev_action);
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "id", (size_t) p->key.via.str.size)){
+                            docker_ev_id = (char *) p->val.via.str.ptr;
+                            docker_ev_id_size = p->val.via.str.size;
+
+                            m_assert(docker_ev_id, "docker_ev_id is NULL");
+                            m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
+
+                            // debug_log("docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "Actor", (size_t) p->key.via.str.size)){
+                            // debug_log( "msg key:[%.*s]val:[%.*s]", (int)   p->key.via.str.size, 
+                            //                                                                     p->key.via.str.ptr, 
+                            //                                                             (int)   p->val.via.str.size, 
+                            //                                                                     p->val.via.str.ptr);
+                            if(likely(p->val.type == MSGPACK_OBJECT_MAP && p->val.via.map.size != 0)){
+                                msgpack_object_kv* ac = p->val.via.map.ptr;
+                                msgpack_object_kv* const ac_pend= p->val.via.map.ptr + p->val.via.map.size;
+                                do{
+                                    if(!strncmp(ac->key.via.str.ptr, "ID", (size_t) ac->key.via.str.size)){
+                                        docker_ev_id = (char *) ac->val.via.str.ptr;
+                                        docker_ev_id_size = ac->val.via.str.size;
+
+                                        m_assert(docker_ev_id, "docker_ev_id is NULL");
+                                        m_assert(docker_ev_id_size, "docker_ev_id_size is 0");
+
+                                        // debug_log("docker_ev_id: %.*s", docker_ev_id_size, docker_ev_id);
+                                    }
+                                    else if(!strncmp(ac->key.via.str.ptr, "Attributes", (size_t) ac->key.via.str.size)){
+                                        if(likely(ac->val.type == MSGPACK_OBJECT_MAP && ac->val.via.map.size != 0)){
+                                            msgpack_object_kv* att = ac->val.via.map.ptr;
+                                            msgpack_object_kv* const att_pend = ac->val.via.map.ptr + ac->val.via.map.size;
+                                            do{
+                                                if(unlikely(++docker_ev_attr.size > docker_ev_attr.max_size)){
+                                                    docker_ev_attr.max_size = docker_ev_attr.size;
+                                                    docker_ev_attr.key = reallocz(docker_ev_attr.key, 
+                                                                                docker_ev_attr.max_size * sizeof(char *));
+                                                    docker_ev_attr.val = reallocz(docker_ev_attr.val, 
+                                                                                docker_ev_attr.max_size * sizeof(char *));
+                                                    docker_ev_attr.key_size = reallocz(docker_ev_attr.key_size, 
+                                                                                docker_ev_attr.max_size * sizeof(size_t));
+                                                    docker_ev_attr.val_size = reallocz(docker_ev_attr.val_size, 
+                                                                                docker_ev_attr.max_size * sizeof(size_t));
+                                                }
+
+                                                docker_ev_attr.key[docker_ev_attr.size - 1] =  (char *) att->key.via.str.ptr;
+                                                docker_ev_attr.val[docker_ev_attr.size - 1] =  (char *) att->val.via.str.ptr;
+                                                docker_ev_attr.key_size[docker_ev_attr.size - 1] = (size_t) att->key.via.str.size;
+                                                docker_ev_attr.val_size[docker_ev_attr.size - 1] = (size_t) att->val.via.str.size;
+
+                                                att++;
+                                                continue;
+                                            } while(att < att_pend);
+                                        }
+                                    }
+                                    ac++;
+                                    continue;
+                                } while(ac < ac_pend);
+                            }
+                        }
+                        
+                        break;
+                    }
+
+                    case FLB_MQTT:
+                    {
+                        if(!strncmp(p->key.via.str.ptr, "topic", (size_t) p->key.via.str.size)){
+                            mqtt_topic = (char *) p->val.via.str.ptr;
+                            mqtt_topic_size = (size_t) p->val.via.str.size;
+
+                            while(0 == (message_size = dl_msgpack_object_print_buffer(mqtt_message, mqtt_message_size_max, *x)))
+                                mqtt_message = reallocz(mqtt_message, (mqtt_message_size_max += 10));
+
+                            new_tmp_text_size = message_size + 1; // +1 for '\n'
+
+                            m_assert(message_size, "message_size is 0");
+                            m_assert(mqtt_message, "mqtt_message is NULL");
+
+                            break; // watch out, MQTT requires a 'break' here, as we parse the entire 'x' msgpack_object
+                        }
+                        else m_assert(0, "missing mqtt topic");
+
+                        break;
+                    }
+
+                    default:
+                        break;
                 }
-
-            } while(p < pend);
+                
+            } while(++p < pend);
         } 
     }
 
