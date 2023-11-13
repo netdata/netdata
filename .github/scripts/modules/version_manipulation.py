@@ -37,14 +37,14 @@ def padded_version(item):
 
 def extract_version(title):
     if identify_channel(title):
-        _ , _pattern = identify_channel(title) 
+        _ , _pattern = identify_channel(title)
     try:
         match = re.match(_pattern, title)
         if match:
             return tuple(map(int, match.groups()))
     except:
         return None
-    
+
 
 
 def get_release_path_and_filename(_version):
@@ -66,10 +66,10 @@ def get_release_path_and_filename(_version):
 
 def compare_version_with_remote(version):
     """
-    If the version = fun (version) you need to update the version in the 
+    If the version = fun (version) you need to update the version in the
     remote. If the version remote doesn't exist, returns the version
     :param channel: any version of the agent
-    :return: the greater from version and version remote.    
+    :return: the greater from version and version remote.
     """
 
     prefix = "https://packages.netdata.cloud/releases"
@@ -111,7 +111,7 @@ def sort_and_grouby_major_agents_of_channel(channel):
         pattern = r'v(\d+)\.(\d+)\.(\d+)'
     else:
         pattern = r'v(\d+)\.(\d+)\.(\d+)-(\d+)-nightly'
-    
+
     try:
         G = Github(GH_TOKEN)
         repo = G.get_repo(repos_URL[channel])
@@ -119,7 +119,7 @@ def sort_and_grouby_major_agents_of_channel(channel):
     except GithubException as e:
         print(f"GitHub API request failed: {e}")
         return None
-    
+
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         return None
