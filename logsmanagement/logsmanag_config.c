@@ -22,7 +22,8 @@ g_logs_manag_config_t g_logs_manag_config = {
     .buff_flush_to_db_interval = SAVE_BLOB_TO_DB_DEFAULT,
     .enable_collected_logs_total = ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT,
     .enable_collected_logs_rate = ENABLE_COLLECTED_LOGS_RATE_DEFAULT,
-    .sd_journal_field_prefix = SD_JOURNAL_FIELD_PREFIX
+    .sd_journal_field_prefix = SD_JOURNAL_FIELD_PREFIX,
+    .do_sd_journal_send = SD_JOURNAL_SEND_DEFAULT
 };
 
 static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
@@ -312,7 +313,6 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         section, 
         "circular buffer drop logs if full", 
         g_logs_manag_config.circ_buff_drop_logs);
-    
 
     g_logs_manag_config.compression_acceleration = appconfig_get_number(    
         &logsmanagement_d_conf,
@@ -332,6 +332,12 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         "collected logs rate chart enable", 
         g_logs_manag_config.enable_collected_logs_rate);
 
+    g_logs_manag_config.do_sd_journal_send = appconfig_get_boolean(    
+        &logsmanagement_d_conf,
+        section, 
+        "submit logs to system journal", 
+        g_logs_manag_config.do_sd_journal_send);
+
     g_logs_manag_config.sd_journal_field_prefix = appconfig_get(
         &logsmanagement_d_conf,
         section,
@@ -347,6 +353,7 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         collector_info("CONFIG: [%s] compression acceleration: %d",           section,  g_logs_manag_config.compression_acceleration);
         collector_info("CONFIG: [%s] collected logs total chart enable: %d",  section,  g_logs_manag_config.enable_collected_logs_total);
         collector_info("CONFIG: [%s] collected logs rate chart enable: %d",   section,  g_logs_manag_config.enable_collected_logs_rate);
+        collector_info("CONFIG: [%s] submit logs to system journal: %d",      section,  g_logs_manag_config.do_sd_journal_send);
         collector_info("CONFIG: [%s] systemd journal fields prefix: %s",      section,  g_logs_manag_config.sd_journal_field_prefix);
     }
 
@@ -807,6 +814,13 @@ static void config_section_init(uv_loop_t *main_loop,
                                                         g_logs_manag_config.disk_space_limit_in_mib) MiB / BLOB_MAX_FILES;
     collector_info("[%s]: BLOB max size = %lld", p_file_info->chartname, (long long)p_file_info->blob_max_size);
 
+
+    /* -------------------------------------------------------------------------
+     * Read configuration about sending logs to system journal.
+     * ------------------------------------------------------------------------- */
+    p_file_info->do_sd_journal_send = appconfig_get_boolean(&log_management_config, config_section->name,
+                                                            "submit logs to system journal",
+                                                            g_logs_manag_config.do_sd_journal_send);
 
     /* -------------------------------------------------------------------------
      * Read collected logs chart configuration.

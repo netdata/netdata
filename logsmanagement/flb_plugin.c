@@ -761,27 +761,29 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
 
-        if(p_file_info->log_type == FLB_WEB_LOG){
-            sd_journal_send(
-                *line_parsed.vhost          ?   "%sWEB_LOG_VHOST=%s"          : "_%s=%s", sd_journal_field_prefix, line_parsed.vhost,
-                line_parsed.port            ?   "%sWEB_LOG_PORT=%d"           : "_%s=%d", sd_journal_field_prefix, line_parsed.port,
-                *line_parsed.req_scheme     ?   "%sWEB_LOG_REQ_SCHEME=%s"     : "_%s=%s", sd_journal_field_prefix, line_parsed.req_scheme,
-                *line_parsed.req_client     ?   "%sWEB_LOG_REQ_CLIENT=%s"     : "_%s=%s", sd_journal_field_prefix, line_parsed.req_client,
-                                                "%sWEB_LOG_REQ_METHOD=%s"               , sd_journal_field_prefix, line_parsed.req_method,
-                *line_parsed.req_URL        ?   "%sWEB_LOG_REQ_URL=%s"        : "_%s=%s", sd_journal_field_prefix, line_parsed.req_URL,
-                *line_parsed.req_proto      ?   "%sWEB_LOG_REQ_PROTO=%s"      : "_%s=%s", sd_journal_field_prefix, line_parsed.req_proto,
-                line_parsed.req_size        ?   "%sWEB_LOG_REQ_SIZE=%d"       : "_%s=%d", sd_journal_field_prefix, line_parsed.req_size,
-                line_parsed.req_proc_time   ?   "%sWEB_LOG_REC_PROC_TIME=%d"  : "_%s=%d", sd_journal_field_prefix, line_parsed.req_proc_time,
-                line_parsed.resp_code       ?   "%sWEB_LOG_RESP_CODE=%d"      : "_%s=%d", sd_journal_field_prefix ,line_parsed.resp_code,
-                line_parsed.ups_resp_time   ?   "%sWEB_LOG_UPS_RESP_TIME=%d"  : "_%s=%d", sd_journal_field_prefix ,line_parsed.ups_resp_time,
-                *line_parsed.ssl_proto      ?   "%sWEB_LOG_SSL_PROTO=%s"      : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_proto,
-                *line_parsed.ssl_cipher     ?   "%sWEB_LOB_SSL_CIPHER=%s"     : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_cipher,
-                "MESSAGE=%.*s", (int) message_size, message,
-                NULL
-            );
+        if(p_file_info->do_sd_journal_send){
+            if(p_file_info->log_type == FLB_WEB_LOG){
+                sd_journal_send(
+                    *line_parsed.vhost          ?   "%sWEB_LOG_VHOST=%s"          : "_%s=%s", sd_journal_field_prefix, line_parsed.vhost,
+                    line_parsed.port            ?   "%sWEB_LOG_PORT=%d"           : "_%s=%d", sd_journal_field_prefix, line_parsed.port,
+                    *line_parsed.req_scheme     ?   "%sWEB_LOG_REQ_SCHEME=%s"     : "_%s=%s", sd_journal_field_prefix, line_parsed.req_scheme,
+                    *line_parsed.req_client     ?   "%sWEB_LOG_REQ_CLIENT=%s"     : "_%s=%s", sd_journal_field_prefix, line_parsed.req_client,
+                                                    "%sWEB_LOG_REQ_METHOD=%s"               , sd_journal_field_prefix, line_parsed.req_method,
+                    *line_parsed.req_URL        ?   "%sWEB_LOG_REQ_URL=%s"        : "_%s=%s", sd_journal_field_prefix, line_parsed.req_URL,
+                    *line_parsed.req_proto      ?   "%sWEB_LOG_REQ_PROTO=%s"      : "_%s=%s", sd_journal_field_prefix, line_parsed.req_proto,
+                    line_parsed.req_size        ?   "%sWEB_LOG_REQ_SIZE=%d"       : "_%s=%d", sd_journal_field_prefix, line_parsed.req_size,
+                    line_parsed.req_proc_time   ?   "%sWEB_LOG_REC_PROC_TIME=%d"  : "_%s=%d", sd_journal_field_prefix, line_parsed.req_proc_time,
+                    line_parsed.resp_code       ?   "%sWEB_LOG_RESP_CODE=%d"      : "_%s=%d", sd_journal_field_prefix ,line_parsed.resp_code,
+                    line_parsed.ups_resp_time   ?   "%sWEB_LOG_UPS_RESP_TIME=%d"  : "_%s=%d", sd_journal_field_prefix ,line_parsed.ups_resp_time,
+                    *line_parsed.ssl_proto      ?   "%sWEB_LOG_SSL_PROTO=%s"      : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_proto,
+                    *line_parsed.ssl_cipher     ?   "%sWEB_LOB_SSL_CIPHER=%s"     : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_cipher,
+                    "MESSAGE=%.*s", (int) message_size, message,
+                    NULL
+                );
+            }
+            else
+                sd_journal_send("MESSAGE=%.*s", (int) message_size, message, NULL);
         }
-        else
-            sd_journal_send("MESSAGE=%.*s", (int) message_size, message, NULL);
     } /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
 
     /* FLB_KMSG case */
@@ -1112,12 +1114,14 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
 
-        sd_journal_send(
-            "%sDOCKER_EVENTS_TYPE=%.*s",    sd_journal_field_prefix, (int) docker_ev_type_size,    docker_ev_type,
-            "%sDOCKER_EVENTS_ACTION=%.*s",  sd_journal_field_prefix, (int) docker_ev_action_size,  docker_ev_action,
-            "%sDOCKER_EVENTS_ID=%.*s",      sd_journal_field_prefix, (int) docker_ev_id_size,      docker_ev_id,
-            "MESSAGE=%.*s",                 (int) message_size, &buff->in->data[tmp_item_off - 1 - message_size], 
-            NULL);
+        if(p_file_info->do_sd_journal_send){
+            sd_journal_send(
+                "%sDOCKER_EVENTS_TYPE=%.*s",    sd_journal_field_prefix, (int) docker_ev_type_size,    docker_ev_type,
+                "%sDOCKER_EVENTS_ACTION=%.*s",  sd_journal_field_prefix, (int) docker_ev_action_size,  docker_ev_action,
+                "%sDOCKER_EVENTS_ID=%.*s",      sd_journal_field_prefix, (int) docker_ev_id_size,      docker_ev_id,
+                "MESSAGE=%.*s",                 (int) message_size, &buff->in->data[tmp_item_off - 1 - message_size], 
+                NULL);
+        }
     } /* FLB_DOCKER_EV case end */
 
     /* FLB_MQTT case */
@@ -1142,9 +1146,11 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
             buff->in->text_size = new_tmp_text_size;
 
-            sd_journal_send("%sMQTT_TOPIC=%s", key, 
-                            "MESSAGE=%.*s", (int) message_size, mqtt_message, 
-                            NULL);
+            if(p_file_info->do_sd_journal_send){
+                sd_journal_send("%sMQTT_TOPIC=%s", key, 
+                                "MESSAGE=%.*s", (int) message_size, mqtt_message, 
+                                NULL);
+            }
         }
         else m_assert(0, "missing mqtt topic");
     }

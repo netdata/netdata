@@ -78,11 +78,9 @@ typedef struct flb_output_config {
 } Flb_output_config_t;
 
 struct File_info {
-    /* TODO: Struct needs refactoring, as a lot of members take up memory that
-     * is not used, depending on the type of the log source. */
 
     /* Struct members core to any log source type */
-    const char *chartname;                         /**< Top level chart name for this log source on web dashboard **/ 
+    const char *chartname;                          /**< Top level chart name for this log source on web dashboard **/ 
     char *filename;                                 /**< Full path of log source **/
     const char *file_basename;                      /**< Basename of log source **/
     const char *stream_guid;                        /**< Streaming input GUID **/
@@ -93,6 +91,7 @@ struct File_info {
     int update_every;                               /**< Interval (in sec) of how often to collect and update charts **/
     int update_timeout;                             /**< Timeout to update charts after, since last update */
     int use_log_timestamp;                          /**< Use log timestamps instead of collection timestamps, if available **/
+    int do_sd_journal_send;                         /**< Write to system journal - not applicable to all log source types **/
     struct Chart_meta *chart_meta;
     LOG_SRC_STATE state;                            /**< State of log source, used to sync status among threads **/
 
@@ -155,6 +154,7 @@ typedef struct {
     int enable_collected_logs_total;
     int enable_collected_logs_rate;
     char *sd_journal_field_prefix;
+    int do_sd_journal_send;
 } g_logs_manag_config_t;
 
 extern g_logs_manag_config_t g_logs_manag_config;
