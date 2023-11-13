@@ -30,19 +30,36 @@ static void registry_set_cookie(struct web_client *w, const char *guid) {
     char rfc7231_expires[RFC7231_MAX_LENGTH];
     rfc7231_datetime(rfc7231_expires, sizeof(rfc7231_expires), now_realtime_sec() + registry.persons_expiration);
 
-    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s\r\n", guid, rfc7231_expires);
-    buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; SameSite=Strict; Expires=%s\r\n", guid, rfc7231_expires);
-    if(registry.enable_cookies_samesite_secure)
-        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; SameSite=None; Secure\r\n", guid, rfc7231_expires);
+    BUFFER *cookie = buffer_create(1024, NULL);
 
-    if(registry.registry_domain && *registry.registry_domain) {
-        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s\r\n", guid, rfc7231_expires, registry.registry_domain);
-        buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=Strict\r\n", guid, rfc7231_expires, registry.registry_domain);
-        if(registry.enable_cookies_samesite_secure)
-            buffer_sprintf(w->response.header, "Set-Cookie: " NETDATA_REGISTRY_COOKIE_NAME "=%s; Expires=%s; Domain=%s; SameSite=None; Secure\r\n", guid, rfc7231_expires, registry.registry_domain);
+    buffer_sprintf(cookie, "%s=%s; Expires=%s", NETDATA_REGISTRY_COOKIE_NAME, guid, rfc7231_expires);
+    web_client_add_cookie(w, strdupz(buffer_tostring(cookie)));
+    buffer_flush(cookie);
+
+    buffer_sprintf(cookie, "%s=%s; Expires=%s; SameSite=Strict", NETDATA_REGISTRY_COOKIE_NAME, guid, rfc7231_expires);
+    web_client_add_cookie(w, strdupz(buffer_tostring(cookie)));
+    buffer_flush(cookie);
+
+    if(registry.enable_cookies_samesite_secure) {
+        buffer_sprintf(cookie, "%s=%s; Expires=%s; SameSite=None; Secure", NETDATA_REGISTRY_COOKIE_NAME, guid, rfc7231_expires);
+        web_client_add_cookie(w, strdupz(buffer_tostring(cookie)));
+        buffer_flush(cookie);
     }
 
-    w->response.has_cookies = true;
+    if(registry.registry_domain && *registry.registry_domain) {
+        buffer_sprintf(cookie, "%s=%s; Expires=%s; Domain=%s", NETDATA_REGISTRY_COOKIE_NAME, guid, rfc7231_expires, registry.registry_domain);
+        web_client_add_cookie(w, strdupz(buffer_tostring(cookie)));
+        buffer_flush(cookie);
+
+        buffer_sprintf(cookie, "%s=%s; Expires=%s; Domain=%s; SameSite=Strict", NETDATA_REGISTRY_COOKIE_NAME, guid, rfc7231_expires, registry.registry_domain);
+        web_client_add_cookie(w, strdupz(buffer_tostring(cookie)));
+        buffer_flush(cookie);
+
+        if(registry.enable_cookies_samesite_secure) {
+            buffer_sprintf(cookie, "%s=%s; Expires=%s; Domain=%s; SameSite=None; Secure", NETDATA_REGISTRY_COOKIE_NAME, guid, rfc7231_expires, registry.registry_domain);
+            web_client_add_cookie(w, strdupz(buffer_tostring(cookie)));
+        }
+    }
 }
 
 static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PERSON *p) {

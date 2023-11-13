@@ -109,13 +109,20 @@ typedef enum web_client_flags {
 #define NETDATA_WEB_REQUEST_MAX_SIZE 65536
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 
+struct http_cookie {
+    char *cookie;
+    struct http_cookie *next;
+};
+
 struct response {
     BUFFER *header;         // our response header
     BUFFER *header_output;  // internal use
     BUFFER *data;           // our response data buffer
 
     short int code;         // the HTTP response code
-    bool has_cookies;
+
+    struct http_cookie *cookie_first;
+    struct http_cookie *cookie_last;
 
     size_t rlen; // if non-zero, the excepted size of ifd (input of firecopy)
     size_t sent; // current data length sent to output
@@ -201,6 +208,9 @@ struct web_client {
 
     struct response response;
 };
+
+int web_client_add_cookie(struct web_client *w, char *cookie);
+void web_client_cookies_flush(struct web_client *w);
 
 int web_client_permission_denied(struct web_client *w);
 int web_client_bearer_required(struct web_client *w);

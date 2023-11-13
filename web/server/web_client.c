@@ -282,7 +282,7 @@ void web_client_request_done(struct web_client *w) {
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
 
-    w->response.has_cookies = false;
+    web_client_cookies_flush(w);
     w->response.rlen = 0;
     w->response.sent = 0;
     w->response.code = 0;
@@ -318,6 +318,31 @@ static struct {
         , {"icns" , 0    , CT_IMAGE_ICNS}
         , {       NULL, 0, 0}
 };
+
+int web_client_add_cookie(struct web_client *w, char *cookie) {
+    struct http_cookie *new = mallocz(sizeof(struct http_cookie));
+    new->cookie = cookie;
+    new->next = NULL;
+    if (w->response.cookie_first == NULL)
+        w->response.cookie_first = new;
+    else 
+        w->response.cookie_last->next = new;
+
+    w->response.cookie_last = new;
+}
+
+void web_client_cookies_flush(struct web_client *w) {
+    struct http_cookie *c = w->response.cookie_first;
+    w->response.cookie_first = NULL;
+    w->response.cookie_last = NULL;
+
+    while (c != NULL) {
+        struct http_cookie *next = c->next;
+        free(c->cookie);
+        free(c);
+        c = next;
+    }
+}
 
 static inline uint8_t contenttype_for_filename(const char *filename) {
     // netdata_log_info("checking filename '%s'", filename);
@@ -1377,7 +1402,13 @@ void web_client_build_http_header(struct web_client *w) {
     if(unlikely(web_x_frame_options))
         buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
 
-    if(w->response.has_cookies) {
+    struct http_cookie *c = w->response.cookie_first;
+    while (c != NULL) {
+        buffer_sprintf(w->response.header_output, "Set-Cookie: %s\r\n", c->cookie);
+        c = c->next;
+    }
+
+    if(w->response.cookie_first != NULL) {
         if(respect_web_browser_do_not_track_policy)
             buffer_sprintf(w->response.header_output,
                            "Tk: T;cookies\r\n");

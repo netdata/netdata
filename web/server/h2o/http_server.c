@@ -248,6 +248,13 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_JSON_UTF8);
     else
         h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_CONTENT_TYPE, NULL, CONTENT_TEXT_UTF8);
+
+    struct http_cookie *cookie = w.response.cookie_first;
+    while (cookie != NULL) {
+        h2o_add_header(&req->pool, &req->res.headers, H2O_TOKEN_SET_COOKIE, NULL, cookie->cookie, strlen(cookie->cookie));
+        cookie = cookie->next;
+    }
+
     h2o_start_response(req, &generator);
     h2o_send(req, &body, 1, H2O_SEND_STATE_FINAL);
 
