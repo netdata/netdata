@@ -72,6 +72,7 @@ typedef enum __attribute__ ((__packed__)) {
     BUFFER_JSON_OPTIONS_DEFAULT = 0,
     BUFFER_JSON_OPTIONS_MINIFY = (1 << 0),
     BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS = (1 << 1),
+    BUFFER_JSON_OPTIONS_NON_ANONYMOUS = (1 << 2),
 } BUFFER_JSON_OPTIONS;
 
 typedef struct web_buffer {
@@ -809,8 +810,13 @@ static inline void buffer_json_member_add_boolean(BUFFER *wb, const char *key, b
 
 static inline void buffer_json_member_add_array(BUFFER *wb, const char *key) {
     buffer_print_json_comma_newline_spacing(wb);
-    buffer_print_json_key(wb, key);
-    buffer_fast_strcat(wb, ":[", 2);
+    if (key) {
+        buffer_print_json_key(wb, key);
+        buffer_fast_strcat(wb, ":[", 2);
+    }
+    else
+        buffer_fast_strcat(wb, "[", 1);
+
     wb->json.stack[wb->json.depth].count++;
 
     _buffer_json_depth_push(wb, BUFFER_JSON_ARRAY);
