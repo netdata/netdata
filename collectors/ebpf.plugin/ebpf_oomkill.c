@@ -492,7 +492,7 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_EBPF_MEMORY_GROUP,
                              NETDATA_EBPF_CHART_TYPE_STACKED,
                              "app.ebpf_oomkill",
-                             20020,
+                             20072,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_OOMKILL);
         ebpf_create_chart_labels("app_group", w->name, 0);
