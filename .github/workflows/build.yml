@@ -886,7 +886,7 @@ jobs:
           python .github/scripts/check_latest_versions.py  ${{ steps.version.outputs.version }}
       - name: Sync newer releases
         id: sync-releases
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-latest-version.run == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-latest-version.versions_needs_update == 'true'
         run: |
           .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification
@@ -905,8 +905,10 @@ jobs:
               Prepare version info: ${{ steps.version.outcome }}
               Create release: ${{ steps.create-release.outcome }}
               Checkout back netdata/netdata: ${{ steps.checkout-netdata.outcome }}
-              Update latest packaged versions: ${{ steps.create-latest-versions-metadata.outcome }}
-              Commit latest packaged versions: ${{ steps.commit-latest-releases.outcome }}
+              Init python environment: ${{ steps.init-python.outcome }}
+              Setup python environment: ${{ steps.setup-python.outcome }}
+              Check the nearly published release against the advertised: ${{ steps.check-latest-version.outcome }}
+              Sync with the releases: ${{ steps.sync-releases.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
