@@ -1144,7 +1144,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
    if (free_pages > (total_pages * threshold / 100)) {
 
        int do_free_pages = (int) (free_pages * vacuum_pc / 100);
-       netdata_log_info("%s: Freeing %d database pages", db_alias, do_free_pages);
+       nd_log(NDLS_DAEMON, NDLP_DEBUG, "%s: Freeing %d database pages", db_alias, do_free_pages);
 
        char sql[128];
        snprintfz(sql, 127, "PRAGMA incremental_vacuum(%d)", do_free_pages);
@@ -1258,7 +1258,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     RRDHOST *host;
 
     size_t max_threads = MIN(get_netdata_cpus() / 2, 6);
-    netdata_log_info("METADATA: Using %zu threads for context loading", max_threads);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Using %zu threads for context loading", max_threads);
     struct host_context_load_thread *hclt = callocz(max_threads, sizeof(*hclt));
 
     size_t thread_index;
@@ -1291,7 +1291,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     cleanup_finished_threads(hclt, max_threads, true);
     freez(hclt);
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
-    netdata_log_info("METADATA: host contexts loaded in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: host contexts loaded in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
 
     worker_is_idle();
 }
@@ -1556,7 +1556,7 @@ static void metadata_event_loop(void *arg)
     wc->timer_req.data = wc;
     fatal_assert(0 == uv_timer_start(&wc->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
-    netdata_log_info("Starting metadata sync thread");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Starting metadata sync thread");
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -1684,7 +1684,7 @@ static void metadata_event_loop(void *arg)
     freez(loop);
     worker_unregister();
 
-    netdata_log_info("Shutting down event loop");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down event loop");
     completion_mark_complete(&wc->start_stop_complete);
     if (wc->scan_complete) {
         completion_destroy(wc->scan_complete);
@@ -1710,15 +1710,15 @@ void metadata_sync_shutdown(void)
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    netdata_log_info("METADATA: Sending a shutdown command");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     /* wait for metadata thread to shut down */
-    netdata_log_info("METADATA: Waiting for shutdown ACK");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
     completion_wait_for(&metasync_worker.start_stop_complete);
     completion_destroy(&metasync_worker.start_stop_complete);
-    netdata_log_info("METADATA: Shutdown complete");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Shutdown complete");
 }
 
 void metadata_sync_shutdown_prepare(void)
@@ -1735,20 +1735,20 @@ void metadata_sync_shutdown_prepare(void)
     completion_init(compl);
     __atomic_store_n(&wc->scan_complete, compl, __ATOMIC_RELAXED);
 
-    netdata_log_info("METADATA: Sending a scan host command");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
     while (unlikely(metadata_flag_check(&metasync_worker, METADATA_FLAG_PROCESSING)) && max_wait_iterations--) {
         if (max_wait_iterations == 1999)
-            netdata_log_info("METADATA: Current worker is running; waiting to finish");
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Current worker is running; waiting to finish");
         sleep_usec(1000);
     }
 
     cmd.opcode = METADATA_SCAN_HOSTS;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
-    netdata_log_info("METADATA: Waiting for host scan completion");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Waiting for host scan completion");
     completion_wait_for(wc->scan_complete);
-    netdata_log_info("METADATA: Host scan complete; can continue with shutdown");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Host scan complete; can continue with shutdown");
 }
 
 // -------------------------------------------------------------
@@ -1766,7 +1766,7 @@ void metadata_sync_init(void)
     completion_wait_for(&wc->start_stop_complete);
     completion_destroy(&wc->start_stop_complete);
 
-    netdata_log_info("SQLite metadata sync initialization complete");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "SQLite metadata sync initialization complete");
 }
 
 
@@ -1825,7 +1825,7 @@ void metadata_queue_load_host_context(RRDHOST *host)
     if (unlikely(!metasync_worker.loop))
         return;
     queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
-    netdata_log_info("Queued command to load host contexts");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command to load host contexts");
 }
 
 //
