@@ -3,7 +3,7 @@ name: Monitor-stable-releases
 
 #on:
 #  release:
-#    types: [released]
+#    types: [released, deleted]
 
 
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
@@ -21,21 +21,32 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
-      - name: Update latest packaged version
-        id: create-latest-versions-metadata
+      - name: Init python environment
+        uses: actions/setup-python@v4
+        id: init-python
+        with:
+          python-version: "3.9"
+      - name: Setup python environment
+        id: setup-python
         run: |
-          sh .github/scripts/update-latests-per-major-version.sh $(cat packaging/version)
-      - name: Commit Changes
-        id: commit
-        if: steps.create-latest-versions-metadata.outputs.run == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          pip install -r .github/scripts/modules/requirements.txt
+      - name: Check for newer versions
+        id: check-newer-stable
         run: |
-          git config user.name "netdatabot"
-          git config user.email "bot@netdata.cloud"
-          git add packaging/agent-metadata/stable
-          git commit -m "[ci skip] Update the latest major version published"
-          git push origin master
+          python .github/scripts/check_latest_versions_per_channel.py stable
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-newer-stable.run == 'true'
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Sync newer releases
+        id: sync-releases
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-newer-stable.run == 'true'
+        run: |
+          .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -47,7 +58,11 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to update stable Agent's metadata.
               Checkout: ${{ steps.checkout.outcome }}
-              Updating latest releases: ${{ steps.create-latest-versions-metadata.outcome }}
+              Init python: ${{ steps.init-python.outcome }}
+              Setup python: ${{ steps.setup-python.outcome }}
+              Check for newer stable releaes: ${{ steps.check-newer-stable.outcome }}
+              Setup ssh: ${{ steps.ssh-setup.outcome }}
+              Syncing newer release to packages.netdata.cloud : ${{ steps.sync-releases.outcome }}
               Commit changes: ${{ steps.commit.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: failure()
