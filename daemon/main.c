@@ -1054,6 +1054,20 @@ static void backwards_compatible_config() {
 
 }
 
+static int get_hostname(char *buf) {
+    if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", netdata_configured_host_prefix);
+
+        if (!read_file(filename, buf, HOSTNAME_MAX)) {
+            buf = trim(buf);
+            return 0;
+        }
+    }
+
+    return gethostname(buf, HOSTNAME_MAX);
+}
+
 static void get_netdata_configured_variables() {
     backwards_compatible_config();
 
@@ -1061,9 +1075,9 @@ static void get_netdata_configured_variables() {
     // get the hostname
 
     char buf[HOSTNAME_MAX + 1];
-    if(gethostname(buf, HOSTNAME_MAX) == -1){
+
+    if (get_hostname(buf))
         netdata_log_error("Cannot get machine hostname.");
-    }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
