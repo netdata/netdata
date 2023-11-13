@@ -1077,6 +1077,11 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_LOGS,   "errors flood protection period",
                 CONFIG_SECTION_LOGS,   "logs flood protection period");
+    config_move(CONFIG_SECTION_HEALTH, "is ephemeral",
+                CONFIG_SECTION_GLOBAL, "is ephemeral");
+
+    config_move(CONFIG_SECTION_HEALTH, "has unstable connection",
+                CONFIG_SECTION_GLOBAL, "has unstable connection");
 }
 
 static int get_hostname(char *buf, size_t buf_size) {
