@@ -402,7 +402,7 @@ modules:
               unit: "calls/s"
               chart_type: stacked
               dimensions:
-                - name: callp
+                - name: call
             - name: app.task_close
               description: Tasks closed
               unit: "calls/s"
