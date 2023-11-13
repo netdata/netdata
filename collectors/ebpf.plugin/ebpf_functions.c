@@ -4360,7 +4360,7 @@ void *ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
-    struct functions_evloop_globals *wg = functions_evloop_init(7,
+    struct functions_evloop_globals *wg = functions_evloop_init(8,
                                                                 "EBPF",
                                                                 &lock,
                                                                 &ebpf_plugin_exit);
