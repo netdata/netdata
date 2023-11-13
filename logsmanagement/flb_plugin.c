@@ -121,9 +121,13 @@ static void *flb_lib_handle = NULL;
 
 static struct flb_lib_out_cb *fwd_input_out_cb = NULL;
 
+static const char *sd_journal_field_prefix = SD_JOURNAL_FIELD_PREFIX;
+
 extern netdata_mutex_t stdout_mut;
 
-int flb_init(flb_srvc_config_t flb_srvc_config, const char *const stock_config_dir){
+int flb_init(flb_srvc_config_t flb_srvc_config, 
+            const char *const stock_config_dir, 
+            const char *const new_sd_journal_field_prefix){
     int rc = 0;
     char *dl_error;
 
@@ -199,6 +203,9 @@ int flb_init(flb_srvc_config_t flb_srvc_config, const char *const stock_config_d
             rc = -1;
             goto do_return;
         }
+    
+    if(new_sd_journal_field_prefix && *new_sd_journal_field_prefix)
+        sd_journal_field_prefix = new_sd_journal_field_prefix;
 
 do_return:
     freez(flb_lib_path);
@@ -756,19 +763,19 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
         if(p_file_info->log_type == FLB_WEB_LOG){
             sd_journal_send(
-                *line_parsed.vhost          ?   "WEB_LOG_VHOST=%s"          : "_=%s", line_parsed.vhost,
-                line_parsed.port            ?   "WEB_LOG_PORT=%d"           : "_=%d", line_parsed.port,
-                *line_parsed.req_scheme     ?   "WEB_LOG_REQ_SCHEME=%s"     : "_=%s", line_parsed.req_scheme,
-                *line_parsed.req_client     ?   "WEB_LOG_REQ_CLIENT=%s"     : "_=%s", line_parsed.req_client,
-                                                "WEB_LOG_REQ_METHOD=%s"             , line_parsed.req_method,
-                *line_parsed.req_URL        ?   "WEB_LOG_REQ_URL=%s"        : "_=%s", line_parsed.req_URL,
-                *line_parsed.req_proto      ?   "WEB_LOG_REQ_PROTO=%s"      : "_=%s", line_parsed.req_proto,
-                line_parsed.req_size        ?   "WEB_LOG_REQ_SIZE=%d"       : "_=%d", line_parsed.req_size,
-                line_parsed.req_proc_time   ?   "WEB_LOG_REC_PROC_TIME=%d"  : "_=%d", line_parsed.req_proc_time,
-                line_parsed.resp_code       ?   "WEB_LOG_RESP_CODE=%d"      : "_=%d", line_parsed.resp_code,
-                line_parsed.ups_resp_time   ?   "WEB_LOG_UPS_RESP_TIME=%d"  : "_=%d", line_parsed.ups_resp_time,
-                *line_parsed.ssl_proto      ?   "WEB_LOG_SSL_PROTO=%s"      : "_=%s", line_parsed.ssl_proto,
-                *line_parsed.ssl_cipher     ?   "WEB_LOB_SSL_CIPHER=%s"     : "_=%s", line_parsed.ssl_cipher,
+                *line_parsed.vhost          ?   "%sWEB_LOG_VHOST=%s"          : "_%s=%s", sd_journal_field_prefix, line_parsed.vhost,
+                line_parsed.port            ?   "%sWEB_LOG_PORT=%d"           : "_%s=%d", sd_journal_field_prefix, line_parsed.port,
+                *line_parsed.req_scheme     ?   "%sWEB_LOG_REQ_SCHEME=%s"     : "_%s=%s", sd_journal_field_prefix, line_parsed.req_scheme,
+                *line_parsed.req_client     ?   "%sWEB_LOG_REQ_CLIENT=%s"     : "_%s=%s", sd_journal_field_prefix, line_parsed.req_client,
+                                                "%sWEB_LOG_REQ_METHOD=%s"               , sd_journal_field_prefix, line_parsed.req_method,
+                *line_parsed.req_URL        ?   "%sWEB_LOG_REQ_URL=%s"        : "_%s=%s", sd_journal_field_prefix, line_parsed.req_URL,
+                *line_parsed.req_proto      ?   "%sWEB_LOG_REQ_PROTO=%s"      : "_%s=%s", sd_journal_field_prefix, line_parsed.req_proto,
+                line_parsed.req_size        ?   "%sWEB_LOG_REQ_SIZE=%d"       : "_%s=%d", sd_journal_field_prefix, line_parsed.req_size,
+                line_parsed.req_proc_time   ?   "%sWEB_LOG_REC_PROC_TIME=%d"  : "_%s=%d", sd_journal_field_prefix, line_parsed.req_proc_time,
+                line_parsed.resp_code       ?   "%sWEB_LOG_RESP_CODE=%d"      : "_%s=%d", sd_journal_field_prefix ,line_parsed.resp_code,
+                line_parsed.ups_resp_time   ?   "%sWEB_LOG_UPS_RESP_TIME=%d"  : "_%s=%d", sd_journal_field_prefix ,line_parsed.ups_resp_time,
+                *line_parsed.ssl_proto      ?   "%sWEB_LOG_SSL_PROTO=%s"      : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_proto,
+                *line_parsed.ssl_cipher     ?   "%sWEB_LOB_SSL_CIPHER=%s"     : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_cipher,
                 "MESSAGE=%.*s", (int) message_size, message,
                 NULL
             );
@@ -1106,10 +1113,10 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         buff->in->text_size = new_tmp_text_size;
 
         sd_journal_send(
-            "DOCKER_EVENTS_TYPE=%.*s",    (int) docker_ev_type_size,    docker_ev_type,
-            "DOCKER_EVENTS_ACTION=%.*s",  (int) docker_ev_action_size,  docker_ev_action,
-            "DOCKER_EVENTS_ID=%.*s",      (int) docker_ev_id_size,      docker_ev_id,
-            "MESSAGE=%.*s",               (int) message_size,           &buff->in->data[tmp_item_off - 1 - message_size], 
+            "%sDOCKER_EVENTS_TYPE=%.*s",    sd_journal_field_prefix, (int) docker_ev_type_size,    docker_ev_type,
+            "%sDOCKER_EVENTS_ACTION=%.*s",  sd_journal_field_prefix, (int) docker_ev_action_size,  docker_ev_action,
+            "%sDOCKER_EVENTS_ID=%.*s",      sd_journal_field_prefix, (int) docker_ev_id_size,      docker_ev_id,
+            "MESSAGE=%.*s",                 (int) message_size, &buff->in->data[tmp_item_off - 1 - message_size], 
             NULL);
     } /* FLB_DOCKER_EV case end */
 
@@ -1135,7 +1142,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
             buff->in->text_size = new_tmp_text_size;
 
-            sd_journal_send("MQTT_TOPIC=%s", key, 
+            sd_journal_send("%sMQTT_TOPIC=%s", key, 
                             "MESSAGE=%.*s", (int) message_size, mqtt_message, 
                             NULL);
         }

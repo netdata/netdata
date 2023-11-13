@@ -154,6 +154,7 @@ typedef struct {
     int buff_flush_to_db_interval;
     int enable_collected_logs_total;
     int enable_collected_logs_rate;
+    char *sd_journal_field_prefix;
 } g_logs_manag_config_t;
 
 extern g_logs_manag_config_t g_logs_manag_config;

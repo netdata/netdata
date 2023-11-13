@@ -21,7 +21,8 @@ g_logs_manag_config_t g_logs_manag_config = {
     .disk_space_limit_in_mib = DISK_SPACE_LIMIT_DEFAULT,  
     .buff_flush_to_db_interval = SAVE_BLOB_TO_DB_DEFAULT,
     .enable_collected_logs_total = ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT,
-    .enable_collected_logs_rate = ENABLE_COLLECTED_LOGS_RATE_DEFAULT
+    .enable_collected_logs_rate = ENABLE_COLLECTED_LOGS_RATE_DEFAULT,
+    .sd_journal_field_prefix = SD_JOURNAL_FIELD_PREFIX
 };
 
 static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
@@ -330,6 +331,12 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         section, 
         "collected logs rate chart enable", 
         g_logs_manag_config.enable_collected_logs_rate);
+
+    g_logs_manag_config.sd_journal_field_prefix = appconfig_get(
+        &logsmanagement_d_conf,
+        section,
+        "systemd journal fields prefix",
+        g_logs_manag_config.sd_journal_field_prefix);
     
     if(!rc){
         collector_info("CONFIG: [%s] update every: %d",                       section,  g_logs_manag_config.update_every);
@@ -340,6 +347,7 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         collector_info("CONFIG: [%s] compression acceleration: %d",           section,  g_logs_manag_config.compression_acceleration);
         collector_info("CONFIG: [%s] collected logs total chart enable: %d",  section,  g_logs_manag_config.enable_collected_logs_total);
         collector_info("CONFIG: [%s] collected logs rate chart enable: %d",   section,  g_logs_manag_config.enable_collected_logs_rate);
+        collector_info("CONFIG: [%s] systemd journal fields prefix: %s",      section,  g_logs_manag_config.sd_journal_field_prefix);
     }
 
 

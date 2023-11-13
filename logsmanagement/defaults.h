@@ -30,6 +30,8 @@
 #endif
 #define ENABLE_COLLECTED_LOGS_RATE_DEFAULT CONFIG_BOOLEAN_YES   /**< Default value to enable (or not) metrics of rate of collected log records **/
 
+#define SD_JOURNAL_FIELD_PREFIX "LOGS_MANAG_"                   /**< Default systemd journal field prefix for sources that log to the system journal */
+
 /* -------------------------------------------------------------------------- */
 
 

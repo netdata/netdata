@@ -663,7 +663,7 @@ static int test_flb_init(){
     fprintf(stderr, "Testing flb_init() with wrong stock_config_dir...\n"); 
 
     SUPRESS_STDERR();
-    rc = flb_init(flb_srvc_config, "/tmp");
+    rc = flb_init(flb_srvc_config, "/tmp", "example_prefix_");
     UNSUPRESS_STDERR();
     if(!rc){
         fprintf(stderr, "- Error, flb_init() should fail but it returns %d.\n", rc);
@@ -672,7 +672,7 @@ static int test_flb_init(){
 
     fprintf(stderr, "Testing flb_init() with correct stock_config_dir...\n"); 
 
-    rc = flb_init(flb_srvc_config, get_stock_config_dir());
+    rc = flb_init(flb_srvc_config, get_stock_config_dir(), "example_prefix_");
     if(rc){
         fprintf(stderr, "- Error, flb_init() should fail but it returns %d.\n", rc);
         ++errors;
