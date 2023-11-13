@@ -407,7 +407,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
                     struct aclk_sync_cfg_t *ahc = host->aclk_config;
                     if (unlikely(!ahc))
                         sql_create_aclk_table(host, &host->host_uuid, host->node_id);
-                    aclk_host_state_update(host, live);
+                    aclk_host_state_update(host, live, 1);
                     break;
 // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:

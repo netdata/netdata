@@ -917,7 +917,7 @@ exit:
     return NULL;
 }
 
-void aclk_host_state_update(RRDHOST *host, int cmd)
+void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 {
     uuid_t node_id;
     int ret = 0;
@@ -962,7 +962,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     node_instance_connection_t node_state_update = {
         .hops = host->system_info->hops,
         .live = cmd,
-        .queryable = 1,
+        .queryable = queryable,
         .session_id = aclk_session_newarch
     };
     node_state_update.node_id = mallocz(UUID_STR_LEN);
