@@ -871,22 +871,24 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
-      - name: Update latest packaged version
-        id: create-latest-versions-metadata
-        if: steps.checkout-netdata.outputs.run == 'true'
+      - name: Init python environment for publish release metadata
+        uses: actions/setup-python@v4
+        id: init-python
+        with:
+          python-version: "3.9"
+      - name: Setup python environment
+        id: setup-python
         run: |
-          sh .github/scripts/update-latests-per-major-version.sh "$(cat packaging/version)"
-      - name: Commit Changes
-        id: commit-latest-releases
-        if: steps.create-latest-versions-metadata.outputs.run == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          pip install -r .github/scripts/modules/requirements.txt
+      - name: Check if the version is latest and published
+        id: check-latest-version
         run: |
-          git config user.name "netdatabot"
-          git config user.email "bot@netdata.cloud"
-          git add packaging/agent-metadata/nightly
-          git commit -m "[ci skip] Update the latest major version published"
-          git push origin master
+          python .github/scripts/check_latest_versions.py  ${{ steps.version.outputs.version }}
+      - name: Sync newer releases
+        id: sync-releases
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-latest-version.run == 'true'
+        run: |
+          .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

@@ -2,15 +2,6 @@
 
 set -e
 
-paths_array=$1
-vers_array=$2
-
-IFS=' ' read -r -a paths <<< "$paths_array"
-IFS=' ' read -r -a versions <<< "$vers_array"
-
-echo "${paths[@]}"
-echo "${versions[@]}"
-
 host="packages.netdata.cloud"
 user="netdatabot"
 
