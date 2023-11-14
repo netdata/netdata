@@ -32,49 +32,49 @@ static bool nd_log_limit_reached(struct nd_log_source *source);
 // logging method
 
 typedef enum  __attribute__((__packed__)) {
-    ND_LOG_METHOD_DISABLED = 0,
-    ND_LOG_METHOD_DEVNULL,
-    ND_LOG_METHOD_DEFAULT,
-    ND_LOG_METHOD_JOURNAL,
-    ND_LOG_METHOD_SYSLOG,
-    ND_LOG_METHOD_STDOUT,
-    ND_LOG_METHOD_STDERR,
-    ND_LOG_METHOD_FILE,
-} ND_LOG_METHOD;
+    NDLO_DISABLED = 0,
+    NDLO_DEVNULL,
+    NDLO_DEFAULT,
+    NDLO_JOURNAL,
+    NDLO_SYSLOG,
+    NDLO_STDOUT,
+    NDLO_STDERR,
+    NDLO_FILE,
+} ND_LOG_OUTPUT;
 
 
 static struct {
-    ND_LOG_METHOD method;
+    ND_LOG_OUTPUT output;
     const char *name;
-} nd_log_methods[] = {
-        { .method = ND_LOG_METHOD_DISABLED, .name = "none" },
-        { .method = ND_LOG_METHOD_DEVNULL, .name = "/dev/null" },
-        { .method = ND_LOG_METHOD_DEFAULT, .name = "default" },
-        { .method = ND_LOG_METHOD_JOURNAL, .name = "journal" },
-        { .method = ND_LOG_METHOD_SYSLOG, .name = "syslog" },
-        { .method = ND_LOG_METHOD_STDOUT, .name = "stdout" },
-        { .method = ND_LOG_METHOD_STDERR, .name = "stderr" },
-        { .method = ND_LOG_METHOD_FILE, .name = "file" },
+} nd_log_outputs[] = {
+        { .output = NDLO_DISABLED, .name = "none" },
+        { .output = NDLO_DEVNULL, .name = "/dev/null" },
+        { .output = NDLO_DEFAULT, .name = "default" },
+        { .output = NDLO_JOURNAL, .name = "journal" },
+        { .output = NDLO_SYSLOG, .name = "syslog" },
+        { .output = NDLO_STDOUT, .name = "stdout" },
+        { .output = NDLO_STDERR, .name = "stderr" },
+        { .output = NDLO_FILE, .name = "file" },
 };
 
-static ND_LOG_METHOD nd_log_method2id(const char *method) {
-    if(!method || !*method)
-        return ND_LOG_METHOD_DEFAULT;
+static ND_LOG_OUTPUT nd_log_output2id(const char *output) {
+    if(!output || !*output)
+        return NDLO_DEFAULT;
 
-    size_t entries = sizeof(nd_log_methods) / sizeof(nd_log_methods[0]);
+    size_t entries = sizeof(nd_log_outputs) / sizeof(nd_log_outputs[0]);
     for(size_t i = 0; i < entries ;i++) {
-        if(strcmp(nd_log_methods[i].name, method) == 0)
-            return nd_log_methods[i].method;
+        if(strcmp(nd_log_outputs[i].name, output) == 0)
+            return nd_log_outputs[i].output;
     }
 
-    return ND_LOG_METHOD_FILE;
+    return NDLO_FILE;
 }
 
-static const char *nd_log_id2method(ND_LOG_METHOD method) {
-    size_t entries = sizeof(nd_log_methods) / sizeof(nd_log_methods[0]);
+static const char *nd_log_id2output(ND_LOG_OUTPUT output) {
+    size_t entries = sizeof(nd_log_outputs) / sizeof(nd_log_outputs[0]);
     for(size_t i = 0; i < entries ;i++) {
-        if(method == nd_log_methods[i].method)
-            return nd_log_methods[i].name;
+        if(output == nd_log_outputs[i].output)
+            return nd_log_outputs[i].name;
     }
 
     return "unknown";
@@ -273,15 +273,25 @@ struct nd_log_limit {
     usec_t started_monotonic_ut;
     uint32_t counter;
     uint32_t prevented;
-    bool unlimited;
+
+    uint32_t throttle_period;
+    uint32_t logs_per_period;
+    uint32_t logs_per_period_backup;
 };
 
-#define ND_LOG_LIMITS_DEFAULT { .unlimited = false, }
-#define ND_LOG_LIMITS_UNLIMITED { .unlimited = true, }
+#define ND_LOG_LIMITS_DEFAULT (struct nd_log_limit){ .logs_per_period = ND_LOG_DEFAULT_THROTTLE_LOGS, .logs_per_period_backup = ND_LOG_DEFAULT_THROTTLE_LOGS, .throttle_period = ND_LOG_DEFAULT_THROTTLE_PERIOD, }
+#define ND_LOG_LIMITS_UNLIMITED (struct nd_log_limit){  .logs_per_period = 0, .logs_per_period_backup = 0, .throttle_period = 0, }
+
+typedef enum __attribute__((__packed__)) {
+    NDLOF_JOURNAL,
+    NDLOF_LOGFMT,
+    NDLOF_JSON,
+} ND_LOG_OUTPUT_FORMAT;
 
 struct nd_log_source {
     SPINLOCK spinlock;
-    ND_LOG_METHOD method;
+    ND_LOG_OUTPUT method;
+    ND_LOG_OUTPUT_FORMAT format;
     const char *filename;
     int fd;
     FILE *fp;
@@ -328,19 +338,8 @@ static struct {
         bool initialized;
     } std_error;
 
-    struct {
-        uint32_t throttle_period;
-        uint32_t logs_per_period;
-        uint32_t logs_per_period_backup;
-    } limits;
-
 } nd_log = {
         .overwrite_process_source = 0,
-        .limits = {
-                .throttle_period = 1200,
-                .logs_per_period = 200,
-                .logs_per_period_backup = 200,
-        },
         .journal = {
                 .initialized = false,
         },
@@ -363,7 +362,8 @@ static struct {
         .sources = {
                 [NDLS_UNSET] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_DISABLED,
+                        .method = NDLO_DISABLED,
+                        .format = NDLOF_JOURNAL,
                         .filename = NULL,
                         .fd = -1,
                         .fp = NULL,
@@ -372,7 +372,8 @@ static struct {
                 },
                 [NDLS_ACCESS] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_DEFAULT,
+                        .method = NDLO_DEFAULT,
+                        .format = NDLOF_LOGFMT,
                         .filename = LOG_DIR "/access.log",
                         .fd = -1,
                         .fp = NULL,
@@ -381,7 +382,8 @@ static struct {
                 },
                 [NDLS_ACLK] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_FILE,
+                        .method = NDLO_FILE,
+                        .format = NDLOF_LOGFMT,
                         .filename = LOG_DIR "/aclk.log",
                         .fd = -1,
                         .fp = NULL,
@@ -390,7 +392,8 @@ static struct {
                 },
                 [NDLS_COLLECTORS] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_DEFAULT,
+                        .method = NDLO_DEFAULT,
+                        .format = NDLOF_LOGFMT,
                         .filename = LOG_DIR "/collectors.log",
                         .fd = STDERR_FILENO,
                         .fp = NULL,
@@ -399,7 +402,8 @@ static struct {
                 },
                 [NDLS_DEBUG] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_DISABLED,
+                        .method = NDLO_DISABLED,
+                        .format = NDLOF_LOGFMT,
                         .filename = LOG_DIR "/debug.log",
                         .fd = STDOUT_FILENO,
                         .fp = NULL,
@@ -408,8 +412,9 @@ static struct {
                 },
                 [NDLS_DAEMON] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_DEFAULT,
-                        .filename = LOG_DIR "/error.log",
+                        .method = NDLO_DEFAULT,
+                        .filename = LOG_DIR "/daemon.log",
+                        .format = NDLOF_LOGFMT,
                         .fd = -1,
                         .fp = NULL,
                         .min_priority = NDLP_INFO,
@@ -417,7 +422,8 @@ static struct {
                 },
                 [NDLS_HEALTH] = {
                         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                        .method = ND_LOG_METHOD_DEFAULT,
+                        .method = NDLO_DEFAULT,
+                        .format = NDLOF_LOGFMT,
                         .filename = LOG_DIR "/health.log",
                         .fd = -1,
                         .fp = NULL,
@@ -436,72 +442,135 @@ __attribute__((constructor)) void initialize_invocation_id(void) {
     setenv("NETDATA_INVOCATION_ID", uuid, 1);
 }
 
-void nd_log_set_destination_output(ND_LOG_SOURCES source, const char *setting) {
-    if(!setting || !*setting || strcmp(setting, "none") == 0 || strcmp(setting, "off") == 0) {
-        nd_log.sources[source].method = ND_LOG_METHOD_DISABLED;
-        nd_log.sources[source].filename = "/dev/null";
+void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
+    char buf[FILENAME_MAX + 100];
+    if(setting && *setting)
+        strncpyz(buf, setting, sizeof(buf) - 1);
+    else
+        buf[0] = '\0';
+
+    struct nd_log_source *ls = &nd_log.sources[source];
+    char *output = strrchr(buf, '@');
+
+    if(!output)
+        // all of it is the output
+        output = buf;
+    else {
+        // we found an '@', the next char is the output
+        *output = '\0';
+        output++;
+
+        // parse the other params
+        char *remaining = buf;
+        while(remaining) {
+            char *value = strsep_skip_consecutive_separators(&remaining, ",");
+            if (!value || !*value) continue;
+
+            char *name = strsep_skip_consecutive_separators(&value, "=");
+            if (!name || !*name) continue;
+
+            if(strcmp(name, "logfmt") == 0)
+                ls->format = NDLOF_LOGFMT;
+            else if(strcmp(name, "json") == 0)
+                ls->format = NDLOF_JSON;
+            else if(strcmp(name, "journal") == 0)
+                ls->format = NDLOF_JOURNAL;
+            else if(strcmp(name, "level") == 0 && value && *value)
+                ls->min_priority = nd_log_priority2id(value);
+            else if(strcmp(name, "protection") == 0 && value && *value) {
+                if(strcmp(value, "off") == 0 || strcmp(value, "none") == 0) {
+                    ls->limits = ND_LOG_LIMITS_UNLIMITED;
+                    ls->limits.counter = 0;
+                    ls->limits.prevented = 0;
+                }
+                else {
+                    ls->limits = ND_LOG_LIMITS_DEFAULT;
+
+                    char *slash = strchr(value, '/');
+                    if(slash) {
+                        *slash = '\0';
+                        slash++;
+                        ls->limits.logs_per_period = ls->limits.logs_per_period_backup = str2u(value);
+                        ls->limits.throttle_period = str2u(slash);
+                    }
+                    else {
+                        ls->limits.logs_per_period = ls->limits.logs_per_period_backup = str2u(value);
+                        ls->limits.throttle_period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
+                    }
+                }
+            }
+            else
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error while parsing configuration of log source '%s'. "
+                                              "In config '%s', '%s' is not understood.",
+                                              nd_log_source2str(source), setting, name);
+        }
     }
-    else if(strcmp(setting, "journal") == 0) {
-        nd_log.sources[source].method = ND_LOG_METHOD_JOURNAL;
-        nd_log.sources[source].filename = NULL;
+
+    if(!output || !*output || strcmp(output, "none") == 0 || strcmp(output, "off") == 0) {
+        ls->method = NDLO_DISABLED;
+        ls->filename = "/dev/null";
     }
-    else if(strcmp(setting, "syslog") == 0) {
-        nd_log.sources[source].method = ND_LOG_METHOD_SYSLOG;
-        nd_log.sources[source].filename = NULL;
+    else if(strcmp(output, "journal") == 0) {
+        ls->method = NDLO_JOURNAL;
+        ls->filename = NULL;
     }
-    else if(strcmp(setting, "/dev/null") == 0) {
-        nd_log.sources[source].method = ND_LOG_METHOD_DEVNULL;
-        nd_log.sources[source].filename = "/dev/null";
+    else if(strcmp(output, "syslog") == 0) {
+        ls->method = NDLO_SYSLOG;
+        ls->filename = NULL;
     }
-    else if(strcmp(setting, "system") == 0) {
-        if(nd_log.sources[source].fd == STDERR_FILENO) {
-            nd_log.sources[source].method = ND_LOG_METHOD_STDERR;
-            nd_log.sources[source].filename = NULL;
-            nd_log.sources[source].fd = STDERR_FILENO;
+    else if(strcmp(output, "/dev/null") == 0) {
+        ls->method = NDLO_DEVNULL;
+        ls->filename = "/dev/null";
+    }
+    else if(strcmp(output, "system") == 0) {
+        if(ls->fd == STDERR_FILENO) {
+            ls->method = NDLO_STDERR;
+            ls->filename = NULL;
+            ls->fd = STDERR_FILENO;
         }
         else {
-            nd_log.sources[source].method = ND_LOG_METHOD_STDOUT;
-            nd_log.sources[source].filename = NULL;
-            nd_log.sources[source].fd = STDOUT_FILENO;
+            ls->method = NDLO_STDOUT;
+            ls->filename = NULL;
+            ls->fd = STDOUT_FILENO;
         }
     }
-    else if(strcmp(setting, "stderr") == 0) {
-        nd_log.sources[source].method = ND_LOG_METHOD_STDERR;
-        nd_log.sources[source].filename = NULL;
-        nd_log.sources[source].fd = STDERR_FILENO;
+    else if(strcmp(output, "stderr") == 0) {
+        ls->method = NDLO_STDERR;
+        ls->filename = NULL;
+        ls->fd = STDERR_FILENO;
     }
-    else if(strcmp(setting, "stdout") == 0) {
-        nd_log.sources[source].method = ND_LOG_METHOD_STDOUT;
-        nd_log.sources[source].filename = NULL;
-        nd_log.sources[source].fd = STDOUT_FILENO;
+    else if(strcmp(output, "stdout") == 0) {
+        ls->method = NDLO_STDOUT;
+        ls->filename = NULL;
+        ls->fd = STDOUT_FILENO;
     }
     else {
-        nd_log.sources[source].method = ND_LOG_METHOD_FILE;
-        nd_log.sources[source].filename = setting;
+        ls->method = NDLO_FILE;
+        ls->filename = output;
     }
 
     if(source == NDLS_COLLECTORS) {
         // set the method for the collector processes we will spawn
 
-        ND_LOG_METHOD method;
+        ND_LOG_OUTPUT method;
 
-        if(nd_log.sources[source].method == ND_LOG_METHOD_SYSLOG || nd_log.sources[source].method == ND_LOG_METHOD_JOURNAL)
-            method = nd_log.sources[source].method;
+        if(ls->method == NDLO_SYSLOG || ls->method == NDLO_JOURNAL)
+            method = ls->method;
         else
-            method = ND_LOG_METHOD_STDERR;
+            method = NDLO_STDERR;
 
-        setenv("NETDATA_LOG_METHOD", nd_log_id2method(method), 1);
+        setenv("NETDATA_LOG_METHOD", nd_log_id2output(method), 1);
     }
 }
 
-void nd_log_set_severity_level(const char *severity) {
-    if(!severity || !*severity)
-        severity = "info";
+void nd_log_set_priority_level(const char *setting) {
+    if(!setting || !*setting)
+        setting = "info";
 
-    ND_LOG_FIELD_PRIORITY priority = nd_log_priority2id(severity);
+    ND_LOG_FIELD_PRIORITY priority = nd_log_priority2id(setting);
     nd_log.sources[NDLS_DAEMON].min_priority = priority;
     nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
-    setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
+    setenv("NETDATA_LOG_PRIORITY_LEVEL", nd_log_id2priority(priority), 1);
 }
 
 void nd_log_set_facility(const char *facility) {
@@ -512,9 +581,14 @@ void nd_log_set_facility(const char *facility) {
     setenv("NETDATA_SYSLOG_FACILITY", nd_log_id2facility(nd_log.syslog.facility), 1);
 }
 
-void nd_log_set_flood_protection(time_t period, size_t logs) {
-    nd_log.limits.throttle_period = period;
-    nd_log.limits.logs_per_period = nd_log.limits.logs_per_period_backup = logs;
+void nd_log_set_flood_protection(size_t logs, time_t period) {
+    nd_log.sources[NDLS_DAEMON].limits.logs_per_period =
+            nd_log.sources[NDLS_DAEMON].limits.logs_per_period_backup;
+            nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period =
+            nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period_backup = logs;
+
+    nd_log.sources[NDLS_DAEMON].limits.throttle_period =
+            nd_log.sources[NDLS_COLLECTORS].limits.throttle_period = period;
 
     char buf[100];
     snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )period);
@@ -565,7 +639,7 @@ static bool nd_log_journal_direct_init(const char *path) {
     nd_log.journal_direct.fd = fd;
     nd_log.journal_direct.initialized = true;
 
-    if(nd_log.sources[NDLS_COLLECTORS].method == ND_LOG_METHOD_JOURNAL)
+    if(nd_log.sources[NDLS_COLLECTORS].method == NDLO_JOURNAL)
         setenv("NETDATA_SYSTEMD_JOURNAL_PATH", filename, 1);
 
     return true;
@@ -589,7 +663,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
         nd_log.sources[i].fp = NULL;
     }
 
-    nd_log_set_severity_level(getenv("NETDATA_LOG_SEVERITY_LEVEL"));
+    nd_log_set_priority_level(getenv("NETDATA_LOG_PRIORITY_LEVEL"));
     nd_log_set_facility(getenv("NETDATA_SYSLOG_FACILITY"));
 
     time_t period = 1200;
@@ -612,34 +686,34 @@ void nd_log_initialize_for_external_plugins(const char *name) {
             netdata_configured_host_prefix = (char *)s;
     }
 
-    ND_LOG_METHOD method = nd_log_method2id(getenv("NETDATA_LOG_METHOD"));
+    ND_LOG_OUTPUT method = nd_log_output2id(getenv("NETDATA_LOG_METHOD"));
 
-    if(method != ND_LOG_METHOD_JOURNAL && method != ND_LOG_METHOD_SYSLOG && method != ND_LOG_METHOD_STDERR) {
+    if(method != NDLO_JOURNAL && method != NDLO_SYSLOG && method != NDLO_STDERR) {
         if(nd_log_is_stderr_journal()) {
             nd_log(NDLS_COLLECTORS, NDLP_WARNING, "NETDATA_LOG_METHOD is not set. Using journal.");
-            method = ND_LOG_METHOD_JOURNAL;
+            method = NDLO_JOURNAL;
         }
         else {
             nd_log(NDLS_COLLECTORS, NDLP_WARNING, "NETDATA_LOG_METHOD is not set. Using stderr.");
-            method = ND_LOG_METHOD_STDERR;
+            method = NDLO_STDERR;
         }
     }
 
     switch(method) {
-        case ND_LOG_METHOD_JOURNAL:
+        case NDLO_JOURNAL:
             if(!nd_log_journal_direct_init(getenv("NETDATA_SYSTEMD_JOURNAL_PATH")) ||
                !nd_log_journal_direct_init(NULL) || !nd_log_journal_systemd_init()) {
                 nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to initialize journal. Using stderr.");
-                method = ND_LOG_METHOD_STDERR;
+                method = NDLO_STDERR;
             }
             break;
 
-        case ND_LOG_METHOD_SYSLOG:
+        case NDLO_SYSLOG:
             nd_log_syslog_init();
             break;
 
         default:
-            method = ND_LOG_METHOD_STDERR;
+            method = NDLO_STDERR;
             break;
     }
 
@@ -681,46 +755,46 @@ static bool nd_log_replace_existing_fd(struct nd_log_source *e, int new_fd) {
 }
 
 static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
-    if(e->method == ND_LOG_METHOD_DEFAULT)
-        nd_log_set_destination_output(source, e->filename);
+    if(e->method == NDLO_DEFAULT)
+        nd_log_set_user_settings(source, e->filename);
 
-    if((e->method == ND_LOG_METHOD_FILE && !e->filename) ||
-       (e->method == ND_LOG_METHOD_DEVNULL && e->fd == -1))
-        e->method = ND_LOG_METHOD_DISABLED;
+    if((e->method == NDLO_FILE && !e->filename) ||
+       (e->method == NDLO_DEVNULL && e->fd == -1))
+        e->method = NDLO_DISABLED;
 
     if(e->fp)
         fflush(e->fp);
 
     switch(e->method) {
-        case ND_LOG_METHOD_SYSLOG:
+        case NDLO_SYSLOG:
             nd_log_syslog_init();
             break;
 
-        case ND_LOG_METHOD_JOURNAL:
+        case NDLO_JOURNAL:
             nd_log_journal_direct_init(NULL);
             nd_log_journal_systemd_init();
             break;
 
-        case ND_LOG_METHOD_STDOUT:
+        case NDLO_STDOUT:
             e->fp = stdout;
             e->fd = STDOUT_FILENO;
             break;
 
         default:
-        case ND_LOG_METHOD_DEFAULT:
-        case ND_LOG_METHOD_STDERR:
-            e->method = ND_LOG_METHOD_STDERR;
+        case NDLO_DEFAULT:
+        case NDLO_STDERR:
+            e->method = NDLO_STDERR;
             e->fp = stderr;
             e->fd = STDERR_FILENO;
             break;
 
-        case ND_LOG_METHOD_DEVNULL:
-        case ND_LOG_METHOD_FILE: {
+        case NDLO_DEVNULL:
+        case NDLO_FILE: {
             int fd = open(e->filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
             if(fd == -1) {
                 if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
                     e->fd = STDERR_FILENO;
-                    e->method = ND_LOG_METHOD_STDERR;
+                    e->method = NDLO_STDERR;
                     netdata_log_error("Cannot open log file '%s'. Falling back to stderr.", e->filename);
                 }
                 else
@@ -730,9 +804,9 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                 if (!nd_log_replace_existing_fd(e, fd)) {
                     if(e->fd == STDOUT_FILENO || e->fd == STDERR_FILENO) {
                         if(e->fd == STDOUT_FILENO)
-                            e->method = ND_LOG_METHOD_STDOUT;
+                            e->method = NDLO_STDOUT;
                         else if(e->fd == STDERR_FILENO)
-                            e->method = ND_LOG_METHOD_STDERR;
+                            e->method = NDLO_STDERR;
 
                         // we have dup2() fd, so we can close the one we opened
                         if(fd != STDOUT_FILENO && fd != STDERR_FILENO)
@@ -1027,6 +1101,79 @@ void log_stack_push(struct log_stack_entry *lgs) {
 }
 
 // ----------------------------------------------------------------------------
+// json formatter
+
+static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_max) {
+    CLEAN_BUFFER *tmp = NULL;
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    for (size_t i = 0; i < fields_max; i++) {
+        if (!fields[i].entry.set || !fields[i].journal)
+            continue;
+
+        const char *key = fields[i].journal;
+
+        const char *s = NULL;
+        switch(fields[i].entry.type) {
+            case NDFT_TXT:
+                s = fields[i].entry.txt;
+                break;
+            case NDFT_STR:
+                s = string2str(fields[i].entry.str);
+                break;
+            case NDFT_BFR:
+                s = buffer_tostring(fields[i].entry.bfr);
+                break;
+            case NDFT_U32:
+                buffer_json_member_add_uint64(wb, key, fields[i].entry.u32);
+                break;
+            case NDFT_I32:
+                buffer_json_member_add_int64(wb, key, fields[i].entry.i32);
+                break;
+            case NDFT_U64:
+            case NDFT_TIMESTAMP_USEC:
+                buffer_json_member_add_uint64(wb, key, fields[i].entry.u64);
+                break;
+            case NDFT_I64:
+                buffer_json_member_add_int64(wb, key, fields[i].entry.i64);
+                break;
+            case NDFT_DBL:
+                buffer_json_member_add_double(wb, key, fields[i].entry.dbl);
+                break;
+            case NDFT_PRIORITY:
+                buffer_json_member_add_uint64(wb, key, fields[i].entry.priority);
+                break;
+            case NDFT_UUID:{
+                char u[UUID_COMPACT_STR_LEN];
+                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                buffer_json_member_add_string(wb, key, u);
+            }
+                break;
+            case NDFT_CALLBACK: {
+                if(!tmp)
+                    tmp = buffer_create(1024, NULL);
+                else
+                    buffer_flush(tmp);
+                if(fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data))
+                    s = buffer_tostring(tmp);
+                else
+                    s = NULL;
+            }
+                break;
+            default:
+                s = "UNHANDLED";
+                break;
+        }
+
+        if(s && *s)
+            buffer_json_member_add_string(wb, key, s);
+    }
+
+    buffer_json_finalize(wb);
+}
+
+// ----------------------------------------------------------------------------
 // logfmt formatter
 
 static void timestamp_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
@@ -1067,30 +1214,11 @@ static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
 }
 
 static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
-    static char *priorities[] = {
-            [NDLP_ALERT] = "alert",
-            [NDLP_CRIT] = "critical",
-            [NDLP_EMERG] = "emergency",
-            [NDLP_ERR] = "error",
-            [NDLP_WARNING] = "warning",
-            [NDLP_INFO] = "info",
-            [NDLP_NOTICE] = "notice",
-            [NDLP_DEBUG] = "debug",
-    };
-
     uint64_t pri = lf->entry.u64;
-
-    if(buffer_strlen(wb))
-        buffer_fast_strcat(wb, " ", 1);
 
     buffer_strcat(wb, key);
     buffer_fast_strcat(wb, "=", 1);
-
-    size_t entries = sizeof(priorities) / sizeof(priorities[0]);
-    if(pri < entries)
-        buffer_strcat(wb, priorities[pri]);
-    else
-        buffer_print_uint64(wb, pri);
+    buffer_strcat(wb, nd_log_id2priority(pri));
 }
 
 static bool string_has_spaces(const char *s) {
@@ -1212,6 +1340,39 @@ static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields
 
 // ----------------------------------------------------------------------------
 // journal logger
+
+bool nd_log_check_journal_socket(const char *path) {
+    struct stat statbuf;
+
+    // Check if the path is valid
+    if (!path || !*path)
+        return false;
+
+    // Use stat to check if the file exists and is a socket
+    if (stat(path, &statbuf) == -1)
+        // The file does not exist or cannot be accessed
+        return false;
+
+    // Check if the file is a socket
+    if (S_ISSOCK(statbuf.st_mode))
+        return true;
+
+    return false;
+}
+
+bool nd_log_journal_socket_available(void) {
+    if(netdata_configured_host_prefix && *netdata_configured_host_prefix) {
+        char filename[FILENAME_MAX + 1];
+
+        snprintfz(filename, sizeof(filename), "%s%s",
+                  netdata_configured_host_prefix, "/run/systemd/journal/socket");
+
+        if(nd_log_check_journal_socket(filename))
+            return true;
+    }
+
+    return nd_log_check_journal_socket("/run/systemd/journal/socket");
+}
 
 bool nd_log_is_stderr_journal(void) {
     const char *journal_stream = getenv("JOURNAL_STREAM");
@@ -1484,7 +1645,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
 // ----------------------------------------------------------------------------
 // syslog logger - uses logfmt
 
-static bool nd_logger_syslog(int priority, struct log_field *fields, size_t fields_max) {
+static bool nd_logger_syslog(int priority, ND_LOG_OUTPUT_FORMAT format, struct log_field *fields, size_t fields_max) {
     CLEAN_BUFFER *wb = buffer_create(1024, NULL);
 
     nd_logger_logfmt(wb, fields, fields_max);
@@ -1496,10 +1657,14 @@ static bool nd_logger_syslog(int priority, struct log_field *fields, size_t fiel
 // ----------------------------------------------------------------------------
 // file logger - uses logfmt
 
-static bool nd_logger_file(FILE *fp, struct log_field *fields, size_t fields_max) {
+static bool nd_logger_file(FILE *fp, ND_LOG_OUTPUT_FORMAT format, struct log_field *fields, size_t fields_max) {
     BUFFER *wb = buffer_create(1024, NULL);
 
-    nd_logger_logfmt(wb, fields, fields_max);
+    if(format == NDLOF_JSON)
+        nd_logger_json(wb, fields, fields_max);
+    else
+        nd_logger_logfmt(wb, fields, fields_max);
+
     int r = fprintf(fp, "%s\n", buffer_tostring(wb));
     fflush(fp);
 
@@ -1510,14 +1675,14 @@ static bool nd_logger_file(FILE *fp, struct log_field *fields, size_t fields_max
 // ----------------------------------------------------------------------------
 // logger router
 
-static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
+static ND_LOG_OUTPUT nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
     *spinlock = NULL;
-    ND_LOG_METHOD method = nd_log.sources[source].method;
+    ND_LOG_OUTPUT output = nd_log.sources[source].method;
 
-    switch(method) {
-        case ND_LOG_METHOD_JOURNAL:
+    switch(output) {
+        case NDLO_JOURNAL:
             if(unlikely(!nd_log.journal_direct.initialized && !nd_log.journal.initialized)) {
-                method = ND_LOG_METHOD_FILE;
+                output = NDLO_FILE;
                 *fpp = stderr;
                 *spinlock = &nd_log.std_error.spinlock;
             }
@@ -1527,9 +1692,9 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
             }
             break;
 
-        case ND_LOG_METHOD_SYSLOG:
+        case NDLO_SYSLOG:
             if(unlikely(!nd_log.syslog.initialized)) {
-                method = ND_LOG_METHOD_FILE;
+                output = NDLO_FILE;
                 *spinlock = &nd_log.std_error.spinlock;
                 *fpp = stderr;
             }
@@ -1539,7 +1704,7 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
             }
             break;
 
-        case ND_LOG_METHOD_FILE:
+        case NDLO_FILE:
             if(!nd_log.sources[source].fp) {
                 *fpp = stderr;
                 *spinlock = &nd_log.std_error.spinlock;
@@ -1550,36 +1715,36 @@ static ND_LOG_METHOD nd_logger_select_method(ND_LOG_SOURCES source, FILE **fpp, 
             }
             break;
 
-        case ND_LOG_METHOD_STDOUT:
-            method = ND_LOG_METHOD_FILE;
+        case NDLO_STDOUT:
+            output = NDLO_FILE;
             *fpp = stdout;
             *spinlock = &nd_log.std_output.spinlock;
             break;
 
         default:
-        case ND_LOG_METHOD_DEFAULT:
-        case ND_LOG_METHOD_STDERR:
-            method = ND_LOG_METHOD_FILE;
+        case NDLO_DEFAULT:
+        case NDLO_STDERR:
+            output = NDLO_FILE;
             *fpp = stderr;
             *spinlock = &nd_log.std_error.spinlock;
             break;
 
-        case ND_LOG_METHOD_DISABLED:
-        case ND_LOG_METHOD_DEVNULL:
-            method = ND_LOG_METHOD_DISABLED;
+        case NDLO_DISABLED:
+        case NDLO_DEVNULL:
+            output = NDLO_DISABLED;
             *fpp = NULL;
             *spinlock = NULL;
             break;
     }
 
-    return method;
+    return output;
 }
 
 // ----------------------------------------------------------------------------
 // high level logger
 
 static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
-                                 ND_LOG_METHOD method, struct nd_log_source *source,
+                                 ND_LOG_OUTPUT output, struct nd_log_source *source,
                                  struct log_field *fields, size_t fields_max) {
     if(spinlock)
         spinlock_lock(spinlock);
@@ -1588,13 +1753,13 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
     if(limit && nd_log_limit_reached(source))
         goto cleanup;
 
-    if(method == ND_LOG_METHOD_JOURNAL) {
+    if(output == NDLO_JOURNAL) {
         if(!nd_logger_journal_direct(fields, fields_max) && !nd_logger_journal_libsystemd(fields, fields_max)) {
             // we can't log to journal, let's log to stderr
             if(spinlock)
                 spinlock_unlock(spinlock);
 
-            method = ND_LOG_METHOD_FILE;
+            output = NDLO_FILE;
             spinlock = &nd_log.std_error.spinlock;
             fp = stderr;
 
@@ -1603,11 +1768,11 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
         }
     }
 
-    if(method == ND_LOG_METHOD_SYSLOG)
-        nd_logger_syslog(priority, fields, fields_max);
+    if(output == NDLO_SYSLOG)
+        nd_logger_syslog(priority, source->format, fields, fields_max);
 
-    if(method == ND_LOG_METHOD_FILE)
-        nd_logger_file(fp, fields, fields_max);
+    if(output == NDLO_FILE)
+        nd_logger_file(fp, source->format, fields, fields_max);
 
 
 cleanup:
@@ -1652,8 +1817,8 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     SPINLOCK *spinlock;
     FILE *fp;
-    ND_LOG_METHOD method = nd_logger_select_method(source, &fp, &spinlock);
-    if(method != ND_LOG_METHOD_FILE && method != ND_LOG_METHOD_JOURNAL && method != ND_LOG_METHOD_SYSLOG)
+    ND_LOG_OUTPUT output = nd_logger_select_output(source, &fp, &spinlock);
+    if(output != NDLO_FILE && output != NDLO_JOURNAL && output != NDLO_SYSLOG)
         return;
 
     // mark all fields as unset
@@ -1715,7 +1880,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
     }
 
-    nd_logger_log_fields(spinlock, fp, limit, priority, method, &nd_log.sources[source],
+    nd_logger_log_fields(spinlock, fp, limit, priority, output, &nd_log.sources[source],
                          thread_log_fields, THREAD_FIELDS_MAX);
 
     if(nd_log.sources[source].pending_msg) {
@@ -1747,7 +1912,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
                 .txt = nd_log.sources[source].pending_msg,
         };
 
-        nd_logger_log_fields(spinlock, fp, false, priority, method,
+        nd_logger_log_fields(spinlock, fp, false, priority, output,
                              &nd_log.sources[source],
                              thread_log_fields, THREAD_FIELDS_MAX);
 
@@ -1875,8 +2040,6 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
 void nd_log_limits_reset(void) {
     usec_t now_ut = now_monotonic_usec();
 
-    nd_log.limits.logs_per_period = nd_log.limits.logs_per_period_backup;
-
     spinlock_lock(&nd_log.std_output.spinlock);
     spinlock_lock(&nd_log.std_error.spinlock);
 
@@ -1885,6 +2048,7 @@ void nd_log_limits_reset(void) {
         nd_log.sources[i].limits.prevented = 0;
         nd_log.sources[i].limits.counter = 0;
         nd_log.sources[i].limits.started_monotonic_ut = now_ut;
+        nd_log.sources[i].limits.logs_per_period = nd_log.sources[i].limits.logs_per_period_backup;
         spinlock_unlock(&nd_log.sources[i].spinlock);
     }
 
@@ -1894,11 +2058,13 @@ void nd_log_limits_reset(void) {
 
 void nd_log_limits_unlimited(void) {
     nd_log_limits_reset();
-    nd_log.limits.logs_per_period = ((nd_log.limits.logs_per_period_backup * 10) < 10000) ? 10000 : (nd_log.limits.logs_per_period_backup * 10);
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        nd_log.sources[i].limits.logs_per_period = 0;
+    }
 }
 
 static bool nd_log_limit_reached(struct nd_log_source *source) {
-    if(nd_log.limits.throttle_period == 0 || nd_log.limits.logs_per_period == 0)
+    if(source->limits.throttle_period == 0 || source->limits.logs_per_period == 0)
         return false;
 
     usec_t now_ut = now_monotonic_usec();
@@ -1907,14 +2073,14 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
 
     source->limits.counter++;
 
-    if(now_ut - source->limits.started_monotonic_ut > (usec_t)nd_log.limits.throttle_period) {
+    if(now_ut - source->limits.started_monotonic_ut > (usec_t)source->limits.throttle_period) {
         if(source->limits.prevented) {
             BUFFER *wb = buffer_create(1024, NULL);
             buffer_sprintf(wb,
                            "LOG FLOOD PROTECTION: resuming logging "
                            "(prevented %"PRIu32" logs in the last %"PRIu32" seconds).",
                            source->limits.prevented,
-                           nd_log.limits.throttle_period);
+                           source->limits.throttle_period);
 
             if(source->pending_msg)
                 freez((void *)source->pending_msg);
@@ -1933,7 +2099,7 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
         return false;
     }
 
-    if(source->limits.counter > nd_log.limits.logs_per_period) {
+    if(source->limits.counter > source->limits.logs_per_period) {
         if(!source->limits.prevented) {
             BUFFER *wb = buffer_create(1024, NULL);
             buffer_sprintf(wb,
@@ -1941,10 +2107,10 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
                     "in %"PRIu32" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.",
                     source->limits.counter,
                     (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC),
-                    nd_log.limits.logs_per_period,
-                    nd_log.limits.throttle_period,
+                    source->limits.logs_per_period,
+                    source->limits.throttle_period,
                     program_name,
-                    (int64_t)((source->limits.started_monotonic_ut + (nd_log.limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
+                    (int64_t)((source->limits.started_monotonic_ut + (source->limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
 
             if(source->pending_msg)
                 freez((void *)source->pending_msg);

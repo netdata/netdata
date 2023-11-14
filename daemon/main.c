@@ -850,54 +850,46 @@ static void security_init(){
 #endif
 
 static void log_init(void) {
+    nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
+
+    time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
+    size_t logs = ND_LOG_DEFAULT_THROTTLE_LOGS;
+    period = config_get_number(CONFIG_SECTION_LOGS, "logs flood protection period", period);
+    logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
+    nd_log_set_flood_protection(logs, period);
+
+    nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", NDLP_INFO_STR));
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    nd_log_set_destination_output(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
+    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
 
-    bool with_journal = nd_log_is_stderr_journal(); (void)with_journal;
-#ifdef HAVE_SYSTEMD
-    snprintfz(filename, FILENAME_MAX, "journal");
-#else
+    bool with_journal = nd_log_is_stderr_journal() || nd_log_journal_socket_available();
     if(with_journal)
         snprintfz(filename, FILENAME_MAX, "journal");
     else
-        snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-#endif
-    nd_log_set_destination_output(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "error", filename));
+        snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", filename));
 
-#ifdef HAVE_SYSTEMD
-    snprintfz(filename, FILENAME_MAX, "journal");
-#else
     if(with_journal)
         snprintfz(filename, FILENAME_MAX, "journal");
     else
         snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-#endif
-    nd_log_set_destination_output(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
+    nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    nd_log_set_destination_output(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
+    nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    nd_log_set_destination_output(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
+    nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-        nd_log_set_destination_output(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
+        nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 #endif
-
-    nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
-
-    time_t period = 1200;
-    size_t logs = 200;
-    period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", period);
-    logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)logs);
-    nd_log_set_flood_protection(period, logs);
-
-    nd_log_set_severity_level(config_get(CONFIG_SECTION_LOGS, "severity level", NDLP_INFO_STR));
 }
 
 char *initialize_lock_directory_path(char *prefix)
@@ -1069,6 +1061,17 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
+    config_move(CONFIG_SECTION_LOGS,   "error",
+                CONFIG_SECTION_LOGS,   "daemon");
+
+    config_move(CONFIG_SECTION_LOGS,   "severity level",
+                CONFIG_SECTION_LOGS,   "level");
+
+    config_move(CONFIG_SECTION_LOGS,   "errors to trigger flood protection",
+                CONFIG_SECTION_LOGS,   "logs to trigger flood protection");
+
+    config_move(CONFIG_SECTION_LOGS,   "errors flood protection period",
+                CONFIG_SECTION_LOGS,   "logs flood protection period");
 }
 
 static void get_netdata_configured_variables() {

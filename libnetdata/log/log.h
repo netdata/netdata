@@ -9,6 +9,9 @@ extern "C" {
 
 #include "../libnetdata.h"
 
+#define ND_LOG_DEFAULT_THROTTLE_LOGS 1200
+#define ND_LOG_DEFAULT_THROTTLE_PERIOD 3600
+
 typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only
     NDLS_ACCESS,      // access.log
@@ -110,17 +113,18 @@ typedef enum __attribute__((__packed__)) {
     NDFT_CALLBACK,
 } ND_LOG_STACK_FIELD_TYPE;
 
-void nd_log_set_destination_output(ND_LOG_SOURCES source, const char *setting);
+void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
-void nd_log_set_severity_level(const char *severity);
+void nd_log_set_priority_level(const char *setting);
 void nd_log_initialize(void);
 void nd_log_reopen_log_files(void);
 void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
-void nd_log_set_flood_protection(time_t period, size_t logs);
+void nd_log_set_flood_protection(size_t logs, time_t period);
 void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_set_thread_source(ND_LOG_SOURCES source);
 bool nd_log_is_stderr_journal(void);
+bool nd_log_journal_socket_available(void);
 
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 
