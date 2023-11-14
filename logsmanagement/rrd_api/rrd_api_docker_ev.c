@@ -17,7 +17,7 @@ void docker_ev_chart_init(struct File_info *p_file_info){
             , "Events type"                     // title
             , "events types"                    // units
             , "event_type"                      // family
-            , "Docker Events Logs.events_type"  // context
+            , NULL                              // context
             , RRDSET_TYPE_AREA_NAME             // chart_type
             , ++chart_prio                      // priority
             , p_file_info->update_every         // update_every
@@ -30,15 +30,15 @@ void docker_ev_chart_init(struct File_info *p_file_info){
     /* Docker events actions - initialise */
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_ACTION){
         lgs_mng_create_chart(
-            (char *) p_file_info->chartname       // type
-            , "events_action"                     // id
-            , "Events action"                     // title
-            , "events actions"                    // units
-            , "event_action"                      // family
-            , "Docker Events Logs.events_actions" // context
-            , RRDSET_TYPE_AREA_NAME               // chart_type
-            , ++chart_prio                        // priority
-            , p_file_info->update_every           // update_every
+            (char *) p_file_info->chartname     // type
+            , "events_action"                   // id
+            , "Events action"                   // title
+            , "events actions"                  // units
+            , "event_action"                    // family
+            , NULL                              // context
+            , RRDSET_TYPE_AREA_NAME             // chart_type
+            , ++chart_prio                      // priority
+            , p_file_info->update_every         // update_every
         );
 
         for(int ev_off = 0; ev_off < NUM_OF_DOCKER_EV_TYPES; ev_off++){

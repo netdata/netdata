@@ -794,7 +794,7 @@ netdataDashboard.menu = {
         info: 'Metrics extracted from log messages collected from the Journald daemon. For details, see <a href="https://docs.fluentbit.io/manual/pipeline/inputs/systemd" target="_blank">the Fluent Bit Systemd plugin</a>.'
     },
 
-    'Docker Events Logs': {
+    'docker_events_logs': {
         title: 'Docker Events Logs',
         icon: '<i class="fas fa-book"></i>',
         info: 'Docker server events metrics. For details, see <a href="https://docs.fluentbit.io/manual/pipeline/inputs/docker-events" target="_blank">the Fluent Bit Docker Events plugin</a> ' +
@@ -8255,7 +8255,7 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // Logs Management
 
-    'Docker Events Logs.events_type': {
+    'docker_events_logs.events_type': {
         info: 'The Docker object type of the event. See <a href="https://docs.docker.com/engine/reference/commandline/events/#description" target="_blank">here</a> for more information.'
     },
 
