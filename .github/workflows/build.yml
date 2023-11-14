@@ -885,7 +885,7 @@ jobs:
           python .github/scripts/check_latest_versions.py  ${{ steps.version.outputs.version }}
       - name: SSH setup
         id: ssh-setup
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' steps.check-latest-version.outputs.versions_needs_update == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
@@ -893,7 +893,7 @@ jobs:
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Sync newer releases
         id: sync-releases
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'  && steps.check-latest-version.outputs.versions_needs_update == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
         run: |
           .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification
