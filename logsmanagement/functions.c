@@ -728,7 +728,7 @@ cleanup:
     }
 }
 
-void logsmanagement_func_facets_init(bool *p_logsmanagement_should_exit){
+struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsmanagement_should_exit){
 
     function_query_status_dict = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -750,4 +750,6 @@ void logsmanagement_func_facets_init(bool *p_logsmanagement_should_exit){
     functions_evloop_add_function(  wg, LOGS_MANAG_FUNC_NAME, 
                                     logsmanagement_function_facets,
                                     LOGS_MANAG_QUERY_TIMEOUT_DEFAULT);
+    
+    return wg;
 }

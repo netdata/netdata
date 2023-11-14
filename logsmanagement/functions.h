@@ -17,6 +17,6 @@ int logsmanagement_function_execute_cb( BUFFER *dest_wb, int timeout,
                                         void (*callback)(BUFFER *wb, int code, void *callback_data), 
                                         void *callback_data);
 
-void logsmanagement_func_facets_init(bool *p_logsmanagement_should_exit);
+struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsmanagement_should_exit);
 
 #endif // FUNCTIONS_H_

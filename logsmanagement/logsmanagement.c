@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
         uv_signal_start(&signals[i].sig, signal_handler, signals[i].signum);
     } 
 
-    logsmanagement_func_facets_init(&logsmanagement_should_exit);
+    struct functions_evloop_globals *wg = logsmanagement_func_facets_init(&logsmanagement_should_exit);
 
     collector_info("%s setup completed successfully", program_name);
 
@@ -259,6 +259,8 @@ int main(int argc, char **argv) {
     if(uv_loop_close(main_loop))
         m_assert(0, "uv_loop_close() result not 0");
     freez(main_loop);
+
+    functions_evloop_cancel_threads(wg);
 
     collector_info("logs management clean up done - exiting");
 
