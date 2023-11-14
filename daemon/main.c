@@ -1179,7 +1179,6 @@ static void get_netdata_configured_variables() {
        default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
     }
 #endif
-    // ------------------------------------------------------------------------
 
     // --------------------------------------------------------------------
     // get KSM settings
