@@ -867,7 +867,6 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Checkout netdata main Repo # Checkout back to netdata/netdata repo to the update latest packaged versions
         id: checkout-netdata
-        if: steps.create-release.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
@@ -886,7 +885,7 @@ jobs:
           python .github/scripts/check_latest_versions.py  ${{ steps.version.outputs.version }}
       - name: Sync newer releases
         id: sync-releases
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-latest-version.versions_needs_update == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.versions_needs_update == 'true'
         run: |
           .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification

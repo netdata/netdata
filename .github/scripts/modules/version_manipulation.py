@@ -11,8 +11,8 @@ repos_URL = {
 }
 
 GH_TOKEN = os.getenv("GH_TOKEN")
-if GH_TOKEN is None or GH_TOKEN != "": print(
-    "Token is not defined or empty, continuing with limitation on requests per sec towards Github API")
+if GH_TOKEN is None or GH_TOKEN != "":
+    print("Token is not defined or empty, continuing with limitation on requests per sec towards Github API")
 
 
 def identify_channel(_version):
@@ -72,13 +72,13 @@ def compare_version_with_remote(version):
     :param channel: any version of the agent
     :return: the greater from version and version remote.
     """
-    
+
     prefix = "https://packages.netdata.cloud/releases"
     path, filename = get_release_path_and_filename(version)
     
     remote_url = f"{prefix}/{path}/{filename}"
     response = requests.get(remote_url)
-    
+
     if response.status_code == 200:
         version_remote = response.text.rstrip()
         
@@ -108,11 +108,6 @@ def sort_and_grouby_major_agents_of_channel(channel):
     :param channel: "nightly" or "stable"
     :return: None or dict() with the Agents grouped by major version # (vX)
     """
-    if channel == "stable":
-        pattern = r'v(\d+)\.(\d+)\.(\d+)'
-    else:
-        pattern = r'v(\d+)\.(\d+)\.(\d+)-(\d+)-nightly'
-    
     try:
         G = Github(GH_TOKEN)
         repo = G.get_repo(repos_URL[channel])
@@ -120,16 +115,15 @@ def sort_and_grouby_major_agents_of_channel(channel):
     except GithubException as e:
         print(f"GitHub API request failed: {e}")
         return None
-    
+
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         return None
-    
+
     extracted_titles = [extract_version(item.title) for item in releases if
                         extract_version(item.title) is not None]
     # Necessary sorting for implement the group by
     extracted_titles.sort(key=lambda x: x[0])
-    # print(extracted_titles)
     # Group titles by major version
     grouped_by_major = {major: list(group) for major, group in groupby(extracted_titles, key=lambda x: x[0])}
     sorted_grouped_by_major = {}

@@ -37,7 +37,7 @@ jobs:
         run: |
           pip install -r .github/scripts/modules/requirements.txt
       - name: Check for newer versions
-        id: check-newer-stable
+        id: check-newer-releases
         run: |
           python .github/scripts/check_latest_versions_per_channel.py "${{ github.event.inputs.channel }}"
       - name: SSH setup
@@ -66,9 +66,8 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Init python: ${{ steps.init-python.outcome }}
               Setup python: ${{ steps.setup-python.outcome }}
-              Check for newer stable releaes: ${{ steps.check-newer-stable.outcome }}
+              Check for newer stable releaes: ${{ steps.check-newer-releases.outcome }}
               Setup ssh: ${{ steps.ssh-setup.outcome }}
               Syncing newer release to packages.netdata.cloud : ${{ steps.sync-releases.outcome }}
-              Commit changes: ${{ steps.commit.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: failure()
