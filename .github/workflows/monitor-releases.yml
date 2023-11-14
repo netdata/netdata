@@ -13,7 +13,7 @@ on:
 
 
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
-  group: monitor-stable-releases-${{ github.ref }}-${{ github.event_name }}
+  group: monitor-{{ github.event.inputs.channel }}-releases-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
           python .github/scripts/check_latest_versions_per_channel.py "${{ github.event.inputs.channel }}"
       - name: SSH setup
         id: ssh-setup
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-newer-stable.run == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-newer-releases.run == 'true'
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}

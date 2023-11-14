@@ -44,7 +44,8 @@ def extract_version(title):
         match = re.match(_pattern, title)
         if match:
             return tuple(map(int, match.groups()))
-    except:
+    except Exception as e:
+        print(f"Unexpected error: {e}")
         return None
 
 
@@ -84,7 +85,7 @@ def compare_version_with_remote(version):
 
         version_components = extract_version(version)
         remote_version_components = extract_version(version_remote)
-        
+
         absolute_version = padded_version(version_components)
         absolute_remote_version = padded_version(remote_version_components)
 
