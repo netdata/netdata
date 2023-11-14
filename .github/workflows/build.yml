@@ -885,7 +885,7 @@ jobs:
           python .github/scripts/check_latest_versions.py  ${{ steps.version.outputs.version }}
       - name: Sync newer releases
         id: sync-releases
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.versions_needs_update == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
         run: |
           .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification

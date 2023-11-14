@@ -75,19 +75,19 @@ def compare_version_with_remote(version):
 
     prefix = "https://packages.netdata.cloud/releases"
     path, filename = get_release_path_and_filename(version)
-    
+
     remote_url = f"{prefix}/{path}/{filename}"
     response = requests.get(remote_url)
 
     if response.status_code == 200:
         version_remote = response.text.rstrip()
-        
+
         version_components = extract_version(version)
         remote_version_components = extract_version(version_remote)
         
         absolute_version = padded_version(version_components)
         absolute_remote_version = padded_version(remote_version_components)
-        
+
         if absolute_version > absolute_remote_version:
             print(f"Version in the remote: {version_remote}, is older than the current: {version}, I need to update")
             return (version)
