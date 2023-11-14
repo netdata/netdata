@@ -1111,7 +1111,8 @@ void pluginsd_function_cancel(void *data) {
     dfe_done(t);
 
     if(sent <= 0)
-        netdata_log_error("PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
 }
 
 // this is the function that is called from

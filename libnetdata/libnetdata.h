@@ -731,6 +731,7 @@ extern char *netdata_configured_host_prefix;
 #endif
 #include "socket/socket.h"
 #include "config/appconfig.h"
+#include "log/journal.h"
 #include "log/log.h"
 #include "procfile/procfile.h"
 #include "string/string.h"

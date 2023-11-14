@@ -175,6 +175,8 @@ LIBNETDATA_FILES = \
     libnetdata/line_splitter/line_splitter.h \
     libnetdata/locks/locks.c \
     libnetdata/locks/locks.h \
+    libnetdata/log/journal.c \
+    libnetdata/log/journal.h \
     libnetdata/log/log.c \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \

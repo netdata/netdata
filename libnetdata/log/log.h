@@ -123,7 +123,6 @@ void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(size_t logs, time_t period);
 void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_set_thread_source(ND_LOG_SOURCES source);
-bool nd_log_is_stderr_journal(void);
 bool nd_log_journal_socket_available(void);
 
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);

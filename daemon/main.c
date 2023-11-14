@@ -864,7 +864,7 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
 
-    bool with_journal = nd_log_is_stderr_journal() || nd_log_journal_socket_available();
+    bool with_journal = is_stderr_connected_to_journal() || nd_log_journal_socket_available();
     if(with_journal)
         snprintfz(filename, FILENAME_MAX, "journal");
     else

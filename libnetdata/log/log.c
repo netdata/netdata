@@ -612,29 +612,26 @@ static bool nd_log_journal_direct_init(const char *path) {
         return true;
 
     char filename[FILENAME_MAX + 1];
-
-    if(path && *path)
-        strncpyz(filename, path, sizeof(filename) - 1);
-    else if(netdata_configured_host_prefix && *netdata_configured_host_prefix)
-        snprintfz(filename, sizeof(filename), "%s%s",
-                  netdata_configured_host_prefix, "/run/systemd/journal/socket");
-    else
-        strncpyz(filename, "/run/systemd/journal/socket", sizeof(filename) - 1);
-
-    // Create a socket
-    int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
-    if (fd < 0) return false;
-
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(struct sockaddr_un));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, filename, sizeof(addr.sun_path) - 1);
-
-    // Connect the socket (optional, but can simplify send operations)
-    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        close(fd);
-        return false;
+    if(!is_path_unix_socket(path)) {
+        journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, "netdata");
+        if (!is_path_unix_socket(filename)) {
+            journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, NULL);
+            if (!is_path_unix_socket(filename)) {
+                journal_construct_path(filename, sizeof(filename), NULL, "netdata");
+                if (!is_path_unix_socket(filename)) {
+                    journal_construct_path(filename, sizeof(filename), NULL, NULL);
+                    if (!is_path_unix_socket(filename))
+                        return false;
+                }
+            }
+        }
     }
+    else
+        snprintfz(filename, sizeof(filename), "%s", path);
+
+    int fd = journal_direct_fd(filename);
+    if(fd < 0)
+        return false;
 
     nd_log.journal_direct.fd = fd;
     nd_log.journal_direct.initialized = true;
@@ -689,7 +686,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     ND_LOG_OUTPUT method = nd_log_output2id(getenv("NETDATA_LOG_METHOD"));
 
     if(method != NDLO_JOURNAL && method != NDLO_SYSLOG && method != NDLO_STDERR) {
-        if(nd_log_is_stderr_journal()) {
+        if(is_stderr_connected_to_journal()) {
             nd_log(NDLS_COLLECTORS, NDLP_WARNING, "NETDATA_LOG_METHOD is not set. Using journal.");
             method = NDLO_JOURNAL;
         }
@@ -1341,25 +1338,6 @@ static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields
 // ----------------------------------------------------------------------------
 // journal logger
 
-bool nd_log_check_journal_socket(const char *path) {
-    struct stat statbuf;
-
-    // Check if the path is valid
-    if (!path || !*path)
-        return false;
-
-    // Use stat to check if the file exists and is a socket
-    if (stat(path, &statbuf) == -1)
-        // The file does not exist or cannot be accessed
-        return false;
-
-    // Check if the file is a socket
-    if (S_ISSOCK(statbuf.st_mode))
-        return true;
-
-    return false;
-}
-
 bool nd_log_journal_socket_available(void) {
     if(netdata_configured_host_prefix && *netdata_configured_host_prefix) {
         char filename[FILENAME_MAX + 1];
@@ -1367,31 +1345,11 @@ bool nd_log_journal_socket_available(void) {
         snprintfz(filename, sizeof(filename), "%s%s",
                   netdata_configured_host_prefix, "/run/systemd/journal/socket");
 
-        if(nd_log_check_journal_socket(filename))
+        if(is_path_unix_socket(filename))
             return true;
     }
 
-    return nd_log_check_journal_socket("/run/systemd/journal/socket");
-}
-
-bool nd_log_is_stderr_journal(void) {
-    const char *journal_stream = getenv("JOURNAL_STREAM");
-    if (!journal_stream)
-        return false; // JOURNAL_STREAM is not set
-
-    struct stat stderr_stat;
-    if (fstat(STDERR_FILENO, &stderr_stat) < 0)
-        return false; // Error in getting stderr info
-
-    // Parse device and inode from JOURNAL_STREAM
-    char *endptr;
-    long journal_dev = strtol(journal_stream, &endptr, 10);
-    if (*endptr != ':')
-        return false; // Format error in JOURNAL_STREAM
-
-    long journal_ino = strtol(endptr + 1, NULL, 10);
-
-    return (stderr_stat.st_dev == (dev_t)journal_dev) && (stderr_stat.st_ino == (ino_t)journal_ino);
+    return is_path_unix_socket("/run/systemd/journal/socket");
 }
 
 static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max) {
@@ -1477,49 +1435,6 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
     }
 
     return r == 0;
-#else
-    return false;
-#endif
-}
-
-static bool nd_log_journal_direct_with_memfd(int fd, const char *buffer, size_t buffer_len) {
-#if defined(__NR_memfd_create) && defined(MFD_ALLOW_SEALING) && defined(F_ADD_SEALS) && defined(F_SEAL_SHRINK) && defined(F_SEAL_GROW) && defined(F_SEAL_WRITE)
-    // Create a memory file descriptor
-    int memfd = (int)syscall(__NR_memfd_create, "journald", MFD_ALLOW_SEALING);
-    if (memfd < 0) return false;
-
-    // Write data to the memfd
-    if (write(memfd, buffer, buffer_len) != (ssize_t)buffer_len) {
-        close(memfd);
-        return false;
-    }
-
-    // Seal the memfd to make it immutable
-    if (fcntl(memfd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE) < 0) {
-        close(memfd);
-        return false;
-    }
-
-    struct iovec iov = {0};
-    struct msghdr msg = {0};
-    struct cmsghdr *cmsg;
-    char cmsgbuf[CMSG_SPACE(sizeof(int))];
-
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    msg.msg_control = cmsgbuf;
-    msg.msg_controllen = sizeof(cmsgbuf);
-
-    cmsg = CMSG_FIRSTHDR(&msg);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(cmsg), &memfd, sizeof(int));
-
-    ssize_t r = sendmsg(fd, &msg, 0);
-
-    close(memfd);
-    return r >= 0;
 #else
     return false;
 #endif
@@ -1629,17 +1544,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
         }
     }
 
-    // Send the datagram
-    if (send(nd_log.journal_direct.fd, buffer_tostring(wb), buffer_strlen(wb), 0) < 0) {
-        if(errno != EMSGSIZE)
-            return false;
-
-        // datagram is too large, fallback to memfd
-        if(!nd_log_journal_direct_with_memfd(nd_log.journal_direct.fd, buffer_tostring(wb), buffer_strlen(wb)))
-            return false;
-    }
-
-    return true;
+    return journal_direct_send(nd_log.journal_direct.fd, buffer_tostring(wb), buffer_strlen(wb));
 }
 
 // ----------------------------------------------------------------------------
