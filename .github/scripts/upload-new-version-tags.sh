@@ -10,4 +10,9 @@ staging="${TMPDIR:-/tmp}/staging-new-releases"
 
 mkdir -p "${staging}"
 
-# rsync -av "${staging}" "${user}@${host}:${prefix}"
+for source_dir in "${staging}"/*; do
+    if [ -d "${source_dir}" ]; then
+        base_name=$(basename "${source_dir}")
+        scp -r "${source_dir}"/* "${user}@${host}:${prefix}/${base_name}"
+    fi
+done
