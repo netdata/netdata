@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix typo in metadata \(eBPF\) [\#16405](https://github.com/netdata/netdata/pull/16405) ([thiagoftsm](https://github.com/thiagoftsm))
+- adaptec\_raid: fix parsing PD without NCQ status [\#16400](https://github.com/netdata/netdata/pull/16400) ([ilyam8](https://github.com/ilyam8))
+- eBPF apps order [\#16395](https://github.com/netdata/netdata/pull/16395) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix systemd-units func expiration time [\#16393](https://github.com/netdata/netdata/pull/16393) ([ilyam8](https://github.com/ilyam8))
 - docker: mount /etc/localtime [\#16392](https://github.com/netdata/netdata/pull/16392) ([ilyam8](https://github.com/ilyam8))
 - fix "differ in signedness" warn in cgroup [\#16391](https://github.com/netdata/netdata/pull/16391) ([ilyam8](https://github.com/ilyam8))
 - fix v0 dashboard [\#16389](https://github.com/netdata/netdata/pull/16389) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16386](https://github.com/netdata/netdata/pull/16386) ([netdatabot](https://github.com/netdatabot))
 - skip spaces when reading cpuset [\#16385](https://github.com/netdata/netdata/pull/16385) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16384](https://github.com/netdata/netdata/pull/16384) ([netdatabot](https://github.com/netdatabot))
 - use pre-configured message\_ids to identify common logs [\#16383](https://github.com/netdata/netdata/pull/16383) ([ktsaou](https://github.com/ktsaou))
@@ -29,6 +33,8 @@
 - fix system.net when inside lxc  [\#16364](https://github.com/netdata/netdata/pull/16364) ([ilyam8](https://github.com/ilyam8))
 - collectors/freeipmi: add ipmi-sensors function [\#16363](https://github.com/netdata/netdata/pull/16363) ([ilyam8](https://github.com/ilyam8))
 - Add assorted improvements to the version policy draft. [\#16362](https://github.com/netdata/netdata/pull/16362) ([Ferroin](https://github.com/Ferroin))
+- Add a apcupsd status code metric [\#16361](https://github.com/netdata/netdata/pull/16361) ([thomasbeaudry](https://github.com/thomasbeaudry))
+- Switch alarm\_log to use the buffer json functions [\#16360](https://github.com/netdata/netdata/pull/16360) ([stelfrag](https://github.com/stelfrag))
 - Switch charts / chart to use buffer json functions [\#16359](https://github.com/netdata/netdata/pull/16359) ([stelfrag](https://github.com/stelfrag))
 - health: put guides into subdirs [\#16358](https://github.com/netdata/netdata/pull/16358) ([ilyam8](https://github.com/ilyam8))
 - Import alert guides from Netdata Assistant [\#16355](https://github.com/netdata/netdata/pull/16355) ([ralphm](https://github.com/ralphm))
@@ -413,9 +419,6 @@
 - nfacct.plugin increase restart time from 4 hours to 1 day [\#15801](https://github.com/netdata/netdata/pull/15801) ([ilyam8](https://github.com/ilyam8))
 - Function systemd-journal: always have a nd\_journal\_process [\#15798](https://github.com/netdata/netdata/pull/15798) ([ktsaou](https://github.com/ktsaou))
 - prevent reporting negative retention when the db is empty [\#15796](https://github.com/netdata/netdata/pull/15796) ([ktsaou](https://github.com/ktsaou))
-- Fix typo in Readme [\#15794](https://github.com/netdata/netdata/pull/15794) ([shyamvalsan](https://github.com/shyamvalsan))
-- fix hpssa handle unassigned drives [\#15793](https://github.com/netdata/netdata/pull/15793) ([ilyam8](https://github.com/ilyam8))
-- Dyncfg add streaming support [\#15791](https://github.com/netdata/netdata/pull/15791) ([underhood](https://github.com/underhood))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
