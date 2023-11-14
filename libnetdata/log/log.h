@@ -249,7 +249,6 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #define netdata_log_error(args...)  netdata_logger(NDLS_DAEMON,     NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_error(args...)    netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
-#define netdata_log_health(args...) netdata_logger(NDLS_HEALTH,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
 
 #define log_aclk_message_bin(__data, __data_len, __tx, __mqtt_topic, __message_name) \
     nd_log(NDLS_ACLK, NDLP_INFO, \

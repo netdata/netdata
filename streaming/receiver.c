@@ -448,10 +448,10 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         if (rpt->config.health_enabled != CONFIG_BOOLEAN_NO) {
             if (rpt->config.alarms_delay > 0) {
                 host->health.health_delay_up_to = now_realtime_sec() + rpt->config.alarms_delay;
-                netdata_log_health(
-                        "[%s]: Postponing health checks for %" PRId64 " seconds, because it was just connected.",
-                        rrdhost_hostname(host),
-                        (int64_t) rpt->config.alarms_delay);
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "[%s]: Postponing health checks for %" PRId64 " seconds, because it was just connected.",
+                       rrdhost_hostname(host),
+                       (int64_t) rpt->config.alarms_delay);
             }
         }
 
