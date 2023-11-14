@@ -91,20 +91,19 @@ struct web_client *web_client_get_from_cache(void) {
         // get it from avail
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(web_clients_cache.avail.head, w, cache.prev, cache.next);
         web_clients_cache.avail.count--;
+
         spinlock_unlock(&web_clients_cache.avail.spinlock);
-
         web_client_reuse_from_cache(w);
-
         spinlock_lock(&web_clients_cache.used.spinlock);
+
         web_clients_cache.used.reused++;
     }
     else {
         spinlock_unlock(&web_clients_cache.avail.spinlock);
-
-        // allocate it
         w = web_client_create(&netdata_buffers_statistics.buffers_web);
-
         spinlock_lock(&web_clients_cache.used.spinlock);
+
+        w->id = global_statistics_web_client_connected();
         web_clients_cache.used.allocated++;
     }
 
@@ -115,7 +114,6 @@ struct web_client *web_client_get_from_cache(void) {
 
     // initialize it
     w->use_count++;
-    w->id = global_statistics_web_client_connected();
     w->mode = WEB_CLIENT_MODE_GET;
 
     return w;
