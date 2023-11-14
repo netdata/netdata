@@ -1,9 +1,15 @@
 ---
-name: Monitor-stable-releases
+name: Monitor-releases
 
-#on:
+on:
 #  release:
 #    types: [released, deleted]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Specify the release channel'
+        required: true
+        default: 'stable'
 
 
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
@@ -33,7 +39,7 @@ jobs:
       - name: Check for newer versions
         id: check-newer-stable
         run: |
-          python .github/scripts/check_latest_versions_per_channel.py stable
+          python .github/scripts/check_latest_versions_per_channel.py "${{ github.event.inputs.channel }}"
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-newer-stable.run == 'true'
@@ -44,7 +50,7 @@ jobs:
           known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
       - name: Sync newer releases
         id: sync-releases
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-newer-stable.run == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.check-newer-releases.versions_needs_update == 'true'
         run: |
           .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification
