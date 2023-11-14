@@ -227,24 +227,11 @@ struct ebpf_target *ebpf_select_target(char *name, uint32_t length, uint32_t has
 #endif
 #define NETDATA_EBPF_ALLOC_MIN_ELEMENTS 256
 
-// ARAL Sectiion
-extern void ebpf_aral_init(void);
-
-extern ebpf_process_stat_plus_t *ebpf_process_stat_get(void);
-extern void ebpf_process_stat_release(ebpf_process_stat_plus_t *stat);
-extern ebpf_process_stat_t *process_stat_vector;
-
-void ebpf_fd_aral_init();
-netdata_fd_stat_t *ebpf_fd_stat_get(void);
-void ebpf_fd_release(netdata_fd_stat_t *stat);
 
 void ebpf_remove_pid_from_apps_group(struct ebpf_target *target, uint32_t pid);
 
 // ARAL Section end
 
 #include "libnetdata/threads/threads.h"
-
-// ARAL variables
-extern ARAL *ebpf_aral_apps_pid_stat;
 
 #endif /* NETDATA_EBPF_APPS_H */

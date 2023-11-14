@@ -5,54 +5,6 @@
 #include "ebpf_apps.h"
 
 // ----------------------------------------------------------------------------
-// ARAL vectors used to speed up processing
-ARAL *ebpf_aral_apps_pid_stat = NULL;
-
-/**
- * eBPF ARAL Init
- *
- * Initiallize array allocator that will be used when integration with apps and ebpf is created.
- */
-void ebpf_aral_init(void)
-{
-    size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
-    if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
-        netdata_log_error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
-        max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
-    }
-
-    ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf_pid_stat", sizeof(struct ebpf_pid_stat));
-
-#ifdef NETDATA_DEV_MODE
-    netdata_log_info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
-#endif
-}
-
-/**
- * eBPF pid stat get
- *
- * Get a ebpf_pid_stat entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-struct ebpf_pid_stat *ebpf_pid_stat_get(void)
-{
-    struct ebpf_pid_stat *target = aral_mallocz(ebpf_aral_apps_pid_stat);
-    memset(target, 0, sizeof(struct ebpf_pid_stat));
-    return target;
-}
-
-/**
- * eBPF target release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
-{
-    aral_freez(ebpf_aral_apps_pid_stat, stat);
-}
-
-// ----------------------------------------------------------------------------
 // internal flags
 // handled in code (automatically set)
 
