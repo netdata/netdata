@@ -8,6 +8,7 @@ SUBDIRS = \
     aral \
     avl \
     buffer \
+    buffered_reader \
     clocks \
     completion \
     config \

@@ -2838,61 +2838,6 @@ static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PAR
 
 // ----------------------------------------------------------------------------
 
-static inline bool buffered_reader_read(struct buffered_reader *reader, int fd) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(reader->read_buffer[reader->read_len] != '\0')
-        fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
-#endif
-
-    ssize_t bytes_read = read(fd, reader->read_buffer + reader->read_len, sizeof(reader->read_buffer) - reader->read_len - 1);
-    if(unlikely(bytes_read <= 0))
-        return false;
-
-    reader->read_len += bytes_read;
-    reader->read_buffer[reader->read_len] = '\0';
-
-    return true;
-}
-
-static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms) {
-    errno = 0;
-    struct pollfd fds[1];
-
-    fds[0].fd = fd;
-    fds[0].events = POLLIN;
-
-    int ret = poll(fds, 1, timeout_ms);
-
-    if (ret > 0) {
-        /* There is data to read */
-        if (fds[0].revents & POLLIN)
-            return buffered_reader_read(reader, fd);
-
-        else if(fds[0].revents & POLLERR) {
-            netdata_log_error("PARSER: read failed: POLLERR.");
-            return false;
-        }
-        else if(fds[0].revents & POLLHUP) {
-            netdata_log_error("PARSER: read failed: POLLHUP.");
-            return false;
-        }
-        else if(fds[0].revents & POLLNVAL) {
-            netdata_log_error("PARSER: read failed: POLLNVAL.");
-            return false;
-        }
-
-        netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
-        return false;
-    }
-    else if (ret == 0) {
-        netdata_log_error("PARSER: timeout while waiting for data.");
-        return false;
-    }
-
-    netdata_log_error("PARSER: poll() failed with code %d.", ret);
-    return false;
-}
-
 void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
 

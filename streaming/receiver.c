@@ -252,52 +252,6 @@ static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HAN
     return true;
 }
 
-/* Produce a full line if one exists, statefully return where we start next time.
- * When we hit the end of the buffer with a partial line move it to the beginning for the next fill.
- */
-inline bool buffered_reader_next_line(struct buffered_reader *reader, BUFFER *dst) {
-    buffer_need_bytes(dst, reader->read_len - reader->pos + 2);
-
-    size_t start = reader->pos;
-
-    char *ss = &reader->read_buffer[start];
-    char *se = &reader->read_buffer[reader->read_len];
-    char *ds = &dst->buffer[dst->len];
-    char *de = &ds[dst->size - dst->len - 2];
-
-    if(ss >= se) {
-        *ds = '\0';
-        reader->pos = 0;
-        reader->read_len = 0;
-        reader->read_buffer[reader->read_len] = '\0';
-        return false;
-    }
-
-    // copy all bytes to buffer
-    while(ss < se && ds < de && *ss != '\n') {
-        *ds++ = *ss++;
-        dst->len++;
-    }
-
-    // if we have a newline, return the buffer
-    if(ss < se && ds < de && *ss == '\n') {
-        // newline found in the r->read_buffer
-
-        *ds++ = *ss++; // copy the newline too
-        dst->len++;
-
-        *ds = '\0';
-
-        reader->pos = ss - reader->read_buffer;
-        return true;
-    }
-
-    reader->pos = 0;
-    reader->read_len = 0;
-    reader->read_buffer[reader->read_len] = '\0';
-    return false;
-}
-
 bool plugin_is_enabled(struct plugind *cd);
 
 static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAKE reason, bool force) {

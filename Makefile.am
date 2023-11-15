@@ -145,6 +145,8 @@ LIBNETDATA_FILES = \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
     libnetdata/buffer/buffer.h \
+    libnetdata/buffered_reader/buffered_reader.c \
+    libnetdata/buffered_reader/buffered_reader.h \
     libnetdata/circular_buffer/circular_buffer.c \
     libnetdata/circular_buffer/circular_buffer.h \
     libnetdata/clocks/clocks.c \
@@ -330,6 +332,12 @@ SYSTEMD_JOURNAL_PLUGIN_FILES = \
     collectors/systemd-journal.plugin/systemd-journal-annotations.c \
     collectors/systemd-journal.plugin/systemd-journal-files.c \
     collectors/systemd-journal.plugin/systemd-journal-fstat.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+SYSTEMD_CAT_NATIVE_FILES = \
+    libnetdata/log/systemd-cat-native.c \
+    libnetdata/log/systemd-cat-native.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -1304,6 +1312,12 @@ if ENABLE_PLUGIN_SYSTEMD_JOURNAL
         $(OPTIONAL_SYSTEMD_LIBS) \
         $(NULL)
 endif
+
+plugins_PROGRAMS += systemd-cat-native
+systemd_cat_native_SOURCES = $(SYSTEMD_CAT_NATIVE_FILES)
+systemd_cat_native_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
 
 if ENABLE_PLUGIN_EBPF
     plugins_PROGRAMS += ebpf.plugin

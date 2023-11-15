@@ -733,6 +733,7 @@ extern char *netdata_configured_host_prefix;
 #include "config/appconfig.h"
 #include "log/journal.h"
 #include "log/log.h"
+#include "buffered_reader/buffered_reader.h"
 #include "procfile/procfile.h"
 #include "string/string.h"
 #include "dictionary/dictionary.h"
