@@ -259,6 +259,8 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
 
                 find_package(Protobuf)
         endif()
+
+        set(ENABLE_PROTOBUF True)
 endif()
 
 #
@@ -748,7 +750,11 @@ set(ACLK_ALWAYS_BUILD aclk/aclk_rrdhost_state.h
                       aclk/aclk.c
                       aclk/aclk.h
                       aclk/aclk_capas.c
-                      aclk/aclk_capas.h)
+                      aclk/aclk_capas.h
+                      aclk/aclk_util.c
+                      aclk/aclk_util.h
+                      aclk/https_client.c
+                      aclk/https_client.h)
 
 set(TIMEX_PLUGIN_FILES collectors/timex.plugin/plugin_timex.c)
 
@@ -889,9 +895,7 @@ set(ACLK_PROTO_DEFS aclk/aclk-schemas/proto/aclk/v1/lib.proto
                     aclk/aclk-schemas/proto/context/v1/stream.proto
                     aclk/aclk-schemas/proto/agent/v1/cmds.proto)
 
-set(ACLK_FILES aclk/aclk_util.c
-               aclk/aclk_util.h
-               aclk/aclk_stats.c
+set(ACLK_FILES aclk/aclk_stats.c
                aclk/aclk_stats.h
                aclk/aclk_query.c
                aclk/aclk_query.h
@@ -903,8 +907,6 @@ set(ACLK_FILES aclk/aclk_util.c
                aclk/aclk_tx_msgs.h
                aclk/aclk_rx_msgs.c
                aclk/aclk_rx_msgs.h
-               aclk/https_client.c
-               aclk/https_client.h
                aclk/aclk_alarm_api.c
                aclk/aclk_alarm_api.h
                aclk/aclk_contexts_api.c
@@ -1146,7 +1148,7 @@ target_link_libraries(libnetdata PUBLIC "$<$<BOOL:${ENABLE_H2O}>:h2o>")
 
 function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
         if(NOT ARGN)
-                message(SEND_ERROR "Error: PROTOBUF_ACLK_GENERATE_CPP() called without any proto files")
+                message(SEND_ERROR "Error: protoc_generate_cpp() called without any proto files")
                 return()
         endif()
 
@@ -1180,10 +1182,14 @@ function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
         set(${HDRS} ${${HDRS}} PARENT_SCOPE)
 endfunction()
 
-if(ENABLE_ACLK)
-        #
-        # mqtt library
-        #
+#
+# mqtt library
+#
+if (ENABLE_H2O OR ENABLE_ACLK)
+        set(ENABLE_MQTTWEBSOCKETS True)
+endif()
+
+if(ENABLE_MQTTWEBSOCKETS)
         include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include
                                    ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include
                                    ${CMAKE_SOURCE_DIR}/mqtt_websockets/c_rhash/include)
@@ -1199,6 +1205,9 @@ if(ENABLE_ACLK)
 
         target_link_libraries(mqttwebsockets PRIVATE libnetdata)
 
+endif()
+
+if(ENABLE_ACLK)
         #
         # proto definitions
         #
@@ -1491,17 +1500,17 @@ add_executable(netdata
 )
 
 target_compile_definitions(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_ACLK}>:${PROTOBUF_CFLAGS_OTHER}>"
+        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
         "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_CFLAGS_OTHER}>"
 )
 
 target_include_directories(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_ACLK}>:${PROTOBUF_INCLUDE_DIRS}>"
+        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/aclk/aclk-schemas>"
-        "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include>"
-        "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include>"
+        "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include>"
+        "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include>"
         "$<$<BOOL:${ENABLE_ML}>:${CMAKE_SOURCE_DIR}/ml/dlib>"
         "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
@@ -1511,8 +1520,8 @@ target_link_libraries(netdata PRIVATE
         m
         libnetdata
         "$<$<BOOL:${LINUX}>:rt>"
-        "$<$<BOOL:${ENABLE_ACLK}>:mqttwebsockets>"
-        "$<$<BOOL:${ENABLE_ACLK}>:${PROTOBUF_LIBRARIES}>"
+        "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
+        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
