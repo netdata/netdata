@@ -2,7 +2,7 @@
 
 Name:           netdata-repo
 Version:        2
-Release:        1
+Release:        2
 Summary:        Netdata stable repositories configuration.
 
 Group:          System Environment/Base
@@ -23,6 +23,10 @@ BuildArch:      noarch
 
 %if 0%{?centos_ver} && 0%{?centos_ver} < 8
 Requires:       yum-plugin-priorities
+%endif
+
+%if 0%{?centos_ver} && 0%{!?amazon_linux:1} && 0%{!?oraclelinux:1}
+Requires:       epel-release
 %endif
 
 # Overlapping file installs
@@ -104,6 +108,8 @@ This package contains the official Netdata package repository configuration for 
 %endif
 
 %changelog
+* Mon Nov 13 2023 Austin Hemmelgarn <austin@netdata.cloud> 2-2
+- Add EPEL requirement for RHEL packages.
 * Wed Dec 7 2022 Austin Hemmelgarn <austin@netdata.cloud> 2-1
 - Switch to new hosting at repo.netdata.cloud.
 * Mon Jun 6 2022 Austin Hemmelgarn <austin@netdata.cloud> 1-2

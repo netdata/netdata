@@ -583,6 +583,7 @@ static int health_readfile(const char *filename, void *data) {
     struct alert_config *alert_cfg = NULL;
 
     int ignore_this = 0;
+    bool filtered_config = false;
     size_t line = 0, append = 0;
     char *s;
     while((s = fgets(&buffer[append], (int)(HEALTH_CONF_MAX_LINE - append), fp)) || append) {
@@ -680,8 +681,10 @@ static int health_readfile(const char *filename, void *data) {
                 alert_cfg->alarm = string_dup(rc->name);
                 alert_cfg->source = health_source_file(line, filename);
                 ignore_this = 0;
+                filtered_config = false;
             } else {
                 rc = NULL;
+                filtered_config = true;
             }
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
@@ -727,8 +730,10 @@ static int health_readfile(const char *filename, void *data) {
                 alert_cfg->template_key = string_dup(rt->name);
                 alert_cfg->source = health_source_file(line, filename);
                 ignore_this = 0;
+                filtered_config = false;
             } else {
                 rt = NULL;
+                filtered_config = true;
             }
         }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
@@ -1320,8 +1325,8 @@ static int health_readfile(const char *filename, void *data) {
             }
         }
         else {
-            netdata_log_error("Health configuration at line %zu of file '%s' has unknown key '%s'. Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.",
-                              line, filename, key);
+            if (!filtered_config)
+                netdata_log_error("Health configuration at line %zu of file '%s' has unknown key '%s'. Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.", line, filename, key);
         }
     }
 

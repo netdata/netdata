@@ -1,3 +1,9 @@
+netdata-repo (2-2) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 13 Nov 2023 11:15:00 -0500
+
 netdata-repo (2-1) unstable; urgency=medium
 
   * Switched to new package hosting infrastructure
