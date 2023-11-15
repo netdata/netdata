@@ -109,3 +109,89 @@ Netdata comes with `logrotate` configuration to rotate its log files periodicall
 The default is usually found in `/etc/logrotate.d/netdata`.
 
 Sending a `SIGHUP` to Netdata, will instruct it to re-open all its log files.
+
+## Log Fields
+
+Netdata exposes the following fields to its logs:
+
+|                journal                 |             logfmt             |                    json                     |                                             Description                                             |
+|:--------------------------------------:|:------------------------------:|:-------------------------------------------:|:---------------------------------------------------------------------------------------------------:|
+|      `_SOURCE_REALTIME_TIMESTAMP`      |             `time`             |                   `time`                    |                                     the timestamp of the event                                      |
+|          `SYSLOG_IDENTIFIER`           |             `comm`             |                   `comm`                    |                                    the program logging the event                                    |
+|            `ND_LOG_SOURCE`             |            `source`            |                  `source`                   |                               one of the [log sources](#log-sources)                                |
+|         `PRIORITY`<br/>numeric         |        `level`<br/>text        |             `level`<br/>numeric             |                                one of the [log levels](#log-levels)                                 |
+|                `ERRNO`                 |            `errno`             |                   `errno`                   |                                    the numeric value of `errno`                                     |
+|            `INVOCATION_ID`             |               -                |                      -                      |                a unique UUID of the Netdata session, reset on every Netdata restart                 |
+|              `CODE_LINE`               |               -                |                      -                      |                      the line number of of the source code logging this event                       |
+|              `CODE_FILE`               |               -                |                      -                      |                         the filename of the source code logging this event                          |
+|            `CODE_FUNCTION`             |               -                |                      -                      |                       the function name of the source code logging this event                       |
+|                 `TID`                  |             `tid`              |                    `tid`                    |                           the thread id of the thread logging this event                            |
+|              `THREAD_TAG`              |            `thread`            |                  `thread`                   |                              the name of the thread logging this event                              |
+|              `MESSAGE_ID`              |            `msg_id`            |                  `msg_id`                   |                                   see [message IDs](#message-ids)                                   |
+|              `ND_MODULE`               |            `module`            |                  `module`                   |                                the Netdata module logging this event                                |
+|             `ND_NIDL_NODE`             |             `node`             |                   `node`                    |                          the hostname of the node the event is related to                           |
+|           `ND_NIDL_INSTANCE`           |           `instance`           |                 `instance`                  |                          the instance of the node the event is related to                           |
+|           `ND_NIDL_CONTEXT`            |           `context`            |                  `context`                  | the context the event is related to (this is usually the chart name, as shown on netdata dashboards |
+|          `ND_NIDL_DIMENSION`           |          `dimension`           |                 `dimension`                 |                                the dimension the event is related to                                |
+|           `ND_SRC_TRANSPORT`           |        `src_transport`         |               `src_transport`               |    when the data come from a child, this is the protocol used between the child and this Netdata    |
+|              `ND_SRC_IP`               |            `src_ip`            |                  `src_ip`                   |                                the IP of the child sending the data                                 |
+|             `ND_SRC_PORT`              |           `src_port`           |                 `src_port`                  |                               the port of the child sending the data                                |
+|            `ND_SRC_METHOD`             |          `src_method`          |                `src_method`                 |                                                                                                     |
+|         `ND_SRC_CAPABILITIES`          |       `src_capabilities`       |             `src_capabilities`              |                                                                                                     |
+|           `ND_DST_TRANSPORT`           |        `dst_transport`         |               `dst_transport`               |                                                                                                     |
+|              `ND_DST_IP`               |            `dst_ip`            |                  `dst_ip`                   |                                                                                                     |
+|             `ND_DST_PORT`              |           `dst_port`           |                 `dst_port`                  |                                                                                                     |
+|         `ND_DST_CAPABILITIES`          |       `dst_capabilities`       |             `dst_capabilities`              |                                                                                                     |
+|          `ND_REQUEST_METHOD`           |          `req_method`          |                `req_method`                 |                                                                                                     |
+|           `ND_RESPONSE_CODE`           |             `code`             |                   `code`                    |                                                                                                     |
+|           `ND_CONNECTION_ID`           |             `conn`             |                   `conn`                    |                                                                                                     |
+|          `ND_TRANSACTION_ID`           |         `transaction`          |                `transaction`                |                                                                                                     |
+|        `ND_RESPONSE_SENT_BYTES`        |          `sent_bytes`          |                `sent_bytes`                 |                                                                                                     |
+|        `ND_RESPONSE_SIZE_BYTES`        |          `size_bytes`          |                `size_bytes`                 |                                                                                                     |
+|      `ND_RESPONSE_PREP_TIME_USEC`      |           `prep_ut`            |                  `prep_ut`                  |                                                                                                     |
+|      `ND_RESPONSE_SENT_TIME_USEC`      |           `sent_ut`            |                  `sent_ut`                  |                                                                                                     |
+|     `ND_RESPONSE_TOTAL_TIME_USEC`      |           `total_ut`           |                 `total_ut`                  |                                                                                                     |
+|             `ND_ALERT_ID`              |           `alert_id`           |                 `alert_id`                  |                                                                                                     |
+|          `ND_ALERT_EVENT_ID`           |        `alert_event_id`        |              `alert_event_id`               |                                                                                                     |
+|           `ND_ALERT_CONFIG`            |         `alert_config`         |               `alert_config`                |                                                                                                     |
+|            `ND_ALERT_NAME`             |            `alert`             |                   `alert`                   |                                                                                                     |
+|            `ND_ALERT_CLASS`            |         `alert_class`          |                `alert_class`                |                                                                                                     |
+|          `ND_ALERT_COMPONENT`          |       `alert_component`        |              `alert_component`              |                                                                                                     |
+|            `ND_ALERT_TYPE`             |          `alert_type`          |                `alert_type`                 |                                                                                                     |
+|            `ND_ALERT_EXEC`             |          `alert_exec`          |                `alert_exec`                 |                                                                                                     |
+|          `ND_ALERT_RECIPIENT`          |       `alert_recipient`        |              `alert_recipient`              |                                                                                                     |
+|            `ND_ALERT_VALUE`            |         `alert_value`          |                `alert_value`                |                                                                                                     |
+|          `ND_ALERT_VALUE_OLD`          |       `alert_value_old`        |              `alert_value_old`              |                                                                                                     |
+|           `ND_ALERT_STATUS`            |         `alert_status`         |               `alert_status`                |                                                                                                     |
+|         `ND_ALERT_STATUS_OLD`          |       `alert_value_old`        |              `alert_value_old`              |                                                                                                     |
+|            `ND_ALERT_UNITS`            |         `alert_units`          |                `alert_units`                |                                                                                                     |
+|           `ND_ALERT_SUMMARY`           |        `alert_summary`         |               `alert_summary`               |                                                                                                     |
+|            `ND_ALERT_INFO`             |          `alert_info`          |                `alert_info`                 |                                                                                                     |
+|          `ND_ALERT_DURATION`           |        `alert_duration`        |              `alert_duration`               |                                                                                                     |
+| `ND_ALERT_NOTIFICATION_TIMESTAMP_USEC` | `alert_notification_timestamp` |       `alert_notification_timestamp`        |                                                                                                     |
+|              `ND_REQUEST`              |           `request`            |                  `request`                  |                                                                                                     |
+|               `MESSAGE`                |             `msg`              |                    `msg`                    |                                                                                                     |
+
+
+### Message IDs
+
+Netdata assigns specific message IDs to certain events:
+
+- `ed4cdb8f1beb4ad3b57cb3cae2d162fa` when a Netdata child connects to this Netdata
+- `6e2e3839067648968b646045dbf28d66` when this Netdata connects to a Netdata parent
+- `9ce0cb58ab8b44df82c4bf1ad9ee22de` when a Netdata alert changes state
+
+You can view these events using the Netdata systemd-journal.plugin at the `MESSAGE_ID` filter,
+or using `journalctl` like this:
+
+```bash
+# query children connection
+journalctl MESSAGE_ID=ed4cdb8f1beb4ad3b57cb3cae2d162fa
+
+# query parent connection
+journalctl MESSAGE_ID=6e2e3839067648968b646045dbf28d66
+
+# query alert transitions
+journalctl MESSAGE_ID=9ce0cb58ab8b44df82c4bf1ad9ee22de
+```
+
