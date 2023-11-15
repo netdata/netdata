@@ -1313,7 +1313,7 @@ if ENABLE_PLUGIN_SYSTEMD_JOURNAL
         $(NULL)
 endif
 
-plugins_PROGRAMS += systemd-cat-native
+sbin_PROGRAMS += systemd-cat-native
 systemd_cat_native_SOURCES = $(SYSTEMD_CAT_NATIVE_FILES)
 systemd_cat_native_LDADD = \
         $(NETDATA_COMMON_LIBS) \

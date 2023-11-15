@@ -550,6 +550,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
+%{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
 
 %{_unitdir}/%{name}.service
