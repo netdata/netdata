@@ -50,7 +50,7 @@ apcupsd_check() {
 
   local host working=0 failed=0
   for host in "${!apcupsd_sources[@]}"; do
-    apcupsd_get "${apcupsd_sources[${host}]}" > /dev/null
+    apcupsd_get "${apcupsd_sources[${host}]}" >/dev/null
     # shellcheck disable=2181
     if [ $? -ne 0 ]; then
       error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
@@ -77,7 +77,7 @@ apcupsd_create() {
   local host
   for host in "${!apcupsd_sources[@]}"; do
     # create the charts
-    cat << EOF
+    cat <<EOF
 CHART apcupsd_${host}.charge '' "UPS Charge" "percentage" ups apcupsd.charge area $((apcupsd_priority + 2)) $apcupsd_update_every '' '' 'apcupsd'
 DIMENSION battery_charge charge absolute 1 100
 
@@ -110,13 +110,28 @@ CHART apcupsd_${host}.time '' "UPS Time Remaining" "Minutes" ups apcupsd.time ar
 DIMENSION time time absolute 1 100
 
 CHART apcupsd_${host}.online '' "UPS ONLINE flag" "boolean" ups apcupsd.online line $((apcupsd_priority + 9)) $apcupsd_update_every '' '' 'apcupsd'
-DIMENSION online online absolute 0 1
+DIMENSION online online absolute 1 1
 
 CHART apcupsd_${host}.selftest '' "UPS Self-Test status" "status" ups apcupsd.selftest line $((apcupsd_priority + 10)) $apcupsd_update_every '' '' 'apcupsd'
-DIMENSION selftest_OK 'OK' absolute 0 1
-DIMENSION selftest_NO 'NO' absolute 0 1
-DIMENSION selftest_BT 'BT' absolute 0 1
-DIMENSION selftest_NG 'NG' absolute 0 1
+DIMENSION selftest_OK 'OK' absolute 1 1
+DIMENSION selftest_NO 'NO' absolute 1 1
+DIMENSION selftest_BT 'BT' absolute 1 1
+DIMENSION selftest_NG 'NG' absolute 1 1
+
+CHART apcupsd_${host}.status '' "UPS Status" "status" ups apcupsd.status line $((apcupsd_priority + 11)) $apcupsd_update_every '' '' 'apcupsd'
+DIMENSION status_ONLINE 'ONLINE' absolute 1 1
+DIMENSION status_ONBATT 'ONBATT' absolute 1 1
+DIMENSION status_OVERLOAD 'OVERLOAD' absolute 1 1
+DIMENSION status_LOWBATT 'LOWBATT' absolute 1 1
+DIMENSION status_REPLACEBATT 'REPLACEBATT' absolute 1 1
+DIMENSION status_NOBATT 'NOBATT' absolute 1 1
+DIMENSION status_SLAVE 'SLAVE' absolute 1 1
+DIMENSION status_SLAVEDOWN 'SLAVEDOWN' absolute 1 1
+DIMENSION status_COMMLOST 'COMMLOST' absolute 1 1
+DIMENSION status_CAL 'CAL' absolute 1 1
+DIMENSION status_TRIM 'TRIM' absolute 1 1
+DIMENSION status_BOOST 'BOOST' absolute 1 1
+DIMENSION status_SHUTTING_DOWN 'SHUTTING_DOWN' absolute 1 1
 
 EOF
   done
@@ -136,24 +151,38 @@ apcupsd_update() {
     apcupsd_get "${apcupsd_sources[${host}]}" | awk "
 
 BEGIN {
-	battery_charge = 0;
-	battery_voltage = 0;
-	battery_voltage_nominal = 0;
-	input_voltage = 0;
-	input_voltage_min = 0;
-	input_voltage_max = 0;
-	input_frequency = 0;
-	output_voltage = 0;
-	output_voltage_nominal = 0;
-	load = 0;
-	temp = 0;
-	time = 0;
-	nompower = 0;
-	load_usage = 0;
-        selftest_OK = 0;
-        selftest_NO = 0;
-        selftest_BT = 0;
-        selftest_NG = 0;
+  battery_charge = 0;
+  battery_voltage = 0;
+  battery_voltage_nominal = 0;
+  input_voltage = 0;
+  input_voltage_min = 0;
+  input_voltage_max = 0;
+  input_frequency = 0;
+  output_voltage = 0;
+  output_voltage_nominal = 0;
+  load = 0;
+  temp = 0;
+  time = 0;
+  nompower = 0;
+  load_usage = 0;
+  selftest_OK = 0;
+  selftest_NO = 0;
+  selftest_BT = 0;
+  selftest_NG = 0;
+  status_ONLINE = 0;
+  status_CAL = 0;
+  status_TRIM = 0;
+  status_BOOST = 0;
+  status_ONBATT = 0;
+  status_OVERLOAD = 0;
+  status_LOWBATT = 0;
+  status_REPLACEBATT = 0;
+  status_NOBATT = 0;
+  status_SLAVE = 0;
+  status_SLAVEDOWN = 0;
+  status_COMMLOST = 0;
+  status_SHUTTING_DOWN = 0;
+
 }
 /^BCHARGE.*/   { battery_charge = \$3 * 100 };
 /^BATTV.*/     { battery_voltage = \$3 * 100 };
@@ -174,61 +203,92 @@ BEGIN {
                  selftest_BT = (\$3 == \"BT\") ? 1 : 0;
                  selftest_NG = (\$3 == \"NG\") ? 1 : 0;
                };
+/^STATUS.*/    { status_ONLINE = (\$3 == \"ONLINE\") ? 1 : 0;
+                 status_CAL = (\$3 == \"CAL\") ? 1 : 0;
+                 status_TRIM = (\$3 == \"TRIM\") ? 1 : 0;
+                 status_BOOST = (\$3 == \"BOOST\") ? 1 : 0;
+                 status_ONBATT = (\$3 == \"ONBATT\") ? 1 : 0;
+                 status_OVERLOAD = (\$3 == \"OVERLOAD\") ? 1 : 0;
+                 status_LOWBATT = (\$3 == \"LOWBATT\") ? 1 : 0;
+                 status_REPLACEBATT = (\$3 == \"REPLACEBATT\") ? 1 : 0;
+                 status_NOBATT = (\$3 == \"NOBATT\") ? 1 : 0;
+                 status_SLAVE = (\$3 == \"SLAVE\") ? 1 : 0;
+                 status_SLAVEDOWN = (\$3 == \"SLAVEDOWN\") ? 1 : 0;
+                 status_COMMLOST = (\$3 == \"COMMLOST\") ? 1 : 0;
+                 status_SHUTTING_DOWN = (\$3 == \"SHUTTING\" && \$4 == \"DOWN\") ? 1 : 0;
+               };
+
 END {
-	{ load_usage = nompower * load / 100 };
+  { load_usage = nompower * load / 100 };
 
-	print \"BEGIN apcupsd_${host}.online $1\";
-	print \"SET online = \" online;
-	print \"END\"
+  print \"BEGIN apcupsd_${host}.online $1\";
+  print \"SET online = \" online;
+  print \"END\"
 
-	if (online == 1) {
-		print \"BEGIN apcupsd_${host}.charge $1\";
-		print \"SET battery_charge = \" battery_charge;
-		print \"END\"
+  if (online == 1) {
+    print \"BEGIN apcupsd_${host}.charge $1\";
+    print \"SET battery_charge = \" battery_charge;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.battery_voltage $1\";
-		print \"SET battery_voltage = \" battery_voltage;
-		print \"SET battery_voltage_nominal = \" battery_voltage_nominal;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.battery_voltage $1\";
+    print \"SET battery_voltage = \" battery_voltage;
+    print \"SET battery_voltage_nominal = \" battery_voltage_nominal;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.input_voltage $1\";
-		print \"SET input_voltage = \" input_voltage;
-		print \"SET input_voltage_min = \" input_voltage_min;
-		print \"SET input_voltage_max = \" input_voltage_max;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.input_voltage $1\";
+    print \"SET input_voltage = \" input_voltage;
+    print \"SET input_voltage_min = \" input_voltage_min;
+    print \"SET input_voltage_max = \" input_voltage_max;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.input_frequency $1\";
-		print \"SET input_frequency = \" input_frequency;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.input_frequency $1\";
+    print \"SET input_frequency = \" input_frequency;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.output_voltage $1\";
-		print \"SET output_voltage = \" output_voltage;
-		print \"SET output_voltage_nominal = \" output_voltage_nominal;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.output_voltage $1\";
+    print \"SET output_voltage = \" output_voltage;
+    print \"SET output_voltage_nominal = \" output_voltage_nominal;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.load $1\";
-		print \"SET load = \" load;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.load $1\";
+    print \"SET load = \" load;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.load_usage $1\";
-		print \"SET load_usage = \" load_usage;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.load_usage $1\";
+    print \"SET load_usage = \" load_usage;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.temp $1\";
-		print \"SET temp = \" temp;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.temp $1\";
+    print \"SET temp = \" temp;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.time $1\";
-		print \"SET time = \" time;
-		print \"END\"
+    print \"BEGIN apcupsd_${host}.time $1\";
+    print \"SET time = \" time;
+    print \"END\"
 
-		print \"BEGIN apcupsd_${host}.selftest $1\";
-		print \"SET selftest_OK = \" selftest_OK;
-		print \"SET selftest_NO = \" selftest_NO;
-		print \"SET selftest_BT = \" selftest_BT;
-		print \"SET selftest_NG = \" selftest_NG;
-		print \"END\"
-	}
+    print \"BEGIN apcupsd_${host}.selftest $1\";
+    print \"SET selftest_OK = \" selftest_OK;
+    print \"SET selftest_NO = \" selftest_NO;
+    print \"SET selftest_BT = \" selftest_BT;
+    print \"SET selftest_NG = \" selftest_NG;
+    print \"END\"
+
+    print \"BEGIN apcupsd_${host}.status $1\";
+    print \"SET status_ONLINE = \" status_ONLINE;
+    print \"SET status_ONBATT = \" status_ONBATT;
+    print \"SET status_OVERLOAD = \" status_OVERLOAD;
+    print \"SET status_LOWBATT = \" status_LOWBATT;
+    print \"SET status_REPLACEBATT = \" status_REPLACEBATT;
+    print \"SET status_NOBATT = \" status_NOBATT;
+    print \"SET status_SLAVE = \" status_SLAVE;
+    print \"SET status_SLAVEDOWN = \" status_SLAVEDOWN;
+    print \"SET status_COMMLOST = \" status_COMMLOST;
+    print \"SET status_CAL = \" status_CAL;
+    print \"SET status_TRIM = \" status_TRIM;
+    print \"SET status_BOOST = \" status_BOOST;
+    print \"SET status_SHUTTING_DOWN = \" status_SHUTTING_DOWN;
+    print \"END\";
+  }
 }"
     # shellcheck disable=SC2181
     if [ $? -ne 0 ]; then

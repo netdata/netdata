@@ -75,16 +75,20 @@ Metrics:
 
 These Metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.cachestat_ratio | a dimension per app group | % |
-| apps.cachestat_dirties | a dimension per app group | page/s |
-| apps.cachestat_hits | a dimension per app group | hits/s |
-| apps.cachestat_misses | a dimension per app group | misses/s |
+| app.ebpf_cachestat_hit_ratio | ratio | % |
+| app.ebpf_cachestat_dirty_pages | pages | page/s |
+| app.ebpf_cachestat_access | hits | hits/s |
+| app.ebpf_cachestat_misses | misses | misses/s |
 
 ### Per cgroup
 
