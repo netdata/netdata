@@ -1446,7 +1446,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         }
 
                         rrdsetvar_custom_chart_variable_set(
-                            d->st_bandwidth, d->chart_var_speed, (NETDATA_DOUBLE)d->speed * KILOBITS_IN_A_MEGABIT);
+                            d->st_bandwidth, d->chart_var_speed, (NETDATA_DOUBLE)d->speed);
 
                         if (d->speed) {
                             d->speed_file_exists = 1;
