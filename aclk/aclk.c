@@ -976,9 +976,8 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     rrdhost_aclk_state_unlock(localhost);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Queuing status update for node=%s, live=%d, hops=%u",
-           (char*)node_state_update.node_id, cmd, host->system_info->hops);
-
+           "Queuing status update for node=%s, live=%d, hops=%u, queryable=%d",
+           (char*)node_state_update.node_id, cmd, host->system_info->hops, queryable);
     freez((void*)node_state_update.node_id);
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
@@ -1022,7 +1021,7 @@ void aclk_send_node_instances()
             rrdhost_aclk_state_unlock(localhost);
 
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Queuing status update for node=%s, live=%d, hops=%d",
+                   "Queuing status update for node=%s, live=%d, hops=%d, queryable=1",
                    (char*)node_state_update.node_id, list->live, list->hops);
 
             freez((void*)node_state_update.capabilities);
