@@ -619,7 +619,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             int prometheus_collector = 0;
-            RRDSET_FLAGS flags = __atomic_load_n(&st->flags, __ATOMIC_RELAXED);
+            RRDSET_FLAGS flags = rrdset_flag_get(st);
             if (as_collected) {
                 if (flags & RRDSET_FLAG_HOMOGENEOUS_CHECK)
                     rrdset_update_heterogeneous_flag(st);

@@ -9,6 +9,10 @@ endmeta-->
 
 # SMS
 
+
+<img src="https://netdata.cloud/img/sms.svg" width="150"/>
+
+
 Send notifications to `smstools3` using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 The SMS Server Tools 3 is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.
 
@@ -53,9 +57,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| sendsms | Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:` | YES | True |
-| SEND_SMS | Set `SEND_SMS` to `YES`. |  | True |
-| DEFAULT_RECIPIENT_SMS | Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2. |  | True |
+| sendsms | Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:` | YES | yes |
+| SEND_SMS | Set `SEND_SMS` to `YES`. |  | yes |
+| DEFAULT_RECIPIENT_SMS | Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2. |  | yes |
 
 ##### sendsms
 

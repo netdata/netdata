@@ -148,6 +148,7 @@ typedef struct ebpf_addresses {
     uint32_t hash;
     // We use long as address, because it matches system length
     unsigned long addr;
+    uint32_t type;
 } ebpf_addresses_t;
 
 extern char *ebpf_user_config_dir;

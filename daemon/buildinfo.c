@@ -47,6 +47,7 @@ typedef enum __attribute__((packed)) {
     BIB_FEATURE_CLOUD,
     BIB_FEATURE_HEALTH,
     BIB_FEATURE_STREAMING,
+    BIB_FEATURE_BACKFILLING,
     BIB_FEATURE_REPLICATION,
     BIB_FEATURE_STREAMING_COMPRESSION,
     BIB_FEATURE_CONTEXTS,
@@ -464,6 +465,14 @@ static struct {
                 .json = "streaming",
                 .value = NULL,
         },
+        [BIB_FEATURE_BACKFILLING] = {
+                .category = BIC_FEATURE,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "Back-filling (of higher database tiers)",
+                .json = "back-filling",
+                .value = NULL,
+        },
         [BIB_FEATURE_REPLICATION] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
@@ -478,7 +487,7 @@ static struct {
                 .analytics = "Stream Compression",
                 .print = "Streaming and Replication Compression",
                 .json = "stream-compression",
-                .value = "none",
+                .value = NULL,
         },
         [BIB_FEATURE_CONTEXTS] = {
                 .category = BIC_FEATURE,
@@ -920,6 +929,23 @@ static void build_info_set_value(BUILD_INFO_SLOT slot, const char *value) {
     BUILD_INFO[slot].value = value;
 }
 
+static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
+    size_t size = BUILD_INFO[slot].value ? strlen(BUILD_INFO[slot].value) + 1 : 0;
+    size += strlen(value);
+    char buf[size + 1];
+
+    if(BUILD_INFO[slot].value) {
+        strcpy(buf, BUILD_INFO[slot].value);
+        strcat(buf, " ");
+        strcat(buf, value);
+    }
+    else
+        strcpy(buf, value);
+
+    freez((void *)BUILD_INFO[slot].value);
+    BUILD_INFO[slot].value = strdupz(buf);
+}
+
 static void build_info_set_value_strdupz(BUILD_INFO_SLOT slot, const char *value) {
     if(!value) value = "";
     build_info_set_value(slot, strdupz(value));
@@ -947,11 +973,11 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
     build_info_set_status(BIB_FEATURE_HEALTH, true);
     build_info_set_status(BIB_FEATURE_STREAMING, true);
+    build_info_set_status(BIB_FEATURE_BACKFILLING, true);
     build_info_set_status(BIB_FEATURE_REPLICATION, true);
 
-#ifdef ENABLE_RRDPUSH_COMPRESSION
     build_info_set_status(BIB_FEATURE_STREAMING_COMPRESSION, true);
-#endif
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "gzip");
 
     build_info_set_status(BIB_FEATURE_CONTEXTS, true);
     build_info_set_status(BIB_FEATURE_TIERING, true);
@@ -983,6 +1009,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_CONNECTIVITY_TLS_HOST_VERIFY, true);
 #endif
 
+        
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif

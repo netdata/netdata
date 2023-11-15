@@ -9,6 +9,10 @@ endmeta-->
 
 # Kavenegar
 
+
+<img src="https://netdata.cloud/img/kavenegar.png" width="150"/>
+
+
 [Kavenegar](https://kavenegar.com/) as service for software developers, based in Iran, provides send and receive SMS, calling voice by using its APIs.
 You can send notifications to Kavenegar using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
@@ -49,10 +53,10 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_KAVENEGAR | Set `SEND_KAVENEGAR` to YES | YES | True |
-| KAVENEGAR_API_KEY | Set `KAVENEGAR_API_KEY` to your API key. |  | True |
-| KAVENEGAR_SENDER | Set `KAVENEGAR_SENDER` to the value of your Sender. |  | True |
-| DEFAULT_RECIPIENT_KAVENEGAR | Set `DEFAULT_RECIPIENT_KAVENEGAR` to the SMS recipient you want the alert notifications to be sent to. You can define multiple recipients like this: 09155555555 09177777777. |  | True |
+| SEND_KAVENEGAR | Set `SEND_KAVENEGAR` to YES | YES | yes |
+| KAVENEGAR_API_KEY | Set `KAVENEGAR_API_KEY` to your API key. |  | yes |
+| KAVENEGAR_SENDER | Set `KAVENEGAR_SENDER` to the value of your Sender. |  | yes |
+| DEFAULT_RECIPIENT_KAVENEGAR | Set `DEFAULT_RECIPIENT_KAVENEGAR` to the SMS recipient you want the alert notifications to be sent to. You can define multiple recipients like this: 09155555555 09177777777. |  | yes |
 
 ##### DEFAULT_RECIPIENT_KAVENEGAR
 

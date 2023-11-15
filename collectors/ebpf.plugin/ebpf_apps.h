@@ -10,11 +10,13 @@
 #include "libnetdata/ebpf/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
+#define NETDATA_APP_FAMILY "app"
 #define NETDATA_APPS_FILE_GROUP "file_access"
+#define NETDATA_APPS_FILE_FDS "fds"
 #define NETDATA_APPS_FILE_CGROUP_GROUP "file_access (eBPF)"
 #define NETDATA_APPS_PROCESS_GROUP "process (eBPF)"
 #define NETDATA_APPS_NET_GROUP "net"
-#define NETDATA_APPS_IPC_SHM_GROUP "ipc shm (eBPF)"
+#define NETDATA_APPS_IPC_SHM_GROUP "ipc shm"
 
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
@@ -47,8 +49,10 @@ struct ebpf_target {
 
     char id[EBPF_MAX_NAME + 1];
     uint32_t idhash;
+    uint32_t charts_created;
 
     char name[EBPF_MAX_NAME + 1];
+    char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
 
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
@@ -218,7 +222,6 @@ extern ebpf_process_stat_t *process_stat_vector;
 extern ARAL *ebpf_aral_socket_pid;
 void ebpf_socket_aral_init();
 ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
-void ebpf_socket_release(ebpf_socket_publish_apps_t *stat);
 
 extern ARAL *ebpf_aral_cachestat_pid;
 void ebpf_cachestat_aral_init();

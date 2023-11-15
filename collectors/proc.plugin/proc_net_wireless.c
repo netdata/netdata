@@ -85,12 +85,13 @@ static struct netwireless {
 
 static void netwireless_free_st(struct netwireless *wireless_dev)
 {
-    if (wireless_dev->st_status) rrdset_is_obsolete(wireless_dev->st_status);
-    if (wireless_dev->st_link) rrdset_is_obsolete(wireless_dev->st_link);
-    if (wireless_dev->st_level) rrdset_is_obsolete(wireless_dev->st_level);
-    if (wireless_dev->st_noise) rrdset_is_obsolete(wireless_dev->st_noise);
-    if (wireless_dev->st_discarded_packets) rrdset_is_obsolete(wireless_dev->st_discarded_packets);
-    if (wireless_dev->st_missed_beacon) rrdset_is_obsolete(wireless_dev->st_missed_beacon);
+    if (wireless_dev->st_status) rrdset_is_obsolete___safe_from_collector_thread(wireless_dev->st_status);
+    if (wireless_dev->st_link) rrdset_is_obsolete___safe_from_collector_thread(wireless_dev->st_link);
+    if (wireless_dev->st_level) rrdset_is_obsolete___safe_from_collector_thread(wireless_dev->st_level);
+    if (wireless_dev->st_noise) rrdset_is_obsolete___safe_from_collector_thread(wireless_dev->st_noise);
+    if (wireless_dev->st_discarded_packets)
+        rrdset_is_obsolete___safe_from_collector_thread(wireless_dev->st_discarded_packets);
+    if (wireless_dev->st_missed_beacon) rrdset_is_obsolete___safe_from_collector_thread(wireless_dev->st_missed_beacon);
 
     wireless_dev->st_status = NULL;
     wireless_dev->st_link = NULL;

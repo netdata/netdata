@@ -9,6 +9,10 @@ endmeta-->
 
 # PagerDuty
 
+
+<img src="https://netdata.cloud/img/pagerduty.png" width="150"/>
+
+
 PagerDuty is an enterprise incident resolution service that integrates with ITOps and DevOps monitoring stacks to improve operational reliability and agility. From enriching and aggregating events to correlating them into incidents, PagerDuty streamlines the incident management process by reducing alert noise and resolution times.
 You can send notifications to PagerDuty using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
@@ -51,8 +55,8 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_PD | Set `SEND_PD` to YES | YES | True |
-| DEFAULT_RECIPIENT_PD | Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to. You can define multiple service keys like this: `pd_service_key_1` `pd_service_key_2`. |  | True |
+| SEND_PD | Set `SEND_PD` to YES | YES | yes |
+| DEFAULT_RECIPIENT_PD | Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to. You can define multiple service keys like this: `pd_service_key_1` `pd_service_key_2`. |  | yes |
 
 ##### DEFAULT_RECIPIENT_PD
 

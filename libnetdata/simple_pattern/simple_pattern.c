@@ -144,6 +144,14 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         m->negative = negative;
         m->case_sensitive = case_sensitive;
 
+        if(default_mode == SIMPLE_PATTERN_SUBSTRING) {
+            m->mode = SIMPLE_PATTERN_SUBSTRING;
+
+            struct simple_pattern *tm = m;
+            for(tm = m; tm->child ; tm = tm->child) ;
+            tm->mode = SIMPLE_PATTERN_SUBSTRING;
+        }
+
         // link it at the end
         if(unlikely(!root))
             root = last = m;

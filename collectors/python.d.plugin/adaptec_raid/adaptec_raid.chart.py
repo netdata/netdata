@@ -87,7 +87,7 @@ def find_pds(d):
         elif row.startswith('Temperature'):
             v = row.split(':')[-1].split()[0]
             pd.temperature = v
-        elif row.startswith('NCQ status'):
+        elif row.startswith(('NCQ status', 'Device Phy')) or not row:
             if pd.id and pd.state and pd.smart_warnings:
                 pds.append(pd)
             pd = PD()

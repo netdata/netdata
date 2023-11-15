@@ -9,6 +9,10 @@ endmeta-->
 
 # Microsoft Teams
 
+
+<img src="https://netdata.cloud/img/msteams.svg" width="150"/>
+
+
 You can send Netdata alerts to Microsoft Teams using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
@@ -49,9 +53,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_MSTEAMS | Set `SEND_MSTEAMS` to YES | YES | True |
-| MSTEAMS_WEBHOOK_URL | set `MSTEAMS_WEBHOOK_URL` to the incoming webhook URL as given by Microsoft Teams. |  | True |
-| DEFAULT_RECIPIENT_MSTEAMS | Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to. |  | True |
+| SEND_MSTEAMS | Set `SEND_MSTEAMS` to YES | YES | yes |
+| MSTEAMS_WEBHOOK_URL | set `MSTEAMS_WEBHOOK_URL` to the incoming webhook URL as given by Microsoft Teams. |  | yes |
+| DEFAULT_RECIPIENT_MSTEAMS | Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to. |  | yes |
 
 ##### DEFAULT_RECIPIENT_MSTEAMS
 

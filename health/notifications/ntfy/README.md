@@ -9,6 +9,10 @@ endmeta-->
 
 # ntfy
 
+
+<img src="https://netdata.cloud/img/ntfy.svg" width="150"/>
+
+
 [ntfy](https://ntfy.sh/) (pronounce: notify) is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) notification service. It allows you to send notifications to your phone or desktop via scripts from any computer, entirely without signup, cost or setup. It's also [open source](https://github.com/binwiederhier/ntfy) if you want to run your own server.
 You can send alerts to an ntfy server using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
@@ -50,11 +54,11 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_NTFY | Set `SEND_NTFY` to YES | YES | True |
-| DEFAULT_RECIPIENT_NTFY | URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://ntfy.sh. |  | True |
-| NTFY_USERNAME | The username for netdata to use to authenticate with an ntfy server. |  | False |
-| NTFY_PASSWORD | The password for netdata to use to authenticate with an ntfy server. |  | False |
-| NTFY_ACCESS_TOKEN | The access token for netdata to use to authenticate with an ntfy server. |  | False |
+| SEND_NTFY | Set `SEND_NTFY` to YES | YES | yes |
+| DEFAULT_RECIPIENT_NTFY | URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://ntfy.sh. |  | yes |
+| NTFY_USERNAME | The username for netdata to use to authenticate with an ntfy server. |  | no |
+| NTFY_PASSWORD | The password for netdata to use to authenticate with an ntfy server. |  | no |
+| NTFY_ACCESS_TOKEN | The access token for netdata to use to authenticate with an ntfy server. |  | no |
 
 ##### DEFAULT_RECIPIENT_NTFY
 

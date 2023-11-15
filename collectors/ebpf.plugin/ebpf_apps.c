@@ -132,16 +132,6 @@ ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
     return target;
 }
 
-/**
- * eBPF socket release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_socket_release(ebpf_socket_publish_apps_t *stat)
-{
-    aral_freez(ebpf_aral_socket_pid, stat);
-}
-
 /*****************************************************************
  *
  *  CACHESTAT ARAL FUNCTIONS
@@ -511,6 +501,13 @@ struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char
     else
         // copy the id
         strncpyz(w->name, nid, EBPF_MAX_NAME);
+
+    strncpyz(w->clean_name, w->name, EBPF_MAX_NAME);
+    netdata_fix_chart_name(w->clean_name);
+    for (char *d = w->clean_name; *d; d++) {
+        if (*d == '.')
+            *d = '_';
+    }
 
     strncpyz(w->compare, nid, EBPF_MAX_COMPARE_NAME);
     size_t len = strlen(w->compare);

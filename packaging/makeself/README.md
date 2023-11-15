@@ -19,13 +19,20 @@ will be used by default for installation.
 If you want to enforce the usage of a static build and have the installer return a failure if one is not available,
 you can do so by adding `--static-only` to the options you pass to the installer.
 
+## Requirements
+
+- Container runtime tool (Docker or Podman)
+
 ## Building a static binary package
 
-To build the static binary 64-bit distribution package, run:
+Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
+Otherwise, [perform a cleanup](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+
+
+To build the static binary 64-bit distribution package, into the root folder on the netdata repo, run:
 
 ```bash
-cd /path/to/netdata.git
-./packaging/makeself/build-x86_64-static.sh
+./packaging/makeself/build-static.sh x86_64
 ```
 
 The program will:
@@ -37,13 +44,15 @@ The program will:
 
 Once finished, a file named `netdata-vX.X.X-gGITHASH-x86_64-DATE-TIME.run` will be created in the current directory. This is the Netdata binary package that can be run to install Netdata on any other computer.
 
+You can build static binaries for other architectures such as `armv7l`, `aarch64`, and `ppc64le`.
+
 ## Building binaries with debug info
 
 To build Netdata binaries with debugging / tracing information in them, use:
 
 ```bash
 cd /path/to/netdata.git
-./packaging/makeself/build-x86_64-static.sh debug
+./packaging/makeself/build-static.sh x86_64 debug
 ```
 
 These binaries are not optimized (they are a bit slower), they have certain features disables (like log flood protection), other features enables (like `debug flags`) and are not stripped (the binary files are bigger, since they now include source code tracing information).

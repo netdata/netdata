@@ -1,9 +1,9 @@
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/2662304/a62997fb-d75d-42df-b188-b804cd034a70#gh-light-mode-only" alt="Netdata" width="300"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
 </a>
 <a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://github.com/netdata/netdata/assets/2662304/95ea1560-5e83-44d3-ad33-7980f8298b65#gh-dark-mode-only" alt="Netdata" width="300"/>
+  <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
 <h3 align="center">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
@@ -30,6 +30,15 @@
 
 <hr class="solid">
 
+<p align="center">
+<a href="https://www.netdata.cloud#gh-light-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/srecon_light.png" alt="ObservabilityCon23" width="600"/>
+</a>
+<a href="https://www.netdata.cloud#gh-dark-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/srecon_dark.png" alt="ObservabilityCon23" width="600"/>
+</a>
+</p>
+
 MENU: **[WHAT IS NEW](#whats-new-and-coming)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)**
 
 Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers, and applications.
@@ -53,7 +62,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
-- 📖 **systemd Journal Logs Explorer** (beta, in the nightly release channel)<br/>
+- 📖 **systemd Journal Logs Explorer**<br/>
   Provides a `systemd` journal logs explorer, to view, filter and analyze system and applications logs by directly accessing `systemd` journal files on individual hosts and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
@@ -64,10 +73,24 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ---
 
+**LATEST BLOG POST**:<br/>
+
+<p align="center">
+<a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-light-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus.png" alt="Netdata" width="500"/>
+</a>
+<a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-dark-mode-only">
+  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus%20dark.png" alt="Netdata" width="500"/>
+</a>
+</p>
+
+On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% less bandwidth**, **98% less disk I/O**, and is **75% more disk space efficient** on high resolution metrics storage, while providing more than a year of overall retention on the same disk footprint Prometheus offers 7 days of retention. [Read the full analysis in our blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
+
+---
+
 NEW: **Netdata and LOGS !** 🥳</br>
 
 Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query `systemd` journal logs!
-The plugin is available from Oct 3, 2023 to nightly channel users.
 
 ![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
@@ -80,7 +103,7 @@ The plugin is available from Oct 3, 2023 to nightly channel users.
   <br />
   Netdata actively supports and is a member of the Cloud Native Computing Foundation (CNCF)<br />
   &nbsp;<br/>
-  ...and due to your love :heart:, it is one of the most :star:'d projects in the <a href="https://landscape.cncf.io/card-mode?grouping=no&sort=stars">CNCF landscape</a>!
+  ...and due to your love :heart: and :star:, <b>Netdata is leading the Observability category</b> at the <a href="https://landscape.cncf.io/card-mode?category=observability-and-analysis&grouping=no&sort=stars">CNCF landscape</a>!
 </p>
 &nbsp;<br/>
 
@@ -121,10 +144,10 @@ The plugin is available from Oct 3, 2023 to nightly channel users.
 |   Advanced Troubleshooting    | Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor, and many more. |    later     |                                               interrupted                                               |
 |  Easy Custom<br/>Dashboards   |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     soon     |                                                 planned                                                 |
 |     More Customizability      |                           Set default settings for all charts and views!                            |     soon     |                                                 planned                                                 |
-|        `systemd` journal      |                     View the `systemd` journal logs of your systems on the dashboard.                      |     now     |                                               in nightly                                               |
 |          UCUM Units           |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon     |                                               in progress                                               |
-| **Netdata Cloud<br/>On-Prem** |                        **Netdata Cloud available for On-Prem installation!**                        |   **soon**   |                                             **in progress**                                             |
 |       Click to Activate       |                          Configure Alerts and Data Collectors from the UI!                          |     soon     |                                               in progress                                               |
+| **Netdata Cloud<br/>On-Prem** |                        **Netdata Cloud available for On-Prem installation!**                        |   **available**   |   [fill this form](https://www.netdata.cloud/contact-us/?subject=on-prem)                                            |
+|        `systemd` journal      |                     View the `systemd` journal logs of your systems on the dashboard.               | Oct<br/>2023 |   [v1.43](https://github.com/netdata/netdata/releases/tag/v1.43.0) |
 |         Integrations          |                                  Netdata Integrations Marketplace!                                  | Aug<br/>2023 |           [v1.42](https://github.com/netdata/netdata/releases#v1420-integrations-marketplace)           |
 |         New Agent UI          |                    Now Netdata Cloud and Netdata Agent share the same dashboard!                    | Jul<br/>2023 |          [v1.41](https://github.com/netdata/netdata/releases/tag/v1.41.0#v1410-one-dashboard)           |
 |      Summary Dashboards       |                                    High level tiles everywhere!                                     | Jun<br/>2023 | [v1.40](https://github.com/netdata/netdata/releases/tag/v1.40.0#v1400-visualization-summary-dashboards) |
@@ -422,6 +445,8 @@ Yes, you can!
 
 Netdata has been designed to spread disk writes across time. Each metric is flushed to disk every 17 minutes, but metrics are flushed evenly across time, at an almost constant rate. Also, metrics are packed into bigger blocks we call `extents` and are compressed with LZ4 before saving them, to minimize the number of I/O operations made.
 
+Netdata also employs direct I/O for all its database operations, ensuring optimized performance. By managing its own caches, Netdata avoids overburdening system caches, facilitating a harmonious coexistence with other applications.
+
 Single node Agents (not Parents), should have a constant rate of about 50 KiB/s or less, with some spikes above that every minute (flushing of tier 1) and higher spikes every hour (flushing of tier 2).
 
 Health Alerts and Machine-Learning run queries to evaluate their expressions and learn from the metrics' patterns. These are also spread over time, so there should be an almost constant read rate too.
@@ -441,6 +466,8 @@ Using the above, the Netdata Agent on your production system will not use a disk
 ### :raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?
 
 Netdata is a "ready to use" monitoring solution. Prometheus and Grafana are tools to build your own monitoring solution.
+
+Netdata is also a lot faster, requires singificantly less resources and puts almost no stress on the server it runs. For a performance comparison check [this blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -614,9 +641,9 @@ Netdata is a widely adopted project...
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
 
-Browse the [Netdata stargazers on GitHub](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as AMD, Amazon, Baidu, Cisco, Delta, Facebook, IBM, Intel, Netflix, Qualcomm, Riot Games, SAP, Samsung, Unity, Valve, and many others.
+Browse the [Netdata stargazers on GitHub](https://github.com/netdata/netdata/stargazers) to discover users from renowned companies and enterprises, such as ABN AMRO Bank, AMD, Amazon, Baidu, Booking.com, Cisco, Delta, Facebook, Google, IBM, Intel, Logitech, Netflix, Nokia, Qualcomm, Realtek Semiconductor Corp, Redhat, Riot Games, SAP, Samsung, Unity, Valve, and many others.
 
-Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, among several others.
+Netdata also enjoys significant usage in academia, with notable institutions including New York University, Columbia University, New Jersey University, Seoul National University, University College London, among several others.
 
 And, Netdata is also used by numerous governmental organizations worldwide.
 
@@ -754,7 +781,6 @@ General information about contributions:
 - Check our [Security Policy](https://github.com/netdata/netdata/security/policy).
 - Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - Read our [Contributing Guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
-- We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
 
 Package maintainers should read the guide on [building Netdata from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from the source and preparing a package.

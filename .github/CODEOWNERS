@@ -19,11 +19,11 @@ collectors/cups.plugin/ @thiagoftsm
 exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
-docs/ @tkatsoulas @andrewm4894 @Ancairon
+docs/ @tkatsoulas @Ancairon
 health/ @thiagoftsm @vkalintiris @MrZammler
 health/health.d/ @thiagoftsm @MrZammler
 health/notifications/ @Ferroin @thiagoftsm @MrZammler
-ml/ @andrewm4894 @vkalintiris
+ml/ @vkalintiris
 libnetdata/ @thiagoftsm @vkalintiris
 packaging/ @Ferroin @tkatsoulas
 registry/ @novykh
@@ -35,8 +35,8 @@ web/gui/ @novykh
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin @tkatsoulas
-*.md @tkatsoulas @andrewm4894 @Ancairon
-*.mdx @tkatsoulas @andrewm4894 @Ancairon
+*.md @tkatsoulas @Ancairon
+*.mdx @tkatsoulas @Ancairon
 Dockerfile* @Ferroin @tkatsoulas
 
 # Ownership of specific files

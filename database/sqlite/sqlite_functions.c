@@ -4,7 +4,7 @@
 #include "sqlite3recover.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 14
+#define DB_METADATA_VERSION 15
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -60,6 +60,8 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_5 ON health_log_detail (health_log_id, unique_id DESC);",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id);",
 
     NULL
 };
@@ -414,7 +416,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
             sqlite3_free(err_msg);
         }
         else {
-            db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
             (void) sqlite3_close(db_meta);
         }
         return 1;
@@ -469,6 +471,9 @@ void sql_close_database(void)
 
     add_stmt_to_list(NULL);
 
+    (void) db_execute(db_meta, "PRAGMA analysis_limit=1000");
+    (void) db_execute(db_meta, "PRAGMA optimize");
+
     rc = sqlite3_close_v2(db_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
@@ -509,22 +514,25 @@ int db_execute(sqlite3 *db, const char *cmd)
 {
     int rc;
     int cnt = 0;
+
     while (cnt < SQL_MAX_RETRY) {
         char *err_msg;
         rc = sqlite3_exec_monitored(db, cmd, 0, 0, &err_msg);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
-            sqlite3_free(err_msg);
-            if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
-                usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
-            }
-            else
-                break;
-        }
-        else
+        if (likely(rc == SQLITE_OK))
             break;
 
         ++cnt;
+        error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
+        sqlite3_free(err_msg);
+
+        if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
+            usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
+            continue;
+        }
+
+        if (rc == SQLITE_CORRUPT)
+            mark_database_to_recover(NULL, db);
+        break;
     }
     return (rc != SQLITE_OK);
 }

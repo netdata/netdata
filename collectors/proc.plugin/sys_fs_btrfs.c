@@ -196,8 +196,8 @@ static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every
 
 static inline void btrfs_free_commits_stats(BTRFS_NODE *node){
     if(node->st_commits){
-        rrdset_is_obsolete(node->st_commits);
-        rrdset_is_obsolete(node->st_commit_timings);
+        rrdset_is_obsolete___safe_from_collector_thread(node->st_commits);
+        rrdset_is_obsolete___safe_from_collector_thread(node->st_commit_timings);
     }
     freez(node->commit_stats_filename);
     node->commit_stats_filename = NULL;
@@ -211,7 +211,7 @@ static inline void btrfs_free_disk(BTRFS_DISK *d) {
 
 static inline void btrfs_free_device(BTRFS_DEVICE *d) {
     if(d->st_error_stats)
-        rrdset_is_obsolete(d->st_error_stats);
+        rrdset_is_obsolete___safe_from_collector_thread(d->st_error_stats);
     freez(d->error_stats_filename);
     freez(d);
 }
@@ -220,16 +220,16 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
     // collector_info("BTRFS: destroying '%s'", node->id);
 
     if(node->st_allocation_disks)
-        rrdset_is_obsolete(node->st_allocation_disks);
+        rrdset_is_obsolete___safe_from_collector_thread(node->st_allocation_disks);
 
     if(node->st_allocation_data)
-        rrdset_is_obsolete(node->st_allocation_data);
+        rrdset_is_obsolete___safe_from_collector_thread(node->st_allocation_data);
 
     if(node->st_allocation_metadata)
-        rrdset_is_obsolete(node->st_allocation_metadata);
+        rrdset_is_obsolete___safe_from_collector_thread(node->st_allocation_metadata);
 
     if(node->st_allocation_system)
-        rrdset_is_obsolete(node->st_allocation_system);
+        rrdset_is_obsolete___safe_from_collector_thread(node->st_allocation_system);
 
     freez(node->allocation_data_bytes_used_filename);
     freez(node->allocation_data_total_bytes_filename);

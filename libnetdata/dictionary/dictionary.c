@@ -137,6 +137,7 @@ struct dictionary {
     const char *creation_function;
     const char *creation_file;
     size_t creation_line;
+    pid_t creation_tid;
 #endif
 
     usec_t last_gc_run_us;
@@ -1873,6 +1874,7 @@ void cleanup_destroyed_dictionaries(void) {
         size_t line = dict->creation_line;
         const char *file = dict->creation_file;
         const char *function = dict->creation_function;
+        pid_t pid = dict->creation_tid;
 #endif
 
         DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
@@ -1880,13 +1882,19 @@ void cleanup_destroyed_dictionaries(void) {
 
             internal_error(
                 true,
-                "DICTIONARY: freed dictionary with delayed destruction, created from %s() %zu@%s.",
-                function, line, file);
+                "DICTIONARY: freed dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                function, line, file, pid);
 
             if(last) last->next = next;
             else dictionaries_waiting_to_be_destroyed = next;
         }
         else {
+
+            internal_error(
+                    true,
+                    "DICTIONARY: cannot free dictionary with delayed destruction, created from %s() %zu@%s pid %d.",
+                    function, line, file, pid);
+
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
         }
@@ -2085,6 +2093,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
     dict->creation_function = function;
     dict->creation_file = file;
     dict->creation_line = line;
+    dict->creation_tid = gettid();
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);

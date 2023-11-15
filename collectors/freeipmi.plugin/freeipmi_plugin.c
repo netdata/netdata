@@ -22,6 +22,10 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#define FREEIPMI_GLOBAL_FUNCTION_SENSORS() do { \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\"\n", 5, "Displays current sensor state and readings"); \
+    } while(0)
+
 // component names, based on our patterns
 #define NETDATA_SENSOR_COMPONENT_MEMORY_MODULE     "Memory Module"
 #define NETDATA_SENSOR_COMPONENT_MEMORY            "Memory"
@@ -82,6 +86,12 @@ static void netdata_update_ipmi_sel_events_count(struct netdata_ipmi_state *stat
 #include <ipmi_monitoring_offsets.h>
 
 /* Communication Configuration - Initialize accordingly */
+
+static netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
+static bool function_plugin_should_exit = false;
+
+int update_every = IPMI_SENSORS_MIN_UPDATE_EVERY; // this is the minimum update frequency
+int update_every_sel = IPMI_SEL_MIN_UPDATE_EVERY; // this is the minimum update frequency for SEL events
 
 /* Hostname, NULL for In-band communication, non-null for a hostname */
 char *hostname = NULL;
@@ -707,6 +717,8 @@ struct netdata_ipmi_state {
     } updates;
 };
 
+struct netdata_ipmi_state state = {0};
+
 // ----------------------------------------------------------------------------
 // excluded record ids maintenance (both for sensor data and state)
 
@@ -1297,6 +1309,7 @@ static size_t send_ipmi_sensor_metrics_to_netdata(struct netdata_ipmi_state *sta
     int update_every = (int)(state->sensors.freq_ut / USEC_PER_SEC);
     struct sensor *sn;
 
+    netdata_mutex_lock(&stdout_mutex);
     // generate the CHART/DIMENSION lines, if we have to
     dfe_start_reentrant(state->sensors.dict, sn) {
                 if(unlikely(!sn->do_metric && !sn->do_state))
@@ -1396,11 +1409,15 @@ static size_t send_ipmi_sensor_metrics_to_netdata(struct netdata_ipmi_state *sta
             }
     dfe_done(sn);
 
+    netdata_mutex_unlock(&stdout_mutex);
+
     return total_sensors_sent;
 }
 
 static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state) {
     static bool sel_chart_generated = false;
+
+    netdata_mutex_lock(&stdout_mutex);
 
     if(likely(state->sel.status == ICS_RUNNING)) {
         if(unlikely(!sel_chart_generated)) {
@@ -1422,11 +1439,187 @@ static size_t send_ipmi_sel_metrics_to_netdata(struct netdata_ipmi_state *state)
         );
     }
 
+    netdata_mutex_unlock(&stdout_mutex);
+
     return state->sel.events;
 }
 
 // ----------------------------------------------------------------------------
+
+static const char *get_sensor_state_string(struct sensor *sn) {
+    switch (sn->sensor_state) {
+        case IPMI_MONITORING_STATE_NOMINAL:
+            return "nominal";
+        case IPMI_MONITORING_STATE_WARNING:
+            return "warning";
+        case IPMI_MONITORING_STATE_CRITICAL:
+            return "critical";
+        default:
+            return "unknown";
+    }
+}
+
+static const char *get_sensor_function_priority(struct sensor *sn) {
+    switch (sn->sensor_state) {
+        case IPMI_MONITORING_STATE_WARNING:
+            return "warning";
+        case IPMI_MONITORING_STATE_CRITICAL:
+            return "critical";
+        default:
+            return "normal";
+    }
+}
+
+static void freeimi_function_sensors(const char *transaction, char *function __maybe_unused, int timeout __maybe_unused, bool *cancelled __maybe_unused) {
+    time_t expires = now_realtime_sec() + update_every;
+
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", update_every);
+    buffer_json_member_add_string(wb, "help", "View IPMI sensor readings and its state");
+    buffer_json_member_add_array(wb, "data");
+
+    struct sensor *sn;
+    dfe_start_reentrant(state.sensors.dict, sn) {
+        if (unlikely(!sn->do_metric && !sn->do_state))
+            continue;
+
+        double reading = NAN;
+        switch (sn->sensor_reading_type) {
+            case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
+                        reading = (double)sn->sensor_reading.uint32_value;
+                        break;
+            case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
+                        reading = (double)(sn->sensor_reading.double_value);
+                        break;
+            case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
+                        reading = (double)sn->sensor_reading.bool_value;
+                        break;
+        }
+
+        buffer_json_add_array_item_array(wb);
+
+        buffer_json_add_array_item_string(wb, sn->sensor_name);
+        buffer_json_add_array_item_string(wb, sn->type);
+        buffer_json_add_array_item_string(wb, sn->component);
+        buffer_json_add_array_item_double(wb, reading);
+        buffer_json_add_array_item_string(wb, sn->units);
+        buffer_json_add_array_item_string(wb, get_sensor_state_string(sn));
+
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_string(wb, "severity", get_sensor_function_priority(sn));
+        buffer_json_object_close(wb);
+
+        buffer_json_array_close(wb);
+    }
+    dfe_done(sn);
+
+    buffer_json_array_close(wb); // data
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Sensor", "Sensor Name",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Type", "Sensor Type",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Component", "Sensor Component",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Reading", "Sensor Current Reading",
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, NULL, 0, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Units", "Sensor Reading Units",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "State", "Sensor State",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                NULL);
+        buffer_rrdf_table_add_field(
+                wb, field_id++,
+                "rowOptions", "rowOptions",
+                RRDF_FIELD_TYPE_NONE,
+                RRDR_FIELD_VISUAL_ROW_OPTIONS,
+                RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                RRDF_FIELD_SORT_FIXED,
+                NULL,
+                RRDF_FIELD_SUMMARY_COUNT,
+                RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_DUMMY,
+                NULL);
+    }
+
+    buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "Type");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Sensors");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Sensor");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Sensors");
+        buffer_json_add_array_item_string(wb, "Component");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Sensors");
+        buffer_json_add_array_item_string(wb, "State");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
+
+    buffer_free(wb);
+}
+
+// ----------------------------------------------------------------------------
 // main, command line arguments parsing
+
+static void plugin_exit(int code) {
+    fflush(stdout);
+    function_plugin_should_exit = true;
+    exit(code);
+}
 
 int main (int argc, char **argv) {
     bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
@@ -1434,8 +1627,6 @@ int main (int argc, char **argv) {
     stderror = stderr;
     clocks_init();
 
-    int update_every = IPMI_SENSORS_MIN_UPDATE_EVERY; // this is the minimum update frequency
-    int update_every_sel = IPMI_SEL_MIN_UPDATE_EVERY; // this is the minimum update frequency for SEL events
     bool debug = false;
 
     // ------------------------------------------------------------------------
@@ -1801,15 +1992,16 @@ int main (int argc, char **argv) {
 
     heartbeat_t hb;
     heartbeat_init(&hb);
+
     for(iteration = 0; 1 ; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
         if (!tty) {
+            netdata_mutex_lock(&stdout_mutex);
             fprintf(stdout, "\n"); // keepalive to avoid parser read timeout (2 minutes) during ipmi_detect_speed_secs()
             fflush(stdout);
+            netdata_mutex_unlock(&stdout_mutex);
         }
-
-        struct netdata_ipmi_state state = {0 };
 
         spinlock_lock(&sensors_data.spinlock);
         state.sensors = sensors_data.state.sensors;
@@ -1827,8 +2019,7 @@ int main (int argc, char **argv) {
                                     __FUNCTION__, (size_t)((now_monotonic_usec() - state.sensors.last_iteration_ut) / USEC_PER_SEC));
 
                     fprintf(stdout, "EXIT\n");
-                    fflush(stdout);
-                    exit(0);
+                    plugin_exit(0);
                 }
                 break;
 
@@ -1838,14 +2029,12 @@ int main (int argc, char **argv) {
             case ICS_INIT_FAILED:
                 collector_error("%s(): sensors failed to initialize. Calling DISABLE.", __FUNCTION__);
                 fprintf(stdout, "DISABLE\n");
-                fflush(stdout);
-                exit(0);
+                plugin_exit(0);
 
             case ICS_FAILED:
                 collector_error("%s(): sensors fails repeatedly to collect metrics. Exiting to restart.", __FUNCTION__);
                 fprintf(stdout, "EXIT\n");
-                fflush(stdout);
-                exit(0);
+                plugin_exit(0);
         }
 
         if(netdata_do_sel) {
@@ -1865,6 +2054,16 @@ int main (int argc, char **argv) {
         if(unlikely(debug))
             fprintf(stderr, "%s: calling send_ipmi_sensor_metrics_to_netdata()\n", program_name);
 
+        static bool add_func_sensors = true;
+        if (add_func_sensors) {
+            add_func_sensors = false;
+            struct functions_evloop_globals *wg =
+                functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit);
+            functions_evloop_add_function(
+                wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+            FREEIPMI_GLOBAL_FUNCTION_SENSORS();
+        }
+
         state.updates.now_ut = now_monotonic_usec();
         send_ipmi_sensor_metrics_to_netdata(&state);
 
@@ -1879,6 +2078,8 @@ int main (int argc, char **argv) {
                     , dictionary_entries(state.sensors.dict)
                     , state.sensors.collected
             );
+
+        netdata_mutex_lock(&stdout_mutex);
 
         if (!global_chart_created) {
             global_chart_created = true;
@@ -1899,10 +2100,11 @@ int main (int argc, char **argv) {
         if (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS) {
             collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
-            fflush(stdout);
-            exit(0);
+            plugin_exit(0);
         }
 
         fflush(stdout);
+
+        netdata_mutex_unlock(&stdout_mutex);
     }
 }

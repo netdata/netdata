@@ -173,8 +173,8 @@ You can find the configuration at `/etc/netdata/netdata.conf`:
 	# update every (flushInterval) = 1
 	# udp messages to process at once = 10
 	# create private charts for metrics matching = *
-	# max private charts allowed = 200
 	# max private charts hard limit = 1000
+	# cleanup obsolete charts after secs = 0
 	# private charts memory mode = save
 	# private charts history = 3996
 	# histograms and timers percentile (percentThreshold) = 95.00000
@@ -234,13 +234,11 @@ The default behavior is to use the same settings as the rest of the Netdata Agen
 - `private charts memory mode`
 - `private charts history`
 
-### Optimize private metric charts visualization and storage
+### Optimize private metric charts storage
 
-If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the Netdata dashboard (this is a web browser issue we need to address at the Netdata UI). So, Netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
+For optimization reasons, Netdata imposes a hard limit on private metric charts. The limit is set via the `max private charts hard limit` setting (which defaults to 1000 charts). Metrics above this hard limit are still collected, but they can only be used in synthetic charts (once a metric is added to chart, it will be sent to backend servers too).
 
-The metrics above this soft limit are still processed by Netdata, can be used in synthetic charts and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, Netdata will still generate charts, but they will automatically be created with `memory mode = none` (Netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
-
-Metrics above the hard limit are still collected, but they can only be used in synthetic charts (once a metric is added to chart, it will be sent to backend servers too).
+If you have many ephemeral metrics collected (i.e. that you collect values for a certain amount of time), you can set the configuration option `set charts as obsolete after secs`. Setting a value in seconds here, means that Netdata will mark those metrics (and their private charts) as obsolete after the specified time has passed since the last sent metric value. Those charts will later be deleted according to the setting in `cleanup obsolete charts after secs`. Setting `set charts as obsolete after secs` to 0 (which is also the default value) will disable this functionality.
 
 Example private charts (automatically generated without any configuration):
 

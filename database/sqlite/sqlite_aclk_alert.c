@@ -71,9 +71,9 @@ fail:
 //decide if some events should be sent or not
 #define SQL_SELECT_ALERT_BY_ID                                                                                             \
     "SELECT hld.new_status, hl.config_hash_id, hld.unique_id FROM health_log hl, aclk_alert_%s aa, health_log_detail hld " \
-    "WHERE hl.host_id = @host_id AND hld.unique_id = aa.filtered_alert_unique_id "                                         \
+    "WHERE hl.host_id = @host_id AND +hld.unique_id = aa.filtered_alert_unique_id "                                        \
     "AND hld.alarm_id = @alarm_id AND hl.health_log_id = hld.health_log_id "                                               \
-    "ORDER BY hld.alarm_event_id DESC LIMIT 1;"
+    "ORDER BY hld.rowid DESC LIMIT 1;"
 
 static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
@@ -292,13 +292,6 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         rc = db_execute(db_meta, buffer_tostring(sql_fix));
         if (unlikely(rc))
             error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
-
-        else {
-            buffer_flush(sql_fix);
-            buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
-            if (unlikely(db_execute(db_meta, buffer_tostring(sql_fix))))
-                error_report("Failed to create ACLK alert table for host %s", rrdhost_hostname(wc->host));
-        }
         buffer_free(sql_fix);
 
         // Try again

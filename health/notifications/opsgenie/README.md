@@ -9,6 +9,10 @@ endmeta-->
 
 # OpsGenie
 
+
+<img src="https://netdata.cloud/img/opsgenie.png" width="150"/>
+
+
 Opsgenie is an alerting and incident response tool. It is designed to group and filter alarms, build custom routing rules for on-call teams, and correlate deployments and commits to incidents.
 You can send notifications to Opsgenie using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
@@ -49,9 +53,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_OPSGENIE | Set `SEND_OPSGENIE` to YES | YES | True |
-| OPSGENIE_API_KEY | Set `OPSGENIE_API_KEY` to your API key. |  | True |
-| OPSGENIE_API_URL | Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`. | https://api.opsgenie.com | False |
+| SEND_OPSGENIE | Set `SEND_OPSGENIE` to YES | YES | yes |
+| OPSGENIE_API_KEY | Set `OPSGENIE_API_KEY` to your API key. |  | yes |
+| OPSGENIE_API_URL | Set `OPSGENIE_API_URL` to the corresponding URL if required, for example there are region-specific API URLs such as `https://eu.api.opsgenie.com`. | https://api.opsgenie.com | no |
 
 </details>
 

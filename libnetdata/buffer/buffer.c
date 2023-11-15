@@ -301,12 +301,15 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
     strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
     strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
-    wb->json.options = options;
     wb->json.depth = (int8_t)(depth - 1);
     _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 
     if(add_anonymous_object)
         buffer_fast_strcat(wb, "{", 1);
+    else
+        options |= BUFFER_JSON_OPTIONS_NON_ANONYMOUS;
+
+    wb->json.options = options;
 
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
@@ -316,9 +319,14 @@ void buffer_json_finalize(BUFFER *wb) {
     while(wb->json.depth >= 0) {
         switch(wb->json.stack[wb->json.depth].type) {
             case BUFFER_JSON_OBJECT:
-                buffer_json_object_close(wb);
+                if (wb->json.depth == 0)
+                    if (!(wb->json.options & BUFFER_JSON_OPTIONS_NON_ANONYMOUS))
+                        buffer_json_object_close(wb);
+                    else
+                        _buffer_json_depth_pop(wb);
+                else
+                    buffer_json_object_close(wb);
                 break;
-
             case BUFFER_JSON_ARRAY:
                 buffer_json_array_close(wb);
                 break;

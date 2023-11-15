@@ -9,6 +9,10 @@ endmeta-->
 
 # Email
 
+
+<img src="https://netdata.cloud/img/email.png" width="150"/>
+
+
 Send notifications via Email using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
@@ -48,9 +52,9 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| EMAIL_SENDER | You can change `EMAIL_SENDER` to the email address sending the notifications. | netdata | False |
-| SEND_EMAIL | Set `SEND_EMAIL` to YES | YES | True |
-| DEFAULT_RECIPIENT_EMAIL | Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default. You can define multiple email addresses like this: `alarms@example.com` `systems@example.com`. | root | True |
+| EMAIL_SENDER | You can change `EMAIL_SENDER` to the email address sending the notifications. | netdata | no |
+| SEND_EMAIL | Set `SEND_EMAIL` to YES | YES | yes |
+| DEFAULT_RECIPIENT_EMAIL | Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default. You can define multiple email addresses like this: `alarms@example.com` `systems@example.com`. | root | yes |
 
 ##### DEFAULT_RECIPIENT_EMAIL
 

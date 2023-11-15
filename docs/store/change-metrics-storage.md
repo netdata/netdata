@@ -38,7 +38,7 @@ on the maximum retention and the memory used by Netdata is described in detail, 
 ```
 
 The default "update every iterations" of 60 means that if a metric is collected per second in Tier 0, then
-we will have a data point every minute in tier 1 and every minute in tier 2. 
+we will have a data point every minute in tier 1 and every hour in tier 2. 
 
 Up to 5 tiers are supported. You may add, or remove tiers and/or modify these multipliers, as long as the 
 product of all the "update every iterations" does not exceed 65535 (number of points for each tier0 point).

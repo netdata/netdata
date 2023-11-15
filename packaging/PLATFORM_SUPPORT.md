@@ -68,6 +68,7 @@ to work on these platforms with minimal user effort.
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 | Debian                   | 10.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
+| Fedora                   | 39             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 38             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 37             | x86\_64, AArch64                       |                                                                                                                                                    |
 | openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                                                    |
@@ -77,6 +78,7 @@ to work on these platforms with minimal user effort.
 | Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                                                    |
+| Ubuntu                   | 23.10          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
 | Ubuntu                   | 23.04          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
@@ -96,7 +98,6 @@ with minimal user effort.
 | Alpine Linux  | Edge       | No                       |                                                                                                      |
 | Alpine Linux  | 3.17       | No                       |                                                                                                      |
 | Alpine Linux  | 3.16       | No                       |                                                                                                      |
-| Alpine Linux  | 3.15       | No                       |                                                                                                      |
 | Arch Linux    | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | openSUSE      | Tumbleweed | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.41.0 of the Netdata Agent |

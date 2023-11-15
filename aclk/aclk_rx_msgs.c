@@ -108,7 +108,7 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     }
     start = payload + 4;
 
-    if(!(end = strstr(payload, " HTTP/1.1\x0D\x0A"))) {
+    if(!(end = strstr(payload, HTTP_1_1 HTTP_ENDL))) {
         errno = 0;
         netdata_log_error("Doesn't look like HTTP GET request.");
         return 1;

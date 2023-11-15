@@ -5,6 +5,9 @@
 
 #include "libnetdata/libnetdata.h"
 
+#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
+#include "mqtt_websockets/c_rhash/include/c_rhash.h"
+
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
     HTTP_REQ_POST,
@@ -76,5 +79,57 @@ void https_req_response_init(https_req_response_t *res);
     }
 
 int https_request(https_req_t *request, https_req_response_t *response);
+
+// we expose previously internal parser as this is usefull also from
+// other parts of the code
+enum http_parse_state {
+    HTTP_PARSE_INITIAL = 0,
+    HTTP_PARSE_HEADERS,
+    HTTP_PARSE_CONTENT
+};
+
+typedef uint32_t parse_ctx_flags_t;
+
+#define HTTP_PARSE_FLAG_DONT_WAIT_FOR_CONTENT ((parse_ctx_flags_t)0x01)
+
+#define HTTP_PARSE_FLAGS_DEFAULT ((parse_ctx_flags_t)0)
+
+typedef struct {
+    parse_ctx_flags_t flags;
+
+    enum http_parse_state state;
+    int content_length;
+    int http_code;
+
+    c_rhash headers;
+
+    // for chunked data only
+    char *chunked_response;
+    size_t chunked_response_size;
+    size_t chunked_response_written;
+
+    enum chunked_content_state {
+        CHUNKED_CONTENT_CHUNK_SIZE = 0,
+        CHUNKED_CONTENT_CHUNK_DATA,
+        CHUNKED_CONTENT_CHUNK_END_CRLF,
+        CHUNKED_CONTENT_FINAL_CRLF
+    } chunked_content_state;
+
+    size_t chunk_size;
+    size_t chunk_got;
+} http_parse_ctx;
+
+void http_parse_ctx_create(http_parse_ctx *ctx);
+void http_parse_ctx_destroy(http_parse_ctx *ctx);
+
+typedef enum {
+    HTTP_PARSE_ERROR = -1,
+    HTTP_PARSE_NEED_MORE_DATA = 0,
+    HTTP_PARSE_SUCCESS = 1
+} http_parse_rc;
+
+http_parse_rc parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx);
+
+const char *get_http_header_by_name(http_parse_ctx *ctx, const char *name);
 
 #endif /* NETDATA_HTTPS_CLIENT_H */

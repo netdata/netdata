@@ -269,6 +269,8 @@ struct target {
     uid_t uid;
     gid_t gid;
 
+    bool is_other;
+
     kernel_uint_t minflt;
     kernel_uint_t cminflt;
     kernel_uint_t majflt;
@@ -1007,6 +1009,7 @@ static int read_apps_groups_conf(const char *path, const char *file)
     apps_groups_default_target = get_apps_groups_target("p+!o@w#e$i^r&7*5(-i)l-o_", NULL, "other"); // match nothing
     if(!apps_groups_default_target)
         fatal("Cannot create default target");
+    apps_groups_default_target->is_other = true;
 
     // allow the user to override group 'other'
     if(apps_groups_default_target->target)
@@ -3747,7 +3750,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     struct target *w;
 
     for (w = root; w ; w = w->next) {
-        if(unlikely(!w->exposed))
+        if (unlikely(!w->exposed && !w->is_other))
             continue;
 
         send_BEGIN(type, w->clean_name, "processes", dt);
@@ -3758,7 +3761,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_SET("threads", w->num_threads);
         send_END();
 
-        if(unlikely(!w->processes))
+        if (unlikely(!w->processes && !w->is_other))
             continue;
 
         send_BEGIN(type, w->clean_name, "cpu_utilization", dt);
@@ -3810,7 +3813,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         if (enable_detailed_uptime_charts) {
             send_BEGIN(type, w->clean_name, "uptime_summary", dt);
             send_SET("min", w->uptime_min);
-            send_SET("avg", w->uptime_sum / w->processes);
+            send_SET("avg", w->processes > 0 ? w->uptime_sum / w->processes : 0);
             send_SET("max", w->uptime_max);
             send_END();
         }
@@ -3869,7 +3872,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 
     for (w = root; w; w = w->next) {
-        if (likely(w->exposed || !w->processes))
+        if (likely(w->exposed || (!w->processes && !w->is_other)))
             continue;
 
         w->exposed = 1;
@@ -4799,13 +4802,13 @@ static void function_processes(const char *transaction, char *function __maybe_u
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "KiB/s", LReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "LWrites", "Logical I/O Writes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "KiB/s", LWrites_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 #endif
 
         // I/O calls
@@ -4813,12 +4816,12 @@ static void function_processes(const char *transaction, char *function __maybe_u
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
                                     "calls/s", RCalls_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "WCalls", "I/O Write Calls", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,
                                     "calls/s", WCalls_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // minor page faults
         buffer_rrdf_table_add_field(wb, field_id++, "MinFlt", "Minor Page Faults/s", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
@@ -4856,7 +4859,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "pgflts/s", TMajFlt_max, RRDF_FIELD_SORT_DESCENDING,
                                     NULL, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // open file descriptors
         buffer_rrdf_table_add_field(wb, field_id++, "FDsLimitPercent", "Percentage of Open Descriptors vs Limits",
@@ -4868,24 +4871,24 @@ static void function_processes(const char *transaction, char *function __maybe_u
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", FDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Files", "Open Files", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
                                     "fds",
                                     Files_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Pipes", "Open Pipes", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
                                     "fds",
                                     Pipes_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Sockets", "Open Sockets", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
                                     "fds", Sockets_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "iNotiFDs", "Open iNotify Descriptors",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", iNotiFDs_max, RRDF_FIELD_SORT_DESCENDING,
@@ -4922,12 +4925,12 @@ static void function_processes(const char *transaction, char *function __maybe_u
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
                                     "processes", Processes_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Threads", "Threads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
                                     "threads", Threads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
         buffer_rrdf_table_add_field(wb, field_id++, "Uptime", "Uptime in seconds", RRDF_FIELD_TYPE_DURATION,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_DURATION_S, 2,
                                     "seconds", Uptime_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,

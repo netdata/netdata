@@ -65,7 +65,7 @@ void power_supply_free(struct power_supply *ps) {
 
         // free capacity structure
         if(likely(ps->capacity)) {
-            if(likely(ps->capacity->st)) rrdset_is_obsolete(ps->capacity->st);
+            if(likely(ps->capacity->st)) rrdset_is_obsolete___safe_from_collector_thread(ps->capacity->st);
             freez(ps->capacity->filename);
             if(likely(ps->capacity->fd != -1)) close(ps->capacity->fd);
             files_num--;
@@ -89,7 +89,7 @@ void power_supply_free(struct power_supply *ps) {
             }
 
             // free properties
-            if(likely(pr->st)) rrdset_is_obsolete(pr->st);
+            if(likely(pr->st)) rrdset_is_obsolete___safe_from_collector_thread(pr->st);
             freez(pr->name);
             freez(pr->title);
             freez(pr->units);

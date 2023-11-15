@@ -9,6 +9,10 @@ endmeta-->
 
 # Alerta
 
+
+<img src="https://netdata.cloud/img/alerta.png" width="150"/>
+
+
 The [Alerta](https://alerta.io/) monitoring system is a tool used to consolidate and de-duplicate alerts from multiple sources for quick ‘at-a-glance’ visualization. With just one system you can monitor alerts from many other monitoring tools on a single screen.
 You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host Netdata configuration.
 
@@ -50,11 +54,11 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_ALERTA | Set `SEND_ALERTA` to YES |  | True |
-| ALERTA_WEBHOOK_URL | set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server. |  | True |
-| ALERTA_API_KEY | Set `ALERTA_API_KEY` to your API key. |  | True |
-| DEFAULT_RECIPIENT_ALERTA | Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | True |
-| DEFAULT_RECIPIENT_CUSTOM | Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice |  | False |
+| SEND_ALERTA | Set `SEND_ALERTA` to YES |  | yes |
+| ALERTA_WEBHOOK_URL | set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server. |  | yes |
+| ALERTA_API_KEY | Set `ALERTA_API_KEY` to your API key. |  | yes |
+| DEFAULT_RECIPIENT_ALERTA | Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | yes |
+| DEFAULT_RECIPIENT_CUSTOM | Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice |  | no |
 
 ##### ALERTA_API_KEY
 

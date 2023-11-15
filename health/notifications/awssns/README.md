@@ -9,6 +9,10 @@ endmeta-->
 
 # AWS SNS
 
+
+<img src="https://netdata.cloud/img/aws.svg" width="150"/>
+
+
 As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. Among other things, SNS supports sending notifications to:
 - Email addresses
 - Mobile Phones via SMS
@@ -67,10 +71,10 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| aws path | The full path of the aws command. If empty, the system `$PATH` will be searched for it. If not found, Amazon SNS notifications will be silently disabled. |  | True |
-| SEND_AWSNS | Set `SEND_AWSNS` to YES | YES | True |
-| AWSSNS_MESSAGE_FORMAT | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. | ${status} on ${host} at ${date}: ${chart} ${value_string} | True |
-| DEFAULT_RECIPIENT_AWSSNS | Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic. |  | True |
+| aws path | The full path of the aws command. If empty, the system `$PATH` will be searched for it. If not found, Amazon SNS notifications will be silently disabled. |  | yes |
+| SEND_AWSNS | Set `SEND_AWSNS` to YES | YES | yes |
+| AWSSNS_MESSAGE_FORMAT | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. | ${status} on ${host} at ${date}: ${chart} ${value_string} | yes |
+| DEFAULT_RECIPIENT_AWSSNS | Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic. |  | yes |
 
 ##### AWSSNS_MESSAGE_FORMAT
 

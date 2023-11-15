@@ -9,6 +9,10 @@ endmeta-->
 
 # Matrix
 
+
+<img src="https://netdata.cloud/img/matrix.svg" width="150"/>
+
+
 Send notifications to Matrix network rooms using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
@@ -50,10 +54,10 @@ The following options can be defined for this notification
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| SEND_MATRIX | Set `SEND_MATRIX` to YES | YES | True |
-| MATRIX_HOMESERVER | set `MATRIX_HOMESERVER` to the URL of the Matrix homeserver. |  | True |
-| MATRIX_ACCESSTOKEN | Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account. |  | True |
-| DEFAULT_RECIPIENT_MATRIX | Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`. |  | True |
+| SEND_MATRIX | Set `SEND_MATRIX` to YES | YES | yes |
+| MATRIX_HOMESERVER | set `MATRIX_HOMESERVER` to the URL of the Matrix homeserver. |  | yes |
+| MATRIX_ACCESSTOKEN | Set `MATRIX_ACCESSTOKEN` to the access token from your Matrix account. |  | yes |
+| DEFAULT_RECIPIENT_MATRIX | Set `DEFAULT_RECIPIENT_MATRIX`  to the rooms you want the alert notifications to be sent to. The format is `!roomid:homeservername`. |  | yes |
 
 ##### MATRIX_ACCESSTOKEN
 

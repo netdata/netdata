@@ -38,17 +38,17 @@ static unsigned char functions_allowed_chars[256] = {
     [30] = '_', //
     [31] = '_', //
     [32] = ' ', // SPACE keep
-    [33] = '_', // !
-    [34] = '_', // "
-    [35] = '_', // #
-    [36] = '_', // $
-    [37] = '_', // %
-    [38] = '_', // &
-    [39] = '_', // '
-    [40] = '_', // (
-    [41] = '_', // )
-    [42] = '_', // *
-    [43] = '_', // +
+    [33] = '!', // ! keep
+    [34] = '"', // " keep
+    [35] = '#', // # keep
+    [36] = '$', // $ keep
+    [37] = '%', // % keep
+    [38] = '&', // & keep
+    [39] = '\'', // ' keep
+    [40] = '(', // ( keep
+    [41] = ')', // ) keep
+    [42] = '*', // * keep
+    [43] = '+', // + keep
     [44] = ',', // , keep
     [45] = '-', // - keep
     [46] = '.', // . keep
@@ -64,12 +64,12 @@ static unsigned char functions_allowed_chars[256] = {
     [56] = '8', // 8 keep
     [57] = '9', // 9 keep
     [58] = ':', // : keep
-    [59] = ':', // ; convert ; to :
-    [60] = '_', // <
-    [61] = ':', // = convert = to :
-    [62] = '_', // >
-    [63] = '_', // ?
-    [64] = '_', // @
+    [59] = ';', // ; keep
+    [60] = '<', // < keep
+    [61] = '=', // = keep
+    [62] = '>', // > keep
+    [63] = '?', // ? keep
+    [64] = '@', // @ keep
     [65] = 'A', // A keep
     [66] = 'B', // B keep
     [67] = 'C', // C keep
@@ -96,12 +96,12 @@ static unsigned char functions_allowed_chars[256] = {
     [88] = 'X', // X keep
     [89] = 'Y', // Y keep
     [90] = 'Z', // Z keep
-    [91] = '_', // [
-    [92] = '/', // backslash convert \ to /
-    [93] = '_', // ]
-    [94] = '_', // ^
+    [91] = '[', // [ keep
+    [92] = '\\', // backslash keep
+    [93] = ']', // ] keep
+    [94] = '^', // ^ keep
     [95] = '_', // _ keep
-    [96] = '_', // `
+    [96] = '`', // ` keep
     [97] = 'a', // a keep
     [98] = 'b', // b keep
     [99] = 'c', // c keep
@@ -128,10 +128,10 @@ static unsigned char functions_allowed_chars[256] = {
     [120] = 'x', // x keep
     [121] = 'y', // y keep
     [122] = 'z', // z keep
-    [123] = '_', // {
-    [124] = '_', // |
-    [125] = '_', // }
-    [126] = '_', // ~
+    [123] = '{', // { keep
+    [124] = '|', // | keep
+    [125] = '}', // } keep
+    [126] = '~', // ~ keep
     [127] = '_', //
     [128] = '_', //
     [129] = '_', //
@@ -833,7 +833,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     struct timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
     usec_t now_ut = tp.tv_sec * USEC_PER_SEC + tp.tv_nsec / NSEC_PER_USEC;
-    usec_t end_ut = now_ut + r->timeout * USEC_PER_SEC;
+    usec_t end_ut = now_ut + r->timeout * USEC_PER_SEC + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
 
     struct rrd_function_call_wait *tmp = mallocz(sizeof(struct rrd_function_call_wait));
     tmp->free_with_signal = false;
@@ -991,7 +991,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
         // the caller has to wait
 
         code = rdcf->execute_cb(result_wb, timeout, sanitized_cmd, rdcf->execute_cb_data,
-                                NULL, NULL,                             // no callback needed, it is synchronous
+                                result_cb, result_cb_data,
                                 is_cancelled_cb, is_cancelled_cb_data,  // it is ok to pass these, we block the caller
                                 NULL, NULL);                            // no need to pass, we will wait
 
@@ -1097,35 +1097,36 @@ cleanup:
 
 // ----------------------------------------------------------------------------
 
-static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident, const char *kq, const char *sq) {
+static void functions2json(DICTIONARY *functions, BUFFER *wb)
+{
     struct rrd_host_function *t;
-    dfe_start_read(functions, t) {
-        if(!rrd_collector_running(t->collector)) continue;
+    dfe_start_read(functions, t)
+    {
+        if (!rrd_collector_running(t->collector))
+            continue;
 
-        if(t_dfe.counter)
-            buffer_strcat(wb, ",\n");
+        buffer_json_member_add_object(wb, t_dfe.name);
+        buffer_json_member_add_string_or_empty(wb, "help", string2str(t->help));
+        buffer_json_member_add_int64(wb, "timeout", (int64_t)t->timeout);
 
-        buffer_sprintf(wb, "%s%s%s%s: {", ident, kq, t_dfe.name, kq);
-        buffer_sprintf(wb, "\n\t%s%shelp%s: %s%s%s", ident, kq, kq, sq, string2str(t->help), sq);
-        buffer_sprintf(wb, ",\n\t%s%stimeout%s: %d", ident, kq, kq, t->timeout);
-        buffer_sprintf(wb, ",\n\t%s%soptions%s: \"%s%s\"", ident, kq, kq
-                       , (t->options & RRD_FUNCTION_LOCAL)?"LOCAL ":""
-                       , (t->options & RRD_FUNCTION_GLOBAL)?"GLOBAL ":""
-                       );
-        buffer_sprintf(wb, "\n%s}", ident);
+        char options[65];
+        snprintfz(
+            options,
+            64,
+            "%s%s",
+            (t->options & RRD_FUNCTION_LOCAL) ? "LOCAL " : "",
+            (t->options & RRD_FUNCTION_GLOBAL) ? "GLOBAL" : "");
+
+        buffer_json_member_add_string_or_empty(wb, "options", options);
+        buffer_json_object_close(wb);
     }
     dfe_done(t);
-    buffer_strcat(wb, "\n");
 }
 
-void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, const char *sq) {
+void chart_functions2json(RRDSET *st, BUFFER *wb) {
     if(!st || !st->functions_view) return;
 
-    char ident[tabs + 1];
-    ident[tabs] = '\0';
-    while(tabs) ident[--tabs] = '\t';
-
-    functions2json(st->functions_view, wb, ident, kq, sq);
+    functions2json(st->functions_view, wb);
 }
 
 void host_functions2json(RRDHOST *host, BUFFER *wb) {
@@ -1372,19 +1373,19 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MIN, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbTo", "DB Data Retention To",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_MS,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbDuration", "DB Data Retention Duration",
                                     RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbMetrics", "Time-series Metrics in the DB",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,

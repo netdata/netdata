@@ -35,9 +35,6 @@ struct mrg_statistics {
 
     size_t entries_referenced;
 
-    MRG_CACHE_LINE_PADDING(1);
-    size_t entries_with_retention;
-
     MRG_CACHE_LINE_PADDING(2);
     size_t current_references;
 

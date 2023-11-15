@@ -72,6 +72,7 @@ typedef enum __attribute__ ((__packed__)) {
     BUFFER_JSON_OPTIONS_DEFAULT = 0,
     BUFFER_JSON_OPTIONS_MINIFY = (1 << 0),
     BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS = (1 << 1),
+    BUFFER_JSON_OPTIONS_NON_ANONYMOUS = (1 << 2),
 } BUFFER_JSON_OPTIONS;
 
 typedef struct web_buffer {
@@ -809,8 +810,13 @@ static inline void buffer_json_member_add_boolean(BUFFER *wb, const char *key, b
 
 static inline void buffer_json_member_add_array(BUFFER *wb, const char *key) {
     buffer_print_json_comma_newline_spacing(wb);
-    buffer_print_json_key(wb, key);
-    buffer_fast_strcat(wb, ":[", 2);
+    if (key) {
+        buffer_print_json_key(wb, key);
+        buffer_fast_strcat(wb, ":[", 2);
+    }
+    else
+        buffer_fast_strcat(wb, "[", 1);
+
     wb->json.stack[wb->json.depth].count++;
 
     _buffer_json_depth_push(wb, BUFFER_JSON_ARRAY);
@@ -857,6 +863,13 @@ static inline void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value)
     buffer_print_json_comma_newline_spacing(wb);
 
     buffer_print_uint64(wb, value);
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_add_array_item_boolean(BUFFER *wb, bool value) {
+    buffer_print_json_comma_newline_spacing(wb);
+
+    buffer_strcat(wb, value ? "true" : "false");
     wb->json.stack[wb->json.depth].count++;
 }
 
@@ -959,12 +972,14 @@ typedef enum __attribute__((packed)) {
     RRDF_FIELD_OPTS_STICKY       = (1 << 2), // the field should be sticky
     RRDF_FIELD_OPTS_FULL_WIDTH   = (1 << 3), // the field should get full width
     RRDF_FIELD_OPTS_WRAP         = (1 << 4), // the field should wrap
-    RRDR_FIELD_OPTS_DUMMY        = (1 << 5), // not a presentable field
+    RRDF_FIELD_OPTS_DUMMY        = (1 << 5), // not a presentable field
+    RRDF_FIELD_OPTS_EXPANDED_FILTER = (1 << 6), // show the filter expanded
 } RRDF_FIELD_OPTIONS;
 
 typedef enum __attribute__((packed)) {
     RRDF_FIELD_TYPE_NONE,
     RRDF_FIELD_TYPE_INTEGER,
+    RRDF_FIELD_TYPE_BOOLEAN,
     RRDF_FIELD_TYPE_STRING,
     RRDF_FIELD_TYPE_DETAIL_STRING,
     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
@@ -981,6 +996,9 @@ static inline const char *rrdf_field_type_to_string(RRDF_FIELD_TYPE type) {
 
         case RRDF_FIELD_TYPE_INTEGER:
             return "integer";
+
+        case RRDF_FIELD_TYPE_BOOLEAN:
+            return "boolean";
 
         case RRDF_FIELD_TYPE_STRING:
             return "string";
@@ -1112,7 +1130,7 @@ static inline const char *rrdf_field_summary_to_string(RRDF_FIELD_SUMMARY summar
 }
 
 typedef enum __attribute__((packed)) {
-    RRDF_FIELD_FILTER_NONE,
+    RRDF_FIELD_FILTER_NONE = 0,
     RRDF_FIELD_FILTER_RANGE,
     RRDF_FIELD_FILTER_MULTISELECT,
     RRDF_FIELD_FILTER_FACET,
@@ -1173,8 +1191,9 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
 
         buffer_json_member_add_boolean(wb, "full_width", options & RRDF_FIELD_OPTS_FULL_WIDTH);
         buffer_json_member_add_boolean(wb, "wrap", options & RRDF_FIELD_OPTS_WRAP);
+        buffer_json_member_add_boolean(wb, "default_expanded_filter", options & RRDF_FIELD_OPTS_EXPANDED_FILTER);
 
-        if(options & RRDR_FIELD_OPTS_DUMMY)
+        if(options & RRDF_FIELD_OPTS_DUMMY)
             buffer_json_member_add_boolean(wb, "dummy", true);
     }
     buffer_json_object_close(wb);
