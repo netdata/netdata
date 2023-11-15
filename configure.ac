@@ -2069,6 +2069,7 @@ AC_CONFIG_FILES([
     libnetdata/aral/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
+    libnetdata/buffered_reader/Makefile
     libnetdata/clocks/Makefile
     libnetdata/completion/Makefile
     libnetdata/config/Makefile
