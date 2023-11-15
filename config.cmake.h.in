@@ -43,6 +43,8 @@
 #cmakedefine ENABLE_DBENGINE
 #cmakedefine ENABLE_HTTPS
 #cmakedefine ENABLE_LZ4
+#cmakedefine ENABLE_ZSTD
+#cmakedefine ENABLE_BROTLI
 #cmakedefine STORAGE_WITH_MATH
 
 

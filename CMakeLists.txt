@@ -486,7 +486,11 @@ set(DAEMON_FILES daemon/buildinfo.c
 set(H2O_FILES web/server/h2o/http_server.c
               web/server/h2o/http_server.h
               web/server/h2o/h2o_utils.c
-              web/server/h2o/h2o_utils.h)
+              web/server/h2o/h2o_utils.h
+              web/server/h2o/streaming.c
+              web/server/h2o/streaming.h
+              web/server/h2o/connlist.c
+              web/server/h2o/connlist.h)
 
 if(ENABLE_H2O)
     list(APPEND DAEMON_FILES ${H2O_FILES})
@@ -694,15 +698,32 @@ set(REGISTRY_PLUGIN_FILES registry/registry.c
 
 set(STATSD_PLUGIN_FILES collectors/statsd.plugin/statsd.c)
 
-set(SYSTEMD_JOURNAL_PLUGIN_FILES collectors/systemd-journal.plugin/systemd-journal.c)
+set(SYSTEMD_JOURNAL_PLUGIN_FILES collectors/systemd-journal.plugin/systemd-journal.c
+                                 collectors/systemd-journal.plugin/systemd-internals.h
+                                 collectors/systemd-journal.plugin/systemd-main.c
+                                 collectors/systemd-journal.plugin/systemd-units.c
+                                 collectors/systemd-journal.plugin/systemd-journal.c
+                                 collectors/systemd-journal.plugin/systemd-journal-annotations.c
+                                 collectors/systemd-journal.plugin/systemd-journal-files.c
+                                 collectors/systemd-journal.plugin/systemd-journal-fstat.c)
 
 set(STREAMING_PLUGIN_FILES streaming/rrdpush.c
                            streaming/rrdpush.h
                            streaming/compression.c
+                           streaming/compression.h
+                           streaming/compression_brotli.c
+                           streaming/compression_brotli.h
+                           streaming/compression_gzip.c
+                           streaming/compression_gzip.h
+                           streaming/compression_lz4.c
+                           streaming/compression_lz4.h
+                           streaming/compression_zstd.c
+                           streaming/compression_zstd.h
                            streaming/receiver.c
                            streaming/sender.c
                            streaming/replication.c
-                           streaming/replication.h)
+                           streaming/replication.h
+                           streaming/common.h)
 
 set(WEB_PLUGIN_FILES web/server/web_client.c
                      web/server/web_client.h
@@ -734,7 +755,11 @@ set(TIMEX_PLUGIN_FILES collectors/timex.plugin/plugin_timex.c)
 set(PROFILE_PLUGIN_FILES collectors/profile.plugin/plugin_profile.cc)
 
 set(CGROUPS_PLUGIN_FILES collectors/cgroups.plugin/sys_fs_cgroup.c
-                         collectors/cgroups.plugin/sys_fs_cgroup.h)
+                         collectors/cgroups.plugin/sys_fs_cgroup.h
+                         collectors/cgroups.plugin/cgroup-internals.h
+                         collectors/cgroups.plugin/cgroup-discovery.c
+                         collectors/cgroups.plugin/cgroup-charts.c
+                         collectors/cgroups.plugin/cgroup-top.c)
 
 set(DISKSPACE_PLUGIN_FILES collectors/diskspace.plugin/plugin_diskspace.c)
 
@@ -1066,14 +1091,29 @@ if(LIBLZ4_FOUND)
         set(ENABLE_LZ4 On)
 else()
         pkg_check_modules(LIBLZ4 REQUIRED liblz4)
-        target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
-        target_compile_definitions(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
 endif()
 
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
+
+# zstd
+pkg_check_modules(LIBZSTD libzstd)
+if(LIBZSTD_FOUND)
+        set(ENABLE_ZSTD On)
+        target_include_directories(libnetdata BEFORE PUBLIC ${LIBZSTD_INCLUDE_DIRS})
+        target_compile_definitions(libnetdata PUBLIC ${LIBZSTD_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${LIBZSTD_LDFLAGS})
+endif()
+
+# brotli
+pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
+if(LIBBROTLI_FOUND)
+        set(ENABLE_BROTLI On)
+        target_include_directories(libnetdata BEFORE PUBLIC ${LIBBROTLI_INCLUDE_DIRS})
+        target_compile_definitions(libnetdata PUBLIC ${LIBBROTLI_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${LIBBROTLI_LDFLAGS})
+endif()
 
 # uuid
 pkg_check_modules(UUID REQUIRED uuid)
@@ -1692,7 +1732,6 @@ install(FILES collectors/charts.d.plugin/ap/ap.chart.sh
               collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
               collectors/charts.d.plugin/example/example.chart.sh
               collectors/charts.d.plugin/libreswan/libreswan.chart.sh
-              collectors/charts.d.plugin/nut/nut.chart.sh
               collectors/charts.d.plugin/opensips/opensips.chart.sh
               collectors/charts.d.plugin/sensors/sensors.chart.sh
         DESTINATION usr/libexec/netdata/charts.d)
@@ -1703,7 +1742,6 @@ install(FILES collectors/charts.d.plugin/ap/ap.conf
               collectors/charts.d.plugin/apcupsd/apcupsd.conf
               collectors/charts.d.plugin/example/example.conf
               collectors/charts.d.plugin/libreswan/libreswan.conf
-              collectors/charts.d.plugin/nut/nut.conf
               collectors/charts.d.plugin/opensips/opensips.conf
               collectors/charts.d.plugin/sensors/sensors.conf
         DESTINATION usr/lib/netdata/conf.d/charts.d)
