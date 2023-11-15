@@ -57,6 +57,7 @@ typedef enum __attribute__((__packed__)) {
 
     NDF_NIDL_NODE,                              // the node / rrdhost currently being worked
     NDF_NIDL_INSTANCE,                          // the instance / rrdset currently being worked
+    NDF_NIDL_CONTEXT,                           // the context of the instance currently being worked
     NDF_NIDL_DIMENSION,                         // the dimension / rrddim currently being worked
 
     // web server, aclk and stream receiver
@@ -86,6 +87,28 @@ typedef enum __attribute__((__packed__)) {
     NDF_RESPONSE_PREPARATION_TIME_USEC,         // for http like requests, the preparation time
     NDF_RESPONSE_SENT_TIME_USEC,                // for http like requests, the time to send the response back
     NDF_RESPONSE_TOTAL_TIME_USEC,               // for http like requests, the total time to complete the response
+
+    // health alerts
+    NDF_ALERT_ID,
+    NDF_ALERT_EVENT_ID,
+    NDF_ALERT_CONFIG_HASH,
+    NDF_ALERT_NAME,
+    NDF_ALERT_CLASS,
+    NDF_ALERT_COMPONENT,
+    NDF_ALERT_TYPE,
+    NDF_ALERT_EXEC,
+    NDF_ALERT_RECIPIENT,
+    NDF_ALERT_DURATION,
+    NDF_ALERT_VALUE,
+    NDF_ALERT_VALUE_OLD,
+    NDF_ALERT_STATUS,
+    NDF_ALERT_STATUS_OLD,
+    NDF_ALERT_SOURCE,
+    NDF_ALERT_UNITS,
+    NDF_ALERT_SUMMARY,
+    NDF_ALERT_INFO,
+    NDF_ALERT_NOTIFICATION_REALTIME_USEC,
+    // NDF_ALERT_FLAGS,
 
     // put new items here
     // leave the request URL and the message last

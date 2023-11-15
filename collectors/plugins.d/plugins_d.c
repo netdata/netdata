@@ -169,8 +169,10 @@ static void *pluginsd_worker_thread(void *arg) {
                     else
                         plugin = cd->fullfilename;
 
+                    char module[100];
+                    snprintfz(module, sizeof(module), "plugins.d[%s]", plugin);
                     ND_LOG_STACK lgs[] = {
-                            ND_LOG_FIELD_TXT(NDF_MODULE, plugin),
+                            ND_LOG_FIELD_TXT(NDF_MODULE, module),
                             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(cd->host)),
                             ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "pluginsd"),
                             ND_LOG_FIELD_END(),

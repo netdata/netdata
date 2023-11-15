@@ -378,6 +378,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
                         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
                         ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
                         ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+                        ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
                         ND_LOG_FIELD_END(),
                 };
                 ND_LOG_STACK_PUSH(lgs);

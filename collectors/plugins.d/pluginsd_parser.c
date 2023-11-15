@@ -2929,6 +2929,15 @@ bool parser_reconstruct_instance(BUFFER *wb, void *ptr) {
     return true;
 }
 
+bool parser_reconstruct_context(BUFFER *wb, void *ptr) {
+    PARSER *parser = ptr;
+    if(!parser || !parser->user.st)
+        return false;
+
+    buffer_strcat(wb, string2str(parser->user.st->context));
+    return true;
+}
+
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
 {
     int enabled = cd->unsafe.enabled;
@@ -2981,6 +2990,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
                         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
                         ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
                         ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+                        ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
                         ND_LOG_FIELD_END(),
                 };
                 ND_LOG_STACK_PUSH(lgs);

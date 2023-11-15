@@ -165,6 +165,7 @@ static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *co
 
 bool parser_reconstruct_node(BUFFER *wb, void *ptr);
 bool parser_reconstruct_instance(BUFFER *wb, void *ptr);
+bool parser_reconstruct_context(BUFFER *wb, void *ptr);
 
 static inline int parser_action(PARSER *parser, char *input) {
 #ifdef NETDATA_LOG_STREAM_RECEIVE

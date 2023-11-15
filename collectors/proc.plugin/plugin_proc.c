@@ -138,6 +138,12 @@ static bool is_lxcfs_proc_mounted() {
     return false;
 }
 
+static bool log_proc_module(BUFFER *wb, void *data) {
+    struct proc_module *pm = data;
+    buffer_sprintf(wb, "proc.plugin[%s]", pm->name);
+    return true;
+}
+
 void *proc_main(void *ptr)
 {
     worker_register("PROC");
@@ -176,7 +182,7 @@ void *proc_main(void *ptr)
 #define LGS_MODULE_ID 0
 
                 ND_LOG_STACK lgs[] = {
-                        [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, NULL),
+                        [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin"),
                         ND_LOG_FIELD_END(),
                 };
                 ND_LOG_STACK_PUSH(lgs);
@@ -197,9 +203,9 @@ void *proc_main(void *ptr)
                             continue;
 
                         worker_is_busy(i);
-                        lgs[LGS_MODULE_ID].txt = pm->name;
+                        lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_proc_module, pm);
                         pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-                        lgs[LGS_MODULE_ID].txt = NULL;
+                        lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin");
                     }
                 }
             }

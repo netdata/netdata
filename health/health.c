@@ -1194,6 +1194,7 @@ void *health_main(void *ptr) {
                                                                     rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
                         if (ae) {
+                            health_log_alert(host, ae);
                             health_alarm_log_add_entry(host, ae);
                             rc->old_status = rc->status;
                             rc->status = RRDCALC_STATUS_REMOVED;
@@ -1465,6 +1466,7 @@ void *health_main(void *ptr) {
                                                                      )
                                                                     );
 
+                        health_log_alert(host, ae);
                         health_alarm_log_add_entry(host, ae);
 
                         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -1555,6 +1557,7 @@ void *health_main(void *ptr) {
                                                                      )
                                                                     );
 
+                        health_log_alert(host, ae);
                         ae->last_repeat = rc->last_repeat;
                         if (!(rc->run_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {
                             ae->flags |= HEALTH_ENTRY_RUN_ONCE;

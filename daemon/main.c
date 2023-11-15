@@ -880,7 +880,10 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
-    snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
     nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
 #ifdef ENABLE_ACLK

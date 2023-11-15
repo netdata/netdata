@@ -228,12 +228,12 @@ static const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
 
 const char *log_sources_str[] = {
         [NDLS_UNSET] = "UNSET",
-        [NDLS_ACCESS] = "ACCESS",
-        [NDLS_ACLK] = "ACLK",
-        [NDLS_COLLECTORS] = "COLLECTORS",
-        [NDLS_DAEMON] = "DAEMON",
-        [NDLS_HEALTH] = "HEALTH",
-        [NDLS_DEBUG] = "DEBUG",
+        [NDLS_ACCESS] = "access",
+        [NDLS_ACLK] = "aclk",
+        [NDLS_COLLECTORS] = "collector",
+        [NDLS_DAEMON] = "daemon",
+        [NDLS_HEALTH] = "health",
+        [NDLS_DEBUG] = "debug",
 };
 
 static const char *nd_log_source2str(ND_LOG_SOURCES source) {
@@ -546,7 +546,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
     }
     else {
         ls->method = NDLO_FILE;
-        ls->filename = output;
+        ls->filename = strdupz(output);
     }
 
     if(source == NDLS_COLLECTORS) {
@@ -898,7 +898,7 @@ void nd_log_chown_log_files(uid_t uid, gid_t gid) {
 struct log_field;
 static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf);
 static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf);
-static void timestamp_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf);
 
 // ----------------------------------------------------------------------------
 
@@ -927,7 +927,7 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
         [NDF_TIMESTAMP_REALTIME_USEC] = {
                 .journal = NULL,
                 .logfmt = "time",
-                .logfmt_annotator = timestamp_annotator,
+                .logfmt_annotator = timestamp_usec_annotator,
         },
         [NDF_SYSLOG_IDENTIFIER] = {
                 .journal = "SYSLOG_IDENTIFIER", // standard journald field
@@ -985,11 +985,15 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
         },
         [NDF_NIDL_INSTANCE] = {
                 .journal = "ND_NIDL_INSTANCE",
-                .logfmt = "st",
+                .logfmt = "instance",
+        },
+        [NDF_NIDL_CONTEXT] = {
+                .journal = "ND_NIDL_CONTEXT",
+                .logfmt = "context",
         },
         [NDF_NIDL_DIMENSION] = {
                 .journal = "ND_NIDL_DIMENSION",
-                .logfmt = "rd",
+                .logfmt = "dimension",
         },
         [NDF_SRC_TRANSPORT] = {
                 .journal = "ND_SRC_TRANSPORT",
@@ -1063,6 +1067,79 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
                 .journal = "ND_RESPONSE_TOTAL_TIME_USEC",
                 .logfmt = "total_ut",
         },
+        [NDF_ALERT_ID] = {
+                .journal = "ND_ALERT_ID",
+                .logfmt = "alert_id",
+        },
+        [NDF_ALERT_EVENT_ID] = {
+                .journal = "ND_ALERT_EVENT_ID",
+                .logfmt = "alert_event_id",
+        },
+        [NDF_ALERT_CONFIG_HASH] = {
+                .journal = "ND_ALERT_CONFIG",
+                .logfmt = "alert_config",
+        },
+        [NDF_ALERT_NAME] = {
+                .journal = "ND_ALERT_NAME",
+                .logfmt = "alert",
+        },
+        [NDF_ALERT_CLASS] = {
+                .journal = "ND_ALERT_CLASS",
+                .logfmt = "alert_class",
+        },
+        [NDF_ALERT_COMPONENT] = {
+                .journal = "ND_ALERT_COMPONENT",
+                .logfmt = "alert_component",
+        },
+        [NDF_ALERT_TYPE] = {
+                .journal = "ND_ALERT_TYPE",
+                .logfmt = "alert_type",
+        },
+        [NDF_ALERT_EXEC] = {
+                .journal = "ND_ALERT_EXEC",
+                .logfmt = "alert_exec",
+        },
+        [NDF_ALERT_RECIPIENT] = {
+                .journal = "ND_ALERT_RECIPIENT",
+                .logfmt = "alert_recipient",
+        },
+        [NDF_ALERT_VALUE] = {
+                .journal = "ND_ALERT_VALUE",
+                .logfmt = "alert_value",
+        },
+        [NDF_ALERT_VALUE_OLD] = {
+                .journal = "ND_ALERT_VALUE_OLD",
+                .logfmt = "alert_value_old",
+        },
+        [NDF_ALERT_STATUS] = {
+                .journal = "ND_ALERT_STATUS",
+                .logfmt = "alert_status",
+        },
+        [NDF_ALERT_STATUS_OLD] = {
+                .journal = "ND_ALERT_STATUS_OLD",
+                .logfmt = "alert_value_old",
+        },
+        [NDF_ALERT_UNITS] = {
+                .journal = "ND_ALERT_UNITS",
+                .logfmt = "alert_units",
+        },
+        [NDF_ALERT_SUMMARY] = {
+                .journal = "ND_ALERT_SUMMARY",
+                .logfmt = "alert_summary",
+        },
+        [NDF_ALERT_INFO] = {
+                .journal = "ND_ALERT_INFO",
+                .logfmt = "alert_info",
+        },
+        [NDF_ALERT_DURATION] = {
+                .journal = "ND_ALERT_DURATION",
+                .logfmt = "alert_duration",
+        },
+        [NDF_ALERT_NOTIFICATION_REALTIME_USEC] = {
+                .journal = "ND_ALERT_NOTIFICATION_TIMESTAMP_USEC",
+                .logfmt = "alert_notification_timestamp",
+                .logfmt_annotator = timestamp_usec_annotator,
+        },
 
         // put new items here
         // leave the request URL and the message last
@@ -1106,10 +1183,10 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
     for (size_t i = 0; i < fields_max; i++) {
-        if (!fields[i].entry.set || !fields[i].journal)
+        if (!fields[i].entry.set || !fields[i].logfmt)
             continue;
 
-        const char *key = fields[i].journal;
+        const char *key = fields[i].logfmt;
 
         const char *s = NULL;
         switch(fields[i].entry.type) {
@@ -1173,7 +1250,7 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
 // ----------------------------------------------------------------------------
 // logfmt formatter
 
-static void timestamp_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
     usec_t ut = lf->entry.u64;
 
     if(!ut)
@@ -1212,6 +1289,9 @@ static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
 
 static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
     uint64_t pri = lf->entry.u64;
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
 
     buffer_strcat(wb, key);
     buffer_fast_strcat(wb, "=", 1);
@@ -1768,8 +1848,9 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         }
         thread_log_fields[NDF_THREAD_TAG].entry = ND_LOG_FIELD_TXT(NDF_THREAD_TAG, thread_tag);
 
-        if(!thread_log_fields[NDF_MODULE].entry.set)
-            thread_log_fields[NDF_MODULE].entry = ND_LOG_FIELD_TXT(NDF_MODULE, thread_tag);
+        // TODO: fix the ND_MODULE in logging by setting proper module name in threads
+//        if(!thread_log_fields[NDF_MODULE].entry.set)
+//            thread_log_fields[NDF_MODULE].entry = ND_LOG_FIELD_CB(NDF_MODULE, thread_tag_to_module, (void *)thread_tag);
     }
 
     if(likely(!thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry.set))
