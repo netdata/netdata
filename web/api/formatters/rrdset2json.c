@@ -21,21 +21,22 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 {
     time_t first_entry_t = rrdset_first_entry_s(st);
     time_t last_entry_t  = rrdset_last_entry_s(st);
+    char buf[RRD_ID_LENGTH_MAX + 16];
 
     buffer_json_member_add_string(wb, "id", rrdset_id(st));
     buffer_json_member_add_string(wb, "name", rrdset_name(st));
     buffer_json_member_add_string(wb, "type", rrdset_parts_type(st));
     buffer_json_member_add_string(wb, "family", rrdset_family(st));
     buffer_json_member_add_string(wb, "context", rrdset_context(st));
-    buffer_json_member_add_string(wb, "title", rrdset_title(st));
+    snprintfz(buf, RRD_ID_LENGTH_MAX + 15, "%s (%s)", rrdset_title(st), rrdset_name(st));
+    buffer_json_member_add_string(wb, "title", buf);
     buffer_json_member_add_int64(wb, "priority", st->priority);
     buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
     buffer_json_member_add_string(wb, "module", rrdset_module_name(st));
     buffer_json_member_add_string(wb, "units", rrdset_units(st));
 
-    char data_url[RRD_ID_LENGTH_MAX + 16];
-    snprintfz(data_url, RRD_ID_LENGTH_MAX + 15, "/api/v1/data?chart=%s", rrdset_name(st));
-    buffer_json_member_add_string(wb, "data_url", data_url);
+    snprintfz(buf, RRD_ID_LENGTH_MAX + 15, "/api/v1/data?chart=%s", rrdset_name(st));
+    buffer_json_member_add_string(wb, "data_url", buf);
 
     buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(st->chart_type));
     buffer_json_member_add_int64(wb, "duration", (int64_t)(last_entry_t - first_entry_t + st->update_every));
