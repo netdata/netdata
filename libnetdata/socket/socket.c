@@ -303,7 +303,7 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
     }
 
     sock_setreuse(sock, 1);
-    sock_setreuse_port(sock, 1);
+    sock_setreuse_port(sock, 0);
     sock_setnonblock(sock);
     sock_enlarge_in(sock);
 
@@ -348,7 +348,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     }
 
     sock_setreuse(sock, 1);
-    sock_setreuse_port(sock, 1);
+    sock_setreuse_port(sock, 0);
     sock_setnonblock(sock);
     sock_enlarge_in(sock);
 
