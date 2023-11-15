@@ -570,6 +570,11 @@ void nd_log_set_priority_level(const char *setting) {
     ND_LOG_FIELD_PRIORITY priority = nd_log_priority2id(setting);
     nd_log.sources[NDLS_DAEMON].min_priority = priority;
     nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
+
+    // backwards compatibility
+    setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
+
+    // the right one
     setenv("NETDATA_LOG_PRIORITY_LEVEL", nd_log_id2priority(priority), 1);
 }
 
