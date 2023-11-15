@@ -32,9 +32,17 @@ functions - [plugins.d](https://github.com/netdata/netdata/blob/master/collector
 
 | Function | Description | plugin - module |
 | :-- | :-- | :-- |
-| processes | Detailed information on the currently running processes on the node. | [apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) |
+| processes | Detailed information on the currently running processes on the node. | [apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) |\
 | ebpf_socket | Detailed socket information. | [ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md#ebpf_thread) |
 | ebpf_thread | Controller for eBPF threads. | [ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md#ebpf_socket) |
+| block-devices | Detailed information on block devices | |
+| containers-vms | Detailed information on currently running containers and virtual machines | |
+| mount-points | Detailed information on mount points | |
+| network interfaces | Detailed information on network interfaces | |
+| streaming | Detailed information on Netdata agent streaming and replication | |
+| systemd-journal | systemd Journal Logs. | |
+| systemd-list-units | Detailed information on systemd list units. | |
+| systemd-services | Detailed information on systemd services. | | 
 
 If you have ideas or requests for other functions:
 * Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
