@@ -33,6 +33,10 @@ typedef enum __attribute__ ((__packed__)) {
     DATAFILE_ACQUIRE_MAX,
 } DATAFILE_ACQUIRE_REASONS;
 
+typedef enum __attribute__ ((__packed__)) {
+    DATAFILE_FLAG_IS_AVAILABLE          = (1 << 0),
+} DATAFILE_FLAGS;
+
 /* only one event loop is supported for now */
 struct rrdengine_datafile {
     unsigned tier;
@@ -44,6 +48,7 @@ struct rrdengine_datafile {
     struct rrdengine_journalfile *journalfile;
     struct rrdengine_datafile *prev;
     struct rrdengine_datafile *next;
+    DATAFILE_FLAGS flags;
 
     struct {
         SPINLOCK spinlock;
