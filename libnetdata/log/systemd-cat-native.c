@@ -87,11 +87,15 @@ int main(int argc, char *argv[]) {
     }
 
     char path[FILENAME_MAX + 1];
-    journal_construct_path(path, sizeof(path), socket, namespace);
-    int fd = journal_direct_fd(path);
-    if(fd == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open '%s' as a UNIX socket.", socket);
-        return 1;
+    int fd = -1;
+
+    if(!log_as_netdata) {
+        journal_construct_path(path, sizeof(path), socket, namespace);
+        fd = journal_direct_fd(path);
+        if (fd == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open '%s' as a UNIX socket.", socket);
+            return 1;
+        }
     }
 
     struct buffered_reader reader;
