@@ -17,7 +17,7 @@ def main(command_line_args):
     os.makedirs(staging, exist_ok=True)
     for version in versions:
         temp_value = ndvm.compare_version_with_remote(version)
-        if temp_value == version:
+        if temp_value:
             path, filename = ndvm.get_release_path_and_filename(version)
             release_path = os.path.join(staging, path)
             os.makedirs(release_path, exist_ok=True)

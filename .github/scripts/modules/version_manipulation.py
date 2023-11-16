@@ -94,7 +94,7 @@ def compare_version_with_remote(version):
             return (version)
         else:
             print(f"Version in the remote: {version_remote}, is newer than the current: {version}, no action needed")
-            return (version_remote)
+            return (None)
     else:
         # Remote version not found
         print(f"Version in the remote not found, updating the predefined latest path with the version: {version}")
