@@ -104,24 +104,24 @@ EOFLOG
 }
 
 info() {
-  log $NDLP_INFO "${@}"
+  log "$NDLP_INFO" "${@}"
 }
 
 warning() {
-  log $NDLP_WARN "${@}"
+  log "$NDLP_WARN" "${@}"
 }
 
 error() {
-  log $NDLP_ERR "${@}"
+  log "$NDLP_ERR" "${@}"
 }
 
 fatal() {
-  log $NDLP_ALERT "${@}"
+  log "$NDLP_ALERT" "${@}"
   exit 1
 }
 
 debug() {
-  log $NDLP_DEBUG "${@}"
+  log "$NDLP_DEBUG" "${@}"
 }
 
 debug=0
