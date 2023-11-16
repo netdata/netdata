@@ -23,7 +23,13 @@ static inline bool buffered_reader_read(struct buffered_reader *reader, int fd) 
         fatal("read_buffer does not start with zero");
 #endif
 
-    ssize_t bytes_read = read(fd, reader->read_buffer + reader->read_len, sizeof(reader->read_buffer) - reader->read_len - 1);
+    char *read_at = reader->read_buffer + reader->read_len;
+    ssize_t remaining = sizeof(reader->read_buffer) - reader->read_len - 1;
+
+    if(unlikely(remaining <= 0))
+        return false;
+
+    ssize_t bytes_read = read(fd, read_at, remaining);
     if(unlikely(bytes_read <= 0))
         return false;
 
