@@ -426,6 +426,9 @@ static inline void sanitize_json_string(char *dst, const char *src, size_t dst_s
 }
 
 static inline bool sanitize_command_argument_string(char *dst, const char *src, size_t dst_size) {
+    if(dst_size)
+        *dst = '\0';
+
     // skip leading dashes
     while (*src == '-')
         src++;

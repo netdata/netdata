@@ -584,11 +584,16 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
         ls->filename = strdupz(output);
     }
 
+#if defined(NETDATA_INTERNAL_CHECKS) || defined(NETDATA_DEV_MODE)
+    ls->min_priority = NDLP_DEBUG;
+#endif
+
     if(source == NDLS_COLLECTORS) {
         // set the method for the collector processes we will spawn
 
         ND_LOG_OUTPUT method;
         ND_LOG_OUTPUT_FORMAT format = ls->format;
+        ND_LOG_FIELD_PRIORITY priority = ls->min_priority;
 
         if(ls->method == NDLO_SYSLOG || ls->method == NDLO_JOURNAL)
             method = ls->method;
@@ -597,6 +602,8 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
 
         setenv("NETDATA_LOG_METHOD", nd_log_id2output(method), 1);
         setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
+        setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
+        setenv("NETDATA_LOG_PRIORITY_LEVEL", nd_log_id2priority(priority), 1);
     }
 }
 
@@ -605,6 +612,11 @@ void nd_log_set_priority_level(const char *setting) {
         setting = "info";
 
     ND_LOG_FIELD_PRIORITY priority = nd_log_priority2id(setting);
+
+#if defined(NETDATA_INTERNAL_CHECKS) || defined(NETDATA_DEV_MODE)
+    priority = NDLP_DEBUG;
+#endif
+
     nd_log.sources[NDLS_DAEMON].min_priority = priority;
     nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
 
@@ -2013,9 +2025,10 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields[NDF_PRIORITY].entry = ND_LOG_FIELD_U64(NDF_PRIORITY, priority);
     }
 
-    if(likely(!thread_log_fields[NDF_TID].entry.set)) {
+    if(likely(!thread_log_fields[NDF_TID].entry.set))
         thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid());
 
+    if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
         char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
         const char *thread_tag = netdata_thread_tag();
         if(!netdata_thread_tag_exists()) {
@@ -2109,10 +2122,8 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     int saved_errno = errno;
     source = nd_log_validate_source(source);
 
-#if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
     if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority > nd_log.sources[source].min_priority)
         return;
-#endif
 
     va_list args;
     va_start(args, fmt);
