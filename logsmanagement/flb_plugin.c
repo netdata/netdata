@@ -16,7 +16,10 @@
 #include "../fluent-bit/lib/msgpack-c/include/msgpack/object.h"
 #include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
 #include <dlfcn.h>
+
+#ifdef HAVE_SYSTEMD
 #include <systemd/sd-journal.h>
+#endif
 
 #define LOG_REC_KEY "msg" /**< key to represent log message field in most log sources **/
 #define LOG_REC_KEY_SYSTEMD "MESSAGE" /**< key to represent log message field in systemd log source **/
@@ -761,6 +764,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
 
+#ifdef HAVE_SYSTEMD
         if(p_file_info->do_sd_journal_send){
             if(p_file_info->log_type == FLB_WEB_LOG){
                 sd_journal_send(
@@ -794,6 +798,8 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 sd_journal_send("MESSAGE=%.*s", (int) message_size, message, NULL);
             }
         }
+#endif
+
     } /* FLB_TAIL, FLB_WEB_LOG and FLB_SERIAL case end */
 
     /* FLB_KMSG case */
@@ -1124,6 +1130,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
 
+#ifdef HAVE_SYSTEMD
         if(p_file_info->do_sd_journal_send){
             sd_journal_send(
                 "%sDOCKER_EVENTS_TYPE=%.*s",    sd_journal_field_prefix, (int) docker_ev_type_size,    docker_ev_type,
@@ -1132,6 +1139,8 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 "MESSAGE=%.*s",                 (int) message_size, &buff->in->data[tmp_item_off - 1 - message_size], 
                 NULL);
         }
+#endif
+
     } /* FLB_DOCKER_EV case end */
 
     /* FLB_MQTT case */
@@ -1156,11 +1165,14 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
             m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
             buff->in->text_size = new_tmp_text_size;
 
+#ifdef HAVE_SYSTEMD
             if(p_file_info->do_sd_journal_send){
                 sd_journal_send("%sMQTT_TOPIC=%s", key, 
                                 "MESSAGE=%.*s", (int) message_size, mqtt_message, 
                                 NULL);
             }
+#endif
+
         }
         else m_assert(0, "missing mqtt topic");
     }
