@@ -147,6 +147,7 @@ void nd_log_set_flood_protection(size_t logs, time_t period);
 void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_set_thread_source(ND_LOG_SOURCES source);
 bool nd_log_journal_socket_available(void);
+ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
 
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 
@@ -187,7 +188,7 @@ struct log_stack_entry {
 #define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP_USEC, .u64 = (value), .set = true, }
 #define ND_LOG_FIELD_CB(field, func, data) (struct log_stack_entry){ .id = (field), .type = NDFT_CALLBACK, .cb = { .formatter = (func), .formatter_data = (data) }, .set = true, }
 #define ND_LOG_FIELD_UUID(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_UUID, .uuid = (value), .set = true, }
-#define ND_LOG_FIELD_END() { .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
+#define ND_LOG_FIELD_END() (struct log_stack_entry){ .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
 
 void log_stack_pop(void *ptr);
 void log_stack_push(struct log_stack_entry *lgs);

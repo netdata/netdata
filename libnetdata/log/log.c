@@ -245,6 +245,47 @@ static const char *nd_log_source2str(ND_LOG_SOURCES source) {
 }
 
 // ----------------------------------------------------------------------------
+// log output formats
+
+typedef enum __attribute__((__packed__)) {
+    NDLOF_JOURNAL,
+    NDLOF_LOGFMT,
+    NDLOF_JSON,
+} ND_LOG_OUTPUT_FORMAT;
+
+static struct {
+    ND_LOG_OUTPUT_FORMAT format;
+    const char *name;
+} nd_log_formats[] = {
+        { .format = NDLOF_JOURNAL, .name = "journal" },
+        { .format = NDLOF_LOGFMT, .name = "logfmt" },
+        { .format = NDLOF_JSON, .name = "json" },
+};
+
+static ND_LOG_OUTPUT_FORMAT nd_log_format2id(const char *format) {
+    if(!format || !*format)
+        return NDLOF_LOGFMT;
+
+    size_t entries = sizeof(nd_log_formats) / sizeof(nd_log_formats[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(nd_log_formats[i].name, format) == 0)
+            return nd_log_formats[i].format;
+    }
+
+    return NDLOF_LOGFMT;
+}
+
+static const char *nd_log_id2format(ND_LOG_OUTPUT_FORMAT format) {
+    size_t entries = sizeof(nd_log_formats) / sizeof(nd_log_formats[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(format == nd_log_formats[i].format)
+            return nd_log_formats[i].name;
+    }
+
+    return "logfmt";
+}
+
+// ----------------------------------------------------------------------------
 // format dates
 
 void log_date(char *buffer, size_t len, time_t now) {
@@ -281,12 +322,6 @@ struct nd_log_limit {
 
 #define ND_LOG_LIMITS_DEFAULT (struct nd_log_limit){ .logs_per_period = ND_LOG_DEFAULT_THROTTLE_LOGS, .logs_per_period_backup = ND_LOG_DEFAULT_THROTTLE_LOGS, .throttle_period = ND_LOG_DEFAULT_THROTTLE_PERIOD, }
 #define ND_LOG_LIMITS_UNLIMITED (struct nd_log_limit){  .logs_per_period = 0, .logs_per_period_backup = 0, .throttle_period = 0, }
-
-typedef enum __attribute__((__packed__)) {
-    NDLOF_JOURNAL,
-    NDLOF_LOGFMT,
-    NDLOF_JSON,
-} ND_LOG_OUTPUT_FORMAT;
 
 struct nd_log_source {
     SPINLOCK spinlock;
@@ -553,6 +588,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
         // set the method for the collector processes we will spawn
 
         ND_LOG_OUTPUT method;
+        ND_LOG_OUTPUT_FORMAT format = ls->format;
 
         if(ls->method == NDLO_SYSLOG || ls->method == NDLO_JOURNAL)
             method = ls->method;
@@ -560,6 +596,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
             method = NDLO_STDERR;
 
         setenv("NETDATA_LOG_METHOD", nd_log_id2output(method), 1);
+        setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
     }
 }
 
@@ -680,7 +717,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     if(s && *s >= '0' && *s <= '9')
         logs = str2u(s);
 
-    nd_log_set_flood_protection(period, logs);
+    nd_log_set_flood_protection(logs, period);
 
     if(!netdata_configured_host_prefix) {
         s = getenv("NETDATA_HOST_PREFIX");
@@ -689,6 +726,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     }
 
     ND_LOG_OUTPUT method = nd_log_output2id(getenv("NETDATA_LOG_METHOD"));
+    ND_LOG_OUTPUT_FORMAT format = nd_log_format2id(getenv("NETDATA_LOG_FORMAT"));
 
     if(method != NDLO_JOURNAL && method != NDLO_SYSLOG && method != NDLO_STDERR) {
         if(is_stderr_connected_to_journal()) {
@@ -721,6 +759,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
         nd_log.sources[i].method = method;
+        nd_log.sources[i].format = format;
         nd_log.sources[i].fd = -1;
         nd_log.sources[i].fp = NULL;
     }
@@ -1160,6 +1199,15 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
 };
 
 #define THREAD_FIELDS_MAX (sizeof(thread_log_fields) / sizeof(thread_log_fields[0]))
+
+ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len) {
+    for(size_t i = 0; i < THREAD_FIELDS_MAX ;i++) {
+        if(thread_log_fields[i].journal && strncmp(field, thread_log_fields[i].journal, len) == 0)
+            return i;
+    }
+
+    return NDF_STOP;
+}
 
 void log_stack_pop(void *ptr) {
     if(!ptr) return;
