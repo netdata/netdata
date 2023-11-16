@@ -145,17 +145,18 @@ INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
 THREAD_TAG="alarm-notify"
+ND_LOG_SOURCE=health
 ND_NIDL_NODE=${host}
 ND_NIDL_INSTANCE=${chart}
-ND_NIDL_CONTEXT=
+ND_NIDL_CONTEXT=${context}
 ND_ALERT_NAME=${name}
 ND_ALERT_ID=${alarm_id}
 ND_ALERT_UNIQUE_ID=${unique_id}
 ND_ALERT_EVENT_ID=${alarm_event_id}
 ND_ALERT_TRANSITION_ID=${transition_id//-/}
 ND_ALERT_CLASS=${classification}
-ND_ALERT_COMPONENT=
-ND_ALERT_TYPE=
+ND_ALERT_COMPONENT=${component}
+ND_ALERT_TYPE=${type}
 ND_ALERT_RECIPIENT=${roles}
 ND_ALERT_VALUE=${value}
 ND_ALERT_VALUE_OLD=${old_value}
@@ -329,6 +330,9 @@ else
   child_machine_guid="${28}" # the machine_guid of the child
   transition_id="${29}"      # the transition_id of the alert
   summary="${30}"            # the summary text field of the alert
+  context="${31}"            # the context of the chart
+  component="${32}"
+  type="${33}"
 fi
 
 # -----------------------------------------------------------------------------

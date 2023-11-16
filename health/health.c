@@ -82,10 +82,13 @@ static bool prepare_command(BUFFER *wb,
                             const char *edit_command,
                             const char *machine_guid,
                             uuid_t *transition_id,
-                            const char *summary
+                            const char *summary,
+                            const char *context,
+                            const char *component,
+                            const char *type
 ) {
     char buf[8192];
-    size_t n = 8192 - 1;
+    size_t n = sizeof(buf) - 1;
 
     buffer_strcat(wb, "exec");
 
@@ -192,6 +195,18 @@ static bool prepare_command(BUFFER *wb,
     buffer_sprintf(wb, " '%s'", buf);
 
     if (!sanitize_command_argument_string(buf, summary, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, context, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, component, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, type, n))
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
@@ -590,7 +605,11 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               edit_command,
                               host->machine_guid,
                               &ae->transition_id,
-                              host->health.use_summary_for_notifications && ae->summary?ae_summary(ae):ae_name(ae));
+                              host->health.use_summary_for_notifications && ae->summary?ae_summary(ae):ae_name(ae),
+                              string2str(ae->chart_context),
+                              string2str(ae->component),
+                              string2str(ae->type)
+                              );
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {
