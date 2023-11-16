@@ -1210,7 +1210,7 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
 
 ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len) {
     for(size_t i = 0; i < THREAD_FIELDS_MAX ;i++) {
-        if(thread_log_fields[i].journal && strncmp(field, thread_log_fields[i].journal, len) == 0)
+        if(thread_log_fields[i].journal && strlen(thread_log_fields[i].journal) == len && strncmp(field, thread_log_fields[i].journal, len) == 0)
             return i;
     }
 
