@@ -2,8 +2,8 @@
 name: Monitor-releases
 
 on:
-#  release:
-#    types: [released, deleted]
+  release:
+    types: [released, deleted]
   workflow_dispatch:
     inputs:
       channel:
@@ -31,7 +31,7 @@ jobs:
         uses: actions/setup-python@v4
         id: init-python
         with:
-          python-version: "3.9"
+          python-version: "3.12"
       - name: Setup python environment
         id: setup-python
         run: |
