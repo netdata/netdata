@@ -19,6 +19,9 @@
 
 #ifdef HAVE_SYSTEMD
 #include <systemd/sd-journal.h>
+#define SD_JOURNAL_SEND_DEFAULT_FIELDS \
+            "%s_LOG_SOURCE=%s"  , sd_journal_field_prefix, log_src_t_str[p_file_info->log_source], \
+            "%s_LOG_TYPE=%s"    , sd_journal_field_prefix, log_src_type_t_str[p_file_info->log_type]
 #endif
 
 #define LOG_REC_KEY "msg" /**< key to represent log message field in most log sources **/
@@ -768,6 +771,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
         if(p_file_info->do_sd_journal_send){
             if(p_file_info->log_type == FLB_WEB_LOG){
                 sd_journal_send(
+                    SD_JOURNAL_SEND_DEFAULT_FIELDS,
                     *line_parsed.vhost          ?   "%sWEB_LOG_VHOST=%s"          : "_%s=%s", sd_journal_field_prefix, line_parsed.vhost,
                     line_parsed.port            ?   "%sWEB_LOG_PORT=%d"           : "_%s=%d", sd_journal_field_prefix, line_parsed.port,
                     *line_parsed.req_scheme     ?   "%sWEB_LOG_REQ_SCHEME=%s"     : "_%s=%s", sd_journal_field_prefix, line_parsed.req_scheme,
@@ -781,21 +785,26 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     line_parsed.ups_resp_time   ?   "%sWEB_LOG_UPS_RESP_TIME=%d"  : "_%s=%d", sd_journal_field_prefix ,line_parsed.ups_resp_time,
                     *line_parsed.ssl_proto      ?   "%sWEB_LOG_SSL_PROTO=%s"      : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_proto,
                     *line_parsed.ssl_cipher     ?   "%sWEB_LOB_SSL_CIPHER=%s"     : "_%s=%s", sd_journal_field_prefix ,line_parsed.ssl_cipher,
-                    "MESSAGE=%.*s", (int) message_size, message,
+                    LOG_REC_KEY_SYSTEMD "=%.*s", (int) message_size, message,
                     NULL
                 );
             }
             else if(p_file_info->log_type == FLB_SERIAL){
                 Flb_serial_config_t *serial_config = (Flb_serial_config_t *) p_file_info->flb_config;
                 sd_journal_send(
+                    SD_JOURNAL_SEND_DEFAULT_FIELDS,
                     serial_config->bitrate && *serial_config->bitrate ? 
                         "%sSERIAL_BITRATE=%s" : "_%s=%s", sd_journal_field_prefix, serial_config->bitrate,
-                    "MESSAGE=%.*s", (int) message_size, message, 
+                    LOG_REC_KEY_SYSTEMD "=%.*s", (int) message_size, message, 
                     NULL
                 );
             }
             else{
-                sd_journal_send("MESSAGE=%.*s", (int) message_size, message, NULL);
+                sd_journal_send(
+                    SD_JOURNAL_SEND_DEFAULT_FIELDS, 
+                    LOG_REC_KEY_SYSTEMD "=%.*s", (int) message_size, message, 
+                    NULL
+                );
             }
         }
 #endif
@@ -1133,11 +1142,13 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 #ifdef HAVE_SYSTEMD
         if(p_file_info->do_sd_journal_send){
             sd_journal_send(
+                SD_JOURNAL_SEND_DEFAULT_FIELDS,
                 "%sDOCKER_EVENTS_TYPE=%.*s",    sd_journal_field_prefix, (int) docker_ev_type_size,    docker_ev_type,
                 "%sDOCKER_EVENTS_ACTION=%.*s",  sd_journal_field_prefix, (int) docker_ev_action_size,  docker_ev_action,
                 "%sDOCKER_EVENTS_ID=%.*s",      sd_journal_field_prefix, (int) docker_ev_id_size,      docker_ev_id,
-                "MESSAGE=%.*s",                 (int) message_size, &buff->in->data[tmp_item_off - 1 - message_size], 
-                NULL);
+                LOG_REC_KEY_SYSTEMD "=%.*s",                 (int) message_size, &buff->in->data[tmp_item_off - 1 - message_size], 
+                NULL
+            );
         }
 #endif
 
@@ -1167,9 +1178,12 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
 
 #ifdef HAVE_SYSTEMD
             if(p_file_info->do_sd_journal_send){
-                sd_journal_send("%sMQTT_TOPIC=%s", key, 
-                                "MESSAGE=%.*s", (int) message_size, mqtt_message, 
-                                NULL);
+                sd_journal_send(
+                    SD_JOURNAL_SEND_DEFAULT_FIELDS,
+                    "%sMQTT_TOPIC=%s", key, 
+                    LOG_REC_KEY_SYSTEMD "=%.*s", (int) message_size, mqtt_message, 
+                    NULL
+                );
             }
 #endif
 
@@ -1186,10 +1200,10 @@ skip_collect_and_drop_logs:
         memset(&result.data, 0, sizeof(msgpack_object));
     }
 
-    if(p_file_info) uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
+    if(p_file_info) 
+        uv_mutex_unlock(&p_file_info->flb_tmp_buff_mut);
     
     flb_lib_free(record);
-    // FLB_OUTPUT_RETURN(FLB_OK); // Watch out! This breaks output - won't flush all pending logs
     return 0;
     
 }
