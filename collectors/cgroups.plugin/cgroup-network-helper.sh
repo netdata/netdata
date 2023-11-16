@@ -97,7 +97,7 @@ SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
 THREAD_TAG="cgroup-network-helper.sh"
 ND_LOG_SOURCE=collector
-MESSAGE=[ALERT NOTIFICATION]: ${*//[$'\r\n']}
+MESSAGE=${*//[$'\r\n']}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE
