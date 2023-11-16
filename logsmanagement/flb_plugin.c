@@ -1398,8 +1398,12 @@ int flb_add_input(struct File_info *const p_file_info){
             debug_log( "Setting up FLB_SERIAL collector");
 
             Flb_serial_config_t *serial_config = (Flb_serial_config_t *) p_file_info->flb_config;
-            if(unlikely(!serial_config || !serial_config->bitrate || !*serial_config->bitrate ||
-                        !serial_config->min_bytes || !p_file_info->filename)) return CONFIG_READ_ERROR;
+            if(unlikely(!serial_config || 
+                        !serial_config->bitrate || 
+                        !*serial_config->bitrate ||
+                        !serial_config->min_bytes || 
+                        !*serial_config->min_bytes || 
+                        !p_file_info->filename)) return CONFIG_READ_ERROR;
         
             /* Set up serial input */
             p_file_info->flb_input = flb_input(ctx, "serial", NULL);
@@ -1408,6 +1412,7 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Tag", tag_s,
                 "File", p_file_info->filename,
                 "Bitrate", serial_config->bitrate,
+                "Min_Bytes", serial_config->min_bytes,
                 "Separator", serial_config->separator,
                 "Format", serial_config->format,
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
