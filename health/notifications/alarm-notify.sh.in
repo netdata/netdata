@@ -81,48 +81,51 @@ export LC_ALL=C
 
 PROGRAM_NAME="$(basename "${0}")"
 
-LOG_LEVEL_EMERG=0   # system is unusable
-LOG_LEVEL_ALERT=1   # action must be taken immediately
-LOG_LEVEL_CRIT=2    # critical conditions
-LOG_LEVEL_ERR=3     # error conditions
-LOG_LEVEL_WARN=4    # warning conditions
-LOG_LEVEL_NOTICE=5  # normal but significant condition
-LOG_LEVEL_INFO=6    # informational
-LOG_LEVEL_DEBUG=7   # debug-level messages
-LOG_LEVEL=$LOG_LEVEL_INFO
+# these should be the same with syslog() priorities
+NDLP_EMERG=0   # system is unusable
+NDLP_ALERT=1   # action must be taken immediately
+NDLP_CRIT=2    # critical conditions
+NDLP_ERR=3     # error conditions
+NDLP_WARN=4    # warning conditions
+NDLP_NOTICE=5  # normal but significant condition
+NDLP_INFO=6    # informational
+NDLP_DEBUG=7   # debug-level messages
+
+# the max (numerically) log level we will log
+LOG_LEVEL=$NDLP_INFO
 
 set_log_severity_level() {
   case ${NETDATA_LOG_SEVERITY_LEVEL,,} in
     "emerg" | "emergency")
-      LOG_LEVEL=$LOG_LEVEL_EMERG
+      LOG_LEVEL=$NDLP_EMERG
       ;;
 
     "alert")
-      LOG_LEVEL=$LOG_LEVEL_ALERT
+      LOG_LEVEL=$NDLP_ALERT
       ;;
 
     "crit" | "critical")
-      LOG_LEVEL=$LOG_LEVEL_CRIT
+      LOG_LEVEL=$NDLP_CRIT
       ;;
 
     "err" | "error")
-      LOG_LEVEL=$LOG_LEVEL_ERR
+      LOG_LEVEL=$NDLP_ERR
       ;;
 
     "warn" | "warning")
-      LOG_LEVEL=$LOG_LEVEL_WARN
+      LOG_LEVEL=$NDLP_WARN
       ;;
 
     "notice")
-      LOG_LEVEL=$LOG_LEVEL_NOTICE
+      LOG_LEVEL=$NDLP_NOTICE
       ;;
 
     "info")
-      LOG_LEVEL=$LOG_LEVEL_INFO
+      LOG_LEVEL=$NDLP_INFO
       ;;
 
     "debug")
-      LOG_LEVEL=$LOG_LEVEL_DEBUG
+      LOG_LEVEL=$NDLP_DEBUG
       ;;
   esac
 }
@@ -143,7 +146,7 @@ THREAD_TAG="alarm-notify"
 ND_NIDL_NODE=${host}
 ND_NIDL_INSTANCE=${chart}
 ND_NIDL_CONTEXT=
-ND_ALERT=${name}
+ND_ALERT_NAME=${name}
 ND_ALERT_ID=${alarm_id}
 ND_ALERT_UNIQUE_ID=${unique_id}
 ND_ALERT_EVENT_ID=${alarm_event_id}
@@ -168,28 +171,28 @@ EOFLOG
 }
 
 info() {
-  log $LOG_LEVEL_INFO "${@}"
+  log $NDLP_INFO "${@}"
 }
 
 warning() {
-  log $LOG_LEVEL_WARN "${@}"
+  log $NDLP_WARN "${@}"
 }
 
 error() {
-  log $LOG_LEVEL_ERR "${@}"
+  log $NDLP_ERR "${@}"
 }
 
 fatal() {
-  log $LOG_LEVEL_EMERG "${@}"
+  log $NDLP_ALERT "${@}"
   exit 1
 }
 
 debug() {
-  log $LOG_LEVEL_DEBUG "${@}"
+  log $NDLP_DEBUG "${@}"
 }
 
 if [ "${NETDATA_ALARM_NOTIFY_DEBUG-0}" = "1" ]; then
-  LOG_LEVEL=${LOG_LEVEL_DEBUG}
+  LOG_LEVEL=${NDLP_DEBUG}
 fi
 
 docurl() {
@@ -493,7 +496,7 @@ else
       debug "Loading config file '${CONFIG}'..."
       source "${CONFIG}" || error "Failed to load config file '${CONFIG}'."
     else
-      warning "Cannot find file '${CONFIG}'."
+      debug "Cannot find file '${CONFIG}'."
     fi
   done
 fi

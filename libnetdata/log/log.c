@@ -2155,7 +2155,7 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
 
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, NDLP_CRIT, true, saved_errno, fmt, args);
+    nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, fmt, args);
     va_end(args);
 
     char date[LOG_DATE_LENGTH];
