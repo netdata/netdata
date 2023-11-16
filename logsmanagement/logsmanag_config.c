@@ -958,6 +958,12 @@ static void config_section_init(uv_loop_t *main_loop,
         }
     }
     else if(p_file_info->log_type == FLB_KMSG){
+        Flb_kmsg_config_t *kmsg_config = callocz(1, sizeof(Flb_kmsg_config_t));
+
+        kmsg_config->prio_level = appconfig_get(&log_management_config, config_section->name, "prio level", "8");
+
+        p_file_info->flb_config = kmsg_config;
+
         if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_SEVER;
         }

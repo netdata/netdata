@@ -153,6 +153,7 @@ This collector will collect logs from the kernel message log buffer. See also do
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
+| `prio level` | Drop kernel logs with priority higher than `prio level`. Default value is 8, so no logs will be dropped.
 | `severity chart` | Enable chart showing Syslog Severity values of collected logs. Severity values are in the range of 0 to 7 inclusive.|
 | `subsystem chart` | Enable chart showing which subsystems generated the logs.|
 | `device chart` | Enable chart showing which devices generated the logs.|

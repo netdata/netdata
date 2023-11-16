@@ -45,6 +45,9 @@ typedef struct flb_tail_config {
     int use_inotify;
 } Flb_tail_config_t;
 
+typedef struct flb_kmsg_config {
+    char *prio_level;
+} Flb_kmsg_config_t;
 
 typedef struct flb_serial_config {
     char *bitrate;

@@ -1267,12 +1267,18 @@ int flb_add_input(struct File_info *const p_file_info){
         }
         case FLB_KMSG: {
             debug_log( "Setting up FLB_KMSG collector");
+
+            Flb_kmsg_config_t *kmsg_config = (Flb_kmsg_config_t *) p_file_info->flb_config;
+            if(unlikely(!kmsg_config || 
+                        !kmsg_config->prio_level || 
+                        !*kmsg_config->prio_level)) return CONFIG_READ_ERROR;
         
             /* Set up kmsg input */
             p_file_info->flb_input = flb_input(ctx, "kmsg", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
             if(flb_input_set(ctx, p_file_info->flb_input, 
                 "Tag", tag_s,
+                "Prio_Level", kmsg_config->prio_level,
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
             
             break;
