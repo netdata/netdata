@@ -81,57 +81,116 @@ export LC_ALL=C
 
 PROGRAM_NAME="$(basename "${0}")"
 
-LOG_LEVEL_ERR=1
-LOG_LEVEL_WARN=2
-LOG_LEVEL_INFO=3
-LOG_LEVEL="$LOG_LEVEL_INFO"
+LOG_LEVEL_EMERG=0   # system is unusable
+LOG_LEVEL_ALERT=1   # action must be taken immediately
+LOG_LEVEL_CRIT=2    # critical conditions
+LOG_LEVEL_ERR=3     # error conditions
+LOG_LEVEL_WARN=4    # warning conditions
+LOG_LEVEL_NOTICE=5  # normal but significant condition
+LOG_LEVEL_INFO=6    # informational
+LOG_LEVEL_DEBUG=7   # debug-level messages
+LOG_LEVEL=$LOG_LEVEL_INFO
 
 set_log_severity_level() {
   case ${NETDATA_LOG_SEVERITY_LEVEL,,} in
-    "info") LOG_LEVEL="$LOG_LEVEL_INFO";;
-    "warn" | "warning") LOG_LEVEL="$LOG_LEVEL_WARN";;
-    "err" | "error") LOG_LEVEL="$LOG_LEVEL_ERR";;
+    "emerg" | "emergency")
+      LOG_LEVEL=$LOG_LEVEL_EMERG
+      ;;
+
+    "alert")
+      LOG_LEVEL=$LOG_LEVEL_ALERT
+      ;;
+
+    "crit" | "critical")
+      LOG_LEVEL=$LOG_LEVEL_CRIT
+      ;;
+
+    "err" | "error")
+      LOG_LEVEL=$LOG_LEVEL_ERR
+      ;;
+
+    "warn" | "warning")
+      LOG_LEVEL=$LOG_LEVEL_WARN
+      ;;
+
+    "notice")
+      LOG_LEVEL=$LOG_LEVEL_NOTICE
+      ;;
+
+    "info")
+      LOG_LEVEL=$LOG_LEVEL_INFO
+      ;;
+
+    "debug")
+      LOG_LEVEL=$LOG_LEVEL_DEBUG
+      ;;
   esac
 }
 
 set_log_severity_level
 
-logdate() {
-  date "+%Y-%m-%d %H:%M:%S"
-}
-
 log() {
-  local status="${1}"
-  shift
+  local level="${1}"
+  shift 1
 
-  echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+  [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
+  systemd-cat-native --log-as-netdata <<EOFLOG
+INVOCATION_ID=${NETDATA_INVOCATION_ID}
+SYSLOG_IDENTIFIER=${PROGRAM_NAME}
+PRIORITY=${level}
+THREAD_TAG="alarm-notify"
+ND_NIDL_NODE=${host}
+ND_NIDL_INSTANCE=${chart}
+ND_NIDL_CONTEXT=
+ND_ALERT=${name}
+ND_ALERT_ID=${alarm_id}
+ND_ALERT_UNIQUE_ID=${unique_id}
+ND_ALERT_EVENT_ID=${alarm_event_id}
+ND_ALERT_TRANSITION_ID=${transition_id//-/}
+ND_ALERT_CLASS=${classification}
+ND_ALERT_COMPONENT=
+ND_ALERT_TYPE=
+ND_ALERT_RECIPIENT=${roles}
+ND_ALERT_VALUE=${value}
+ND_ALERT_VALUE_OLD=${old_value}
+ND_ALERT_STATUS=${status}
+ND_ALERT_STATUS_OLD=${old_status}
+ND_ALERT_UNITS=${units}
+ND_ALERT_SUMMARY=${summary}
+ND_ALERT_INFO=${info}
+ND_ALERT_DURATION=${duration}
+MESSAGE_ID=6db0018e83e34320ae2a659d78019fb7
+MESSAGE=[NOTIFICATION] ${*}
+
+EOFLOG
+  # AN EMPTY LINE IS NEEDED ABOVE
 }
 
 info() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_INFO" -gt "$LOG_LEVEL" ]] && return
-  log INFO "${@}"
+  log $LOG_LEVEL_INFO "${@}"
 }
 
 warning() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_WARN" -gt "$LOG_LEVEL" ]] && return
-  log WARNING "${@}"
+  log $LOG_LEVEL_WARN "${@}"
 }
 
 error() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_ERR" -gt "$LOG_LEVEL" ]] && return
-  log ERROR "${@}"
+  log $LOG_LEVEL_ERR "${@}"
 }
 
 fatal() {
-  log FATAL "${@}"
+  log $LOG_LEVEL_EMERG "${@}"
   exit 1
 }
 
-debug=${NETDATA_ALARM_NOTIFY_DEBUG-0}
 debug() {
-  [ "${debug}" = "1" ] && log DEBUG "${@}"
+  log $LOG_LEVEL_DEBUG "${@}"
 }
+
+if [ "${NETDATA_ALARM_NOTIFY_DEBUG-0}" = "1" ]; then
+  LOG_LEVEL=${LOG_LEVEL_DEBUG}
+fi
 
 docurl() {
   if [ -z "${curl}" ]; then

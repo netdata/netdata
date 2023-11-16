@@ -203,7 +203,7 @@ static struct {
         { .priority = NDLP_DEBUG, .name = "debug" },
 };
 
-static int nd_log_priority2id(const char *priority) {
+int nd_log_priority2id(const char *priority) {
     size_t entries = sizeof(nd_log_priorities) / sizeof(nd_log_priorities[0]);
     for(size_t i = 0; i < entries ;i++) {
         if(strcmp(nd_log_priorities[i].name, priority) == 0)
@@ -1115,6 +1115,14 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
                 .journal = "ND_ALERT_ID",
                 .logfmt = "alert_id",
         },
+        [NDF_ALERT_UNIQUE_ID] = {
+                .journal = "ND_ALERT_UNIQUE_ID",
+                .logfmt = "alert_unique_id",
+        },
+        [NDF_ALERT_TRANSITION_ID] = {
+                .journal = "ND_ALERT_TRANSITION_ID",
+                .logfmt = "alert_transition_id",
+        },
         [NDF_ALERT_EVENT_ID] = {
                 .journal = "ND_ALERT_EVENT_ID",
                 .logfmt = "alert_event_id",
@@ -1303,8 +1311,127 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
 // ----------------------------------------------------------------------------
 // logfmt formatter
 
+
+static int64_t log_field_to_int64(struct log_field *lf) {
+    CLEAN_BUFFER *tmp = NULL;
+    const char *s = NULL;
+
+    switch(lf->entry.type) {
+        case NDFT_UUID:
+        case NDFT_UNSET:
+            return 0;
+
+        case NDFT_TXT:
+            s = lf->entry.txt;
+            break;
+
+        case NDFT_STR:
+            s = string2str(lf->entry.str);
+            break;
+
+        case NDFT_BFR:
+            s = buffer_tostring(lf->entry.bfr);
+            break;
+
+        case NDFT_CALLBACK:
+            if(!tmp)
+                tmp = buffer_create(0, NULL);
+            else
+                buffer_flush(tmp);
+
+            if(lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
+                s = buffer_tostring(tmp);
+            else
+                s = NULL;
+            break;
+
+        case NDFT_TIMESTAMP_USEC:
+        case NDFT_U64:
+            return lf->entry.u64;
+
+        case NDFT_I64:
+            return lf->entry.i64;
+
+        case NDFT_U32:
+            return lf->entry.u32;
+
+        case NDFT_I32:
+            return lf->entry.i32;
+
+        case NDFT_DBL:
+            return lf->entry.dbl;
+
+        case NDFT_PRIORITY:
+            return lf->entry.priority;
+    }
+
+    if(s && *s)
+        return str2ll(s, NULL);
+
+    return 0;
+}
+
+static uint64_t log_field_to_uint64(struct log_field *lf) {
+    CLEAN_BUFFER *tmp = NULL;
+    const char *s = NULL;
+
+    switch(lf->entry.type) {
+        case NDFT_UUID:
+        case NDFT_UNSET:
+            return 0;
+
+        case NDFT_TXT:
+            s = lf->entry.txt;
+            break;
+
+        case NDFT_STR:
+            s = string2str(lf->entry.str);
+            break;
+
+        case NDFT_BFR:
+            s = buffer_tostring(lf->entry.bfr);
+            break;
+
+        case NDFT_CALLBACK:
+            if(!tmp)
+                tmp = buffer_create(0, NULL);
+            else
+                buffer_flush(tmp);
+
+            if(lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
+                s = buffer_tostring(tmp);
+            else
+                s = NULL;
+            break;
+
+        case NDFT_TIMESTAMP_USEC:
+        case NDFT_U64:
+            return lf->entry.u64;
+
+        case NDFT_I64:
+            return lf->entry.i64;
+
+        case NDFT_U32:
+            return lf->entry.u32;
+
+        case NDFT_I32:
+            return lf->entry.i32;
+
+        case NDFT_DBL:
+            return lf->entry.dbl;
+
+        case NDFT_PRIORITY:
+            return lf->entry.priority;
+    }
+
+    if(s && *s)
+        return str2uint64_t(s, NULL);
+
+    return 0;
+}
+
 static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
-    usec_t ut = lf->entry.u64;
+    usec_t ut = log_field_to_uint64(lf);
 
     if(!ut)
         return;
@@ -1321,7 +1448,7 @@ static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_fie
 }
 
 static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
-    int errnum = lf->entry.i32;
+    int64_t errnum = log_field_to_int64(lf);
 
     if(errnum == 0)
         return;
@@ -1341,7 +1468,7 @@ static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
 }
 
 static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
-    uint64_t pri = lf->entry.u64;
+    uint64_t pri = log_field_to_uint64(lf);
 
     if(buffer_strlen(wb))
         buffer_fast_strcat(wb, " ", 1);
@@ -1913,7 +2040,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields[NDF_ERRNO].entry = ND_LOG_FIELD_I32(NDF_ERRNO, saved_errno);
 
     CLEAN_BUFFER *wb = NULL;
-    if(fmt) {
+    if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
         wb = buffer_create(1024, NULL);
         buffer_vsprintf(wb, fmt, ap);
         thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));

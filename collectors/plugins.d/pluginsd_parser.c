@@ -2948,7 +2948,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
                         if(unlikely(!buffered_reader_read_timeout(&parser->reader,
                                                                   fileno((FILE *) parser->fp_input),
-                                                                  2 * 60 * MSEC_PER_SEC)))
+                                                                  2 * 60 * MSEC_PER_SEC, true)))
                             break;
 
                         continue;

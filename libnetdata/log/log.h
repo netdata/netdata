@@ -90,7 +90,9 @@ typedef enum __attribute__((__packed__)) {
 
     // health alerts
     NDF_ALERT_ID,
+    NDF_ALERT_UNIQUE_ID,
     NDF_ALERT_EVENT_ID,
+    NDF_ALERT_TRANSITION_ID,
     NDF_ALERT_CONFIG_HASH,
     NDF_ALERT_NAME,
     NDF_ALERT_CLASS,
@@ -148,6 +150,7 @@ void nd_log_initialize_for_external_plugins(const char *name);
 void nd_log_set_thread_source(ND_LOG_SOURCES source);
 bool nd_log_journal_socket_available(void);
 ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
+int nd_log_priority2id(const char *priority);
 
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 

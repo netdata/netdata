@@ -33,7 +33,7 @@ static inline bool buffered_reader_read(struct buffered_reader *reader, int fd) 
     return true;
 }
 
-static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms) {
+static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms, bool log_error) {
     errno = 0;
     struct pollfd fds[1];
 
@@ -48,27 +48,33 @@ static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, 
             return buffered_reader_read(reader, fd);
 
         else if(fds[0].revents & POLLERR) {
-            netdata_log_error("PARSER: read failed: POLLERR.");
+            if(log_error)
+                netdata_log_error("PARSER: read failed: POLLERR.");
             return false;
         }
         else if(fds[0].revents & POLLHUP) {
-            netdata_log_error("PARSER: read failed: POLLHUP.");
+            if(log_error)
+                netdata_log_error("PARSER: read failed: POLLHUP.");
             return false;
         }
         else if(fds[0].revents & POLLNVAL) {
-            netdata_log_error("PARSER: read failed: POLLNVAL.");
+            if(log_error)
+                netdata_log_error("PARSER: read failed: POLLNVAL.");
             return false;
         }
 
-        netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
+        if(log_error)
+            netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
         return false;
     }
     else if (ret == 0) {
-        netdata_log_error("PARSER: timeout while waiting for data.");
+        if(log_error)
+            netdata_log_error("PARSER: timeout while waiting for data.");
         return false;
     }
 
-    netdata_log_error("PARSER: poll() failed with code %d.", ret);
+    if(log_error)
+        netdata_log_error("PARSER: poll() failed with code %d.", ret);
     return false;
 }
 

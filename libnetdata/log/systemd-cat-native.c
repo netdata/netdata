@@ -41,13 +41,14 @@ static int help(void) {
 }
 
 static void lgs_reset(struct log_stack_entry *lgs) {
-    for(size_t i = 0; i < _NDF_MAX ;i++) {
-        if(lgs[i].type == NDFT_TXT && lgs[i].txt)
+    for(size_t i = 1; i < _NDF_MAX ;i++) {
+        if(lgs[i].type == NDFT_TXT && lgs[i].set && lgs[i].txt)
             freez((void *)lgs[i].txt);
 
         lgs[i] = ND_LOG_FIELD_TXT(i, NULL);
     }
 
+    lgs[0] = ND_LOG_FIELD_TXT(NDF_MESSAGE, NULL);
     lgs[_NDF_MAX] = ND_LOG_FIELD_END();
 }
 
@@ -104,11 +105,14 @@ int main(int argc, char *argv[]) {
     CLEAN_BUFFER *msg = buffer_create(sizeof(reader.read_buffer), NULL);
 
     ND_LOG_STACK lgs[_NDF_MAX + 1] = { 0 };
+    ND_LOG_STACK_PUSH(lgs);
     lgs_reset(lgs);
+    size_t fields_added = 0;
+    ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
 
     while(true) {
         if(unlikely(!buffered_reader_next_line(&reader, wb))) {
-            if(!buffered_reader_read_timeout(&reader, STDIN_FILENO, timeout_ms))
+            if(!buffered_reader_read_timeout(&reader, STDIN_FILENO, timeout_ms, false))
                 break;
 
             continue;
@@ -124,15 +128,16 @@ int main(int argc, char *argv[]) {
         if(unlikely(log_as_netdata)) { // unlikely to optimize batch processing
             if (!wb->len) {
                 // an empty line - we are done for this message
-                nd_log(NDLS_COLLECTORS, NDLP_INFO, NULL);
+                nd_log(NDLS_HEALTH, priority, "added %d fields", fields_added);
                 lgs_reset(lgs);
+                fields_added = 0;
             }
             else {
                 char *equal = strchr(wb->buffer, '=');
                 if(equal) {
                     const char *field = wb->buffer;
                     size_t field_len = equal - wb->buffer;
-                    int id = nd_log_field_id_by_name(field, field_len);
+                    ND_LOG_FIELD_ID id = nd_log_field_id_by_name(field, field_len);
                     if(id != NDF_STOP) {
                         const char *value = ++equal;
 
@@ -140,6 +145,12 @@ int main(int argc, char *argv[]) {
                             freez((void *)lgs[id].txt);
 
                         lgs[id].txt = strdupz(value);
+                        lgs[id].set = true;
+
+                        fields_added++;
+
+                        if(id == NDF_PRIORITY)
+                            priority = nd_log_priority2id(value);
                     }
                     else
                         nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -168,6 +179,17 @@ int main(int argc, char *argv[]) {
 
         wb->len = 0;
         wb->buffer[0] = '\0';
+    }
+
+    // if the last message did not have an empty line, log it
+
+    if(log_as_netdata && fields_added) {
+        nd_log(NDLS_HEALTH, priority, "added %d fields", fields_added);
+    }
+    else if (msg && msg->len) {
+        bool ret = journal_direct_send(fd, msg->buffer, msg->len);
+        if (!ret)
+            fatal("Cannot send message to systemd journal.");
     }
 
     return 0;

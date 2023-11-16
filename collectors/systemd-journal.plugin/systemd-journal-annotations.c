@@ -726,6 +726,7 @@ void netdata_systemd_journal_message_ids_init(void) {
     i.msg = "Netdata connection from child"; dictionary_set(known_journal_messages_ids, "ed4cdb8f1beb4ad3b57cb3cae2d162fa", &i, sizeof(i));
     i.msg = "Netdata connection to parent"; dictionary_set(known_journal_messages_ids, "6e2e3839067648968b646045dbf28d66", &i, sizeof(i));
     i.msg = "Netdata alert transition"; dictionary_set(known_journal_messages_ids, "9ce0cb58ab8b44df82c4bf1ad9ee22de", &i, sizeof(i));
+    i.msg = "Netdata alert notification"; dictionary_set(known_journal_messages_ids, "6db0018e83e34320ae2a659d78019fb7", &i, sizeof(i));
 }
 
 void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
