@@ -42,6 +42,8 @@
 # -----------------------------------------------------------------------------
 # testing notifications
 
+cmd_line="'${0}' $(printf "'%s' " "${@}")"
+
 if { [ "${1}" = "test" ] || [ "${2}" = "test" ]; } && [ "${#}" -le 2 ]; then
   if [ "${2}" = "test" ]; then
     recipient="${1}"
@@ -163,8 +165,9 @@ ND_ALERT_UNITS=${units}
 ND_ALERT_SUMMARY=${summary}
 ND_ALERT_INFO=${info}
 ND_ALERT_DURATION=${duration}
+ND_REQUEST=${cmd_line}
 MESSAGE_ID=6db0018e83e34320ae2a659d78019fb7
-MESSAGE=[NOTIFICATION] ${*}
+MESSAGE=[ALERT NOTIFICATION]: ${*}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE
@@ -268,7 +271,8 @@ custom_sender() {
 
 # check for BASH v4+ (required for associative arrays)
 if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
-  fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
+  echo >&2 "BASH version 4 or later is required (this is ${BASH_VERSION})."
+  exit 1
 fi
 
 # -----------------------------------------------------------------------------
@@ -947,7 +951,7 @@ for method in "${SEND_EMAIL}" \
   fi
 done
 if [ "$proceed" -eq 0 ]; then
-  fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
+  fatal "All notification methods are disabled; not sending notification to '${roles}' for transition to '${status}' of alert '${name}' of instance '${chart}' on host '${host}'."
 fi
 
 # -----------------------------------------------------------------------------
