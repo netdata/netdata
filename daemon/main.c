@@ -1054,16 +1054,32 @@ static void backwards_compatible_config() {
 
 }
 
+static int get_hostname(char *buf, size_t buf_size) {
+    if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", netdata_configured_host_prefix);
+
+        if (!read_file(filename, buf, buf_size)) {
+            trim(buf);
+            return 0;
+        }
+    }
+
+    return gethostname(buf, buf_size);
+}
+
 static void get_netdata_configured_variables() {
     backwards_compatible_config();
 
     // ------------------------------------------------------------------------
     // get the hostname
 
+    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
+    verify_netdata_host_prefix();
+
     char buf[HOSTNAME_MAX + 1];
-    if(gethostname(buf, HOSTNAME_MAX) == -1){
+    if (get_hostname(buf, HOSTNAME_MAX))
         netdata_log_error("Cannot get machine hostname.");
-    }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
@@ -1163,10 +1179,6 @@ static void get_netdata_configured_variables() {
        default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
     }
 #endif
-    // ------------------------------------------------------------------------
-
-    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
-    verify_netdata_host_prefix();
 
     // --------------------------------------------------------------------
     // get KSM settings
