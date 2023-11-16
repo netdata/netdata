@@ -80,6 +80,7 @@ export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 export LC_ALL=C
 
 # -----------------------------------------------------------------------------
+# logging
 
 PROGRAM_NAME="$(basename "${0}")"
 
@@ -195,9 +196,22 @@ debug() {
   log $NDLP_DEBUG "${@}"
 }
 
+debug=0
 if [ "${NETDATA_ALARM_NOTIFY_DEBUG-0}" = "1" ]; then
+  debug=1
   LOG_LEVEL=$NDLP_DEBUG
 fi
+
+# -----------------------------------------------------------------------------
+# check for BASH v4+ (required for associative arrays)
+
+if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
+  echo >&2 "BASH version 4 or later is required (this is ${BASH_VERSION})."
+  exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
 
 docurl() {
   if [ -z "${curl}" ]; then
@@ -267,14 +281,6 @@ ntfy
 custom_sender() {
   info "custom notification mechanism is not configured; not sending ${notification_description}"
 }
-
-# -----------------------------------------------------------------------------
-
-# check for BASH v4+ (required for associative arrays)
-if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
-  echo >&2 "BASH version 4 or later is required (this is ${BASH_VERSION})."
-  exit 1
-fi
 
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
