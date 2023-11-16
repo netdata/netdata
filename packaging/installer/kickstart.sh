@@ -618,7 +618,7 @@ download() {
 get_actual_version() {
     major="${1}"
     channel="${2}"
-    url="${RELEASE_INFO_URL}/${channel}/v${major}"
+    url="${RELEASE_INFO_URL}/${channel}/${major}"
 
     if check_for_remote_file "${RELEASE_INFO_URL}"; then
         if check_for_remote_file "${url}"; then
@@ -2049,7 +2049,7 @@ handle_major_version() {
     return
   fi
 
-  actual_version="$(get_actual_version "${INSTALL_MAJOR_VERSION}" "${RELEASE_CHANNEL}")"
+  actual_version="$(get_actual_version "v${INSTALL_MAJOR_VERSION}" "${RELEASE_CHANNEL}")"
 
   if [ -z "${actual_version}" ]; then
     if [ "${INTERACTIVE}" -eq 0 ]; then
