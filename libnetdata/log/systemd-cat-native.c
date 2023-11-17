@@ -3,6 +3,14 @@
 #include "systemd-cat-native.h"
 #include "../required_dummies.h"
 
+#ifdef __FreeBSD__
+#include <sys/endian.h>
+#endif
+
+#ifdef __APPLE__
+#include <machine/endian.h>
+#endif
+
 static int help(void) {
     fprintf(stderr,
             "Netdata systemd-cat-native\n"
@@ -22,7 +30,7 @@ static int help(void) {
             "\n"
             "Usage:\n"
             "\n"
-            "   %s [--namespace=NAMESPACE] [--socket=PATH] [--log-as-netdata|-N]\n"
+            "   %s [--namespace=NAMESPACE] [--socket=PATH] [--log-as-netdata|-N] [--newline=STRING]\n"
             "\n"
             "The default namespace and socket depends on whether the program is started by Netdata.\n"
             "When it is started by Netdata, it inherits whatever settings Netdata has.\n"
@@ -32,8 +40,8 @@ static int help(void) {
             "--log-as-netdata, means to log the received messages the same way Netdata does\n"
             "(using the same log output and format as the Netdata daemon in its process tree).\n"
             "\n"
-            "When --log-as-netdata is not specified, entries are sent directly to systemd-journald\n"
-            "without any kind of processing.\n"
+            "--newline, sets a string which will be replaced with a newline, allowing sending\n"
+            "multiline logs to systemd-journal.\n"
             "\n",
             program_name);
 
@@ -52,12 +60,117 @@ static void lgs_reset(struct log_stack_entry *lgs) {
     lgs[_NDF_MAX] = ND_LOG_FIELD_END();
 }
 
+static size_t copy_replacing_newlines(char *dst, size_t dst_len, const char *src, size_t src_len, const char *newline) {
+    if (!dst || !src) return 0;
+
+    const char *current_src = src;
+    const char *src_end = src + src_len; // Pointer to the end of src
+    char *current_dst = dst;
+    size_t remaining_dst_len = dst_len;
+    size_t newline_len = newline && *newline ? strlen(newline) : 0;
+
+    size_t bytes_copied = 0; // To track the number of bytes copied
+
+    while (remaining_dst_len > 1 && current_src < src_end) {
+        if (newline_len > 0) {
+            const char *found = strstr(current_src, newline);
+            if (found && found < src_end) {
+                size_t copy_len = found - current_src;
+                if (copy_len >= remaining_dst_len) copy_len = remaining_dst_len - 1;
+
+                memcpy(current_dst, current_src, copy_len);
+                current_dst += copy_len;
+                *current_dst++ = '\n';
+                remaining_dst_len -= (copy_len + 1);
+                bytes_copied += copy_len + 1; // +1 for the newline character
+                current_src = found + newline_len;
+                continue;
+            }
+        }
+
+        // Copy the remaining part of src to dst
+        size_t copy_len = src_end - current_src;
+        if (copy_len >= remaining_dst_len) copy_len = remaining_dst_len - 1;
+
+        memcpy(current_dst, current_src, copy_len);
+        current_dst += copy_len;
+        remaining_dst_len -= copy_len;
+        bytes_copied += copy_len;
+        break;
+    }
+
+    // Ensure the string is null-terminated
+    *current_dst = '\0';
+
+    return bytes_copied;
+}
+
+static const char *strdupz_replacing_newlines(const char *src, const char *newline) {
+    if(!src) src = "";
+
+    size_t src_len = strlen(src);
+    char *buffer = mallocz(src_len + 1);
+    copy_replacing_newlines(buffer, src_len + 1, src, src_len, newline);
+    return buffer;
+}
+
+static void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src, size_t src_len, const char *newline) {
+    if(!src) return;
+
+    const char *equal;
+    if(!newline || !*newline || !strstr(src, newline) || !(equal = strchr(src, '='))) {
+        buffer_memcat(wb, src, src_len);
+        return;
+    }
+
+    size_t key_len = equal - src;
+    buffer_memcat(wb, src, key_len);
+    buffer_putc(wb, '\n');
+
+    char *length_ptr = &wb->buffer[wb->len];
+    uint64_t le_size = 0;
+    buffer_memcat(wb, &le_size, sizeof(le_size));
+
+    const char *value = ++equal;
+    size_t value_len = src_len - key_len - 1;
+    buffer_need_bytes(wb, value_len + 1);
+    size_t size = copy_replacing_newlines(&wb->buffer[wb->len], value_len + 1, value, value_len, newline);
+    wb->len += size;
+    buffer_putc(wb, '\n');
+
+    le_size = htole64(size);
+    memcpy(length_ptr, &le_size, sizeof(le_size));
+}
+
+static void journal_send_buffer(int fd, BUFFER *msg) {
+// DEBUGGING:
+//
+//    CLEAN_BUFFER *tmp = buffer_create(0, NULL);
+//
+//    for(size_t i = 0; i < msg->len ;i++) {
+//        if(isprint(msg->buffer[i]))
+//            buffer_putc(tmp, msg->buffer[i]);
+//        else {
+//            buffer_putc(tmp, '[');
+//            buffer_print_uint64_hex(tmp, msg->buffer[i]);
+//            buffer_putc(tmp, ']');
+//        }
+//    }
+//
+//    fprintf(stderr, "SENDING: %s\n", buffer_tostring(tmp));
+
+    bool ret = journal_direct_send(fd, msg->buffer, msg->len);
+    if (!ret)
+        fatal("Cannot send message to systemd journal.");
+}
+
 int main(int argc, char *argv[]) {
     clocks_init();
     nd_log_initialize_for_external_plugins(argv[0]);
 
     int timeout_ms = 0;
     bool log_as_netdata = false;
+    const char *newline = NULL;
     const char *namespace = NULL;
     const char *socket = getenv("NETDATA_SYSTEMD_JOURNAL_PATH");
 
@@ -75,6 +188,9 @@ int main(int argc, char *argv[]) {
 
         else if(strncmp(k, "--socket=", 9) == 0)
             socket = &k[9];
+
+        else if(strncmp(k, "--newline=", 10) == 0)
+            newline = &k[10];
 
         else {
             fprintf(stderr, "Unknown parameter '%s'\n", k);
@@ -139,7 +255,7 @@ int main(int argc, char *argv[]) {
                         if(lgs[id].txt)
                             freez((void *)lgs[id].txt);
 
-                        lgs[id].txt = strdupz(value);
+                        lgs[id].txt = strdupz_replacing_newlines(value, newline);
                         lgs[id].set = true;
 
                         fields_added++;
@@ -160,15 +276,13 @@ int main(int argc, char *argv[]) {
         else {
             if (!wb->len) {
                 // an empty line - we are done for this message
-                if (msg->len) {
-                    bool ret = journal_direct_send(fd, msg->buffer, msg->len);
-                    if (!ret)
-                        fatal("Cannot send message to systemd journal.");
-                }
+                if (msg->len)
+                    journal_send_buffer(fd, msg);
+
                 buffer_flush(msg);
             }
             else {
-                buffer_memcat(msg, wb->buffer, wb->len);
+                buffer_memcat_replacing_newlines(msg, wb->buffer, wb->len, newline);
             }
         }
 
@@ -178,14 +292,11 @@ int main(int argc, char *argv[]) {
 
     // if the last message did not have an empty line, log it
 
-    if(log_as_netdata && fields_added) {
+    if(log_as_netdata && fields_added)
         nd_log(NDLS_HEALTH, priority, "added %d fields", fields_added);
-    }
-    else if (msg && msg->len) {
-        bool ret = journal_direct_send(fd, msg->buffer, msg->len);
-        if (!ret)
-            fatal("Cannot send message to systemd journal.");
-    }
+
+    else if (msg && msg->len)
+        journal_send_buffer(fd, msg);
 
     return 0;
 }

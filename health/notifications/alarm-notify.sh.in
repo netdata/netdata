@@ -141,7 +141,7 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata <<EOFLOG
+  systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
@@ -169,7 +169,7 @@ ND_ALERT_INFO=${info}
 ND_ALERT_DURATION=${duration}
 ND_REQUEST=${cmd_line}
 MESSAGE_ID=6db0018e83e34320ae2a659d78019fb7
-MESSAGE=[ALERT NOTIFICATION]: ${*//[$'\r\n']}
+MESSAGE=[ALERT NOTIFICATION]: ${*//[$'\r\n']/{NEWLINE}}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE
@@ -1987,7 +1987,7 @@ send_prowl() {
       info "sent prowl event for ${notification_description}"
       sent=1
     else
-      error "failed to send prowl event for ${notification_description}, with with error code ${httpcode}."
+      error "failed to send prowl event for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
 
     [ ${sent} -gt 0 ] && return 0
@@ -2251,7 +2251,7 @@ EOF
         info "sent Dynatrace event '${DYNATRACE_EVENT}' to '${DYNATRACE_SERVER}' for ${notification_description}"
         return 0
      else
-        warning "failed to send Dynatrace event to '${DYNATRACE_SERVER}' for ${notification_description}, with HTTP error code ${httpcode}"
+        warning "failed to send Dynatrace event to '${DYNATRACE_SERVER}' for ${notification_description}, with HTTP response status code ${httpcode}"
         return 1
      fi
   else
@@ -2315,7 +2315,7 @@ EOF
   if [ "${httpcode}" = "200" ]; then
     info "sent opsgenie event for ${notification_description}"
   else
-    error "failed to send opsgenie event for ${notification_description}, with HTTP error code ${httpcode}."
+    error "failed to send opsgenie event for ${notification_description}, with HTTP response status code ${httpcode}."
     return 1
   fi
 
@@ -2354,7 +2354,7 @@ EOF
   if [ "${httpcode}" = "200" ]; then
     info "sent gotify event for ${notification_description}"
   else
-    error "failed to send gotify event for ${notification_description}, with HTTP error code ${httpcode}."
+    error "failed to send gotify event for ${notification_description}, with HTTP response status code ${httpcode}."
     return 1
   fi
 

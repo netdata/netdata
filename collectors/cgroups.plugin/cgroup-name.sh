@@ -76,14 +76,14 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata <<EOFLOG
+  systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
 THREAD_TAG="cgroup-name"
 ND_LOG_SOURCE=collector
 ND_REQUEST=${cmd_line}
-MESSAGE=${*//[$'\r\n']}
+MESSAGE=${*//[$'\r\n']/{NEWLINE}}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE

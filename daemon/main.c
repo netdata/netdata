@@ -761,7 +761,7 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>\n"
+            " Copyright (C) 2016-2023, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
