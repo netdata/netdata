@@ -4,32 +4,33 @@
 #include "common.h"
 #include "aclk/https_client.h"
 
-#define WORKER_SENDER_JOB_CONNECT                    0
-#define WORKER_SENDER_JOB_PIPE_READ                  1
-#define WORKER_SENDER_JOB_SOCKET_RECEIVE             2
-#define WORKER_SENDER_JOB_EXECUTE                    3
-#define WORKER_SENDER_JOB_SOCKET_SEND                4
-#define WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE   5
-#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW        6
-#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT         7
-#define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR      8
-#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR    9
-#define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR      10
-#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED  11
-#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR  12
-#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR     13
-#define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION 14
-#define WORKER_SENDER_JOB_BUFFER_RATIO              15
-#define WORKER_SENDER_JOB_BYTES_RECEIVED            16
-#define WORKER_SENDER_JOB_BYTES_SENT                17
-#define WORKER_SENDER_JOB_BYTES_COMPRESSED          18
-#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED        19
-#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO   20
-#define WORKER_SENDER_JOB_REPLAY_REQUEST            21
-#define WORKER_SENDER_JOB_FUNCTION_REQUEST          22
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE          23
+#define WORKER_SENDER_JOB_CONNECT                                0
+#define WORKER_SENDER_JOB_PIPE_READ                              1
+#define WORKER_SENDER_JOB_SOCKET_RECEIVE                         2
+#define WORKER_SENDER_JOB_EXECUTE                                3
+#define WORKER_SENDER_JOB_SOCKET_SEND                            4
+#define WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE               5
+#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                    6
+#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                     7
+#define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR                  8
+#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                9
+#define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR                  10
+#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED              11
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR              12
+#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                 13
+#define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION             14
+#define WORKER_SENDER_JOB_BUFFER_RATIO                          15
+#define WORKER_SENDER_JOB_BYTES_RECEIVED                        16
+#define WORKER_SENDER_JOB_BYTES_SENT                            17
+#define WORKER_SENDER_JOB_BYTES_COMPRESSED                      18
+#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                    19
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO               20
+#define WORKER_SENDER_JOB_REPLAY_REQUEST                        21
+#define WORKER_SENDER_JOB_FUNCTION_REQUEST                      22
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                      23
+#define WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION    24
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 21
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 25
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 21
 #endif
 
@@ -390,6 +391,7 @@ void rrdpush_clean_encoded(stream_encoded_t *se) {
 
 struct {
     const char *response;
+    const char *status;
     size_t length;
     int32_t version;
     bool dynamic;
@@ -401,6 +403,7 @@ struct {
     {
         .response = START_STREAMING_PROMPT_VN,
         .length = sizeof(START_STREAMING_PROMPT_VN) - 1,
+        .status = RRDPUSH_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V3, // and above
         .dynamic = true,                 // dynamic = we will parse the version / capabilities
         .error = NULL,
@@ -411,6 +414,7 @@ struct {
     {
         .response = START_STREAMING_PROMPT_V2,
         .length = sizeof(START_STREAMING_PROMPT_V2) - 1,
+        .status = RRDPUSH_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V2,
         .dynamic = false,
         .error = NULL,
@@ -421,6 +425,7 @@ struct {
     {
         .response = START_STREAMING_PROMPT_V1,
         .length = sizeof(START_STREAMING_PROMPT_V1) - 1,
+        .status = RRDPUSH_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V1,
         .dynamic = false,
         .error = NULL,
@@ -431,6 +436,7 @@ struct {
     {
         .response = START_STREAMING_ERROR_SAME_LOCALHOST,
         .length = sizeof(START_STREAMING_ERROR_SAME_LOCALHOST) - 1,
+        .status = RRDPUSH_STATUS_LOCALHOST,
         .version = STREAM_HANDSHAKE_ERROR_LOCALHOST,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
@@ -441,6 +447,7 @@ struct {
     {
         .response = START_STREAMING_ERROR_ALREADY_STREAMING,
         .length = sizeof(START_STREAMING_ERROR_ALREADY_STREAMING) - 1,
+        .status = RRDPUSH_STATUS_ALREADY_CONNECTED,
         .version = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
@@ -451,6 +458,7 @@ struct {
     {
         .response = START_STREAMING_ERROR_NOT_PERMITTED,
         .length = sizeof(START_STREAMING_ERROR_NOT_PERMITTED) - 1,
+        .status = RRDPUSH_STATUS_PERMISSION_DENIED,
         .version = STREAM_HANDSHAKE_ERROR_DENIED,
         .dynamic = false,
         .error = "remote server denied access, probably we don't have the right API key?",
@@ -461,6 +469,7 @@ struct {
     {
         .response = START_STREAMING_ERROR_BUSY_TRY_LATER,
         .length = sizeof(START_STREAMING_ERROR_BUSY_TRY_LATER) - 1,
+        .status = RRDPUSH_STATUS_RATE_LIMIT,
         .version = STREAM_HANDSHAKE_BUSY_TRY_LATER,
         .dynamic = false,
         .error = "remote server is currently busy, we should try later",
@@ -471,6 +480,7 @@ struct {
     {
         .response = START_STREAMING_ERROR_INTERNAL_ERROR,
         .length = sizeof(START_STREAMING_ERROR_INTERNAL_ERROR) - 1,
+        .status = RRDPUSH_STATUS_INTERNAL_SERVER_ERROR,
         .version = STREAM_HANDSHAKE_INTERNAL_ERROR,
         .dynamic = false,
         .error = "remote server is encountered an internal error, we should try later",
@@ -481,6 +491,7 @@ struct {
     {
         .response = START_STREAMING_ERROR_INITIALIZATION,
         .length = sizeof(START_STREAMING_ERROR_INITIALIZATION) - 1,
+        .status = RRDPUSH_STATUS_INITIALIZATION_IN_PROGRESS,
         .version = STREAM_HANDSHAKE_INITIALIZATION,
         .dynamic = false,
         .error = "remote server is initializing, we should try later",
@@ -493,6 +504,7 @@ struct {
     {
         .response = NULL,
         .length = 0,
+        .status = RRDPUSH_STATUS_BAD_HANDSHAKE,
         .version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE,
         .dynamic = false,
         .error = "remote node response is not understood, is it Netdata?",
@@ -530,6 +542,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     ND_LOG_FIELD_PRIORITY priority = stream_responses[i].priority;
     const char *error = stream_responses[i].error;
+    const char *status = stream_responses[i].status;
     int worker_job_id = stream_responses[i].worker_job_id;
     int delay = stream_responses[i].postpone_reconnect_seconds;
 
@@ -537,6 +550,12 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     rrdpush_sender_thread_close_socket(host);
     host->destination->reason = version;
     host->destination->postpone_reconnection_until = now_realtime_sec() + delay;
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     char buf[ISO8601_MAX_LENGTH];
     iso8601_datetime_ut(buf, sizeof(buf), host->destination->postpone_reconnection_until * USEC_PER_SEC, 0);
@@ -569,6 +588,12 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
         if(!netdata_ssl_connect(&host->sender->ssl)) {
             // couldn't connect
 
+            ND_LOG_STACK lgs[] = {
+                    ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_SSL_ERROR),
+                    ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             rrdpush_sender_thread_close_socket(host);
             host->destination->reason = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
@@ -580,6 +605,12 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
             security_test_certificate(host->sender->ssl.conn)) {
             // certificate is not valid
 
+            ND_LOG_STACK lgs[] = {
+                    ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_INVALID_SSL_CERTIFICATE),
+                    ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             netdata_log_error("SSL: closing the stream connection, because the server SSL certificate is not valid.");
             rrdpush_sender_thread_close_socket(host);
@@ -590,6 +621,12 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 
         return true;
     }
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_ESTABLISH_SSL_CONNECTION),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     netdata_log_error("SSL: failed to establish connection.");
     return false;
@@ -838,6 +875,13 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
 
     if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
+        ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION),
+                ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         rrdpush_sender_thread_close_socket(host);
         host->destination->reason = STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE;
         host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
@@ -857,6 +901,12 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         timeout);
 
     if(bytes <= 0) { // timeout is 0
+        ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_TIMEOUT),
+                ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(host);
 
@@ -880,6 +930,12 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         timeout);
 
     if(bytes <= 0) { // timeout is 0
+        ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_TIMEOUT),
+                ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(host);
 
@@ -910,7 +966,15 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 
     log_sender_capabilities(s);
 
-    netdata_log_debug(D_STREAM, "STREAM: Connected on fd %d...", s->rrdpush_sender_socket);
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CONNECTED),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "STREAM %s: connected to %s...",
+           rrdhost_hostname(host), s->connected_to);
 
     return true;
 }
@@ -1506,6 +1570,7 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "disconnect cant upgrade");
 
     worker_register_job_name(WORKER_SENDER_JOB_REPLAY_REQUEST, "replay request");
     worker_register_job_name(WORKER_SENDER_JOB_FUNCTION_REQUEST, "function");
@@ -1611,7 +1676,10 @@ void *rrdpush_sender_thread(void *ptr) {
             s->replication.oldest_request_after_t = 0;
 
             rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-            netdata_log_info("STREAM %s [send to %s]: enabling metrics streaming...", rrdhost_hostname(s->host), s->connected_to);
+
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "STREAM %s [send to %s]: enabling metrics streaming...",
+                   rrdhost_hostname(s->host), s->connected_to);
 
             continue;
         }

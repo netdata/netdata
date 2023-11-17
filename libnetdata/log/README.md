@@ -179,7 +179,8 @@ Netdata assigns specific message IDs to certain events:
 
 - `ed4cdb8f1beb4ad3b57cb3cae2d162fa` when a Netdata child connects to this Netdata
 - `6e2e3839067648968b646045dbf28d66` when this Netdata connects to a Netdata parent
-- `9ce0cb58ab8b44df82c4bf1ad9ee22de` when a Netdata alert changes state
+- `9ce0cb58ab8b44df82c4bf1ad9ee22de` when alerts change state
+- `6db0018e83e34320ae2a659d78019fb7` when notifications are sent
 
 You can view these events using the Netdata systemd-journal.plugin at the `MESSAGE_ID` filter,
 or using `journalctl` like this:
@@ -193,5 +194,8 @@ journalctl MESSAGE_ID=6e2e3839067648968b646045dbf28d66
 
 # query alert transitions
 journalctl MESSAGE_ID=9ce0cb58ab8b44df82c4bf1ad9ee22de
+
+# query alert notifications
+journalctl MESSAGE_ID=6db0018e83e34320ae2a659d78019fb7
 ```
 
