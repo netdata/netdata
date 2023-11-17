@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    uv_thread_create(&stats_charts_thread_id, stats_charts_init, &stdout_mut);
+    fatal_assert(0 == uv_thread_create(&stats_charts_thread_id, stats_charts_init, &stdout_mut));
     
 #if defined(__STDC_VERSION__)
     debug_log( "__STDC_VERSION__: %ld", __STDC_VERSION__);

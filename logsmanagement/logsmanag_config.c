@@ -221,7 +221,7 @@ void p_file_info_destroy_all(void){
     if(p_file_infos_arr){
         uv_thread_t thread_id[p_file_infos_arr->count];
         for(int i = 0; i < p_file_infos_arr->count; i++){
-            uv_thread_create(&thread_id[i], p_file_info_destroy, p_file_infos_arr->data[i]);
+            fatal_assert(0 == uv_thread_create(&thread_id[i], p_file_info_destroy, p_file_infos_arr->data[i]));
         }
         for(int i = 0; i < p_file_infos_arr->count; i++){
             uv_thread_join(&thread_id[i]);
@@ -1122,12 +1122,13 @@ static void config_section_init(uv_loop_t *main_loop,
                             p_file_info->chartname, cus_off);
             break;
         }
+        netdata_fix_chart_id(cus_chart_v);
 
         /* Read regex config */
         char *cus_regex_k = mallocz(snprintf(NULL, 0, "custom %d regex", MAX_CUS_CHARTS_PER_SOURCE) + 1);
         sprintf(cus_regex_k, "custom %d regex", cus_off);
         char *cus_regex_v = appconfig_get(&log_management_config, config_section->name, cus_regex_k, NULL);
-        debug_log( "cus regex:(%s:%s)", cus_regex_k, cus_regex_v ? cus_regex_v : "NULL");
+        debug_log( "cus regex: (%s:%s)", cus_regex_k, cus_regex_v ? cus_regex_v : "NULL");
         freez(cus_regex_k);
         if(unlikely(!cus_regex_v)) {
             collector_error("[%s]: custom %d regex = NULL, custom charts for this log source will be disabled.", 
@@ -1140,7 +1141,7 @@ static void config_section_init(uv_loop_t *main_loop,
         char *cus_regex_name_k = mallocz(snprintf(NULL, 0, "custom %d regex name", MAX_CUS_CHARTS_PER_SOURCE) + 1);
         sprintf(cus_regex_name_k, "custom %d regex name", cus_off);
         char *cus_regex_name_v = appconfig_get( &log_management_config, config_section->name, 
-                                                cus_regex_name_k, strdupz(cus_regex_v));
+                                                cus_regex_name_k, cus_regex_v);
         debug_log( "cus regex name: (%s:%s)", cus_regex_name_k, cus_regex_name_v ? cus_regex_name_v : "NULL");
         freez(cus_regex_name_k);
         m_assert(cus_regex_name_v, "cus_regex_name_v cannot be NULL, should be cus_regex_v");

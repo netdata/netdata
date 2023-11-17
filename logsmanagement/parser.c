@@ -209,10 +209,14 @@ int search_keyword( char *src, size_t src_sz __maybe_unused,
     
     m_assert(src[src_sz - 1] == '\0', "src[src_sz - 1] should be '\0' but it's not");
     m_assert((dest && dest_sz) || (!dest && !dest_sz), "either both dest and dest_sz exist, or none does");
+
+    if(unlikely(dest && !dest_sz))
+        return -1;
     
     regex_t regex_compiled;
     
-    if(regex) regex_compiled = *regex;
+    if(regex) 
+        regex_compiled = *regex;
     else{
         char regexString[MAX_REGEX_SIZE];
         const int regex_flags = ignore_case ? REG_EXTENDED | REG_NEWLINE | REG_ICASE : REG_EXTENDED | REG_NEWLINE;
@@ -222,6 +226,7 @@ int search_keyword( char *src, size_t src_sz __maybe_unused,
             size_t regcomp_err_str_size = regerror(rc, &regex_compiled, 0, 0);
             char *regcomp_err_str = mallocz(regcomp_err_str_size);
             regerror(rc, &regex_compiled, regcomp_err_str, regcomp_err_str_size);
+            freez(regcomp_err_str);
             fatal("Could not compile regular expression:%.*s, error: %s", (int) MAX_REGEX_SIZE, regexString, regcomp_err_str);
         };
     }
@@ -229,17 +234,22 @@ int search_keyword( char *src, size_t src_sz __maybe_unused,
     regmatch_t groupArray[1];
     int matches = 0;
     char *cursor = src;
-    if(dest_sz) *dest_sz = 0;
+
+    if(dest_sz) 
+        *dest_sz = 0;
+
     for ( ; ; matches++){
-        if (regexec(&regex_compiled, cursor, 1, groupArray, REG_NOTBOL | REG_NOTEOL)) break;  // No more matches
-        if (groupArray[0].rm_so == -1) break;  // No more groups
+        if (regexec(&regex_compiled, cursor, 1, groupArray, REG_NOTBOL | REG_NOTEOL)) 
+            break;  // No more matches
+        if (groupArray[0].rm_so == -1) 
+            break;  // No more groups
 
         size_t match_len = (size_t) (groupArray[0].rm_eo - groupArray[0].rm_so);
 
         // debug_log( "Match %d [%2d-%2d]:%.*s\n", matches, groupArray[0].rm_so, 
         //         groupArray[0].rm_eo, (int) match_len, cursor + groupArray[0].rm_so);
 
-        if(dest){
+        if(dest && dest_sz){
             memcpy( &dest[*dest_sz], cursor + groupArray[0].rm_so, match_len);
             *dest_sz += match_len + 1;
             dest[*dest_sz - 1] = '\n';
@@ -248,7 +258,8 @@ int search_keyword( char *src, size_t src_sz __maybe_unused,
         cursor += groupArray[0].rm_eo;
     }
 
-    if(!regex) regfree(&regex_compiled);
+    if(!regex) 
+        regfree(&regex_compiled);
 
     return matches;
 }
@@ -393,11 +404,13 @@ Web_log_parser_config_t *read_web_log_parser_config(const char *log_format, cons
         }
 
         wblp_config->fields[fields_off++] = CUSTOM;
-        continue;
 
     }
 
-    for(int i = 0; parsed_format[i] != NULL; i++) freez(parsed_format[i]);
+    for(int i = 0; parsed_format[i] != NULL; i++) 
+        freez(parsed_format[i]);
+
+    freez(parsed_format);
     return wblp_config;
 }
 

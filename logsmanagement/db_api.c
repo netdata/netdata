@@ -162,8 +162,9 @@ static void db_writer_db_mode_none(void *arg){
         uv_rwlock_rdunlock(&p_file_info->circ_buff->buff_realloc_rwlock);       \
     }                                                                           \
     if(__atomic_load_n(&p_file_info->state, __ATOMIC_RELAXED) == LOG_SRC_READY) \
-        return (void) uv_thread_create( p_file_info->db_writer_thread,          \
-                                        db_writer_db_mode_none, p_file_info);   \
+        return fatal_assert(!uv_thread_create(  p_file_info->db_writer_thread,  \
+                                                db_writer_db_mode_none,         \
+                                                p_file_info));                  \
 }
 
 static void db_writer_db_mode_full(void *arg){
