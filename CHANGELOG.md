@@ -6,14 +6,17 @@
 
 **Merged pull requests:**
 
+- Minor: Remove backtick from doc [\#16423](https://github.com/netdata/netdata/pull/16423) ([MrZammler](https://github.com/MrZammler))
 - disable socket port reuse [\#16420](https://github.com/netdata/netdata/pull/16420) ([ilyam8](https://github.com/ilyam8))
 - fix proc net dev: keep iface speed chart var in Mbits [\#16418](https://github.com/netdata/netdata/pull/16418) ([ilyam8](https://github.com/ilyam8))
 - Don't print errors from reading filtered alerts [\#16417](https://github.com/netdata/netdata/pull/16417) ([MrZammler](https://github.com/MrZammler))
 - /api/v1/charts: bring back chart id to `title` [\#16416](https://github.com/netdata/netdata/pull/16416) ([ilyam8](https://github.com/ilyam8))
 - fix: don't count reused connections as new [\#16414](https://github.com/netdata/netdata/pull/16414) ([ilyam8](https://github.com/ilyam8))
+- Add support for installing a specific major version of the agent on install. [\#16413](https://github.com/netdata/netdata/pull/16413) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#16409](https://github.com/netdata/netdata/pull/16409) ([netdatabot](https://github.com/netdatabot))
 - Improve handling around EPEL requirement for RPM packages. [\#16406](https://github.com/netdata/netdata/pull/16406) ([Ferroin](https://github.com/Ferroin))
 - Fix typo in metadata \(eBPF\) [\#16405](https://github.com/netdata/netdata/pull/16405) ([thiagoftsm](https://github.com/thiagoftsm))
+- docker: use /host/etc/hostname if mounted [\#16401](https://github.com/netdata/netdata/pull/16401) ([ilyam8](https://github.com/ilyam8))
 - adaptec\_raid: fix parsing PD without NCQ status [\#16400](https://github.com/netdata/netdata/pull/16400) ([ilyam8](https://github.com/ilyam8))
 - eBPF apps order [\#16395](https://github.com/netdata/netdata/pull/16395) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix systemd-units func expiration time [\#16393](https://github.com/netdata/netdata/pull/16393) ([ilyam8](https://github.com/ilyam8))
@@ -37,6 +40,7 @@
 - cgroups: collect pids/pids.current [\#16369](https://github.com/netdata/netdata/pull/16369) ([ilyam8](https://github.com/ilyam8))
 - docs: Correct time unit for tier 2 explanation [\#16368](https://github.com/netdata/netdata/pull/16368) ([sepek](https://github.com/sepek))
 - cgroups: fix throttle\_duration chart context [\#16367](https://github.com/netdata/netdata/pull/16367) ([ilyam8](https://github.com/ilyam8))
+- Introduce agent release metadata pipelines [\#16366](https://github.com/netdata/netdata/pull/16366) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix system.net when inside lxc  [\#16364](https://github.com/netdata/netdata/pull/16364) ([ilyam8](https://github.com/ilyam8))
 - collectors/freeipmi: add ipmi-sensors function [\#16363](https://github.com/netdata/netdata/pull/16363) ([ilyam8](https://github.com/ilyam8))
 - Add assorted improvements to the version policy draft. [\#16362](https://github.com/netdata/netdata/pull/16362) ([Ferroin](https://github.com/Ferroin))
@@ -416,9 +420,6 @@
 - systemd-journal fixes [\#15814](https://github.com/netdata/netdata/pull/15814) ([ktsaou](https://github.com/ktsaou))
 - fix packaging: link health.log to stdout [\#15813](https://github.com/netdata/netdata/pull/15813) ([ilyam8](https://github.com/ilyam8))
 - docs rename alarm to alert [\#15812](https://github.com/netdata/netdata/pull/15812) ([ilyam8](https://github.com/ilyam8))
-- bump ui to v6.28.0 [\#15810](https://github.com/netdata/netdata/pull/15810) ([ilyam8](https://github.com/ilyam8))
-- return 412 instead of 403 when a bearer token is required [\#15808](https://github.com/netdata/netdata/pull/15808) ([ktsaou](https://github.com/ktsaou))
-- installer setuid fallback for perf and slabinfo plugins [\#15807](https://github.com/netdata/netdata/pull/15807) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
