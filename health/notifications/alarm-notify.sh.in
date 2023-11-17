@@ -868,6 +868,7 @@ fi
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
+have_to_send_something="NO"
 for method_name in ${method_names}; do
   send_var="SEND_${method_name^^}"
   if [ "${!send_var}" = "NO" ]; then
@@ -897,7 +898,11 @@ for method_name in ${method_names}; do
   to_var="to_${method_name}"
   declare to_${method_name}="${!arr_var[*]}"
 
-  [ -z "${!to_var}" ] && declare ${send_var}="NO"
+  if [ -z "${!to_var}" ]; then
+    declare ${send_var}="NO"
+  else
+    have_to_send_something="YES"
+  fi
 done
 
 # -----------------------------------------------------------------------------
@@ -962,8 +967,14 @@ for method in "${SEND_EMAIL}" \
     break
   fi
 done
+
 if [ "$proceed" -eq 0 ]; then
-  fatal "All notification methods are disabled; not sending ${notification_description}."
+  if [ "${have_to_send_something}" = "NO" ]; then
+    debug "All notification methods are disabled; not sending ${notification_description}."
+    exit 0
+  else
+    fatal "All notification methods are disabled; not sending ${notification_description}."
+  fi
 fi
 
 # -----------------------------------------------------------------------------
