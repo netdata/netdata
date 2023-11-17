@@ -1266,6 +1266,20 @@ void log_stack_push(struct log_stack_entry *lgs) {
 static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_max) {
     CLEAN_BUFFER *tmp = NULL;
 
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
     for (size_t i = 0; i < fields_max; i++) {
@@ -1285,14 +1299,7 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
             case NDFT_BFR:
                 s = buffer_tostring(fields[i].entry.bfr);
                 break;
-            case NDFT_U32:
-                buffer_json_member_add_uint64(wb, key, fields[i].entry.u32);
-                break;
-            case NDFT_I32:
-                buffer_json_member_add_int64(wb, key, fields[i].entry.i32);
-                break;
             case NDFT_U64:
-            case NDFT_TIMESTAMP_USEC:
                 buffer_json_member_add_uint64(wb, key, fields[i].entry.u64);
                 break;
             case NDFT_I64:
@@ -1300,9 +1307,6 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
                 break;
             case NDFT_DBL:
                 buffer_json_member_add_double(wb, key, fields[i].entry.dbl);
-                break;
-            case NDFT_PRIORITY:
-                buffer_json_member_add_uint64(wb, key, fields[i].entry.priority);
                 break;
             case NDFT_UUID:{
                 char u[UUID_COMPACT_STR_LEN];
@@ -1338,6 +1342,21 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
 
 
 static int64_t log_field_to_int64(struct log_field *lf) {
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
     CLEAN_BUFFER *tmp = NULL;
     const char *s = NULL;
 
@@ -1370,24 +1389,14 @@ static int64_t log_field_to_int64(struct log_field *lf) {
                 s = NULL;
             break;
 
-        case NDFT_TIMESTAMP_USEC:
         case NDFT_U64:
             return lf->entry.u64;
 
         case NDFT_I64:
             return lf->entry.i64;
 
-        case NDFT_U32:
-            return lf->entry.u32;
-
-        case NDFT_I32:
-            return lf->entry.i32;
-
         case NDFT_DBL:
             return lf->entry.dbl;
-
-        case NDFT_PRIORITY:
-            return lf->entry.priority;
     }
 
     if(s && *s)
@@ -1397,6 +1406,21 @@ static int64_t log_field_to_int64(struct log_field *lf) {
 }
 
 static uint64_t log_field_to_uint64(struct log_field *lf) {
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
     CLEAN_BUFFER *tmp = NULL;
     const char *s = NULL;
 
@@ -1429,24 +1453,14 @@ static uint64_t log_field_to_uint64(struct log_field *lf) {
                 s = NULL;
             break;
 
-        case NDFT_TIMESTAMP_USEC:
         case NDFT_U64:
             return lf->entry.u64;
 
         case NDFT_I64:
             return lf->entry.i64;
 
-        case NDFT_U32:
-            return lf->entry.u32;
-
-        case NDFT_I32:
-            return lf->entry.i32;
-
         case NDFT_DBL:
             return lf->entry.dbl;
-
-        case NDFT_PRIORITY:
-            return lf->entry.priority;
     }
 
     if(s && *s)
@@ -1547,6 +1561,21 @@ static void string_to_logfmt(BUFFER *wb, const char *s) {
 }
 
 static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max) {
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
     CLEAN_BUFFER *tmp = NULL;
 
     for (size_t i = 0; i < fields_max; i++) {
@@ -1581,18 +1610,7 @@ static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields
                         string_to_logfmt(wb, buffer_tostring(fields[i].entry.bfr));
                     }
                     break;
-                case NDFT_U32:
-                    buffer_strcat(wb, key);
-                    buffer_fast_strcat(wb, "=", 1);
-                    buffer_print_uint64(wb, fields[i].entry.u32);
-                    break;
-                case NDFT_I32:
-                    buffer_strcat(wb, key);
-                    buffer_fast_strcat(wb, "=", 1);
-                    buffer_print_int64(wb, fields[i].entry.i32);
-                    break;
                 case NDFT_U64:
-                case NDFT_TIMESTAMP_USEC:
                     buffer_strcat(wb, key);
                     buffer_fast_strcat(wb, "=", 1);
                     buffer_print_uint64(wb, fields[i].entry.u64);
@@ -1606,11 +1624,6 @@ static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields
                     buffer_strcat(wb, key);
                     buffer_fast_strcat(wb, "=", 1);
                     buffer_print_netdata_double(wb, fields[i].entry.dbl);
-                    break;
-                case NDFT_PRIORITY:
-                    buffer_strcat(wb, key);
-                    buffer_fast_strcat(wb, "=", 1);
-                    buffer_print_uint64(wb, fields[i].entry.priority);
                     break;
                 case NDFT_UUID: {
                     char u[UUID_COMPACT_STR_LEN];
@@ -1659,6 +1672,21 @@ bool nd_log_journal_socket_available(void) {
 
 static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max) {
 #ifdef HAVE_SYSTEMD
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
     struct iovec iov[fields_max];
     int iov_count = 0;
 
@@ -1684,14 +1712,7 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
                 if(buffer_strlen(fields[i].entry.bfr))
                     asprintf(&value, "%s=%s", key, buffer_tostring(fields[i].entry.bfr));
                 break;
-            case NDFT_U32:
-                asprintf(&value, "%s=%u", key, fields[i].entry.u32);
-                break;
-            case NDFT_I32:
-                asprintf(&value, "%s=%d", key, fields[i].entry.i32);
-                break;
             case NDFT_U64:
-            case NDFT_TIMESTAMP_USEC:
                 asprintf(&value, "%s=%" PRIu64, key, fields[i].entry.u64);
                 break;
             case NDFT_I64:
@@ -1699,9 +1720,6 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
                 break;
             case NDFT_DBL:
                 asprintf(&value, "%s=%f", key, fields[i].entry.dbl);
-                break;
-            case NDFT_PRIORITY:
-                asprintf(&value, "%s=%d", key, (int)fields[i].entry.priority);
                 break;
             case NDFT_UUID: {
                 char u[UUID_COMPACT_STR_LEN];
@@ -1749,6 +1767,20 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
     if(!nd_log.journal_direct.initialized)
         return false;
 
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
     CLEAN_BUFFER *wb = buffer_create(4096, NULL);
     CLEAN_BUFFER *tmp = NULL;
 
@@ -1769,20 +1801,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
             case NDFT_BFR:
                 s = buffer_tostring(fields[i].entry.bfr);
                 break;
-            case NDFT_U32:
-                buffer_strcat(wb, key);
-                buffer_putc(wb, '=');
-                buffer_print_uint64(wb, fields[i].entry.u32);
-                buffer_putc(wb, '\n');
-                break;
-            case NDFT_I32:
-                buffer_strcat(wb, key);
-                buffer_putc(wb, '=');
-                buffer_print_int64(wb, fields[i].entry.i32);
-                buffer_putc(wb, '\n');
-                break;
             case NDFT_U64:
-            case NDFT_TIMESTAMP_USEC:
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_uint64(wb, fields[i].entry.u64);
@@ -1798,12 +1817,6 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
                 buffer_strcat(wb, key);
                 buffer_putc(wb, '=');
                 buffer_print_netdata_double(wb, fields[i].entry.dbl);
-                buffer_putc(wb, '\n');
-                break;
-            case NDFT_PRIORITY:
-                buffer_strcat(wb, key);
-                buffer_putc(wb, '=');
-                buffer_print_uint64(wb, fields[i].entry.priority);
                 buffer_putc(wb, '\n');
                 break;
             case NDFT_UUID:{
@@ -2080,10 +2093,10 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     }
 
     if(likely(!thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry.set))
-        thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry = ND_LOG_FIELD_TMT(NDF_TIMESTAMP_REALTIME_USEC, now_realtime_usec());
+        thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry = ND_LOG_FIELD_U64(NDF_TIMESTAMP_REALTIME_USEC, now_realtime_usec());
 
     if(saved_errno != 0 && !thread_log_fields[NDF_ERRNO].entry.set)
-        thread_log_fields[NDF_ERRNO].entry = ND_LOG_FIELD_I32(NDF_ERRNO, saved_errno);
+        thread_log_fields[NDF_ERRNO].entry = ND_LOG_FIELD_I64(NDF_ERRNO, saved_errno);
 
     CLEAN_BUFFER *wb = NULL;
     if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
@@ -2102,7 +2115,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
         thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry = (struct log_stack_entry){
                 .set = true,
-                .type = NDFT_TIMESTAMP_USEC,
+                .type = NDFT_U64,
                 .u64 = now_realtime_usec(),
         };
 

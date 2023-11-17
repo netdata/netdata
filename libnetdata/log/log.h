@@ -127,14 +127,10 @@ typedef enum __attribute__((__packed__)) {
     NDFT_TXT,
     NDFT_STR,
     NDFT_BFR,
-    NDFT_U32,
-    NDFT_I32,
     NDFT_U64,
     NDFT_I64,
     NDFT_DBL,
     NDFT_UUID,
-    NDFT_PRIORITY,
-    NDFT_TIMESTAMP_USEC,
     NDFT_CALLBACK,
 } ND_LOG_STACK_FIELD_TYPE;
 
@@ -162,12 +158,9 @@ struct log_stack_entry {
         const char *txt;
         struct netdata_string *str;
         BUFFER *bfr;
-        uint32_t u32;
         uint64_t u64;
-        int32_t i32;
         int64_t i64;
         double dbl;
-        ND_LOG_FIELD_PRIORITY priority;
         const uuid_t *uuid;
         struct {
             log_formatter_callback_t formatter;
@@ -183,12 +176,8 @@ struct log_stack_entry {
 #define ND_LOG_FIELD_STR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_STR, .str = (value), .set = true, }
 #define ND_LOG_FIELD_BFR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_BFR, .bfr = (value), .set = true, }
 #define ND_LOG_FIELD_U64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U64, .u64 = (value), .set = true, }
-#define ND_LOG_FIELD_U32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U32, .u32 = (value), .set = true, }
 #define ND_LOG_FIELD_I64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I64, .i64 = (value), .set = true, }
-#define ND_LOG_FIELD_I32(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I32, .i32 = (value), .set = true, }
 #define ND_LOG_FIELD_DBL(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_DBL, .dbl = (value), .set = true, }
-#define ND_LOG_FIELD_PRI(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_PRIORITY, .priority = (value), .set = true, }
-#define ND_LOG_FIELD_TMT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TIMESTAMP_USEC, .u64 = (value), .set = true, }
 #define ND_LOG_FIELD_CB(field, func, data) (struct log_stack_entry){ .id = (field), .type = NDFT_CALLBACK, .cb = { .formatter = (func), .formatter_data = (data) }, .set = true, }
 #define ND_LOG_FIELD_UUID(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_UUID, .uuid = (value), .set = true, }
 #define ND_LOG_FIELD_END() (struct log_stack_entry){ .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
