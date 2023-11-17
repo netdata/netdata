@@ -701,14 +701,14 @@ If you have an e.g. external disk mounted on `/mnt/disk1` and you don't wish any
 it (but you do for all other mount points), you can add the following to the alert's configuration:
 
 ```yaml
-chart labels: mount_point=!/mnt/disk1 *`
+chart labels: mount_point=!/mnt/disk1 *
 ```
 
 The `chart labels` is a space-separated list that accepts simple patterns. If you use multiple different chart labels,
 then the result is an OR between them. i.e. the following:
 
 ```yaml
-chart labels: mount_point=/mnt/disk1 device=sda`
+chart labels: mount_point=/mnt/disk1 device=sda
 ```
 
 Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`. Furthermore, if a chart label name
