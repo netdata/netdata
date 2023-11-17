@@ -414,13 +414,8 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
     return slots;
 }
 
-<<<<<<< HEAD
-static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
-    struct rrdengine_instance *ctx = handle->ctx;
-=======
 static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
->>>>>>> c331fd018 (first working prototype)
 
     PGD *d = NULL;
     
