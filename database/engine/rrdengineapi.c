@@ -208,7 +208,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     if (unlikely(!handle->pgc_page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
         return false;
 
-    struct rrdengine_instance *ctx = handle->ctx;
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
@@ -471,7 +471,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
                                              const SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
-    struct rrdengine_instance *ctx = handle->ctx;
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if(unlikely(!handle->page_data))
         handle->page_data = rrdeng_alloc_new_page_data(handle, &handle->page_data_size, point_in_time_ut);
@@ -631,7 +631,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
  */
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
-    struct rrdengine_instance *ctx = handle->ctx;
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     handle->page_flags |= RRDENG_PAGE_COLLECT_FINALIZE;
     rrdeng_store_metric_flush_current_page(collection_handle);
@@ -776,7 +776,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_handle, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
-    struct rrdengine_instance *ctx = handle->ctx;
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if (likely(handle->page)) {
         // we have a page to release
