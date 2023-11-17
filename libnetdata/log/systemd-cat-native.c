@@ -55,10 +55,6 @@ static void lgs_reset(struct log_stack_entry *lgs) {
 int main(int argc, char *argv[]) {
     clocks_init();
 
-    // if we don't run under Netdata, log to stderr,
-    // otherwise, use the logging method Netdata wants us to use.
-    setenv("NETDATA_LOG_METHOD", "stderr", 0);
-
     nd_log_initialize_for_external_plugins(argv[0]);
 
     int timeout_ms = 0;

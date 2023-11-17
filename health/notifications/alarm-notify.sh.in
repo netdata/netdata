@@ -301,8 +301,8 @@ if [[ ${1} = "unittest" ]]; then
   status="${4}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
   old_status="${5}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 elif [[ ${1} = "dump_methods" ]]; then
-    dump_methods=1
-    status="WARNING"
+  dump_methods=1
+  status="WARNING"
 else
   roles="${1}"               # the roles that should be notified for this event
   args_host="${2}"           # the host generated this event
@@ -676,7 +676,16 @@ filter_recipient_by_criticality() {
 }
 
 # -----------------------------------------------------------------------------
-# verify the delivery methods supported
+# check the configured targets
+
+# check email
+if [ "${SEND_EMAIL}" = "AUTO" ]; then
+  if command -v curl >/dev/null 2>&1; then
+      SEND_EMAIL="YES"
+  else
+      SEND_EMAIL="NO"
+  fi
+fi
 
 # check slack
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
@@ -755,112 +764,121 @@ filter_recipient_by_criticality() {
 # check custom
 [ -z "${DEFAULT_RECIPIENT_CUSTOM}" ] && SEND_CUSTOM="NO"
 
-if [ "${SEND_PUSHOVER}" = "YES" ] ||
-  [ "${SEND_SLACK}" = "YES" ] ||
-  [ "${SEND_ROCKETCHAT}" = "YES" ] ||
-  [ "${SEND_ALERTA}" = "YES" ] ||
-  [ "${SEND_PD}" = "YES" ] ||
-  [ "${SEND_FLOCK}" = "YES" ] ||
-  [ "${SEND_DISCORD}" = "YES" ] ||
-  [ "${SEND_HIPCHAT}" = "YES" ] ||
-  [ "${SEND_TWILIO}" = "YES" ] ||
-  [ "${SEND_MESSAGEBIRD}" = "YES" ] ||
-  [ "${SEND_KAVENEGAR}" = "YES" ] ||
-  [ "${SEND_TELEGRAM}" = "YES" ] ||
-  [ "${SEND_PUSHBULLET}" = "YES" ] ||
-  [ "${SEND_KAFKA}" = "YES" ] ||
-  [ "${SEND_FLEEP}" = "YES" ] ||
-  [ "${SEND_PROWL}" = "YES" ] ||
-  [ "${SEND_MATRIX}" = "YES" ] ||
-  [ "${SEND_CUSTOM}" = "YES" ] ||
-  [ "${SEND_MSTEAMS}" = "YES" ] ||
-  [ "${SEND_DYNATRACE}" = "YES" ] ||
-  [ "${SEND_OPSGENIE}" = "YES" ] ||
-  [ "${SEND_GOTIFY}" = "YES" ] ||
-  [ "${SEND_NTFY}" = "YES" ]; then
-  # if we need curl, check for the curl command
-  if [ -z "${curl}" ]; then
-    curl="$(command -v curl 2>/dev/null)"
-  fi
-  if [ -z "${curl}" ]; then
-    error "Cannot find curl command in the system path. Disabling all curl based notifications."
-    SEND_PUSHOVER="NO"
-    SEND_PUSHBULLET="NO"
-    SEND_TELEGRAM="NO"
-    SEND_SLACK="NO"
-    SEND_MSTEAMS="NO"
-    SEND_ROCKETCHAT="NO"
-    SEND_ALERTA="NO"
-    SEND_PD="NO"
-    SEND_FLOCK="NO"
-    SEND_DISCORD="NO"
-    SEND_TWILIO="NO"
-    SEND_HIPCHAT="NO"
-    SEND_MESSAGEBIRD="NO"
-    SEND_KAVENEGAR="NO"
-    SEND_KAFKA="NO"
-    SEND_FLEEP="NO"
-    SEND_PROWL="NO"
-    SEND_MATRIX="NO"
-    SEND_CUSTOM="NO"
-    SEND_DYNATRACE="NO"
-    SEND_OPSGENIE="NO"
-    SEND_GOTIFY="NO"
-    SEND_NTFY="NO"
-  fi
-fi
+# -----------------------------------------------------------------------------
+# check the availability of targets
 
-if [ "${SEND_SMS}" = "YES" ]; then
-  if [ -z "${sendsms}" ]; then
-    sendsms="$(command -v sendsms 2>/dev/null)"
-  fi
-  if [ -z "${sendsms}" ]; then
-    SEND_SMS="NO"
-  fi
-fi
-# if we need sendmail, check for the sendmail command
-if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
-  sendmail="$(command -v sendmail 2>/dev/null)"
-  if [ -z "${sendmail}" ]; then
-    debug "Cannot find sendmail command in the system path. Disabling email notifications."
-    SEND_EMAIL="NO"
-  fi
-fi
+check_supported_targets() {
+  local log=${1}
+  shift
 
-# if we need logger, check for the logger command
-if [ "${SEND_SYSLOG}" = "YES" ] && [ -z "${logger}" ]; then
-  logger="$(command -v logger 2>/dev/null)"
-  if [ -z "${logger}" ]; then
-    debug "Cannot find logger command in the system path. Disabling syslog notifications."
-    SEND_SYSLOG="NO"
+  if [ "${SEND_PUSHOVER}" = "YES" ] ||
+    [ "${SEND_SLACK}" = "YES" ] ||
+    [ "${SEND_ROCKETCHAT}" = "YES" ] ||
+    [ "${SEND_ALERTA}" = "YES" ] ||
+    [ "${SEND_PD}" = "YES" ] ||
+    [ "${SEND_FLOCK}" = "YES" ] ||
+    [ "${SEND_DISCORD}" = "YES" ] ||
+    [ "${SEND_HIPCHAT}" = "YES" ] ||
+    [ "${SEND_TWILIO}" = "YES" ] ||
+    [ "${SEND_MESSAGEBIRD}" = "YES" ] ||
+    [ "${SEND_KAVENEGAR}" = "YES" ] ||
+    [ "${SEND_TELEGRAM}" = "YES" ] ||
+    [ "${SEND_PUSHBULLET}" = "YES" ] ||
+    [ "${SEND_KAFKA}" = "YES" ] ||
+    [ "${SEND_FLEEP}" = "YES" ] ||
+    [ "${SEND_PROWL}" = "YES" ] ||
+    [ "${SEND_MATRIX}" = "YES" ] ||
+    [ "${SEND_CUSTOM}" = "YES" ] ||
+    [ "${SEND_MSTEAMS}" = "YES" ] ||
+    [ "${SEND_DYNATRACE}" = "YES" ] ||
+    [ "${SEND_OPSGENIE}" = "YES" ] ||
+    [ "${SEND_GOTIFY}" = "YES" ] ||
+    [ "${SEND_NTFY}" = "YES" ]; then
+    # if we need curl, check for the curl command
+    if [ -z "${curl}" ]; then
+      curl="$(command -v curl 2>/dev/null)"
+    fi
+    if [ -z "${curl}" ]; then
+      $log "Cannot find curl command in the system path. Disabling all curl based notifications."
+      SEND_PUSHOVER="NO"
+      SEND_PUSHBULLET="NO"
+      SEND_TELEGRAM="NO"
+      SEND_SLACK="NO"
+      SEND_MSTEAMS="NO"
+      SEND_ROCKETCHAT="NO"
+      SEND_ALERTA="NO"
+      SEND_PD="NO"
+      SEND_FLOCK="NO"
+      SEND_DISCORD="NO"
+      SEND_TWILIO="NO"
+      SEND_HIPCHAT="NO"
+      SEND_MESSAGEBIRD="NO"
+      SEND_KAVENEGAR="NO"
+      SEND_KAFKA="NO"
+      SEND_FLEEP="NO"
+      SEND_PROWL="NO"
+      SEND_MATRIX="NO"
+      SEND_CUSTOM="NO"
+      SEND_DYNATRACE="NO"
+      SEND_OPSGENIE="NO"
+      SEND_GOTIFY="NO"
+      SEND_NTFY="NO"
+    fi
   fi
-fi
 
-# if we need aws, check for the aws command
-if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
-  aws="$(command -v aws 2>/dev/null)"
-  if [ -z "${aws}" ]; then
-    debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
-    SEND_AWSSNS="NO"
+  if [ "${SEND_SMS}" = "YES" ]; then
+    if [ -z "${sendsms}" ]; then
+      sendsms="$(command -v sendsms 2>/dev/null)"
+    fi
+    if [ -z "${sendsms}" ]; then
+      SEND_SMS="NO"
+    fi
   fi
-fi
+  # if we need sendmail, check for the sendmail command
+  if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
+    sendmail="$(command -v sendmail 2>/dev/null)"
+    if [ -z "${sendmail}" ]; then
+      $log "Cannot find sendmail command in the system path. Disabling email notifications."
+      SEND_EMAIL="NO"
+    fi
+  fi
 
-# if we need nc, check for the nc command
-if [ "${SEND_IRC}" = "YES" ] && [ -z "${nc}" ]; then
-  nc="$(command -v nc 2>/dev/null)"
-  if [ -z "${nc}" ]; then
-    debug "Cannot find nc command in the system path.  Disabling IRC notifications."
-    SEND_IRC="NO"
+  # if we need logger, check for the logger command
+  if [ "${SEND_SYSLOG}" = "YES" ] && [ -z "${logger}" ]; then
+    logger="$(command -v logger 2>/dev/null)"
+    if [ -z "${logger}" ]; then
+      $log "Cannot find logger command in the system path. Disabling syslog notifications."
+      SEND_SYSLOG="NO"
+    fi
   fi
-fi
+
+  # if we need aws, check for the aws command
+  if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
+    aws="$(command -v aws 2>/dev/null)"
+    if [ -z "${aws}" ]; then
+      $log "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
+      SEND_AWSSNS="NO"
+    fi
+  fi
+
+  # if we need nc, check for the nc command
+  if [ "${SEND_IRC}" = "YES" ] && [ -z "${nc}" ]; then
+    nc="$(command -v nc 2>/dev/null)"
+    if [ -z "${nc}" ]; then
+      $log "Cannot find nc command in the system path.  Disabling IRC notifications."
+      SEND_IRC="NO"
+    fi
+  fi
+}
 
 if [ ${dump_methods} ]; then
+    check_supported_targets debug
     for name in "${!SEND_@}"; do
         if [ "${!name}" = "YES" ]; then
             echo "$name"
         fi
     done
-    exit
+    exit 0
 fi
 
 # -----------------------------------------------------------------------------
@@ -976,6 +994,8 @@ if [ "$proceed" -eq 0 ]; then
     fatal "All notification methods are disabled; not sending ${notification_description}."
   fi
 fi
+
+check_supported_targets error
 
 # -----------------------------------------------------------------------------
 # get the date the alarm happened
