@@ -361,7 +361,7 @@
             - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
             - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
             - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-        * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Telegram:
+        - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Telegram:
             - Bot Token - the token of your bot
             - Chat ID - the chat id where your bot will deliver messages to
 
