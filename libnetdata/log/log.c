@@ -477,8 +477,14 @@ static struct {
 };
 
 __attribute__((constructor)) void initialize_invocation_id(void) {
-    if(uuid_parse_flexi(getenv("NETDATA_INVOCATION_ID"), nd_log.invocation_id) != 0)
-        uuid_generate_random(nd_log.invocation_id);
+    // check for a NETDATA_INVOCATION_ID
+    if(uuid_parse_flexi(getenv("NETDATA_INVOCATION_ID"), nd_log.invocation_id) != 0) {
+        // not found, check for systemd set INVOCATION_ID
+        if(uuid_parse_flexi(getenv("INVOCATION_ID"), nd_log.invocation_id) != 0) {
+            // not found, generate a new one
+            uuid_generate_random(nd_log.invocation_id);
+        }
+    }
 
     char uuid[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(nd_log.invocation_id, uuid);
@@ -1264,7 +1270,6 @@ void log_stack_push(struct log_stack_entry *lgs) {
 // json formatter
 
 static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_max) {
-    CLEAN_BUFFER *tmp = NULL;
 
     //  --- FIELD_PARSER_VERSIONS ---
     //
@@ -1281,6 +1286,7 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
     // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    CLEAN_BUFFER *tmp = NULL;
 
     for (size_t i = 0; i < fields_max; i++) {
         if (!fields[i].entry.set || !fields[i].logfmt)
