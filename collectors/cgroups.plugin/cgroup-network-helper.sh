@@ -29,6 +29,8 @@
 
 export LC_ALL=C
 
+cmd_line="'${0}' $(printf "'%s' " "${@}")"
+
 # -----------------------------------------------------------------------------
 # logging
 
@@ -97,6 +99,7 @@ SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
 THREAD_TAG="cgroup-network-helper.sh"
 ND_LOG_SOURCE=collector
+ND_REQUEST=${cmd_line}
 MESSAGE=${*//[$'\r\n']}
 
 EOFLOG

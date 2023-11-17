@@ -54,7 +54,6 @@ static void lgs_reset(struct log_stack_entry *lgs) {
 
 int main(int argc, char *argv[]) {
     clocks_init();
-
     nd_log_initialize_for_external_plugins(argv[0]);
 
     int timeout_ms = 0;
