@@ -568,6 +568,26 @@ AC_CHECK_LIB(
 )
 
 # -----------------------------------------------------------------------------
+# libcurl
+
+PKG_CHECK_MODULES(
+    [LIBCURL],
+    [libcurl],
+    [AC_CHECK_LIB(
+        [curl],
+        [curl_easy_init],
+        [have_libcurl=yes],
+        [have_libcurl=no]
+    )],
+    [have_libcurl=no]
+)
+
+if test "x$have_libcurl" = "xyes"; then
+    AC_DEFINE([HAVE_CURL], [1], [libcurl usability])
+    OPTIONAL_CURL_LIBS="-lcurl"
+fi
+
+# -----------------------------------------------------------------------------
 # zstd
 
 AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_createDStream],
@@ -1587,18 +1607,6 @@ PKG_CHECK_MODULES(
 )
 
 PKG_CHECK_MODULES(
-    [LIBCURL],
-    [libcurl],
-    [AC_CHECK_LIB(
-        [curl],
-        [curl_easy_init],
-        [have_libcurl=yes],
-        [have_libcurl=no]
-    )],
-    [have_libcurl=no]
-)
-
-PKG_CHECK_MODULES(
     [AWS_CPP_SDK_CORE],
     [aws-cpp-sdk-core],
     [have_libaws_cpp_sdk_core=yes],
@@ -1942,6 +1950,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_BROTLIENC_LIBS])
 AC_SUBST([OPTIONAL_BROTLIDEC_LIBS])
+AC_SUBST([OPTIONAL_CURL_LIBS])
 AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
