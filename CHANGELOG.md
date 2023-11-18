@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#16431](https://github.com/netdata/netdata/pull/16431) ([netdatabot](https://github.com/netdatabot))
+- Regenerate integrations.js [\#16430](https://github.com/netdata/netdata/pull/16430) ([netdatabot](https://github.com/netdatabot))
+- proc\_net\_dev: keep nic\_speed\_max in kilobits [\#16429](https://github.com/netdata/netdata/pull/16429) ([ilyam8](https://github.com/ilyam8))
+- update go.d plugin to v0.57.0 [\#16427](https://github.com/netdata/netdata/pull/16427) ([ilyam8](https://github.com/ilyam8))
+- Adds config info for Telegram cloud notification [\#16424](https://github.com/netdata/netdata/pull/16424) ([juacker](https://github.com/juacker))
 - Minor: Remove backtick from doc [\#16423](https://github.com/netdata/netdata/pull/16423) ([MrZammler](https://github.com/MrZammler))
+- Update netdata-functions.md [\#16421](https://github.com/netdata/netdata/pull/16421) ([shyamvalsan](https://github.com/shyamvalsan))
 - disable socket port reuse [\#16420](https://github.com/netdata/netdata/pull/16420) ([ilyam8](https://github.com/ilyam8))
 - fix proc net dev: keep iface speed chart var in Mbits [\#16418](https://github.com/netdata/netdata/pull/16418) ([ilyam8](https://github.com/ilyam8))
 - Don't print errors from reading filtered alerts [\#16417](https://github.com/netdata/netdata/pull/16417) ([MrZammler](https://github.com/MrZammler))
@@ -415,11 +421,6 @@
 - Improve dyncfg exit [\#15824](https://github.com/netdata/netdata/pull/15824) ([underhood](https://github.com/underhood))
 - Release job message status to avoid memory leak [\#15822](https://github.com/netdata/netdata/pull/15822) ([stelfrag](https://github.com/stelfrag))
 - ML improve init [\#15819](https://github.com/netdata/netdata/pull/15819) ([stelfrag](https://github.com/stelfrag))
-- Update cmakelist [\#15817](https://github.com/netdata/netdata/pull/15817) ([stelfrag](https://github.com/stelfrag))
-- added /api/v2/ilove.svg endpoint [\#15815](https://github.com/netdata/netdata/pull/15815) ([ktsaou](https://github.com/ktsaou))
-- systemd-journal fixes [\#15814](https://github.com/netdata/netdata/pull/15814) ([ktsaou](https://github.com/ktsaou))
-- fix packaging: link health.log to stdout [\#15813](https://github.com/netdata/netdata/pull/15813) ([ilyam8](https://github.com/ilyam8))
-- docs rename alarm to alert [\#15812](https://github.com/netdata/netdata/pull/15812) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
