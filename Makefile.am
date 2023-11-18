@@ -341,6 +341,10 @@ SYSTEMD_CAT_NATIVE_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+LOG2JOURNAL_FILES = \
+    libnetdata/log/log2journal.c \
+    $(NULL)
+
 CUPS_PLUGIN_FILES = \
     collectors/cups.plugin/cups_plugin.c \
     $(LIBNETDATA_FILES) \
@@ -1303,6 +1307,14 @@ if ENABLE_PLUGIN_FREEIPMI
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
         $(NULL)
+endif
+
+if ENABLE_LOG2JOURNAL
+    sbin_PROGRAMS += log2journal
+    log2journal_SOURCES = $(LOG2JOURNAL_FILES)
+    log2journal_LDADD = \
+            $(OPTIONAL_PCRE2_LIBS) \
+            $(NULL)
 endif
 
 if ENABLE_PLUGIN_SYSTEMD_JOURNAL
