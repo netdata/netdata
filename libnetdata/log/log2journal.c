@@ -41,13 +41,14 @@ void display_help(const char *name) {
     printf("       Include unmatched log entries in the output with KEY as the field name.\n");
     printf("       Use this to log unmatched entries to stdout instead of stderr.\n");
     printf("       Use --inject-unmatched to inject additional fields to unmatched lines.\n");
+    printf("       --inject entries are added to unmatched lines too.\n");
     printf("\n");
     printf("  --duplicate=OLD,NEW\n");
     printf("       Duplicate a field with OLD key as NEW key, retaining the same value.\n");
     printf("       Useful for further processing. Up to %d duplications allowed.\n", MAX_KEY_DUPS);
     printf("\n");
     printf("  --inject=LINE\n");
-    printf("       Inject constant fields into successfully parsed log entries.\n");
+    printf("       Inject constant fields to the output (both matched and unmatched logs).\n");
     printf("       Up to %d fields can be injected.\n", MAX_INJECTIONS);
     printf("\n");
     printf("  --inject-unmatched=LINE\n");

@@ -216,7 +216,7 @@ SYSLOG_IDENTIFIER=nginx                  # <<<<<<<<< THIS HAS BEEN ADDED
 
 ```
 
-Now the mesaage is ready to be send to a systemd-journal. For this we use `systemd-cat-native`. This command can send such messages to a journal running on the localhost, a local journal namespace, or a `systemd-journal-remote` running on another server. By just appending `| systemd-cat-native` to the command, the message will be sent to the local journal.
+Now the message is ready to be sent to a systemd-journal. For this we use `systemd-cat-native`. This command can send such messages to a journal running on the localhost, a local journal namespace, or a `systemd-journal-remote` running on another server. By just appending `| systemd-cat-native` to the command, the message will be sent to the local journal.
 
 
 ```bash
@@ -310,7 +310,7 @@ tail -n $last -F /var/log/nginx/*access.log |\
 		--duplicate=NGINX_STATUS,STATUS2PRIORITY \
 		--duplicate=NGINX_STATUS,STATUS_FAMILY \
 		--inject=SYSLOG_IDENTIFIER=nginx \
-		--unmatched-key=NGINX_UNMATCHED_LINE \
+		--unmatched-key=MESSAGE \
 		--inject-unmatched=PRIORITY=1 \
 		| sed -u \
 			-e 's|^STATUS2PRIORITY=5.*$|PRIORITY=3|' \
