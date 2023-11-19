@@ -58,7 +58,8 @@ void display_help(const char *name) {
     printf("       Display this help and exit.\n");
     printf("\n");
     printf("  PATTERN\n");
-    printf("       PATTERN should be a valid PCRE2 regular expression.\n");
+    printf("       PATTERN should be a valid PCRE2 regular expression. RE2 regular expressions\n");
+    printf("       (like the ones usually used in Go applications), are valid PCRE2 patterns too.\n");
     printf("       Regular expressions without named groups are ignored.\n");
     printf("\n");
     printf("The maximum line length accepted is %d characters\n", MAX_LINE_LENGTH);

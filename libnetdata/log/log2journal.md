@@ -9,10 +9,10 @@ The process involves the usual piping of shell commands, to get and process the 
 The overall process looks like this:
 
 ```bash
-tail -F /var/log/nginx/*.log    |\
-  log2journal 'PATTERN'         |\
-  sed -u SEARCH-REPLACE-RULES   |\
-  systemd-cat-native OPTIONS
+tail -F /var/log/nginx/*.log       |\  # outputs log lines
+  log2journal 'PATTERN'            |\  # outputs Journal Export Format
+  sed -u -e SEARCH-REPLACE-RULES   |\  # optional rewriting rules
+  systemd-cat-native                   # send to local/remote journald
 ```
 
 Let's see the steps:
@@ -362,7 +362,8 @@ Options:
        Display this help and exit.
 
   PATTERN
-       PATTERN should be a valid PCRE2 regular expression.
+       PATTERN should be a valid PCRE2 regular expression. Usually RE2 patterns
+       (the ones used by Go applications), are valid PCRE2 patterns too.
        Regular expressions without named groups are ignored.
 
 The maximum line length accepted is 1048576 characters
