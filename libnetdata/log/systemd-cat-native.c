@@ -611,13 +611,13 @@ int main(int argc, char *argv[]) {
                         "Please either give --url or --socket, not both.\n");
         return 1;
     }
-#endif
 
     if(url && namespace) {
         fprintf(stderr, "Cannot log to a systemd-journal-remote URL using a namespace. "
                         "Please either give --url or --namespace, not both.\n");
         return 1;
     }
+#endif
 
     if(log_as_netdata && namespace) {
         fprintf(stderr, "Cannot log as netdata using a namespace. "
