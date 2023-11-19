@@ -50,11 +50,14 @@ log_format access '$remote_addr - $remote_user [$time_local] '
                     '$request_length $request_time '
                     '"$http_referer" "$http_user_agent"';
 
-I want to use `log2joural` to convert this log for systemd-journal. `log2journal` accepts a PCRE2 regular expression, using the named groups in the pattern as the journal fields to extract from the logs.
+I want to use `log2joural` to convert this log for systemd-journal.
+`log2journal` accepts a PCRE2 regular expression, using the named groups
+in the pattern as the journal fields to extract from the logs.
 
 Prefix all PCRE2 group names with `NGINX_` and use capital characters only. 
 
-For the $request, use the field `MESSAGE` (without NGINX_ prefix), so that it will appear in systemd journals as the message of the log.
+For the $request, use the field `MESSAGE` (without NGINX_ prefix), so that
+it will appear in systemd journals as the message of the log.
 
 Please give me the PCRE2 pattern.
 ```
@@ -87,9 +90,11 @@ As you can see, it extracted all the fields.
 The `MESSAGE` however, has 3 fields by itself: the method, the URL and the procotol version. Let's ask ChatGPT to extract these too:
 
 ```
-I see that the MESSAGE has 3 key items in it. The request method (GET, POST, etc), the URL and HTTP protocol version.
+I see that the MESSAGE has 3 key items in it. The request method (GET, POST,
+etc), the URL and HTTP protocol version.
 
-I want to keep the MESSAGE as it is, with all the information in it, but also extract the 3 items from it as separate fields.
+I want to keep the MESSAGE as it is, with all the information in it, but also
+extract the 3 items from it as separate fields.
 
 Can this be done?
 ```
@@ -262,47 +267,56 @@ So, the log line, with all its fields parsed, ended up in systemd-journal.
 ## `log2journal` options
 
 ```
-Netdata log2journal
+Netdata log2journal v1.43.0-319-g4ada93a6e
 
-Convert a structured log to systemd-journald export format.
+Convert structured log input to systemd Journal Export Format.
 
-Usage: log2journal [OPTIONS] PATTERN
+Using PCRE2 patterns, extract the fields from structured logs on the standard
+input, and generate output according to systemd Journal Export Format
+
+Usage: ./log2journal [OPTIONS] PATTERN
 
 Options:
 
-  --filename-key=KEY       Add a field with KEY as the key and the current filename as value.
-                           Automatically detects filenames when piped after 'tail -F',
-                           and tail matches multiple filenames.
-                           To inject the filename when tailing a single file, use --inject.
+  --filename-key=KEY
+       Add a field with KEY as the key and the current filename as value.
+       Automatically detects filenames when piped after 'tail -F',
+       and tail matches multiple filenames.
+       To inject the filename when tailing a single file, use --inject.
 
-  --unmatched-key=KEY      Include unmatched log entries in the output with KEY as the field name.
-                           Use this to log unmatched entries to stdout instead of stderr.
-                           Use --inject-unmatched to inject additional fields to unmatched lines.
+  --unmatched-key=KEY
+       Include unmatched log entries in the output with KEY as the field name.
+       Use this to log unmatched entries to stdout instead of stderr.
+       Use --inject-unmatched to inject additional fields to unmatched lines.
 
-  --duplicate=OLD,NEW      Duplicate a field with OLD key as NEW key, retaining the same value.
-                           Useful for further processing. Up to 2048 duplications allowed.
+  --duplicate=OLD,NEW
+       Duplicate a field with OLD key as NEW key, retaining the same value.
+       Useful for further processing. Up to 2048 duplications allowed.
 
-  --inject=LINE            Inject constant fields into successfully parsed log entries.
-                           Up to 2048 fields can be injected.
+  --inject=LINE
+       Inject constant fields into successfully parsed log entries.
+       Up to 2048 fields can be injected.
 
-  --inject-unmatched=LINE  Inject lines into the output for each unmatched log entry.
-                           Up to 2048 such lines can be injected.
+  --inject-unmatched=LINE
+       Inject lines into the output for each unmatched log entry.
+       Up to 2048 such lines can be injected.
 
-  -h, --help               Display this help and exit.
+  -h, --help
+       Display this help and exit.
 
-
-PATTERN should be a valid PCRE2 regular expression.
-Regular expressions without group names are ignored.
+  PATTERN
+       PATTERN should be a valid PCRE2 regular expression.
+       Regular expressions without named groups are ignored.
 
 The maximum line length accepted is 1048576 characters
 The maximum number of fields in the PCRE2 pattern is 8192
-
 ```
 
 ## `systemd-cat-native` options
 
 ```
-Netdata systemd-cat-native
+
+Netdata systemd-cat-native v1.43.0-319-g4ada93a6e
 
 This program reads from its standard input, lines in the format:
 
@@ -313,40 +327,91 @@ KEYN=VALUEN\n
 
 and sends them to systemd-journal.
 
-   - Binary fields are not accepted, but are generated after newline processing
+   - Binary journal fields are not accepted at its input
+   - Binary journal fields can be generated after newline processing
    - Messages have to be separated by an empty line
    - Keys starting with underscore are not accepted (by journald)
+   - Other rules imposed by systemd-journald are imposed (by journald)
 
 Usage:
 
-   systemd-cat-native [--newline=STRING]
+   ./systemd-cat-native
+          [--newline=STRING]
           [--log-as-netdata|-N]
           [--namespace=NAMESPACE] [--socket=PATH]
           [--url=URL [--key=FILENAME] [--cert=FILENAME] [--trust=FILENAME|all]]
 
 The program has the following modes of logging:
 
-  * log as Netdata (it uses environment variables set by Netdata for the log destination)
-  * log to local systemd-journald (use --socket and --namespace to configure destination)
-  * log to a remote systemd-journal-remote (use --url to enable)
+  * Log to a local systemd-journald or stderr
 
-The default namespace and socket depends on whether the program is started by Netdata.
-When it is started by Netdata, it inherits whatever settings Netdata has.
-When it is started by other programs, it uses the default namespace and the default
-systemd-journald socket.
+    This is the default mode. If systemd-journald is available, logs will be
+    sent to systemd, otherwise logs will be printed on stderr, using logfmt
+    formatting. Options --socket and --namespace are available to configure
+    the journal destination:
 
---log-as-netdata, means to log the received messages the same way Netdata does
-(using the same log output and format as the Netdata daemon in its process tree).
+      --socket=PATH
+        The path of a systemd-journald UNIX socket.
+        The program will use the default systemd-journald socket when this
+        option is not used.
 
---newline, sets a string which will be replaced with a newline, allowing sending
-multiline logs to systemd-journal. So, by passing --newline="{NEWLINE}", it will
-replace all occurrences of {NEWLINE} with \n and use the binary form of the journal
-export format for the field.
+      --namespace=NAMESPACE
+        The name of a configured and running systemd-journald namespace.
+        The program will produce the socket path based on its internal
+        defaults, to send the messages to the systemd journal namespace.
 
-When logging to systemd-journal-remote, the defaults are:
+  * Log as Netdata, enabled with --log-as-netdata or -N
 
-  --key=/etc/ssl/private/journal-upload.pem
-  --cert=/etc/ssl/certs/journal-upload.pem
-  --trust=/etc/ssl/ca/trusted.pem
+    In this mode the program uses environment variables set by Netdata for
+    the log destination. Only log fields defined by Netdata are accepted.
+    If the environment variables expected by Netdata are not found, it
+    falls back to stderr logging in logfmt format.
+
+  * Log to a systemd-journal-remote TCP socket, enabled with --url=URL
+
+    In this mode, the program will directly sent logs to a remote systemd
+    journal (systemd-journal-remote expected at the destination)
+    This mode is available even when the local system does not support
+    systemd, or even it is not Linux, allowing a remote Linux systemd
+    journald to become the logs database of the local system.
+
+      --url=URL
+        The destination systemd-journal-remote address and port, similarly
+        to what /etc/systemd/journal-upload.conf accepts.
+        Usually it is in the form: https://ip.address:19532
+        Both http and https URLs are accepted. When using https, the
+        following additional options are accepted:
+
+      --key=FILENAME
+        The filename of the private key of the server.
+        The default is: /etc/ssl/private/journal-upload.pem
+
+      --cert=FILENAME
+        The filename of the public key of the server.
+        The default is: /etc/ssl/certs/journal-upload.pem
+
+      --trust=FILENAME | all
+        The filename of the trusted CA public key.
+        The default is: /etc/ssl/ca/trusted.pem
+        The keyword 'all' can be used to trust all CAs.
+
+    NEWLINES PROCESSING
+    systemd-journal logs entries may have newlines in them. However the
+    Journal Export Format uses binary formatted data to achieve this,
+    making it hard for text processing.
+
+    To overcome this limitation, this program allows single-line text
+    formatted values at its input, to be binary formatted multi-line Journal
+    Export Format at its output.
+
+    To achieve that it allows replacing a given string to a newline.
+    The parameter --newline=STRING allows setting the string to be replaced
+    with newlines.
+
+    For example by setting --newline='{NEWLINE}', the program will replace
+    all occurrences of {NEWLINE} with the newline character, within each
+    VALUE of the KEY=VALUE lines. Once this this done, the program will
+    switch the field to the binary Journal Export Format before sending the
+    log event to systemd-journal.
 
 ```
