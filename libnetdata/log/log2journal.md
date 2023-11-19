@@ -18,7 +18,7 @@ tail -F /var/log/nginx/*.log    |\
 Let's see the steps:
 
 1. `tail -F /var/log/nginx/*.log`<br/>this command will tail all `*.log` files in `/var/log/nginx/`. We use `-F` instead of `-f` to ensure that files will still be tailed after log rotation.
-2. `log2joural` is a Netdata program. It reads log entries and extracts fields, according to the PCRE2 pattern it accepts. The output of `log2journal` is in Systemd Journal Export Format, and it looks like this:
+2. `log2joural` is a Netdata program. It reads log entries and extracts fields, according to the PCRE2 pattern it accepts. It can also apply some basic operations on the fields, like injecting new fields or duplicating existing ones. The output of `log2journal` is in Systemd Journal Export Format, and it looks like this:
     ```bash
    KEY1=VALUE1 # << start of the first log line
    KEY2=VALUE2
@@ -26,7 +26,7 @@ Let's see the steps:
    KEY1=VALUE1 # << start of the second log line
    KEY2=VALUE2
     ```
-3. `sed` is an optional step in case we want to alter the fields in some way. For example, we may want to set the PRIORITY field of systemd-journal to make Netdata dashboards and `journalctl` color the internal server errors. Or we may want to anonymize the logs, to remove sensitive information from them. Or even we may want to remove the variable parts of the requests, to make them uniform. We will see below how such processing can be done.
+3. `sed` is an optional step and is an example. Any kind of processing can be applied at this stage, in case we want to alter the fields in some way. For example, we may want to set the PRIORITY field of systemd-journal to make Netdata dashboards and `journalctl` color the internal server errors. Or we may want to anonymize the logs, to remove sensitive information from them. Or even we may want to remove the variable parts of the requests, to make them uniform. We will see below how such processing can be done.
 4. `systemd-cat-native` is a Netdata program. I can send the logs to a local `systemd-journald` (journal namespaces supported), or to a remote `systemd-journal-remote`.
 
 ## Real-life example
