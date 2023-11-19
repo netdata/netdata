@@ -1082,10 +1082,6 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
                 .journal = "ND_SRC_PORT",
                 .logfmt = "src_port",
         },
-        [NDF_SRC_METHOD] = {
-                .journal = "ND_SRC_METHOD",
-                .logfmt = "src_method",
-        },
         [NDF_SRC_CAPABILITIES] = {
                 .journal = "ND_SRC_CAPABILITIES",
                 .logfmt = "src_capabilities",

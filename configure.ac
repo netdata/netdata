@@ -588,6 +588,28 @@ if test "x$have_libcurl" = "xyes"; then
 fi
 
 # -----------------------------------------------------------------------------
+# PCRE2
+
+PKG_CHECK_MODULES(
+    [LIBPCRE2],
+    [libpcre2-8],
+    [AC_CHECK_LIB(
+        [pcre2-8],
+        [pcre2_compile_8],
+        [have_libpcre2=yes],
+        [have_libpcre2=no]
+    )],
+    [have_libpcre2=no]
+)
+
+if test "x$have_libpcre2" = "xyes"; then
+    AC_DEFINE([HAVE_PCRE2], [1], [PCRE2 usability])
+    OPTIONAL_PCRE2_LIBS="-lpcre2-8"
+fi
+
+AM_CONDITIONAL([ENABLE_LOG2JOURNAL], [test "${have_libpcre2}" = "yes"])
+
+# -----------------------------------------------------------------------------
 # zstd
 
 AC_CHECK_LIB([zstd], [ZSTD_createCStream, ZSTD_createDStream],
@@ -1951,6 +1973,7 @@ AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_BROTLIENC_LIBS])
 AC_SUBST([OPTIONAL_BROTLIDEC_LIBS])
 AC_SUBST([OPTIONAL_CURL_LIBS])
+AC_SUBST([OPTIONAL_PCRE2_LIBS])
 AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])

@@ -101,6 +101,7 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
     const char *equal;
     if(!newline || !*newline || !strstr(src, newline) || !(equal = strchr(src, '='))) {
         buffer_memcat(wb, src, src_len);
+        buffer_putc(wb, '\n');
         return;
     }
 
@@ -190,9 +191,9 @@ CURL* initialize_connection_to_systemd_journal_remote(const char* url, const cha
     return curl;
 }
 
-CURLcode send_to_systemd_journal_remote(CURL* curl, BUFFER *msg) {
+CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
     buffer_sprintf(msg,
-                   "\n"
+                   ""
                    "__REALTIME_TIMESTAMP=%llu\n"
                    "__MONOTONIC_TIMESTAMP=%llu\n"
                    "_BOOT_ID=%s\n"
@@ -283,9 +284,9 @@ static int log_input_to_journal_remote(const char *url, const char *key, const c
         if (!line->len) {
             // an empty line - we are done for this message
             if (msg->len) {
-                res = send_to_systemd_journal_remote(curl, msg);
+                res = journal_remote_send_buffer(curl, msg);
                 if (res != CURLE_OK) {
-                    fprintf(stderr, "send_to_systemd_journal_remote() failed: %s\n", curl_easy_strerror(res));
+                    fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
                     failures++;
                     goto cleanup;
                 }
@@ -300,9 +301,9 @@ static int log_input_to_journal_remote(const char *url, const char *key, const c
     }
 
     if (msg->len) {
-        res = send_to_systemd_journal_remote(curl, msg);
+        res = journal_remote_send_buffer(curl, msg);
         if (res != CURLE_OK) {
-            fprintf(stderr, "send_to_systemd_journal_remote() failed: %s\n", curl_easy_strerror(res));
+            fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
             failures++;
         }
         else
@@ -321,7 +322,8 @@ cleanup:
 
 static int help(void) {
     fprintf(stderr,
-            "Netdata systemd-cat-native\n"
+            "\n"
+            "Netdata systemd-cat-native " PACKAGE_VERSION "\n"
             "\n"
             "This program reads from its standard input, lines in the format:\n"
             "\n"
@@ -332,13 +334,16 @@ static int help(void) {
             "\n"
             "and sends them to systemd-journal.\n"
             "\n"
-            "   - Binary fields are not accepted, but are generated after newline processing\n"
+            "   - Binary journal fields are not accepted at its input\n"
+            "   - Binary journal fields can be generated after newline processing\n"
             "   - Messages have to be separated by an empty line\n"
             "   - Keys starting with underscore are not accepted (by journald)\n"
+            "   - Other rules imposed by systemd-journald are imposed (by journald)\n"
             "\n"
             "Usage:\n"
             "\n"
-            "   %s [--newline=STRING]\n"
+            "   %s\n"
+            "          [--newline=STRING]\n"
             "          [--log-as-netdata|-N]\n"
             "          [--namespace=NAMESPACE] [--socket=PATH]\n"
 #ifdef HAVE_CURL
@@ -347,32 +352,78 @@ static int help(void) {
             "\n"
             "The program has the following modes of logging:\n"
             "\n"
-            "  * log as Netdata (it uses environment variables set by Netdata for the log destination)\n"
-            "  * log to local systemd-journald (use --socket and --namespace to configure destination)\n"
+            "  * Log to a local systemd-journald or stderr\n"
+            "\n"
+            "    This is the default mode. If systemd-journald is available, logs will be\n"
+            "    sent to systemd, otherwise logs will be printed on stderr, using logfmt\n"
+            "    formatting. Options --socket and --namespace are available to configure\n"
+            "    the journal destination:\n"
+            "\n"
+            "      --socket=PATH\n"
+            "        The path of a systemd-journald UNIX socket.\n"
+            "        The program will use the default systemd-journald socket when this\n"
+            "        option is not used.\n"
+            "\n"
+            "      --namespace=NAMESPACE\n"
+            "        The name of a configured and running systemd-journald namespace.\n"
+            "        The program will produce the socket path based on its internal\n"
+            "        defaults, to send the messages to the systemd journal namespace.\n"
+            "\n"
+            "  * Log as Netdata, enabled with --log-as-netdata or -N\n"
+            "\n"
+            "    In this mode the program uses environment variables set by Netdata for\n"
+            "    the log destination. Only log fields defined by Netdata are accepted.\n"
+            "    If the environment variables expected by Netdata are not found, it\n"
+            "    falls back to stderr logging in logfmt format.\n"
 #ifdef HAVE_CURL
-            "  * log to a remote systemd-journal-remote (use --url to enable)\n"
+            "\n"
+            "  * Log to a systemd-journal-remote TCP socket, enabled with --url=URL\n"
+            "\n"
+            "    In this mode, the program will directly sent logs to a remote systemd\n"
+            "    journal (systemd-journal-remote expected at the destination)\n"
+            "    This mode is available even when the local system does not support\n"
+            "    systemd, or even it is not Linux, allowing a remote Linux systemd\n"
+            "    journald to become the logs database of the local system.\n"
+            "\n"
+            "      --url=URL\n"
+            "        The destination systemd-journal-remote address and port, similarly\n"
+            "        to what /etc/systemd/journal-upload.conf accepts.\n"
+            "        Usually it is in the form: https://ip.address:19532\n"
+            "        Both http and https URLs are accepted. When using https, the\n"
+            "        following additional options are accepted:\n"
+            "\n"
+            "      --key=FILENAME\n"
+            "        The filename of the private key of the server.\n"
+            "        The default is: " DEFAULT_PRIVATE_KEY "\n"
+            "\n"
+            "      --cert=FILENAME\n"
+            "        The filename of the public key of the server.\n"
+            "        The default is: " DEFAULT_PUBLIC_KEY "\n"
+            "\n"
+            "      --trust=FILENAME | all\n"
+            "        The filename of the trusted CA public key.\n"
+            "        The default is: " DEFAULT_CA_CERT "\n"
+            "        The keyword 'all' can be used to trust all CAs.\n"
 #endif
             "\n"
-            "The default namespace and socket depends on whether the program is started by Netdata.\n"
-            "When it is started by Netdata, it inherits whatever settings Netdata has.\n"
-            "When it is started by other programs, it uses the default namespace and the default\n"
-            "systemd-journald socket.\n"
+            "    NEWLINES PROCESSING\n"
+            "    systemd-journal logs entries may have newlines in them. However the\n"
+            "    Journal Export Format uses binary formatted data to achieve this,\n"
+            "    making it hard for text processing.\n"
             "\n"
-            "--log-as-netdata, means to log the received messages the same way Netdata does\n"
-            "(using the same log output and format as the Netdata daemon in its process tree).\n"
+            "    To overcome this limitation, this program allows single-line text\n"
+            "    formatted values at its input, to be binary formatted multi-line Journal\n"
+            "    Export Format at its output.\n"
             "\n"
-            "--newline, sets a string which will be replaced with a newline, allowing sending\n"
-            "multiline logs to systemd-journal. So, by passing --newline=\"{NEWLINE}\", it will\n"
-            "replace all occurrences of {NEWLINE} with \\n and use the binary form of the journal\n"
-            "export format for the field.\n"
-#ifdef HAVE_CURL
+            "    To achieve that it allows replacing a given string to a newline.\n"
+            "    The parameter --newline=STRING allows setting the string to be replaced\n"
+            "    with newlines.\n"
             "\n"
-            "When logging to systemd-journal-remote, the defaults are:\n"
-            "\n"
-            "  --key=" DEFAULT_PRIVATE_KEY "\n"
-            "  --cert=" DEFAULT_PUBLIC_KEY "\n"
-            "  --trust=" DEFAULT_CA_CERT "\n"
-#endif
+            "    For example by setting --newline='{NEWLINE}', the program will replace\n"
+            "    all occurrences of {NEWLINE} with the newline character, within each\n"
+            "    VALUE of the KEY=VALUE lines. Once this this done, the program will\n"
+            "    switch the field to the binary Journal Export Format before sending the\n"
+            "    log event to systemd-journal.\n"
             "\n",
             program_name);
 
@@ -448,15 +499,27 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
                     if(id == NDF_PRIORITY)
                         priority = nd_log_priority2id(value);
                 }
-                else
+                else {
+                    struct log_stack_entry backup = lgs[NDF_MESSAGE];
+                    lgs[NDF_MESSAGE] = ND_LOG_FIELD_TXT(NDF_MESSAGE, NULL);
+
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
                            "Field '%.*s' is not a Netdata field. Ignoring it.",
                            field_len, field);
+
+                    lgs[NDF_MESSAGE] = backup;
+                }
             }
-            else
+            else {
+                struct log_stack_entry backup = lgs[NDF_MESSAGE];
+                lgs[NDF_MESSAGE] = ND_LOG_FIELD_TXT(NDF_MESSAGE, NULL);
+
                 nd_log(NDLS_COLLECTORS, NDLP_ERR,
                        "Line does not contain an = sign; ignoring it: %s",
                        line->buffer);
+
+                lgs[NDF_MESSAGE] = backup;
+            }
         }
     }
 
@@ -471,12 +534,12 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
 // ----------------------------------------------------------------------------
 // log to a local systemd-journald
 
-static bool journal_send_buffer(int fd, BUFFER *msg) {
+static bool journal_local_send_buffer(int fd, BUFFER *msg) {
     // log_message_to_stderr(msg);
 
     bool ret = journal_direct_send(fd, msg->buffer, msg->len);
     if (!ret)
-        fatal("Cannot send message to systemd journal.");
+        fprintf(stderr, "Cannot send message to systemd journal.\n");
 
     return ret;
 }
@@ -485,10 +548,14 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     char path[FILENAME_MAX + 1];
     int fd = -1;
 
-    journal_construct_path(path, sizeof(path), socket, namespace);
+    if(socket)
+        snprintfz(path, sizeof(path), "%s", socket);
+    else
+        journal_construct_path(path, sizeof(path), NULL, namespace);
+
     fd = journal_direct_fd(path);
     if (fd == -1) {
-        fprintf(stderr, "Cannot open '%s' as a UNIX socket.\n", socket);
+        fprintf(stderr, "Cannot open '%s' as a UNIX socket.\n", path);
         return 1;
     }
 
@@ -498,13 +565,18 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     CLEAN_BUFFER *msg = buffer_create(sizeof(reader.read_buffer), NULL);
 
     size_t messages_logged = 0;
+    size_t failed_messages = 0;
 
     while(get_next_line(&reader, line, timeout_ms)) {
         if (!line->len) {
             // an empty line - we are done for this message
             if (msg->len) {
-                if(journal_send_buffer(fd, msg))
+                if(journal_local_send_buffer(fd, msg))
                     messages_logged++;
+                else {
+                    failed_messages++;
+                    goto cleanup;
+                }
             }
 
             buffer_flush(msg);
@@ -514,11 +586,14 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     }
 
     if (msg && msg->len) {
-        if(journal_send_buffer(fd, msg))
+        if(journal_local_send_buffer(fd, msg))
             messages_logged++;
+        else
+            failed_messages++;
     }
 
-    return messages_logged ? 0 : 1;
+cleanup:
+    return !failed_messages && messages_logged ? 0 : 1;
 }
 
 int main(int argc, char *argv[]) {
@@ -586,13 +661,13 @@ int main(int argc, char *argv[]) {
                         "Please either give --url or --socket, not both.\n");
         return 1;
     }
-#endif
 
     if(url && namespace) {
         fprintf(stderr, "Cannot log to a systemd-journal-remote URL using a namespace. "
                         "Please either give --url or --namespace, not both.\n");
         return 1;
     }
+#endif
 
     if(log_as_netdata && namespace) {
         fprintf(stderr, "Cannot log as netdata using a namespace. "

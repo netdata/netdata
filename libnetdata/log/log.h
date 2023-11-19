@@ -66,7 +66,6 @@ typedef enum __attribute__((__packed__)) {
     // web server and stream receiver
     NDF_SRC_IP,                                 // the streaming / web server source IP
     NDF_SRC_PORT,                               // the streaming / web server source Port
-    NDF_SRC_METHOD,                             // the streaming receiver capabilities
     NDF_SRC_CAPABILITIES,                       // the stream receiver capabilities
 
     // stream sender (established links)
