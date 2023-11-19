@@ -22,6 +22,9 @@
 #define SYSTEMD_JOURNAL_MAX_PARAMS              1000
 #define SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION  (1 * 3600)
 #define SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY 200
+#define SYSTEMD_JOURNAL_DEFAULT_ITEMS_SAMPLING  100000
+#define SYSTEMD_JOURNAL_SAMPLING_SLOTS          500
+#define SYSTEMD_JOURNAL_SAMPLING_RECALIBRATE    10000
 
 #define JOURNAL_PARAMETER_HELP                  "help"
 #define JOURNAL_PARAMETER_AFTER                 "after"
@@ -41,6 +44,7 @@
 #define JOURNAL_PARAMETER_SLICE                 "slice"
 #define JOURNAL_PARAMETER_DELTA                 "delta"
 #define JOURNAL_PARAMETER_TAIL                  "tail"
+#define JOURNAL_PARAMETER_SAMPLING              "sampling"
 
 #define JOURNAL_KEY_ND_JOURNAL_FILE             "ND_JOURNAL_FILE"
 #define JOURNAL_KEY_ND_JOURNAL_PROCESS          "ND_JOURNAL_PROCESS"
@@ -189,10 +193,34 @@ typedef struct function_query_status {
     bool tail;
     bool data_only;
     bool slice;
+    size_t sampling;
     size_t filters;
     usec_t last_modified;
     const char *query;
     const char *histogram;
+
+    struct {
+        size_t sampled;
+        size_t unsampled;
+    } samples;
+
+    struct {
+        size_t init;
+        size_t every;
+        size_t skipped;
+        size_t recalibrate;
+        size_t sampled;
+        size_t unsampled;
+    } samples_per_file;
+
+    struct {
+        usec_t start_ut;
+        usec_t end_ut;
+        usec_t step_ut;
+        usec_t init;
+        size_t sampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
+        size_t unsampled[SYSTEMD_JOURNAL_SAMPLING_SLOTS];
+    } samples_per_time_slot;
 
     // per file progress info
     // size_t cached_count;
@@ -235,6 +263,147 @@ static inline bool netdata_systemd_journal_seek_to(sd_journal *j, usec_t timesta
 }
 
 #define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
+
+// ----------------------------------------------------------------------------
+// sampling support
+
+static void sampling_query_init(FUNCTION_QUERY_STATUS *fqs) {
+    if(!fqs->sampling)
+        return;
+
+    if(fqs->query) {
+        // the user is searching for something specific
+        // disable sampling
+        fqs->sampling = 0;
+        return;
+    }
+
+    if(fqs->data_only) {
+        // the user is doing a data query
+        // disable sampling
+        fqs->sampling = 0;
+        return;
+    }
+
+    if(!fqs->after_ut || !fqs->before_ut || fqs->after_ut >= fqs->before_ut) {
+        // we don't have enough information for sampling
+        fqs->sampling = 0;
+        return;
+    }
+
+    usec_t delta = fqs->before_ut - fqs->after_ut;
+    usec_t step = delta / SYSTEMD_JOURNAL_SAMPLING_SLOTS - 1;
+    if(step < 1) step = 1;
+
+    fqs->samples_per_time_slot.start_ut = fqs->after_ut;
+    fqs->samples_per_time_slot.end_ut = fqs->before_ut;
+    fqs->samples_per_time_slot.step_ut = step;
+
+    fqs->samples_per_file.init = (fqs->sampling / 4) / fqs->files_matched;
+    if(fqs->samples_per_file.init < fqs->entries * 2)
+        fqs->samples_per_file.init = fqs->entries * 2;
+
+    fqs->samples_per_time_slot.init = (fqs->sampling / 4) / SYSTEMD_JOURNAL_SAMPLING_SLOTS;
+    if(fqs->samples_per_time_slot.init < fqs->entries * 2)
+        fqs->samples_per_time_slot.init = fqs->entries * 2;
+}
+
+static void sampling_file_init(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf __maybe_unused) {
+    fqs->samples_per_file.sampled = 0;
+    fqs->samples_per_file.unsampled = 0;
+    fqs->samples_per_file.every = 0;
+    fqs->samples_per_file.skipped = 0;
+}
+
+static void sampling_decide_file_sampling_every(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut) {
+    size_t sampled = fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled;
+
+    if(!sampled)
+        sampled = 1;
+
+    // find the common duration
+    usec_t after_ut = fqs->samples_per_time_slot.start_ut < jf->msg_first_ut ? jf->msg_first_ut : fqs->samples_per_time_slot.start_ut;
+    usec_t before_ut = fqs->samples_per_time_slot.end_ut > jf->msg_last_ut ? jf->msg_last_ut : fqs->samples_per_time_slot.end_ut;
+
+    if(after_ut > before_ut) {
+        usec_t t = after_ut;
+        after_ut = before_ut;
+        before_ut = t;
+    }
+
+    if(after_ut == before_ut)
+        after_ut = before_ut - 1;
+
+    if(msg_ut <= after_ut)
+        msg_ut = after_ut + 1;
+
+    if(msg_ut >= before_ut)
+        msg_ut = before_ut - 1;
+
+    size_t expected_lines = sampled * (before_ut - after_ut) / (msg_ut - after_ut);
+    if(expected_lines < 1)
+        expected_lines = 1;
+
+    size_t wanted_samples = (fqs->sampling / 2) / fqs->files_matched;
+
+    fqs->samples_per_file.every = expected_lines / wanted_samples;
+
+    if(fqs->samples_per_file.every < 1)
+        fqs->samples_per_file.every = 1;
+}
+
+static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut) {
+    if(!fqs->sampling)
+        return true;
+
+    if(unlikely(msg_ut < fqs->samples_per_time_slot.start_ut))
+        msg_ut = fqs->samples_per_time_slot.start_ut;
+    if(unlikely(msg_ut > fqs->samples_per_time_slot.end_ut))
+        msg_ut = fqs->samples_per_time_slot.end_ut;
+
+    size_t slot = (msg_ut - fqs->samples_per_time_slot.start_ut) / fqs->samples_per_time_slot.step_ut;
+    if(slot >= SYSTEMD_JOURNAL_SAMPLING_SLOTS)
+        slot = SYSTEMD_JOURNAL_SAMPLING_SLOTS - 1;
+
+    bool should_sample = false;
+
+    if(fqs->samples_per_file.sampled < fqs->samples_per_file.init ||
+        fqs->samples_per_time_slot.sampled[slot] < fqs->samples_per_time_slot.init)
+        should_sample = true;
+
+    else if(fqs->samples_per_file.recalibrate >= SYSTEMD_JOURNAL_SAMPLING_RECALIBRATE || !fqs->samples_per_file.every) {
+        // this is the first to be unsampled for this file
+        sampling_decide_file_sampling_every(fqs, jf, msg_ut);
+        fqs->samples_per_file.recalibrate = 0;
+        should_sample = true;
+    }
+    else {
+        // we sample 1 every fqs->samples_per_file.every
+        if(fqs->samples_per_file.skipped >= fqs->samples_per_file.every) {
+            fqs->samples_per_file.skipped = 0;
+            should_sample = true;
+        }
+        else
+            fqs->samples_per_file.skipped++;
+    }
+
+    fqs->samples_per_file.recalibrate++;
+
+    if(should_sample) {
+        fqs->samples.sampled++;
+        fqs->samples_per_file.sampled++;
+        fqs->samples_per_time_slot.sampled[slot]++;
+    }
+    else {
+        fqs->samples.unsampled++;
+        fqs->samples_per_file.unsampled++;
+        fqs->samples_per_time_slot.unsampled[slot]++;
+    }
+
+    return should_sample;
+}
+
+// ----------------------------------------------------------------------------
 
 static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
     const char *k = data;
@@ -361,7 +530,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         if (unlikely(msg_ut < stop_ut))
             break;
 
-        bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+        if(is_row_in_sample(fqs, jf, msg_ut))
+            bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
         // make sure each line gets a unique timestamp
         if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -447,7 +617,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         if (unlikely(msg_ut > stop_ut))
             break;
 
-        bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
+        if(is_row_in_sample(fqs, jf, msg_ut))
+            bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
         // make sure each line gets a unique timestamp
         if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -620,6 +791,8 @@ static ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_one_file(
 #endif // HAVE_SD_JOURNAL_RESTART_FIELDS
 
     if(matches_filters) {
+        sampling_file_init(fqs, jf);
+
         if(fqs->direction == FACETS_ANCHOR_DIRECTION_FORWARD)
             status = netdata_systemd_journal_query_forward(j, wb, facets, jf, fqs);
         else
@@ -697,6 +870,8 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     bool partial = false;
     usec_t started_ut;
     usec_t ended_ut = now_monotonic_usec();
+
+    sampling_query_init(fqs);
 
     buffer_json_member_add_array(wb, "_journal_files");
     for(size_t f = 0; f < files_used ;f++) {
@@ -906,6 +1081,10 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             "      The number of items to return.\n"
             "      The default is %d.\n"
             "\n"
+            "   "JOURNAL_PARAMETER_SAMPLING":ITEMS\n"
+            "      The number of log entries to sample to estimate facets counters and histogram.\n"
+            "      The default is %d.\n"
+            "\n"
             "   "JOURNAL_PARAMETER_ANCHOR":TIMESTAMP_IN_MICROSECONDS\n"
             "      Return items relative to this timestamp.\n"
             "      The exact items to be returned depend on the query `"JOURNAL_PARAMETER_DIRECTION"`.\n"
@@ -946,6 +1125,7 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
             , JOURNAL_DEFAULT_SLICE_MODE ? "true" : "false" // slice
             , -SYSTEMD_JOURNAL_DEFAULT_QUERY_DURATION
             , SYSTEMD_JOURNAL_DEFAULT_ITEMS_PER_QUERY
+            , SYSTEMD_JOURNAL_DEFAULT_ITEMS_SAMPLING
             , JOURNAL_DEFAULT_DIRECTION == FACETS_ANCHOR_DIRECTION_BACKWARD ? "backward" : "forward"
     );
 
@@ -1055,6 +1235,7 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
     facets_accepted_param(facets, JOURNAL_PARAMETER_PROGRESS);
     facets_accepted_param(facets, JOURNAL_PARAMETER_DELTA);
     facets_accepted_param(facets, JOURNAL_PARAMETER_TAIL);
+    facets_accepted_param(facets, JOURNAL_PARAMETER_SAMPLING);
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
     facets_accepted_param(facets, JOURNAL_PARAMETER_SLICE);
@@ -1170,6 +1351,7 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
     const char *progress_id = NULL;
     SD_JOURNAL_FILE_SOURCE_TYPE source_type = SDJF_ALL;
     size_t filters = 0;
+    size_t sampling = SYSTEMD_JOURNAL_DEFAULT_ITEMS_SAMPLING;
 
     buffer_json_member_add_object(wb, "_request");
 
@@ -1204,6 +1386,9 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
                 tail = false;
             else
                 tail = true;
+        }
+        else if(strncmp(keyword, JOURNAL_PARAMETER_SAMPLING ":", sizeof(JOURNAL_PARAMETER_SAMPLING ":") - 1) == 0) {
+            sampling = str2ul(&keyword[sizeof(JOURNAL_PARAMETER_SAMPLING ":") - 1]);
         }
         else if(strncmp(keyword, JOURNAL_PARAMETER_DATA_ONLY ":", sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1) == 0) {
             char *v = &keyword[sizeof(JOURNAL_PARAMETER_DATA_ONLY ":") - 1];
@@ -1415,6 +1600,7 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
     fqs->direction = direction;
     fqs->anchor.start_ut = anchor;
     fqs->anchor.stop_ut = 0;
+    fqs->sampling = sampling;
 
     if(fqs->anchor.start_ut && fqs->tail) {
         // a tail request
@@ -1477,6 +1663,7 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_PROGRESS, false);
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_DELTA, fqs->delta);
     buffer_json_member_add_boolean(wb, JOURNAL_PARAMETER_TAIL, fqs->tail);
+    buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_SAMPLING, fqs->sampling);
     buffer_json_member_add_string(wb, JOURNAL_PARAMETER_ID, progress_id);
     buffer_json_member_add_uint64(wb, "source_type", fqs->source_type);
     buffer_json_member_add_uint64(wb, JOURNAL_PARAMETER_AFTER, fqs->after_ut / USEC_PER_SEC);
