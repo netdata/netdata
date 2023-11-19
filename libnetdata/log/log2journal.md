@@ -11,7 +11,7 @@ The overall process looks like this:
 ```bash
 tail -F /var/log/nginx/*.log    |\
   log2journal 'PATTERN'         |\
-  sed SEARCH-REPLACE            |\
+  sed -u SEARCH-REPLACE-RULES   |\
   systemd-cat-native OPTIONS
 ```
 
@@ -166,13 +166,15 @@ NGINX_URL=/index.html
 Now that we have the `STATUS2PRIORITY` field equal to the `NGINX_STATUS`, we can use a `sed` command to change it to the `PRIORITY` field we want. The `sed` command could be:
 
 ```bash
-sed -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' 
+sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' 
 ```
+
+We use `-u` for unbuffered communication.
 
 This command first changes all 5xx `STATUS2PRIORITY` fields to `PRIORITY=3` (error) and then changes all the rest to `PRIORITY=6` (info). Let's see the whole of it:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY | sed -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -195,7 +197,7 @@ Similarly, we could duplicate `NGINX_URL` to `NGINX_ENDPOINT` and then process i
 To complete the example, we can also inject a `SYSLOG_IDENTIFIER` with `log2journal`, using `--inject=SYSLOG_IDENTIFIER=nginx`, like this:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY --inject=SYSLOG_IDENTIFIER=nginx | sed -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -218,7 +220,7 @@ Now the mesaage is ready to be send to a systemd-journal. For this we use `syste
 
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY --inject=SYSLOG_IDENTIFIER=nginx | sed -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' | systemd-cat-native
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' | systemd-cat-native
 # no output
 
 # let's find the message
@@ -263,6 +265,61 @@ Sun 2023-11-19 04:34:06.583912 EET [s=1eb59e7934984104ab3b61f5d9648057;i=115b6d4
 ```
 
 So, the log line, with all its fields parsed, ended up in systemd-journal.
+
+The complete example, would look like the following script.
+Running this script with parameter `test` will produce output on the terminal for you to inspect.
+Unmatched log entries are added to the journal with PRIORITY=1 (`ERR_ALERT`), so that you can spot them.
+
+We also used the `--filename-key` of `log2journal`, which parses the filename when `tail` switches output
+between files, and adds the field `NGINX_LOG_FILE` with the filename each log line comes from.
+
+Finally, the script also adds the field `NGINX_STATUS_FAMILY` taking values `2xx`, `3xx`, etc, so that
+it is easy to find all the logs of a specific status family.
+
+```bash
+#!/usr/bin/env bash
+
+test=0
+last=0
+send_or_show='./systemd-cat-native'
+[ "${1}" = "test" ] && test=1 && last=100 && send_or_show=cat
+
+pattern='(?x)                          # Enable PCRE2 extended mode
+^
+(?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR
+(?<NGINX_REMOTE_USER>[^ ]+) \s         # NGINX_REMOTE_USER
+\[
+  (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
+\]
+\s+ "
+(?<MESSAGE>                            # MESSAGE
+  (?<NGINX_METHOD>[A-Z]+) \s+          # NGINX_METHOD
+  (?<NGINX_URL>[^ ]+) \s+              # NGINX_URL
+  HTTP/(?<NGINX_HTTP_VERSION>[^"]+)    # NGINX_HTTP_VERSION
+)
+" \s+
+(?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
+(?<NGINX_BODY_BYTES_SENT>\d+) \s+      # NGINX_BODY_BYTES_SENT
+"(?<NGINX_HTTP_REFERER>[^"]*)" \s+     # NGINX_HTTP_REFERER
+"(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT
+'
+
+tail -n $last -F /var/log/nginx/*access.log |\
+	log2journal "${pattern}" \
+		--filename-key=NGINX_LOG_FILE \
+		--duplicate=NGINX_STATUS,STATUS2PRIORITY \
+		--duplicate=NGINX_STATUS,STATUS_FAMILY \
+		--inject=SYSLOG_IDENTIFIER=nginx \
+		--unmatched-key=NGINX_UNMATCHED_LINE \
+		--inject-unmatched=PRIORITY=1 \
+		| sed -u \
+			-e 's|^STATUS2PRIORITY=5.*$|PRIORITY=3|' \
+			-e 's|^STATUS2PRIORITY=.*$|PRIORITY=6|' \
+			-e 's|^STATUS_FAMILY=\([0-9]\).*$|NGINX_STATUS_FAMILY=\1xx|' \
+			-e 's|^STATUS_FAMILY=.*$|NGINX_STATUS_FAMILY=UNKNOWN|' \
+			| $send_or_show
+```
+
 
 ## `log2journal` options
 
