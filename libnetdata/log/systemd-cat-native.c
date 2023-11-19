@@ -101,6 +101,7 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
     const char *equal;
     if(!newline || !*newline || !strstr(src, newline) || !(equal = strchr(src, '='))) {
         buffer_memcat(wb, src, src_len);
+        buffer_putc(wb, '\n');
         return;
     }
 
@@ -190,9 +191,9 @@ CURL* initialize_connection_to_systemd_journal_remote(const char* url, const cha
     return curl;
 }
 
-CURLcode send_to_systemd_journal_remote(CURL* curl, BUFFER *msg) {
+CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
     buffer_sprintf(msg,
-                   "\n"
+                   ""
                    "__REALTIME_TIMESTAMP=%llu\n"
                    "__MONOTONIC_TIMESTAMP=%llu\n"
                    "_BOOT_ID=%s\n"
@@ -283,9 +284,9 @@ static int log_input_to_journal_remote(const char *url, const char *key, const c
         if (!line->len) {
             // an empty line - we are done for this message
             if (msg->len) {
-                res = send_to_systemd_journal_remote(curl, msg);
+                res = journal_remote_send_buffer(curl, msg);
                 if (res != CURLE_OK) {
-                    fprintf(stderr, "send_to_systemd_journal_remote() failed: %s\n", curl_easy_strerror(res));
+                    fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
                     failures++;
                     goto cleanup;
                 }
@@ -300,9 +301,9 @@ static int log_input_to_journal_remote(const char *url, const char *key, const c
     }
 
     if (msg->len) {
-        res = send_to_systemd_journal_remote(curl, msg);
+        res = journal_remote_send_buffer(curl, msg);
         if (res != CURLE_OK) {
-            fprintf(stderr, "send_to_systemd_journal_remote() failed: %s\n", curl_easy_strerror(res));
+            fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
             failures++;
         }
         else
@@ -448,15 +449,27 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
                     if(id == NDF_PRIORITY)
                         priority = nd_log_priority2id(value);
                 }
-                else
+                else {
+                    struct log_stack_entry backup = lgs[NDF_MESSAGE];
+                    lgs[NDF_MESSAGE] = ND_LOG_FIELD_TXT(NDF_MESSAGE, NULL);
+
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
                            "Field '%.*s' is not a Netdata field. Ignoring it.",
                            field_len, field);
+
+                    lgs[NDF_MESSAGE] = backup;
+                }
             }
-            else
+            else {
+                struct log_stack_entry backup = lgs[NDF_MESSAGE];
+                lgs[NDF_MESSAGE] = ND_LOG_FIELD_TXT(NDF_MESSAGE, NULL);
+
                 nd_log(NDLS_COLLECTORS, NDLP_ERR,
                        "Line does not contain an = sign; ignoring it: %s",
                        line->buffer);
+
+                lgs[NDF_MESSAGE] = backup;
+            }
         }
     }
 
@@ -471,12 +484,12 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
 // ----------------------------------------------------------------------------
 // log to a local systemd-journald
 
-static bool journal_send_buffer(int fd, BUFFER *msg) {
+static bool journal_local_send_buffer(int fd, BUFFER *msg) {
     // log_message_to_stderr(msg);
 
     bool ret = journal_direct_send(fd, msg->buffer, msg->len);
     if (!ret)
-        fatal("Cannot send message to systemd journal.");
+        fprintf(stderr, "Cannot send message to systemd journal.\n");
 
     return ret;
 }
@@ -485,10 +498,14 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     char path[FILENAME_MAX + 1];
     int fd = -1;
 
-    journal_construct_path(path, sizeof(path), socket, namespace);
+    if(socket)
+        snprintfz(path, sizeof(path), socket);
+    else
+        journal_construct_path(path, sizeof(path), NULL, namespace);
+
     fd = journal_direct_fd(path);
     if (fd == -1) {
-        fprintf(stderr, "Cannot open '%s' as a UNIX socket.\n", socket);
+        fprintf(stderr, "Cannot open '%s' as a UNIX socket.\n", path);
         return 1;
     }
 
@@ -498,13 +515,18 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     CLEAN_BUFFER *msg = buffer_create(sizeof(reader.read_buffer), NULL);
 
     size_t messages_logged = 0;
+    size_t failed_messages = 0;
 
     while(get_next_line(&reader, line, timeout_ms)) {
         if (!line->len) {
             // an empty line - we are done for this message
             if (msg->len) {
-                if(journal_send_buffer(fd, msg))
+                if(journal_local_send_buffer(fd, msg))
                     messages_logged++;
+                else {
+                    failed_messages++;
+                    goto cleanup;
+                }
             }
 
             buffer_flush(msg);
@@ -514,11 +536,14 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     }
 
     if (msg && msg->len) {
-        if(journal_send_buffer(fd, msg))
+        if(journal_local_send_buffer(fd, msg))
             messages_logged++;
+        else
+            failed_messages++;
     }
 
-    return messages_logged ? 0 : 1;
+cleanup:
+    return !failed_messages && messages_logged ? 0 : 1;
 }
 
 int main(int argc, char *argv[]) {

@@ -46,7 +46,7 @@ void display_help(const char *name) {
     printf("  -h, --help               Display this help and exit.\n");
     printf("\n");
     printf("\n");
-    printf("PATTERN should be a valid PCRE2 regular expression with named groups.\n");
+    printf("PATTERN should be a valid PCRE2 regular expression.\n");
     printf("Regular expressions without group names are ignored.\n");
     printf("\n");
     printf("The maximum line length accepted is %d characters\n", MAX_LINE_LENGTH);
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     PCRE2_UCHAR errbuf[1024];
 
     // Compile the regular expression
-    re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, PCRE2_EXTENDED, &errornumber, &erroffset, NULL);
+    re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, 0, &errornumber, &erroffset, NULL);
     if (re == NULL) {
         pcre2_get_error_message(errornumber, errbuf, sizeof(errbuf));
         fprintf(stderr, "PCRE2 compilation failed at offset %d: %s\n", (int)erroffset, errbuf);
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
         // Check for match
         if (rc < 0) {
             pcre2_get_error_message(rc, errbuf, sizeof(errbuf));
-            fprintf(stderr, "PCRE2 error %d: %s on line: %s", rc, errbuf, line);
+            fprintf(stderr, "PCRE2 error %d: %s on line: %s\n", rc, errbuf, line);
 
             if (unmatched_key) {
                 printf("%s=PCRE2 error %d: %s on line: %s\n", unmatched_key, rc, errbuf, line);
@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
             printf("%s\n", injections[j]);
         }
 
-        if (current_filename[0]) {
+        if (filename_key && current_filename[0]) {
             printf("%s=%s\n", filename_key, current_filename);
         }
 

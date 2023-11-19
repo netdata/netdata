@@ -5,4 +5,5 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 dist_noinst_DATA = \
     README.md \
+    log2journal.md \
     $(NULL)
