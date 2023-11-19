@@ -555,7 +555,8 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
 
     fd = journal_direct_fd(path);
     if (fd == -1) {
-        fprintf(stderr, "Cannot open '%s' as a UNIX socket.\n", path);
+        fprintf(stderr, "Cannot open '%s' as a UNIX socket (errno = %d)\n",
+                path, errno);
         return 1;
     }
 
