@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// only for PACKAGE_VERSION
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,9 +20,9 @@
 
 void display_help(const char *name) {
     printf("\n");
-    printf("Netdata log2journal\n");
+    printf("Netdata log2journal " PACKAGE_VERSION "\n");
     printf("\n");
-    printf("Convert a structured log to systemd-journald export format.\n");
+    printf("Convert structured log input to systemd Journal Export Format.\n");
     printf("\n");
     printf("Usage: %s [OPTIONS] PATTERN\n", name);
     printf("\n");
@@ -47,7 +50,7 @@ void display_help(const char *name) {
     printf("\n");
     printf("\n");
     printf("PATTERN should be a valid PCRE2 regular expression.\n");
-    printf("Regular expressions without group names are ignored.\n");
+    printf("Regular expressions without named groups are ignored.\n");
     printf("\n");
     printf("The maximum line length accepted is %d characters\n", MAX_LINE_LENGTH);
     printf("The maximum number of fields in the PCRE2 pattern is %d\n", OVECCOUNT / 3);

@@ -322,7 +322,7 @@ cleanup:
 
 static int help(void) {
     fprintf(stderr,
-            "Netdata systemd-cat-native\n"
+            "Netdata systemd-cat-native " PACKAGE_VERSION "\n"
             "\n"
             "This program reads from its standard input, lines in the format:\n"
             "\n"
