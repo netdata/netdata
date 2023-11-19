@@ -499,7 +499,7 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     int fd = -1;
 
     if(socket)
-        snprintfz(path, sizeof(path), socket);
+        snprintfz(path, sizeof(path), "%s", socket);
     else
         journal_construct_path(path, sizeof(path), NULL, namespace);
 
