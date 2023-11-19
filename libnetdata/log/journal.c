@@ -130,7 +130,7 @@ void journal_construct_path(char *dst, size_t dst_len, const char *host_prefix, 
         host_prefix = "";
 
     if(namespace_str)
-        snprintfz(dst, dst_len, "%s/run/systemd/journal.%s.conf/socket",
+        snprintfz(dst, dst_len, "%s/run/systemd/journal.%s/socket",
                   host_prefix, namespace_str);
     else
         snprintfz(dst, dst_len, "%s" JOURNAL_DIRECT_SOCKET,
