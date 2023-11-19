@@ -90,6 +90,7 @@ void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t start_ut, usec_t stop_ut, FACETS_ANCHOR_DIRECTION direction);
 void facets_enable_slice_mode(FACETS *facets);
+bool facets_row_candidate_to_keep(FACETS *facets, usec_t usec);
 
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);
 void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options);

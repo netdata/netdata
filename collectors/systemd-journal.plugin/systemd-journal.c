@@ -352,7 +352,7 @@ static void sampling_decide_file_sampling_every(FUNCTION_QUERY_STATUS *fqs, stru
         fqs->samples_per_file.every = 1;
 }
 
-static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut) {
+static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, bool candidate_to_keep) {
     if(!fqs->sampling)
         return true;
 
@@ -365,7 +365,7 @@ static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_f
     if(slot >= SYSTEMD_JOURNAL_SAMPLING_SLOTS)
         slot = SYSTEMD_JOURNAL_SAMPLING_SLOTS - 1;
 
-    bool should_sample = false;
+    bool should_sample = candidate_to_keep;
 
     if(fqs->samples_per_file.sampled < fqs->samples_per_file.init ||
         fqs->samples_per_time_slot.sampled[slot] < fqs->samples_per_time_slot.init)
@@ -530,7 +530,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         if (unlikely(msg_ut < stop_ut))
             break;
 
-        if(is_row_in_sample(fqs, jf, msg_ut))
+        if(is_row_in_sample(fqs, jf, msg_ut, facets_row_candidate_to_keep(facets, msg_ut)))
             bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
         // make sure each line gets a unique timestamp
@@ -617,7 +617,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         if (unlikely(msg_ut > stop_ut))
             break;
 
-        if(is_row_in_sample(fqs, jf, msg_ut))
+        if(is_row_in_sample(fqs, jf, msg_ut, facets_row_candidate_to_keep(facets, msg_ut)))
             bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
         // make sure each line gets a unique timestamp

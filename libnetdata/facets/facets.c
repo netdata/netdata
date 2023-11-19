@@ -1771,6 +1771,10 @@ static inline bool facets_is_entry_within_anchor(FACETS *facets, usec_t usec) {
     return true;
 }
 
+bool facets_row_candidate_to_keep(FACETS *facets, usec_t usec) {
+    return !facets->base || usec > facets->base->prev->usec || facets->items_to_return < facets->max_items_to_return;
+}
+
 static void facets_row_keep(FACETS *facets, usec_t usec) {
     facets->operations.rows.matched++;
 
