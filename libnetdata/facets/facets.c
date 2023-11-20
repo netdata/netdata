@@ -2611,6 +2611,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
     if(show_items) {
         buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
         buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
+        buffer_json_member_add_uint64(wb, "unsampled", facets->operations.rows.unsampled);
         buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
         buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
         buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
