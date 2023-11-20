@@ -725,7 +725,30 @@ static void config_section_init(uv_loop_t *main_loop,
                 } else p_file_info->filename = strdupz(KMSG_DEFAULT_PATH);
                 break;
             case FLB_SYSTEMD:
-                p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
+                const char *const systemd_path_default[] = {
+                    "/run/log/journal",
+                    "/var/log/journal",
+                    NULL
+                };
+                for(int i = 0; systemd_path_default[i]; i++){
+
+                    DIR *dir = opendir(systemd_path_default[i]);
+                    if(!dir) continue;
+
+                    int de_num = 0;
+                    struct dirent *de = NULL;
+                    while ((de = readdir(dir))) {
+                        if(++de_num > 2) break; // journal files location found
+                    }
+                    closedir(dir);
+
+                    if(de_num > 2){
+                        p_file_info->filename = (char *) systemd_path_default[i];
+                        break;
+                    }
+                }
+                if(!p_file_info->filename)
+                    p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH); // last resort, try to open local only
                 break;
             case FLB_DOCKER_EV:
                 if(access(DOCKER_EV_DEFAULT_PATH, R_OK)){
