@@ -139,19 +139,11 @@ static std::unordered_map<std::string, size_t> parseOptions(int argc, char *argv
 
         if (Idx < argc)
         {
-            try
-            {
-                size_t Value = std::stoi(argv[Idx + 1]);
-                // If the argument is a known option, store the value
-                if (Opts.find(Arg) != Opts.end()) {
-                    Opts[Arg] = Value;
-                    Idx++; // Increment the counter to skip the next argument, since it's a value
-                }
-            }
-            catch (const std::invalid_argument& ia)
-            {
-                // If the argument is not a valid integer, print an error message
-                fatal("Invalid number: argv[%d] = >>>%s<<<", Idx + 1, argv[Idx + 1]);
+            size_t Value = std::stoi(argv[Idx + 1]);
+            // If the argument is a known option, store the value
+            if (Opts.find(Arg) != Opts.end()) {
+                Opts[Arg] = Value;
+                Idx++; // Increment the counter to skip the next argument, since it's a value
             }
         }
     }
