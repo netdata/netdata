@@ -38,7 +38,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         bool cancelled = false;
-        char buf[] = "systemd-journal after:-16000000 before:0 last:1";
+        char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, 600, &cancelled);
