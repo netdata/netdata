@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "facets.h"
 
-#define HISTOGRAM_COLUMNS 150               // the target number of points in a histogram
+#define FACETS_HISTOGRAM_COLUMNS 150        // the target number of points in a histogram
 #define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
 #define FACETS_KEYS_HASHTABLE_ENTRIES 15
 #define FACETS_VALUES_HASHTABLE_ENTRIES 15
+
+static inline void facets_reset_key(FACET_KEY *k);
 
 // ----------------------------------------------------------------------------
 
@@ -356,6 +358,7 @@ struct facets {
         struct {
             size_t evaluated;
             size_t matched;
+            size_t unsampled;
             size_t created;
             size_t reused;
         } rows;
@@ -775,7 +778,7 @@ static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
     usec_t bar_width_ut = 1 * USEC_PER_SEC;
 
     for (int i = array_size - 1; i >= 0; --i) {
-        if (duration_ut / (valid_durations_s[i] * USEC_PER_SEC) >= HISTOGRAM_COLUMNS) {
+        if (duration_ut / (valid_durations_s[i] * USEC_PER_SEC) >= FACETS_HISTOGRAM_COLUMNS) {
             bar_width_ut = valid_durations_s[i] * USEC_PER_SEC;
             break;
         }
@@ -787,6 +790,10 @@ static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
 static inline usec_t facets_histogram_slot_baseline_ut(FACETS *facets, usec_t ut) {
     usec_t delta_ut = ut % facets->histogram.slot_width_ut;
     return ut - delta_ut;
+}
+
+size_t facets_histogram_slots(FACETS *facets) {
+    return facets->histogram.slots;
 }
 
 void facets_set_timeframe_and_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut) {
@@ -832,17 +839,7 @@ void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_
     facets_set_timeframe_and_histogram_by_id(facets, hash_str, after_ut, before_ut);
 }
 
-static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
-    if(!facets->histogram.enabled ||
-            !facets->histogram.key ||
-            !facets->histogram.key->values.enabled ||
-            !facet_key_value_updated(facets->histogram.key) ||
-            usec < facets->histogram.after_ut ||
-            usec > facets->histogram.before_ut)
-        return;
-
-    FACET_VALUE *v = facets->histogram.key->current_value.v;
-
+static inline void facets_histogram_update_value_slot(FACETS *facets, usec_t usec, FACET_VALUE *v) {
     if(unlikely(!v->histogram))
         v->histogram = callocz(facets->histogram.slots, sizeof(*v->histogram));
 
@@ -860,6 +857,40 @@ static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
         slot = facets->histogram.slots - 1;
 
     v->histogram[slot]++;
+}
+
+static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
+    if(!facets->histogram.enabled ||
+            !facets->histogram.key ||
+            !facets->histogram.key->values.enabled ||
+            !facet_key_value_updated(facets->histogram.key) ||
+            usec < facets->histogram.after_ut ||
+            usec > facets->histogram.before_ut)
+        return;
+
+    FACET_VALUE *v = facets->histogram.key->current_value.v;
+    facets_histogram_update_value_slot(facets, usec, v);
+}
+
+void facets_row_finished_unsampled(FACETS *facets, usec_t usec) {
+    facets->operations.rows.evaluated++;
+    facets->operations.rows.matched++;
+    facets->operations.rows.unsampled++;
+
+    if(!facets->histogram.enabled ||
+       !facets->histogram.key ||
+       !facets->histogram.key->values.enabled ||
+       usec < facets->histogram.after_ut ||
+       usec > facets->histogram.before_ut)
+        return;
+
+    if(!facets->histogram.key->unsampled_value.v)
+        FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(facets->histogram.key);
+
+    FACET_VALUE *v = facets->histogram.key->unsampled_value.v;
+    facets_histogram_update_value_slot(facets, usec, v);
+
+    facets_reset_key(facets->histogram.key);
 }
 
 static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
@@ -1932,7 +1963,7 @@ void facets_rows_begin(FACETS *facets) {
     facets_reset_keys_with_value_and_row(facets);
 }
 
-bool facets_row_finished(FACETS *facets, usec_t usec, bool sampled) {
+bool facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.rows.evaluated++;
 
     if(unlikely((facets->query && facets->keys_filtered_by_query &&
@@ -1961,10 +1992,7 @@ bool facets_row_finished(FACETS *facets, usec_t usec, bool sampled) {
 
         if(!facet_key_value_updated(k)) {
             // put the FACET_VALUE_UNSET value into it
-            if(sampled)
-                facets_key_set_empty_value(facets, k);
-            else
-                facets_key_set_unsampled_value(facets, k);
+            facets_key_set_empty_value(facets, k);
         }
 
         total_keys++;
