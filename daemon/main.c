@@ -1477,6 +1477,12 @@ int main(int argc, char **argv) {
                                     libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
                                     config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
                                 }
+
+                                {
+                                    char buf[20 + 1];
+                                    snprintfz(buf, 20, "%d", libuv_worker_threads);
+                                    setenv("UV_THREADPOOL_SIZE", buf, 1);
+                                }
                             }
 
                             post_conf_load(&user);

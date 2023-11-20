@@ -179,6 +179,8 @@ int storage_engine_benchmarks(int argc, char *argv[])
     size_t num_points_per_dimension = Options["--num-points-per-dimension"];
     size_t num_seconds_to_run = Options["--num-seconds-to-run"];
 
+    error_log_limit_unlimited();
+
     netdata_log_error("Test configuration: threads=%zu, groups=%zu, dims_per_group=%zu, points_per_dim=%zu",
                       num_threads, num_groups, num_dims_per_group, num_points_per_dimension);
 

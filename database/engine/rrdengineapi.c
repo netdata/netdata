@@ -1203,6 +1203,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
+    ctx->atomic.num_flushed_pages = 0;
 
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
     ctx->atomic.first_time_s = LONG_MAX;
