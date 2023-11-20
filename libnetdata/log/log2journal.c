@@ -109,11 +109,15 @@ void display_help(const char *name) {
     printf("\n");
 }
 
+struct txt {
+    char *s;
+    size_t len;
+};
+
 struct key_dup {
     char *target;
     char *keys[MAX_KEY_DUPS_KEYS];
-    char *values[MAX_KEY_DUPS_KEYS];
-    size_t values_lengths[MAX_KEY_DUPS_KEYS];
+    struct txt values[MAX_KEY_DUPS_KEYS];
     size_t used;
     bool exposed;
 };
@@ -125,19 +129,36 @@ char *strdup_len(const char *src, size_t len) {
     return s;
 }
 
-int main(int argc, char *argv[]) {
-    char *filename_key = NULL;
-    char *pattern = NULL;
-    char *unmatched_key = NULL;
-    struct key_dup dups[MAX_KEY_DUPS] = { 0 };
-    size_t key_dup_used = 0;
-    const char *injections[MAX_INJECTIONS] = { 0 };
-    bool injections_on_unmatched[MAX_INJECTIONS] = { 0 };
-    size_t injections_used = 0;
-    const char *injections_unmatched[MAX_INJECTIONS] = { 0 };
-    size_t injections_unmatched_used = 0;
+struct log_job {
+    const char *pattern;
 
-    // Parse command line arguments
+    struct {
+        const char *key;
+        char current[FILENAME_MAX + 1];
+        bool last_line_was_empty;
+    } filename;
+
+    struct {
+        const char *keys[MAX_INJECTIONS];
+        bool on_unmatched_too[MAX_INJECTIONS];
+        size_t used;
+    } injections;
+
+    struct {
+        const char *key;
+        struct {
+            const char *keys[MAX_INJECTIONS];
+            size_t used;
+        } injections;
+    } unmatched;
+
+    struct {
+        struct key_dup keys[MAX_KEY_DUPS];
+        size_t used;
+    } dups;
+};
+
+bool parse_parameters(struct log_job *jb, int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
         if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
@@ -145,31 +166,31 @@ int main(int argc, char *argv[]) {
             exit(0);
         }
         else if (strncmp(arg, "--filename-key=", 15) == 0)
-            filename_key = arg + 15;
+            jb->filename.key = arg + 15;
         else if (strncmp(arg, "--unmatched-key=", 16) == 0)
-            unmatched_key = arg + 16;
+            jb->unmatched.key = arg + 16;
         else if(strncmp(arg, "--duplicate=", 12) == 0) {
             const char *first_key = arg + 12;
             const char *comma = strchr(first_key, '=');
             if(!comma) {
                 fprintf(stderr, "Error: --duplicate=TARGET=KEY1,... is missing the equal sign.\n");
-                return 1;
+                return false;
             }
             const char *next_key = comma + 1;
 
-            if (key_dup_used >= MAX_KEY_DUPS) {
+            if (jb->dups.used >= MAX_KEY_DUPS) {
                 fprintf(stderr, "Error: too many duplications. You can duplicate up to %d keys\n", MAX_KEY_DUPS);
-                return 1;
+                return false;
             }
 
             size_t first_key_len = comma - first_key;
-            dups[key_dup_used].target = strdup_len(first_key, first_key_len);
-            dups[key_dup_used].used = 0;
+            jb->dups.keys[jb->dups.used].target = strdup_len(first_key, first_key_len);
+            jb->dups.keys[jb->dups.used].used = 0;
 
             while(next_key) {
-                if(dups[key_dup_used].used >= MAX_KEY_DUPS_KEYS) {
-                    fprintf(stderr, "Error: too many keys in duplication of target '%s'.\n", dups[key_dup_used].target);
-                    return 1;
+                if(jb->dups.keys[jb->dups.used].used >= MAX_KEY_DUPS_KEYS) {
+                    fprintf(stderr, "Error: too many keys in duplication of target '%s'.\n", jb->dups.keys[jb->dups.used].target);
+                    return false;
                 }
 
                 first_key = next_key;
@@ -177,253 +198,332 @@ int main(int argc, char *argv[]) {
 
                 if(comma) {
                     first_key_len = comma - first_key;
-                    dups[key_dup_used].keys[dups[key_dup_used].used++] = strdup_len(first_key, first_key_len);
+                    jb->dups.keys[jb->dups.used].keys[jb->dups.keys[jb->dups.used].used++] = strdup_len(first_key, first_key_len);
                     next_key = comma + 1;
                 }
                 else {
-                    dups[key_dup_used].keys[dups[key_dup_used].used++] = strdup(first_key);
+                    jb->dups.keys[jb->dups.used].keys[jb->dups.keys[jb->dups.used].used++] = strdup(first_key);
                     next_key = NULL;
                 }
             }
 
-            key_dup_used++;
+            jb->dups.used++;
         }
         else if(strncmp(arg, "--inject=", 9) == 0) {
-            if(injections_used >= MAX_INJECTIONS) {
+            if(jb->injections.used >= MAX_INJECTIONS) {
                 fprintf(stderr, "Error: too many injections. You can inject up to %d lines\n", MAX_INJECTIONS);
-                return 1;
+                return false;
             }
-            injections[injections_used++] = strdup(arg + 9);
+            jb->injections.keys[jb->injections.used++] = strdup(arg + 9);
         }
         else if(strncmp(arg, "--inject-unmatched=", 19) == 0) {
-            if(injections_unmatched_used >= MAX_INJECTIONS) {
+            if(jb->unmatched.injections.used >= MAX_INJECTIONS) {
                 fprintf(stderr, "Error: too many unmatched injections. You can inject up to %d lines\n", MAX_INJECTIONS);
-                return 1;
+                return false;
             }
-            injections_unmatched[injections_unmatched_used++] = strdup(arg + 19);
+            jb->unmatched.injections.keys[jb->unmatched.injections.used++] = strdup(arg + 19);
         }
         else {
             // Assume it's the pattern if not recognized as a parameter
-            if (!pattern) {
-                pattern = arg;
+            if (!jb->pattern) {
+                jb->pattern = arg;
             } else {
                 fprintf(stderr, "Error: Multiple patterns detected. Specify only one pattern.\n");
-                return 1;
+                return false;
             }
         }
     }
 
-    // Check if pattern is set and exactly one pattern is specified
-    if (!pattern) {
+    // Check if a pattern is set and exactly one pattern is specified
+    if (!jb->pattern) {
         fprintf(stderr, "Error: Pattern not specified.\n");
         display_help(argv[0]);
-        return 1;
+        return false;
     }
 
-    // mark all injections to be added to unmatched logs
-    for(size_t i = 0; i < injections_used ; i++)
-        injections_on_unmatched[i] = true;
+    return true;
+}
 
-    if(injections_used && injections_unmatched_used) {
-        for(size_t i = 0; i < injections_used ;i++) {
-            const char *equal = strchr(injections[i], '=');
+static void jb_select_which_injections_should_be_injected_on_unmatched(struct log_job *jb) {
+    // mark all injections to be added to unmatched logs
+    for(size_t i = 0; i < jb->injections.used ; i++)
+        jb->injections.on_unmatched_too[i] = true;
+
+    if(jb->injections.used && jb->unmatched.injections.used) {
+        // we have both injections and injections on unmatched
+
+        // we find all the injections that are also configured as injections on unmatched,
+        // and we disable them, so that the output will not have the same key twice
+
+        for(size_t i = 0; i < jb->injections.used ;i++) {
+            const char *equal = strchr(jb->injections.keys[i], '=');
             if(!equal)
                 continue;
 
-            size_t len = equal - injections[i] + 1;
-            for(size_t u = 0; u < injections_unmatched_used ;u++) {
-                equal = strchr(injections_unmatched[u], '=');
+            size_t len = equal - jb->injections.keys[i] + 1;
+            for(size_t u = 0; u < jb->unmatched.injections.used ; u++) {
+                equal = strchr(jb->unmatched.injections.keys[u], '=');
                 if(!equal)
                     continue;
 
-                size_t len2 = equal - injections_unmatched[u] + 1;
-                if(len == len2 && strncmp(injections[i], injections_unmatched[u], len) == 0)
-                    injections_on_unmatched[i] = false;
+                size_t len2 = equal - jb->unmatched.injections.keys[u] + 1;
+                if(len == len2 && strncmp(jb->injections.keys[i], jb->unmatched.injections.keys[u], len) == 0)
+                    jb->injections.on_unmatched_too[i] = false;
             }
         }
     }
+}
 
-    pcre2_code *re;
+static inline void jb_send_duplications_for_key(struct log_job *jb, const char *key, const char *value, size_t value_len) {
+    // IMPORTANT:
+    // The 'value' may not be NULL terminated and have more data that the value we need
+
+    for (size_t d = 0; d < jb->dups.used; d++) {
+        if(jb->dups.keys[d].exposed || jb->dups.keys[d].used == 0) continue;
+
+        if(jb->dups.keys[d].used == 1) {
+            // just one key to be duplicated
+            if(strcmp(jb->dups.keys[d].keys[0], key) == 0) {
+                printf("%s=%.*s\n", jb->dups.keys[d].target, (int) value_len, value);
+                jb->dups.keys[d].exposed = true;
+            }
+        }
+        else {
+            // multiple keys to be duplicated
+            for(size_t g = 0; g < jb->dups.keys[d].used ;g++) {
+                struct key_dup *kd = &jb->dups.keys[d];
+                if(strcmp(kd->keys[g], key) == 0) {
+                    if(kd->values[g].len >= value_len) {
+                        // the existing value allocation, fits our value
+
+                        memcpy(kd->values[g].s, value, value_len);
+                        kd->values[g].s[value_len] = '\0';
+                    }
+                    else {
+                        // no existing value allocation, or too small for our value
+
+                        if(kd->values[g].s)
+                            free(kd->values[g].s);
+
+                        kd->values[g].s = strdup_len(value, value_len);
+                        kd->values[g].len = value_len;
+                    }
+                }
+            }
+        }
+    }
+}
+
+static inline void jb_send_remaining_duplications(struct log_job *jb) {
+    // IMPORTANT:
+    // all duplications are exposed, even the ones we haven't found their keys in the source,
+    // so that the output always has the same fields for matched entries.
+
+    for(size_t d = 0; d < jb->dups.used ; d++) {
+        if(jb->dups.keys[d].exposed || jb->dups.keys[d].used == 0)
+            continue;
+
+        printf("%s=", jb->dups.keys[d].target);
+        for(size_t g = 0; g < jb->dups.keys[d].used ;g++) {
+            char *comma = (g > 0) ? "," : "";
+            char *value = (jb->dups.keys[d].values[g].s && jb->dups.keys[d].values[g].s[0]) ? jb->dups.keys[d].values[g].s : "[unavailable]";
+            printf("%s%s", comma, value);
+
+            // clear it for the next iteration
+            if(jb->dups.keys[d].values[g].s)
+                jb->dups.keys[d].values[g].s[0] = '\0';
+        }
+        printf("\n");
+    }
+}
+
+static inline void jb_finalize_injections(struct log_job *jb, bool line_is_matched) {
+    for (size_t j = 0; j < jb->injections.used; j++) {
+        if(!line_is_matched && !jb->injections.on_unmatched_too[j])
+            continue;
+
+        printf("%s\n", jb->injections.keys[j]);
+    }
+}
+
+static inline void jb_reset_injections(struct log_job *jb) {
+    for(size_t d = 0; d < jb->dups.used ; d++)
+        jb->dups.keys[d].exposed = false;
+}
+
+static inline void jb_inject_filename(struct log_job *jb) {
+    if (jb->filename.key && jb->filename.current[0])
+        printf("%s=%s\n", jb->filename.key, jb->filename.current);
+}
+
+static inline bool jb_switched_filename(struct log_job *jb, const char *line, size_t len) {
+    // IMPORTANT:
+    // Return TRUE when the caller should skip this line (because it is ours).
+    // Unfortunately, we have to consume empty lines too.
+
+    // IMPORTANT:
+    // filename may not be NULL terminated and have more data than the filename.
+
+    if (!len) {
+        jb->filename.last_line_was_empty = true;
+        return true;
+    }
+
+    // Check if it's a log file change line
+    if (jb->filename.last_line_was_empty && line[0] == '=' && strncmp(line, "==> ", 4) == 0) {
+        const char *start = line + 4;
+        const char *end = strstr(line, " <==");
+        while (*start == ' ') start++;
+        if (*start != '\n' && *start != '\0' && end) {
+            size_t filename_length = end - start;
+            if(filename_length >= sizeof(jb->filename.current) - 1)
+                filename_length = sizeof(jb->filename.current) - 2;
+
+            snprintf(jb->filename.current, sizeof(jb->filename.current),
+                     "%.*s", (int)filename_length, start);
+
+            jb->filename.current[sizeof(jb->filename.current) - 1] = '\0';
+            return true;
+        }
+    }
+
+    jb->filename.last_line_was_empty = false;
+    return false;
+}
+
+static char *get_next_line(struct log_job *jb, char *buffer, size_t size, size_t *line_length) {
+    if(!fgets(buffer, (int)size, stdin)) {
+        *line_length = 0;
+        return NULL;
+    }
+
+    char *line = buffer;
+    size_t len = strlen(line);
+
+    // remove trailing newlines and spaces
+    while(len > 1 && (line[len - 1] == '\n' || isspace(line[len - 1])))
+        line[--len] = '\0';
+
+    // skip leading spaces
+    while(isspace(*line)) {
+        line++;
+        len--;
+    }
+
+    *line_length = len;
+    return line;
+}
+
+static pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
+    int error_number;
+    PCRE2_SIZE error_offset;
     PCRE2_SPTR pattern_ptr = (PCRE2_SPTR)pattern;
-    int errornumber;
-    PCRE2_SIZE erroffset;
-    pcre2_match_data *match_data;
-    PCRE2_UCHAR errbuf[1024];
 
-    // Compile the regular expression
-    re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, 0, &errornumber, &erroffset, NULL);
+    pcre2_code *re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, 0, &error_number, &error_offset, NULL);
     if (re == NULL) {
-        pcre2_get_error_message(errornumber, errbuf, sizeof(errbuf));
-        fprintf(stderr, "PCRE2 compilation failed at offset %d: %s\n", (int)erroffset, errbuf);
+        PCRE2_UCHAR errbuf[1024];
+        pcre2_get_error_message(error_number, errbuf, sizeof(errbuf));
+        fprintf(stderr, "PCRE2 compilation failed at offset %d: %s\n", (int)error_offset, errbuf);
         fprintf(stderr, "Check for common regex syntax errors or unsupported PCRE2 patterns.\n");
-        return 1;
+        return NULL;
     }
 
-    // Create a match data block
-    match_data = pcre2_match_data_create_from_pattern(re, NULL);
+    return re;
+}
+static inline bool jb_pcre2_match(pcre2_code *re, pcre2_match_data *match_data, char *line, size_t len) {
+    int rc = pcre2_match(re, (PCRE2_SPTR)line, len, 0, 0, match_data, NULL);
+    if(rc < 0) {
+        PCRE2_UCHAR errbuf[1024];
+        pcre2_get_error_message(rc, errbuf, sizeof(errbuf));
+        fprintf(stderr, "PCRE2 error %d: %s on: %s\n", rc, errbuf, line);
+        return false;
+    }
 
-    char current_filename[FILENAME_MAX + 1] = "";
+    return true;
+}
+
+static inline void jb_traverse_pcre2_named_groups_and_send_keys(struct log_job *jb, pcre2_code *re, pcre2_match_data *match_data, char *line) {
+    PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+    uint32_t namecount;
+    pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &namecount);
+
+    if (namecount > 0) {
+        PCRE2_SPTR name_table;
+        pcre2_pattern_info(re, PCRE2_INFO_NAMETABLE, &name_table);
+        uint32_t name_entry_size;
+        pcre2_pattern_info(re, PCRE2_INFO_NAMEENTRYSIZE, &name_entry_size);
+
+        const unsigned char *tabptr = name_table;
+        for (uint32_t i = 0; i < namecount; i++) {
+            int n = (tabptr[0] << 8) | tabptr[1];
+            const char *group_name = (const char *)(tabptr + 2);
+
+            PCRE2_SIZE start_offset = ovector[2 * n];
+            PCRE2_SIZE end_offset = ovector[2 * n + 1];
+            PCRE2_SIZE group_length = end_offset - start_offset;
+
+            printf("%s=%.*s\n", group_name, (int)group_length, line + start_offset);
+
+            // process the duplications
+            jb_send_duplications_for_key(jb, group_name, line + start_offset, group_length);
+
+            tabptr += name_entry_size;
+        }
+
+        // print all non-exposed duplications
+        jb_send_remaining_duplications(jb);
+    }
+}
+
+struct log_job log_job = { 0 };
+
+int main(int argc, char *argv[]) {
+    struct log_job *jb = &log_job;
+
+    if(!parse_parameters(jb, argc, argv))
+        exit(1);
+
+    jb_select_which_injections_should_be_injected_on_unmatched(jb);
+
+    pcre2_code *re = jb_compile_pcre2_pattern(jb->pattern);
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+
     char buffer[MAX_LINE_LENGTH];
-    bool last_line_was_newline = true;
+    char *line;
+    size_t len;
 
-    while (fgets(buffer, MAX_LINE_LENGTH, stdin) != NULL) {
-        char *line = buffer;
-        size_t len = strlen(line);
-
-        // remove trailing newlines and spaces
-        while(len > 1 && (line[len - 1] == '\n' || isspace(line[len - 1])))
-            line[--len] = '\0';
-
-        // skip leading spaces
-        while(isspace(*line)) {
-            line++;
-            len--;
-        }
-
-        // Check if it's an empty line and skip it
-        if (!len) {
-            last_line_was_newline = true;
+    while ((line = get_next_line(jb, buffer, sizeof(buffer), &len))) {
+        if(jb_switched_filename(jb, line, len))
             continue;
-        }
 
-        // Check if it's a log file change line
-        if (last_line_was_newline && line[0] == '=' && strncmp(line, "==> ", 4) == 0) {
-            char *filename_start = line + 4;
-            char *filename_end = strstr(line, " <==");
-            while (*filename_start == ' ') filename_start++;
-            if (*filename_start != '\n' && *filename_start != '\0') {
-                if (filename_end)
-                    *filename_end = '\0'; // Terminate the filename
-                snprintf(current_filename, sizeof(current_filename) - 1, "%s", filename_start);
-                current_filename[sizeof(current_filename) - 1] = '\0';
-            }
+        jb_reset_injections(jb);
 
-            continue;
-        }
-
-        last_line_was_newline = false;
-
-        // Regular log line, process it as usual
-        int rc = pcre2_match(re, (PCRE2_SPTR)line, len, 0, 0, match_data, NULL);
-
-        // Check for match
         bool line_is_matched;
-        if (rc < 0) {
+        if(!jb_pcre2_match(re, match_data, line, len)) {
             line_is_matched = false;
 
-            pcre2_get_error_message(rc, errbuf, sizeof(errbuf));
-            fprintf(stderr, "PCRE2 error %d: %s on line: %s\n", rc, errbuf, line);
+            if (jb->unmatched.key) {
+                // we are sending errors to Journal
+                printf("%s=PCRE2 error on: %s\n", jb->unmatched.key, line);
 
-            if (unmatched_key) {
-                printf("%s=PCRE2 error %d: %s on line: %s\n", unmatched_key, rc, errbuf, line);
-
-                for (size_t j = 0; j < injections_unmatched_used; j++)
-                    printf("%s\n", injections_unmatched[j]);
+                for (size_t j = 0; j < jb->unmatched.injections.used; j++)
+                    printf("%s\n", jb->unmatched.injections.keys[j]);
             }
-            else
+            else {
+                // we are just logging errors to stderr
                 continue;
+            }
         }
         else {
             line_is_matched = true;
-
-            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
-            uint32_t namecount;
-            pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &namecount);
-
-            if (namecount > 0) {
-                PCRE2_SPTR name_table;
-                pcre2_pattern_info(re, PCRE2_INFO_NAMETABLE, &name_table);
-                uint32_t name_entry_size;
-                pcre2_pattern_info(re, PCRE2_INFO_NAMEENTRYSIZE, &name_entry_size);
-
-                const unsigned char *tabptr = name_table;
-                for (uint32_t i = 0; i < namecount; i++) {
-                    int n = (tabptr[0] << 8) | tabptr[1];
-                    const char *group_name = (const char *)(tabptr + 2);
-
-                    PCRE2_SIZE start_offset = ovector[2 * n];
-                    PCRE2_SIZE end_offset = ovector[2 * n + 1];
-                    PCRE2_SIZE group_length = end_offset - start_offset;
-
-                    printf("%s=%.*s\n", group_name, (int)group_length, line + start_offset);
-
-                    // process the duplications
-                    for (size_t d = 0; d < key_dup_used; d++) {
-                        if(dups[d].exposed || dups[d].used == 0) continue;
-
-                        if(dups[d].used == 1) {
-                            // just one key to be duplicated
-                            if(strcmp(dups[d].keys[0], group_name) == 0) {
-                                printf("%s=%.*s\n", dups[d].target, (int) group_length, line + start_offset);
-                                dups[d].exposed = true;
-                            }
-                        }
-                        else {
-                            // multiple keys to be duplicated
-                            for(size_t g = 0; g < dups[d].used ;g++) {
-                                struct key_dup *kd = &dups[d];
-                                if(strcmp(kd->keys[g], group_name) == 0) {
-                                    if(kd->values_lengths[g] >= group_length) {
-                                        // the existing value allocation, fits our value
-
-                                        memcpy(kd->values[g], line + start_offset, group_length);
-                                        kd->values[g][group_length] = '\0';
-                                    }
-                                    else {
-                                        // no existing value allocation, or too small for our value
-
-                                        if(kd->values[g])
-                                            free(kd->values[g]);
-
-                                        kd->values[g] = strdup_len(line + start_offset, group_length);
-                                        kd->values_lengths[g] = group_length;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    tabptr += name_entry_size;
-                }
-
-                // print all non-exposed duplications
-                for(size_t d = 0; d < key_dup_used ; d++) {
-                    if(dups[d].exposed || dups[d].used == 0)
-                        continue;
-
-                    printf("%s=", dups[d].target);
-                    for(size_t g = 0; g < dups[d].used ;g++) {
-                        char *comma = (g > 0) ? "," : "";
-                        char *value = (dups[d].values[g] && dups[d].values[g][0]) ? dups[d].values[g] : "[unavailable]";
-                        printf("%s%s", comma, value);
-
-                        // clear it for the next iteration
-                        if(dups[d].values[g])
-                            dups[d].values[g][0] = '\0';
-                    }
-                    printf("\n");
-                }
-            }
+            jb_traverse_pcre2_named_groups_and_send_keys(jb, re, match_data, line);
         }
 
-        for (size_t j = 0; j < injections_used; j++) {
-            if(!line_is_matched && !injections_on_unmatched[j])
-                continue;
-
-            printf("%s\n", injections[j]);
-        }
-
-        if (filename_key && current_filename[0]) {
-            printf("%s=%s\n", filename_key, current_filename);
-        }
+        jb_inject_filename(jb);
+        jb_finalize_injections(jb, line_is_matched);
 
         printf("\n");
         fflush(stdout);
-
-        // print all non-exposed duplications
-        for(size_t d = 0; d < key_dup_used ; d++) {
-            dups[d].exposed = false;
-        }
     }
 
     // Release memory used for the compiled regular expression and match data
