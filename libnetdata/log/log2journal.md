@@ -142,10 +142,10 @@ Avoid setting priority to 0 (`LOG_EMERG`), because these will be on your termina
 
 To set the PRIORITY field in the output, we can use `NGINX_STATUS` fields. We need a copy of it, which we will alter later.
 
-We can instruct `log2journal` to duplicate `NGINX_STATUS`, like this: `log2journal --duplicate=NGINX_STATUS,STATUS2PRIORITY`. Let's try it:
+We can instruct `log2journal` to duplicate `NGINX_STATUS`, like this: `log2journal --duplicate=STATUS2PRIORITY=NGINX_STATUS`. Let's try it:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -174,7 +174,7 @@ We use `-u` for unbuffered communication.
 This command first changes all 5xx `STATUS2PRIORITY` fields to `PRIORITY=3` (error) and then changes all the rest to `PRIORITY=6` (info). Let's see the whole of it:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -197,7 +197,7 @@ Similarly, we could duplicate `NGINX_URL` to `NGINX_ENDPOINT` and then process i
 To complete the example, we can also inject a `SYSLOG_IDENTIFIER` with `log2journal`, using `--inject=SYSLOG_IDENTIFIER=nginx`, like this:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -220,7 +220,7 @@ Now the message is ready to be sent to a systemd-journal. For this we use `syste
 
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=NGINX_STATUS,STATUS2PRIORITY --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' | systemd-cat-native
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' | systemd-cat-native
 # no output
 
 # let's find the message
@@ -307,8 +307,8 @@ pattern='(?x)                          # Enable PCRE2 extended mode
 tail -n $last -F /var/log/nginx/*access.log |\
 	log2journal "${pattern}" \
 		--filename-key=NGINX_LOG_FILE \
-		--duplicate=NGINX_STATUS,STATUS2PRIORITY \
-		--duplicate=NGINX_STATUS,STATUS_FAMILY \
+		--duplicate=STATUS2PRIORITY=NGINX_STATUS \
+		--duplicate=STATUS_FAMILY=NGINX_STATUS \
 		--inject=SYSLOG_IDENTIFIER=nginx \
 		--unmatched-key=MESSAGE \
 		--inject-unmatched=PRIORITY=1 \
@@ -324,7 +324,8 @@ tail -n $last -F /var/log/nginx/*access.log |\
 ## `log2journal` options
 
 ```
-Netdata log2journal v1.43.0-319-g4ada93a6e
+
+Netdata log2journal v1.43.0-337-g116dc1bc3
 
 Convert structured log input to systemd Journal Export Format.
 
@@ -343,31 +344,73 @@ Options:
 
   --unmatched-key=KEY
        Include unmatched log entries in the output with KEY as the field name.
-       Use this to log unmatched entries to stdout instead of stderr.
+       Use this to include unmatched entries to the output stream.
+       Usually it should be set to --unmatched-key=MESSAGE so that the
+       unmatched entry will appear as the log message in the journals.
        Use --inject-unmatched to inject additional fields to unmatched lines.
 
-  --duplicate=OLD,NEW
-       Duplicate a field with OLD key as NEW key, retaining the same value.
-       Useful for further processing. Up to 2048 duplications allowed.
+  --duplicate=TARGET=KEY1[,KEY2[,KEY3[,...]]
+       Create a new key called TARGET, duplicating the values of the keys
+       given. Useful for further processing. When multiple keys are given,
+       their values are separated by comma.
+       Up to 2048 duplications can be given on the command line, and up to
+       10 keys per duplication command are allowed.
 
   --inject=LINE
-       Inject constant fields into successfully parsed log entries.
+       Inject constant fields to the output (both matched and unmatched logs).
+       --inject entries are added to unmatched lines too, when their key is
+       not used in --inject-unmatched (--inject-unmatched override --inject).
        Up to 2048 fields can be injected.
 
   --inject-unmatched=LINE
        Inject lines into the output for each unmatched log entry.
+       Usually, --inject-unmatched=PRIORITY=3 is needed to mark the unmatched
+       lines as errors, so that they can easily be spotted in the journals.
        Up to 2048 such lines can be injected.
 
   -h, --help
        Display this help and exit.
 
   PATTERN
-       PATTERN should be a valid PCRE2 regular expression. Usually RE2 patterns
-       (the ones used by Go applications), are valid PCRE2 patterns too.
+       PATTERN should be a valid PCRE2 regular expression.
+       RE2 regular expressions (like the ones usually used in Go applications),
+       are usually valid PCRE2 patterns too.
        Regular expressions without named groups are ignored.
 
-The maximum line length accepted is 1048576 characters
-The maximum number of fields in the PCRE2 pattern is 8192
+The maximum line length accepted is 1048576 characters.
+The maximum number of fields in the PCRE2 pattern is 8192.
+
+JOURNAL FIELDS RULES (enforced by systemd-journald)
+
+     - field names can be up to 64 characters
+     - the only allowed field characters are A-Z, 0-9 and underscore
+     - the first character of fields cannot be a digit
+     - protected journal fields start with underscore:
+       * they are accepted by systemd-journal-remote
+       * they are NOT accepted by a local systemd-journald
+
+     For best results, always include these fields:
+
+      MESSAGE=TEXT
+      The MESSAGE is the body of the log entry.
+      This field is what we usually see in our logs.
+
+      PRIORITY=NUMBER
+      PRIORITY sets the severity of the log entry.
+      0=emerg, 1=alert, 2=crit, 3=err, 4=warn, 5=notice, 6=info, 7=debug
+      - Emergency events (0) are usually broadcast to all terminals.
+      - Emergency, alert, critical, and error (0-3) are usually colored red.
+      - Warning (4) entries are usually colored yellow.
+      - Notice (5) entries are usually bold or have a brighter white color.
+      - Info (6) entries are the default.
+      - Debug (7) entries are usually grayed or dimmed.
+
+      SYSLOG_IDENTIFIER=NAME
+      SYSLOG_IDENTIFIER sets the name of application.
+      Use something descriptive, like: SYSLOG_IDENTIFIER=nginx-logs
+
+You can find the most common fields at 'man systemd.journal-fields'.
+
 ```
 
 ## `systemd-cat-native` options

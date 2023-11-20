@@ -17,6 +17,7 @@
 #define MAX_LINE_LENGTH (1024 * 1024)
 #define MAX_KEY_DUPS 2048
 #define MAX_INJECTIONS 2048
+#define MAX_KEY_DUPS_KEYS 10
 
 void display_help(const char *name) {
     printf("\n");
@@ -39,49 +40,101 @@ void display_help(const char *name) {
     printf("\n");
     printf("  --unmatched-key=KEY\n");
     printf("       Include unmatched log entries in the output with KEY as the field name.\n");
-    printf("       Use this to log unmatched entries to stdout instead of stderr.\n");
+    printf("       Use this to include unmatched entries to the output stream.\n");
+    printf("       Usually it should be set to --unmatched-key=MESSAGE so that the\n");
+    printf("       unmatched entry will appear as the log message in the journals.\n");
     printf("       Use --inject-unmatched to inject additional fields to unmatched lines.\n");
-    printf("       --inject entries are added to unmatched lines too.\n");
     printf("\n");
-    printf("  --duplicate=OLD,NEW\n");
-    printf("       Duplicate a field with OLD key as NEW key, retaining the same value.\n");
-    printf("       Useful for further processing. Up to %d duplications allowed.\n", MAX_KEY_DUPS);
+    printf("  --duplicate=TARGET=KEY1[,KEY2[,KEY3[,...]]\n");
+    printf("       Create a new key called TARGET, duplicating the values of the keys\n");
+    printf("       given. Useful for further processing. When multiple keys are given,\n");
+    printf("       their values are separated by comma.\n");
+    printf("       Up to %d duplications can be given on the command line, and up to\n", MAX_KEY_DUPS);
+    printf("       %d keys per duplication command are allowed.\n", MAX_KEY_DUPS_KEYS);
     printf("\n");
     printf("  --inject=LINE\n");
     printf("       Inject constant fields to the output (both matched and unmatched logs).\n");
+    printf("       --inject entries are added to unmatched lines too, when their key is\n");
+    printf("       not used in --inject-unmatched (--inject-unmatched override --inject).\n");
     printf("       Up to %d fields can be injected.\n", MAX_INJECTIONS);
     printf("\n");
     printf("  --inject-unmatched=LINE\n");
     printf("       Inject lines into the output for each unmatched log entry.\n");
+    printf("       Usually, --inject-unmatched=PRIORITY=3 is needed to mark the unmatched\n");
+    printf("       lines as errors, so that they can easily be spotted in the journals.\n");
     printf("       Up to %d such lines can be injected.\n", MAX_INJECTIONS);
     printf("\n");
     printf("  -h, --help\n");
     printf("       Display this help and exit.\n");
     printf("\n");
     printf("  PATTERN\n");
-    printf("       PATTERN should be a valid PCRE2 regular expression. RE2 regular expressions\n");
-    printf("       (like the ones usually used in Go applications), are valid PCRE2 patterns too.\n");
+    printf("       PATTERN should be a valid PCRE2 regular expression.\n");
+    printf("       RE2 regular expressions (like the ones usually used in Go applications),\n");
+    printf("       are usually valid PCRE2 patterns too.\n");
     printf("       Regular expressions without named groups are ignored.\n");
     printf("\n");
-    printf("The maximum line length accepted is %d characters\n", MAX_LINE_LENGTH);
-    printf("The maximum number of fields in the PCRE2 pattern is %d\n", OVECCOUNT / 3);
+    printf("The maximum line length accepted is %d characters.\n", MAX_LINE_LENGTH);
+    printf("The maximum number of fields in the PCRE2 pattern is %d.\n", OVECCOUNT / 3);
+    printf("\n");
+    printf("JOURNAL FIELDS RULES (enforced by systemd-journald)\n");
+    printf("\n");
+    printf("     - field names can be up to 64 characters\n");
+    printf("     - the only allowed field characters are A-Z, 0-9 and underscore\n");
+    printf("     - the first character of fields cannot be a digit\n");
+    printf("     - protected journal fields start with underscore:\n");
+    printf("       * they are accepted by systemd-journal-remote\n");
+    printf("       * they are NOT accepted by a local systemd-journald\n");
+    printf("\n");
+    printf("     For best results, always include these fields:\n");
+    printf("\n");
+    printf("      MESSAGE=TEXT\n");
+    printf("      The MESSAGE is the body of the log entry.\n");
+    printf("      This field is what we usually see in our logs.\n");
+    printf("\n");
+    printf("      PRIORITY=NUMBER\n");
+    printf("      PRIORITY sets the severity of the log entry.\n");
+    printf("      0=emerg, 1=alert, 2=crit, 3=err, 4=warn, 5=notice, 6=info, 7=debug\n");
+    printf("      - Emergency events (0) are usually broadcast to all terminals.\n");
+    printf("      - Emergency, alert, critical, and error (0-3) are usually colored red.\n");
+    printf("      - Warning (4) entries are usually colored yellow.\n");
+    printf("      - Notice (5) entries are usually bold or have a brighter white color.\n");
+    printf("      - Info (6) entries are the default.\n");
+    printf("      - Debug (7) entries are usually grayed or dimmed.\n");
+    printf("\n");
+    printf("      SYSLOG_IDENTIFIER=NAME\n");
+    printf("      SYSLOG_IDENTIFIER sets the name of application.\n");
+    printf("      Use something descriptive, like: SYSLOG_IDENTIFIER=nginx-logs\n");
+    printf("\n");
+    printf("You can find the most common fields at 'man systemd.journal-fields'.\n");
     printf("\n");
 }
 
 struct key_dup {
-    char *old_key;
-    char *new_key;
+    char *target;
+    char *keys[MAX_KEY_DUPS_KEYS];
+    char *values[MAX_KEY_DUPS_KEYS];
+    size_t values_lengths[MAX_KEY_DUPS_KEYS];
+    size_t used;
+    bool exposed;
 };
+
+char *strdup_len(const char *src, size_t len) {
+    char *s = malloc(len + 1);
+    memcpy(s, src, len);
+    s[len] = '\0';
+    return s;
+}
 
 int main(int argc, char *argv[]) {
     char *filename_key = NULL;
     char *pattern = NULL;
     char *unmatched_key = NULL;
-    struct key_dup dups[MAX_KEY_DUPS];
+    struct key_dup dups[MAX_KEY_DUPS] = { 0 };
     size_t key_dup_used = 0;
-    const char *injections[MAX_INJECTIONS];
+    const char *injections[MAX_INJECTIONS] = { 0 };
+    bool injections_on_unmatched[MAX_INJECTIONS] = { 0 };
     size_t injections_used = 0;
-    const char *injections_unmatched[MAX_INJECTIONS];
+    const char *injections_unmatched[MAX_INJECTIONS] = { 0 };
     size_t injections_unmatched_used = 0;
 
     // Parse command line arguments
@@ -96,25 +149,43 @@ int main(int argc, char *argv[]) {
         else if (strncmp(arg, "--unmatched-key=", 16) == 0)
             unmatched_key = arg + 16;
         else if(strncmp(arg, "--duplicate=", 12) == 0) {
-            const char *old_key = arg + 12;
-            const char *comma = strchr(old_key, ',');
+            const char *first_key = arg + 12;
+            const char *comma = strchr(first_key, '=');
             if(!comma) {
-                fprintf(stderr, "Error: --duplicate=KEY1,KEY2 is missing the comma.\n");
+                fprintf(stderr, "Error: --duplicate=TARGET=KEY1,... is missing the equal sign.\n");
                 return 1;
             }
-            const char *new_key = comma + 1;
+            const char *next_key = comma + 1;
 
             if (key_dup_used >= MAX_KEY_DUPS) {
                 fprintf(stderr, "Error: too many duplications. You can duplicate up to %d keys\n", MAX_KEY_DUPS);
                 return 1;
             }
 
-            size_t old_key_len = comma - old_key;
-            dups[key_dup_used].old_key = malloc(old_key_len + 1);
-            memcpy(dups[key_dup_used].old_key, old_key, old_key_len);
-            dups[key_dup_used].old_key[old_key_len] = '\0';
+            size_t first_key_len = comma - first_key;
+            dups[key_dup_used].target = strdup_len(first_key, first_key_len);
+            dups[key_dup_used].used = 0;
 
-            dups[key_dup_used].new_key = strdup(new_key);
+            while(next_key) {
+                if(dups[key_dup_used].used >= MAX_KEY_DUPS_KEYS) {
+                    fprintf(stderr, "Error: too many keys in duplication of target '%s'.\n", dups[key_dup_used].target);
+                    return 1;
+                }
+
+                first_key = next_key;
+                comma = strchr(first_key, ',');
+
+                if(comma) {
+                    first_key_len = comma - first_key;
+                    dups[key_dup_used].keys[dups[key_dup_used].used++] = strdup_len(first_key, first_key_len);
+                    next_key = comma + 1;
+                }
+                else {
+                    dups[key_dup_used].keys[dups[key_dup_used].used++] = strdup(first_key);
+                    next_key = NULL;
+                }
+            }
+
             key_dup_used++;
         }
         else if(strncmp(arg, "--inject=", 9) == 0) {
@@ -147,6 +218,29 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error: Pattern not specified.\n");
         display_help(argv[0]);
         return 1;
+    }
+
+    // mark all injections to be added to unmatched logs
+    for(size_t i = 0; i < injections_used ; i++)
+        injections_on_unmatched[i] = true;
+
+    if(injections_used && injections_unmatched_used) {
+        for(size_t i = 0; i < injections_used ;i++) {
+            const char *equal = strchr(injections[i], '=');
+            if(!equal)
+                continue;
+
+            size_t len = equal - injections[i] + 1;
+            for(size_t u = 0; u < injections_unmatched_used ;u++) {
+                equal = strchr(injections_unmatched[u], '=');
+                if(!equal)
+                    continue;
+
+                size_t len2 = equal - injections_unmatched[u] + 1;
+                if(len == len2 && strncmp(injections[i], injections_unmatched[u], len) == 0)
+                    injections_on_unmatched[i] = false;
+            }
+        }
     }
 
     pcre2_code *re;
@@ -197,7 +291,7 @@ int main(int argc, char *argv[]) {
             char *filename_start = line + 4;
             char *filename_end = strstr(line, " <==");
             while (*filename_start == ' ') filename_start++;
-            if (filename_start && *filename_start != '\n' && *filename_start != '\0') {
+            if (*filename_start != '\n' && *filename_start != '\0') {
                 if (filename_end)
                     *filename_end = '\0'; // Terminate the filename
                 snprintf(current_filename, sizeof(current_filename) - 1, "%s", filename_start);
@@ -213,7 +307,10 @@ int main(int argc, char *argv[]) {
         int rc = pcre2_match(re, (PCRE2_SPTR)line, len, 0, 0, match_data, NULL);
 
         // Check for match
+        bool line_is_matched;
         if (rc < 0) {
+            line_is_matched = false;
+
             pcre2_get_error_message(rc, errbuf, sizeof(errbuf));
             fprintf(stderr, "PCRE2 error %d: %s on line: %s\n", rc, errbuf, line);
 
@@ -227,6 +324,8 @@ int main(int argc, char *argv[]) {
                 continue;
         }
         else {
+            line_is_matched = true;
+
             PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
             uint32_t namecount;
             pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &namecount);
@@ -248,18 +347,69 @@ int main(int argc, char *argv[]) {
 
                     printf("%s=%.*s\n", group_name, (int)group_length, line + start_offset);
 
+                    // process the duplications
                     for (size_t d = 0; d < key_dup_used; d++) {
-                        if (strcmp(dups[d].old_key, group_name) == 0) {
-                            printf("%s=%.*s\n", dups[d].new_key, (int)group_length, line + start_offset);
+                        if(dups[d].exposed || dups[d].used == 0) continue;
+
+                        if(dups[d].used == 1) {
+                            // just one key to be duplicated
+                            if(strcmp(dups[d].keys[0], group_name) == 0) {
+                                printf("%s=%.*s\n", dups[d].target, (int) group_length, line + start_offset);
+                                dups[d].exposed = true;
+                            }
+                        }
+                        else {
+                            // multiple keys to be duplicated
+                            for(size_t g = 0; g < dups[d].used ;g++) {
+                                struct key_dup *kd = &dups[d];
+                                if(strcmp(kd->keys[g], group_name) == 0) {
+                                    if(kd->values_lengths[g] >= group_length) {
+                                        // the existing value allocation, fits our value
+
+                                        memcpy(kd->values[g], line + start_offset, group_length);
+                                        kd->values[g][group_length] = '\0';
+                                    }
+                                    else {
+                                        // no existing value allocation, or too small for our value
+
+                                        if(kd->values[g])
+                                            free(kd->values[g]);
+
+                                        kd->values[g] = strdup_len(line + start_offset, group_length);
+                                        kd->values_lengths[g] = group_length;
+                                    }
+                                }
+                            }
                         }
                     }
 
                     tabptr += name_entry_size;
                 }
+
+                // print all non-exposed duplications
+                for(size_t d = 0; d < key_dup_used ; d++) {
+                    if(dups[d].exposed || dups[d].used == 0)
+                        continue;
+
+                    printf("%s=", dups[d].target);
+                    for(size_t g = 0; g < dups[d].used ;g++) {
+                        char *comma = (g > 0) ? "," : "";
+                        char *value = (dups[d].values[g] && dups[d].values[g][0]) ? dups[d].values[g] : "[unavailable]";
+                        printf("%s%s", comma, value);
+
+                        // clear it for the next iteration
+                        if(dups[d].values[g])
+                            dups[d].values[g][0] = '\0';
+                    }
+                    printf("\n");
+                }
             }
         }
 
         for (size_t j = 0; j < injections_used; j++) {
+            if(!line_is_matched && !injections_on_unmatched[j])
+                continue;
+
             printf("%s\n", injections[j]);
         }
 
@@ -269,6 +419,11 @@ int main(int argc, char *argv[]) {
 
         printf("\n");
         fflush(stdout);
+
+        // print all non-exposed duplications
+        for(size_t d = 0; d < key_dup_used ; d++) {
+            dups[d].exposed = false;
+        }
     }
 
     // Release memory used for the compiled regular expression and match data
