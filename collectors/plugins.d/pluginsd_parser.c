@@ -2945,10 +2945,13 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
                 while(likely(service_running(SERVICE_COLLECTORS))) {
 
                     if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
+                        buffered_reader_ret_t ret = buffered_reader_read_timeout(
+                                &parser->reader,
+                                fileno((FILE *) parser->fp_input),
+                                2 * 60 * MSEC_PER_SEC, true
+                                                                                );
 
-                        if(unlikely(!buffered_reader_read_timeout(&parser->reader,
-                                                                  fileno((FILE *) parser->fp_input),
-                                                                  2 * 60 * MSEC_PER_SEC, true)))
+                        if(unlikely(ret != BUFFERED_READER_READ_OK))
                             break;
 
                         continue;

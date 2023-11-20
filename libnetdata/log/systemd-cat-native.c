@@ -27,13 +27,12 @@ static void log_message_to_stderr(BUFFER *msg) {
     fprintf(stderr, "SENDING: %s\n", buffer_tostring(tmp));
 }
 
-static inline bool get_next_line(struct buffered_reader *reader, BUFFER *line, int timeout_ms) {
-    buffer_flush(line);
-
+static inline buffered_reader_ret_t get_next_line(struct buffered_reader *reader, BUFFER *line, int timeout_ms) {
     while(true) {
         if(unlikely(!buffered_reader_next_line(reader, line))) {
-            if(!buffered_reader_read_timeout(reader, STDIN_FILENO, timeout_ms, false))
-                return false;
+            buffered_reader_ret_t ret = buffered_reader_read_timeout(reader, STDIN_FILENO, timeout_ms, false);
+            if(unlikely(ret != BUFFERED_READER_READ_OK))
+                return ret;
 
             continue;
         }
@@ -45,7 +44,7 @@ static inline bool get_next_line(struct buffered_reader *reader, BUFFER *line, i
             while(line->len && line->buffer[line->len - 1] == '\n')
                 line->buffer[--line->len] = '\0';
 
-            return true;
+            return BUFFERED_READER_READ_OK;
         }
     }
 }
@@ -191,19 +190,27 @@ CURL* initialize_connection_to_systemd_journal_remote(const char* url, const cha
     return curl;
 }
 
-CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
+static void journal_remote_complete_event(BUFFER *msg, usec_t *monotonic_ut) {
+    usec_t ut = now_monotonic_usec();
+
+    if(monotonic_ut)
+        *monotonic_ut = ut;
+
     buffer_sprintf(msg,
-                   ""
-                   "__REALTIME_TIMESTAMP=%llu\n"
-                   "__MONOTONIC_TIMESTAMP=%llu\n"
-                   "_BOOT_ID=%s\n"
-                   "_HOSTNAME=%s\n"
-                   "\n"
+            ""
+            "__REALTIME_TIMESTAMP=%llu\n"
+            "__MONOTONIC_TIMESTAMP=%llu\n"
+            "_BOOT_ID=%s\n"
+            "_HOSTNAME=%s\n"
+            "\n"
                    , now_realtime_usec()
-                   , now_monotonic_usec()
+                   , ut
                    , global_boot_id
                    , global_hostname
-                   );
+                  );
+}
+
+static CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
 
     // log_message_to_stderr(msg);
 
@@ -221,11 +228,21 @@ CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
     return curl_easy_perform(curl);
 }
 
-static int log_input_to_journal_remote(const char *url, const char *key, const char *cert, const char *trust, const char *newline, int timeout_ms) {
+typedef enum {
+    LOG_TO_JOURNAL_REMOTE_BAD_PARAMS = -1,
+    LOG_TO_JOURNAL_REMOTE_CANNOT_INITIALIZE = -2,
+    LOG_TO_JOURNAL_REMOTE_CANNOT_SEND = -3,
+    LOG_TO_JOURNAL_REMOTE_CANNOT_READ = -4,
+} log_to_journal_remote_ret_t;
+
+static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, const char *key, const char *cert, const char *trust, const char *newline, int timeout_ms) {
     if(!url || !*url) {
         fprintf(stderr, "No URL is given.\n");
-        return -1;
+        return LOG_TO_JOURNAL_REMOTE_BAD_PARAMS;
     }
+
+    if(timeout_ms < 10)
+        timeout_ms = 10;
 
     global_boot_id[0] = '\0';
     char boot_id[1024];
@@ -271,43 +288,101 @@ static int log_input_to_journal_remote(const char *url, const char *key, const c
     curl = initialize_connection_to_systemd_journal_remote(full_url, key, cert, trust, &headers);
 
     if(!curl)
-        return 1;
+        return LOG_TO_JOURNAL_REMOTE_CANNOT_INITIALIZE;
 
     struct buffered_reader reader;
     buffered_reader_init(&reader);
     CLEAN_BUFFER *line = buffer_create(sizeof(reader.read_buffer), NULL);
     CLEAN_BUFFER *msg = buffer_create(sizeof(reader.read_buffer), NULL);
 
+    size_t msg_full_events = 0;
+    size_t msg_partial_fields = 0;
+    usec_t msg_started_ut = 0;
     size_t failures = 0;
     size_t messages_logged = 0;
-    while(get_next_line(&reader, line, timeout_ms)) {
-        if (!line->len) {
-            // an empty line - we are done for this message
-            if (msg->len) {
+
+    log_to_journal_remote_ret_t ret = 0;
+
+    while(true) {
+        buffered_reader_ret_t rc = get_next_line(&reader, line, timeout_ms);
+        if(rc == BUFFERED_READER_READ_POLL_TIMEOUT) {
+            if(msg_full_events && !msg_partial_fields) {
                 res = journal_remote_send_buffer(curl, msg);
-                if (res != CURLE_OK) {
+                if(res != CURLE_OK) {
                     fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
                     failures++;
+                    ret = LOG_TO_JOURNAL_REMOTE_CANNOT_SEND;
                     goto cleanup;
                 }
                 else
                     messages_logged++;
+
+                msg_full_events = 0;
+                buffer_flush(msg);
+            }
+        }
+        else if(rc == BUFFERED_READER_READ_OK) {
+            if(!line->len) {
+                // an empty line - we are done for this message
+                if(msg_partial_fields) {
+                    msg_partial_fields = 0;
+
+                    usec_t ut;
+                    journal_remote_complete_event(msg, &ut);
+                    if(!msg_full_events)
+                        msg_started_ut = ut;
+
+                    msg_full_events++;
+
+                    if(ut - msg_started_ut >= USEC_PER_SEC / 2) {
+                        res = journal_remote_send_buffer(curl, msg);
+                        if(res != CURLE_OK) {
+                            fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
+                            failures++;
+                            ret = LOG_TO_JOURNAL_REMOTE_CANNOT_SEND;
+                            goto cleanup;
+                        }
+                        else
+                            messages_logged++;
+
+                        msg_full_events = 0;
+                        buffer_flush(msg);
+                    }
+                }
+            }
+            else {
+                buffer_memcat_replacing_newlines(msg, line->buffer, line->len, newline);
+                msg_partial_fields++;
             }
 
-            buffer_flush(msg);
+            buffer_flush(line);
         }
-        else
-            buffer_memcat_replacing_newlines(msg, line->buffer, line->len, newline);
+        else {
+            fprintf(stderr, "cannot read input data, failed with code %d\n", rc);
+            ret = LOG_TO_JOURNAL_REMOTE_CANNOT_READ;
+            break;
+        }
     }
 
-    if (msg->len) {
-        res = journal_remote_send_buffer(curl, msg);
-        if (res != CURLE_OK) {
-            fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
-            failures++;
+    if (msg_full_events || msg_partial_fields) {
+        if(msg_partial_fields) {
+            msg_partial_fields = 0;
+            msg_full_events++;
+            journal_remote_complete_event(msg, NULL);
         }
-        else
-            messages_logged++;
+
+        if(msg_full_events) {
+            res = journal_remote_send_buffer(curl, msg);
+            if(res != CURLE_OK) {
+                fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
+                failures++;
+            }
+            else
+                messages_logged++;
+
+            msg_full_events = 0;
+            buffer_flush(msg);
+        }
     }
 
 cleanup:
@@ -315,7 +390,7 @@ cleanup:
     curl_slist_free_all(headers);
     curl_global_cleanup();
 
-    return !failures && messages_logged ? 0 : 1;
+    return ret;
 }
 
 #endif
@@ -404,6 +479,9 @@ static int help(void) {
             "        The filename of the trusted CA public key.\n"
             "        The default is: " DEFAULT_CA_CERT "\n"
             "        The keyword 'all' can be used to trust all CAs.\n"
+            "\n"
+            "      --keep-trying\n"
+            "        Keep trying to send the message, if the remote journal is not there.\n"
 #endif
             "\n"
             "    NEWLINES PROCESSING\n"
@@ -467,7 +545,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
     size_t messages_logged = 0;
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
 
-    while(get_next_line(&reader, line, timeout_ms)) {
+    while(get_next_line(&reader, line, timeout_ms) == BUFFERED_READER_READ_OK) {
         if(!line->len) {
             // an empty line - we are done for this message
 
@@ -521,6 +599,8 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
                 lgs[NDF_MESSAGE] = backup;
             }
         }
+
+        buffer_flush(line);
     }
 
     if(fields_added) {
@@ -568,7 +648,7 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     size_t messages_logged = 0;
     size_t failed_messages = 0;
 
-    while(get_next_line(&reader, line, timeout_ms)) {
+    while(get_next_line(&reader, line, timeout_ms) == BUFFERED_READER_READ_OK) {
         if (!line->len) {
             // an empty line - we are done for this message
             if (msg->len) {
@@ -584,6 +664,8 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
         }
         else
             buffer_memcat_replacing_newlines(msg, line->buffer, line->len, newline);
+
+        buffer_flush(line);
     }
 
     if (msg && msg->len) {
@@ -611,6 +693,7 @@ int main(int argc, char *argv[]) {
     const char *key = NULL;
     const char *cert = NULL;
     const char *trust = NULL;
+    bool keep_trying = false;
 #endif
 
     for(int i = 1; i < argc ;i++) {
@@ -643,6 +726,9 @@ int main(int argc, char *argv[]) {
 
         else if (strncmp(k, "--trust=", 8) == 0)
             trust = &k[8];
+
+        else if (strcmp(k, "--keep-trying") == 0)
+            keep_trying = true;
 #endif
         else {
             fprintf(stderr, "Unknown parameter '%s'\n", k);
@@ -680,8 +766,12 @@ int main(int argc, char *argv[]) {
         return log_input_as_netdata(newline, timeout_ms);
 
 #ifdef HAVE_CURL
-    if(url)
-        return log_input_to_journal_remote(url, key, cert, trust, newline, timeout_ms);
+    if(url) {
+        log_to_journal_remote_ret_t rc;
+        do {
+            rc = log_input_to_journal_remote(url, key, cert, trust, newline, timeout_ms);
+        } while(keep_trying && rc == LOG_TO_JOURNAL_REMOTE_CANNOT_SEND);
+    }
 #endif
 
     return log_input_to_journal(socket, namespace, newline, timeout_ms);

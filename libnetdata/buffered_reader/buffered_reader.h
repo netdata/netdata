@@ -17,7 +17,20 @@ static inline void buffered_reader_init(struct buffered_reader *reader) {
     reader->pos = 0;
 }
 
-static inline bool buffered_reader_read(struct buffered_reader *reader, int fd) {
+typedef enum {
+    BUFFERED_READER_READ_OK = 0,
+    BUFFERED_READER_READ_FAILED = -1,
+    BUFFERED_READER_READ_BUFFER_FULL = -2,
+    BUFFERED_READER_READ_POLLERR = -3,
+    BUFFERED_READER_READ_POLLHUP = -4,
+    BUFFERED_READER_READ_POLLNVAL = -5,
+    BUFFERED_READER_READ_POLL_UNKNOWN = -6,
+    BUFFERED_READER_READ_POLL_TIMEOUT = -7,
+    BUFFERED_READER_READ_POLL_FAILED = -8,
+} buffered_reader_ret_t;
+
+
+static inline buffered_reader_ret_t buffered_reader_read(struct buffered_reader *reader, int fd) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(reader->read_buffer[reader->read_len] != '\0')
         fatal("read_buffer does not start with zero");
@@ -27,19 +40,19 @@ static inline bool buffered_reader_read(struct buffered_reader *reader, int fd) 
     ssize_t remaining = sizeof(reader->read_buffer) - reader->read_len - 1;
 
     if(unlikely(remaining <= 0))
-        return false;
+        return BUFFERED_READER_READ_BUFFER_FULL;
 
     ssize_t bytes_read = read(fd, read_at, remaining);
     if(unlikely(bytes_read <= 0))
-        return false;
+        return BUFFERED_READER_READ_FAILED;
 
     reader->read_len += bytes_read;
     reader->read_buffer[reader->read_len] = '\0';
 
-    return true;
+    return BUFFERED_READER_READ_OK;
 }
 
-static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms, bool log_error) {
+static inline buffered_reader_ret_t buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms, bool log_error) {
     errno = 0;
     struct pollfd fds[1];
 
@@ -56,32 +69,32 @@ static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, 
         else if(fds[0].revents & POLLERR) {
             if(log_error)
                 netdata_log_error("PARSER: read failed: POLLERR.");
-            return false;
+            return BUFFERED_READER_READ_POLLERR;
         }
         else if(fds[0].revents & POLLHUP) {
             if(log_error)
                 netdata_log_error("PARSER: read failed: POLLHUP.");
-            return false;
+            return BUFFERED_READER_READ_POLLHUP;
         }
         else if(fds[0].revents & POLLNVAL) {
             if(log_error)
                 netdata_log_error("PARSER: read failed: POLLNVAL.");
-            return false;
+            return BUFFERED_READER_READ_POLLNVAL;
         }
 
         if(log_error)
             netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
-        return false;
+        return BUFFERED_READER_READ_POLL_UNKNOWN;
     }
     else if (ret == 0) {
         if(log_error)
             netdata_log_error("PARSER: timeout while waiting for data.");
-        return false;
+        return BUFFERED_READER_READ_POLL_TIMEOUT;
     }
 
     if(log_error)
         netdata_log_error("PARSER: poll() failed with code %d.", ret);
-    return false;
+    return BUFFERED_READER_READ_POLL_FAILED;
 }
 
 /* Produce a full line if one exists, statefully return where we start next time.
