@@ -9,6 +9,8 @@
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
+#include <utility>
+#include <string>
 
 static STORAGE_ENGINE *se = nullptr;
 static STORAGE_INSTANCE *si = nullptr;
