@@ -129,26 +129,6 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
 #ifdef HAVE_CURL
 #include <curl/curl.h>
 
-#ifdef ENABLE_LZ4
-#include <lz4.h>
-
-static size_t compress_data_lz4(const char *input, size_t input_size, char **output) {
-    int max_compressed_size = LZ4_compressBound(input_size);
-    *output = malloc(max_compressed_size);
-    if (*output == NULL) {
-        return 0;
-    }
-
-    int compressed_data_size = LZ4_compress_default(input, *output, input_size, max_compressed_size);
-    if (compressed_data_size <= 0) {
-        free(*output);
-        return 0;
-    }
-
-    return compressed_data_size;
-}
-#endif
-
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 256
 #endif
@@ -190,11 +170,6 @@ CURL* initialize_connection_to_systemd_journal_remote(const char* url, const cha
 
     *headers = curl_slist_append(*headers, "Content-Type: application/vnd.fdo.journal");
     *headers = curl_slist_append(*headers, "Transfer-Encoding: chunked");
-
-#ifdef ENABLE_LZ4
-    *headers = curl_slist_append(*headers, "Content-Encoding: lz4");
-#endif
-
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, *headers);
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -236,49 +211,21 @@ static void journal_remote_complete_event(BUFFER *msg, usec_t *monotonic_ut) {
 }
 
 static CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
+
     // log_message_to_stderr(msg);
+
+    struct upload_data upload = {0};
 
     if (!curl || !buffer_strlen(msg))
         return CURLE_FAILED_INIT;
 
-    // Original data
-    const char* original_data = buffer_tostring(msg);
-    size_t original_length = buffer_strlen(msg);
-
-#ifdef ENABLE_LZ4
-    // Compress data
-    char* compressed_data = NULL;
-    size_t compressed_length = compress_data_lz4(original_data, original_length, &compressed_data);
-    if (compressed_length == 0 || compressed_data == NULL) {
-        // Handle compression error
-        return CURLE_FAILED_INIT;
-    }
-
-    struct upload_data upload = {
-            .data = compressed_data,
-            .length = compressed_length,
-    };
-
-#else
-    // uncompressed
-
-    struct upload_data upload = {
-            .data = char *)original_data,
-            .length = original_length,
-    };
-#endif
+    upload.data = (char *) buffer_tostring(msg);
+    upload.length = buffer_strlen(msg);
 
     curl_easy_setopt(curl, CURLOPT_READDATA, &upload);
     curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)upload.length);
 
-    CURLcode res = curl_easy_perform(curl);
-
-#ifdef ENABLE_LZ4
-    // Free the compressed data after sending
-    free(compressed_data);
-#endif
-
-    return res;
+    return curl_easy_perform(curl);
 }
 
 typedef enum {
@@ -512,10 +459,6 @@ static int help(void) {
             "    This mode is available even when the local system does not support\n"
             "    systemd, or even it is not Linux, allowing a remote Linux systemd\n"
             "    journald to become the logs database of the local system.\n"
-#ifdef ENABLE_LZ4
-            "\n"
-            "    The stream to systemd-journal-remote will be compressed with LZ4\n"
-#endif
             "\n"
             "      --url=URL\n"
             "        The destination systemd-journal-remote address and port, similarly\n"
