@@ -284,6 +284,16 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR | ((rc->rrdvar_host_chart_name) ? 0 : RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR),
         &rc->value);
 
+    if (rc->options & RRDCALC_OPTION_SET_GLOBAL) {
+        rrdvar_add_and_acquire(
+        "host",
+        host->rrdvars,
+        rc->name,
+        RRDVAR_TYPE_CALCULATED,
+        RRDVAR_FLAG_HOST_GLOBAL_VAR,
+        &rc->value);
+    }
+
     string_freez(rrdset_id_rrdcalc_name);
     string_freez(rrdset_name_rrdcalc_name);
 
@@ -326,7 +336,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         rc->summary,
         rc->info,
         0,
-        rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
+        rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0,
+        rc);
 
     rc->ae = ae;
     health_alarm_log_add_entry(host, ae);
@@ -372,7 +383,8 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
             rc->summary,
             rc->info,
             0,
-            0);
+            0,
+            rc);
 
         rc->ae = ae;
         health_alarm_log_add_entry(host, ae);

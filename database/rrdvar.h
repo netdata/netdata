@@ -27,6 +27,7 @@ typedef enum rrdvar_options {
     RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR    = (1 << 5), // this is a an alarm variable, attached to the host, using the chart id
     RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR  = (1 << 6), // this is a an alarm variable, attached to the host, using the chart name
     RRDVAR_FLAG_CONFIG_VAR                  = (1 << 7), // this is a an alarm variable, read from alarm config
+    RRDVAR_FLAG_HOST_GLOBAL_VAR             = (1 << 8), // this is a an alarm variable, attached to the host, using the alarm name
 
     // this is 24 bit
     // to increase it you have to set change the bitfield in

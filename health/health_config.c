@@ -135,6 +135,8 @@ static inline uint32_t health_parse_options(const char *s) {
 
             if(!strcasecmp(buf, "no-clear-notification") || !strcasecmp(buf, "no-clear"))
                 options |= RRDCALC_OPTION_NO_CLEAR_NOTIFICATION;
+             if(!strcasecmp(buf, "set-global"))
+                options |= RRDCALC_OPTION_SET_GLOBAL;
             else
                 netdata_log_error("Ignoring unknown alarm option '%s'", buf);
         }
@@ -401,6 +403,9 @@ static inline int health_parse_db_lookup(
         }
         else if(!strcasecmp(key, "match-names") || !strcasecmp(key, "match_names")) {
             *options |= RRDR_OPTION_MATCH_NAMES;
+        }
+        else if(!strcasecmp(key, "localhost-anomaly-rate") || !strcasecmp(key, "localhost_anomaly_rate")) {
+            *options |= RRDR_OPTION_LOCALHOST_ANOMALY_RATE;
         }
         else if(!strcasecmp(key, "of")) {
             char *find = NULL;
