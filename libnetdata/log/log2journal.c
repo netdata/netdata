@@ -17,12 +17,12 @@
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
 
-#define MAX_OUTPUT_KEYS 512
+#define MAX_OUTPUT_KEYS 1024
 #define OVECCOUNT (MAX_OUTPUT_KEYS * 3)    // should be a multiple of 3
 #define MAX_LINE_LENGTH (1024 * 1024)
-#define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 4)
-#define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 4)
-#define MAX_REWRITES (MAX_OUTPUT_KEYS / 4)
+#define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 2)
+#define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
+#define MAX_REWRITES (MAX_OUTPUT_KEYS / 2)
 #define MAX_KEY_DUPS_KEYS 20
 
 #define MAX_KEY_LEN 64              // according to systemd-journald
@@ -35,7 +35,7 @@ void display_help(const char *name) {
     printf("Convert structured log input to systemd Journal Export Format.\n");
     printf("\n");
     printf("Using PCRE2 patterns, extract the fields from structured logs on the standard\n");
-    printf("input, and generate output according to systemd Journal Export Format\n");
+    printf("input, and generate output according to systemd Journal Export Format.\n");
     printf("\n");
     printf("Usage: %s [OPTIONS] PATTERN\n", name);
     printf("\n");
