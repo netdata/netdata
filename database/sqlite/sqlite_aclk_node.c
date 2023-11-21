@@ -29,7 +29,7 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 
 static void build_node_collectors(RRDHOST *host)
 {
-    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
+    struct aclk_sync_cfg_t *wc = host->aclk_config;
 
     struct update_node_collectors upd_node_collectors;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
@@ -50,7 +50,7 @@ static void build_node_info(RRDHOST *host)
 {
     struct update_node_info node_info;
 
-    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
+    struct aclk_sync_cfg_t *wc = host->aclk_config;
 
     rrd_rdlock();
     node_info.node_id = wc->node_id;
@@ -138,7 +138,7 @@ void aclk_check_node_info_and_collectors(void)
     size_t replicating = 0;
     dfe_start_reentrant(rrdhost_root_index, host)
     {
-        struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
+        struct aclk_sync_cfg_t *wc = host->aclk_config;
         if (unlikely(!wc))
             continue;
 

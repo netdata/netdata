@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Removes Observabilitycon banner README.md [\#16434](https://github.com/netdata/netdata/pull/16434) ([Aliki92](https://github.com/Aliki92))
+- Journal sampling [\#16433](https://github.com/netdata/netdata/pull/16433) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16431](https://github.com/netdata/netdata/pull/16431) ([netdatabot](https://github.com/netdatabot))
 - Regenerate integrations.js [\#16430](https://github.com/netdata/netdata/pull/16430) ([netdatabot](https://github.com/netdatabot))
 - proc\_net\_dev: keep nic\_speed\_max in kilobits [\#16429](https://github.com/netdata/netdata/pull/16429) ([ilyam8](https://github.com/ilyam8))
@@ -420,7 +422,6 @@
 - Fix use after free [\#15825](https://github.com/netdata/netdata/pull/15825) ([stelfrag](https://github.com/stelfrag))
 - Improve dyncfg exit [\#15824](https://github.com/netdata/netdata/pull/15824) ([underhood](https://github.com/underhood))
 - Release job message status to avoid memory leak [\#15822](https://github.com/netdata/netdata/pull/15822) ([stelfrag](https://github.com/stelfrag))
-- ML improve init [\#15819](https://github.com/netdata/netdata/pull/15819) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
