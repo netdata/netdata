@@ -277,6 +277,20 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
                 }
             }
         }
+        else if(mode & (CONTEXTS_V2_ALERT_EVAL)) {
+            if (!strcmp(name, "chart"))
+                req.alert_eval.chart = value;
+            else if (!strcmp(name, "context"))
+                req.alert_eval.context = value;
+            else if (!strcmp(name, "lookup"))
+                req.alert_eval.lookup = value;
+            else if (!strcmp(name, "calc"))
+                req.alert_eval.calc = value;
+            else if (!strcmp(name, "warn"))
+                req.alert_eval.warn = value;
+            else if (!strcmp(name, "crit"))
+                req.alert_eval.crit = value;
+        }
     }
 
     if ((mode & CONTEXTS_V2_ALERT_TRANSITIONS) && !req.alerts.last)
@@ -289,6 +303,10 @@ static int web_client_api_request_v2_contexts_internal(RRDHOST *host __maybe_unu
 
 static int web_client_api_request_v2_alert_transitions(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERT_TRANSITIONS | CONTEXTS_V2_NODES);
+}
+
+static int web_client_api_request_v2_alert_eval(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return web_client_api_request_v2_contexts_internal(host, w, url, CONTEXTS_V2_ALERT_EVAL | CONTEXTS_V2_NODES);
 }
 
 static int web_client_api_request_v2_alerts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -850,10 +868,11 @@ static struct web_api_command api_commands_v2[] = {
         {"versions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_versions, 0},
         {"functions",           0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS,     web_client_api_request_v2_functions, 0},
         {"q",                   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_q, 0},
-        {"alerts",              0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alerts, 0},
 
+        {"alerts",              0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alerts, 0},
         {"alert_transitions",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_transitions, 0},
         {"alert_config",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_config, 0},
+        {"alert_eval",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_eval, 0},
 
         {"claim",               0, WEB_CLIENT_ACL_NOCHECK,                                                     web_client_api_request_v2_claim, 0},
 

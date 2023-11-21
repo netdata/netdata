@@ -1652,6 +1652,34 @@ static void contexts_v2_alert_transition_callback(struct sql_alert_transition_da
     }
 }
 
+static void contexts_v2_alert_eval_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
+    struct health_virtual hv = {
+        .debug = debug,
+        .chart = ctl->request->alert_eval.chart,
+        .context = ctl->request->alert_eval.context,
+        .calc = ctl->request->alert_eval.calc,
+        .lookup = ctl->request->alert_eval.lookup,
+        .warn = ctl->request->alert_eval.warn,
+        .crit = ctl->request->alert_eval.crit,
+        .after = ctl->window.after,
+        .before = ctl->window.before,
+    };
+
+    int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
+    if(min_run_every < 1) min_run_every = 1;
+
+    buffer_json_member_add_array(wb, "alert_eval");
+
+    struct contexts_v2_node *t;
+    dfe_start_read(ctl->nodes.dict, t) {
+        buffer_json_add_array_item_object(wb);
+        health_virtual(t->host, wb, &hv, min_run_every);
+        buffer_json_object_close(wb);
+    }
+    dfe_done(t);
+    buffer_json_array_close(wb);
+}
+
 static void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
     struct alert_transitions_callback_data data = {
             .wb = wb,
@@ -2117,6 +2145,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
         if (mode & CONTEXTS_V2_AGENTS)
             buffer_json_agents_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO), true);
+
+        if(mode & CONTEXTS_V2_ALERT_EVAL)
+            contexts_v2_alert_eval_to_json(wb, &ctl, debug);
     }
 
     buffer_json_cloud_timings(wb, "timings", &ctl.timings);

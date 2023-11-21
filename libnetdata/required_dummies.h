@@ -31,6 +31,15 @@ int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE 
     (void)result;
     return 0;
 };
+
+int health_variable_lookup_and_query(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE *result, time_t v_at)
+{
+    (void)variable;
+    (void)rc;
+    (void)result;
+    (void)v_at;
+    return 0;
+};
 #endif
 
 void rrdset_thread_rda_free(void){};

@@ -634,6 +634,15 @@ struct api_v2_contexts_request {
         usec_t global_id_anchor;
     } alerts;
 
+    struct {
+        char *chart;
+        char *context;
+        char *lookup;
+        char *calc;
+        char *warn;
+        char *crit;
+    } alert_eval;
+
     time_t after;
     time_t before;
     time_t timeout_ms;
@@ -654,6 +663,7 @@ typedef enum __attribute__ ((__packed__)) {
     CONTEXTS_V2_FUNCTIONS           = (1 << 9),
     CONTEXTS_V2_ALERTS              = (1 << 10),
     CONTEXTS_V2_ALERT_TRANSITIONS   = (1 << 11),
+    CONTEXTS_V2_ALERT_EVAL          = (1 << 12),
 } CONTEXTS_V2_MODE;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);
