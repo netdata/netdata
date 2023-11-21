@@ -3,6 +3,8 @@
 #ifndef NETDATA_RRDDISKPROTOCOL_H
 #define NETDATA_RRDDISKPROTOCOL_H
 
+#include <stdint.h>
+
 #define RRDENG_BLOCK_SIZE (4096)
 #define RRDFILE_ALIGNMENT RRDENG_BLOCK_SIZE
 
@@ -36,7 +38,8 @@ struct rrdeng_df_sb {
  */
 #define PAGE_METRICS    (0)
 #define PAGE_TIER       (1)
-#define PAGE_TYPE_MAX   1   // Maximum page type (inclusive)
+#define PAGE_GORILLA_METRICS    (2)
+#define PAGE_TYPE_MAX   2   // Maximum page type (inclusive)
 
 /*
  * Data file page descriptor
@@ -47,7 +50,14 @@ struct rrdeng_extent_page_descr {
     uint8_t uuid[UUID_SZ];
     uint32_t page_length;
     uint64_t start_time_ut;
-    uint64_t end_time_ut;
+    union {
+        struct {
+            uint32_t entries;
+            uint32_t delta_time_s;
+        } gorilla  __attribute__((packed));
+
+        uint64_t end_time_ut;
+    };
 } __attribute__ ((packed));
 
 /*
