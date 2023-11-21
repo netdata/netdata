@@ -281,6 +281,9 @@ void jb_cleanup(struct log_job *jb) {
     memset(jb, 0, sizeof(*jb));
 }
 
+// ----------------------------------------------------------------------------
+// command line params
+
 bool parse_parameters(struct log_job *jb, int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
@@ -385,6 +388,9 @@ bool parse_parameters(struct log_job *jb, int argc, char **argv) {
     return true;
 }
 
+// ----------------------------------------------------------------------------
+// injection of constant fields
+
 static void jb_select_which_injections_should_be_injected_on_unmatched(struct log_job *jb) {
     // mark all injections to be added to unmatched logs
     for(size_t i = 0; i < jb->injections.used ; i++)
@@ -404,6 +410,31 @@ static void jb_select_which_injections_should_be_injected_on_unmatched(struct lo
         }
     }
 }
+
+
+static inline void jb_finalize_injections(struct log_job *jb, bool line_is_matched) {
+    for (size_t j = 0; j < jb->injections.used; j++) {
+        if(!line_is_matched && !jb->injections.keys[j].on_unmatched)
+            continue;
+
+        send_key_value(jb->injections.keys[j].key, jb->injections.keys[j].value.s);
+    }
+}
+
+static inline void jb_reset_injections(struct log_job *jb) {
+    for(size_t d = 0; d < jb->dups.used ; d++) {
+        struct key_dup *kd = &jb->dups.array[d];
+        kd->exposed = false;
+
+        for(size_t g = 0; g < kd->used ; g++) {
+            if(kd->values[g].s)
+                kd->values[g].s[0] = '\0';
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// duplications
 
 static inline void jb_send_duplications_for_key(struct log_job *jb, const char *key, const char *value, size_t value_len) {
     // IMPORTANT:
@@ -476,26 +507,8 @@ static inline void jb_send_remaining_duplications(struct log_job *jb) {
     }
 }
 
-static inline void jb_finalize_injections(struct log_job *jb, bool line_is_matched) {
-    for (size_t j = 0; j < jb->injections.used; j++) {
-        if(!line_is_matched && !jb->injections.keys[j].on_unmatched)
-            continue;
-
-        send_key_value(jb->injections.keys[j].key, jb->injections.keys[j].value.s);
-    }
-}
-
-static inline void jb_reset_injections(struct log_job *jb) {
-    for(size_t d = 0; d < jb->dups.used ; d++) {
-        struct key_dup *kd = &jb->dups.array[d];
-        kd->exposed = false;
-
-        for(size_t g = 0; g < kd->used ; g++) {
-            if(kd->values[g].s)
-                kd->values[g].s[0] = '\0';
-        }
-    }
-}
+// ----------------------------------------------------------------------------
+// filename injection
 
 static inline void jb_inject_filename(struct log_job *jb) {
     if (jb->filename.key && jb->filename.current[0])
@@ -531,6 +544,9 @@ static inline bool jb_switched_filename(struct log_job *jb, const char *line, si
     return false;
 }
 
+// ----------------------------------------------------------------------------
+// input reading
+
 static char *get_next_line(struct log_job *jb, char *buffer, size_t size, size_t *line_length) {
     if(!fgets(buffer, (int)size, stdin)) {
         *line_length = 0;
@@ -553,6 +569,9 @@ static char *get_next_line(struct log_job *jb, char *buffer, size_t size, size_t
     *line_length = len;
     return line;
 }
+
+// ----------------------------------------------------------------------------
+// PCRE2
 
 static pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
     int error_number;
@@ -615,8 +634,9 @@ static inline void jb_traverse_pcre2_named_groups_and_send_keys(struct log_job *
     }
 }
 
-struct log_job log_job = { 0 };
+// ----------------------------------------------------------------------------
 
+struct log_job log_job = { 0 };
 int main(int argc, char *argv[]) {
     struct log_job *jb = &log_job;
 
