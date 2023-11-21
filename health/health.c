@@ -383,7 +383,7 @@ static void health_reload_host(RRDHOST *host) {
 
 #ifdef ENABLE_ACLK
     if (netdata_cloud_enabled) {
-        struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+        struct aclk_sync_cfg_t *wc = host->aclk_config;
         if (likely(wc)) {
             wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
         }
@@ -422,7 +422,7 @@ static inline int compare_active_alerts(const void * a, const void * b) {
     active_alerts_t *active_alerts_a = (active_alerts_t *)a;
     active_alerts_t *active_alerts_b = (active_alerts_t *)b;
 
-    return ( active_alerts_b->last_status_change - active_alerts_a->last_status_change );
+    return (int) ( active_alerts_b->last_status_change - active_alerts_a->last_status_change );
 }
 
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
@@ -943,7 +943,7 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
 #ifdef ENABLE_ACLK
     if (netdata_cloud_enabled) {
-        struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
+        struct aclk_sync_cfg_t *wc = host->aclk_config;
         if (unlikely(!wc)) {
             return;
         }
@@ -1554,10 +1554,9 @@ void *health_main(void *ptr) {
             }
 #ifdef ENABLE_ACLK
             if (netdata_cloud_enabled) {
-                struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *)host->aclk_sync_host_config;
-                if (unlikely(!wc)) {
+                struct aclk_sync_cfg_t *wc = host->aclk_config;
+                if (unlikely(!wc))
                     continue;
-                }
 
                 if (wc->alert_queue_removed == 1) {
                     sql_queue_removed_alerts_to_aclk(host);

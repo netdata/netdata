@@ -5,7 +5,6 @@
 
 #include "sqlite3.h"
 
-
 #ifndef ACLK_MAX_CHART_BATCH
 #define ACLK_MAX_CHART_BATCH    (200)
 #endif
@@ -41,11 +40,11 @@ static inline int claimed()
     return localhost->aclk_state.claimed_id != NULL;
 }
 
-#define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
-        "alert_unique_id, date_created, date_submitted, date_cloud_ack, filtered_alert_unique_id NOT NULL, " \
-        "unique(alert_unique_id));"
+#define TABLE_ACLK_ALERT                                                                                               \
+    "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, "                                      \
+    "alert_unique_id, date_created, date_submitted, date_cloud_ack, filtered_alert_unique_id NOT NULL, "               \
+    "UNIQUE(alert_unique_id));"
 
-#define INDEX_ACLK_ALERT "CREATE INDEX IF NOT EXISTS aclk_alert_index_%s ON aclk_alert_%s (alert_unique_id);"
 #define INDEX_ACLK_ALERT1 "CREATE INDEX IF NOT EXISTS aclk_alert_index1_%s ON aclk_alert_%s (filtered_alert_unique_id);"
 #define INDEX_ACLK_ALERT2 "CREATE INDEX IF NOT EXISTS aclk_alert_index2_%s ON aclk_alert_%s (date_submitted);"
 
@@ -71,16 +70,10 @@ struct aclk_database_cmd {
     enum aclk_database_opcode opcode;
     void *param[2];
     struct completion *completion;
+    struct aclk_database_cmd *prev, *next;
 };
 
-#define ACLK_DATABASE_CMD_Q_MAX_SIZE (1024)
-
-struct aclk_database_cmdqueue {
-    unsigned head, tail;
-    struct aclk_database_cmd cmd_array[ACLK_DATABASE_CMD_Q_MAX_SIZE];
-};
-
-struct aclk_sync_host_config {
+typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
     int alert_updates;
     int alert_checkpoint_req;
@@ -92,16 +85,12 @@ struct aclk_sync_host_config {
     char *alerts_snapshot_uuid;        // will contain the snapshot_uuid value if snapshot was requested
     uint64_t alerts_log_first_sequence_id;
     uint64_t alerts_log_last_sequence_id;
-};
+} aclk_sync_cfg_t;
 
-extern sqlite3 *db_meta;
-
-int aclk_database_enq_cmd_noblock(struct aclk_database_cmd *cmd);
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 void sql_aclk_sync_init(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void aclk_push_node_alert_snapshot(const char *node_id);
-void aclk_push_node_health_log(const char *node_id);
 void aclk_push_node_removed_alerts(const char *node_id);
 void schedule_node_info_update(RRDHOST *host);
 
