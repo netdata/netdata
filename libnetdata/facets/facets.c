@@ -36,7 +36,8 @@ static const uint8_t id_encoding_characters_reverse[256] = {
 #define FACETS_HASH XXH64_hash_t
 #define FACETS_HASH_FUNCTION(src, len) XXH3_64bits(src, len)
 #define FACETS_HASH_ZERO (FACETS_HASH)0
-#define FACETS_HASH_UNSAMPLED (FACETS_HASH)UINT64_MAX
+#define FACETS_HASH_UNSAMPLED (FACETS_HASH)(UINT64_MAX - 1)
+#define FACETS_HASH_ESTIMATED (FACETS_HASH)UINT64_MAX
 
 static inline void facets_hash_to_str(FACETS_HASH num, char *out) {
     out[11] = '\0';
@@ -196,6 +197,7 @@ typedef struct facet_value {
     bool selected;
     bool empty;
     bool unsampled;
+    bool estimated;
 
     uint32_t rows_matching_facet_value;
     uint32_t final_facet_value_counter;
@@ -212,13 +214,15 @@ typedef enum {
     FACET_KEY_VALUE_UPDATED     = (1 << 0),
     FACET_KEY_VALUE_EMPTY       = (1 << 1),
     FACET_KEY_VALUE_UNSAMPLED   = (1 << 2),
-    FACET_KEY_VALUE_COPIED      = (1 << 3),
+    FACET_KEY_VALUE_ESTIMATED   = (1 << 3),
+    FACET_KEY_VALUE_COPIED      = (1 << 4),
 } FACET_KEY_VALUE_FLAGS;
 
 #define facet_key_value_updated(k) ((k)->current_value.flags & FACET_KEY_VALUE_UPDATED)
 #define facet_key_value_empty(k) ((k)->current_value.flags & FACET_KEY_VALUE_EMPTY)
 #define facet_key_value_unsampled(k) ((k)->current_value.flags & FACET_KEY_VALUE_UNSAMPLED)
-#define facet_key_value_empty_or_unsampled(k) ((k)->current_value.flags & (FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED))
+#define facet_key_value_estimated(k) ((k)->current_value.flags & FACET_KEY_VALUE_ESTIMATED)
+#define facet_key_value_empty_or_unsampled_or_estimated(k) ((k)->current_value.flags & (FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED|FACET_KEY_VALUE_ESTIMATED))
 #define facet_key_value_copied(k) ((k)->current_value.flags & FACET_KEY_VALUE_COPIED)
 
 struct facet_key {
@@ -259,6 +263,10 @@ struct facet_key {
     struct {
         FACET_VALUE *v;
     } unsampled_value;
+
+    struct {
+        FACET_VALUE *v;
+    } estimated_value;
 
     struct {
         facet_dynamic_row_t cb;
@@ -359,6 +367,7 @@ struct facets {
             size_t evaluated;
             size_t matched;
             size_t unsampled;
+            size_t estimated;
             size_t created;
             size_t reused;
         } rows;
@@ -374,6 +383,7 @@ struct facets {
             size_t dynamic;
             size_t empty;
             size_t unsampled;
+            size_t estimated;
             size_t indexed;
             size_t inserts;
             size_t conflicts;
@@ -545,6 +555,27 @@ static inline void FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(FACET_KEY *k) {
         FACET_VALUE *v = FACET_VALUE_ADD_TO_INDEX(k, &tv);
         v->unsampled = true;
         k->unsampled_value.v = v;
+        k->current_value.v = v;
+    }
+}
+
+static inline void FACET_VALUE_ADD_ESTIMATED_VALUE_TO_INDEX(FACET_KEY *k) {
+    static const FACET_VALUE tv = {
+            .hash = FACETS_HASH_ESTIMATED,
+            .name = FACET_VALUE_ESTIMATED,
+            .name_len = sizeof(FACET_VALUE_ESTIMATED) - 1,
+    };
+
+    k->current_value.hash = FACETS_HASH_ESTIMATED;
+
+    if(k->estimated_value.v) {
+        FACET_VALUE_ADD_CONFLICT(k, k->estimated_value.v, &tv);
+        k->current_value.v = k->estimated_value.v;
+    }
+    else {
+        FACET_VALUE *v = FACET_VALUE_ADD_TO_INDEX(k, &tv);
+        v->estimated = true;
+        k->estimated_value.v = v;
         k->current_value.v = v;
     }
 }
@@ -839,7 +870,7 @@ void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_
     facets_set_timeframe_and_histogram_by_id(facets, hash_str, after_ut, before_ut);
 }
 
-static inline void facets_histogram_update_value_slot(FACETS *facets, usec_t usec, FACET_VALUE *v) {
+static inline uint32_t facets_histogram_slot_at_time_ut(FACETS *facets, usec_t usec, FACET_VALUE *v) {
     if(unlikely(!v->histogram))
         v->histogram = callocz(facets->histogram.slots, sizeof(*v->histogram));
 
@@ -856,6 +887,11 @@ static inline void facets_histogram_update_value_slot(FACETS *facets, usec_t use
     if(unlikely(slot >= facets->histogram.slots))
         slot = facets->histogram.slots - 1;
 
+    return slot;
+}
+
+static inline void facets_histogram_update_value_slot(FACETS *facets, usec_t usec, FACET_VALUE *v) {
+    uint32_t slot = facets_histogram_slot_at_time_ut(facets, usec, v);
     v->histogram[slot]++;
 }
 
@@ -870,6 +906,40 @@ static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
 
     FACET_VALUE *v = facets->histogram.key->current_value.v;
     facets_histogram_update_value_slot(facets, usec, v);
+}
+
+void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, size_t entries) {
+    facets->operations.rows.evaluated += entries;
+    facets->operations.rows.matched += entries;
+    facets->operations.rows.estimated += entries;
+
+    if(!facets->histogram.enabled ||
+       !facets->histogram.key ||
+       !facets->histogram.key->values.enabled)
+        return;
+
+    if(from_ut < facets->histogram.after_ut)
+        from_ut = facets->histogram.after_ut;
+
+    if(to_ut > facets->histogram.before_ut)
+        to_ut = facets->histogram.before_ut;
+
+    if(!facets->histogram.key->estimated_value.v)
+        FACET_VALUE_ADD_ESTIMATED_VALUE_TO_INDEX(facets->histogram.key);
+
+    FACET_VALUE *v = facets->histogram.key->estimated_value.v;
+
+    size_t from_slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
+    size_t to_slot = facets_histogram_slot_at_time_ut(facets, to_ut, v);
+    size_t slots = to_slot < from_slot ? 1 : to_slot - from_slot + 1;
+    size_t entries_per_slot = entries / slots;
+
+    for(uint32_t slot = 0; slot < slots ;slot++) {
+        if(unlikely(slot >= facets->histogram.slots))
+            slot = facets->histogram.slots - 1;
+
+        v->histogram[from_slot + slot] += entries_per_slot;
+    }
 }
 
 void facets_row_finished_unsampled(FACETS *facets, usec_t usec) {
@@ -1653,7 +1723,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED;
-    k->current_value.flags &= ~(FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED);
+    k->current_value.flags &= ~(FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED|FACET_KEY_VALUE_ESTIMATED);
 
     facets->operations.values.registered++;
 
@@ -1667,7 +1737,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 //    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
 //        found = true;
 
-    if(facets->query && !facet_key_value_empty_or_unsampled(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
+    if(facets->query && !facet_key_value_empty_or_unsampled_or_estimated(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         facets->operations.fts.searches++;
         facets_key_value_copy_to_buffer(k);
         switch(simple_pattern_matches_extract(facets->query, buffer_tostring(k->current_value.b), NULL, 0)) {
@@ -1778,7 +1848,7 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
                 .empty = true,
         };
 
-        if(facet_key_value_updated(k) && !facet_key_value_empty_or_unsampled(k)) {
+        if(facet_key_value_updated(k) && !facet_key_value_empty_or_unsampled_or_estimated(k)) {
             t.tmp = facets_key_get_value(k);
             t.tmp_len = facets_key_get_value_length(k);
             t.empty = false;
@@ -2370,6 +2440,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                             if((facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
                                 continue;
 
+                            if(v->unsampled || v->estimated)
+                                continue;
+
                             buffer_json_add_array_item_object(wb);
                             {
                                 buffer_json_member_add_string(wb, "id", hash_to_static_string(v->hash));
@@ -2612,6 +2685,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
         buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
         buffer_json_member_add_uint64(wb, "unsampled", facets->operations.rows.unsampled);
+        buffer_json_member_add_uint64(wb, "estimated", facets->operations.rows.estimated);
         buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
         buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
         buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
@@ -2676,6 +2750,8 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             buffer_json_member_add_uint64(wb, "transformed", facets->operations.values.transformed);
             buffer_json_member_add_uint64(wb, "dynamic", facets->operations.values.dynamic);
             buffer_json_member_add_uint64(wb, "empty", facets->operations.values.empty);
+            buffer_json_member_add_uint64(wb, "unsampled", facets->operations.values.unsampled);
+            buffer_json_member_add_uint64(wb, "estimated", facets->operations.values.estimated);
             buffer_json_member_add_uint64(wb, "indexed", facets->operations.values.indexed);
             buffer_json_member_add_uint64(wb, "inserts", facets->operations.values.inserts);
             buffer_json_member_add_uint64(wb, "conflicts", facets->operations.values.conflicts);

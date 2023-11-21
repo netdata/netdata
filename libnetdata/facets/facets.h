@@ -7,6 +7,7 @@
 
 #define FACET_VALUE_UNSET "-"
 #define FACET_VALUE_UNSAMPLED "[unsampled]"
+#define FACET_VALUE_ESTIMATED "[estimated]"
 
 typedef enum __attribute__((packed)) {
     FACETS_ANCHOR_DIRECTION_FORWARD,
@@ -87,6 +88,7 @@ void facets_rows_begin(FACETS *facets);
 bool facets_row_finished(FACETS *facets, usec_t usec);
 
 void facets_row_finished_unsampled(FACETS *facets, usec_t usec);
+void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, size_t entries);
 size_t facets_histogram_slots(FACETS *facets);
 
 FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options);
