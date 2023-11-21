@@ -382,7 +382,7 @@ static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct
     usec_t remaining_ut = remaining_to_ut - remaining_from_ut;
 
     if(total_time_ut)
-        *total_time_ut = before_ut - after_ut;
+        *total_time_ut = (before_ut > after_ut) ? before_ut - after_ut : 1;
 
     if(remaining_start_ut)
         *remaining_start_ut = remaining_from_ut;
@@ -394,14 +394,27 @@ static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct
 }
 
 static size_t sampling_file_estimate_remaining_lines(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
-    size_t sampled_lines = sampling_file_lines_scanned(fqs);
+    size_t scanned_lines = sampling_file_lines_scanned(fqs);
 
     usec_t total_time_ut;
     usec_t remaining_time_ut = sampling_file_remaining_time_ut(fqs, jf, direction, msg_ut, &total_time_ut, NULL, NULL);
 
-    size_t expected_lines = sampled_lines * total_time_ut / remaining_time_ut;
+    if (total_time_ut == 0)
+        total_time_ut = 1;
 
-    if(expected_lines < 1)
+    // Calculate the proportion of time covered
+    double time_proportion = (double)(total_time_ut - remaining_time_ut) / (double)total_time_ut;
+
+    if (time_proportion == 0 || !isfinite(time_proportion))
+        time_proportion = 1.0;
+
+    // Estimate the total number of lines in the file
+    size_t total_lines_estimated = (size_t)((double)scanned_lines / time_proportion);
+
+    // Calculate the estimated number of remaining lines
+    size_t expected_lines = total_lines_estimated - scanned_lines;
+
+    if (expected_lines < 1)
         expected_lines = 1;
 
     return expected_lines;
