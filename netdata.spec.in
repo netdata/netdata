@@ -106,7 +106,7 @@ BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
 BuildRequires: libcurl-devel
 %if 0%{?amzn} < 2023 || 0%{?centos_ver} < 8 || 0%{?suse_version}
-BuildRequires: pcre-devel
+# do nothing - log2journal is not available on these systems
 %else
 BuildRequires: pcre2-devel
 %endif
@@ -556,7 +556,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
+%if 0%{?amzn} < 2023 || 0%{?centos_ver} < 8 || 0%{?suse_version}
+# do nothing - log2journal is not available on these systems
+%else
 %{_sbindir}/log2journal
+%endif
 %{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
 
