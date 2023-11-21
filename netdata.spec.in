@@ -105,7 +105,7 @@ BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
 BuildRequires: libcurl-devel
-BuildRequires: libpcre2-devel
+BuildRequires: pcre2-devel
 %if 0%{?suse_version}
 BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
