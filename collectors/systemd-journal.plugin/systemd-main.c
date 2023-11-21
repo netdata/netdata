@@ -69,10 +69,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ------------------------------------------------------------------------
 
-    time_t started_t = now_monotonic_sec();
-
-    size_t iteration = 0;
-    usec_t step = 1000 * USEC_PER_MS;
+    usec_t step_ut = 100 * USEC_PER_MS;
+    usec_t send_newline_ut = 0;
+    usec_t since_last_scan_ut = 1000 * USEC_PER_SEC; // something big to trigger scanning at start
     bool tty = isatty(fileno(stderr)) == 1;
 
     netdata_mutex_lock(&stdout_mutex);
@@ -88,23 +87,20 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!plugin_should_exit) {
-        iteration++;
 
-        netdata_mutex_unlock(&stdout_mutex);
-        heartbeat_next(&hb, step);
-        netdata_mutex_lock(&stdout_mutex);
-
-        if(!tty)
-            fprintf(stdout, "\n");
-
-        if(iteration % 60 == 0)
+        if(since_last_scan_ut > 60 * USEC_PER_SEC) {
             journal_files_registry_update();
+            since_last_scan_ut = 0;
+        }
 
-        fflush(stdout);
+        usec_t dt_ut = heartbeat_next(&hb, step_ut);
+        since_last_scan_ut += dt_ut;
+        send_newline_ut += dt_ut;
 
-        time_t now = now_monotonic_sec();
-        if(now - started_t > 86400)
-            break;
+        if(!tty && send_newline_ut > USEC_PER_SEC) {
+            send_newline_and_flush();
+            send_newline_ut = 0;
+        }
     }
 
     exit(0);
