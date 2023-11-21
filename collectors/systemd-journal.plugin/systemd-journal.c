@@ -200,6 +200,11 @@ typedef struct function_query_status {
     const char *histogram;
 
     struct {
+        usec_t start_ut;     // the starting time of the query - we start from this
+        usec_t stop_ut;      // the ending time of the query - we stop at this
+    } query_file;
+
+    struct {
         uint32_t enable_after_samples;
         uint32_t slots;
         uint32_t sampled;
@@ -351,16 +356,9 @@ static size_t sampling_file_lines_scanned(FUNCTION_QUERY_STATUS *fqs) {
 static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
         usec_t msg_ut, usec_t *total_time_ut, usec_t *remaining_start_ut, usec_t *remaining_end_ut) {
 
-    // find the common duration
-    usec_t after_ut = fqs->samples_per_time_slot.start_ut < jf->msg_first_ut ? jf->msg_first_ut : fqs->samples_per_time_slot.start_ut;
-    usec_t before_ut = fqs->samples_per_time_slot.end_ut > jf->msg_last_ut ? jf->msg_last_ut : fqs->samples_per_time_slot.end_ut;
-
-    // flip them if they are reversed
-    if(after_ut > before_ut) {
-        usec_t t = after_ut;
-        after_ut = before_ut;
-        before_ut = t;
-    }
+    // fqs->query_file.start/stop follow the direction of the query
+    usec_t after_ut = MIN(fqs->query_file.start_ut, fqs->query_file.stop_ut);
+    usec_t before_ut = MAX(fqs->query_file.start_ut, fqs->query_file.stop_ut);
 
     // since we have a timestamp in msg_ut
     // this timestamp can extend the overlap
@@ -479,7 +477,8 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
     fqs->samples_per_file.unsampled++;
     fqs->samples_per_time_slot.unsampled[slot]++;
 
-    if(fqs->samples.sampled + fqs->samples.unsampled > fqs->sampling)
+    if(fqs->samples.sampled + fqs->samples.unsampled > fqs->sampling &&
+        fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled)
         return SAMPLING_STOP_AND_ESTIMATE;
 
     return SAMPLING_SKIP_FIELDS;
@@ -591,6 +590,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     usec_t stop_ut = (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->after_ut;
     bool stop_when_full = (fqs->data_only && !fqs->anchor.stop_ut);
 
+    fqs->query_file.start_ut = start_ut;
+    fqs->query_file.stop_ut = stop_ut;
+
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
@@ -688,6 +690,9 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     usec_t start_ut = (fqs->data_only && fqs->anchor.start_ut) ? fqs->anchor.start_ut : fqs->after_ut;
     usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
     bool stop_when_full = (fqs->data_only && !fqs->anchor.stop_ut);
+
+    fqs->query_file.start_ut = start_ut;
+    fqs->query_file.stop_ut = stop_ut;
 
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
