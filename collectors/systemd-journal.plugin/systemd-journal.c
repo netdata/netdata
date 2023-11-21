@@ -336,6 +336,7 @@ static void sampling_query_init(FUNCTION_QUERY_STATUS *fqs, FACETS *facets) {
 static void sampling_file_init(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf __maybe_unused) {
     fqs->samples_per_file.sampled = 0;
     fqs->samples_per_file.unsampled = 0;
+    fqs->samples_per_file.estimated = 0;
     fqs->samples_per_file.every = 0;
     fqs->samples_per_file.skipped = 0;
     fqs->samples_per_file.recalibrate = 0;
