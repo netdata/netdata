@@ -723,7 +723,7 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
 
     rc = execute_insert(res);
     if (likely(rc == SQLITE_DONE)) {
-        netdata_log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
+        nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         wc->alert_queue_removed = 0;
     }
