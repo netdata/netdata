@@ -1060,6 +1060,25 @@ static void config_section_init(uv_loop_t *main_loop,
 
             p_file_info->parser_config->gen_config = syslog_config;
         }
+        else {
+            Flb_systemd_config_t *systemd_config = callocz(1, sizeof(Flb_systemd_config_t));
+
+            systemd_config->read_from_tail = appconfig_get(&log_management_config, config_section->name, "read from tail", NULL);
+            
+            /* not possible to backfill correctly if _SOURCE_REALTIME_TIMESTAMP is not used */
+            if( p_file_info->use_log_timestamp && 
+                systemd_config->read_from_tail && (
+                !strcasecmp(systemd_config->read_from_tail, "off") ||
+                !strcasecmp(systemd_config->read_from_tail, "no"))
+                ){
+                systemd_config->read_from_tail = "Off";
+            }
+            else
+                systemd_config->read_from_tail = "On";
+
+            p_file_info->flb_config = systemd_config;
+
+        }
         if(appconfig_get_boolean(&log_management_config, config_section->name, "priority value chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_PRIOR;
         }

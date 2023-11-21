@@ -257,7 +257,6 @@ int circ_buff_insert(Circ_buff_t *const buff){
         debug_log( "buff out of space! will be expanded.");
         uv_rwlock_wrlock(&buff->buff_realloc_rwlock);
 
-        
         Circ_buff_item_t *items_new = callocz(buff->num_of_items + 1, sizeof(Circ_buff_item_t));
 
         for(int i = 0; i < buff->num_of_items; i++){

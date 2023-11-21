@@ -12,8 +12,6 @@
 #include "query.h"
 #include "file_info.h"	
 
-#define LOGS_MANAG_DB_SUBPATH "/logs_management_db"
-
 int db_user_version(sqlite3 *const db, const int set_user_version);
 void db_set_main_dir(char *const dir);
 int db_init(void);

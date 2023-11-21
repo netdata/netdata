@@ -41,6 +41,8 @@
 /*                                  Database                                  */
 /* -------------------------------------------------------------------------- */
 
+#define LOGS_MANAG_DB_SUBPATH "/logs_management_db"     /**< Logs management database directory subpath **/
+
 typedef enum {
     LOGS_MANAG_DB_MODE_FULL = 0,
     LOGS_MANAG_DB_MODE_NONE
@@ -111,6 +113,7 @@ typedef enum {
 #define FLB_LOG_FILENAME_DEFAULT "fluentbit.log"         /**< Default Fluent Bit log filename **/
 #define FLB_LOG_LEVEL_DEFAULT "info"                     /**< Default Fluent Bit log level **/
 #define FLB_CORO_STACK_SIZE_DEFAULT "24576"              /**< Default Fluent Bit coro stack size - do not change this value unless there is a good reason **/
+#define FLB_CURSOR_DB_FILENAME_DEFAULT "flb-cursor.db"   /**< Default Fluent Bit cursor DB filename **/
 
 #define FLB_FORWARD_UNIX_PATH_DEFAULT ""                 /**< Default path for Forward unix socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/
 #define FLB_FORWARD_UNIX_PERM_DEFAULT "0644"             /**< Default permissions for Forward unix socket configuration, see also https://docs.fluentbit.io/manual/pipeline/inputs/forward#configuration-parameters **/

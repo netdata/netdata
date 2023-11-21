@@ -54,9 +54,9 @@ sudo killall -s KILL stress_test
 sudo killall -s KILL -u netdata
 
 # Remove potentially persistent directories and files
-sudo rm -f $INSTALL_PATH/netdata/var/log/netdata/error.log
-sudo rm -rf $INSTALL_PATH/netdata/var/cache/netdata/logs_management_db 
-sudo rm -rf $INSTALL_PATH/netdata_log_management_stress_test_data
+# sudo rm -f $INSTALL_PATH/netdata/var/log/netdata/error.log
+# sudo rm -rf $INSTALL_PATH/netdata/var/cache/netdata/logs_management_db 
+# sudo rm -rf $INSTALL_PATH/netdata_log_management_stress_test_data
 
 CPU_CORES=$(grep ^cpu\\scores /proc/cpuinfo | uniq |  awk '{print $4}')
 
@@ -65,7 +65,7 @@ if [ "$build_clean_netdata" -eq 1 ]
 then
 	cd ../..
 	sudo $INSTALL_PATH/netdata/usr/libexec/netdata/netdata-uninstaller.sh -y -f -e $INSTALL_PATH/netdata/etc/netdata/.environment
-	sudo rm -rf $INSTALL_PATH/netdata/etc/netdata # Remove /etc/netdata if it persists for some reason
+	# sudo rm -rf $INSTALL_PATH/netdata/etc/netdata # Remove /etc/netdata if it persists for some reason
 	sudo git clean -dxff && git submodule update --init --recursive --force 
 
 	if [ "$build_for_release" -eq 0 ]

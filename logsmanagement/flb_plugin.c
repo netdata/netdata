@@ -222,6 +222,31 @@ do_return:
 }
 
 int flb_run(void){
+
+    /* If there is an FLB_SYSTEMD log type source that uses a DB cursor,
+     * the cursor database must be configured here, since it is guaranteed
+     * that the database directory will exist at this point. */
+    for(int i = 0; i < p_file_infos_arr->count; i++){
+        if(p_file_infos_arr->data[i]->log_type == FLB_SYSTEMD){
+
+            Flb_systemd_config_t *systemd_config = (Flb_systemd_config_t *) p_file_infos_arr->data[i]->flb_config;
+            if(unlikely(!systemd_config ||
+                        !systemd_config->read_from_tail ||
+                        !*systemd_config->read_from_tail)) return -1;
+
+            char cursor_db_path[FILENAME_MAX + 1];
+            snprintfz(cursor_db_path, FILENAME_MAX, "%s%s",
+                        p_file_infos_arr->data[i]->db_dir,
+                        FLB_CURSOR_DB_FILENAME_DEFAULT);
+
+            collector_info("cursor_db_path:%s", cursor_db_path);
+
+            if(flb_input_set(ctx, p_file_infos_arr->data[i]->flb_input,
+                "DB", !strcasecmp(systemd_config->read_from_tail, "Off") ? cursor_db_path : "",
+                NULL) != 0) return -1;
+        }
+    }
+
     if (likely(flb_start(ctx)) == 0) return 0;
     else return -1;
 }
@@ -1285,13 +1310,18 @@ int flb_add_input(struct File_info *const p_file_info){
         }
         case FLB_SYSTEMD: {
             debug_log( "Setting up FLB_SYSTEMD collector");
-        
+
+            Flb_systemd_config_t *systemd_config = (Flb_systemd_config_t *) p_file_info->flb_config;
+            if(unlikely(!systemd_config ||
+                        !systemd_config->read_from_tail ||
+                        !*systemd_config->read_from_tail)) return CONFIG_READ_ERROR;
+
             /* Set up systemd input */
             p_file_info->flb_input = flb_input(ctx, "systemd", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
             if(flb_input_set(ctx, p_file_info->flb_input, 
                 "Tag", tag_s,
-                "Read_From_Tail", "On",
+                "Read_From_Tail", systemd_config->read_from_tail,
                 "Strip_Underscores", "On",
                 "Path", !strcmp(p_file_info->filename, SYSTEMD_DEFAULT_PATH) ? "" : p_file_info->filename,
                 NULL) != 0) return FLB_INPUT_SET_ERROR;

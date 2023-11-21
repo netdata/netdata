@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
     p_file_infos_arr = callocz(1, sizeof(struct File_infos_arr));
 
     if(logs_manag_config_load(&flb_srvc_config, &p_forward_in_config, g_update_every)) 
-        exit(1);    
+        exit(1);
 
     if(flb_init(flb_srvc_config, get_stock_config_dir(), g_logs_manag_config.sd_journal_field_prefix)){
         collector_error("flb_init() failed - logs management will be disabled");
@@ -178,18 +178,13 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    /* Run Fluent Bit engine
-     * NOTE: flb_run() ideally would be executed after db_init(), but in case of
-     * a db_init() failure, it is easier to call flb_stop_and_cleanup() rather 
-     * than the other way round (i.e. cleaning up after db_init(), if flb_run() 
-     * fails). */
-    if(flb_run()){
-        collector_error("flb_run() failed - logs management will be disabled");
+    if(db_init()){
+        collector_error("db_init() failed - logs management will be disabled");
         exit(1);
     }
 
-    if(db_init()){
-        collector_error("db_init() failed - logs management will be disabled");
+    if(flb_run()){
+        collector_error("flb_run() failed - logs management will be disabled");
         exit(1);
     }
 
