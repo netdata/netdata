@@ -108,4 +108,11 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
 void function_systemd_units(const char *transaction, char *function, int timeout, bool *cancelled);
 #endif
 
+static inline void send_newline_and_flush(void) {
+    netdata_mutex_lock(&stdout_mutex);
+    fprintf(stdout, "\n");
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
+}
+
 #endif //NETDATA_COLLECTORS_SYSTEMD_INTERNALS_H

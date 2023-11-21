@@ -383,6 +383,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
                         .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
                 };
                 dictionary_set(journal_files_registry, absolute_path, &t, sizeof(t));
+                send_newline_and_flush();
             }
         }
     }
@@ -391,21 +392,27 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
 }
 
 void journal_files_registry_update(void) {
-    usec_t scan_ut = now_monotonic_usec();
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
-    for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES ;i++) {
-        if(!journal_directories[i].path)
-            break;
+    if(spinlock_trylock(&spinlock)) {
+        usec_t scan_ut = now_monotonic_usec();
 
-        journal_directory_scan(journal_directories[i].path, 0, scan_ut);
+        for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
+            if(!journal_directories[i].path)
+                break;
+
+            journal_directory_scan(journal_directories[i].path, 0, scan_ut);
+        }
+
+        struct journal_file *jf;
+        dfe_start_write(journal_files_registry, jf){
+                    if(jf->last_scan_ut < scan_ut)
+                        dictionary_del(journal_files_registry, jf_dfe.name);
+                }
+        dfe_done(jf);
+
+        spinlock_unlock(&spinlock);
     }
-
-    struct journal_file *jf;
-    dfe_start_write(journal_files_registry, jf) {
-        if(jf->last_scan_ut < scan_ut)
-            dictionary_del(journal_files_registry, jf_dfe.name);
-    }
-    dfe_done(jf);
 }
 
 // ----------------------------------------------------------------------------
@@ -472,6 +479,4 @@ void journal_init_files_and_directories(void) {
     boot_ids_to_first_ut = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(usec_t));
-
-    journal_files_registry_update();
 }
