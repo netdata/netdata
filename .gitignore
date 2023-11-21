@@ -42,6 +42,7 @@ sha256sums.txt
 netdata
 netdatacli
 systemd-cat-native
+log2journal
 !netdata/
 upload/
 artifacts/
