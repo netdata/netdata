@@ -104,6 +104,8 @@ BuildRequires: zlib-devel
 BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
+BuildRequires: libcurl-devel
+BuildRequires: libpcre2-devel
 %if 0%{?suse_version}
 BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
@@ -550,6 +552,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
+%{_sbindir}/log2journal
 %{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
 
