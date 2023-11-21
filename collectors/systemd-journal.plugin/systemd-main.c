@@ -74,8 +74,6 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     usec_t since_last_scan_ut = 1000 * USEC_PER_SEC; // something big to trigger scanning at start
     bool tty = isatty(fileno(stderr)) == 1;
 
-    netdata_mutex_lock(&stdout_mutex);
-
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
             SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
 
@@ -83,6 +81,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
             SYSTEMD_UNITS_FUNCTION_NAME, SYSTEMD_UNITS_DEFAULT_TIMEOUT, SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
 #endif
+
+    send_newline_and_flush();
 
     heartbeat_t hb;
     heartbeat_init(&hb);
