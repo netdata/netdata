@@ -247,6 +247,43 @@ fail:
     buffer_free(sql);
 }
 
+// OPCODE: ACLK_DATABASE_NODE_UNREGISTER
+static void sql_unregister_node(char *machine_guid)
+{
+    int rc;
+    uuid_t host_uuid;
+
+    if (unlikely(!machine_guid))
+        return;
+
+    rc = uuid_parse(machine_guid, host_uuid);
+    freez(machine_guid);
+    if (rc)
+        return;
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, "UPDATE node_instance SET node_id = NULL WHERE host_id = @host_id", -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement remote node id for a host");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to remove node id");
+        goto failed;
+    }
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to execute command to remove node id");
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize statement to remove node id");
+}
+
+
 static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
 {
     struct aclk_database_cmd cmd;
@@ -408,6 +445,9 @@ static void aclk_synchronization(void *arg __maybe_unused)
                     if (unlikely(!ahc))
                         sql_create_aclk_table(host, &host->host_uuid, host->node_id);
                     aclk_host_state_update(host, live, 1);
+                    break;
+                case ACLK_DATABASE_NODE_UNREGISTER:
+                    sql_unregister_node(cmd.param[0]);
                     break;
 // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
@@ -607,3 +647,18 @@ void schedule_node_info_update(RRDHOST *host __maybe_unused)
     aclk_database_enq_cmd(&cmd);
 #endif
 }
+
+#ifdef ENABLE_ACLK
+void unregister_node(const char *machine_guid)
+{
+    if (unlikely(!machine_guid))
+        return;
+
+    struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = ACLK_DATABASE_NODE_UNREGISTER;
+    cmd.param[0] = strdupz(machine_guid);
+    cmd.completion = NULL;
+    aclk_database_enq_cmd(&cmd);
+}
+#endif

@@ -59,6 +59,7 @@ enum aclk_database_opcode {
     ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,
     ACLK_DATABASE_PUSH_ALERT_CHECKPOINT,
     ACLK_DATABASE_QUEUE_REMOVED_ALERTS,
+    ACLK_DATABASE_NODE_UNREGISTER,
     ACLK_DATABASE_TIMER,
 
     // leave this last
@@ -93,5 +94,8 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void aclk_push_node_alert_snapshot(const char *node_id);
 void aclk_push_node_removed_alerts(const char *node_id);
 void schedule_node_info_update(RRDHOST *host);
+#ifdef ENABLE_ACLK
+void unregister_node(const char *machine_guid);
+#endif
 
 #endif //NETDATA_SQLITE_ACLK_H
