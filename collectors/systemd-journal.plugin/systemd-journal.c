@@ -378,7 +378,13 @@ static void sampling_decide_file_sampling_every(FUNCTION_QUERY_STATUS *fqs, stru
         fqs->samples_per_file.every = 1;
 }
 
-static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
+typedef enum {
+    SAMPLING_STOP_AND_ESTIMATE = -1,
+    SAMPLING_FULL = 0,
+    SAMPLING_SKIP_FIELDS = 1,
+} sampling_t;
+
+static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
     if(!fqs->sampling)
         return true;
 
@@ -420,14 +426,22 @@ static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_f
         fqs->samples.sampled++;
         fqs->samples_per_file.sampled++;
         fqs->samples_per_time_slot.sampled[slot]++;
-    }
-    else {
-        fqs->samples.unsampled++;
-        fqs->samples_per_file.unsampled++;
-        fqs->samples_per_time_slot.unsampled[slot]++;
+
+        return SAMPLING_FULL;
     }
 
-    return should_sample;
+    fqs->samples.unsampled++;
+    fqs->samples_per_file.unsampled++;
+    fqs->samples_per_time_slot.unsampled[slot]++;
+
+    if(fqs->samples.sampled > fqs->sampling)
+        return SAMPLING_STOP_AND_ESTIMATE;
+
+    return SAMPLING_SKIP_FIELDS;
+}
+
+static void sampling_update_file_estimates(FACETS *facets, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf) {
+    
 }
 
 // ----------------------------------------------------------------------------
@@ -557,11 +571,11 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         if (unlikely(msg_ut < stop_ut))
             break;
 
-        bool to_sample = is_row_in_sample(fqs, jf, msg_ut,
+        sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_BACKWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
-        if(to_sample) {
+        if(sample == SAMPLING_FULL) {
             bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
             // make sure each line gets a unique timestamp
@@ -593,8 +607,12 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
                 status = check_stop(fqs->cancelled, &fqs->stop_monotonic_ut);
             }
         }
-        else
+        else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
+        else {
+            sampling_update_file_estimates(facets, fqs, jf);
+            break;
+        }
     }
 
     FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
@@ -651,11 +669,11 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         if (unlikely(msg_ut > stop_ut))
             break;
 
-        bool to_sample = is_row_in_sample(fqs, jf, msg_ut,
+        sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_FORWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
-        if(to_sample) {
+        if(sample == SAMPLING_FULL) {
             bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
             // make sure each line gets a unique timestamp
@@ -687,8 +705,12 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
                 status = check_stop(fqs->cancelled, &fqs->stop_monotonic_ut);
             }
         }
-        else
+        else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
+        else {
+            sampling_update_file_estimates(facets, fqs, jf);
+            break;
+        }
     }
 
     FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
