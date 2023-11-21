@@ -27,7 +27,7 @@ struct page_descr_with_data {
     uint8_t type;
     uint32_t update_every_s;
     uint32_t page_length;
-    uint8_t *page;
+    struct pgd *pgd;
 
     struct {
         struct page_descr_with_data *prev;

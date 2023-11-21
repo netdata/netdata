@@ -577,55 +577,6 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker) {
 
 // ----------------------------------------------------------------------------
 
-struct {
-    ARAL *aral[RRD_STORAGE_TIERS];
-} dbengine_page_alloc_globals = {};
-
-static inline ARAL *page_size_lookup(size_t size) {
-    for(size_t tier = 0; tier < storage_tiers ;tier++)
-        if(size == tier_page_size[tier])
-            return dbengine_page_alloc_globals.aral[tier];
-
-    return NULL;
-}
-
-static void dbengine_page_alloc_init(void) {
-    for(size_t i = storage_tiers; i > 0 ;i--) {
-        size_t tier = storage_tiers - i;
-
-        char buf[20 + 1];
-        snprintfz(buf, 20, "tier%zu-pages", tier);
-
-        dbengine_page_alloc_globals.aral[tier] = aral_create(
-                buf,
-                tier_page_size[tier],
-                64,
-                512 * tier_page_size[tier],
-                pgc_aral_statistics(),
-                NULL, NULL, false, false);
-    }
-}
-
-void *dbengine_page_alloc(size_t size) {
-    ARAL *ar = page_size_lookup(size);
-    if(ar) return aral_mallocz(ar);
-
-    return mallocz(size);
-}
-
-void dbengine_page_free(void *page, size_t size __maybe_unused) {
-    if(unlikely(!page || page == DBENGINE_EMPTY_PAGE))
-        return;
-
-    ARAL *ar = page_size_lookup(size);
-    if(ar)
-        aral_freez(ar, page);
-    else
-        freez(page);
-}
-
-// ----------------------------------------------------------------------------
-
 void *dbengine_extent_alloc(size_t size) {
     void *extent = mallocz(size);
     return extent;
@@ -890,12 +841,25 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
-        header->descr[i].end_time_ut = descr->end_time_ut;
+
+        switch (descr->type) {
+            case PAGE_METRICS:
+            case PAGE_TIER:
+                header->descr[i].end_time_ut = descr->end_time_ut;
+                break;
+            case PAGE_GORILLA_METRICS:
+                header->descr[i].gorilla.delta_time_s = (uint32_t) ((descr->end_time_ut - descr->start_time_ut) / USEC_PER_SEC);
+                header->descr[i].gorilla.entries = pgd_slots_used(descr->pgd);
+                break;
+            default:
+                fatal("Unknown page type: %uc", descr->type);
+        }
+
         pos += sizeof(header->descr[i]);
     }
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
-        (void) memcpy(xt_io_descr->buf + pos, descr->page, descr->page_length);
+        pgd_copy_to_extent(descr->pgd, xt_io_descr->buf + pos, descr->page_length);
         pos += descr->page_length;
     }
 
@@ -1628,7 +1592,7 @@ static void dbengine_initialize_structures(void) {
     rrdeng_query_handle_init();
     page_descriptors_init();
     extent_buffer_init();
-    dbengine_page_alloc_init();
+    pgd_init_arals();
     extent_io_descriptor_init();
 }
 

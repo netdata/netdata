@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #ifndef DBENGINE_METRIC_H
 #define DBENGINE_METRIC_H
 

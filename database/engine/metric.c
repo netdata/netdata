@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "metric.h"
 
 typedef int32_t REFCOUNT;

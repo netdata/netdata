@@ -797,6 +797,10 @@ set(RRD_PLUGIN_FILES
         database/engine/metric.h
         database/engine/pdc.c
         database/engine/pdc.h
+        database/engine/page.c
+        database/engine/page.h
+        database/engine/page_test.cc
+        database/engine/page_test.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
         )

@@ -208,6 +208,12 @@ AC_ARG_ENABLE(
     [enable_ml="detect"]
 )
 AC_ARG_ENABLE(
+    [gtests],
+    [AS_HELP_STRING([--enable-gtests], [Enable google tests @<:@default no@:>@])],
+    ,
+    [enable_gtests="no"]
+)
+AC_ARG_ENABLE(
     [aclk_ssl_debug],
     [AS_HELP_STRING([--enable-aclk-ssl-debug], [Enables possibility for SSL key logging @<:@default no@:>@])],
     [aclk_ssl_debug="yes"],
@@ -1432,17 +1438,17 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 # -----------------------------------------------------------------------------
 # gtest/gmock
 
-AC_MSG_CHECKING([if gtest and gmock can be found])
+if test "${enable_gtests}" = "yes"; then
+    AC_MSG_CHECKING([if gtest can be found])
 
-PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
-PKG_CHECK_MODULES([GMOCK], [gmock], [have_gmock=yes], [have_gmock=no])
+    PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
 
-if test "${have_gtest}" = "yes" -a "${have_gmock}" = "yes"; then
-    OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS} ${GMOCK_CFLAGS}"
-    OPTIONAL_GTEST_LIBS="${GTEST_LIBS} ${GMOCK_LIBS}"
-    have_gtest="yes"
-else
-    have_gtest="no"
+    if test "${have_gtest}" = "yes"; then
+        OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS}"
+        OPTIONAL_GTEST_LIBS="${GTEST_LIBS}"
+
+        AC_DEFINE([HAVE_GTEST], [1], [gtest availability])
+    fi
 fi
 
 # -----------------------------------------------------------------------------
