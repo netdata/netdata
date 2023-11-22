@@ -687,25 +687,31 @@ static bool nd_log_journal_direct_init(const char *path) {
         return true;
     }
 
+    int fd;
     char filename[FILENAME_MAX + 1];
     if(!is_path_unix_socket(path)) {
+
         journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, "netdata");
-        if (!is_path_unix_socket(filename)) {
+        if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
+
             journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, NULL);
-            if (!is_path_unix_socket(filename)) {
+            if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
+
                 journal_construct_path(filename, sizeof(filename), NULL, "netdata");
-                if (!is_path_unix_socket(filename)) {
+                if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
+
                     journal_construct_path(filename, sizeof(filename), NULL, NULL);
-                    if (!is_path_unix_socket(filename))
+                    if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1)
                         return false;
                 }
             }
         }
     }
-    else
+    else {
         snprintfz(filename, sizeof(filename), "%s", path);
+        fd = journal_direct_fd(filename);
+    }
 
-    int fd = journal_direct_fd(filename);
     if(fd < 0)
         return false;
 
