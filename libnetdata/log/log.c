@@ -364,6 +364,7 @@ static struct {
     struct {
         bool initialized;
         int fd;
+        char filename[FILENAME_MAX + 1];
     } journal_direct;
 
     struct {
@@ -675,9 +676,16 @@ static bool nd_log_journal_systemd_init(void) {
     return nd_log.journal.initialized;
 }
 
+static void nd_log_journal_direct_set_env(void) {
+    if(nd_log.sources[NDLS_COLLECTORS].method == NDLO_JOURNAL)
+        setenv("NETDATA_SYSTEMD_JOURNAL_PATH", nd_log.journal_direct.filename, 1);
+}
+
 static bool nd_log_journal_direct_init(const char *path) {
-    if(nd_log.journal_direct.initialized)
+    if(nd_log.journal_direct.initialized) {
+        nd_log_journal_direct_set_env();
         return true;
+    }
 
     char filename[FILENAME_MAX + 1];
     if(!is_path_unix_socket(path)) {
@@ -704,8 +712,8 @@ static bool nd_log_journal_direct_init(const char *path) {
     nd_log.journal_direct.fd = fd;
     nd_log.journal_direct.initialized = true;
 
-    if(nd_log.sources[NDLS_COLLECTORS].method == NDLO_JOURNAL)
-        setenv("NETDATA_SYSTEMD_JOURNAL_PATH", filename, 1);
+    strncpyz(nd_log.journal_direct.filename, filename, sizeof(nd_log.journal_direct.filename) - 1);
+    nd_log_journal_direct_set_env();
 
     return true;
 }
