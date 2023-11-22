@@ -9,8 +9,8 @@ extern "C" {
 
 #include "../libnetdata.h"
 
-#define ND_LOG_DEFAULT_THROTTLE_LOGS 1200
-#define ND_LOG_DEFAULT_THROTTLE_PERIOD 3600
+#define ND_LOG_DEFAULT_THROTTLE_LOGS 1000
+#define ND_LOG_DEFAULT_THROTTLE_PERIOD 60
 
 typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only

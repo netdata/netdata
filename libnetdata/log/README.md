@@ -45,24 +45,26 @@ All other sources default to a file.
 
 ## Log formats
 
-Netdata supports the follow formats for its logs:
-
-- **journal**, this is automatically selected when logging to systemd-journal.
-- **logfmt**, this is the default when logging to any output other than `journal`. In this format, Netdata annotates the fields to make them human readable. 
-- **json**, to write logs lines in json format. The output is machine readable, similar to `journal`.
+| Format  | Description                                                                                            |
+|---------|--------------------------------------------------------------------------------------------------------|
+| journal | journald-specific log format. Automatically selected when logging to systemd-journal.                  |
+| logfmt  | logs data as a series of key/value pairs. The default when logging to any output other than `journal`. |
+| json    | logs data in JSON format.                                                                              |
 
 ## Log levels
 
 Each time Netdata logs, it assigns a priority to the log. It can be one of this (in order of importance):
 
-- **emergency**, a fatal condition; most likely Netdata will exit immediately after,
-- **alert**, a very important issue that may affect how Netdata operates,
-- **critical**, a very important issue the user should know which, Netdata thinks it can survive,
-- **error**, an error condition indicating that Netdata is trying to do something but it fails,
-- **warning**, something that may or may not affect the operation of Netdata, but the outcome cannot be determined at the time Netdata logs,
-- **notice**, something that does not affect the operation of Netdata, but the user should notice,
-- **info**, the default log level about information the user should know,
-- **debug**, these are more verbose logs that can be ignored,
+| Level     | Description                                                                            |
+|-----------|----------------------------------------------------------------------------------------|
+| emergency | a fatal condition, Netdata will most likely exit immediately after.                    |
+| alert     | a very important issue that may affect how Netdata operates.                           |
+| critical  | a very important issue the user should know which, Netdata thinks it can survive.      |
+| error     | an error condition indicating that Netdata is trying to do something, but it fails.    |
+| warning   | something unexpected has happened that may or may not affect the operation of Netdata. |
+| notice    | something that does not affect the operation of Netdata, but the user should notice.   |
+| info      | the default log level about information the user should know.                          |
+| debug     | these are more verbose logs that can be ignored.                                       |
 
 ## Logs Configuration
 
@@ -70,8 +72,8 @@ In `netdata.conf`, there are the following settings:
 
 ```
 [logs]
-	# logs to trigger flood protection = 600
-	# logs flood protection period = 3600
+	# logs to trigger flood protection = 1000
+	# logs flood protection period = 60
 	# facility = daemon
 	# level = info
 	# daemon = journal
