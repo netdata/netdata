@@ -3,7 +3,7 @@
 
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2023 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Script to find a better name for cgroups
@@ -80,7 +80,7 @@ log() {
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
-THREAD_TAG="cgroup-name"
+THREAD_TAG=cgroup-name
 ND_LOG_SOURCE=collector
 ND_REQUEST=${cmd_line}
 MESSAGE=${*//\\n/--NEWLINE--}
