@@ -83,6 +83,7 @@ int journal_file_dict_items_backward_compar(const void *a, const void *b);
 int journal_file_dict_items_forward_compar(const void *a, const void *b);
 void buffer_json_journal_versions(BUFFER *wb);
 void available_journal_file_sources_to_json_array(BUFFER *wb);
+bool journal_files_completed_once(void);
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 

@@ -391,6 +391,11 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
     closedir(dir);
 }
 
+static size_t journal_files_scans = 0;
+bool journal_files_completed_once(void) {
+    return journal_files_scans > 0;
+}
+
 void journal_files_registry_update(void) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
@@ -411,6 +416,7 @@ void journal_files_registry_update(void) {
                 }
         dfe_done(jf);
 
+        journal_files_scans++;
         spinlock_unlock(&spinlock);
     }
 }

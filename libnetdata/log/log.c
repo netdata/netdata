@@ -221,7 +221,7 @@ int nd_log_priority2id(const char *priority) {
     return NDLP_INFO;
 }
 
-static const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
+const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
     size_t entries = sizeof(nd_log_priorities) / sizeof(nd_log_priorities[0]);
     for(size_t i = 0; i < entries ;i++) {
         if(priority == nd_log_priorities[i].priority)

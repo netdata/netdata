@@ -212,10 +212,17 @@ typedef struct function_query_status {
     const char *histogram;
 
     struct {
+        usec_t start_ut;     // the starting time of the query - we start from this
+        usec_t stop_ut;      // the ending time of the query - we stop at this
+        usec_t first_msg_ut;
+    } query_file;
+
+    struct {
         uint32_t enable_after_samples;
         uint32_t slots;
         uint32_t sampled;
         uint32_t unsampled;
+        uint32_t estimated;
     } samples;
 
     struct {
@@ -225,6 +232,7 @@ typedef struct function_query_status {
         uint32_t recalibrate;
         uint32_t sampled;
         uint32_t unsampled;
+        uint32_t estimated;
     } samples_per_file;
 
     struct {
@@ -328,10 +336,14 @@ static void sampling_query_init(FUNCTION_QUERY_STATUS *fqs, FACETS *facets) {
     // the minimum number of rows to enable sampling
     fqs->samples.enable_after_samples = fqs->sampling / 2;
 
+    size_t files_matched = fqs->files_matched;
+    if(!files_matched)
+        files_matched = 1;
+
     // the minimum number of rows per file to enable sampling
-    fqs->samples_per_file.enable_after_samples = (fqs->sampling / 4) / fqs->files_matched;
-    if(fqs->samples_per_file.enable_after_samples < fqs->entries * 2)
-        fqs->samples_per_file.enable_after_samples = fqs->entries * 2;
+    fqs->samples_per_file.enable_after_samples = (fqs->sampling / 4) / files_matched;
+    if(fqs->samples_per_file.enable_after_samples < fqs->entries)
+        fqs->samples_per_file.enable_after_samples = fqs->entries;
 
     // the minimum number of rows per time slot to enable sampling
     fqs->samples_per_time_slot.enable_after_samples = (fqs->sampling / 4) / fqs->samples.slots;
@@ -342,57 +354,156 @@ static void sampling_query_init(FUNCTION_QUERY_STATUS *fqs, FACETS *facets) {
 static void sampling_file_init(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf __maybe_unused) {
     fqs->samples_per_file.sampled = 0;
     fqs->samples_per_file.unsampled = 0;
+    fqs->samples_per_file.estimated = 0;
     fqs->samples_per_file.every = 0;
     fqs->samples_per_file.skipped = 0;
     fqs->samples_per_file.recalibrate = 0;
 }
 
-static void sampling_decide_file_sampling_every(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
+static size_t sampling_file_lines_scanned(FUNCTION_QUERY_STATUS *fqs) {
     size_t sampled = fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled;
+    if(!sampled) sampled = 1;
+    return sampled;
+}
 
-    if(!sampled)
-        sampled = 1;
+static double sampling_file_query_overlapping_timeframe_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
+        usec_t msg_ut, usec_t *after_ut, usec_t *before_ut) {
+    // find the overlap of the query and file timeframes
+    // taking into account the first message we encountered
 
-    // find the common duration
-    usec_t after_ut = fqs->samples_per_time_slot.start_ut < jf->msg_first_ut ? jf->msg_first_ut : fqs->samples_per_time_slot.start_ut;
-    usec_t before_ut = fqs->samples_per_time_slot.end_ut > jf->msg_last_ut ? jf->msg_last_ut : fqs->samples_per_time_slot.end_ut;
+    double progress;
+    usec_t oldest_ut, newest_ut, elapsed_ut;
+    if(direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
+        // the first message we know (oldest)
+        oldest_ut = fqs->query_file.first_msg_ut ? fqs->query_file.first_msg_ut : jf->msg_first_ut;
+        if(!oldest_ut) oldest_ut = fqs->query_file.start_ut;
 
-    if(after_ut > before_ut) {
-        usec_t t = after_ut;
-        after_ut = before_ut;
-        before_ut = t;
+        if(jf->msg_last_ut)
+            newest_ut = MIN(fqs->query_file.stop_ut, jf->msg_last_ut);
+        else if(jf->file_last_modified_ut)
+            newest_ut = MIN(fqs->query_file.stop_ut, jf->file_last_modified_ut);
+        else
+            newest_ut = fqs->query_file.stop_ut;
+
+        if(msg_ut < oldest_ut)
+            oldest_ut = msg_ut - 1;
+
+        elapsed_ut = msg_ut - oldest_ut;
+    }
+    else /* BACKWARD */ {
+        // the latest message we know (newest)
+        newest_ut = fqs->query_file.first_msg_ut ? fqs->query_file.first_msg_ut : jf->msg_last_ut;
+        if(!newest_ut) newest_ut = fqs->query_file.start_ut;
+
+        if(jf->msg_first_ut)
+            oldest_ut = MAX(fqs->query_file.stop_ut, jf->msg_first_ut);
+        else
+            oldest_ut = fqs->query_file.stop_ut;
+
+        if(newest_ut < msg_ut)
+            newest_ut = msg_ut + 1;
+
+        elapsed_ut = newest_ut - msg_ut;
     }
 
-    if(after_ut == before_ut)
-        after_ut = before_ut - 1;
+    usec_t total_ut = newest_ut - oldest_ut;
+    progress = (double)elapsed_ut / (double)total_ut;
 
+    *after_ut = oldest_ut;
+    *before_ut = newest_ut;
+
+    return progress;
+}
+
+static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
+    usec_t msg_ut, usec_t *total_time_ut, usec_t *remaining_start_ut, usec_t *remaining_end_ut) {
+
+    usec_t after_ut, before_ut;
+    sampling_file_query_overlapping_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
+
+    // since we have a timestamp in msg_ut
+    // this timestamp can extend the overlap
     if(msg_ut <= after_ut)
-        msg_ut = after_ut + 1;
+        after_ut = msg_ut - 1;
 
     if(msg_ut >= before_ut)
-        msg_ut = before_ut - 1;
+        before_ut = msg_ut + 1;
 
-    size_t expected_lines;
+    // return the remaining duration
+    usec_t remaining_from_ut, remaining_to_ut;
+    if(direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
+        remaining_from_ut = msg_ut;
+        remaining_to_ut = before_ut;
+    }
+    else {
+        remaining_from_ut = after_ut;
+        remaining_to_ut = msg_ut;
+    }
 
-    if(direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-        expected_lines = sampled * (before_ut - after_ut) / (msg_ut - after_ut);
-    else
-        expected_lines = sampled * (before_ut - after_ut) / (before_ut - msg_ut);
+    usec_t remaining_ut = remaining_to_ut - remaining_from_ut;
 
-    if(expected_lines < 1)
+    if(total_time_ut)
+        *total_time_ut = (before_ut > after_ut) ? before_ut - after_ut : 1;
+
+    if(remaining_start_ut)
+        *remaining_start_ut = remaining_from_ut;
+
+    if(remaining_end_ut)
+        *remaining_end_ut = remaining_to_ut;
+
+    return remaining_ut;
+}
+
+static size_t sampling_file_estimate_remaining_lines(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
+    size_t scanned_lines = sampling_file_lines_scanned(fqs);
+
+    usec_t total_time_ut;
+    usec_t remaining_time_ut = sampling_file_remaining_time_ut(fqs, jf, direction, msg_ut, &total_time_ut, NULL, NULL);
+
+    if (total_time_ut == 0)
+        total_time_ut = 1;
+
+    // Calculate the proportion of time covered
+    double time_proportion = (double)(total_time_ut - remaining_time_ut) / (double)total_time_ut;
+
+    if (time_proportion == 0 || !isfinite(time_proportion))
+        time_proportion = 1.0;
+
+    // Estimate the total number of lines in the file
+    size_t total_lines_estimated = (size_t)((double)scanned_lines / time_proportion);
+
+    // Calculate the estimated number of remaining lines
+    size_t expected_lines = total_lines_estimated - scanned_lines;
+
+    if (expected_lines < 1)
         expected_lines = 1;
 
-    size_t wanted_samples = (fqs->sampling / 2) / fqs->files_matched;
+    return expected_lines;
+}
 
-    fqs->samples_per_file.every = expected_lines / wanted_samples;
+static void sampling_decide_file_sampling_every(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
+    size_t files_matched = fqs->files_matched;
+    if(!files_matched) files_matched = 1;
+
+    size_t remaining_lines = sampling_file_estimate_remaining_lines(fqs, jf, direction, msg_ut);
+    size_t wanted_samples = (fqs->sampling / 2) / files_matched;
+    if(!wanted_samples) wanted_samples = 1;
+
+    fqs->samples_per_file.every = remaining_lines / wanted_samples;
 
     if(fqs->samples_per_file.every < 1)
         fqs->samples_per_file.every = 1;
 }
 
-static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
-    if(!fqs->sampling)
-        return true;
+typedef enum {
+    SAMPLING_STOP_AND_ESTIMATE = -1,
+    SAMPLING_FULL = 0,
+    SAMPLING_SKIP_FIELDS = 1,
+} sampling_t;
+
+static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
+    if(!fqs->sampling || candidate_to_keep)
+        return SAMPLING_FULL;
 
     if(unlikely(msg_ut < fqs->samples_per_time_slot.start_ut))
         msg_ut = fqs->samples_per_time_slot.start_ut;
@@ -403,7 +514,7 @@ static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_f
     if(slot >= fqs->samples.slots)
         slot = fqs->samples.slots - 1;
 
-    bool should_sample = candidate_to_keep;
+    bool should_sample = false;
 
     if(fqs->samples.sampled < fqs->samples.enable_after_samples ||
         fqs->samples_per_file.sampled < fqs->samples_per_file.enable_after_samples ||
@@ -426,20 +537,40 @@ static inline bool is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_f
             fqs->samples_per_file.skipped++;
     }
 
-    fqs->samples_per_file.recalibrate++;
-
     if(should_sample) {
         fqs->samples.sampled++;
         fqs->samples_per_file.sampled++;
         fqs->samples_per_time_slot.sampled[slot]++;
-    }
-    else {
-        fqs->samples.unsampled++;
-        fqs->samples_per_file.unsampled++;
-        fqs->samples_per_time_slot.unsampled[slot]++;
+
+        return SAMPLING_FULL;
     }
 
-    return should_sample;
+    fqs->samples_per_file.recalibrate++;
+
+    fqs->samples.unsampled++;
+    fqs->samples_per_file.unsampled++;
+    fqs->samples_per_time_slot.unsampled[slot]++;
+
+    if(fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
+        usec_t after_ut, before_ut;
+
+        double progress = sampling_file_query_overlapping_timeframe_ut(
+                fqs, jf, direction, msg_ut, &after_ut, &before_ut);
+
+        if(progress > 0.01)
+            return SAMPLING_STOP_AND_ESTIMATE;
+    }
+
+    return SAMPLING_SKIP_FIELDS;
+}
+
+static void sampling_update_file_estimates(FACETS *facets, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction) {
+    usec_t total_time_ut, remaining_start_ut, remaining_end_ut;
+    sampling_file_remaining_time_ut(fqs, jf, direction, msg_ut, &total_time_ut, &remaining_start_ut, &remaining_end_ut);
+    size_t remaining_lines = sampling_file_estimate_remaining_lines(fqs, jf, direction, msg_ut);
+    facets_update_estimations(facets, remaining_start_ut, remaining_end_ut, remaining_lines);
+    fqs->samples.estimated += remaining_lines;
+    fqs->samples_per_file.estimated += remaining_lines;
 }
 
 // ----------------------------------------------------------------------------
@@ -539,11 +670,15 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     usec_t stop_ut = (fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->after_ut;
     bool stop_when_full = (fqs->data_only && !fqs->anchor.stop_ut);
 
+    fqs->query_file.start_ut = start_ut;
+    fqs->query_file.stop_ut = stop_ut;
+
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
-    usec_t earliest_msg_ut = 0;
+    usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
+    usec_t first_msg_ut = 0; // the first message we got from the db
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
@@ -560,20 +695,25 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
             continue;
         }
 
-        if(unlikely(msg_ut > earliest_msg_ut))
-            earliest_msg_ut = msg_ut;
-
         if (unlikely(msg_ut > start_ut))
             continue;
 
         if (unlikely(msg_ut < stop_ut))
             break;
 
-        bool to_sample = is_row_in_sample(fqs, jf, msg_ut,
+        if(unlikely(msg_ut > latest_msg_ut))
+            latest_msg_ut = msg_ut;
+
+        if(unlikely(!first_msg_ut)) {
+            first_msg_ut = msg_ut;
+            fqs->query_file.first_msg_ut = msg_ut;
+        }
+
+        sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_BACKWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
-        if(to_sample) {
+        if(sample == SAMPLING_FULL) {
             bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
             // make sure each line gets a unique timestamp
@@ -605,8 +745,12 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
                 status = check_stop(fqs->cancelled, &fqs->stop_monotonic_ut);
             }
         }
-        else
+        else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
+        else {
+            sampling_update_file_estimates(facets, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_BACKWARD);
+            break;
+        }
     }
 
     FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
@@ -617,8 +761,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
-    if(earliest_msg_ut > fqs->last_modified)
-        fqs->last_modified = earliest_msg_ut;
+    if(latest_msg_ut > fqs->last_modified)
+        fqs->last_modified = latest_msg_ut;
 
     return status;
 }
@@ -633,11 +777,15 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     usec_t stop_ut = ((fqs->data_only && fqs->anchor.stop_ut) ? fqs->anchor.stop_ut : fqs->before_ut) + anchor_delta;
     bool stop_when_full = (fqs->data_only && !fqs->anchor.stop_ut);
 
+    fqs->query_file.start_ut = start_ut;
+    fqs->query_file.stop_ut = stop_ut;
+
     if(!netdata_systemd_journal_seek_to(j, start_ut))
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
-    usec_t earliest_msg_ut = 0;
+    usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
+    usec_t first_msg_ut = 0; // the first message we got from the db
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
@@ -654,20 +802,25 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
             continue;
         }
 
-        if(likely(msg_ut > earliest_msg_ut))
-            earliest_msg_ut = msg_ut;
-
         if (unlikely(msg_ut < start_ut))
             continue;
 
         if (unlikely(msg_ut > stop_ut))
             break;
 
-        bool to_sample = is_row_in_sample(fqs, jf, msg_ut,
+        if(likely(msg_ut > latest_msg_ut))
+            latest_msg_ut = msg_ut;
+
+        if(unlikely(!first_msg_ut)) {
+            first_msg_ut = msg_ut;
+            fqs->query_file.first_msg_ut = msg_ut;
+        }
+
+        sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_FORWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
-        if(to_sample) {
+        if(sample == SAMPLING_FULL) {
             bytes += netdata_systemd_journal_process_row(j, facets, jf, &msg_ut);
 
             // make sure each line gets a unique timestamp
@@ -699,8 +852,12 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
                 status = check_stop(fqs->cancelled, &fqs->stop_monotonic_ut);
             }
         }
-        else
+        else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
+        else {
+            sampling_update_file_estimates(facets, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_FORWARD);
+            break;
+        }
     }
 
     FUNCTION_PROGRESS_UPDATE_ROWS(fqs->rows_read, row_counter - last_row_counter);
@@ -711,8 +868,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
-    if(earliest_msg_ut > fqs->last_modified)
-        fqs->last_modified = earliest_msg_ut;
+    if(latest_msg_ut > fqs->last_modified)
+        fqs->last_modified = latest_msg_ut;
 
     return status;
 }
@@ -919,8 +1076,10 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     }
 
     bool partial = false;
-    usec_t started_ut;
-    usec_t ended_ut = now_monotonic_usec();
+    usec_t query_started_ut = now_monotonic_usec();
+    usec_t started_ut = query_started_ut;
+    usec_t ended_ut = started_ut;
+    usec_t duration_ut = 0, max_duration_ut = 0;
 
     sampling_query_init(fqs, facets);
 
@@ -931,6 +1090,17 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
         if(!jf_is_mine(jf, fqs))
             continue;
+
+        started_ut = ended_ut;
+
+        // do not even try to do the query if we expect it to pass the timeout
+        if(ended_ut > (query_started_ut + (fqs->stop_monotonic_ut - query_started_ut) * 3 / 4) &&
+            ended_ut + max_duration_ut * 2 >= fqs->stop_monotonic_ut) {
+
+            partial = true;
+            status = ND_SD_JOURNAL_TIMED_OUT;
+            break;
+        }
 
         fqs->file_working++;
         // fqs->cached_count = 0;
@@ -953,9 +1123,11 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         fs_calls = fstat_thread_calls - fs_calls;
         fs_cached = fstat_thread_cached_responses - fs_cached;
 
-        started_ut = ended_ut;
         ended_ut = now_monotonic_usec();
-        usec_t duration_ut = ended_ut - started_ut;
+        duration_ut = ended_ut - started_ut;
+
+        if(duration_ut > max_duration_ut)
+            max_duration_ut = duration_ut;
 
         buffer_json_add_array_item_object(wb); // journal file
         {
@@ -984,6 +1156,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
                 {
                     buffer_json_member_add_uint64(wb, "sampled", fqs->samples_per_file.sampled);
                     buffer_json_member_add_uint64(wb, "unsampled", fqs->samples_per_file.unsampled);
+                    buffer_json_member_add_uint64(wb, "estimated", fqs->samples_per_file.estimated);
                 }
                 buffer_json_object_close(wb); // _sampling
             }
@@ -1056,6 +1229,64 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     buffer_json_member_add_boolean(wb, "partial", partial);
     buffer_json_member_add_string(wb, "type", "table");
 
+    // build a message for the query
+    if(!fqs->data_only) {
+        CLEAN_BUFFER *msg = buffer_create(0, NULL);
+        CLEAN_BUFFER *msg_description = buffer_create(0, NULL);
+        ND_LOG_FIELD_PRIORITY msg_priority = NDLP_INFO;
+
+        if(!journal_files_completed_once()) {
+            buffer_strcat(msg, "Journals are still being scanned. ");
+            buffer_strcat(msg_description
+                          , "LIBRARY SCAN: The journal files are still being scanned, you are probably viewing incomplete data. ");
+            msg_priority = NDLP_WARNING;
+        }
+
+        if(partial) {
+            buffer_strcat(msg, "Query timed-out, incomplete data. ");
+            buffer_strcat(msg_description
+                          , "QUERY TIMEOUT: The query timed out and may not include all the data of the selected window. ");
+            msg_priority = NDLP_WARNING;
+        }
+
+        if(fqs->samples.estimated || fqs->samples.unsampled) {
+            double percent = (double) (fqs->samples.sampled * 100.0 /
+                                       (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
+            buffer_sprintf(msg, "%.2f%% real data", percent);
+            buffer_sprintf(msg_description, "ACTUAL DATA: The filters counters reflect %0.2f%% of the data. ", percent);
+            msg_priority = MIN(msg_priority, NDLP_NOTICE);
+        }
+
+        if(fqs->samples.unsampled) {
+            double percent = (double) (fqs->samples.unsampled * 100.0 /
+                                       (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
+            buffer_sprintf(msg, ", %.2f%% unsampled", percent);
+            buffer_sprintf(msg_description
+                           , "UNSAMPLED DATA: %0.2f%% of the events exist and have been counted, but their values have not been evaluated, so they are not included in the filters counters. "
+                           , percent);
+            msg_priority = MIN(msg_priority, NDLP_NOTICE);
+        }
+
+        if(fqs->samples.estimated) {
+            double percent = (double) (fqs->samples.estimated * 100.0 /
+                                       (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
+            buffer_sprintf(msg, ", %.2f%% estimated", percent);
+            buffer_sprintf(msg_description
+                           , "ESTIMATED DATA: The query selected a large amount of data, so to avoid delaying too much, the presented data are estimated by %0.2f%%. "
+                           , percent);
+            msg_priority = MIN(msg_priority, NDLP_NOTICE);
+        }
+
+        buffer_json_member_add_object(wb, "message");
+        if(buffer_tostring(msg)) {
+            buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
+            buffer_json_member_add_string(wb, "description", buffer_tostring(msg_description));
+            buffer_json_member_add_string(wb, "status", nd_log_id2priority(msg_priority));
+        }
+        // else send an empty object if there is nothing to tell
+        buffer_json_object_close(wb); // message
+    }
+
     if(!fqs->data_only) {
         buffer_json_member_add_time_t(wb, "update_every", 1);
         buffer_json_member_add_string(wb, "help", SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
@@ -1081,6 +1312,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         {
             buffer_json_member_add_uint64(wb, "sampled", fqs->samples.sampled);
             buffer_json_member_add_uint64(wb, "unsampled", fqs->samples.unsampled);
+            buffer_json_member_add_uint64(wb, "estimated", fqs->samples.estimated);
         }
         buffer_json_object_close(wb); // _sampling
     }
