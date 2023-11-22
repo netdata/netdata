@@ -142,10 +142,10 @@ static cmd_status_t cmd_reload_health_execute(char *args, char **message)
     (void)args;
     (void)message;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     netdata_log_info("COMMAND: Reloading HEALTH configuration.");
     health_reload();
-    error_log_limit_reset();
+    nd_log_limits_reset();
 
     return CMD_STATUS_SUCCESS;
 }
@@ -155,11 +155,11 @@ static cmd_status_t cmd_save_database_execute(char *args, char **message)
     (void)args;
     (void)message;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     netdata_log_info("COMMAND: Saving databases.");
     rrdhost_save_all();
     netdata_log_info("COMMAND: Databases saved.");
-    error_log_limit_reset();
+    nd_log_limits_reset();
 
     return CMD_STATUS_SUCCESS;
 }
@@ -169,10 +169,9 @@ static cmd_status_t cmd_reopen_logs_execute(char *args, char **message)
     (void)args;
     (void)message;
 
-    error_log_limit_unlimited();
-    netdata_log_info("COMMAND: Reopening all log files.");
-    reopen_all_log_files();
-    error_log_limit_reset();
+    nd_log_limits_unlimited();
+    nd_log_reopen_log_files();
+    nd_log_limits_reset();
 
     return CMD_STATUS_SUCCESS;
 }
@@ -182,7 +181,7 @@ static cmd_status_t cmd_exit_execute(char *args, char **message)
     (void)args;
     (void)message;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     netdata_log_info("COMMAND: Cleaning up to exit.");
     netdata_cleanup_and_exit(0);
     exit(0);

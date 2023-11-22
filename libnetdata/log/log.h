@@ -9,6 +9,181 @@ extern "C" {
 
 #include "../libnetdata.h"
 
+#define ND_LOG_DEFAULT_THROTTLE_LOGS 1200
+#define ND_LOG_DEFAULT_THROTTLE_PERIOD 3600
+
+typedef enum  __attribute__((__packed__)) {
+    NDLS_UNSET = 0,   // internal use only
+    NDLS_ACCESS,      // access.log
+    NDLS_ACLK,        // aclk.log
+    NDLS_COLLECTORS,  // collectors.log
+    NDLS_DAEMON,      // error.log
+    NDLS_HEALTH,      // health.log
+    NDLS_DEBUG,       // debug.log
+
+    // terminator
+    _NDLS_MAX,
+} ND_LOG_SOURCES;
+
+typedef enum __attribute__((__packed__)) {
+    NDLP_EMERG      = LOG_EMERG,
+    NDLP_ALERT      = LOG_ALERT,
+    NDLP_CRIT       = LOG_CRIT,
+    NDLP_ERR        = LOG_ERR,
+    NDLP_WARNING    = LOG_WARNING,
+    NDLP_NOTICE     = LOG_NOTICE,
+    NDLP_INFO       = LOG_INFO,
+    NDLP_DEBUG      = LOG_DEBUG,
+} ND_LOG_FIELD_PRIORITY;
+
+typedef enum __attribute__((__packed__)) {
+    // KEEP THESE IN THE SAME ORDER AS in thread_log_fields (log.c)
+    // so that it easy to audit for missing fields
+
+    NDF_STOP = 0,
+    NDF_TIMESTAMP_REALTIME_USEC,                // the timestamp of the log message - added automatically
+    NDF_SYSLOG_IDENTIFIER,                      // the syslog identifier of the application - added automatically
+    NDF_LOG_SOURCE,                             // DAEMON, COLLECTORS, HEALTH, ACCESS, ACLK - set at the log call
+    NDF_PRIORITY,                               // the syslog priority (severity) - set at the log call
+    NDF_ERRNO,                                  // the ERRNO at the time of the log call - added automatically
+    NDF_INVOCATION_ID,                          // the INVOCATION_ID of Netdata - added automatically
+    NDF_LINE,                                   // the source code file line number - added automatically
+    NDF_FILE,                                   // the source code filename - added automatically
+    NDF_FUNC,                                   // the source code function - added automatically
+    NDF_TID,                                    // the thread ID of the thread logging - added automatically
+    NDF_THREAD_TAG,                             // the thread tag of the thread logging - added automatically
+    NDF_MESSAGE_ID,                             // for specific events
+    NDF_MODULE,                                 // for internal plugin module, all other get the NDF_THREAD_TAG
+
+    NDF_NIDL_NODE,                              // the node / rrdhost currently being worked
+    NDF_NIDL_INSTANCE,                          // the instance / rrdset currently being worked
+    NDF_NIDL_CONTEXT,                           // the context of the instance currently being worked
+    NDF_NIDL_DIMENSION,                         // the dimension / rrddim currently being worked
+
+    // web server, aclk and stream receiver
+    NDF_SRC_TRANSPORT,                          // the transport we received the request, one of: http, https, pluginsd
+
+    // web server and stream receiver
+    NDF_SRC_IP,                                 // the streaming / web server source IP
+    NDF_SRC_PORT,                               // the streaming / web server source Port
+    NDF_SRC_CAPABILITIES,                       // the stream receiver capabilities
+
+    // stream sender (established links)
+    NDF_DST_TRANSPORT,                          // the transport we send the request, one of: http, https
+    NDF_DST_IP,                                 // the destination streaming IP
+    NDF_DST_PORT,                               // the destination streaming Port
+    NDF_DST_CAPABILITIES,                       // the destination streaming capabilities
+
+    // web server, aclk and stream receiver
+    NDF_REQUEST_METHOD,                         // for http like requests, the http request method
+    NDF_RESPONSE_CODE,                          // for http like requests, the http response code, otherwise a status string
+
+    // web server (all), aclk (queries)
+    NDF_CONNECTION_ID,                          // the web server connection ID
+    NDF_TRANSACTION_ID,                         // the web server and API transaction ID
+    NDF_RESPONSE_SENT_BYTES,                    // for http like requests, the response bytes
+    NDF_RESPONSE_SIZE_BYTES,                    // for http like requests, the uncompressed response size
+    NDF_RESPONSE_PREPARATION_TIME_USEC,         // for http like requests, the preparation time
+    NDF_RESPONSE_SENT_TIME_USEC,                // for http like requests, the time to send the response back
+    NDF_RESPONSE_TOTAL_TIME_USEC,               // for http like requests, the total time to complete the response
+
+    // health alerts
+    NDF_ALERT_ID,
+    NDF_ALERT_UNIQUE_ID,
+    NDF_ALERT_EVENT_ID,
+    NDF_ALERT_TRANSITION_ID,
+    NDF_ALERT_CONFIG_HASH,
+    NDF_ALERT_NAME,
+    NDF_ALERT_CLASS,
+    NDF_ALERT_COMPONENT,
+    NDF_ALERT_TYPE,
+    NDF_ALERT_EXEC,
+    NDF_ALERT_RECIPIENT,
+    NDF_ALERT_DURATION,
+    NDF_ALERT_VALUE,
+    NDF_ALERT_VALUE_OLD,
+    NDF_ALERT_STATUS,
+    NDF_ALERT_STATUS_OLD,
+    NDF_ALERT_SOURCE,
+    NDF_ALERT_UNITS,
+    NDF_ALERT_SUMMARY,
+    NDF_ALERT_INFO,
+    NDF_ALERT_NOTIFICATION_REALTIME_USEC,
+    // NDF_ALERT_FLAGS,
+
+    // put new items here
+    // leave the request URL and the message last
+
+    NDF_REQUEST,                                // the request we are currently working on
+    NDF_MESSAGE,                                // the log message, if any
+
+    // terminator
+    _NDF_MAX,
+} ND_LOG_FIELD_ID;
+
+typedef enum __attribute__((__packed__)) {
+    NDFT_UNSET = 0,
+    NDFT_TXT,
+    NDFT_STR,
+    NDFT_BFR,
+    NDFT_U64,
+    NDFT_I64,
+    NDFT_DBL,
+    NDFT_UUID,
+    NDFT_CALLBACK,
+} ND_LOG_STACK_FIELD_TYPE;
+
+void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
+void nd_log_set_facility(const char *facility);
+void nd_log_set_priority_level(const char *setting);
+void nd_log_initialize(void);
+void nd_log_reopen_log_files(void);
+void chown_open_file(int fd, uid_t uid, gid_t gid);
+void nd_log_chown_log_files(uid_t uid, gid_t gid);
+void nd_log_set_flood_protection(size_t logs, time_t period);
+void nd_log_initialize_for_external_plugins(const char *name);
+void nd_log_set_thread_source(ND_LOG_SOURCES source);
+bool nd_log_journal_socket_available(void);
+ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
+int nd_log_priority2id(const char *priority);
+
+typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
+
+struct log_stack_entry {
+    ND_LOG_FIELD_ID id;
+    ND_LOG_STACK_FIELD_TYPE type;
+    bool set;
+    union {
+        const char *txt;
+        struct netdata_string *str;
+        BUFFER *bfr;
+        uint64_t u64;
+        int64_t i64;
+        double dbl;
+        const uuid_t *uuid;
+        struct {
+            log_formatter_callback_t formatter;
+            void *formatter_data;
+        } cb;
+    };
+};
+
+#define ND_LOG_STACK _cleanup_(log_stack_pop) struct log_stack_entry
+#define ND_LOG_STACK_PUSH(lgs) log_stack_push(lgs)
+
+#define ND_LOG_FIELD_TXT(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_TXT, .txt = (value), .set = true, }
+#define ND_LOG_FIELD_STR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_STR, .str = (value), .set = true, }
+#define ND_LOG_FIELD_BFR(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_BFR, .bfr = (value), .set = true, }
+#define ND_LOG_FIELD_U64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_U64, .u64 = (value), .set = true, }
+#define ND_LOG_FIELD_I64(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_I64, .i64 = (value), .set = true, }
+#define ND_LOG_FIELD_DBL(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_DBL, .dbl = (value), .set = true, }
+#define ND_LOG_FIELD_CB(field, func, data) (struct log_stack_entry){ .id = (field), .type = NDFT_CALLBACK, .cb = { .formatter = (func), .formatter_data = (data) }, .set = true, }
+#define ND_LOG_FIELD_UUID(field, value) (struct log_stack_entry){ .id = (field), .type = NDFT_UUID, .uuid = (value), .set = true, }
+#define ND_LOG_FIELD_END() (struct log_stack_entry){ .id = NDF_STOP, .type = NDFT_UNSET, .set = false, }
+
+void log_stack_pop(void *ptr);
+void log_stack_push(struct log_stack_entry *lgs);
+
 #define D_WEB_BUFFER        0x0000000000000001
 #define D_WEB_CLIENT        0x0000000000000002
 #define D_LISTENER          0x0000000000000004
@@ -46,114 +221,75 @@ extern "C" {
 #define D_REPLICATION       0x0000002000000000
 #define D_SYSTEM            0x8000000000000000
 
-extern int web_server_is_multithreaded;
-
 extern uint64_t debug_flags;
 
 extern const char *program_name;
 
-extern int stdaccess_fd;
-extern FILE *stdaccess;
-
-extern int stdhealth_fd;
-extern FILE *stdhealth;
-
-extern int stdcollector_fd;
-extern FILE *stderror;
-
-extern const char *stdaccess_filename;
-extern const char *stderr_filename;
-extern const char *stdout_filename;
-extern const char *stdhealth_filename;
-extern const char *stdcollector_filename;
-extern const char *facility_log;
-
 #ifdef ENABLE_ACLK
-extern const char *aclklog_filename;
-extern int aclklog_fd;
-extern FILE *aclklog;
 extern int aclklog_enabled;
 #endif
-
-extern int access_log_syslog;
-extern int error_log_syslog;
-extern int output_log_syslog;
-extern int health_log_syslog;
-
-extern time_t error_log_throttle_period;
-extern unsigned long error_log_errors_per_period, error_log_errors_per_period_backup;
-int error_log_limit(int reset);
-
-void open_all_log_files();
-void reopen_all_log_files();
 
 #define LOG_DATE_LENGTH 26
 void log_date(char *buffer, size_t len, time_t now);
 
 static inline void debug_dummy(void) {}
 
-void error_log_limit_reset(void);
-void error_log_limit_unlimited(void);
+void nd_log_limits_reset(void);
+void nd_log_limits_unlimited(void);
 
-typedef struct error_with_limit {
-    time_t log_every;
-    size_t count;
-    time_t last_logged;
-    usec_t sleep_ut;
-} ERROR_LIMIT;
-
-typedef enum netdata_log_level {
-    NETDATA_LOG_LEVEL_ERROR,
-    NETDATA_LOG_LEVEL_INFO,
-
-    NETDATA_LOG_LEVEL_END
-} netdata_log_level_t;
-
-#define NETDATA_LOG_LEVEL_INFO_STR "info"
-#define NETDATA_LOG_LEVEL_ERROR_STR "error"
-#define NETDATA_LOG_LEVEL_ERROR_SHORT_STR "err"
-
-extern netdata_log_level_t global_log_severity_level;
-netdata_log_level_t log_severity_string_to_severity_level(char *level);
-char *log_severity_level_to_severity_string(netdata_log_level_t level);
-void log_set_global_severity_level(netdata_log_level_t value);
-void log_set_global_severity_for_external_plugins();
-
-#define error_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
-#define error_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
+#define NDLP_INFO_STR "info"
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
-#define internal_error(condition, args...) do { if(unlikely(condition)) error_int(0, "IERR", __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
-#define internal_fatal(condition, args...) do { if(unlikely(condition)) fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define netdata_log_debug(type, args...) do { if(unlikely(debug_flags & type)) netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define internal_error(condition, args...) do { if(unlikely(condition)) netdata_logger(NDLS_DAEMON, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#define internal_fatal(condition, args...) do { if(unlikely(condition)) netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
 #else
 #define netdata_log_debug(type, args...) debug_dummy()
 #define internal_error(args...) debug_dummy()
 #define internal_fatal(args...) debug_dummy()
 #endif
 
-#define netdata_log_info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
-#define collector_info(args...)    info_int(1, __FILE__, __FUNCTION__, __LINE__, ##args)
-#define infoerr(args...) error_int(0, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
-#define netdata_log_error(args...)   error_int(0, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
-#define collector_infoerr(args...) error_int(1, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
-#define collector_error(args...)   error_int(1, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
-#define error_limit(erl, args...)   error_limit_int(erl, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
-#define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
-#define fatal_assert(expr) ((expr) ? (void)(0) : fatal_int(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
+#define fatal(args...)   netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, ##args)
+#define fatal_assert(expr) ((expr) ? (void)(0) : netdata_logger_fatal(__FILE__, __FUNCTION__, __LINE__, "Assertion `%s' failed", #expr))
+
+// ----------------------------------------------------------------------------
+// normal logging
+
+void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);
+#define nd_log(NDLS, NDLP, args...) netdata_logger(NDLS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
+#define nd_log_daemon(NDLP, args...) netdata_logger(NDLS_DAEMON, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
+#define nd_log_collector(NDLP, args...) netdata_logger(NDLS_COLLECTORS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
+
+#define netdata_log_info(args...)   netdata_logger(NDLS_DAEMON,     NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
+#define netdata_log_error(args...)  netdata_logger(NDLS_DAEMON,     NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
+#define collector_info(args...)     netdata_logger(NDLS_COLLECTORS, NDLP_INFO,  __FILE__, __FUNCTION__, __LINE__, ##args)
+#define collector_error(args...)    netdata_logger(NDLS_COLLECTORS, NDLP_ERR,   __FILE__, __FUNCTION__, __LINE__, ##args)
+
+#define log_aclk_message_bin(__data, __data_len, __tx, __mqtt_topic, __message_name) \
+    nd_log(NDLS_ACLK, NDLP_INFO, \
+        "direction:%s message:'%s' topic:'%s' json:'%.*s'", \
+        (__tx) ? "OUTGOING" : "INCOMING", __message_name, __mqtt_topic, (int)(__data_len), __data)
+
+// ----------------------------------------------------------------------------
+// logging with limits
+
+typedef struct error_with_limit {
+    SPINLOCK spinlock;
+    time_t log_every;
+    size_t count;
+    time_t last_logged;
+    usec_t sleep_ut;
+} ERROR_LIMIT;
+
+#define nd_log_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
+#define nd_log_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
+void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(7, 8);;
+#define nd_log_limit(erl, NDLS, NDLP, args...)   netdata_logger_with_limit(erl, NDLS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
+
+// ----------------------------------------------------------------------------
 
 void send_statistics(const char *action, const char *action_result, const char *action_data);
-void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
-void info_int( int is_collector, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
-void error_int( int is_collector, const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);
-void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, unsigned long line __maybe_unused, const char *fmt, ... ) PRINTFLIKE(6, 7);;
-void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
-void netdata_log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
-void netdata_log_health( const char *fmt, ... ) PRINTFLIKE(1, 2);
-
-#ifdef ENABLE_ACLK
-void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name);
-#endif
+void netdata_logger_fatal( const char *file, const char *function, unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 
 # ifdef __cplusplus
 }

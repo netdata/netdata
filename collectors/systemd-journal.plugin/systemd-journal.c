@@ -165,6 +165,18 @@
     "|IMAGE_NAME" /* undocumented */            \
     /* "|CONTAINER_PARTIAL_MESSAGE" */          \
                                                 \
+                                                \
+    /* --- NETDATA --- */                       \
+                                                \
+    "|ND_NIDL_NODE"                             \
+    "|ND_NIDL_CONTEXT"                          \
+    "|ND_LOG_SOURCE"                            \
+    /*"|ND_MODULE" */                           \
+    "|ND_ALERT_NAME"                            \
+    "|ND_ALERT_CLASS"                           \
+    "|ND_ALERT_COMPONENT"                       \
+    "|ND_ALERT_TYPE"                            \
+                                                \
     ""
 
 // ----------------------------------------------------------------------------

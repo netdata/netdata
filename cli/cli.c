@@ -3,25 +3,18 @@
 #include "cli.h"
 #include "daemon/pipename.h"
 
-void error_int(int is_collector __maybe_unused, const char *prefix __maybe_unused, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-    FILE *fp = stderr;
-
+void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
     va_list args;
-    va_start( args, fmt );
-    vfprintf(fp, fmt, args );
-    va_end( args );
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args );
+    va_end(args);
 }
 
 #ifdef NETDATA_INTERNAL_CHECKS
 
 uint64_t debug_flags;
 
-void debug_int( const char *file __maybe_unused , const char *function __maybe_unused , const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
-{
-
-}
-
-void fatal_int( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
+void netdata_logger_fatal( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
 {
     abort();
 };

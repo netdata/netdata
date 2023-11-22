@@ -106,6 +106,31 @@ static inline bool stream_has_more_than_one_capability_of(STREAM_CAPABILITIES ca
 #define START_STREAMING_ERROR_INTERNAL_ERROR "The server encountered an internal error. Try later."
 #define START_STREAMING_ERROR_INITIALIZATION "The server is initializing. Try later."
 
+#define RRDPUSH_STATUS_CONNECTED                     "CONNECTED"
+#define RRDPUSH_STATUS_ALREADY_CONNECTED             "ALREADY CONNECTED"
+#define RRDPUSH_STATUS_DISCONNECTED                  "DISCONNECTED"
+#define RRDPUSH_STATUS_RATE_LIMIT                    "RATE LIMIT TRY LATER"
+#define RRDPUSH_STATUS_INITIALIZATION_IN_PROGRESS    "INITIALIZATION IN PROGRESS RETRY LATER"
+#define RRDPUSH_STATUS_INTERNAL_SERVER_ERROR         "INTERNAL SERVER ERROR DROPPING CONNECTION"
+#define RRDPUSH_STATUS_DUPLICATE_RECEIVER            "DUPLICATE RECEIVER DROPPING CONNECTION"
+#define RRDPUSH_STATUS_CANT_REPLY                    "CANT REPLY DROPPING CONNECTION"
+#define RRDPUSH_STATUS_NO_HOSTNAME                   "NO HOSTNAME PERMISSION DENIED"
+#define RRDPUSH_STATUS_NO_API_KEY                    "NO API KEY PERMISSION DENIED"
+#define RRDPUSH_STATUS_INVALID_API_KEY               "INVALID API KEY PERMISSION DENIED"
+#define RRDPUSH_STATUS_NO_MACHINE_GUID               "NO MACHINE GUID PERMISSION DENIED"
+#define RRDPUSH_STATUS_MACHINE_GUID_DISABLED         "MACHINE GUID DISABLED PERMISSION DENIED"
+#define RRDPUSH_STATUS_INVALID_MACHINE_GUID          "INVALID MACHINE GUID PERMISSION DENIED"
+#define RRDPUSH_STATUS_API_KEY_DISABLED              "API KEY DISABLED PERMISSION DENIED"
+#define RRDPUSH_STATUS_NOT_ALLOWED_IP                "NOT ALLOWED IP PERMISSION DENIED"
+#define RRDPUSH_STATUS_LOCALHOST                     "LOCALHOST PERMISSION DENIED"
+#define RRDPUSH_STATUS_PERMISSION_DENIED             "PERMISSION DENIED"
+#define RRDPUSH_STATUS_BAD_HANDSHAKE                 "BAD HANDSHAKE"
+#define RRDPUSH_STATUS_TIMEOUT                       "TIMEOUT"
+#define RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION       "CANT UPGRADE CONNECTION"
+#define RRDPUSH_STATUS_SSL_ERROR                     "SSL ERROR"
+#define RRDPUSH_STATUS_INVALID_SSL_CERTIFICATE       "INVALID SSL CERTIFICATE"
+#define RRDPUSH_STATUS_CANT_ESTABLISH_SSL_CONNECTION "CANT ESTABLISH SSL CONNECTION"
+
 typedef enum {
     STREAM_HANDSHAKE_OK_V3 = 3, // v3+
     STREAM_HANDSHAKE_OK_V2 = 2, // v2
@@ -214,6 +239,7 @@ struct sender_state {
 
     uint16_t hops;
 
+    struct line_splitter line;
     struct compressor_state compressor;
 
 #ifdef NETDATA_LOG_STREAM_SENDER
@@ -305,19 +331,6 @@ typedef struct stream_node_instance {
     STRING *remote_ip;
 } STREAM_NODE_INSTANCE;
 */
-
-struct buffered_reader {
-    ssize_t read_len;
-    ssize_t pos;
-    char read_buffer[PLUGINSD_LINE_MAX + 1];
-};
-
-bool buffered_reader_next_line(struct buffered_reader *reader, BUFFER *dst);
-static inline void buffered_reader_init(struct buffered_reader *reader) {
-    reader->read_buffer[0] = '\0';
-    reader->read_len = 0;
-    reader->pos = 0;
-}
 
 struct receiver_state {
     RRDHOST *host;
@@ -452,7 +465,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
 void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
-void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
 int connect_to_one_of_destinations(
     RRDHOST *host,
     int default_port,
@@ -467,11 +479,12 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host);
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error);
 void stream_capabilities_to_json_array(BUFFER *wb, STREAM_CAPABILITIES caps, const char *key);
-void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status);
+void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority);
 void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDHOST *host, bool sender);
 int32_t stream_capabilities_to_vn(uint32_t caps);
+void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps);
 
 void receiver_state_free(struct receiver_state *rpt);
 bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason);

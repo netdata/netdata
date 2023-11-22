@@ -158,7 +158,9 @@ int sock_setnonblock(int fd) {
 
     int ret = fcntl(fd, F_SETFL, flags);
     if(ret < 0)
-        netdata_log_error("Failed to set O_NONBLOCK on socket %d", fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to set O_NONBLOCK on socket %d",
+               fd);
 
     return ret;
 }
@@ -171,7 +173,9 @@ int sock_delnonblock(int fd) {
 
     int ret = fcntl(fd, F_SETFL, flags);
     if(ret < 0)
-        netdata_log_error("Failed to remove O_NONBLOCK on socket %d", fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to remove O_NONBLOCK on socket %d",
+               fd);
 
     return ret;
 }
@@ -180,7 +184,9 @@ int sock_setreuse(int fd, int reuse) {
     int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
     if(ret == -1)
-        netdata_log_error("Failed to set SO_REUSEADDR on socket %d", fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to set SO_REUSEADDR on socket %d",
+               fd);
 
     return ret;
 }
@@ -191,7 +197,9 @@ int sock_setreuse_port(int fd, int reuse) {
 #ifdef SO_REUSEPORT
     ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
     if(ret == -1 && errno != ENOPROTOOPT)
-        netdata_log_error("failed to set SO_REUSEPORT on socket %d", fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "failed to set SO_REUSEPORT on socket %d",
+               fd);
 #else
     ret = -1;
 #endif
@@ -205,7 +213,9 @@ int sock_enlarge_in(int fd) {
     ret = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bs, sizeof(bs));
 
     if(ret == -1)
-        netdata_log_error("Failed to set SO_RCVBUF on socket %d", fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to set SO_RCVBUF on socket %d",
+               fd);
 
     return ret;
 }
@@ -215,7 +225,9 @@ int sock_enlarge_out(int fd) {
     ret = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs));
 
     if(ret == -1)
-        netdata_log_error("Failed to set SO_SNDBUF on socket %d", fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to set SO_SNDBUF on socket %d",
+               fd);
 
     return ret;
 }
@@ -250,11 +262,12 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 int create_listen_socket_unix(const char *path, int listen_backlog) {
     int sock;
 
-    netdata_log_debug(D_LISTENER, "LISTENER: UNIX creating new listening socket on path '%s'", path);
-
     sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if(sock < 0) {
-        netdata_log_error("LISTENER: UNIX socket() on path '%s' failed.", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: UNIX socket() on path '%s' failed.",
+               path);
+
         return -1;
     }
 
@@ -268,37 +281,47 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
 
     errno = 0;
     if (unlink(path) == -1 && errno != ENOENT)
-        netdata_log_error("LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.",
+               path);
 
     if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
-        netdata_log_error("LISTENER: UNIX bind() on path '%s' failed.", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: UNIX bind() on path '%s' failed.",
+               path);
+
         return -1;
     }
 
     // we have to chmod this to 0777 so that the client will be able
     // to read from and write to this socket.
     if(chmod(path, 0777) == -1)
-        netdata_log_error("LISTENER: failed to chmod() socket file '%s'.", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: failed to chmod() socket file '%s'.",
+               path);
 
     if(listen(sock, listen_backlog) < 0) {
         close(sock);
-        netdata_log_error("LISTENER: UNIX listen() on path '%s' failed.", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: UNIX listen() on path '%s' failed.",
+               path);
+
         return -1;
     }
 
-    netdata_log_debug(D_LISTENER, "LISTENER: Listening on UNIX path '%s'", path);
     return sock;
 }
 
 int create_listen_socket4(int socktype, const char *ip, uint16_t port, int listen_backlog) {
     int sock;
 
-    netdata_log_debug(D_LISTENER, "LISTENER: IPv4 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
-
     sock = socket(AF_INET, socktype, 0);
     if(sock < 0) {
-        netdata_log_error("LISTENER: IPv4 socket() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv4 socket() on ip '%s' port %d, socktype %d failed.",
+               ip, port, socktype);
+
         return -1;
     }
 
@@ -314,24 +337,36 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
 
     int ret = inet_pton(AF_INET, ip, (void *)&name.sin_addr.s_addr);
     if(ret != 1) {
-        netdata_log_error("LISTENER: Failed to convert IP '%s' to a valid IPv4 address.", ip);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: Failed to convert IP '%s' to a valid IPv4 address.",
+               ip);
+
         close(sock);
         return -1;
     }
 
     if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
-        netdata_log_error("LISTENER: IPv4 bind() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv4 bind() on ip '%s' port %d, socktype %d failed.",
+               ip, port, socktype);
+
         return -1;
     }
 
     if(socktype == SOCK_STREAM && listen(sock, listen_backlog) < 0) {
         close(sock);
-        netdata_log_error("LISTENER: IPv4 listen() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv4 listen() on ip '%s' port %d, socktype %d failed.",
+               ip, port, socktype);
+
         return -1;
     }
 
-    netdata_log_debug(D_LISTENER, "LISTENER: Listening on IPv4 ip '%s' port %d, socktype %d", ip, port, socktype);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "LISTENER: Listening on IPv4 ip '%s' port %d, socktype %d",
+           ip, port, socktype);
+
     return sock;
 }
 
@@ -339,11 +374,12 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     int sock;
     int ipv6only = 1;
 
-    netdata_log_debug(D_LISTENER, "LISTENER: IPv6 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
-
     sock = socket(AF_INET6, socktype, 0);
     if (sock < 0) {
-        netdata_log_error("LISTENER: IPv6 socket() on ip '%s' port %d, socktype %d, failed.", ip, port, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv6 socket() on ip '%s' port %d, socktype %d, failed.",
+               ip, port, socktype);
+
         return -1;
     }
 
@@ -354,7 +390,9 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
     /* IPv6 only */
     if(setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&ipv6only, sizeof(ipv6only)) != 0)
-        netdata_log_error("LISTENER: Cannot set IPV6_V6ONLY on ip '%s' port %d, socktype %d.", ip, port, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: Cannot set IPV6_V6ONLY on ip '%s' port %d, socktype %d.",
+               ip, port, socktype);
 
     struct sockaddr_in6 name;
     memset(&name, 0, sizeof(struct sockaddr_in6));
@@ -364,7 +402,10 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
     int ret = inet_pton(AF_INET6, ip, (void *)&name.sin6_addr.s6_addr);
     if(ret != 1) {
-        netdata_log_error("LISTENER: Failed to convert IP '%s' to a valid IPv6 address.", ip);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: Failed to convert IP '%s' to a valid IPv6 address.",
+               ip);
+
         close(sock);
         return -1;
     }
@@ -373,23 +414,35 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
     if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
-        netdata_log_error("LISTENER: IPv6 bind() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv6 bind() on ip '%s' port %d, socktype %d failed.",
+               ip, port, socktype);
+
         return -1;
     }
 
     if (socktype == SOCK_STREAM && listen(sock, listen_backlog) < 0) {
         close(sock);
-        netdata_log_error("LISTENER: IPv6 listen() on ip '%s' port %d, socktype %d failed.", ip, port, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv6 listen() on ip '%s' port %d, socktype %d failed.",
+               ip, port, socktype);
+
         return -1;
     }
 
-    netdata_log_debug(D_LISTENER, "LISTENER: Listening on IPv6 ip '%s' port %d, socktype %d", ip, port, socktype);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "LISTENER: Listening on IPv6 ip '%s' port %d, socktype %d",
+           ip, port, socktype);
+
     return sock;
 }
 
 static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family, int socktype, const char *protocol, const char *ip, uint16_t port, int acl_flags) {
     if(sockets->opened >= MAX_LISTEN_FDS) {
-        netdata_log_error("LISTENER: Too many listening sockets. Failed to add listening %s socket at ip '%s' port %d, protocol %s, socktype %d", protocol, ip, port, protocol, socktype);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: Too many listening sockets. Failed to add listening %s socket at ip '%s' port %d, protocol %s, socktype %d",
+               protocol, ip, port, protocol, socktype);
+
         close(fd);
         return -1;
     }
@@ -519,7 +572,10 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         protocol_str = "unix";
         int fd = create_listen_socket_unix(path, listen_backlog);
         if (fd == -1) {
-            netdata_log_error("LISTENER: Cannot create unix socket '%s'", path);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "LISTENER: Cannot create unix socket '%s'",
+                   path);
+
             sockets->failed++;
         } else {
             acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
@@ -585,7 +641,10 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     if(*interface) {
         scope_id = if_nametoindex(interface);
         if(!scope_id)
-            netdata_log_error("LISTENER: Cannot find a network interface named '%s'. Continuing with limiting the network interface", interface);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "LISTENER: Cannot find a network interface named '%s'. "
+                   "Continuing with limiting the network interface",
+                   interface);
     }
 
     if(!*ip || *ip == '*' || !strcmp(ip, "any") || !strcmp(ip, "all"))
@@ -605,7 +664,10 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 
     int r = getaddrinfo(ip, port, &hints, &result);
     if (r != 0) {
-        netdata_log_error("LISTENER: getaddrinfo('%s', '%s'): %s\n", ip, port, gai_strerror(r));
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: getaddrinfo('%s', '%s'): %s\n",
+               ip, port, gai_strerror(r));
+
         return -1;
     }
 
@@ -622,7 +684,6 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
                 struct sockaddr_in *sin = (struct sockaddr_in *) rp->ai_addr;
                 inet_ntop(AF_INET, &sin->sin_addr, rip, INET_ADDRSTRLEN);
                 rport = ntohs(sin->sin_port);
-                // netdata_log_info("Attempting to listen on IPv4 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
                 fd = create_listen_socket4(socktype, rip, rport, listen_backlog);
                 break;
             }
@@ -631,18 +692,23 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
                 struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) rp->ai_addr;
                 inet_ntop(AF_INET6, &sin6->sin6_addr, rip, INET6_ADDRSTRLEN);
                 rport = ntohs(sin6->sin6_port);
-                // netdata_log_info("Attempting to listen on IPv6 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
                 fd = create_listen_socket6(socktype, scope_id, rip, rport, listen_backlog);
                 break;
             }
 
             default:
-                netdata_log_debug(D_LISTENER, "LISTENER: Unknown socket family %d", family);
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "LISTENER: Unknown socket family %d",
+                       family);
+
                 break;
         }
 
         if (fd == -1) {
-            netdata_log_error("LISTENER: Cannot bind to ip '%s', port %d", rip, rport);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "LISTENER: Cannot bind to ip '%s', port %d",
+                   rip, rport);
+
             sockets->failed++;
         }
         else {
@@ -664,12 +730,13 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     long long int old_port = sockets->default_port;
     long long int new_port = appconfig_get_number(sockets->config, sockets->config_section, "default port", sockets->default_port);
     if(new_port < 1 || new_port > 65535) {
-        netdata_log_error("LISTENER: Invalid listen port %lld given. Defaulting to %lld.", new_port, old_port);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: Invalid listen port %lld given. Defaulting to %lld.",
+               new_port, old_port);
+
         sockets->default_port = (uint16_t) appconfig_set_number(sockets->config, sockets->config_section, "default port", old_port);
     }
     else sockets->default_port = (uint16_t)new_port;
-
-    netdata_log_debug(D_OPTIONS, "LISTENER: Default listen port set to %d.", sockets->default_port);
 
     char *s = appconfig_get(sockets->config, sockets->config_section, "bind to", sockets->default_bind_to);
     while(*s) {
@@ -694,7 +761,9 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     if(sockets->failed) {
         size_t i;
         for(i = 0; i < sockets->opened ;i++)
-            netdata_log_info("LISTENER: Listen socket %s opened successfully.", sockets->fds_names[i]);
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "LISTENER: Listen socket %s opened successfully.",
+                   sockets->fds_names[i]);
     }
 
     return (int)sockets->opened;
@@ -711,13 +780,18 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if(fd == -1) {
-        netdata_log_error("Failed to create UNIX socket() for '%s'", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to create UNIX socket() for '%s'",
+               path);
+
         return -1;
     }
 
     if(timeout) {
         if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
-            netdata_log_error("Failed to set timeout on UNIX socket '%s'", path);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Failed to set timeout on UNIX socket '%s'",
+                   path);
     }
 
     struct sockaddr_un addr;
@@ -726,12 +800,17 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
 
     if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        netdata_log_error("Cannot connect to UNIX socket on path '%s'.", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Cannot connect to UNIX socket on path '%s'.",
+               path);
+
         close(fd);
         return -1;
     }
 
-    netdata_log_debug(D_CONNECT_TO, "Connected to UNIX socket on path '%s'.", path);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "Connected to UNIX socket on path '%s'.",
+           path);
 
     return fd;
 }
@@ -757,9 +836,23 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
 
     int ai_err = getaddrinfo(host, service, &hints, &ai_head);
     if (ai_err != 0) {
-        netdata_log_error("Cannot resolve host '%s', port '%s': %s", host, service, gai_strerror(ai_err));
+
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Cannot resolve host '%s', port '%s': %s",
+               host, service, gai_strerror(ai_err));
+
         return -1;
     }
+
+    char hostBfr[NI_MAXHOST + 1];
+    char servBfr[NI_MAXSERV + 1];
+
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_DST_IP, hostBfr),
+            ND_LOG_FIELD_TXT(NDF_DST_PORT, servBfr),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     int fd = -1;
     for (ai = ai_head; ai != NULL && fd == -1; ai = ai->ai_next) {
@@ -771,9 +864,6 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
         }
 
-        char hostBfr[NI_MAXHOST + 1];
-        char servBfr[NI_MAXSERV + 1];
-
         getnameinfo(ai->ai_addr,
                     ai->ai_addrlen,
                     hostBfr,
@@ -782,54 +872,21 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                     sizeof(servBfr),
                     NI_NUMERICHOST | NI_NUMERICSERV);
 
-        netdata_log_debug(D_CONNECT_TO, "Address info: host = '%s', service = '%s', ai_flags = 0x%02X, ai_family = %d (PF_INET = %d, PF_INET6 = %d), ai_socktype = %d (SOCK_STREAM = %d, SOCK_DGRAM = %d), ai_protocol = %d (IPPROTO_TCP = %d, IPPROTO_UDP = %d), ai_addrlen = %lu (sockaddr_in = %lu, sockaddr_in6 = %lu)",
-              hostBfr,
-              servBfr,
-              (unsigned int)ai->ai_flags,
-              ai->ai_family,
-              PF_INET,
-              PF_INET6,
-              ai->ai_socktype,
-              SOCK_STREAM,
-              SOCK_DGRAM,
-              ai->ai_protocol,
-              IPPROTO_TCP,
-              IPPROTO_UDP,
-              (unsigned long)ai->ai_addrlen,
-              (unsigned long)sizeof(struct sockaddr_in),
-              (unsigned long)sizeof(struct sockaddr_in6));
-
         switch (ai->ai_addr->sa_family) {
             case PF_INET: {
                 struct sockaddr_in *pSadrIn = (struct sockaddr_in *)ai->ai_addr;
                 (void)pSadrIn;
-
-                netdata_log_debug(D_CONNECT_TO, "ai_addr = sin_family: %d (AF_INET = %d, AF_INET6 = %d), sin_addr: '%s', sin_port: '%s'",
-                      pSadrIn->sin_family,
-                      AF_INET,
-                      AF_INET6,
-                      hostBfr,
-                      servBfr);
                 break;
             }
 
             case PF_INET6: {
                 struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6 *) ai->ai_addr;
                 (void)pSadrIn6;
-
-                netdata_log_debug(D_CONNECT_TO,"ai_addr = sin6_family: %d (AF_INET = %d, AF_INET6 = %d), sin6_addr: '%s', sin6_port: '%s', sin6_flowinfo: %u, sin6_scope_id: %u",
-                      pSadrIn6->sin6_family,
-                      AF_INET,
-                      AF_INET6,
-                      hostBfr,
-                      servBfr,
-                      pSadrIn6->sin6_flowinfo,
-                      pSadrIn6->sin6_scope_id);
                 break;
             }
 
             default: {
-                netdata_log_debug(D_CONNECT_TO, "Unknown protocol family %d.", ai->ai_family);
+                // Unknown protocol family
                 continue;
             }
         }
@@ -838,13 +895,17 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
         if(fd != -1) {
             if(timeout) {
                 if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
-                    netdata_log_error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "Failed to set timeout on the socket to ip '%s' port '%s'",
+                           hostBfr, servBfr);
             }
 
             errno = 0;
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 if(errno == EALREADY || errno == EINPROGRESS) {
-                    internal_error(true, "Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "Waiting for connection to ip %s port %s to be established",
+                           hostBfr, servBfr);
 
                     // Convert 'struct timeval' to milliseconds for poll():
                     int timeout_milliseconds = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
@@ -858,11 +919,19 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                         // poll() completed normally. We can check the revents to see what happened
                         if (fds[0].revents & POLLOUT) {
                             // connect() completed successfully, socket is writable.
-                            netdata_log_info("connect() to ip %s port %s completed successfully", hostBfr, servBfr);
+
+                            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                                   "connect() to ip %s port %s completed successfully",
+                                   hostBfr, servBfr);
+
                         }
                         else {
                             // This means that the socket is in error. We will close it and set fd to -1
-                            netdata_log_error("Failed to connect to '%s', port '%s'.", hostBfr, servBfr);
+
+                            nd_log(NDLS_DAEMON, NDLP_ERR,
+                                   "Failed to connect to '%s', port '%s'.",
+                                   hostBfr, servBfr);
+
                             close(fd);
                             fd = -1;
                         }
@@ -870,27 +939,38 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                     else if (ret == 0) {
                         // poll() timed out, the connection is not established within the specified timeout.
                         errno = 0;
-                        netdata_log_error("Timed out while connecting to '%s', port '%s'.", hostBfr, servBfr);
+
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "Timed out while connecting to '%s', port '%s'.",
+                               hostBfr, servBfr);
+
                         close(fd);
                         fd = -1;
                     }
-                    else {
+                    else { // ret < 0
                         // poll() returned an error.
-                        netdata_log_error("Failed to connect to '%s', port '%s'. poll() returned %d", hostBfr, servBfr, ret);
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "Failed to connect to '%s', port '%s'. poll() returned %d",
+                               hostBfr, servBfr, ret);
+
                         close(fd);
                         fd = -1;
                     }
                 }
                 else {
-                    netdata_log_error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "Failed to connect to '%s', port '%s'",
+                           hostBfr, servBfr);
+
                     close(fd);
                     fd = -1;
                 }
             }
-
-            if(fd != -1)
-                netdata_log_debug(D_CONNECT_TO, "Connected to '%s' on port '%s'.", hostBfr, servBfr);
         }
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Failed to socket() to '%s', port '%s'",
+                   hostBfr, servBfr);
     }
 
     freeaddrinfo(ai_head);
@@ -965,17 +1045,20 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         service = e;
     }
 
-    netdata_log_debug(D_CONNECT_TO, "Attempting connection to host = '%s', service = '%s', interface = '%s', protocol = %d (tcp = %d, udp = %d)", host, service, interface, protocol, IPPROTO_TCP, IPPROTO_UDP);
-
     if(!*host) {
-        netdata_log_error("Definition '%s' does not specify a host.", definition);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Definition '%s' does not specify a host.",
+               definition);
+
         return -1;
     }
 
     if(*interface) {
         scope_id = if_nametoindex(interface);
         if(!scope_id)
-            netdata_log_error("Cannot find a network interface named '%s'. Continuing with limiting the network interface", interface);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Cannot find a network interface named '%s'. Continuing with limiting the network interface",
+                   interface);
     }
 
     if(!*service)
@@ -1117,7 +1200,6 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 #endif
 
-    internal_error(true, "%s(): calling recv()", __FUNCTION__ );
     return recv(sockfd, buf, len, flags);
 }
 
@@ -1160,7 +1242,9 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
             return netdata_ssl_write(ssl, buf, len);
         }
         else {
-            netdata_log_error("cannot write to SSL connection - connection is not ready.");
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "cannot write to SSL connection - connection is not ready.");
+
             return -1;
         }
     }
@@ -1224,7 +1308,6 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
                        const char *patname, int allow_dns)
 {
-    netdata_log_debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
     if (!access_list)
         return 1;
     if (simple_pattern_matches(access_list, client_ip))
@@ -1239,16 +1322,21 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
         if (err != 0 ||
             (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
                               NULL, 0, NI_NAMEREQD)) != 0) {
-            netdata_log_error("Incoming %s on '%s' does not match a numeric pattern, and host could not be resolved (err=%s)",
-                  patname, client_ip, gai_strerror(err));
+
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Incoming %s on '%s' does not match a numeric pattern, and host could not be resolved (err=%s)",
+                   patname, client_ip, gai_strerror(err));
+
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
             return 0;
         }
         struct addrinfo *addr_infos = NULL;
         if (getaddrinfo(client_host, NULL, NULL, &addr_infos) !=0 ) {
-            netdata_log_error("LISTENER: cannot validate hostname '%s' from '%s' by resolving it",
-                  client_host, client_ip);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "LISTENER: cannot validate hostname '%s' from '%s' by resolving it",
+                   client_host, client_ip);
+
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
             return 0;
@@ -1266,8 +1354,6 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
                     inet_ntop(AF_INET6, &((struct sockaddr_in6*)(scan->ai_addr))->sin6_addr, address, INET6_ADDRSTRLEN);
                     break;
             }
-            netdata_log_debug(D_LISTENER, "Incoming ip %s rev-resolved onto %s, validating against forward-resolution %s",
-                  client_ip, client_host, address);
             if (!strcmp(client_ip, address)) {
                 validated = 1;
                 break;
@@ -1275,18 +1361,19 @@ int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsi
             scan = scan->ai_next;
         }
         if (!validated) {
-            netdata_log_error("LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS", client_ip, client_host);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS",
+                   client_ip, client_host);
+
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
         }
         if (addr_infos!=NULL)
             freeaddrinfo(addr_infos);
     }
-    if (!simple_pattern_matches(access_list, client_host)) {
-        netdata_log_debug(D_LISTENER, "Incoming connection on '%s' (%s) does not match allowed pattern for %s",
-              client_ip, client_host, patname);
+    if (!simple_pattern_matches(access_list, client_host))
         return 0;
-    }
+
     return 1;
 }
 
@@ -1301,7 +1388,10 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     if (likely(nfd >= 0)) {
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
-            netdata_log_error("LISTENER: cannot getnameinfo() on received client connection.");
+
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "LISTENER: cannot getnameinfo() on received client connection.");
+
             strncpyz(client_ip, "UNKNOWN", ipsize);
             strncpyz(client_port, "UNKNOWN", portsize);
         }
@@ -1319,31 +1409,34 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
             case AF_UNIX:
-                netdata_log_debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
+                // netdata_log_debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
                 // set the port - certain versions of libc return garbage on unix sockets
                 strncpyz(client_port, "UNIX", portsize);
                 break;
 
             case AF_INET:
-                netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                // netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
 
             case AF_INET6:
                 if (strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
-                    netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                    // netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 }
-                else
-                    netdata_log_debug(D_LISTENER, "New IPv6 web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                // else
+                //    netdata_log_debug(D_LISTENER, "New IPv6 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
 
             default:
-                netdata_log_debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
+                // netdata_log_debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
         if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection", allow_dns)) {
             errno = 0;
-            netdata_log_error("Permission denied for client '%s', port '%s'", client_ip, client_port);
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "Permission denied for client '%s', port '%s'",
+                   client_ip, client_port);
+
             close(nfd);
             nfd = -1;
             errno = EPERM;
@@ -1351,7 +1444,9 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     }
 #ifdef HAVE_ACCEPT4
     else if (errno == ENOSYS)
-        netdata_log_error("netdata has been compiled with the assumption that the system has the accept4() call, but it is not here. Recompile netdata like this: ./configure --disable-accept4 ...");
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Netdata has been compiled with the assumption that the system has the accept4() call, but it is not here. "
+               "Recompile netdata like this: ./configure --disable-accept4 ...");
 #endif
 
     return nfd;
@@ -1379,19 +1474,16 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
                              , int   (*snd_callback)(POLLINFO * /*pi*/, short int * /*events*/)
                              , void *data
 ) {
-    netdata_log_debug(D_POLLFD, "POLLFD: ADD: request to add fd %d, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", fd, p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
-
     if(unlikely(fd < 0)) return NULL;
 
     //if(p->limit && p->used >= p->limit) {
-    //    netdata_log_info("Max sockets limit reached (%zu sockets), dropping connection", p->used);
+    //    nd_log(NDLS_DAEMON, NDLP_WARNING, "Max sockets limit reached (%zu sockets), dropping connection", p->used);
     //    close(fd);
     //    return NULL;
     //}
 
     if(unlikely(!p->first_free)) {
         size_t new_slots = p->slots + POLL_FDS_INCREASE_STEP;
-        netdata_log_debug(D_POLLFD, "POLLFD: ADD: increasing size (current = %zu, new = %zu, used = %zu, min = %zu, max = %zu)", p->slots, new_slots, p->used, p->min, p->max);
 
         p->fds = reallocz(p->fds, sizeof(struct pollfd) * new_slots);
         p->inf = reallocz(p->inf, sizeof(POLLINFO) * new_slots);
@@ -1399,7 +1491,6 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
         // reset all the newly added slots
         ssize_t i;
         for(i = new_slots - 1; i >= (ssize_t)p->slots ; i--) {
-            netdata_log_debug(D_POLLFD, "POLLFD: ADD: resetting new slot %zd", i);
             p->fds[i].fd = -1;
             p->fds[i].events = 0;
             p->fds[i].revents = 0;
@@ -1429,8 +1520,6 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
 
     POLLINFO *pi = p->first_free;
     p->first_free = p->first_free->next;
-
-    netdata_log_debug(D_POLLFD, "POLLFD: ADD: selected slot %zu, next free is %zd", pi->slot, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     struct pollfd *pf = &p->fds[pi->slot];
     pf->fd = fd;
@@ -1472,8 +1561,6 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     }
     netdata_thread_enable_cancelability();
 
-    netdata_log_debug(D_POLLFD, "POLLFD: ADD: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
-
     return pi;
 }
 
@@ -1481,7 +1568,6 @@ inline void poll_close_fd(POLLINFO *pi) {
     POLLJOB *p = pi->p;
 
     struct pollfd *pf = &p->fds[pi->slot];
-    netdata_log_debug(D_POLLFD, "POLLFD: DEL: request to clear slot %zu (fd %d), old next free was %zd", pi->slot, pf->fd, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     if(unlikely(pf->fd == -1)) return;
 
@@ -1492,7 +1578,9 @@ inline void poll_close_fd(POLLINFO *pi) {
 
         if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
             if(close(pf->fd) == -1)
-                netdata_log_error("Failed to close() poll_events() socket %d", pf->fd);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "Failed to close() poll_events() socket %d",
+                       pf->fd);
         }
     }
 
@@ -1533,8 +1621,6 @@ inline void poll_close_fd(POLLINFO *pi) {
         }
     }
     netdata_thread_enable_cancelability();
-
-    netdata_log_debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 }
 
 void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
@@ -1542,14 +1628,13 @@ void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)events;
     (void)data;
 
-    // netdata_log_error("POLLFD: internal error: poll_default_add_callback() called");
-
     return NULL;
 }
 
 void poll_default_del_callback(POLLINFO *pi) {
     if(pi->data)
-        netdata_log_error("POLLFD: internal error: del_callback_default() called with data pointer - possible memory leak");
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "POLLFD: internal error: del_callback_default() called with data pointer - possible memory leak");
 }
 
 int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
@@ -1563,12 +1648,17 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
         if (rc < 0) {
             // read failed
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                netdata_log_error("POLLFD: poll_default_rcv_callback(): recv() failed with %zd.", rc);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "POLLFD: poll_default_rcv_callback(): recv() failed with %zd.",
+                       rc);
+
                 return -1;
             }
         } else if (rc) {
             // data received
-            netdata_log_info("POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d", rc, pi->fd);
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d",
+                   rc, pi->fd);
         }
     } while (rc != -1);
 
@@ -1578,7 +1668,10 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
 int poll_default_snd_callback(POLLINFO *pi, short int *events) {
     *events &= ~POLLOUT;
 
-    netdata_log_info("POLLFD: internal error: poll_default_snd_callback(): nothing to send on socket %d", pi->fd);
+    nd_log(NDLS_DAEMON, NDLP_WARNING,
+           "POLLFD: internal error: poll_default_snd_callback(): nothing to send on socket %d",
+           pi->fd);
+
     return 0;
 }
 
@@ -1600,17 +1693,25 @@ static void poll_events_cleanup(void *data) {
 }
 
 static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents) {
-    netdata_log_error("POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
-          , revents & POLLERR  ? "POLLERR" : ""
-          , revents & POLLHUP  ? "POLLHUP" : ""
-          , revents & POLLNVAL ? "POLLNVAL" : ""
-          , pi->slot
-          , pi->fd
-          , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-          , pi->client_port ? pi->client_port : "<undefined-port>"
-          , pf->events & POLLIN ? "POLLIN" : "", pf->events & POLLOUT ? "POLLOUT" : "", pf->events & POLLPRI ? "POLLPRI" : ""
-          , revents & POLLIN ? "POLLIN" : "", revents & POLLOUT ? "POLLOUT" : "", revents & POLLPRI ? "POLLPRI" : ""
-          );
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, pi->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, pi->client_port),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "POLLFD: LISTENER: received %s %s %s on socket at slot %zu (fd %d) client '%s' port '%s' expecting %s %s %s, having %s %s %s"
+           , revents & POLLERR  ? "POLLERR" : ""
+           , revents & POLLHUP  ? "POLLHUP" : ""
+           , revents & POLLNVAL ? "POLLNVAL" : ""
+           , pi->slot
+           , pi->fd
+           , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+           , pi->client_port ? pi->client_port : "<undefined-port>"
+           , pf->events & POLLIN ? "POLLIN" : "", pf->events & POLLOUT ? "POLLOUT" : "", pf->events & POLLPRI ? "POLLPRI" : ""
+           , revents & POLLIN ? "POLLIN" : "", revents & POLLOUT ? "POLLOUT" : "", revents & POLLPRI ? "POLLPRI" : ""
+           );
 
     pf->events = 0;
     poll_close_fd(pi);
@@ -1620,8 +1721,6 @@ static int poll_process_error(POLLINFO *pi, struct pollfd *pf, short int revents
 static inline int poll_process_send(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, time_t now) {
     pi->last_sent_t = now;
     pi->send_count++;
-
-    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: sending data to socket on slot %zu (fd %d)", pi->slot, pf->fd);
 
     pf->events = 0;
 
@@ -1642,8 +1741,6 @@ static inline int poll_process_tcp_read(POLLJOB *p, POLLINFO *pi, struct pollfd 
     pi->last_received_t = now;
     pi->recv_count++;
 
-    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", pi->slot, pf->fd);
-
     pf->events = 0;
 
     // remember the slot, in case we need to close it later
@@ -1663,8 +1760,6 @@ static inline int poll_process_udp_read(POLLINFO *pi, struct pollfd *pf, time_t 
     pi->last_received_t = now;
     pi->recv_count++;
 
-    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: reading data from UDP slot %zu (fd %d)", pi->slot, pf->fd);
-
     // TODO: access_list is not applied to UDP
     // but checking the access list on every UDP packet will destroy
     // performance, especially for statsd.
@@ -1683,13 +1778,9 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
     pi->last_received_t = now;
     pi->recv_count++;
 
-    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: accepting connections from slot %zu (fd %d)", pi->slot, pf->fd);
-
     char client_ip[INET6_ADDRSTRLEN] = "";
     char client_port[NI_MAXSERV] = "";
     char client_host[NI_MAXHOST] = "";
-
-    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", pi->slot, pf->fd);
 
     int nfd = accept_socket(
         pf->fd,SOCK_NONBLOCK,
@@ -1700,15 +1791,15 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
     if (unlikely(nfd < 0)) {
         // accept failed
 
-        netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", pi->slot, pf->fd);
-
         if(unlikely(errno == EMFILE)) {
-            error_limit_static_global_var(erl, 10, 1000);
-            error_limit(&erl, "POLLFD: LISTENER: too many open files - used by this thread %zu, max for this thread %zu",
-                      p->used, p->limit);
+            nd_log_limit_static_global_var(erl, 10, 1000);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                         "POLLFD: LISTENER: too many open files - used by this thread %zu, max for this thread %zu",
+                         p->used, p->limit);
         }
         else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
-            netdata_log_error("POLLFD: LISTENER: accept() failed.");
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "POLLFD: LISTENER: accept() failed.");
 
     }
     else {
@@ -1755,7 +1846,8 @@ void poll_events(LISTEN_SOCKETS *sockets
         , size_t max_tcp_sockets
 ) {
     if(!sockets || !sockets->opened) {
-        netdata_log_error("POLLFD: internal error: no listening sockets are opened");
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "POLLFD: internal error: no listening sockets are opened");
         return;
     }
 
@@ -1808,7 +1900,9 @@ void poll_events(LISTEN_SOCKETS *sockets
         );
 
         pi->data = data;
-        netdata_log_info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "POLLFD: LISTENER: listening on '%s'",
+               (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
     int listen_sockets_active = 1;
@@ -1832,7 +1926,6 @@ void poll_events(LISTEN_SOCKETS *sockets
             now_usec = now_boottime_usec();
 
             if(unlikely(timer_usec && now_usec >= next_timer_usec)) {
-                netdata_log_debug(D_POLLFD, "Calling timer callback after %zu usec", (size_t)(now_usec - last_timer_usec));
                 last_timer_usec = now_usec;
                 p.tmr_callback(p.timer_data);
                 now_usec = now_boottime_usec();
@@ -1849,7 +1942,11 @@ void poll_events(LISTEN_SOCKETS *sockets
         // enable or disable the TCP listening sockets, based on the current number of sockets used and the limit set
         if((listen_sockets_active && (p.limit && p.used >= p.limit)) || (!listen_sockets_active && (!p.limit || p.used < p.limit))) {
             listen_sockets_active = !listen_sockets_active;
-            netdata_log_info("%s listening sockets (used TCP sockets %zu, max allowed for this worker %zu)", (listen_sockets_active)?"ENABLING":"DISABLING", p.used, p.limit);
+
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "%s listening sockets (used TCP sockets %zu, max allowed for this worker %zu)",
+                   (listen_sockets_active)?"ENABLING":"DISABLING", p.used, p.limit);
+
             for (i = 0; i <= p.max; i++) {
                 if(p.inf[i].flags & POLLINFO_FLAG_SERVER_SOCKET && p.inf[i].socktype == SOCK_STREAM) {
                     p.fds[i].events = (short int) ((listen_sockets_active) ? POLLIN : 0);
@@ -1857,16 +1954,19 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
 
-        netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets for %zu ms...", p.max + 1, (size_t)timeout_ms);
         retval = poll(p.fds, p.max + 1, timeout_ms);
         time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
-            netdata_log_error("POLLFD: LISTENER: poll() failed while waiting on %zu sockets.", p.max + 1);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "POLLFD: LISTENER: poll() failed while waiting on %zu sockets.",
+                   p.max + 1);
+
             break;
         }
         else if(unlikely(!retval)) {
-            netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: poll() timeout.");
+            // timeout
+            ;
         }
         else {
             POLLINFO *pi;
@@ -1920,31 +2020,34 @@ void poll_events(LISTEN_SOCKETS *sockets
                             conns[conns_max++] = i;
                         }
                         else
-                            netdata_log_error("POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d."
-                                 , i
-                                 , pi->fd
-                                 , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-                                 , pi->client_port ? pi->client_port : "<undefined-port>"
-                                 , pi->socktype
-                            );
+                            nd_log(NDLS_DAEMON, NDLP_ERR,
+                                   "POLLFD: LISTENER: server slot %zu (fd %d) connection from %s port %s using unhandled socket type %d."
+                                   , i
+                                   , pi->fd
+                                   , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                                   , pi->client_port ? pi->client_port : "<undefined-port>"
+                                   , pi->socktype
+                                   );
                     }
                     else
-                        netdata_log_error("POLLFD: LISTENER: client slot %zu (fd %d) data from %s port %s using flags %08X is neither client nor server."
-                              , i
-                              , pi->fd
-                              , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-                              , pi->client_port ? pi->client_port : "<undefined-port>"
-                              , pi->flags
-                        );
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "POLLFD: LISTENER: client slot %zu (fd %d) data from %s port %s using flags %08X is neither client nor server."
+                               , i
+                               , pi->fd
+                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                               , pi->client_port ? pi->client_port : "<undefined-port>"
+                               , pi->flags
+                               );
                 }
                 else
-                    netdata_log_error("POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
-                      , i
-                      , pi->fd
-                      , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-                      , pi->client_port ? pi->client_port : "<undefined-port>"
-                      , revents
-                );
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
+                           , i
+                           , pi->fd
+                           , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                           , pi->client_port ? pi->client_port : "<undefined-port>"
+                           , revents
+                           );
             }
 
             // process sends
@@ -1997,23 +2100,25 @@ void poll_events(LISTEN_SOCKETS *sockets
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
                     if (unlikely(pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
-                        netdata_log_info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not sent a complete request in %zu seconds - closing it. "
-                              , i
-                              , pi->fd
-                              , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-                              , pi->client_port ? pi->client_port : "<undefined-port>"
-                              , (size_t) p.complete_request_timeout
-                        );
+                        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not sent a complete request in %zu seconds - closing it. "
+                               , i
+                               , pi->fd
+                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                               , pi->client_port ? pi->client_port : "<undefined-port>"
+                               , (size_t) p.complete_request_timeout
+                               );
                         poll_close_fd(pi);
                     }
                     else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
-                        netdata_log_info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s is idle for more than %zu seconds - closing it. "
-                              , i
-                              , pi->fd
-                              , pi->client_ip ? pi->client_ip : "<undefined-ip>"
-                              , pi->client_port ? pi->client_port : "<undefined-port>"
-                              , (size_t) p.idle_timeout
-                        );
+                        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s is idle for more than %zu seconds - closing it. "
+                               , i
+                               , pi->fd
+                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                               , pi->client_port ? pi->client_port : "<undefined-port>"
+                               , (size_t) p.idle_timeout
+                               );
                         poll_close_fd(pi);
                     }
                 }
@@ -2022,5 +2127,4 @@ void poll_events(LISTEN_SOCKETS *sockets
     }
 
     netdata_thread_cleanup_pop(1);
-    netdata_log_debug(D_POLLFD, "POLLFD: LISTENER: cleanup completed");
 }

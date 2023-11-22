@@ -279,6 +279,7 @@ DONOTWAIT=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
+NETDATA_ENABLE_GTESTS=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -333,9 +334,13 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-ml)}" | sed 's/$/ --enable-ml/g')"
       NETDATA_ENABLE_ML=1
       ;;
-    "--disable-ml")
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
-      NETDATA_ENABLE_ML=0
+    "--enable-gtests")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-gtests)}" | sed 's/$/ --enable-gtests/g')"
+      NETDATA_ENABLE_GTESTS=1
+      ;;
+    "--disable-gtests")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-gtests)}" | sed 's/$/ --disable-gtests/g')"
+      NETDATA_ENABLE_GTESTS=0
       ;;
     "--disable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-lto)}" | sed 's/$/ --disable-lto/g')" ;;
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-x86-sse)}" | sed 's/$/ --disable-x86-sse/g')" ;;

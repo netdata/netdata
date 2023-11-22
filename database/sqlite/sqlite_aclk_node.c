@@ -43,7 +43,7 @@ static void build_node_collectors(RRDHOST *host)
     dictionary_destroy(dict);
     freez(upd_node_collectors.claim_id);
 
-    netdata_log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(host));
+    nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: NODE COLLECTORS SENT", wc->node_id, rrdhost_hostname(host));
 }
 
 static void build_node_info(RRDHOST *host)
@@ -103,7 +103,7 @@ static void build_node_info(RRDHOST *host)
     node_info.data.host_labels_ptr = host->rrdlabels;
 
     aclk_update_node_info(&node_info);
-    netdata_log_access("ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == localhost ? "parent" : "child");
+    nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)", wc->node_id, rrdhost_hostname(wc->host), host->machine_guid, wc->host == localhost ? "parent" : "child");
 
     rrd_unlock();
     freez(node_info.claim_id);
@@ -169,8 +169,9 @@ void aclk_check_node_info_and_collectors(void)
     dfe_done(host);
 
     if (context_loading || replicating) {
-        error_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
-        error_limit(&erl, "%zu nodes loading contexts, %zu replicating data", context_loading, replicating);
+        nd_log_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                     "%zu nodes loading contexts, %zu replicating data", context_loading, replicating);
     }
 }
 

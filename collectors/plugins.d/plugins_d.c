@@ -47,8 +47,7 @@ static inline bool plugin_is_running(struct plugind *cd) {
     return ret;
 }
 
-static void pluginsd_worker_thread_cleanup(void *arg)
-{
+static void pluginsd_worker_thread_cleanup(void *arg) {
     struct plugind *cd = (struct plugind *)arg;
 
     worker_unregister();
@@ -143,41 +142,64 @@ static void *pluginsd_worker_thread(void *arg) {
 
     netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
-    struct plugind *cd = (struct plugind *)arg;
-    plugin_set_running(cd);
+            {
+                struct plugind *cd = (struct plugind *) arg;
+                plugin_set_running(cd);
 
-    size_t count = 0;
+                size_t count = 0;
 
-    while (service_running(SERVICE_COLLECTORS)) {
-        FILE *fp_child_input = NULL;
-        FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
+                while(service_running(SERVICE_COLLECTORS)) {
+                    FILE *fp_child_input = NULL;
+                    FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
 
-        if (unlikely(!fp_child_input || !fp_child_output)) {
-            netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").", rrdhost_hostname(cd->host), cd->cmd);
-            break;
-        }
+                    if(unlikely(!fp_child_input || !fp_child_output)) {
+                        netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").",
+                                          rrdhost_hostname(cd->host), cd->cmd);
+                        break;
+                    }
 
-        netdata_log_info("PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
-             rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid);
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
+                           rrdhost_hostname(cd->host),
+                           cd->fullfilename, cd->unsafe.pid);
 
-        count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
+                    const char *plugin = strrchr(cd->fullfilename, '/');
+                    if(plugin)
+                        plugin++;
+                    else
+                        plugin = cd->fullfilename;
 
-        netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
-              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
+                    char module[100];
+                    snprintfz(module, sizeof(module), "plugins.d[%s]", plugin);
+                    ND_LOG_STACK lgs[] = {
+                            ND_LOG_FIELD_TXT(NDF_MODULE, module),
+                            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(cd->host)),
+                            ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "pluginsd"),
+                            ND_LOG_FIELD_END(),
+                    };
+                    ND_LOG_STACK_PUSH(lgs);
 
-        killpid(cd->unsafe.pid);
+                    count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
 
-        int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
+                           rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
 
-        if (likely(worker_ret_code == 0))
-            pluginsd_worker_thread_handle_success(cd);
-        else
-            pluginsd_worker_thread_handle_error(cd, worker_ret_code);
+                    killpid(cd->unsafe.pid);
 
-        cd->unsafe.pid = 0;
-        if (unlikely(!plugin_is_enabled(cd)))
-            break;
-    }
+                    int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
+
+                    if(likely(worker_ret_code == 0))
+                        pluginsd_worker_thread_handle_success(cd);
+                    else
+                        pluginsd_worker_thread_handle_error(cd, worker_ret_code);
+
+                    cd->unsafe.pid = 0;
+
+                    if(unlikely(!plugin_is_enabled(cd)))
+                        break;
+                }
+            }
 
     netdata_thread_cleanup_pop(1);
     return NULL;

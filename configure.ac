@@ -54,6 +54,8 @@ else
   AC_CHECK_TOOL([AR], [ar])
 fi
 
+CFLAGS="$CFLAGS -fexceptions"
+
 # -----------------------------------------------------------------------------
 # configurable options
 
@@ -206,6 +208,12 @@ AC_ARG_ENABLE(
     [AS_HELP_STRING([--enable-ml], [Enable anomaly detection @<:@default autodetect@:>@])],
     ,
     [enable_ml="detect"]
+)
+AC_ARG_ENABLE(
+    [gtests],
+    [AS_HELP_STRING([--enable-gtests], [Enable google tests @<:@default no@:>@])],
+    ,
+    [enable_gtests="no"]
 )
 AC_ARG_ENABLE(
     [aclk_ssl_debug],
@@ -564,6 +572,48 @@ AC_CHECK_LIB(
     [LZ4_compress_fast_continue],
     [LZ4_LIBS="-llz4"]
 )
+
+# -----------------------------------------------------------------------------
+# libcurl
+
+PKG_CHECK_MODULES(
+    [LIBCURL],
+    [libcurl],
+    [AC_CHECK_LIB(
+        [curl],
+        [curl_easy_init],
+        [have_libcurl=yes],
+        [have_libcurl=no]
+    )],
+    [have_libcurl=no]
+)
+
+if test "x$have_libcurl" = "xyes"; then
+    AC_DEFINE([HAVE_CURL], [1], [libcurl usability])
+    OPTIONAL_CURL_LIBS="-lcurl"
+fi
+
+# -----------------------------------------------------------------------------
+# PCRE2
+
+PKG_CHECK_MODULES(
+    [LIBPCRE2],
+    [libpcre2-8],
+    [AC_CHECK_LIB(
+        [pcre2-8],
+        [pcre2_compile_8],
+        [have_libpcre2=yes],
+        [have_libpcre2=no]
+    )],
+    [have_libpcre2=no]
+)
+
+if test "x$have_libpcre2" = "xyes"; then
+    AC_DEFINE([HAVE_PCRE2], [1], [PCRE2 usability])
+    OPTIONAL_PCRE2_LIBS="-lpcre2-8"
+fi
+
+AM_CONDITIONAL([ENABLE_LOG2JOURNAL], [test "${have_libpcre2}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # zstd
@@ -1432,17 +1482,17 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 # -----------------------------------------------------------------------------
 # gtest/gmock
 
-AC_MSG_CHECKING([if gtest and gmock can be found])
+if test "${enable_gtests}" = "yes"; then
+    AC_MSG_CHECKING([if gtest can be found])
 
-PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
-PKG_CHECK_MODULES([GMOCK], [gmock], [have_gmock=yes], [have_gmock=no])
+    PKG_CHECK_MODULES([GTEST], [gtest], [have_gtest=yes], [have_gtest=no])
 
-if test "${have_gtest}" = "yes" -a "${have_gmock}" = "yes"; then
-    OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS} ${GMOCK_CFLAGS}"
-    OPTIONAL_GTEST_LIBS="${GTEST_LIBS} ${GMOCK_LIBS}"
-    have_gtest="yes"
-else
-    have_gtest="no"
+    if test "${have_gtest}" = "yes"; then
+        OPTIONAL_GTEST_CFLAGS="${GTEST_CFLAGS}"
+        OPTIONAL_GTEST_LIBS="${GTEST_LIBS}"
+
+        AC_DEFINE([HAVE_GTEST], [1], [gtest availability])
+    fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -1582,18 +1632,6 @@ PKG_CHECK_MODULES(
         [have_libssl=no]
     )],
     [have_libssl=no]
-)
-
-PKG_CHECK_MODULES(
-    [LIBCURL],
-    [libcurl],
-    [AC_CHECK_LIB(
-        [curl],
-        [curl_easy_init],
-        [have_libcurl=yes],
-        [have_libcurl=no]
-    )],
-    [have_libcurl=no]
 )
 
 PKG_CHECK_MODULES(
@@ -1940,6 +1978,8 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_BROTLIENC_LIBS])
 AC_SUBST([OPTIONAL_BROTLIDEC_LIBS])
+AC_SUBST([OPTIONAL_CURL_LIBS])
+AC_SUBST([OPTIONAL_PCRE2_LIBS])
 AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
@@ -2067,15 +2107,18 @@ AC_CONFIG_FILES([
     libnetdata/aral/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
+    libnetdata/buffered_reader/Makefile
     libnetdata/clocks/Makefile
     libnetdata/completion/Makefile
     libnetdata/config/Makefile
+    libnetdata/datetime/Makefile
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
     libnetdata/facets/Makefile
     libnetdata/functions_evloop/Makefile
     libnetdata/july/Makefile
+    libnetdata/line_splitter/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile
@@ -2089,6 +2132,7 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
+    libnetdata/uuid/Makefile
     libnetdata/json/Makefile
     libnetdata/health/Makefile
     libnetdata/worker_utilization/Makefile

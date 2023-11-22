@@ -333,8 +333,8 @@ static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, v
     struct journal_file *jf = value; (void)jf;
     const char *filename = dictionary_acquired_item_name(item); (void)filename;
 
-    string_freez(jf->source);
     internal_error(true, "removed journal file '%s'", filename);
+    string_freez(jf->source);
 }
 
 void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut) {

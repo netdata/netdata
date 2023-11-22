@@ -104,6 +104,12 @@ BuildRequires: zlib-devel
 BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
+BuildRequires: libcurl-devel
+%if 0%{?suse_version}
+# log2journal is not available on these systems
+%else
+BuildRequires: pcre2-devel
+%endif
 %if 0%{?suse_version}
 BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
@@ -550,6 +556,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
+%if 0%{?suse_version}
+# log2journal is not available on these systems
+%else
+%{_sbindir}/log2journal
+%endif
+%{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
 
 %{_unitdir}/%{name}.service

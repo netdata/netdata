@@ -920,7 +920,6 @@ static void xenstat_send_domain_metrics() {
 }
 
 int main(int argc, char **argv) {
-    stderror = stderr;
     clocks_init();
 
     // ------------------------------------------------------------------------
@@ -928,14 +927,7 @@ int main(int argc, char **argv) {
 
     program_name = "xenstat.plugin";
 
-    // disable syslog
-    error_log_syslog = 0;
-
-    // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
-
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins();
 
     // ------------------------------------------------------------------------
     // parse command line parameters

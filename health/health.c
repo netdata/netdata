@@ -82,10 +82,13 @@ static bool prepare_command(BUFFER *wb,
                             const char *edit_command,
                             const char *machine_guid,
                             uuid_t *transition_id,
-                            const char *summary
+                            const char *summary,
+                            const char *context,
+                            const char *component,
+                            const char *type
 ) {
     char buf[8192];
-    size_t n = 8192 - 1;
+    size_t n = sizeof(buf) - 1;
 
     buffer_strcat(wb, "exec");
 
@@ -192,6 +195,18 @@ static bool prepare_command(BUFFER *wb,
     buffer_sprintf(wb, " '%s'", buf);
 
     if (!sanitize_command_argument_string(buf, summary, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, context, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, component, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, type, n))
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
@@ -342,7 +357,9 @@ static void health_reload_host(RRDHOST *host) {
     if(unlikely(!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
         return;
 
-    netdata_log_health("[%s]: Reloading health.", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "[%s]: Reloading health.",
+           rrdhost_hostname(host));
 
     char *user_path = health_user_config_dir();
     char *stock_path = health_stock_config_dir();
@@ -436,8 +453,10 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     if(unlikely(ae->new_status <= RRDCALC_STATUS_CLEAR && (ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
         // do not send notifications for disabled statuses
-        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
-        netdata_log_health("[%s]: Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "[%s]: Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)",
+               rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
         // mark it as run, so that we will send the same alarm if it happens again
         goto done;
@@ -454,10 +473,10 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             // we have executed this alarm notification in the past
             if(last_executed_status == ae->new_status && !(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) {
                 // don't send the notification for the same status again
-                netdata_log_debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae_chart_id(ae), ae_name(ae)
-                      , rrdcalc_status2string(ae->new_status));
-                netdata_log_health("[%s]: Health not sending again notification for alarm '%s.%s' status %s", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae)
-                      , rrdcalc_status2string(ae->new_status));
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "[%s]: Health not sending again notification for alarm '%s.%s' status %s",
+                       rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae),
+                       rrdcalc_status2string(ae->new_status));
                 goto done;
             }
         }
@@ -476,11 +495,16 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     // Check if alarm notifications are silenced
     if (ae->flags & HEALTH_ENTRY_FLAG_SILENCED) {
-        netdata_log_health("[%s]: Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "[%s]: Health not sending notification for alarm '%s.%s' status %s "
+               "(command API has disabled notifications)",
+               rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
         goto done;
     }
 
-    netdata_log_health("[%s]: Sending notification for alarm '%s.%s' status %s.", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "[%s]: Sending notification for alarm '%s.%s' status %s.",
+           rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
     const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.health_default_exec);
     const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.health_default_recipient);
@@ -581,7 +605,11 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               edit_command,
                               host->machine_guid,
                               &ae->transition_id,
-                              host->health.use_summary_for_notifications && ae->summary?ae_summary(ae):ae_name(ae));
+                              host->health.use_summary_for_notifications && ae->summary?ae_summary(ae):ae_name(ae),
+                              string2str(ae->chart_context),
+                              string2str(ae->component),
+                              string2str(ae->type)
+                              );
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {
@@ -778,7 +806,8 @@ static void health_main_cleanup(void *ptr) {
     netdata_log_info("cleaning up...");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
-    netdata_log_health("Health thread ended.");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "Health thread ended.");
 }
 
 static void initialize_health(RRDHOST *host)
@@ -790,7 +819,9 @@ static void initialize_health(RRDHOST *host)
 
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
-    netdata_log_health("[%s]: Initializing health.", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "[%s]: Initializing health.",
+           rrdhost_hostname(host));
 
     host->health.health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
     host->health.health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
@@ -803,7 +834,11 @@ static void initialize_health(RRDHOST *host)
 
     long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
     if(n < 10) {
-        netdata_log_health("Host '%s': health configuration has invalid max log entries %ld. Using default %u", rrdhost_hostname(host), n, host->health_log.max);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Host '%s': health configuration has invalid max log entries %ld. "
+               "Using default %u",
+               rrdhost_hostname(host), n, host->health_log.max);
+
         config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
     }
     else
@@ -811,7 +846,11 @@ static void initialize_health(RRDHOST *host)
 
     uint32_t m = config_get_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
     if (m < HEALTH_LOG_MINIMUM_HISTORY) {
-        netdata_log_health("Host '%s': health configuration has invalid health log history %u. Using minimum %d", rrdhost_hostname(host), m, HEALTH_LOG_MINIMUM_HISTORY);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Host '%s': health configuration has invalid health log history %u. "
+               "Using minimum %d",
+               rrdhost_hostname(host), m, HEALTH_LOG_MINIMUM_HISTORY);
+
         config_set_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_MINIMUM_HISTORY);
         m = HEALTH_LOG_MINIMUM_HISTORY;
     }
@@ -823,7 +862,9 @@ static void initialize_health(RRDHOST *host)
     } else
         host->health_log.health_log_history = m;
 
-    netdata_log_health("[%s]: Health log history is set to %u seconds (%u days)", rrdhost_hostname(host), host->health_log.health_log_history, host->health_log.health_log_history / 86400);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "[%s]: Health log history is set to %u seconds (%u days)",
+           rrdhost_hostname(host), host->health_log.health_log_history, host->health_log.health_log_history / 86400);
 
     conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL,
                                                 SIMPLE_PATTERN_EXACT, true);
@@ -1049,7 +1090,7 @@ void *health_main(void *ptr) {
         if (unlikely(check_if_resumed_from_suspension())) {
             apply_hibernation_delay = 1;
 
-            netdata_log_health(
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
                        "Postponing alarm checks for %"PRId64" seconds, "
                        "because it seems that the system was just resumed from suspension.",
                        (int64_t)hibernation_delay);
@@ -1058,8 +1099,9 @@ void *health_main(void *ptr) {
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
             static int logged=0;
             if (!logged) {
-                netdata_log_health("Skipping health checks, because all alarms are disabled via a %s command.",
-                           HEALTH_CMDAPI_CMD_DISABLEALL);
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "Skipping health checks, because all alarms are disabled via a %s command.",
+                       HEALTH_CMDAPI_CMD_DISABLEALL);
                 logged = 1;
             }
         }
@@ -1081,7 +1123,7 @@ void *health_main(void *ptr) {
             rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
 
             if (unlikely(apply_hibernation_delay)) {
-                netdata_log_health(
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
                            "[%s]: Postponing health checks for %"PRId64" seconds.",
                            rrdhost_hostname(host),
                            (int64_t)hibernation_delay);
@@ -1094,20 +1136,30 @@ void *health_main(void *ptr) {
                     continue;
                 }
 
-                netdata_log_health("[%s]: Resuming health checks after delay.", rrdhost_hostname(host));
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "[%s]: Resuming health checks after delay.",
+                       rrdhost_hostname(host));
+
                 host->health.health_delay_up_to = 0;
             }
 
             // wait until cleanup of obsolete charts on children is complete
             if (host != localhost) {
                 if (unlikely(host->trigger_chart_obsoletion_check == 1)) {
-                    netdata_log_health("[%s]: Waiting for chart obsoletion check.", rrdhost_hostname(host));
+
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "[%s]: Waiting for chart obsoletion check.",
+                           rrdhost_hostname(host));
+
                     continue;
                 }
             }
 
             if (!health_running_logged) {
-                netdata_log_health("[%s]: Health is running.", rrdhost_hostname(host));
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "[%s]: Health is running.",
+                       rrdhost_hostname(host));
+
                 health_running_logged = true;
             }
 
@@ -1161,6 +1213,7 @@ void *health_main(void *ptr) {
                                                                     rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
                         if (ae) {
+                            health_log_alert(host, ae);
                             health_alarm_log_add_entry(host, ae);
                             rc->old_status = rc->status;
                             rc->status = RRDCALC_STATUS_REMOVED;
@@ -1432,9 +1485,13 @@ void *health_main(void *ptr) {
                                                                      )
                                                                     );
 
+                        health_log_alert(host, ae);
                         health_alarm_log_add_entry(host, ae);
 
-                        netdata_log_health("[%s]: Alert event for [%s.%s], value [%s], status [%s].", rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), ae_new_value_string(ae), rrdcalc_status2string(ae->new_status));
+                        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                               "[%s]: Alert event for [%s.%s], value [%s], status [%s].",
+                               rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), ae_new_value_string(ae),
+                               rrdcalc_status2string(ae->new_status));
 
                         rc->last_status_change_value = rc->value;
                         rc->last_status_change = now;
@@ -1519,6 +1576,7 @@ void *health_main(void *ptr) {
                                                                      )
                                                                     );
 
+                        health_log_alert(host, ae);
                         ae->last_repeat = rc->last_repeat;
                         if (!(rc->run_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {
                             ae->flags |= HEALTH_ENTRY_RUN_ONCE;

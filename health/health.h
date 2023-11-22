@@ -105,4 +105,7 @@ void sql_refresh_hashes(void);
 void health_add_host_labels(void);
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
+void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);
+#define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)
+
 #endif //NETDATA_HEALTH_H

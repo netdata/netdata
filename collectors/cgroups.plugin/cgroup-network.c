@@ -649,12 +649,11 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
-    stderror = stderr;
     pid_t pid = 0;
 
-    program_name = argv[0];
     program_version = VERSION;
-    error_log_syslog = 0;
+    clocks_init();
+    nd_log_initialize_for_external_plugins("cgroup-network");
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -687,8 +686,6 @@ int main(int argc, char **argv) {
 
     if(argc != 3)
         usage();
-    
-    log_set_global_severity_for_external_plugins();
 
     int arg = 1;
     int helper = 1;

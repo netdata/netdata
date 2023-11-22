@@ -352,8 +352,8 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             if(max_skip <= 0) {
                 d->skip = true;
 
-                error_limit_static_global_var(erl, 1, 0);
-                error_limit(&erl,
+                nd_log_limit_static_global_var(erl, 1, 0);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                             "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query "
                             "beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
                             rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st), rrddim_id(d->rd),
@@ -402,14 +402,15 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 fix_min_start_time = min_end_time - min_update_every;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "REPLAY WARNING: 'host:%s/chart:%s' "
-                              "misaligned dimensions, "
-                              "update every (min: %ld, max: %ld), "
-                              "start time (min: %ld, max: %ld), "
-                              "end time (min %ld, max %ld), "
-                              "now %ld, last end time sent %ld, "
-                              "min start time is fixed to %ld",
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl,  NDLS_DAEMON, NDLP_WARNING,
+                         "REPLAY WARNING: 'host:%s/chart:%s' "
+                         "misaligned dimensions, "
+                         "update every (min: %ld, max: %ld), "
+                         "start time (min: %ld, max: %ld), "
+                         "end time (min %ld, max %ld), "
+                         "now %ld, last end time sent %ld, "
+                         "min start time is fixed to %ld",
                         rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
                         min_update_every, max_update_every,
                         min_start_time, max_start_time,
@@ -757,8 +758,8 @@ static void replicate_log_request(struct replication_request_details *r, const c
 #ifdef NETDATA_INTERNAL_CHECKS
     internal_error(true,
 #else
-    error_limit_static_global_var(erl, 1, 0);
-    error_limit(&erl,
+    nd_log_limit_static_global_var(erl, 1, 0);
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
 #endif
                 "REPLAY ERROR: 'host:%s/chart:%s' child sent: "
                 "db from %ld to %ld%s, wall clock time %ld, "

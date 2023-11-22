@@ -42,6 +42,8 @@
 # -----------------------------------------------------------------------------
 # testing notifications
 
+cmd_line="'${0}' $(printf "'%s' " "${@}")"
+
 if { [ "${1}" = "test" ] || [ "${2}" = "test" ]; } && [ "${#}" -le 2 ]; then
   if [ "${2}" = "test" ]; then
     recipient="${1}"
@@ -78,60 +80,138 @@ export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
 export LC_ALL=C
 
 # -----------------------------------------------------------------------------
+# logging
 
 PROGRAM_NAME="$(basename "${0}")"
 
-LOG_LEVEL_ERR=1
-LOG_LEVEL_WARN=2
-LOG_LEVEL_INFO=3
-LOG_LEVEL="$LOG_LEVEL_INFO"
+# these should be the same with syslog() priorities
+NDLP_EMERG=0   # system is unusable
+NDLP_ALERT=1   # action must be taken immediately
+NDLP_CRIT=2    # critical conditions
+NDLP_ERR=3     # error conditions
+NDLP_WARN=4    # warning conditions
+NDLP_NOTICE=5  # normal but significant condition
+NDLP_INFO=6    # informational
+NDLP_DEBUG=7   # debug-level messages
 
-set_log_severity_level() {
-  case ${NETDATA_LOG_SEVERITY_LEVEL,,} in
-    "info") LOG_LEVEL="$LOG_LEVEL_INFO";;
-    "warn" | "warning") LOG_LEVEL="$LOG_LEVEL_WARN";;
-    "err" | "error") LOG_LEVEL="$LOG_LEVEL_ERR";;
+# the max (numerically) log level we will log
+LOG_LEVEL=$NDLP_INFO
+
+set_log_min_priority() {
+  case "${NETDATA_LOG_PRIORITY_LEVEL,,}" in
+    "emerg" | "emergency")
+      LOG_LEVEL=$NDLP_EMERG
+      ;;
+
+    "alert")
+      LOG_LEVEL=$NDLP_ALERT
+      ;;
+
+    "crit" | "critical")
+      LOG_LEVEL=$NDLP_CRIT
+      ;;
+
+    "err" | "error")
+      LOG_LEVEL=$NDLP_ERR
+      ;;
+
+    "warn" | "warning")
+      LOG_LEVEL=$NDLP_WARN
+      ;;
+
+    "notice")
+      LOG_LEVEL=$NDLP_NOTICE
+      ;;
+
+    "info")
+      LOG_LEVEL=$NDLP_INFO
+      ;;
+
+    "debug")
+      LOG_LEVEL=$NDLP_DEBUG
+      ;;
   esac
 }
 
-set_log_severity_level
-
-logdate() {
-  date "+%Y-%m-%d %H:%M:%S"
-}
+set_log_min_priority
 
 log() {
-  local status="${1}"
-  shift
+  local level="${1}"
+  shift 1
 
-  echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+  [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
+  systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
+INVOCATION_ID=${NETDATA_INVOCATION_ID}
+SYSLOG_IDENTIFIER=${PROGRAM_NAME}
+PRIORITY=${level}
+THREAD_TAG="alarm-notify"
+ND_LOG_SOURCE=health
+ND_NIDL_NODE=${host}
+ND_NIDL_INSTANCE=${chart}
+ND_NIDL_CONTEXT=${context}
+ND_ALERT_NAME=${name}
+ND_ALERT_ID=${alarm_id}
+ND_ALERT_UNIQUE_ID=${unique_id}
+ND_ALERT_EVENT_ID=${alarm_event_id}
+ND_ALERT_TRANSITION_ID=${transition_id//-/}
+ND_ALERT_CLASS=${classification}
+ND_ALERT_COMPONENT=${component}
+ND_ALERT_TYPE=${type}
+ND_ALERT_RECIPIENT=${roles}
+ND_ALERT_VALUE=${value}
+ND_ALERT_VALUE_OLD=${old_value}
+ND_ALERT_STATUS=${status}
+ND_ALERT_STATUS_OLD=${old_status}
+ND_ALERT_UNITS=${units}
+ND_ALERT_SUMMARY=${summary}
+ND_ALERT_INFO=${info}
+ND_ALERT_DURATION=${duration}
+ND_REQUEST=${cmd_line}
+MESSAGE_ID=6db0018e83e34320ae2a659d78019fb7
+MESSAGE=[ALERT NOTIFICATION]: ${*//[$'\r\n']/{NEWLINE}}
+
+EOFLOG
+  # AN EMPTY LINE IS NEEDED ABOVE
 }
 
 info() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_INFO" -gt "$LOG_LEVEL" ]] && return
-  log INFO "${@}"
+  log "$NDLP_INFO" "${@}"
 }
 
 warning() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_WARN" -gt "$LOG_LEVEL" ]] && return
-  log WARNING "${@}"
+  log "$NDLP_WARN" "${@}"
 }
 
 error() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_ERR" -gt "$LOG_LEVEL" ]] && return
-  log ERROR "${@}"
+  log "$NDLP_ERR" "${@}"
 }
 
 fatal() {
-  log FATAL "${@}"
+  log "$NDLP_ALERT" "${@}"
   exit 1
 }
 
-debug=${NETDATA_ALARM_NOTIFY_DEBUG-0}
 debug() {
-  [ "${debug}" = "1" ] && log DEBUG "${@}"
+  log "$NDLP_DEBUG" "${@}"
 }
+
+debug=0
+if [ "${NETDATA_ALARM_NOTIFY_DEBUG-0}" = "1" ]; then
+  debug=1
+  LOG_LEVEL=$NDLP_DEBUG
+fi
+
+# -----------------------------------------------------------------------------
+# check for BASH v4+ (required for associative arrays)
+
+if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
+  echo >&2 "BASH version 4 or later is required (this is ${BASH_VERSION})."
+  exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
 
 docurl() {
   if [ -z "${curl}" ]; then
@@ -199,15 +279,8 @@ ntfy
 # this is to be overwritten by the config file
 
 custom_sender() {
-  info "not sending custom notification for ${status} of '${host}.${chart}.${name}'"
+  info "custom notification mechanism is not configured; not sending ${notification_description}"
 }
-
-# -----------------------------------------------------------------------------
-
-# check for BASH v4+ (required for associative arrays)
-if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
-  fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
-fi
 
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
@@ -228,8 +301,8 @@ if [[ ${1} = "unittest" ]]; then
   status="${4}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
   old_status="${5}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 elif [[ ${1} = "dump_methods" ]]; then
-    dump_methods=1
-    status="WARNING"
+  dump_methods=1
+  status="WARNING"
 else
   roles="${1}"               # the roles that should be notified for this event
   args_host="${2}"           # the host generated this event
@@ -263,6 +336,9 @@ else
   child_machine_guid="${28}" # the machine_guid of the child
   transition_id="${29}"      # the transition_id of the alert
   summary="${30}"            # the summary text field of the alert
+  context="${31}"            # the context of the chart
+  component="${32}"
+  type="${33}"
 fi
 
 # -----------------------------------------------------------------------------
@@ -276,18 +352,20 @@ else
   host="${args_host}"
 fi
 
+notification_description="notification to '${roles}' for transition from ${old_status} to ${status}, of alert '${name}' = '${value_string}', of instance '${chart}', context '${context}' on host '${host}'"
+
 # -----------------------------------------------------------------------------
 # screen statuses we don't need to send a notification
 
 # don't do anything if this is not WARNING, CRITICAL or CLEAR
 if [ "${status}" != "WARNING" ] && [ "${status}" != "CRITICAL" ] && [ "${status}" != "CLEAR" ]; then
-  info "not sending notification for ${status} of '${host}.${chart}.${name}'"
+  debug "not sending ${notification_description}"
   exit 1
 fi
 
 # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
 if [ "${clear_alarm_always}" != "YES" ] && [ "${old_status}" != "WARNING" ] && [ "${old_status}" != "CRITICAL" ] && [ "${status}" = "CLEAR" ]; then
-  info "not sending notification for ${status} of '${host}.${chart}.${name}' (last status was ${old_status})"
+  debug "not sending ${notification_description}"
   exit 1
 fi
 
@@ -434,7 +512,7 @@ else
       debug "Loading config file '${CONFIG}'..."
       source "${CONFIG}" || error "Failed to load config file '${CONFIG}'."
     else
-      warning "Cannot find file '${CONFIG}'."
+      debug "Cannot find file '${CONFIG}'."
     fi
   done
 fi
@@ -598,7 +676,16 @@ filter_recipient_by_criticality() {
 }
 
 # -----------------------------------------------------------------------------
-# verify the delivery methods supported
+# check the configured targets
+
+# check email
+if [ "${SEND_EMAIL}" = "AUTO" ]; then
+  if command -v curl >/dev/null 2>&1; then
+      SEND_EMAIL="YES"
+  else
+      SEND_EMAIL="NO"
+  fi
+fi
 
 # check slack
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
@@ -677,112 +764,121 @@ filter_recipient_by_criticality() {
 # check custom
 [ -z "${DEFAULT_RECIPIENT_CUSTOM}" ] && SEND_CUSTOM="NO"
 
-if [ "${SEND_PUSHOVER}" = "YES" ] ||
-  [ "${SEND_SLACK}" = "YES" ] ||
-  [ "${SEND_ROCKETCHAT}" = "YES" ] ||
-  [ "${SEND_ALERTA}" = "YES" ] ||
-  [ "${SEND_PD}" = "YES" ] ||
-  [ "${SEND_FLOCK}" = "YES" ] ||
-  [ "${SEND_DISCORD}" = "YES" ] ||
-  [ "${SEND_HIPCHAT}" = "YES" ] ||
-  [ "${SEND_TWILIO}" = "YES" ] ||
-  [ "${SEND_MESSAGEBIRD}" = "YES" ] ||
-  [ "${SEND_KAVENEGAR}" = "YES" ] ||
-  [ "${SEND_TELEGRAM}" = "YES" ] ||
-  [ "${SEND_PUSHBULLET}" = "YES" ] ||
-  [ "${SEND_KAFKA}" = "YES" ] ||
-  [ "${SEND_FLEEP}" = "YES" ] ||
-  [ "${SEND_PROWL}" = "YES" ] ||
-  [ "${SEND_MATRIX}" = "YES" ] ||
-  [ "${SEND_CUSTOM}" = "YES" ] ||
-  [ "${SEND_MSTEAMS}" = "YES" ] ||
-  [ "${SEND_DYNATRACE}" = "YES" ] ||
-  [ "${SEND_OPSGENIE}" = "YES" ] ||
-  [ "${SEND_GOTIFY}" = "YES" ] ||
-  [ "${SEND_NTFY}" = "YES" ]; then
-  # if we need curl, check for the curl command
-  if [ -z "${curl}" ]; then
-    curl="$(command -v curl 2>/dev/null)"
-  fi
-  if [ -z "${curl}" ]; then
-    error "Cannot find curl command in the system path. Disabling all curl based notifications."
-    SEND_PUSHOVER="NO"
-    SEND_PUSHBULLET="NO"
-    SEND_TELEGRAM="NO"
-    SEND_SLACK="NO"
-    SEND_MSTEAMS="NO"
-    SEND_ROCKETCHAT="NO"
-    SEND_ALERTA="NO"
-    SEND_PD="NO"
-    SEND_FLOCK="NO"
-    SEND_DISCORD="NO"
-    SEND_TWILIO="NO"
-    SEND_HIPCHAT="NO"
-    SEND_MESSAGEBIRD="NO"
-    SEND_KAVENEGAR="NO"
-    SEND_KAFKA="NO"
-    SEND_FLEEP="NO"
-    SEND_PROWL="NO"
-    SEND_MATRIX="NO"
-    SEND_CUSTOM="NO"
-    SEND_DYNATRACE="NO"
-    SEND_OPSGENIE="NO"
-    SEND_GOTIFY="NO"
-    SEND_NTFY="NO"
-  fi
-fi
+# -----------------------------------------------------------------------------
+# check the availability of targets
 
-if [ "${SEND_SMS}" = "YES" ]; then
-  if [ -z "${sendsms}" ]; then
-    sendsms="$(command -v sendsms 2>/dev/null)"
-  fi
-  if [ -z "${sendsms}" ]; then
-    SEND_SMS="NO"
-  fi
-fi
-# if we need sendmail, check for the sendmail command
-if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
-  sendmail="$(command -v sendmail 2>/dev/null)"
-  if [ -z "${sendmail}" ]; then
-    debug "Cannot find sendmail command in the system path. Disabling email notifications."
-    SEND_EMAIL="NO"
-  fi
-fi
+check_supported_targets() {
+  local log=${1}
+  shift
 
-# if we need logger, check for the logger command
-if [ "${SEND_SYSLOG}" = "YES" ] && [ -z "${logger}" ]; then
-  logger="$(command -v logger 2>/dev/null)"
-  if [ -z "${logger}" ]; then
-    debug "Cannot find logger command in the system path. Disabling syslog notifications."
-    SEND_SYSLOG="NO"
+  if [ "${SEND_PUSHOVER}" = "YES" ] ||
+    [ "${SEND_SLACK}" = "YES" ] ||
+    [ "${SEND_ROCKETCHAT}" = "YES" ] ||
+    [ "${SEND_ALERTA}" = "YES" ] ||
+    [ "${SEND_PD}" = "YES" ] ||
+    [ "${SEND_FLOCK}" = "YES" ] ||
+    [ "${SEND_DISCORD}" = "YES" ] ||
+    [ "${SEND_HIPCHAT}" = "YES" ] ||
+    [ "${SEND_TWILIO}" = "YES" ] ||
+    [ "${SEND_MESSAGEBIRD}" = "YES" ] ||
+    [ "${SEND_KAVENEGAR}" = "YES" ] ||
+    [ "${SEND_TELEGRAM}" = "YES" ] ||
+    [ "${SEND_PUSHBULLET}" = "YES" ] ||
+    [ "${SEND_KAFKA}" = "YES" ] ||
+    [ "${SEND_FLEEP}" = "YES" ] ||
+    [ "${SEND_PROWL}" = "YES" ] ||
+    [ "${SEND_MATRIX}" = "YES" ] ||
+    [ "${SEND_CUSTOM}" = "YES" ] ||
+    [ "${SEND_MSTEAMS}" = "YES" ] ||
+    [ "${SEND_DYNATRACE}" = "YES" ] ||
+    [ "${SEND_OPSGENIE}" = "YES" ] ||
+    [ "${SEND_GOTIFY}" = "YES" ] ||
+    [ "${SEND_NTFY}" = "YES" ]; then
+    # if we need curl, check for the curl command
+    if [ -z "${curl}" ]; then
+      curl="$(command -v curl 2>/dev/null)"
+    fi
+    if [ -z "${curl}" ]; then
+      $log "Cannot find curl command in the system path. Disabling all curl based notifications."
+      SEND_PUSHOVER="NO"
+      SEND_PUSHBULLET="NO"
+      SEND_TELEGRAM="NO"
+      SEND_SLACK="NO"
+      SEND_MSTEAMS="NO"
+      SEND_ROCKETCHAT="NO"
+      SEND_ALERTA="NO"
+      SEND_PD="NO"
+      SEND_FLOCK="NO"
+      SEND_DISCORD="NO"
+      SEND_TWILIO="NO"
+      SEND_HIPCHAT="NO"
+      SEND_MESSAGEBIRD="NO"
+      SEND_KAVENEGAR="NO"
+      SEND_KAFKA="NO"
+      SEND_FLEEP="NO"
+      SEND_PROWL="NO"
+      SEND_MATRIX="NO"
+      SEND_CUSTOM="NO"
+      SEND_DYNATRACE="NO"
+      SEND_OPSGENIE="NO"
+      SEND_GOTIFY="NO"
+      SEND_NTFY="NO"
+    fi
   fi
-fi
 
-# if we need aws, check for the aws command
-if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
-  aws="$(command -v aws 2>/dev/null)"
-  if [ -z "${aws}" ]; then
-    debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
-    SEND_AWSSNS="NO"
+  if [ "${SEND_SMS}" = "YES" ]; then
+    if [ -z "${sendsms}" ]; then
+      sendsms="$(command -v sendsms 2>/dev/null)"
+    fi
+    if [ -z "${sendsms}" ]; then
+      SEND_SMS="NO"
+    fi
   fi
-fi
+  # if we need sendmail, check for the sendmail command
+  if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
+    sendmail="$(command -v sendmail 2>/dev/null)"
+    if [ -z "${sendmail}" ]; then
+      $log "Cannot find sendmail command in the system path. Disabling email notifications."
+      SEND_EMAIL="NO"
+    fi
+  fi
 
-# if we need nc, check for the nc command
-if [ "${SEND_IRC}" = "YES" ] && [ -z "${nc}" ]; then
-  nc="$(command -v nc 2>/dev/null)"
-  if [ -z "${nc}" ]; then
-    debug "Cannot find nc command in the system path.  Disabling IRC notifications."
-    SEND_IRC="NO"
+  # if we need logger, check for the logger command
+  if [ "${SEND_SYSLOG}" = "YES" ] && [ -z "${logger}" ]; then
+    logger="$(command -v logger 2>/dev/null)"
+    if [ -z "${logger}" ]; then
+      $log "Cannot find logger command in the system path. Disabling syslog notifications."
+      SEND_SYSLOG="NO"
+    fi
   fi
-fi
+
+  # if we need aws, check for the aws command
+  if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
+    aws="$(command -v aws 2>/dev/null)"
+    if [ -z "${aws}" ]; then
+      $log "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
+      SEND_AWSSNS="NO"
+    fi
+  fi
+
+  # if we need nc, check for the nc command
+  if [ "${SEND_IRC}" = "YES" ] && [ -z "${nc}" ]; then
+    nc="$(command -v nc 2>/dev/null)"
+    if [ -z "${nc}" ]; then
+      $log "Cannot find nc command in the system path.  Disabling IRC notifications."
+      SEND_IRC="NO"
+    fi
+  fi
+}
 
 if [ ${dump_methods} ]; then
+    check_supported_targets debug
     for name in "${!SEND_@}"; do
         if [ "${!name}" = "YES" ]; then
             echo "$name"
         fi
     done
-    exit
+    exit 0
 fi
 
 # -----------------------------------------------------------------------------
@@ -790,6 +886,7 @@ fi
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
+have_to_send_something="NO"
 for method_name in ${method_names}; do
   send_var="SEND_${method_name^^}"
   if [ "${!send_var}" = "NO" ]; then
@@ -819,7 +916,11 @@ for method_name in ${method_names}; do
   to_var="to_${method_name}"
   declare to_${method_name}="${!arr_var[*]}"
 
-  [ -z "${!to_var}" ] && declare ${send_var}="NO"
+  if [ -z "${!to_var}" ]; then
+    declare ${send_var}="NO"
+  else
+    have_to_send_something="YES"
+  fi
 done
 
 # -----------------------------------------------------------------------------
@@ -884,9 +985,17 @@ for method in "${SEND_EMAIL}" \
     break
   fi
 done
+
 if [ "$proceed" -eq 0 ]; then
-  fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
+  if [ "${have_to_send_something}" = "NO" ]; then
+    debug "All notification methods are disabled; not sending ${notification_description}."
+    exit 0
+  else
+    fatal "All notification methods are disabled; not sending ${notification_description}."
+  fi
 fi
+
+check_supported_targets error
 
 # -----------------------------------------------------------------------------
 # get the date the alarm happened
@@ -1023,10 +1132,10 @@ send_email() {
     ret=$?
 
     if [ ${ret} -eq 0 ]; then
-      info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
+      info "sent email to '${to_email}' for ${notification_description}"
       return 0
     else
-      error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret} (${cmd_output})."
+      error "failed to send email to '${to_email}' for ${notification_description}, with error code ${ret} (${cmd_output})."
       return 1
     fi
   fi
@@ -1065,10 +1174,10 @@ send_pushover() {
         https://api.pushover.net/1/messages.json)
 
       if [ "${httpcode}" = "200" ]; then
-        info "sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent pushover notification to '${user}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
+        error "failed to send pushover notification to '${user}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1112,10 +1221,10 @@ EOF
         ) "https://api.pushbullet.com/v2/pushes" -X POST)
 
       if [ "${httpcode}" = "200" ]; then
-        info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}'"
+        info "sent pushbullet notification to '${userOrChannelTag}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${userOrChannelTag}' with HTTP response status code ${httpcode}."
+        error "failed to send pushbullet notification to '${userOrChannelTag}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1136,10 +1245,10 @@ send_kafka() {
       "${KAFKA_URL}")
 
     if [ "${httpcode}" = "204" ]; then
-      info "sent kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}'"
+      info "sent kafka data to '${KAFKA_SENDER_IP}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}' with HTTP response status code ${httpcode}."
+      error "failed to send kafka data to '${KAFKA_SENDER_IP}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
 
     [ ${sent} -gt 0 ] && return 0
@@ -1237,10 +1346,10 @@ EOF
       fi
       httpcode=$(docurl -X POST --data "${payload}" ${url})
       if [ "${httpcode}" = "${response_code}" ]; then
-        info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
+        info "sent pagerduty event for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP response status code ${httpcode}."
+        error "failed to send pagerduty event for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1266,10 +1375,10 @@ send_twilio() {
         "https://api.twilio.com/2010-04-01/Accounts/${accountsid}/Messages.json")
 
       if [ "${httpcode}" = "201" ]; then
-        info "sent Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent Twilio SMS to '${user}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
+        error "failed to send Twilio SMS to '${user}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1315,10 +1424,10 @@ send_hipchat() {
         "https://${HIPCHAT_SERVER}/v2/room/${room}/notification")
 
       if [ "${httpcode}" = "204" ]; then
-        info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
+        info "sent HipChat notification to '${room}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}' with HTTP response status code ${httpcode}."
+        error "failed to send HipChat notification to '${room}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1345,10 +1454,10 @@ send_messagebird() {
         "https://rest.messagebird.com/messages")
 
       if [ "${httpcode}" = "201" ]; then
-        info "sent Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent Messagebird SMS to '${user}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
+        error "failed to send Messagebird SMS to '${user}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1372,10 +1481,10 @@ send_kavenegar() {
         --data-urlencode "message=${title} ${message}")
 
       if [ "${httpcode}" = "200" ]; then
-        info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent Kavenegar SMS to '${user}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP response status code ${httpcode}."
+        error "failed to send Kavenegar SMS to '${user}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1416,21 +1525,21 @@ send_telegram() {
         notify_telegram=0
 
         if [ "${httpcode}" = "200" ]; then
-          info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
+          info "sent telegram notification to '${chatid}' for ${notification_description}"
           sent=$((sent + 1))
         elif [ "${httpcode}" = "401" ]; then
-          error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
+          error "failed to send telegram notification to '${chatid}' for ${notification_description}, wrong bot token."
         elif [ "${httpcode}" = "429" ]; then
           if [ "$notify_retries" -gt 0 ]; then
-            error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': rate limit exceeded, retrying after 1s."
+            error "failed to send telegram notification to '${chatid}' for ${notification_description}, rate limit exceeded, retrying after 1s."
             notify_retries=$((notify_retries - 1))
             notify_telegram=1
             sleep 1
           else
-            error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': rate limit exceeded."
+            error "failed to send telegram notification to '${chatid}' for ${notification_description}, rate limit exceeded."
           fi
         else
-          error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP response status code ${httpcode}."
+          error "failed to send telegram notification to '${chatid}' for ${notification_description}, with HTTP response status code ${httpcode}."
         fi
       done
     done
@@ -1487,10 +1596,10 @@ EOF
     httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${cur_webhook}")
 
     if [ "${httpcode}" = "200" ]; then
-      info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${cur_webhook}'"
+      info "sent Microsoft team notification to '${cur_webhook}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${cur_webhook}', with HTTP response status code ${httpcode}."
+      error "failed to send Microsoft team to '${cur_webhook}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -1558,10 +1667,10 @@ EOF
 
     httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
     if [ "${httpcode}" = "200" ]; then
-      info "sent slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}"
+      info "sent slack notification ${chstr} for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}, with HTTP response status code ${httpcode}."
+      error "failed to send slack notification ${chstr} for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -1616,10 +1725,10 @@ EOF
 
     httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
     if [ "${httpcode}" = "200" ]; then
-      info "sent rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+      info "sent rocketchat notification to '${channel}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
+      error "failed to send rocketchat notification to '${channel}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -1685,12 +1794,12 @@ EOF
     httpcode=$(docurl -X POST "${webhook}/alert" -H "Content-Type: application/json" -H "Authorization: $auth" --data "${payload}")
 
     if [ "${httpcode}" = "200" ] || [ "${httpcode}" = "201" ]; then
-      info "sent alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+      info "sent alerta notification to '${channel}' for ${notification_description}"
       sent=$((sent + 1))
     elif [ "${httpcode}" = "202" ]; then
-      info "suppressed alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+      info "suppressed alerta notification to '${channel}' for ${notification_description}"
     else
-      error "failed to send alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
+      error "failed to send alerta notification to '${channel}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -1740,10 +1849,10 @@ send_flock() {
             ]
         }")
     if [ "${httpcode}" = "200" ]; then
-      info "sent flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+      info "sent flock notification to '${channel}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
+      error "failed to send flock notification to '${channel}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -1801,10 +1910,10 @@ EOF
 
     httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
     if [ "${httpcode}" = "200" ]; then
-      info "sent discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+      info "sent discord notification to '${channel}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP response status code ${httpcode}."
+      error "failed to send discord notification to '${channel}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -1830,10 +1939,10 @@ send_fleep() {
       httpcode=$(docurl -X POST --data "${data}" "https://fleep.io/hook/${hook}")
 
       if [ "${httpcode}" = "200" ]; then
-        info "sent fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}'"
+        info "sent fleep data to user '${FLEEP_SENDER}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}' with HTTP response status code ${httpcode}."
+        error "failed to send fleep data to user '${FLEEP_SENDER}' for ${notification_description}, with HTTP response status code ${httpcode}."
       fi
     done
 
@@ -1875,10 +1984,10 @@ send_prowl() {
     httpcode=$(docurl -X POST --data "${data}" "https://api.prowlapp.com/publicapi/add")
 
     if [ "${httpcode}" = "200" ]; then
-      info "sent prowl data for: ${host} ${chart}.${name} is ${status}"
+      info "sent prowl event for ${notification_description}"
       sent=1
     else
-      error "failed to send prowl data for: ${host} ${chart}.${name} is ${status} with with error code ${httpcode}."
+      error "failed to send prowl event for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
 
     [ ${sent} -gt 0 ] && return 0
@@ -1914,10 +2023,10 @@ send_irc() {
       done
 
       if [ "${error}" -eq 0 ]; then
-        info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}'"
+        info "sent irc notification to '${CHANNEL}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}', with error code ${code}."
+        error "failed to send irc notification to '${CHANNEL}' for ${notification_description}, with error code ${code}."
       fi
     done
   fi
@@ -1942,10 +2051,10 @@ send_awssns() {
     # Extract the region from the target ARN.  We need to explicitly specify the region so that it matches up correctly.
     region="$(echo ${target} | cut -f 4 -d ':')"
     if ${aws} sns publish --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null; then
-      info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
+      info "sent Amazon SNS notification to '${target}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
+      error "failed to send Amazon SNS notification to '${target}' for ${notification_description}"
     fi
   done
 
@@ -1987,10 +2096,10 @@ EOF
 
     httpcode=$(docurl -X POST --data "${payload}" "${webhook}")
     if [ "${httpcode}" == "200" ]; then
-      info "sent Matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
+      info "sent Matrix notification to '${room}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send Matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP response status code ${httpcode}."
+      error "failed to send Matrix notification to '${room}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 
@@ -2089,10 +2198,10 @@ send_sms() {
       errmessage=$($sendsms $phone "$msg" 2>&1)
       errcode=$?
       if [ ${errcode} -eq 0 ]; then
-        info "sent smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+        info "sent smstools3 SMS to '${user}' for ${notification_description}"
         sent=$((sent + 1))
       else
-        error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${errcode}: ${errmessage}."
+        error "failed to send smstools3 SMS to '${user}' for ${notification_description}, with error code ${errcode}: ${errmessage}."
       fi
     done
 
@@ -2139,14 +2248,14 @@ EOF
 
   if [ ${ret} -eq 0 ]; then
      if [ "${httpcode}" = "200" ]; then
-        info "sent ${DYNATRACE_EVENT} to ${DYNATRACE_SERVER}"
+        info "sent Dynatrace event '${DYNATRACE_EVENT}' to '${DYNATRACE_SERVER}' for ${notification_description}"
         return 0
      else
-        warning "Dynatrace ${DYNATRACE_SERVER} responded ${httpcode} notification for: ${host} ${chart}.${name} is ${status} was not sent!"
+        warning "failed to send Dynatrace event to '${DYNATRACE_SERVER}' for ${notification_description}, with HTTP response status code ${httpcode}"
         return 1
      fi
   else
-     error  "failed to sent ${DYNATRACE_EVENT} notification for: ${host} ${chart}.${name} is ${status} to  ${DYNATRACE_SERVER} with error code ${ret}."
+     error  "failed to sent Dynatrace '${DYNATRACE_EVENT}' to '${DYNATRACE_SERVER}' for ${notification_description}, with code ${ret}."
      return 1
   fi
 }
@@ -2204,9 +2313,9 @@ EOF
   httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${OPSGENIE_API_URL}/v1/json/integrations/webhooks/netdata?apiKey=${OPSGENIE_API_KEY}")
   # https://docs.opsgenie.com/docs/alert-api#create-alert
   if [ "${httpcode}" = "200" ]; then
-    info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
+    info "sent opsgenie event for ${notification_description}"
   else
-    error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    error "failed to send opsgenie event for ${notification_description}, with HTTP response status code ${httpcode}."
     return 1
   fi
 
@@ -2243,9 +2352,9 @@ EOF
 
   httpcode=$(docurl -X POST -H "Content-Type: application/json" -d "${payload}" "${GOTIFY_APP_URL}/message?token=${GOTIFY_APP_TOKEN}")
   if [ "${httpcode}" = "200" ]; then
-    info "sent gotify notification for: ${host} ${chart}.${name} is ${status}"
+    info "sent gotify event for ${notification_description}"
   else
-    error "failed to send gotify notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+    error "failed to send gotify event for ${notification_description}, with HTTP response status code ${httpcode}."
     return 1
   fi
 
@@ -2298,10 +2407,10 @@ send_ntfy() {
                       -d "${msg}" \
                       ${recipient})
     if [ "${httpcode}" == "200" ]; then
-      info "sent ntfy notification for: ${host} ${chart}.${name} is ${status} to '${recipient}'"
+      info "sent ntfy notification to '${recipient}' for ${notification_description}"
       sent=$((sent + 1))
     else
-      error "failed to send ntfy notification for: ${host} ${chart}.${name} is ${status} to '${recipient}', with HTTP response status code ${httpcode}."
+      error "failed to send ntfy notification to '${recipient}' for ${notification_description}, with HTTP response status code ${httpcode}."
     fi
   done
 

@@ -224,26 +224,31 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 
     if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
-        netdata_log_error("RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
-                          cmd->claim_id, cmd->node_id,
-                          localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-                          cmd->claim_id);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDCONTEXT: received checkpoint command for claim_id '%s', node id '%s', "
+               "but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
+               cmd->claim_id, cmd->node_id,
+               localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+               cmd->claim_id);
 
         return;
     }
 
     RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
-        netdata_log_error("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
-                          cmd->claim_id,
-                          cmd->node_id);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
+               "but there is no node with such node id here. Ignoring command.",
+               cmd->claim_id, cmd->node_id);
 
         return;
     }
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        netdata_log_info("RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', while node '%s' has an active context streaming.",
-                         cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
+               "while node '%s' has an active context streaming.",
+               cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         // disable it temporarily, so that our worker will not attempt to send messages in parallel
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
@@ -252,8 +257,10 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     uint64_t our_version_hash = rrdcontext_version_hash(host);
 
     if(cmd->version_hash != our_version_hash) {
-        netdata_log_error("RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". Sending snapshot of all contexts.",
-                          cmd->version_hash, rrdhost_hostname(host), our_version_hash);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". "
+               "Sending snapshot of all contexts.",
+               cmd->version_hash, rrdhost_hostname(host), our_version_hash);
 
 #ifdef ENABLE_ACLK
         // prepare the snapshot
@@ -275,41 +282,55 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 #endif
     }
 
-    internal_error(true, "RRDCONTEXT: host '%s' enabling streaming of contexts", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRDCONTEXT: host '%s' enabling streaming of contexts",
+           rrdhost_hostname(host));
+
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     char node_str[UUID_STR_LEN];
     uuid_unparse_lower(*host->node_id, node_str);
-    netdata_log_access("ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED", node_str, rrdhost_hostname(host));
+    nd_log(NDLS_ACCESS, NDLP_DEBUG,
+           "ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED",
+           node_str, rrdhost_hostname(host));
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
     struct stop_streaming_ctxs *cmd = ptr;
 
     if(!rrdhost_check_our_claim_id(cmd->claim_id)) {
-        netdata_log_error("RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
-                          cmd->claim_id, cmd->node_id,
-                          localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
-                          cmd->claim_id);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDCONTEXT: received stop streaming command for claim_id '%s', node id '%s', "
+               "but this is not our claim id. Ours '%s', received '%s'. Ignoring command.",
+               cmd->claim_id, cmd->node_id,
+               localhost->aclk_state.claimed_id?localhost->aclk_state.claimed_id:"NOT SET",
+               cmd->claim_id);
 
         return;
     }
 
     RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
     if(!host) {
-        netdata_log_error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but there is no node with such node id here. Ignoring command.",
-                          cmd->claim_id, cmd->node_id);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "
+               "but there is no node with such node id here. Ignoring command.",
+               cmd->claim_id, cmd->node_id);
 
         return;
     }
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        netdata_log_error("RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', but node '%s' does not have active context streaming. Ignoring command.",
-                          cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "
+               "but node '%s' does not have active context streaming. Ignoring command.",
+               cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
         return;
     }
 
-    internal_error(true, "RRDCONTEXT: host '%s' disabling streaming of contexts", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRDCONTEXT: host '%s' disabling streaming of contexts",
+           rrdhost_hostname(host));
+
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 

@@ -115,6 +115,7 @@ struct web_client *web_client_get_from_cache(void) {
     // initialize it
     w->use_count++;
     w->mode = WEB_CLIENT_MODE_GET;
+    memset(w->transaction, 0, sizeof(w->transaction));
 
     return w;
 }

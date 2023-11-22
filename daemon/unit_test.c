@@ -2118,7 +2118,7 @@ int test_dbengine(void)
     RRDDIM *rd[CHARTS][DIMS];
     time_t time_start[REGIONS], time_end[REGIONS];
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
@@ -2347,7 +2347,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
                                    (1024 * 1024);
     default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
 
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
@@ -2522,7 +2522,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     unsigned i, j;
     time_t time_start, test_duration;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
 
     if (!TEST_DURATION_SEC)
         TEST_DURATION_SEC = 10;
