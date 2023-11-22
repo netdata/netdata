@@ -1230,75 +1230,73 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     buffer_json_member_add_string(wb, "type", "table");
 
     // build a message for the query
-    if(!journal_files_completed_once() || partial || fqs->samples.unsampled || fqs->samples.estimated) {
-        buffer_json_member_add_object(wb, "message");
-        {
-            CLEAN_BUFFER *msg = buffer_create(0, NULL);
-            CLEAN_BUFFER *tooltip = buffer_create(0, NULL);
-            int msg_status = 0;
+    buffer_json_member_add_object(wb, "message");
+    {
+        CLEAN_BUFFER *msg = buffer_create(0, NULL);
+        CLEAN_BUFFER *tooltip = buffer_create(0, NULL);
+        int msg_status = 0;
 
-            if(!journal_files_completed_once()) {
-                buffer_strcat(msg, "Journals are still being scanned. ");
-                buffer_strcat(tooltip
-                              , "LIBRARY SCAN: The journal files are still being scanned, you are probably viewing incomplete data. ");
-                msg_status = 2;
-            }
-
-            if(partial) {
-                buffer_strcat(msg, "Query timed-out, incomplete data. ");
-                buffer_strcat(tooltip
-                              , "QUERY TIMEOUT: The query timed out and may not include all the data of the selected window. ");
-                msg_status = 2;
-            }
-
-            if(fqs->samples.estimated || fqs->samples.unsampled) {
-                double percent = (double) (fqs->samples.sampled * 100.0 /
-                                           (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
-                buffer_sprintf(msg, "%.2f%% real data", percent);
-                buffer_sprintf(tooltip, "ACTUAL DATA: The filters counters reflect %0.2f%% of the data. ", percent);
-                msg_status = MAX(msg_status, 1);
-            }
-
-            if(fqs->samples.unsampled) {
-                double percent = (double) (fqs->samples.unsampled * 100.0 /
-                                           (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
-                buffer_sprintf(msg, ", %.2f%% unsampled", percent);
-                buffer_sprintf(tooltip
-                               , "UNSAMPLED DATA: %0.2f%% of the events exist and have been counted, but their values have not been evaluated, so they are not included in the filters counters. "
-                               , percent);
-                msg_status = MAX(msg_status, 1);
-            }
-
-            if(fqs->samples.estimated) {
-                double percent = (double) (fqs->samples.estimated * 100.0 /
-                                           (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
-                buffer_sprintf(msg, ", %.2f%% estimated", percent);
-                buffer_sprintf(tooltip
-                               , "ESTIMATED DATA: The query selected a large amount of data, so to avoid delaying too much, the presented data are estimated by %0.2f%%. "
-                               , percent);
-                msg_status = MAX(msg_status, 1);
-            }
-
-            buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
-            buffer_json_member_add_string(wb, "description", buffer_tostring(tooltip));
-
-            const char *level;
-            switch(msg_status) {
-                default:
-                case 0:
-                    level = "success";
-                    break;
-                case 1:
-                    level = "warning";
-                    break;
-                case 2:
-                    level = "error";
-                    break;
-            }
-            buffer_json_member_add_string(wb, "status", level);
+        if(!journal_files_completed_once()) {
+            buffer_strcat(msg, "Journals are still being scanned. ");
+            buffer_strcat(tooltip
+                          , "LIBRARY SCAN: The journal files are still being scanned, you are probably viewing incomplete data. ");
+            msg_status = 2;
         }
-        buffer_json_object_close(wb); // message
+
+        if(partial) {
+            buffer_strcat(msg, "Query timed-out, incomplete data. ");
+            buffer_strcat(tooltip
+                          , "QUERY TIMEOUT: The query timed out and may not include all the data of the selected window. ");
+            msg_status = 2;
+        }
+
+        if(fqs->samples.estimated || fqs->samples.unsampled) {
+            double percent = (double) (fqs->samples.sampled * 100.0 /
+                                       (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
+            buffer_sprintf(msg, "%.2f%% real data", percent);
+            buffer_sprintf(tooltip, "ACTUAL DATA: The filters counters reflect %0.2f%% of the data. ", percent);
+            msg_status = MAX(msg_status, 1);
+        }
+
+        if(fqs->samples.unsampled) {
+            double percent = (double) (fqs->samples.unsampled * 100.0 /
+                                       (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
+            buffer_sprintf(msg, ", %.2f%% unsampled", percent);
+            buffer_sprintf(tooltip
+                           , "UNSAMPLED DATA: %0.2f%% of the events exist and have been counted, but their values have not been evaluated, so they are not included in the filters counters. "
+                           , percent);
+            msg_status = MAX(msg_status, 1);
+        }
+
+        if(fqs->samples.estimated) {
+            double percent = (double) (fqs->samples.estimated * 100.0 /
+                                       (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
+            buffer_sprintf(msg, ", %.2f%% estimated", percent);
+            buffer_sprintf(tooltip
+                           , "ESTIMATED DATA: The query selected a large amount of data, so to avoid delaying too much, the presented data are estimated by %0.2f%%. "
+                           , percent);
+            msg_status = MAX(msg_status, 1);
+        }
+
+        buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
+        buffer_json_member_add_string(wb, "description", buffer_tostring(tooltip));
+
+        const char *level;
+        switch(msg_status) {
+            default:
+            case 0:
+                level = "success";
+                break;
+            case 1:
+                level = "warning";
+                break;
+            case 2:
+                level = "error";
+                break;
+        }
+        buffer_json_member_add_string(wb, "status", level);
     }
+    buffer_json_object_close(wb); // message
 
     if(!fqs->data_only) {
         buffer_json_member_add_time_t(wb, "update_every", 1);
