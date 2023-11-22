@@ -146,6 +146,7 @@ void nd_log_set_thread_source(ND_LOG_SOURCES source);
 bool nd_log_journal_socket_available(void);
 ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
 int nd_log_priority2id(const char *priority);
+const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 

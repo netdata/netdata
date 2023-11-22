@@ -1232,70 +1232,56 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     // build a message for the query
     if(!fqs->data_only) {
         CLEAN_BUFFER *msg = buffer_create(0, NULL);
-        CLEAN_BUFFER *tooltip = buffer_create(0, NULL);
-        int msg_status = LOG_INFO;
+        CLEAN_BUFFER *msg_description = buffer_create(0, NULL);
+        ND_LOG_FIELD_PRIORITY msg_priority = NDLP_INFO;
 
         if(!journal_files_completed_once()) {
             buffer_strcat(msg, "Journals are still being scanned. ");
-            buffer_strcat(tooltip
+            buffer_strcat(msg_description
                           , "LIBRARY SCAN: The journal files are still being scanned, you are probably viewing incomplete data. ");
-            msg_status = LOG_WARNING;
+            msg_priority = NDLP_WARNING;
         }
 
         if(partial) {
             buffer_strcat(msg, "Query timed-out, incomplete data. ");
-            buffer_strcat(tooltip
+            buffer_strcat(msg_description
                           , "QUERY TIMEOUT: The query timed out and may not include all the data of the selected window. ");
-            msg_status = LOG_WARNING;
+            msg_priority = NDLP_WARNING;
         }
 
         if(fqs->samples.estimated || fqs->samples.unsampled) {
             double percent = (double) (fqs->samples.sampled * 100.0 /
                                        (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
             buffer_sprintf(msg, "%.2f%% real data", percent);
-            buffer_sprintf(tooltip, "ACTUAL DATA: The filters counters reflect %0.2f%% of the data. ", percent);
-            msg_status = MAX(msg_status, LOG_NOTICE);
+            buffer_sprintf(msg_description, "ACTUAL DATA: The filters counters reflect %0.2f%% of the data. ", percent);
+            msg_priority = MIN(msg_priority, NDLP_NOTICE);
         }
 
         if(fqs->samples.unsampled) {
             double percent = (double) (fqs->samples.unsampled * 100.0 /
                                        (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
             buffer_sprintf(msg, ", %.2f%% unsampled", percent);
-            buffer_sprintf(tooltip
+            buffer_sprintf(msg_description
                            , "UNSAMPLED DATA: %0.2f%% of the events exist and have been counted, but their values have not been evaluated, so they are not included in the filters counters. "
                            , percent);
-            msg_status = MAX(msg_status, LOG_NOTICE);
+            msg_priority = MIN(msg_priority, NDLP_NOTICE);
         }
 
         if(fqs->samples.estimated) {
             double percent = (double) (fqs->samples.estimated * 100.0 /
                                        (fqs->samples.estimated + fqs->samples.unsampled + fqs->samples.sampled));
             buffer_sprintf(msg, ", %.2f%% estimated", percent);
-            buffer_sprintf(tooltip
+            buffer_sprintf(msg_description
                            , "ESTIMATED DATA: The query selected a large amount of data, so to avoid delaying too much, the presented data are estimated by %0.2f%%. "
                            , percent);
-            msg_status = MAX(msg_status, LOG_NOTICE);
-        }
-
-        const char *level;
-        switch(msg_status) {
-            default:
-            case LOG_INFO:
-                level = "info";
-                break;
-            case LOG_NOTICE:
-                level = "notice";
-                break;
-            case LOG_WARNING:
-                level = "warning";
-                break;
+            msg_priority = MIN(msg_priority, NDLP_NOTICE);
         }
 
         buffer_json_member_add_object(wb, "message");
         if(buffer_tostring(msg)) {
             buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
-            buffer_json_member_add_string(wb, "description", buffer_tostring(tooltip));
-            buffer_json_member_add_string(wb, "status", level);
+            buffer_json_member_add_string(wb, "description", buffer_tostring(msg_description));
+            buffer_json_member_add_string(wb, "status", nd_log_id2priority(msg_priority));
         }
         // else send an empty object if there is nothing to tell
         buffer_json_object_close(wb); // message
