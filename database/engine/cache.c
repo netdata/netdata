@@ -1862,9 +1862,6 @@ void pgc_destroy(PGC *cache) {
 
         freez(cache->aral);
 #endif
-
-        // TODO: @stelfrag/@ktsaou is this correct? address sanitizer says
-        // we miss memory without this on shutdown.
         freez(cache->index);
         freez(cache);
     }

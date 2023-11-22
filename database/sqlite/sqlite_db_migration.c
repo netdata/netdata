@@ -7,7 +7,7 @@ static int return_int_cb(void *data, int argc, char **argv, char **column)
     int *status = data;
     UNUSED(argc);
     UNUSED(column);
-    *status = str2uint32_t(argv[0], NULL);
+    *status = (int) str2uint32_t(argv[0], NULL);
     return 0;
 }
 
@@ -18,7 +18,7 @@ static int get_auto_vaccum(sqlite3 *database)
 
     int exists = 0;
 
-    snprintf(sql, 127, "PRAGMA auto_vacuum");
+    snprintf(sql, sizeof(sql) - 1, "PRAGMA auto_vacuum");
 
     int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &exists, &err_msg);
     if (rc != SQLITE_OK) {
@@ -35,7 +35,7 @@ int db_table_count(sqlite3 *database)
     char sql[128];
 
     int count = 0;
-    snprintf(sql, 127, "select count(1) from sqlite_schema where type = 'table'");
+    snprintf(sql, sizeof(sql) - 1, "select count(1) from sqlite_schema where type = 'table'");
     int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &count, &err_msg);
     if (rc != SQLITE_OK) {
         netdata_log_info("Error checking database table count; %s", err_msg);
@@ -51,7 +51,7 @@ int table_exists_in_database(sqlite3 *database, const char *table)
 
     int exists = 0;
 
-    snprintf(sql, 127, "select 1 from sqlite_schema where type = 'table' and name = '%s'", table);
+    snprintf(sql, sizeof(sql) - 1, "select 1 from sqlite_schema where type = 'table' and name = '%s'", table);
 
     int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &exists, &err_msg);
     if (rc != SQLITE_OK) {
@@ -69,7 +69,7 @@ static int column_exists_in_table(sqlite3 *database, const char *table, const ch
 
     int exists = 0;
 
-    snprintf(sql, 127, "SELECT 1 FROM pragma_table_info('%s') where name = '%s'", table, column);
+    snprintf(sql, sizeof(sql) - 1, "SELECT 1 FROM pragma_table_info('%s') where name = '%s'", table, column);
 
     int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &exists, &err_msg);
     if (rc != SQLITE_OK) {
@@ -173,7 +173,7 @@ static int do_migration_v3_v4(sqlite3 *database)
 
     int rc;
     sqlite3_stmt *res = NULL;
-    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%'");
+    snprintfz(sql, sizeof(sql) - 1, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%'");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to alter health_log tables");
@@ -183,7 +183,7 @@ static int do_migration_v3_v4(sqlite3 *database)
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          char *table = strdupz((char *) sqlite3_column_text(res, 0));
          if (!column_exists_in_table(database, table, "chart_context")) {
-             snprintfz(sql, 255, "ALTER TABLE %s ADD chart_context text", table);
+             snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE %s ADD chart_context text", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
          }
          freez(table);
@@ -212,7 +212,7 @@ static int do_migration_v6_v7(sqlite3 *database)
 
     int rc;
     sqlite3_stmt *res = NULL;
-    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'aclk_alert_%%'");
+    snprintfz(sql, sizeof(sql) - 1, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'aclk_alert_%%'");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to alter aclk_alert tables");
@@ -222,9 +222,9 @@ static int do_migration_v6_v7(sqlite3 *database)
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          char *table = strdupz((char *) sqlite3_column_text(res, 0));
          if (!column_exists_in_table(database, table, "filtered_alert_unique_id")) {
-             snprintfz(sql, 255, "ALTER TABLE %s ADD filtered_alert_unique_id", table);
+             snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE %s ADD filtered_alert_unique_id", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
-             snprintfz(sql, 255, "UPDATE %s SET filtered_alert_unique_id = alert_unique_id", table);
+             snprintfz(sql, sizeof(sql) - 1, "UPDATE %s SET filtered_alert_unique_id = alert_unique_id", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
          }
          freez(table);
@@ -243,7 +243,7 @@ static int do_migration_v7_v8(sqlite3 *database)
 
     int rc;
     sqlite3_stmt *res = NULL;
-    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%'");
+    snprintfz(sql, sizeof(sql) - 1, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%'");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to alter health_log tables");
@@ -253,7 +253,7 @@ static int do_migration_v7_v8(sqlite3 *database)
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
          char *table = strdupz((char *) sqlite3_column_text(res, 0));
          if (!column_exists_in_table(database, table, "transition_id")) {
-             snprintfz(sql, 255, "ALTER TABLE %s ADD transition_id blob", table);
+             snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE %s ADD transition_id blob", table);
              sqlite3_exec_monitored(database, sql, 0, 0, NULL);
          }
          freez(table);
@@ -273,38 +273,38 @@ static int do_migration_v8_v9(sqlite3 *database)
     sqlite3_stmt *res = NULL;
 
     //create the health_log table and it's index
-    snprintfz(sql, 2047, "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, " \
+    snprintfz(sql, sizeof(sql) - 1, "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, " \
               "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, " \
               "chart_context text, last_transition_id blob, UNIQUE (host_id, alarm_id))");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     //TODO indexes
-    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)");
+    snprintfz(sql, sizeof(sql) - 1, "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
-    snprintfz(sql, 2047, "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, " \
+    snprintfz(sql, sizeof(sql) - 1, "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, " \
               "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, " \
               "flags int, exec_run_timestamp int, delay_up_to_timestamp int, " \
               "info text, exec_code int, new_status real, old_status real, delay int, " \
               "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text, host_id blob)");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
-    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id)");
+    snprintfz(sql, sizeof(sql) - 1, "CREATE INDEX IF NOT EXISTS health_log_d_ind_1 ON health_log_detail (unique_id)");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
-    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)");
+    snprintfz(sql, sizeof(sql) - 1, "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
-    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)");
+    snprintfz(sql, sizeof(sql) - 1, "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
-    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id)");
-    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
-
-    snprintfz(sql, 2047, "ALTER TABLE alert_hash ADD source text");
+    snprintfz(sql, sizeof(sql) - 1, "CREATE INDEX IF NOT EXISTS health_log_d_ind_4 ON health_log_detail (health_log_id)");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
-    snprintfz(sql, 2047, "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id)");
+    snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE alert_hash ADD source text");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
-    snprintfz(sql, 2047, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%' AND name <> 'health_log_detail'");
+    snprintfz(sql, sizeof(sql) - 1, "CREATE INDEX IF NOT EXISTS alert_hash_index ON alert_hash (hash_id)");
+    sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+
+    snprintfz(sql, sizeof(sql) - 1, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'health_log_%%' AND name <> 'health_log_detail'");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to alter health_log tables");
@@ -332,7 +332,7 @@ static int do_migration_v8_v9(sqlite3 *database)
     dfe_done(table);
     dictionary_destroy(dict_tables);
 
-    snprintfz(sql, 2047, "ALTER TABLE health_log_detail DROP COLUMN host_id");
+    snprintfz(sql, sizeof(sql) - 1, "ALTER TABLE health_log_detail DROP COLUMN host_id");
     sqlite3_exec_monitored(database, sql, 0, 0, NULL);
 
     return 0;
@@ -374,7 +374,7 @@ static int do_migration_v14_v15(sqlite3 *database)
 
     int rc;
     sqlite3_stmt *res = NULL;
-    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type = \"index\" AND name LIKE \"aclk_alert_index@_%%\" ESCAPE \"@\"");
+    snprintfz(sql, sizeof(sql) - 1, "SELECT name FROM sqlite_schema WHERE type = \"index\" AND name LIKE \"aclk_alert_index@_%%\" ESCAPE \"@\"");
     rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to drop unused indices");

@@ -208,42 +208,42 @@ int configure_sqlite_database(sqlite3 *database, int target_version)
 
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
-    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA auto_vacuum=%s", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
-    snprintfz(buf, 1024, "PRAGMA synchronous=%s", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA synchronous=%s", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
-    snprintfz(buf, 1024, "PRAGMA journal_mode=%s", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_mode=%s", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
-    snprintfz(buf, 1024, "PRAGMA temp_store=%s", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA temp_store=%s", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
-    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
-    snprintfz(buf, 1024, "PRAGMA cache_size=%lld", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA cache_size=%lld", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
     if (init_database_batch(database, list))
         return 1;
 
-    snprintfz(buf, 1024, "PRAGMA user_version=%d", target_version);
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA user_version=%d", target_version);
     if (init_database_batch(database, list))
         return 1;
 
@@ -390,13 +390,13 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     int rc;
 
     if (likely(!memory)) {
-        snprintfz(sqlite_database, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
         rc = unlink(sqlite_database);
         snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
 
         if (rc == 0 || (rebuild & DB_CHECK_RECOVER)) {
             char new_sqlite_database[FILENAME_MAX + 1];
-            snprintfz(new_sqlite_database, FILENAME_MAX, "%s/netdata-meta-recover.db", netdata_configured_cache_dir);
+            snprintfz(new_sqlite_database, sizeof(new_sqlite_database) - 1, "%s/netdata-meta-recover.db", netdata_configured_cache_dir);
             recover_database(sqlite_database, new_sqlite_database);
             if (rebuild & DB_CHECK_RECOVER)
                 return 0;
@@ -910,7 +910,7 @@ void sql_drop_table(const char *table)
         return;
 
     char wstr[255];
-    snprintfz(wstr, 254, SQL_DROP_TABLE, table);
+    snprintfz(wstr, sizeof(wstr) - 1, SQL_DROP_TABLE, table);
 
     int rc = sqlite3_exec_monitored(db_meta, wstr, 0, 0, NULL);
     if (rc != SQLITE_OK) {

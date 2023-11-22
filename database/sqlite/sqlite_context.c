@@ -31,7 +31,7 @@ int sql_init_context_database(int memory)
     int rc;
 
     if (likely(!memory))
-        snprintfz(sqlite_database, FILENAME_MAX, "%s/context-meta.db", netdata_configured_cache_dir);
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
     else
         strcpy(sqlite_database, ":memory:");
 
@@ -56,9 +56,9 @@ int sql_init_context_database(int memory)
         return 1;
 
     if (likely(!memory))
-        snprintfz(buf, 1024, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta", netdata_configured_cache_dir);
+        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta", netdata_configured_cache_dir);
     else
-        snprintfz(buf, 1024, "ATTACH DATABASE ':memory:' as meta");
+        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE ':memory:' as meta");
 
     if(init_database_batch(db_context_meta, list)) return 1;
 

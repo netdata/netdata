@@ -4,8 +4,9 @@
 
 // SQL statements
 
-#define SQL_STORE_CLAIM_ID  "INSERT INTO node_instance " \
-    "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, unixepoch()) " \
+#define SQL_STORE_CLAIM_ID                                                                                             \
+    "INSERT INTO node_instance "                                                                                       \
+    "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, UNIXEPOCH()) "                                     \
     "ON CONFLICT(host_id) DO UPDATE SET claim_id = excluded.claim_id"
 
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid"
@@ -199,9 +200,9 @@ static void clean_old_chart_labels(RRDSET *st)
     time_t first_time_s = rrdset_first_entry_s(st);
 
     if (unlikely(!first_time_s))
-        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL);
+        snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_CHART_LABEL);
     else
-        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
+        snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
 
     int rc = exec_statement_with_uuid(sql, &st->chart_uuid);
     if (unlikely(rc))
@@ -1175,7 +1176,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
        nd_log(NDLS_DAEMON, NDLP_DEBUG, "%s: Freeing %d database pages", db_alias, do_free_pages);
 
        char sql[128];
-       snprintfz(sql, 127, "PRAGMA incremental_vacuum(%d)", do_free_pages);
+       snprintfz(sql, sizeof(sql) - 1, "PRAGMA incremental_vacuum(%d)", do_free_pages);
        (void) db_execute(database, sql);
    }
 }
@@ -1956,7 +1957,7 @@ static void *metadata_unittest_threads(void)
     tu.join = 0;
     for (int i = 0; i < threads_to_create; i++) {
         char buf[100 + 1];
-        snprintf(buf, 100, "META[%d]", i);
+        snprintf(buf, sizeof(buf) - 1, "META[%d]", i);
         netdata_thread_create(
             &threads[i],
             buf,

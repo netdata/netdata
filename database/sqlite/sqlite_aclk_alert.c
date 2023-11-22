@@ -22,7 +22,7 @@ static void update_filtered(ALARM_ENTRY *ae, int64_t unique_id, char *uuid_str)
     sqlite3_stmt *res = NULL;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, SQL_UPDATE_FILTERED_ALERT, uuid_str);
+    snprintfz(sql, sizeof(sql) - 1, SQL_UPDATE_FILTERED_ALERT, uuid_str);
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement when trying to update_filtered");
@@ -115,7 +115,7 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 
     //get the previous sent event of this alarm_id
     //base the search on the last filtered event
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_SELECT_ALERT_BY_ID, host->aclk_config->uuid_str);
+    snprintfz(sql, sizeof(sql) - 1, SQL_SELECT_ALERT_BY_ID, host->aclk_config->uuid_str);
 
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -184,7 +184,7 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter)
     if (is_event_from_alert_variable_config(ae->unique_id, &host->host_uuid))
         return;
 
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_QUEUE_ALERT_TO_CLOUD, host->aclk_config->uuid_str);
+    snprintfz(sql, sizeof(sql) - 1, SQL_QUEUE_ALERT_TO_CLOUD, host->aclk_config->uuid_str);
 
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_alert, 0);
     if (unlikely(rc != SQLITE_OK)) {
@@ -259,7 +259,7 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
 }
 
 
-void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
+static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
 {
 #ifdef ENABLE_ACLK
     int rc;
@@ -697,7 +697,7 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     char sql[ACLK_SYNC_QUERY_SIZE * 2];
     sqlite3_stmt *res = NULL;
 
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE * 2 - 1, SQL_QUEUE_REMOVE_ALERTS, wc->uuid_str, wc->uuid_str);
+    snprintfz(sql, sizeof(sql) - 1, SQL_QUEUE_REMOVE_ALERTS, wc->uuid_str, wc->uuid_str);
 
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -892,7 +892,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     }
 
     if (cnt) {
-        uint32_t chunk = 1, chunks;
+        uint32_t chunks;
 
         chunks = (cnt / ALARM_EVENTS_PER_CHUNK) + (cnt % ALARM_EVENTS_PER_CHUNK != 0);
         ae = host->health_log.alarms;
@@ -903,15 +903,12 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         alarm_snap.claim_id = claim_id;
         alarm_snap.snapshot_uuid = wc->alerts_snapshot_uuid;
         alarm_snap.chunks = chunks;
-        alarm_snap.chunk = chunk;
+        alarm_snap.chunk = 1;
 
         alarm_snapshot_proto_ptr_t snapshot_proto = NULL;
 
         for (; ae; ae = ae->next) {
-            if (likely(ae->updated_by_id))
-                continue;
-
-            if (unlikely(ae->new_status == RRDCALC_STATUS_UNINITIALIZED))
+            if (likely(ae->updated_by_id) || unlikely(ae->new_status == RRDCALC_STATUS_UNINITIALIZED))
                 continue;
 
             if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
@@ -934,19 +931,9 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
 
             if (cnt == ALARM_EVENTS_PER_CHUNK) {
                 aclk_send_alarm_snapshot(snapshot_proto);
-
                 cnt = 0;
-
-                if (chunk < chunks) {
-                    chunk++;
-
-                    struct alarm_snapshot alarm_snap;
-                    alarm_snap.node_id = wc->node_id;
-                    alarm_snap.claim_id = claim_id;
-                    alarm_snap.snapshot_uuid = wc->alerts_snapshot_uuid;
-                    alarm_snap.chunks = chunks;
-                    alarm_snap.chunk = chunk;
-
+                if (alarm_snap.chunk < chunks) {
+                    alarm_snap.chunk++;
                     snapshot_proto = generate_alarm_snapshot_proto(&alarm_snap);
                 }
             }
@@ -972,7 +959,7 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
         return;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_DELETE_ALERT_ENTRIES, wc->uuid_str);
+    snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_ALERT_ENTRIES, wc->uuid_str);
 
     sqlite3_stmt *res = NULL;
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
@@ -1012,7 +999,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     char sql[ACLK_SYNC_QUERY_SIZE];
 
     sqlite3_stmt *res = NULL;
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, SQL_GET_MIN_MAX_ALERT_SEQ, wc->uuid_str, wc->uuid_str);
+    snprintfz(sql, sizeof(sql) - 1, SQL_GET_MIN_MAX_ALERT_SEQ, wc->uuid_str, wc->uuid_str);
 
     int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
