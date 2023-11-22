@@ -9,7 +9,7 @@
 # Script to find a better name for cgroups
 #
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin:@sbindir_POST@"
 export LC_ALL=C
 
 cmd_line="'${0}' $(printf "'%s' " "${@}")"

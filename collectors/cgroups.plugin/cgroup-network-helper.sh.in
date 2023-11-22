@@ -26,6 +26,7 @@
 # the system path is cleared by cgroup-network
 # shellcheck source=/dev/null
 [ -f /etc/profile ] && source /etc/profile
+export PATH="${PATH}:@sbindir_POST@"
 
 export LC_ALL=C
 

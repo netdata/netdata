@@ -13,7 +13,7 @@
 # each will have a different config file and modules configuration directory.
 #
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin:@sbindir_POST@"
 
 PROGRAM_FILE="$0"
 MODULE_NAME="main"
