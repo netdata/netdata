@@ -925,9 +925,9 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialization of netdata plugin
 
-    program_name = "xenstat.plugin";
+    program_name = PLUGIN_XENSTAT_NAME;
 
-    nd_log_initialize_for_external_plugins();
+    nd_log_initialize_for_external_plugins(PLUGIN_XENSTAT_NAME);
 
     // ------------------------------------------------------------------------
     // parse command line parameters
