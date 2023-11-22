@@ -164,7 +164,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
 #ifdef ENABLE_ACLK
 
-#define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id;"
+#define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id"
 static int is_host_available(uuid_t *host_id)
 {
     sqlite3_stmt *res = NULL;
@@ -223,7 +223,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql,"SELECT 'drop '||type||' IF EXISTS '||name||';' FROM sqlite_schema " \
-                        "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index');", uuid_str);
+                        "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index')", uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -303,7 +303,7 @@ static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unus
 }
 
 #define SQL_SELECT_ACLK_ACTIVE_LIST "SELECT REPLACE(SUBSTR(name,19),'_','-') FROM sqlite_schema " \
-        "WHERE name LIKE 'aclk_chart_latest_%' AND type IN ('table');"
+        "WHERE name LIKE 'aclk_chart_latest_%' AND type IN ('table')"
 
 static void sql_check_aclk_table_list(void)
 {
@@ -315,7 +315,7 @@ static void sql_check_aclk_table_list(void)
     }
 }
 
-#define SQL_ALERT_CLEANUP "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND CAST(date_cloud_ack AS INT) < unixepoch()-%d;"
+#define SQL_ALERT_CLEANUP "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND CAST(date_cloud_ack AS INT) < unixepoch()-%d"
 
 static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
@@ -326,7 +326,7 @@ static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __ma
     return 0;
 }
 
-#define SQL_SELECT_ACLK_ALERT_LIST "SELECT SUBSTR(name,12) FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table');"
+#define SQL_SELECT_ACLK_ALERT_LIST "SELECT SUBSTR(name,12) FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table')"
 
 static void sql_maint_aclk_sync_database_all(void)
 {
@@ -368,9 +368,7 @@ static void timer_cb(uv_timer_t *handle)
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
 
-    time_t now =  now_realtime_sec();
-
-    if (config->cleanup_after < now) {
+    if (config->cleanup_after < now_realtime_sec()) {
         cmd.opcode = ACLK_DATABASE_CLEANUP;
         aclk_database_enq_cmd(&cmd);
         config->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
@@ -560,7 +558,7 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 
 #define SQL_FETCH_ALL_INSTANCES                                                                                        \
     "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni "                                                     \
-    "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL; "
+    "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL"
 
 void sql_aclk_sync_init(void)
 {

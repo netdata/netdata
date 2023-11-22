@@ -113,7 +113,7 @@ static void build_node_info(RRDHOST *host)
     wc->node_collectors_send = now_realtime_sec();
 }
 
-bool host_is_replicating(RRDHOST *host)
+static bool host_is_replicating(RRDHOST *host)
 {
     bool replicating = false;
     RRDSET *st;
@@ -137,6 +137,8 @@ void aclk_check_node_info_and_collectors(void)
     size_t context_loading = 0;
     size_t replicating = 0;
     size_t context_pp = 0;
+
+    time_t now = now_realtime_sec();
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         struct aclk_sync_cfg_t *wc = host->aclk_config;
@@ -160,13 +162,13 @@ void aclk_check_node_info_and_collectors(void)
         if (!pp_queue_empty && (wc->node_info_send_time || wc->node_collectors_send))
             context_pp++;
 
-        if (pp_queue_empty && wc->node_info_send_time && wc->node_info_send_time + 30 < now_realtime_sec()) {
+        if (pp_queue_empty && wc->node_info_send_time && wc->node_info_send_time + 30 < now) {
             wc->node_info_send_time = 0;
             build_node_info(host);
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
         }
 
-        if (pp_queue_empty && wc->node_collectors_send && wc->node_collectors_send + 30 < now_realtime_sec()) {
+        if (pp_queue_empty && wc->node_collectors_send && wc->node_collectors_send + 30 < now) {
             build_node_collectors(host);
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
             wc->node_collectors_send = 0;

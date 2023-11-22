@@ -426,7 +426,7 @@ done:
 #define SQL_CLEANUP_HEALTH_LOG_DETAIL_NOT_CLAIMED "DELETE FROM health_log_detail WHERE health_log_id IN " \
     "(SELECT health_log_id FROM health_log WHERE host_id = @host_id) AND when_key < unixepoch() - @history " \
     "AND updated_by_id <> 0 AND transition_id NOT IN " \
-    "(SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id);"
+    "(SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"
 
 #define SQL_CLEANUP_HEALTH_LOG_DETAIL_CLAIMED(guid) "DELETE from health_log_detail WHERE unique_id NOT IN " \
     "(SELECT filtered_alert_unique_id FROM aclk_alert_%s) " \
@@ -435,7 +435,7 @@ done:
     "AND health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = @host_id) " \
     "AND when_key < unixepoch() - @history " \
     "AND updated_by_id <> 0 AND transition_id NOT IN " \
-    "(SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id);", guid
+    "(SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)", guid
 
 void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed) {
     sqlite3_stmt *res = NULL;
@@ -501,11 +501,11 @@ done:
     "duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, " \
     "delay, new_value, old_value, last_repeat, transition_id, global_id, summary) "                                             \
     "select health_log_id, ?1, ?2, ?3, 0, ?4, unixepoch(), 0, 0, flags, exec_run_timestamp, unixepoch(), info, exec_code, -2, " \
-    "new_status, delay, NULL, new_value, 0, ?5, now_usec(0), summary from health_log_detail where unique_id = ?6 and transition_id = ?7;"
+    "new_status, delay, NULL, new_value, 0, ?5, now_usec(0), summary from health_log_detail where unique_id = ?6 and transition_id = ?7"
 
-#define SQL_INJECT_REMOVED_UPDATE_DETAIL "update health_log_detail set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3 and transition_id = ?4;"
+#define SQL_INJECT_REMOVED_UPDATE_DETAIL "update health_log_detail set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3 and transition_id = ?4"
 
-#define SQL_INJECT_REMOVED_UPDATE_LOG "update health_log set last_transition_id = ?1 where alarm_id = ?2 and last_transition_id = ?3 and host_id = ?4;"
+#define SQL_INJECT_REMOVED_UPDATE_LOG "update health_log set last_transition_id = ?1 where alarm_id = ?2 and last_transition_id = ?3 and host_id = ?4"
 
 void sql_inject_removed_status(RRDHOST *host, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id, uuid_t *prev_transition_id)
 {
@@ -743,7 +743,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
             "hld.info, hld.exec_code, hld.new_status, hld.old_status, hld.delay, hld.new_value, hld.old_value, " \
             "hld.last_repeat, ah.class, ah.component, ah.type, hl.chart_context, hld.transition_id, hld.global_id, hl.chart_name, hld.summary " \
             "FROM health_log hl, alert_hash ah, health_log_detail hld " \
-            "WHERE hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id;"
+            "WHERE hl.config_hash_id = ah.hash_id and hl.host_id = @host_id and hl.last_transition_id = hld.transition_id"
 
 void sql_health_alarm_log_load(RRDHOST *host)
 {
@@ -936,7 +936,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
     "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, " \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, " \
     "p_db_lookup_before, p_update_every, source, chart_labels, summary) values (?1,unixepoch(),?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12," \
-    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36);"
+    "?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36)"
 
 int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
 {
@@ -1214,7 +1214,7 @@ int alert_hash_and_store_config(
 #define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT                                                                          \
     "SELECT hld.new_status FROM health_log hl, health_log_detail hld "                                                 \
     "WHERE hl.host_id = @host_id AND hl.alarm_id = @alarm_id AND hld.unique_id != @unique_id AND hld.flags & @flags "  \
-    "AND hl.health_log_id = hld.health_log_id ORDER BY hld.unique_id DESC LIMIT 1;"
+    "AND hl.health_log_id = hld.health_log_id ORDER BY hld.unique_id DESC LIMIT 1"
 
 int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status)
 {
@@ -1423,11 +1423,11 @@ finish:
          error_report("Failed to reset statement for SQL_SELECT_HEALTH_LOG");
 }
 
-#define SQL_COPY_HEALTH_LOG(table) "INSERT OR IGNORE INTO health_log (host_id, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context) SELECT ?1, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context from %s;", table
-#define SQL_COPY_HEALTH_LOG_DETAIL(table) "INSERT INTO health_log_detail (unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, host_id) SELECT unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, now_usec(1), ?1 from %s;", table
-#define SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID "update health_log_detail set transition_id = uuid_random() where transition_id is null;"
-#define SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID "update health_log_detail set health_log_id = (select health_log_id from health_log where host_id = ?1 and alarm_id = health_log_detail.alarm_id) where health_log_id is null and host_id = ?2;"
-#define SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID "update health_log set last_transition_id = (select transition_id from health_log_detail where health_log_id = health_log.health_log_id and alarm_id = health_log.alarm_id group by (alarm_id) having max(alarm_event_id)) where host_id = ?1;"
+#define SQL_COPY_HEALTH_LOG(table) "INSERT OR IGNORE INTO health_log (host_id, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context) SELECT ?1, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context from %s", table
+#define SQL_COPY_HEALTH_LOG_DETAIL(table) "INSERT INTO health_log_detail (unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, host_id) SELECT unique_id, alarm_id, alarm_event_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, now_usec(1), ?1 from %s", table
+#define SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID "update health_log_detail set transition_id = uuid_random() where transition_id is null"
+#define SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID "update health_log_detail set health_log_id = (select health_log_id from health_log where host_id = ?1 and alarm_id = health_log_detail.alarm_id) where health_log_id is null and host_id = ?2"
+#define SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID "update health_log set last_transition_id = (select transition_id from health_log_detail where health_log_id = health_log.health_log_id and alarm_id = health_log.alarm_id group by (alarm_id) having max(alarm_event_id)) where host_id = ?1"
 int health_migrate_old_health_log_table(char *table) {
     if (!table)
         return 0;

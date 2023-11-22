@@ -11,7 +11,7 @@
 #ifndef ACLK_MAX_CHART_BATCH_COUNT
 #define ACLK_MAX_CHART_BATCH_COUNT (10)
 #endif
-#define ACLK_MAX_ALERT_UPDATES  (5)
+#define ACLK_MAX_ALERT_UPDATES  "5"
 #define ACLK_DATABASE_CLEANUP_FIRST  (1200)
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
 #define ACLK_DELETE_ACK_ALERTS_INTERNAL (86400)
@@ -43,10 +43,10 @@ static inline int claimed()
 #define TABLE_ACLK_ALERT                                                                                               \
     "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, "                                      \
     "alert_unique_id, date_created, date_submitted, date_cloud_ack, filtered_alert_unique_id NOT NULL, "               \
-    "UNIQUE(alert_unique_id));"
+    "UNIQUE(alert_unique_id))"
 
-#define INDEX_ACLK_ALERT1 "CREATE INDEX IF NOT EXISTS aclk_alert_index1_%s ON aclk_alert_%s (filtered_alert_unique_id);"
-#define INDEX_ACLK_ALERT2 "CREATE INDEX IF NOT EXISTS aclk_alert_index2_%s ON aclk_alert_%s (date_submitted);"
+#define INDEX_ACLK_ALERT1 "CREATE INDEX IF NOT EXISTS aclk_alert_index1_%s ON aclk_alert_%s (filtered_alert_unique_id)"
+#define INDEX_ACLK_ALERT2 "CREATE INDEX IF NOT EXISTS aclk_alert_index2_%s ON aclk_alert_%s (date_submitted)"
 
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
