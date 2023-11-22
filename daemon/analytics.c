@@ -921,11 +921,14 @@ void set_global_environment()
     if (clean)
         freez(default_port);
 
-    // set the path we need
+    setenv("NETDATA_EXE_PATH", netdata_exe_path, 1);
+
     char path[1024 + 1], *p = getenv("PATH");
     if (!p)
         p = "/bin:/usr/bin";
-    snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
+    snprintfz(path, 1024, "%s:%s%s%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
+     netdata_exe_path[0] ? ":" : "",
+     netdata_exe_path[0] ? netdata_exe_path : "");
     setenv("PATH", config_get(CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
 
     // python options

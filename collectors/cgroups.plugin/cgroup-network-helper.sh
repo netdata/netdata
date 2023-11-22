@@ -23,10 +23,6 @@
 
 # -----------------------------------------------------------------------------
 
-# the system path is cleared by cgroup-network
-# shellcheck source=/dev/null
-[ -f /etc/profile ] && source /etc/profile
-
 export LC_ALL=C
 
 cmd_line="'${0}' $(printf "'%s' " "${@}")"

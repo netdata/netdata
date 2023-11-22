@@ -10,12 +10,14 @@
 #include <sched.h>
 #endif
 
-char environment_variable2[FILENAME_MAX + 50] = "";
-char environment_variable3[FILENAME_MAX + 50] = "";
+char env_var_path[FILENAME_MAX + 50] = "";
+char env_var_host_prefix[FILENAME_MAX + 50] = "";
+char env_var_log_level[FILENAME_MAX + 50] = "";
+
 char *environment[] = {
-        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
-        environment_variable2,
-        environment_variable3,
+        env_var_path,
+        env_var_host_prefix,
+        env_var_log_level,
         NULL
 };
 
@@ -670,12 +672,20 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // build a safe environment for our script
 
-    // the first environment variable is a fixed PATH=
-    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
+    char *nd_exe_path = getenv("NETDATA_EXE_PATH");
+
+    snprintfz(
+        env_var_path,
+        sizeof(env_var_path) - 1,
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin%s%s",
+        nd_exe_path && *nd_exe_path ? ":" : "",
+        nd_exe_path && *nd_exe_path ? nd_exe_path : "");
+
+    snprintfz(env_var_host_prefix, sizeof(env_var_host_prefix) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
 
     char *s = getenv("NETDATA_LOG_SEVERITY_LEVEL");
     if (s)
-        snprintfz(environment_variable3, sizeof(environment_variable3) - 1, "NETDATA_LOG_SEVERITY_LEVEL=%s", s);
+        snprintfz(env_var_log_level, sizeof(env_var_log_level) - 1, "NETDATA_LOG_SEVERITY_LEVEL=%s", s);
 
     // ------------------------------------------------------------------------
 

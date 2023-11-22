@@ -1910,6 +1910,10 @@ int main(int argc, char **argv) {
 
         // prepare configuration environment variables for the plugins
         get_netdata_configured_variables();
+
+        // Get execution path before switching user to avoid permission issues
+        get_netdata_execution_path();
+
         set_global_environment();
 
         // work while we are cd into config_dir
@@ -1917,9 +1921,6 @@ int main(int argc, char **argv) {
         // files using relative filenames
         if(chdir(netdata_configured_user_config_dir) == -1)
             fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
-
-        // Get execution path before switching user to avoid permission issues
-        get_netdata_execution_path();
     }
 
     {
