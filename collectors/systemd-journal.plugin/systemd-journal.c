@@ -1095,7 +1095,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
         // do not even try to do the query if we expect it to pass the timeout
         if(ended_ut > (query_started_ut + (fqs->stop_monotonic_ut - query_started_ut) * 3 / 4) &&
-            ended_ut + max_duration_ut >= fqs->stop_monotonic_ut) {
+            ended_ut + max_duration_ut * 2 >= fqs->stop_monotonic_ut) {
 
             partial = true;
             status = ND_SD_JOURNAL_TIMED_OUT;
