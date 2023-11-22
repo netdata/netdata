@@ -354,18 +354,54 @@ static size_t sampling_file_lines_scanned(FUNCTION_QUERY_STATUS *fqs) {
     return sampled;
 }
 
+static double sampling_file_query_timeframe_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
+        usec_t msg_ut, usec_t *after_ut, usec_t *before_ut) {
+    // find the overlap of the query and file timeframes
+    // taking into account the first message we encountered
+
+    double progress;
+    usec_t oldest_ut, newest_ut, elapsed_ut;
+    if(direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
+        // the first message we know (oldest)
+        oldest_ut = fqs->query_file.first_msg_ut ? fqs->query_file.first_msg_ut : jf->msg_first_ut;
+        if(!oldest_ut) oldest_ut = fqs->query_file.start_ut;
+
+        if(jf->msg_last_ut)
+            newest_ut = MIN(fqs->query_file.stop_ut, jf->msg_last_ut);
+        else if(jf->file_last_modified_ut)
+            newest_ut = MIN(fqs->query_file.stop_ut, jf->file_last_modified_ut);
+        else
+            newest_ut = fqs->query_file.stop_ut;
+
+        elapsed_ut = msg_ut - oldest_ut;
+    }
+    else /* BACKWARD */ {
+        // the latest message we know (newest)
+        newest_ut = fqs->query_file.first_msg_ut ? fqs->query_file.first_msg_ut : jf->msg_last_ut;
+        if(!newest_ut) newest_ut = fqs->query_file.start_ut;
+
+        if(jf->msg_first_ut)
+            oldest_ut = MAX(fqs->query_file.stop_ut, jf->msg_first_ut);
+        else
+            oldest_ut = fqs->query_file.stop_ut;
+
+        elapsed_ut = newest_ut - msg_ut;
+    }
+
+    usec_t total_ut = newest_ut - oldest_ut;
+    progress = (double)elapsed_ut / (double)total_ut;
+
+    *after_ut = oldest_ut;
+    *before_ut = newest_ut;
+
+    return progress;
+}
+
 static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
-        usec_t msg_ut, usec_t *total_time_ut, usec_t *remaining_start_ut, usec_t *remaining_end_ut) {
+    usec_t msg_ut, usec_t *total_time_ut, usec_t *remaining_start_ut, usec_t *remaining_end_ut) {
 
-    // fqs->query_file.start/stop follow the direction of the query
-    usec_t after_ut = MIN(fqs->query_file.first_msg_ut, fqs->query_file.stop_ut);
-    usec_t before_ut = MAX(fqs->query_file.first_msg_ut, fqs->query_file.stop_ut);
-
-    if(jf->msg_first_ut && after_ut < jf->msg_first_ut)
-        after_ut = jf->msg_first_ut;
-
-    if(jf->msg_last_ut && before_ut > jf->msg_last_ut)
-        before_ut = jf->msg_last_ut;
+    usec_t after_ut, before_ut;
+    sampling_file_query_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
 
     // since we have a timestamp in msg_ut
     // this timestamp can extend the overlap
@@ -499,9 +535,9 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
 
     if(fqs->samples.sampled + fqs->samples.unsampled > fqs->sampling &&
         fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
-        usec_t dt_from_start_ut = MAX(fqs->query_file.first_msg_ut, msg_ut) - MIN(fqs->query_file.first_msg_ut, msg_ut);
-        usec_t dt_from_end_ut = MAX(fqs->query_file.stop_ut, msg_ut) - MIN(fqs->query_file.stop_ut, msg_ut);
-        if(dt_from_start_ut >= (dt_from_start_ut + dt_from_end_ut) / 20)
+        usec_t after_ut, before_ut;
+        double progress = sampling_file_query_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
+        if(progress > 0.03)
             return SAMPLING_STOP_AND_ESTIMATE;
     }
 
