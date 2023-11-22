@@ -794,6 +794,10 @@ bool facets_key_name_is_facet(FACETS *facets, const char *key) {
 
 // ----------------------------------------------------------------------------
 
+size_t facets_histogram_slots(FACETS *facets) {
+    return facets->histogram.slots;
+}
+
 static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
     // Array of valid durations in seconds
     static time_t valid_durations_s[] = {
@@ -821,10 +825,6 @@ static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
 static inline usec_t facets_histogram_slot_baseline_ut(FACETS *facets, usec_t ut) {
     usec_t delta_ut = ut % facets->histogram.slot_width_ut;
     return ut - delta_ut;
-}
-
-size_t facets_histogram_slots(FACETS *facets) {
-    return facets->histogram.slots;
 }
 
 void facets_set_timeframe_and_histogram_by_id(FACETS *facets, const char *key_id, usec_t after_ut, usec_t before_ut) {
@@ -913,33 +913,47 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
     facets->operations.rows.matched += entries;
     facets->operations.rows.estimated += entries;
 
-    if(!facets->histogram.enabled ||
-       !facets->histogram.key ||
-       !facets->histogram.key->values.enabled)
+    if (!facets->histogram.enabled ||
+        !facets->histogram.key ||
+        !facets->histogram.key->values.enabled)
         return;
 
-    if(from_ut < facets->histogram.after_ut)
+    if (from_ut < facets->histogram.after_ut)
         from_ut = facets->histogram.after_ut;
 
-    if(to_ut > facets->histogram.before_ut)
+    if (to_ut > facets->histogram.before_ut)
         to_ut = facets->histogram.before_ut;
 
-    if(!facets->histogram.key->estimated_value.v)
+    if (!facets->histogram.key->estimated_value.v)
         FACET_VALUE_ADD_ESTIMATED_VALUE_TO_INDEX(facets->histogram.key);
 
     FACET_VALUE *v = facets->histogram.key->estimated_value.v;
 
     size_t from_slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
     size_t to_slot = facets_histogram_slot_at_time_ut(facets, to_ut, v);
-    size_t slots = to_slot < from_slot ? 1 : to_slot - from_slot + 1;
-    size_t entries_per_slot = entries / slots;
+    size_t total_ut = to_ut - from_ut;
+    ssize_t remaining_entries = (ssize_t)entries;
 
-    for(uint32_t slot = 0; slot < slots ;slot++) {
-        if(unlikely(slot >= facets->histogram.slots))
-            slot = facets->histogram.slots - 1;
+    for (size_t slot = from_slot; slot <= to_slot; slot++) {
+        if (unlikely(slot >= facets->histogram.slots))
+            break;
 
-        v->histogram[from_slot + slot] += entries_per_slot;
+        usec_t slot_start_ut = facets->histogram.after_ut + slot * facets->histogram.slot_width_ut;
+        usec_t slot_end_ut = slot_start_ut + facets->histogram.slot_width_ut;
+        usec_t overlap_start_ut = (from_ut > slot_start_ut) ? from_ut : slot_start_ut;
+        usec_t overlap_end_ut = (to_ut < slot_end_ut) ? to_ut : slot_end_ut;
+        usec_t overlap_ut = (overlap_end_ut > overlap_start_ut) ? (overlap_end_ut - overlap_start_ut) : 0;
+
+        size_t slot_entries = (overlap_ut * entries) / total_ut;
+        v->histogram[slot] += slot_entries;
+        remaining_entries -= (ssize_t)slot_entries;
     }
+
+    // Check if all entries are assigned
+    // This should always be true if the distribution is correct
+    internal_fatal(remaining_entries < 0 || remaining_entries > (ssize_t)(to_slot - from_slot),
+                   "distribution of estimations is not accurate - there are %zd remaining entries",
+                   remaining_entries);
 }
 
 void facets_row_finished_unsampled(FACETS *facets, usec_t usec) {

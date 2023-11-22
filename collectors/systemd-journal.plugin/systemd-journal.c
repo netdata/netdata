@@ -366,7 +366,7 @@ static size_t sampling_file_lines_scanned(FUNCTION_QUERY_STATUS *fqs) {
     return sampled;
 }
 
-static double sampling_file_query_timeframe_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
+static double sampling_file_query_overlapping_timeframe_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
         usec_t msg_ut, usec_t *after_ut, usec_t *before_ut) {
     // find the overlap of the query and file timeframes
     // taking into account the first message we encountered
@@ -385,6 +385,9 @@ static double sampling_file_query_timeframe_ut(FUNCTION_QUERY_STATUS *fqs, struc
         else
             newest_ut = fqs->query_file.stop_ut;
 
+        if(msg_ut < oldest_ut)
+            oldest_ut = msg_ut - 1;
+
         elapsed_ut = msg_ut - oldest_ut;
     }
     else /* BACKWARD */ {
@@ -396,6 +399,9 @@ static double sampling_file_query_timeframe_ut(FUNCTION_QUERY_STATUS *fqs, struc
             oldest_ut = MAX(fqs->query_file.stop_ut, jf->msg_first_ut);
         else
             oldest_ut = fqs->query_file.stop_ut;
+
+        if(newest_ut < msg_ut)
+            newest_ut = msg_ut + 1;
 
         elapsed_ut = newest_ut - msg_ut;
     }
@@ -413,7 +419,7 @@ static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct
     usec_t msg_ut, usec_t *total_time_ut, usec_t *remaining_start_ut, usec_t *remaining_end_ut) {
 
     usec_t after_ut, before_ut;
-    sampling_file_query_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
+    sampling_file_query_overlapping_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
 
     // since we have a timestamp in msg_ut
     // this timestamp can extend the overlap
@@ -545,11 +551,13 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
     fqs->samples_per_file.unsampled++;
     fqs->samples_per_time_slot.unsampled[slot]++;
 
-    if(fqs->samples.sampled + fqs->samples.unsampled > fqs->sampling &&
-        fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
+    if(fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
         usec_t after_ut, before_ut;
-        double progress = sampling_file_query_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
-        if(progress > 0.03)
+
+        double progress = sampling_file_query_overlapping_timeframe_ut(
+                fqs, jf, direction, msg_ut, &after_ut, &before_ut);
+
+        if(progress > 0.01)
             return SAMPLING_STOP_AND_ESTIMATE;
     }
 
