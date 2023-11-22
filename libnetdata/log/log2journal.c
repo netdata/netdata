@@ -386,7 +386,10 @@ static inline bool jb_pcre2_match(pcre2_code *re, pcre2_match_data *match_data, 
     if(rc < 0) {
         PCRE2_UCHAR errbuf[1024];
         pcre2_get_error_message(rc, errbuf, sizeof(errbuf));
-        log2stderr("PCRE2 error %d: %s on: %s", rc, errbuf, line);
+
+        if(log)
+            log2stderr("PCRE2 error %d: %s on: %s", rc, errbuf, line);
+
         return false;
     }
 
