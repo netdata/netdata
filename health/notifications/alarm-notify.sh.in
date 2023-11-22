@@ -76,7 +76,7 @@ if { [ "${1}" = "test" ] || [ "${2}" = "test" ]; } && [ "${#}" -le 2 ]; then
   exit $test_res
 fi
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin:@sbindir_POST@"
 export LC_ALL=C
 
 # -----------------------------------------------------------------------------
