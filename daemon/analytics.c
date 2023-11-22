@@ -824,8 +824,7 @@ void get_system_timezone(void)
     }
 }
 
-void set_global_environment()
-{
+void set_global_environment() {
     {
         char b[16];
         snprintfz(b, 15, "%d", default_rrd_update_every);
@@ -922,16 +921,14 @@ void set_global_environment()
         freez(default_port);
 
     // set the path we need
-    char path[1024 + 1], *p = getenv("PATH");
-    if (!p)
-        p = "/bin:/usr/bin";
-    snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
+    char path[4096], *p = getenv("PATH");
+    if (!p) p = "/bin:/usr/bin";
+    snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
     setenv("PATH", config_get(CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
 
     // python options
     p = getenv("PYTHONPATH");
-    if (!p)
-        p = "";
+    if (!p) p = "";
     setenv("PYTHONPATH", config_get(CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
 
     // disable buffering for python plugins
@@ -941,41 +938,48 @@ void set_global_environment()
     setenv("LC_ALL", "C", 1);
 }
 
-void send_statistics(const char *action, const char *action_result, const char *action_data)
-{
+void send_statistics(const char *action, const char *action_result, const char *action_data) {
     static char *as_script;
 
     if (netdata_anonymous_statistics_enabled == -1) {
         char *optout_file = mallocz(
             sizeof(char) *
             (strlen(netdata_configured_user_config_dir) + strlen(".opt-out-from-anonymous-statistics") + 2));
+
         sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
+
         if (likely(access(optout_file, R_OK) != 0)) {
             as_script = mallocz(
                 sizeof(char) *
                 (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
+
             sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
+
             if (unlikely(access(as_script, R_OK) != 0)) {
                 netdata_anonymous_statistics_enabled = 0;
-                netdata_log_info("Anonymous statistics script %s not found.", as_script);
+
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "Statistics script '%s' not found.",
+                       as_script);
+
                 freez(as_script);
-            } else {
-                netdata_anonymous_statistics_enabled = 1;
             }
-        } else {
+            else
+                netdata_anonymous_statistics_enabled = 1;
+        }
+        else {
             netdata_anonymous_statistics_enabled = 0;
             as_script = NULL;
         }
+
         freez(optout_file);
     }
-    if (!netdata_anonymous_statistics_enabled)
+
+    if (!netdata_anonymous_statistics_enabled || !action)
         return;
-    if (!action)
-        return;
-    if (!action_result)
+
+    if (!action_result || !action_data)
         action_result = "";
-    if (!action_data)
-        action_data = "";
 
     char *command_to_run = mallocz(
         sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) +
@@ -1030,7 +1034,9 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_prebuilt_distro,
         analytics_data.netdata_fail_reason);
 
-    netdata_log_info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "%s '%s' '%s' '%s'",
+           as_script, action, action_result, action_data);
 
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(command_to_run, &command_pid, &fp_child_input);
@@ -1039,11 +1045,21 @@ void send_statistics(const char *action, const char *action_result, const char *
         char *s = fgets(buffer, 4, fp_child_output);
         int exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
         if (exit_code)
-            netdata_log_error("Execution of anonymous statistics script returned %d.", exit_code);
-        if (s && strncmp(buffer, "200", 3))
-            netdata_log_error("Execution of anonymous statistics script returned http code %s.", buffer);
-    } else {
-        netdata_log_error("Failed to run anonymous statistics script %s.", as_script);
+
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "Statistics script returned error: %d",
+                   exit_code);
+
+        if (s && strncmp(buffer, "200", 3) != 0)
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "Statistics script returned http code: %s",
+                   buffer);
+
     }
+    else
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Failed to run statistics script: %s.",
+               as_script);
+
     freez(command_to_run);
 }
