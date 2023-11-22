@@ -1076,8 +1076,10 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     }
 
     bool partial = false;
-    usec_t started_ut;
-    usec_t ended_ut = now_monotonic_usec();
+    usec_t query_started_ut = now_monotonic_usec();
+    usec_t started_ut = query_started_ut;
+    usec_t ended_ut = started_ut;
+    usec_t duration_ut = 0, max_duration_ut = 0;
 
     sampling_query_init(fqs, facets);
 
@@ -1088,6 +1090,17 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
         if(!jf_is_mine(jf, fqs))
             continue;
+
+        started_ut = ended_ut;
+
+        // do not even try to do the query if we expect it to pass the timeout
+        if(ended_ut > (query_started_ut + (fqs->stop_monotonic_ut - query_started_ut) * 3 / 4) &&
+            ended_ut + max_duration_ut >= fqs->stop_monotonic_ut) {
+
+            partial = true;
+            status = ND_SD_JOURNAL_TIMED_OUT;
+            break;
+        }
 
         fqs->file_working++;
         // fqs->cached_count = 0;
@@ -1110,9 +1123,11 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         fs_calls = fstat_thread_calls - fs_calls;
         fs_cached = fstat_thread_cached_responses - fs_cached;
 
-        started_ut = ended_ut;
         ended_ut = now_monotonic_usec();
-        usec_t duration_ut = ended_ut - started_ut;
+        duration_ut = ended_ut - started_ut;
+
+        if(duration_ut > max_duration_ut)
+            max_duration_ut = duration_ut;
 
         buffer_json_add_array_item_object(wb); // journal file
         {
