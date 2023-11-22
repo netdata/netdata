@@ -360,6 +360,12 @@ static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct
     usec_t after_ut = MIN(fqs->query_file.start_ut, fqs->query_file.stop_ut);
     usec_t before_ut = MAX(fqs->query_file.start_ut, fqs->query_file.stop_ut);
 
+    if(jf->msg_first_ut && after_ut < jf->msg_first_ut)
+        after_ut = jf->msg_first_ut;
+
+    if(jf->msg_last_ut && before_ut > jf->msg_last_ut)
+        before_ut = jf->msg_last_ut;
+
     // since we have a timestamp in msg_ut
     // this timestamp can extend the overlap
     if(msg_ut <= after_ut)
