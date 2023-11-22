@@ -1230,8 +1230,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
     buffer_json_member_add_string(wb, "type", "table");
 
     // build a message for the query
-    buffer_json_member_add_object(wb, "message");
-    {
+    if(!fqs->data_only) {
         CLEAN_BUFFER *msg = buffer_create(0, NULL);
         CLEAN_BUFFER *tooltip = buffer_create(0, NULL);
         int msg_status = 0;
@@ -1278,9 +1277,6 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
             msg_status = MAX(msg_status, 1);
         }
 
-        buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
-        buffer_json_member_add_string(wb, "description", buffer_tostring(tooltip));
-
         const char *level;
         switch(msg_status) {
             default:
@@ -1294,9 +1290,16 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
                 level = "error";
                 break;
         }
-        buffer_json_member_add_string(wb, "status", level);
+
+        buffer_json_member_add_object(wb, "message");
+        if(buffer_tostring(msg)) {
+            buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
+            buffer_json_member_add_string(wb, "description", buffer_tostring(tooltip));
+            buffer_json_member_add_string(wb, "status", level);
+        }
+        // else send an empty object if there is nothing to tell
+        buffer_json_object_close(wb); // message
     }
-    buffer_json_object_close(wb); // message
 
     if(!fqs->data_only) {
         buffer_json_member_add_time_t(wb, "update_every", 1);
