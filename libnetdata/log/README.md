@@ -72,7 +72,7 @@ In `netdata.conf`, there are the following settings:
 
 ```
 [logs]
-	# logs to trigger flood protection = 1200
+	# logs to trigger flood protection = 1000
 	# logs flood protection period = 60
 	# facility = daemon
 	# level = info

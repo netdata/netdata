@@ -9,7 +9,7 @@ extern "C" {
 
 #include "../libnetdata.h"
 
-#define ND_LOG_DEFAULT_THROTTLE_LOGS 1200
+#define ND_LOG_DEFAULT_THROTTLE_LOGS 1000
 #define ND_LOG_DEFAULT_THROTTLE_PERIOD 60
 
 typedef enum  __attribute__((__packed__)) {
