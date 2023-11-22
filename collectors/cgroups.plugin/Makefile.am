@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
     cgroup-name.sh \
+    cgroup-network-helper.sh \
     $(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -17,5 +18,6 @@ dist_plugins_SCRIPTS = \
 
 dist_noinst_DATA = \
     cgroup-name.sh.in \
+    cgroup-network-helper.sh.in \
     README.md \
     $(NULL)

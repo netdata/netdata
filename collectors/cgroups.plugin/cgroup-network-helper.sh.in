@@ -34,6 +34,8 @@ cmd_line="'${0}' $(printf "'%s' " "${@}")"
 # -----------------------------------------------------------------------------
 # logging
 
+NETDATA_EXE_PATH=@sbindir_POST@
+
 PROGRAM_NAME="$(basename "${0}")"
 
 # these should be the same with syslog() priorities
@@ -93,7 +95,7 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
+  PATH=${NETDATA_EXE_PATH} systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
