@@ -500,7 +500,8 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
     if(fqs->samples.sampled + fqs->samples.unsampled > fqs->sampling &&
         fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
         usec_t dt_from_start_ut = MAX(fqs->query_file.first_msg_ut, msg_ut) - MIN(fqs->query_file.first_msg_ut, msg_ut);
-        if(dt_from_start_ut > 2 * USEC_PER_SEC)
+        usec_t dt_from_end_ut = MAX(fqs->query_file.stop_ut, msg_ut) - MIN(fqs->query_file.stop_ut, msg_ut);
+        if(dt_from_start_ut >= (dt_from_start_ut + dt_from_end_ut) / 20)
             return SAMPLING_STOP_AND_ESTIMATE;
     }
 
@@ -647,8 +648,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         if(unlikely(msg_ut > latest_msg_ut))
             latest_msg_ut = msg_ut;
 
-        if(unlikely(!first_msg_ut))
+        if(unlikely(!first_msg_ut)) {
             first_msg_ut = msg_ut;
+            fqs->query_file.first_msg_ut = msg_ut;
+        }
 
         sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_BACKWARD,
@@ -752,8 +755,10 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         if(likely(msg_ut > latest_msg_ut))
             latest_msg_ut = msg_ut;
 
-        if(unlikely(!first_msg_ut))
+        if(unlikely(!first_msg_ut)) {
             first_msg_ut = msg_ut;
+            fqs->query_file.first_msg_ut = msg_ut;
+        }
 
         sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_FORWARD,
