@@ -91,9 +91,9 @@ static const char *nd_log_id2method(ND_LOG_METHOD method) {
 
 const char *nd_log_method_for_external_plugins(const char *s) {
     if(s && *s) {
-        ND_LOG_METHOD out = nd_log_method2id(s);
-        if(IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(out))
-            return nd_log_id2method(out);
+        ND_LOG_METHOD method = nd_log_method2id(s);
+        if(IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(method))
+            return nd_log_id2method(method);
     }
 
     return nd_log_id2method(NDLM_STDERR);
