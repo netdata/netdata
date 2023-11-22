@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Doc change: Curl no longer supports spaces in the URL. [\#16446](https://github.com/netdata/netdata/pull/16446) ([luisj1983](https://github.com/luisj1983))
+- journal startup [\#16443](https://github.com/netdata/netdata/pull/16443) ([ktsaou](https://github.com/ktsaou))
+- Fix icon filename  [\#16441](https://github.com/netdata/netdata/pull/16441) ([shyamvalsan](https://github.com/shyamvalsan))
+- Minor: Small health docs typo fix [\#16439](https://github.com/netdata/netdata/pull/16439) ([MrZammler](https://github.com/MrZammler))
 - Removes Observabilitycon banner README.md [\#16434](https://github.com/netdata/netdata/pull/16434) ([Aliki92](https://github.com/Aliki92))
 - Journal sampling [\#16433](https://github.com/netdata/netdata/pull/16433) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16431](https://github.com/netdata/netdata/pull/16431) ([netdatabot](https://github.com/netdatabot))
@@ -21,6 +25,7 @@
 - /api/v1/charts: bring back chart id to `title` [\#16416](https://github.com/netdata/netdata/pull/16416) ([ilyam8](https://github.com/ilyam8))
 - fix: don't count reused connections as new [\#16414](https://github.com/netdata/netdata/pull/16414) ([ilyam8](https://github.com/ilyam8))
 - Add support for installing a specific major version of the agent on install. [\#16413](https://github.com/netdata/netdata/pull/16413) ([Ferroin](https://github.com/Ferroin))
+- Remove queue limit from ACLK sync event loop [\#16411](https://github.com/netdata/netdata/pull/16411) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#16409](https://github.com/netdata/netdata/pull/16409) ([netdatabot](https://github.com/netdatabot))
 - Improve handling around EPEL requirement for RPM packages. [\#16406](https://github.com/netdata/netdata/pull/16406) ([Ferroin](https://github.com/Ferroin))
 - Fix typo in metadata \(eBPF\) [\#16405](https://github.com/netdata/netdata/pull/16405) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -172,6 +177,7 @@
 - Update info about custom dashboards [\#16121](https://github.com/netdata/netdata/pull/16121) ([elizabyte8](https://github.com/elizabyte8))
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 - shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
+- Add support for gorilla pages for tier 0. [\#15969](https://github.com/netdata/netdata/pull/15969) ([vkalintiris](https://github.com/vkalintiris))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
 - Docs: getting started with netdata cloud onprem [\#15954](https://github.com/netdata/netdata/pull/15954) ([M4itee](https://github.com/M4itee))
 
@@ -417,11 +423,6 @@
 - Fix coverity 393052:  API usage errors  \(LOCK\) [\#15832](https://github.com/netdata/netdata/pull/15832) ([stelfrag](https://github.com/stelfrag))
 - systemd-journal in containers [\#15830](https://github.com/netdata/netdata/pull/15830) ([ktsaou](https://github.com/ktsaou))
 - RPM: fixed attrs for conf.d dirs [\#15828](https://github.com/netdata/netdata/pull/15828) ([k0ste](https://github.com/k0ste))
-- Avoid resource leak  [\#15827](https://github.com/netdata/netdata/pull/15827) ([stelfrag](https://github.com/stelfrag))
-- Release fd if setsockopt or bind fails [\#15826](https://github.com/netdata/netdata/pull/15826) ([stelfrag](https://github.com/stelfrag))
-- Fix use after free [\#15825](https://github.com/netdata/netdata/pull/15825) ([stelfrag](https://github.com/stelfrag))
-- Improve dyncfg exit [\#15824](https://github.com/netdata/netdata/pull/15824) ([underhood](https://github.com/underhood))
-- Release job message status to avoid memory leak [\#15822](https://github.com/netdata/netdata/pull/15822) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
