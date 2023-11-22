@@ -617,8 +617,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
 
         setenv("NETDATA_LOG_METHOD", nd_log_id2output(method), 1);
         setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
-        setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
-        setenv("NETDATA_LOG_PRIORITY_LEVEL", nd_log_id2priority(priority), 1);
+        setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
     }
 }
 
@@ -635,11 +634,8 @@ void nd_log_set_priority_level(const char *setting) {
     nd_log.sources[NDLS_DAEMON].min_priority = priority;
     nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
 
-    // backwards compatibility
-    setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
-
     // the right one
-    setenv("NETDATA_LOG_PRIORITY_LEVEL", nd_log_id2priority(priority), 1);
+    setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
 }
 
 void nd_log_set_facility(const char *facility) {
@@ -747,7 +743,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
         nd_log.sources[i].fp = NULL;
     }
 
-    nd_log_set_priority_level(getenv("NETDATA_LOG_PRIORITY_LEVEL"));
+    nd_log_set_priority_level(getenv("NETDATA_LOG_LEVEL"));
     nd_log_set_facility(getenv("NETDATA_SYSLOG_FACILITY"));
 
     time_t period = 1200;

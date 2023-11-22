@@ -37,7 +37,7 @@ NDLP_DEBUG=7   # debug-level messages
 LOG_LEVEL=$NDLP_INFO
 
 set_log_min_priority() {
-  case "${NETDATA_LOG_PRIORITY_LEVEL,,}" in
+  case "${NETDATA_LOG_LEVEL,,}" in
     "emerg" | "emergency")
       LOG_LEVEL=$NDLP_EMERG
       ;;

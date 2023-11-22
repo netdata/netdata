@@ -509,8 +509,8 @@ The program has the following modes of logging:
     The parameter --newline=STRING allows setting the string to be replaced
     with newlines.
 
-    For example by setting --newline='{NEWLINE}', the program will replace
-    all occurrences of {NEWLINE} with the newline character, within each
+    For example by setting --newline='--NEWLINE--', the program will replace
+    all occurrences of --NEWLINE-- with the newline character, within each
     VALUE of the KEY=VALUE lines. Once this this done, the program will
     switch the field to the binary Journal Export Format before sending the
     log event to systemd-journal.
