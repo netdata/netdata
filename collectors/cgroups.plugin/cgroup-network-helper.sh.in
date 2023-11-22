@@ -26,6 +26,7 @@
 # the system path is cleared by cgroup-network
 # shellcheck source=/dev/null
 [ -f /etc/profile ] && source /etc/profile
+export PATH="${PATH}:@sbindir_POST@"
 
 export LC_ALL=C
 
@@ -33,8 +34,6 @@ cmd_line="'${0}' $(printf "'%s' " "${@}")"
 
 # -----------------------------------------------------------------------------
 # logging
-
-NETDATA_EXE_PATH=@sbindir_POST@
 
 PROGRAM_NAME="$(basename "${0}")"
 
@@ -95,7 +94,7 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  PATH=${NETDATA_EXE_PATH} systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
+  systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
