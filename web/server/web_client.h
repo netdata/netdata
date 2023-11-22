@@ -136,6 +136,8 @@ struct web_client {
     unsigned long long id;
     size_t use_count;
 
+    uuid_t transaction;
+
     WEB_CLIENT_FLAGS flags;             // status flags for the client
     WEB_CLIENT_MODE mode;               // the operational mode of the client
     WEB_CLIENT_ACL acl;                 // the access list of the client
@@ -207,7 +209,7 @@ ssize_t web_client_send(struct web_client *w);
 ssize_t web_client_receive(struct web_client *w);
 ssize_t web_client_read_file(struct web_client *w);
 
-void web_client_process_request(struct web_client *w);
+void web_client_process_request_from_web_server(struct web_client *w);
 void web_client_request_done(struct web_client *w);
 
 void buffer_data_options2string(BUFFER *wb, uint32_t options);
@@ -234,5 +236,6 @@ void web_client_timeout_checkpoint_set(struct web_client *w, int timeout_ms);
 usec_t web_client_timeout_checkpoint(struct web_client *w);
 bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t *usec_since_last_checkpoint);
 usec_t web_client_timeout_checkpoint_response_ready(struct web_client *w, usec_t *usec_since_last_checkpoint);
+void web_client_log_completed_request(struct web_client *w, bool update_web_stats);
 
 #endif

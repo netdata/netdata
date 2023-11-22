@@ -112,7 +112,7 @@ int registry_db_save(void) {
     if(unlikely(!registry_db_should_be_saved()))
         return -2;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
 
     char tmp_filename[FILENAME_MAX + 1];
     char old_filename[FILENAME_MAX + 1];
@@ -124,7 +124,7 @@ int registry_db_save(void) {
     FILE *fp = fopen(tmp_filename, "w");
     if(!fp) {
         netdata_log_error("REGISTRY: Cannot create file: %s", tmp_filename);
-        error_log_limit_reset();
+        nd_log_limits_reset();
         return -1;
     }
 
@@ -135,7 +135,7 @@ int registry_db_save(void) {
     if(bytes1 < 0) {
         netdata_log_error("REGISTRY: Cannot save registry machines - return value %d", bytes1);
         fclose(fp);
-        error_log_limit_reset();
+        nd_log_limits_reset();
         return bytes1;
     }
     netdata_log_debug(D_REGISTRY, "REGISTRY: saving machines took %d bytes", bytes1);
@@ -145,7 +145,7 @@ int registry_db_save(void) {
     if(bytes2 < 0) {
         netdata_log_error("REGISTRY: Cannot save registry persons - return value %d", bytes2);
         fclose(fp);
-        error_log_limit_reset();
+        nd_log_limits_reset();
         return bytes2;
     }
     netdata_log_debug(D_REGISTRY, "REGISTRY: saving persons took %d bytes", bytes2);
@@ -204,7 +204,7 @@ int registry_db_save(void) {
     }
 
     // continue operations
-    error_log_limit_reset();
+    nd_log_limits_reset();
 
     return -1;
 }

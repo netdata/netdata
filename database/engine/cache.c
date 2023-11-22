@@ -1171,9 +1171,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     if(all_of_them && !filter) {
         pgc_ll_lock(cache, &cache->clean);
         if(cache->clean.stats->entries) {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "DBENGINE CACHE: cannot free all clean pages, %zu are still in the clean queue",
-                        cache->clean.stats->entries);
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
+                         "DBENGINE CACHE: cannot free all clean pages, %zu are still in the clean queue",
+                         cache->clean.stats->entries);
         }
         pgc_ll_unlock(cache, &cache->clean);
     }

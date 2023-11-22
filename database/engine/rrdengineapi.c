@@ -361,12 +361,12 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
 #ifdef NETDATA_INTERNAL_CHECKS
         internal_error(true,
 #else
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl,
-                    #endif
-              "DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
-              "with existing %s%s page from %ld to %ld, update every %ld - "
-              "is it collected more than once?",
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+#endif
+                    "DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
+                    "with existing %s%s page from %ld to %ld, update every %ld - "
+                    "is it collected more than once?",
                     uuid,
                     page_entry.start_time_s, page_entry.end_time_s, (time_t)page_entry.update_every_s,
                     pgc_is_page_hot(pgc_page) ? "hot" : "not-hot",
@@ -521,8 +521,8 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
         collect_page_flags_to_buffer(wb, handle->page_flags);
     }
 
-    error_limit_static_global_var(erl, 1, 0);
-    error_limit(&erl,
+    nd_log_limit_static_global_var(erl, 1, 0);
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
                 "DBENGINE: metric '%s' collected point at %ld, %s last collection at %ld, "
                 "update every %ld, %s page from %ld to %ld, position %u (of %u), flags: %s",
                 uuid,
@@ -535,7 +535,7 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
                 (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
                 handle->page_position, handle->page_entries_max,
                 wb ? buffer_tostring(wb) : ""
-    );
+                );
 
     buffer_free(wb);
 #else

@@ -315,7 +315,7 @@ void netdata_cleanup_and_exit(int ret) {
     const char *prev_msg = NULL;
     bool timeout = false;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     netdata_log_info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
@@ -449,8 +449,9 @@ void netdata_cleanup_and_exit(int ret) {
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
                 if(running) {
-                    error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
-                    error_limit(&erl, "waiting for %zu collectors to finish", running);
+                    nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
+                                 "waiting for %zu collectors to finish", running);
                     // sleep_usec(100 * USEC_PER_MS);
                     cleanup_destroyed_dictionaries();
                 }
@@ -618,8 +619,14 @@ int killpid(pid_t pid) {
     int ret;
     netdata_log_debug(D_EXIT, "Request to kill pid %d", pid);
 
+    int signal = SIGTERM;
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    if(service_running(SERVICE_COLLECTORS))
+//        signal = SIGABRT;
+//#endif
+
     errno = 0;
-    ret = kill(pid, SIGTERM);
+    ret = kill(pid, signal);
     if (ret == -1) {
         switch(errno) {
             case ESRCH:
@@ -666,7 +673,7 @@ static void set_nofile_limit(struct rlimit *rl) {
 }
 
 void cancel_main_threads() {
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
 
     int i, found = 0;
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
@@ -756,7 +763,7 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>\n"
+            " Copyright (C) 2016-2023, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
@@ -845,44 +852,49 @@ static void security_init(){
 #endif
 
 static void log_init(void) {
+    nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
+
+    time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
+    size_t logs = ND_LOG_DEFAULT_THROTTLE_LOGS;
+    period = config_get_number(CONFIG_SECTION_LOGS, "logs flood protection period", period);
+    logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
+    nd_log_set_flood_protection(logs, period);
+
+    nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", NDLP_INFO_STR));
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  filename);
+    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
 
-    snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
+    bool with_journal = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */;
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", filename));
 
-    snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    stdcollector_filename = config_get(CONFIG_SECTION_LOGS, "collector", filename);
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
+    nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
-    snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    stdhealth_filename = config_get(CONFIG_SECTION_LOGS, "health", filename);
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-        aclklog_filename = config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename);
+        nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 #endif
-
-    char deffacility[8];
-    snprintfz(deffacility,7,"%s","daemon");
-    facility_log = config_get(CONFIG_SECTION_LOGS, "facility",  deffacility);
-
-    error_log_throttle_period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", error_log_throttle_period);
-    error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
-    error_log_errors_per_period_backup = error_log_errors_per_period;
-
-    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
-    setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
-
-    char *selected_level = config_get(CONFIG_SECTION_LOGS, "severity level", NETDATA_LOG_LEVEL_INFO_STR);
-    global_log_severity_level = log_severity_string_to_severity_level(selected_level);
-    setenv("NETDATA_LOG_SEVERITY_LEVEL", selected_level , 1);
 }
 
 char *initialize_lock_directory_path(char *prefix)
@@ -1054,6 +1066,17 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
+    config_move(CONFIG_SECTION_LOGS,   "error",
+                CONFIG_SECTION_LOGS,   "daemon");
+
+    config_move(CONFIG_SECTION_LOGS,   "severity level",
+                CONFIG_SECTION_LOGS,   "level");
+
+    config_move(CONFIG_SECTION_LOGS,   "errors to trigger flood protection",
+                CONFIG_SECTION_LOGS,   "logs to trigger flood protection");
+
+    config_move(CONFIG_SECTION_LOGS,   "errors flood protection period",
+                CONFIG_SECTION_LOGS,   "logs flood protection period");
 }
 
 static int get_hostname(char *buf, size_t buf_size) {
@@ -1354,6 +1377,7 @@ int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_rrdpush_compressions(void);
+int uuid_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1363,8 +1387,6 @@ int main(int argc, char **argv) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
-    // Initialize stderror avoiding coredump when netdata_log_info() or netdata_log_error() is called
-    stderror = stderr;
 
     int i;
     int config_loaded = 0;
@@ -1516,6 +1538,8 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (ctx_unittest())
                                 return 1;
+                            if (uuid_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
@@ -1541,6 +1565,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
                             return buffer_unittest();
+                        }
+                        else if(strcmp(optarg, "uuidtest") == 0) {
+                            unittest_running = true;
+                            return uuid_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
@@ -1919,10 +1947,10 @@ int main(int argc, char **argv) {
         // get log filenames and settings
 
         log_init();
-        error_log_limit_unlimited();
+        nd_log_limits_unlimited();
 
         // initialize the log files
-        open_all_log_files();
+        nd_log_initialize();
         netdata_log_info("Netdata agent version \""VERSION"\" is starting");
 
         ieee754_doubles = is_system_ieee754_double();
@@ -2103,7 +2131,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // enable log flood protection
 
-    error_log_limit_reset();
+    nd_log_limits_reset();
 
     // Load host labels
     delta_startup_time("collect host labels");

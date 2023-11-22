@@ -1,829 +1,95 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <daemon/main.h>
+#define SD_JOURNAL_SUPPRESS_LOCATION
+
 #include "../libnetdata.h"
+#include <daemon/main.h>
+
+#ifdef __FreeBSD__
+#include <sys/endian.h>
+#endif
+
+#ifdef __APPLE__
+#include <machine/endian.h>
+#endif
 
 #ifdef HAVE_BACKTRACE
 #include <execinfo.h>
 #endif
 
-int web_server_is_multithreaded = 1;
+#ifdef HAVE_SYSTEMD
+#include <systemd/sd-journal.h>
+#endif
+
+#include <syslog.h>
 
 const char *program_name = "";
+
 uint64_t debug_flags = 0;
 
-int access_log_syslog = 0;
-int error_log_syslog = 0;
-int collector_log_syslog = 0;
-int output_log_syslog = 0;  // debug log
-int health_log_syslog = 0;
-
-int stdaccess_fd = -1;
-FILE *stdaccess = NULL;
-
-int stdhealth_fd = -1;
-FILE *stdhealth = NULL;
-
-int stdcollector_fd = -1;
-FILE *stderror = NULL;
-
-const char *stdaccess_filename = NULL;
-const char *stderr_filename = NULL;
-const char *stdout_filename = NULL;
-const char *facility_log = NULL;
-const char *stdhealth_filename = NULL;
-const char *stdcollector_filename = NULL;
-
-netdata_log_level_t global_log_severity_level = NETDATA_LOG_LEVEL_INFO;
-
 #ifdef ENABLE_ACLK
-const char *aclklog_filename = NULL;
-int aclklog_fd = -1;
-FILE *aclklog = NULL;
-int aclklog_syslog = 1;
 int aclklog_enabled = 0;
 #endif
 
 // ----------------------------------------------------------------------------
-// Log facility(https://tools.ietf.org/html/rfc5424)
-//
-// The facilities accepted in the Netdata are in according with the following
-// header files for their respective operating system:
-// sys/syslog.h (Linux )
-// sys/sys/syslog.h (FreeBSD)
-// bsd/sys/syslog.h (darwin-xnu)
 
-#define LOG_AUTH_KEY "auth"
-#define LOG_AUTHPRIV_KEY "authpriv"
-#ifdef __FreeBSD__
-# define LOG_CONSOLE_KEY "console"
-#endif
-#define LOG_CRON_KEY "cron"
-#define LOG_DAEMON_KEY "daemon"
-#define LOG_FTP_KEY "ftp"
-#ifdef __APPLE__
-# define LOG_INSTALL_KEY "install"
-#endif
-#define LOG_KERN_KEY "kern"
-#define LOG_LPR_KEY "lpr"
-#define LOG_MAIL_KEY "mail"
-//#define LOG_INTERNAL_MARK_KEY "mark"
-#ifdef __APPLE__
-# define LOG_NETINFO_KEY "netinfo"
-# define LOG_RAS_KEY "ras"
-# define LOG_REMOTEAUTH_KEY "remoteauth"
-#endif
-#define LOG_NEWS_KEY "news"
-#ifdef __FreeBSD__
-# define LOG_NTP_KEY "ntp"
-#endif
-#define LOG_SECURITY_KEY "security"
-#define LOG_SYSLOG_KEY "syslog"
-#define LOG_USER_KEY "user"
-#define LOG_UUCP_KEY "uucp"
-#ifdef __APPLE__
-# define LOG_LAUNCHD_KEY "launchd"
-#endif
-#define LOG_LOCAL0_KEY "local0"
-#define LOG_LOCAL1_KEY "local1"
-#define LOG_LOCAL2_KEY "local2"
-#define LOG_LOCAL3_KEY "local3"
-#define LOG_LOCAL4_KEY "local4"
-#define LOG_LOCAL5_KEY "local5"
-#define LOG_LOCAL6_KEY "local6"
-#define LOG_LOCAL7_KEY "local7"
-
-static int log_facility_id(const char *facility_name)
-{
-    static int
-        hash_auth = 0,
-        hash_authpriv = 0,
-#ifdef __FreeBSD__
-        hash_console = 0,
-#endif
-        hash_cron = 0,
-        hash_daemon = 0,
-        hash_ftp = 0,
-#ifdef __APPLE__
-        hash_install = 0,
-#endif
-        hash_kern = 0,
-        hash_lpr = 0,
-        hash_mail = 0,
-//      hash_mark = 0,
-#ifdef __APPLE__
-        hash_netinfo = 0,
-        hash_ras = 0,
-        hash_remoteauth = 0,
-#endif
-        hash_news = 0,
-#ifdef __FreeBSD__
-        hash_ntp = 0,
-#endif
-        hash_security = 0,
-        hash_syslog = 0,
-        hash_user = 0,
-        hash_uucp = 0,
-#ifdef __APPLE__
-        hash_launchd = 0,
-#endif
-        hash_local0 = 0,
-        hash_local1 = 0,
-        hash_local2 = 0,
-        hash_local3 = 0,
-        hash_local4 = 0,
-        hash_local5 = 0,
-        hash_local6 = 0,
-        hash_local7 = 0;
-
-    if(unlikely(!hash_auth))
-    {
-        hash_auth = simple_hash(LOG_AUTH_KEY);
-        hash_authpriv = simple_hash(LOG_AUTHPRIV_KEY);
-#ifdef __FreeBSD__
-        hash_console = simple_hash(LOG_CONSOLE_KEY);
-#endif
-        hash_cron = simple_hash(LOG_CRON_KEY);
-        hash_daemon = simple_hash(LOG_DAEMON_KEY);
-        hash_ftp = simple_hash(LOG_FTP_KEY);
-#ifdef __APPLE__
-        hash_install = simple_hash(LOG_INSTALL_KEY);
-#endif
-        hash_kern = simple_hash(LOG_KERN_KEY);
-        hash_lpr = simple_hash(LOG_LPR_KEY);
-        hash_mail = simple_hash(LOG_MAIL_KEY);
-//        hash_mark = simple_uhash();
-#ifdef __APPLE__
-        hash_netinfo = simple_hash(LOG_NETINFO_KEY);
-        hash_ras = simple_hash(LOG_RAS_KEY);
-        hash_remoteauth = simple_hash(LOG_REMOTEAUTH_KEY);
-#endif
-        hash_news = simple_hash(LOG_NEWS_KEY);
-#ifdef __FreeBSD__
-        hash_ntp = simple_hash(LOG_NTP_KEY);
-#endif
-        hash_security = simple_hash(LOG_SECURITY_KEY);
-        hash_syslog = simple_hash(LOG_SYSLOG_KEY);
-        hash_user = simple_hash(LOG_USER_KEY);
-        hash_uucp = simple_hash(LOG_UUCP_KEY);
-#ifdef __APPLE__
-        hash_launchd = simple_hash(LOG_LAUNCHD_KEY);
-#endif
-        hash_local0 = simple_hash(LOG_LOCAL0_KEY);
-        hash_local1 = simple_hash(LOG_LOCAL1_KEY);
-        hash_local2 = simple_hash(LOG_LOCAL2_KEY);
-        hash_local3 = simple_hash(LOG_LOCAL3_KEY);
-        hash_local4 = simple_hash(LOG_LOCAL4_KEY);
-        hash_local5 = simple_hash(LOG_LOCAL5_KEY);
-        hash_local6 = simple_hash(LOG_LOCAL6_KEY);
-        hash_local7 = simple_hash(LOG_LOCAL7_KEY);
-    }
-
-    int hash = simple_hash(facility_name);
-    if ( hash == hash_auth )
-    {
-        return LOG_AUTH;
-    }
-    else if  ( hash == hash_authpriv )
-    {
-        return LOG_AUTHPRIV;
-    }
-#ifdef __FreeBSD__
-    else if ( hash == hash_console )
-    {
-        return LOG_CONSOLE;
-    }
-#endif
-    else if ( hash == hash_cron )
-    {
-        return LOG_CRON;
-    }
-    else if ( hash == hash_daemon )
-    {
-        return LOG_DAEMON;
-    }
-    else if ( hash == hash_ftp )
-    {
-        return LOG_FTP;
-    }
-#ifdef __APPLE__
-    else if ( hash == hash_install )
-    {
-        return LOG_INSTALL;
-    }
-#endif
-    else if ( hash == hash_kern )
-    {
-        return LOG_KERN;
-    }
-    else if ( hash == hash_lpr )
-    {
-        return LOG_LPR;
-    }
-    else if ( hash == hash_mail )
-    {
-        return LOG_MAIL;
-    }
-    /*
-    else if ( hash == hash_mark )
-    {
-        //this is internal for all OS
-        return INTERNAL_MARK;
-    }
-    */
-#ifdef __APPLE__
-    else if ( hash == hash_netinfo )
-    {
-        return LOG_NETINFO;
-    }
-    else if ( hash == hash_ras )
-    {
-        return LOG_RAS;
-    }
-    else if ( hash == hash_remoteauth )
-    {
-        return LOG_REMOTEAUTH;
-    }
-#endif
-    else if ( hash == hash_news )
-    {
-        return LOG_NEWS;
-    }
-#ifdef __FreeBSD__
-    else if ( hash == hash_ntp )
-    {
-        return LOG_NTP;
-    }
-#endif
-    else if ( hash == hash_security )
-    {
-        //FreeBSD is the unique that does not consider
-        //this facility deprecated. We are keeping
-        //it for other OS while they are kept in their headers.
-#ifdef __FreeBSD__
-        return LOG_SECURITY;
-#else
-        return LOG_AUTH;
-#endif
-    }
-    else if ( hash == hash_syslog )
-    {
-        return LOG_SYSLOG;
-    }
-    else if ( hash == hash_user )
-    {
-        return LOG_USER;
-    }
-    else if ( hash == hash_uucp )
-    {
-        return LOG_UUCP;
-    }
-    else if ( hash == hash_local0 )
-    {
-        return LOG_LOCAL0;
-    }
-    else if ( hash == hash_local1 )
-    {
-        return LOG_LOCAL1;
-    }
-    else if ( hash == hash_local2 )
-    {
-        return LOG_LOCAL2;
-    }
-    else if ( hash == hash_local3 )
-    {
-        return LOG_LOCAL3;
-    }
-    else if ( hash == hash_local4 )
-    {
-        return LOG_LOCAL4;
-    }
-    else if ( hash == hash_local5 )
-    {
-        return LOG_LOCAL5;
-    }
-    else if ( hash == hash_local6 )
-    {
-        return LOG_LOCAL6;
-    }
-    else if ( hash == hash_local7 )
-    {
-        return LOG_LOCAL7;
-    }
-#ifdef __APPLE__
-    else if ( hash == hash_launchd )
-    {
-        return LOG_LAUNCHD;
-    }
-#endif
-
-    return LOG_DAEMON;
-}
-
-//we do not need to use this now, but I already created this function to be
-//used case necessary.
-/*
-char *log_facility_name(int code)
-{
-    char *defvalue = { "daemon" };
-    switch(code)
-    {
-        case LOG_AUTH:
-            {
-                return "auth";
-            }
-        case LOG_AUTHPRIV:
-            {
-                return "authpriv";
-            }
-#ifdef __FreeBSD__
-        case LOG_CONSOLE:
-            {
-                return "console";
-            }
-#endif
-        case LOG_CRON:
-            {
-                return "cron";
-            }
-        case LOG_DAEMON:
-            {
-                return defvalue;
-            }
-        case LOG_FTP:
-            {
-                return "ftp";
-            }
-#ifdef __APPLE__
-        case LOG_INSTALL:
-            {
-                return "install";
-            }
-#endif
-        case LOG_KERN:
-            {
-                return "kern";
-            }
-        case LOG_LPR:
-            {
-                return "lpr";
-            }
-        case LOG_MAIL:
-            {
-                return "mail";
-            }
-#ifdef __APPLE__
-        case LOG_NETINFO:
-            {
-                return "netinfo" ;
-            }
-        case LOG_RAS:
-            {
-                return "ras";
-            }
-        case LOG_REMOTEAUTH:
-            {
-                return "remoteauth";
-            }
-#endif
-        case LOG_NEWS:
-            {
-                return "news";
-            }
-#ifdef __FreeBSD__
-        case LOG_NTP:
-            {
-                return "ntp" ;
-            }
-        case LOG_SECURITY:
-            {
-                return "security";
-            }
-#endif
-        case LOG_SYSLOG:
-            {
-                return "syslog";
-            }
-        case LOG_USER:
-            {
-                return "user";
-            }
-        case LOG_UUCP:
-            {
-                return "uucp";
-            }
-        case LOG_LOCAL0:
-            {
-                return "local0";
-            }
-        case LOG_LOCAL1:
-            {
-                return "local1";
-            }
-        case LOG_LOCAL2:
-            {
-                return "local2";
-            }
-        case LOG_LOCAL3:
-            {
-                return "local3";
-            }
-        case LOG_LOCAL4:
-            {
-                return "local4" ;
-            }
-        case LOG_LOCAL5:
-            {
-                return "local5";
-            }
-        case LOG_LOCAL6:
-            {
-                return "local6";
-            }
-        case LOG_LOCAL7:
-            {
-                return "local7" ;
-            }
-#ifdef __APPLE__
-        case LOG_LAUNCHD:
-            {
-                return "launchd";
-            }
-#endif
-    }
-
-    return defvalue;
-}
-*/
+struct nd_log_source;
+static bool nd_log_limit_reached(struct nd_log_source *source);
 
 // ----------------------------------------------------------------------------
+// logging method
 
-void syslog_init() {
-    static int i = 0;
+typedef enum  __attribute__((__packed__)) {
+    NDLO_DISABLED = 0,
+    NDLO_DEVNULL,
+    NDLO_DEFAULT,
+    NDLO_JOURNAL,
+    NDLO_SYSLOG,
+    NDLO_STDOUT,
+    NDLO_STDERR,
+    NDLO_FILE,
+} ND_LOG_OUTPUT;
 
-    if(!i) {
-        openlog(program_name, LOG_PID,log_facility_id(facility_log));
-        i = 1;
+
+static struct {
+    ND_LOG_OUTPUT output;
+    const char *name;
+} nd_log_outputs[] = {
+        { .output = NDLO_DISABLED, .name = "none" },
+        { .output = NDLO_DEVNULL, .name = "/dev/null" },
+        { .output = NDLO_DEFAULT, .name = "default" },
+        { .output = NDLO_JOURNAL, .name = "journal" },
+        { .output = NDLO_SYSLOG, .name = "syslog" },
+        { .output = NDLO_STDOUT, .name = "stdout" },
+        { .output = NDLO_STDERR, .name = "stderr" },
+        { .output = NDLO_FILE, .name = "file" },
+};
+
+static ND_LOG_OUTPUT nd_log_output2id(const char *output) {
+    if(!output || !*output)
+        return NDLO_DEFAULT;
+
+    size_t entries = sizeof(nd_log_outputs) / sizeof(nd_log_outputs[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(nd_log_outputs[i].name, output) == 0)
+            return nd_log_outputs[i].output;
     }
+
+    return NDLO_FILE;
 }
 
-void log_date(char *buffer, size_t len, time_t now) {
-    if(unlikely(!buffer || !len))
-        return;
-
-    time_t t = now;
-    struct tm *tmp, tmbuf;
-
-    tmp = localtime_r(&t, &tmbuf);
-
-    if (tmp == NULL) {
-        buffer[0] = '\0';
-        return;
+static const char *nd_log_id2output(ND_LOG_OUTPUT output) {
+    size_t entries = sizeof(nd_log_outputs) / sizeof(nd_log_outputs[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(output == nd_log_outputs[i].output)
+            return nd_log_outputs[i].name;
     }
 
-    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
-        buffer[0] = '\0';
-
-    buffer[len - 1] = '\0';
-}
-
-static netdata_mutex_t log_mutex = NETDATA_MUTEX_INITIALIZER;
-static inline void log_lock() {
-    netdata_mutex_lock(&log_mutex);
-}
-static inline void log_unlock() {
-    netdata_mutex_unlock(&log_mutex);
-}
-
-static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_syslog, int is_stdaccess, int *fd_ptr) {
-    int f, devnull = 0;
-
-    if(!filename || !*filename || !strcmp(filename, "none") ||  !strcmp(filename, "/dev/null")) {
-        filename = "/dev/null";
-        devnull = 1;
-    }
-
-    if(!strcmp(filename, "syslog")) {
-        filename = "/dev/null";
-        devnull = 1;
-
-    syslog_init();
-        if(enabled_syslog) *enabled_syslog = 1;
-    }
-    else if(enabled_syslog) *enabled_syslog = 0;
-
-    // don't do anything if the user is willing
-    // to have the standard one
-    if(!strcmp(filename, "system")) {
-        if(fd != -1 && !is_stdaccess) {
-            if(fd_ptr) *fd_ptr = fd;
-            return fp;
-        }
-
-        filename = "stderr";
-    }
-
-    if(!strcmp(filename, "stdout"))
-        f = STDOUT_FILENO;
-
-    else if(!strcmp(filename, "stderr"))
-        f = STDERR_FILENO;
-
-    else {
-        f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
-        if(f == -1) {
-            netdata_log_error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
-            if(fd_ptr) *fd_ptr = fd;
-            return fp;
-        }
-    }
-
-    // if there is a level-2 file pointer
-    // flush it before switching the level-1 fds
-    if(fp)
-        fflush(fp);
-
-    if(devnull && is_stdaccess) {
-        fd = -1;
-        fp = NULL;
-    }
-
-    if(fd != f && fd != -1) {
-        // it automatically closes
-        int t = dup2(f, fd);
-        if (t == -1) {
-            netdata_log_error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
-            close(f);
-            if(fd_ptr) *fd_ptr = fd;
-            return fp;
-        }
-        // netdata_log_info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
-        close(f);
-    }
-    else fd = f;
-
-    if(!fp) {
-        fp = fdopen(fd, "a");
-        if (!fp)
-            netdata_log_error("Cannot fdopen() fd %d ('%s')", fd, filename);
-        else {
-            if (setvbuf(fp, NULL, _IOLBF, 0) != 0)
-                netdata_log_error("Cannot set line buffering on fd %d ('%s')", fd, filename);
-        }
-    }
-
-    if(fd_ptr) *fd_ptr = fd;
-    return fp;
-}
-
-void reopen_all_log_files() {
-    if(stdout_filename)
-        open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
-
-    if(stdcollector_filename)
-        open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
-
-    if(stderr_filename) {
-        // Netdata starts using stderr and if it has success to open file it redirects
-        FILE *fp = open_log_file(stdcollector_fd, stderror, stderr_filename,
-                                 &error_log_syslog, 1, &stdcollector_fd);
-        if (fp)
-            stderror = fp;
-    }
-
-#ifdef ENABLE_ACLK
-    if (aclklog_enabled)
-        aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
-#endif
-
-    if(stdaccess_filename)
-        stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
-
-    if(stdhealth_filename)
-        stdhealth = open_log_file(stdhealth_fd, stdhealth, stdhealth_filename, &health_log_syslog, 1, &stdhealth_fd);
-}
-
-void open_all_log_files() {
-    // disable stdin
-    open_log_file(STDIN_FILENO, stdin, "/dev/null", NULL, 0, NULL);
-
-    open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
-    open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
-
-    // Netdata starts using stderr and if it has success to open file it redirects
-    FILE *fp = open_log_file(stdcollector_fd, NULL, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
-    if (fp)
-        stderror = fp;
-
-#ifdef ENABLE_ACLK
-    if(aclklog_enabled)
-        aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
-#endif
-
-    stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
-
-    stdhealth = open_log_file(stdhealth_fd, stdhealth, stdhealth_filename, &health_log_syslog, 1, &stdhealth_fd);
+    return "unknown";
 }
 
 // ----------------------------------------------------------------------------
-// error log throttling
-
-time_t error_log_throttle_period = 1200;
-unsigned long error_log_errors_per_period = 200;
-unsigned long error_log_errors_per_period_backup = 0;
-
-int error_log_limit(int reset) {
-    static time_t start = 0;
-    static unsigned long counter = 0, prevented = 0;
-
-    FILE *fp = stderror ? stderror : stderr;
-
-    // fprintf(fp, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
-
-    // do not throttle if the period is 0
-    if(error_log_throttle_period == 0)
-        return 0;
-
-    // prevent all logs if the errors per period is 0
-    if(error_log_errors_per_period == 0)
-#ifdef NETDATA_INTERNAL_CHECKS
-        return 0;
-#else
-        return 1;
-#endif
-
-    time_t now = now_monotonic_sec();
-    if(!start) start = now;
-
-    if(reset) {
-        if(prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                fp,
-                "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
-                "(prevented %lu logs in the last %"PRId64" seconds).\n",
-                date,
-                program_name,
-                program_name,
-                prevented,
-                (int64_t)(now - start));
-        }
-
-        start = now;
-        counter = 0;
-        prevented = 0;
-    }
-
-    // detect if we log too much
-    counter++;
-
-    if(now - start > error_log_throttle_period) {
-        if(prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                fp,
-                "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
-                "(prevented %lu logs in the last %"PRId64" seconds).\n",
-                date,
-                program_name,
-                program_name,
-                prevented,
-                (int64_t)error_log_throttle_period);
-        }
-
-        // restart the period accounting
-        start = now;
-        counter = 1;
-        prevented = 0;
-
-        // log this error
-        return 0;
-    }
-
-    if(counter > error_log_errors_per_period) {
-        if(!prevented) {
-            char date[LOG_DATE_LENGTH];
-            log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-            fprintf(
-                fp,
-                "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
-                "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
-                date,
-                program_name,
-                counter,
-                (int64_t)(now - start),
-                error_log_errors_per_period,
-                (int64_t)error_log_throttle_period,
-                program_name,
-                (int64_t)(start + error_log_throttle_period - now));
-        }
-
-        prevented++;
-
-        // prevent logging this error
-#ifdef NETDATA_INTERNAL_CHECKS
-        return 0;
-#else
-        return 1;
-#endif
-    }
-
-    return 0;
-}
-
-void error_log_limit_reset(void) {
-    log_lock();
-
-    error_log_errors_per_period = error_log_errors_per_period_backup;
-    error_log_limit(1);
-
-    log_unlock();
-}
-
-void error_log_limit_unlimited(void) {
-    log_lock();
-
-    error_log_errors_per_period = error_log_errors_per_period_backup;
-    error_log_limit(1);
-
-    error_log_errors_per_period = ((error_log_errors_per_period_backup * 10) < 10000) ? 10000 : (error_log_errors_per_period_backup * 10);
-
-    log_unlock();
-}
-
-// ----------------------------------------------------------------------------
-// debug log
-
-void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    va_list args;
-
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    va_start( args, fmt );
-    printf("%s: %s DEBUG : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
-    vprintf(fmt, args);
-    va_end( args );
-    putchar('\n');
-
-    if(output_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_ERR,  fmt, args );
-        va_end( args );
-    }
-
-    fflush(stdout);
-}
-
-// ----------------------------------------------------------------------------
-// info log
-
-void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
-{
-#if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (NETDATA_LOG_LEVEL_INFO > global_log_severity_level)
-        return;
-#endif
-
-    va_list args;
-    FILE *fp = (is_collector || !stderror) ? stderr : stderror;
-
-    log_lock();
-
-    // prevent logging too much
-    if (error_log_limit(0)) {
-        log_unlock();
-        return;
-    }
-
-    if(collector_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_INFO,  fmt, args );
-        va_end( args );
-    }
-
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    va_start( args, fmt );
-#ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(fp, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ",
-            date, program_name, netdata_thread_tag(), line, file, function);
-#else
-    fprintf(fp, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
-#endif
-    vfprintf(fp, fmt, args );
-    va_end( args );
-
-    fputc('\n', fp);
-
-    log_unlock();
-}
-
-// ----------------------------------------------------------------------------
-// error log
+// workaround strerror_r()
 
 #if defined(STRERROR_R_CHAR_P)
 // GLIBC version of strerror_r
@@ -847,191 +113,2120 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #error "cannot detect the format of function strerror_r()"
 #endif
 
-void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-    FILE *fp = stderror ? stderror : stderr;
+static const char *errno2str(int errnum, char *buf, size_t size) {
+    return strerror_result(strerror_r(errnum, buf, size), buf);
+}
+
+// ----------------------------------------------------------------------------
+// facilities
+//
+// sys/syslog.h (Linux)
+// sys/sys/syslog.h (FreeBSD)
+// bsd/sys/syslog.h (darwin-xnu)
+
+static struct {
+    int facility;
+    const char *name;
+} nd_log_facilities[] = {
+        { LOG_AUTH, "auth" },
+        { LOG_AUTHPRIV, "authpriv" },
+        { LOG_CRON, "cron" },
+        { LOG_DAEMON, "daemon" },
+        { LOG_FTP, "ftp" },
+        { LOG_KERN, "kern" },
+        { LOG_LPR, "lpr" },
+        { LOG_MAIL, "mail" },
+        { LOG_NEWS, "news" },
+        { LOG_SYSLOG, "syslog" },
+        { LOG_USER, "user" },
+        { LOG_UUCP, "uucp" },
+        { LOG_LOCAL0, "local0" },
+        { LOG_LOCAL1, "local1" },
+        { LOG_LOCAL2, "local2" },
+        { LOG_LOCAL3, "local3" },
+        { LOG_LOCAL4, "local4" },
+        { LOG_LOCAL5, "local5" },
+        { LOG_LOCAL6, "local6" },
+        { LOG_LOCAL7, "local7" },
+
+#ifdef __FreeBSD__
+        { LOG_CONSOLE, "console" },
+        { LOG_NTP, "ntp" },
+
+        // FreeBSD does not consider 'security' as deprecated.
+        { LOG_SECURITY, "security" },
+#else
+        // For all other O/S 'security' is mapped to 'auth'.
+        { LOG_AUTH, "security" },
+#endif
+
+#ifdef __APPLE__
+        { LOG_INSTALL, "install" },
+        { LOG_NETINFO, "netinfo" },
+        { LOG_RAS,     "ras" },
+        { LOG_REMOTEAUTH, "remoteauth" },
+        { LOG_LAUNCHD, "launchd" },
+
+#endif
+};
+
+static int nd_log_facility2id(const char *facility) {
+    size_t entries = sizeof(nd_log_facilities) / sizeof(nd_log_facilities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(nd_log_facilities[i].name, facility) == 0)
+            return nd_log_facilities[i].facility;
+    }
+
+    return LOG_DAEMON;
+}
+
+static const char *nd_log_id2facility(int facility) {
+    size_t entries = sizeof(nd_log_facilities) / sizeof(nd_log_facilities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(nd_log_facilities[i].facility == facility)
+            return nd_log_facilities[i].name;
+    }
+
+    return "daemon";
+}
+
+// ----------------------------------------------------------------------------
+// priorities
+
+static struct {
+    ND_LOG_FIELD_PRIORITY priority;
+    const char *name;
+} nd_log_priorities[] = {
+        { .priority = NDLP_EMERG, .name = "emergency" },
+        { .priority = NDLP_EMERG, .name = "emerg" },
+        { .priority = NDLP_ALERT, .name = "alert" },
+        { .priority = NDLP_CRIT, .name = "critical" },
+        { .priority = NDLP_CRIT, .name = "crit" },
+        { .priority = NDLP_ERR, .name = "error" },
+        { .priority = NDLP_ERR, .name = "err" },
+        { .priority = NDLP_WARNING, .name = "warning" },
+        { .priority = NDLP_WARNING, .name = "warn" },
+        { .priority = NDLP_NOTICE, .name = "notice" },
+        { .priority = NDLP_INFO, .name = NDLP_INFO_STR },
+        { .priority = NDLP_DEBUG, .name = "debug" },
+};
+
+int nd_log_priority2id(const char *priority) {
+    size_t entries = sizeof(nd_log_priorities) / sizeof(nd_log_priorities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(nd_log_priorities[i].name, priority) == 0)
+            return nd_log_priorities[i].priority;
+    }
+
+    return NDLP_INFO;
+}
+
+static const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
+    size_t entries = sizeof(nd_log_priorities) / sizeof(nd_log_priorities[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(priority == nd_log_priorities[i].priority)
+            return nd_log_priorities[i].name;
+    }
+
+    return NDLP_INFO_STR;
+}
+
+// ----------------------------------------------------------------------------
+// log sources
+
+const char *log_sources_str[] = {
+        [NDLS_UNSET] = "UNSET",
+        [NDLS_ACCESS] = "access",
+        [NDLS_ACLK] = "aclk",
+        [NDLS_COLLECTORS] = "collector",
+        [NDLS_DAEMON] = "daemon",
+        [NDLS_HEALTH] = "health",
+        [NDLS_DEBUG] = "debug",
+};
+
+static const char *nd_log_source2str(ND_LOG_SOURCES source) {
+    size_t entries = sizeof(log_sources_str) / sizeof(log_sources_str[0]);
+    if(source < entries)
+        return log_sources_str[source];
+
+    return "UNKNOWN";
+}
+
+// ----------------------------------------------------------------------------
+// log output formats
+
+typedef enum __attribute__((__packed__)) {
+    NDLOF_JOURNAL,
+    NDLOF_LOGFMT,
+    NDLOF_JSON,
+} ND_LOG_OUTPUT_FORMAT;
+
+static struct {
+    ND_LOG_OUTPUT_FORMAT format;
+    const char *name;
+} nd_log_formats[] = {
+        { .format = NDLOF_JOURNAL, .name = "journal" },
+        { .format = NDLOF_LOGFMT, .name = "logfmt" },
+        { .format = NDLOF_JSON, .name = "json" },
+};
+
+static ND_LOG_OUTPUT_FORMAT nd_log_format2id(const char *format) {
+    if(!format || !*format)
+        return NDLOF_LOGFMT;
+
+    size_t entries = sizeof(nd_log_formats) / sizeof(nd_log_formats[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(nd_log_formats[i].name, format) == 0)
+            return nd_log_formats[i].format;
+    }
+
+    return NDLOF_LOGFMT;
+}
+
+static const char *nd_log_id2format(ND_LOG_OUTPUT_FORMAT format) {
+    size_t entries = sizeof(nd_log_formats) / sizeof(nd_log_formats[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(format == nd_log_formats[i].format)
+            return nd_log_formats[i].name;
+    }
+
+    return "logfmt";
+}
+
+// ----------------------------------------------------------------------------
+// format dates
+
+void log_date(char *buffer, size_t len, time_t now) {
+    if(unlikely(!buffer || !len))
+        return;
+
+    time_t t = now;
+    struct tm *tmp, tmbuf;
+
+    tmp = localtime_r(&t, &tmbuf);
+
+    if (unlikely(!tmp)) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
+        buffer[0] = '\0';
+
+    buffer[len - 1] = '\0';
+}
+
+// ----------------------------------------------------------------------------
+
+struct nd_log_limit {
+    usec_t started_monotonic_ut;
+    uint32_t counter;
+    uint32_t prevented;
+
+    uint32_t throttle_period;
+    uint32_t logs_per_period;
+    uint32_t logs_per_period_backup;
+};
+
+#define ND_LOG_LIMITS_DEFAULT (struct nd_log_limit){ .logs_per_period = ND_LOG_DEFAULT_THROTTLE_LOGS, .logs_per_period_backup = ND_LOG_DEFAULT_THROTTLE_LOGS, .throttle_period = ND_LOG_DEFAULT_THROTTLE_PERIOD, }
+#define ND_LOG_LIMITS_UNLIMITED (struct nd_log_limit){  .logs_per_period = 0, .logs_per_period_backup = 0, .throttle_period = 0, }
+
+struct nd_log_source {
+    SPINLOCK spinlock;
+    ND_LOG_OUTPUT method;
+    ND_LOG_OUTPUT_FORMAT format;
+    const char *filename;
+    int fd;
+    FILE *fp;
+
+    ND_LOG_FIELD_PRIORITY min_priority;
+    const char *pending_msg;
+    struct nd_log_limit limits;
+};
+
+static __thread ND_LOG_SOURCES overwrite_thread_source = 0;
+
+void nd_log_set_thread_source(ND_LOG_SOURCES source) {
+    overwrite_thread_source = source;
+}
+
+static struct {
+    uuid_t invocation_id;
+
+    ND_LOG_SOURCES overwrite_process_source;
+
+    struct nd_log_source sources[_NDLS_MAX];
+
+    struct {
+        bool initialized;
+    } journal;
+
+    struct {
+        bool initialized;
+        int fd;
+    } journal_direct;
+
+    struct {
+        bool initialized;
+        int facility;
+    } syslog;
+
+    struct {
+        SPINLOCK spinlock;
+        bool initialized;
+    } std_output;
+
+    struct {
+        SPINLOCK spinlock;
+        bool initialized;
+    } std_error;
+
+} nd_log = {
+        .overwrite_process_source = 0,
+        .journal = {
+                .initialized = false,
+        },
+        .journal_direct = {
+                .initialized = false,
+                .fd = -1,
+        },
+        .syslog = {
+                .initialized = false,
+                .facility = LOG_DAEMON,
+        },
+        .std_output = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .initialized = false,
+        },
+        .std_error = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .initialized = false,
+        },
+        .sources = {
+                [NDLS_UNSET] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = NDLO_DISABLED,
+                        .format = NDLOF_JOURNAL,
+                        .filename = NULL,
+                        .fd = -1,
+                        .fp = NULL,
+                        .min_priority = NDLP_EMERG,
+                        .limits = ND_LOG_LIMITS_UNLIMITED,
+                },
+                [NDLS_ACCESS] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = NDLO_DEFAULT,
+                        .format = NDLOF_LOGFMT,
+                        .filename = LOG_DIR "/access.log",
+                        .fd = -1,
+                        .fp = NULL,
+                        .min_priority = NDLP_DEBUG,
+                        .limits = ND_LOG_LIMITS_UNLIMITED,
+                },
+                [NDLS_ACLK] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = NDLO_FILE,
+                        .format = NDLOF_LOGFMT,
+                        .filename = LOG_DIR "/aclk.log",
+                        .fd = -1,
+                        .fp = NULL,
+                        .min_priority = NDLP_DEBUG,
+                        .limits = ND_LOG_LIMITS_UNLIMITED,
+                },
+                [NDLS_COLLECTORS] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = NDLO_DEFAULT,
+                        .format = NDLOF_LOGFMT,
+                        .filename = LOG_DIR "/collectors.log",
+                        .fd = STDERR_FILENO,
+                        .fp = NULL,
+                        .min_priority = NDLP_INFO,
+                        .limits = ND_LOG_LIMITS_DEFAULT,
+                },
+                [NDLS_DEBUG] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = NDLO_DISABLED,
+                        .format = NDLOF_LOGFMT,
+                        .filename = LOG_DIR "/debug.log",
+                        .fd = STDOUT_FILENO,
+                        .fp = NULL,
+                        .min_priority = NDLP_DEBUG,
+                        .limits = ND_LOG_LIMITS_UNLIMITED,
+                },
+                [NDLS_DAEMON] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = NDLO_DEFAULT,
+                        .filename = LOG_DIR "/daemon.log",
+                        .format = NDLOF_LOGFMT,
+                        .fd = -1,
+                        .fp = NULL,
+                        .min_priority = NDLP_INFO,
+                        .limits = ND_LOG_LIMITS_DEFAULT,
+                },
+                [NDLS_HEALTH] = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .method = NDLO_DEFAULT,
+                        .format = NDLOF_LOGFMT,
+                        .filename = LOG_DIR "/health.log",
+                        .fd = -1,
+                        .fp = NULL,
+                        .min_priority = NDLP_DEBUG,
+                        .limits = ND_LOG_LIMITS_UNLIMITED,
+                },
+        },
+};
+
+__attribute__((constructor)) void initialize_invocation_id(void) {
+    // check for a NETDATA_INVOCATION_ID
+    if(uuid_parse_flexi(getenv("NETDATA_INVOCATION_ID"), nd_log.invocation_id) != 0) {
+        // not found, check for systemd set INVOCATION_ID
+        if(uuid_parse_flexi(getenv("INVOCATION_ID"), nd_log.invocation_id) != 0) {
+            // not found, generate a new one
+            uuid_generate_random(nd_log.invocation_id);
+        }
+    }
+
+    char uuid[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(nd_log.invocation_id, uuid);
+    setenv("NETDATA_INVOCATION_ID", uuid, 1);
+}
+
+void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
+    char buf[FILENAME_MAX + 100];
+    if(setting && *setting)
+        strncpyz(buf, setting, sizeof(buf) - 1);
+    else
+        buf[0] = '\0';
+
+    struct nd_log_source *ls = &nd_log.sources[source];
+    char *output = strrchr(buf, '@');
+
+    if(!output)
+        // all of it is the output
+        output = buf;
+    else {
+        // we found an '@', the next char is the output
+        *output = '\0';
+        output++;
+
+        // parse the other params
+        char *remaining = buf;
+        while(remaining) {
+            char *value = strsep_skip_consecutive_separators(&remaining, ",");
+            if (!value || !*value) continue;
+
+            char *name = strsep_skip_consecutive_separators(&value, "=");
+            if (!name || !*name) continue;
+
+            if(strcmp(name, "logfmt") == 0)
+                ls->format = NDLOF_LOGFMT;
+            else if(strcmp(name, "json") == 0)
+                ls->format = NDLOF_JSON;
+            else if(strcmp(name, "journal") == 0)
+                ls->format = NDLOF_JOURNAL;
+            else if(strcmp(name, "level") == 0 && value && *value)
+                ls->min_priority = nd_log_priority2id(value);
+            else if(strcmp(name, "protection") == 0 && value && *value) {
+                if(strcmp(value, "off") == 0 || strcmp(value, "none") == 0) {
+                    ls->limits = ND_LOG_LIMITS_UNLIMITED;
+                    ls->limits.counter = 0;
+                    ls->limits.prevented = 0;
+                }
+                else {
+                    ls->limits = ND_LOG_LIMITS_DEFAULT;
+
+                    char *slash = strchr(value, '/');
+                    if(slash) {
+                        *slash = '\0';
+                        slash++;
+                        ls->limits.logs_per_period = ls->limits.logs_per_period_backup = str2u(value);
+                        ls->limits.throttle_period = str2u(slash);
+                    }
+                    else {
+                        ls->limits.logs_per_period = ls->limits.logs_per_period_backup = str2u(value);
+                        ls->limits.throttle_period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
+                    }
+                }
+            }
+            else
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error while parsing configuration of log source '%s'. "
+                                              "In config '%s', '%s' is not understood.",
+                                              nd_log_source2str(source), setting, name);
+        }
+    }
+
+    if(!output || !*output || strcmp(output, "none") == 0 || strcmp(output, "off") == 0) {
+        ls->method = NDLO_DISABLED;
+        ls->filename = "/dev/null";
+    }
+    else if(strcmp(output, "journal") == 0) {
+        ls->method = NDLO_JOURNAL;
+        ls->filename = NULL;
+    }
+    else if(strcmp(output, "syslog") == 0) {
+        ls->method = NDLO_SYSLOG;
+        ls->filename = NULL;
+    }
+    else if(strcmp(output, "/dev/null") == 0) {
+        ls->method = NDLO_DEVNULL;
+        ls->filename = "/dev/null";
+    }
+    else if(strcmp(output, "system") == 0) {
+        if(ls->fd == STDERR_FILENO) {
+            ls->method = NDLO_STDERR;
+            ls->filename = NULL;
+            ls->fd = STDERR_FILENO;
+        }
+        else {
+            ls->method = NDLO_STDOUT;
+            ls->filename = NULL;
+            ls->fd = STDOUT_FILENO;
+        }
+    }
+    else if(strcmp(output, "stderr") == 0) {
+        ls->method = NDLO_STDERR;
+        ls->filename = NULL;
+        ls->fd = STDERR_FILENO;
+    }
+    else if(strcmp(output, "stdout") == 0) {
+        ls->method = NDLO_STDOUT;
+        ls->filename = NULL;
+        ls->fd = STDOUT_FILENO;
+    }
+    else {
+        ls->method = NDLO_FILE;
+        ls->filename = strdupz(output);
+    }
+
+#if defined(NETDATA_INTERNAL_CHECKS) || defined(NETDATA_DEV_MODE)
+    ls->min_priority = NDLP_DEBUG;
+#endif
+
+    if(source == NDLS_COLLECTORS) {
+        // set the method for the collector processes we will spawn
+
+        ND_LOG_OUTPUT method;
+        ND_LOG_OUTPUT_FORMAT format = ls->format;
+        ND_LOG_FIELD_PRIORITY priority = ls->min_priority;
+
+        if(ls->method == NDLO_SYSLOG || ls->method == NDLO_JOURNAL)
+            method = ls->method;
+        else
+            method = NDLO_STDERR;
+
+        setenv("NETDATA_LOG_METHOD", nd_log_id2output(method), 1);
+        setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
+        setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
+        setenv("NETDATA_LOG_PRIORITY_LEVEL", nd_log_id2priority(priority), 1);
+    }
+}
+
+void nd_log_set_priority_level(const char *setting) {
+    if(!setting || !*setting)
+        setting = "info";
+
+    ND_LOG_FIELD_PRIORITY priority = nd_log_priority2id(setting);
+
+#if defined(NETDATA_INTERNAL_CHECKS) || defined(NETDATA_DEV_MODE)
+    priority = NDLP_DEBUG;
+#endif
+
+    nd_log.sources[NDLS_DAEMON].min_priority = priority;
+    nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
+
+    // backwards compatibility
+    setenv("NETDATA_LOG_SEVERITY_LEVEL", nd_log_id2priority(priority), 1);
+
+    // the right one
+    setenv("NETDATA_LOG_PRIORITY_LEVEL", nd_log_id2priority(priority), 1);
+}
+
+void nd_log_set_facility(const char *facility) {
+    if(!facility || !*facility)
+        facility = "daemon";
+
+    nd_log.syslog.facility = nd_log_facility2id(facility);
+    setenv("NETDATA_SYSLOG_FACILITY", nd_log_id2facility(nd_log.syslog.facility), 1);
+}
+
+void nd_log_set_flood_protection(size_t logs, time_t period) {
+    nd_log.sources[NDLS_DAEMON].limits.logs_per_period =
+            nd_log.sources[NDLS_DAEMON].limits.logs_per_period_backup;
+            nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period =
+            nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period_backup = logs;
+
+    nd_log.sources[NDLS_DAEMON].limits.throttle_period =
+            nd_log.sources[NDLS_COLLECTORS].limits.throttle_period = period;
+
+    char buf[100];
+    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )period);
+    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", buf, 1);
+    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t )logs);
+    setenv("NETDATA_ERRORS_PER_PERIOD", buf, 1);
+}
+
+static bool nd_log_journal_systemd_init(void) {
+#ifdef HAVE_SYSTEMD
+    nd_log.journal.initialized = true;
+#else
+    nd_log.journal.initialized = false;
+#endif
+
+    return nd_log.journal.initialized;
+}
+
+static bool nd_log_journal_direct_init(const char *path) {
+    if(nd_log.journal_direct.initialized)
+        return true;
+
+    char filename[FILENAME_MAX + 1];
+    if(!is_path_unix_socket(path)) {
+        journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, "netdata");
+        if (!is_path_unix_socket(filename)) {
+            journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, NULL);
+            if (!is_path_unix_socket(filename)) {
+                journal_construct_path(filename, sizeof(filename), NULL, "netdata");
+                if (!is_path_unix_socket(filename)) {
+                    journal_construct_path(filename, sizeof(filename), NULL, NULL);
+                    if (!is_path_unix_socket(filename))
+                        return false;
+                }
+            }
+        }
+    }
+    else
+        snprintfz(filename, sizeof(filename), "%s", path);
+
+    int fd = journal_direct_fd(filename);
+    if(fd < 0)
+        return false;
+
+    nd_log.journal_direct.fd = fd;
+    nd_log.journal_direct.initialized = true;
+
+    if(nd_log.sources[NDLS_COLLECTORS].method == NDLO_JOURNAL)
+        setenv("NETDATA_SYSTEMD_JOURNAL_PATH", filename, 1);
+
+    return true;
+}
+
+static void nd_log_syslog_init() {
+    if(nd_log.syslog.initialized)
+        return;
+
+    openlog(program_name, LOG_PID, nd_log.syslog.facility);
+    nd_log.syslog.initialized = true;
+}
+
+void nd_log_initialize_for_external_plugins(const char *name) {
+    // if we don't run under Netdata, log to stderr,
+    // otherwise, use the logging method Netdata wants us to use.
+    setenv("NETDATA_LOG_METHOD", "stderr", 0);
+    setenv("NETDATA_LOG_FORMAT", "logfmt", 0);
+
+    nd_log.overwrite_process_source = NDLS_COLLECTORS;
+    program_name = name;
+
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        nd_log.sources[i].method = STDERR_FILENO;
+        nd_log.sources[i].fd = -1;
+        nd_log.sources[i].fp = NULL;
+    }
+
+    nd_log_set_priority_level(getenv("NETDATA_LOG_PRIORITY_LEVEL"));
+    nd_log_set_facility(getenv("NETDATA_SYSLOG_FACILITY"));
+
+    time_t period = 1200;
+    size_t logs = 200;
+    const char *s = getenv("NETDATA_ERRORS_THROTTLE_PERIOD");
+    if(s && *s >= '0' && *s <= '9') {
+        period = str2l(s);
+        if(period < 0) period = 0;
+    }
+
+    s = getenv("NETDATA_ERRORS_PER_PERIOD");
+    if(s && *s >= '0' && *s <= '9')
+        logs = str2u(s);
+
+    nd_log_set_flood_protection(logs, period);
+
+    if(!netdata_configured_host_prefix) {
+        s = getenv("NETDATA_HOST_PREFIX");
+        if(s && *s)
+            netdata_configured_host_prefix = (char *)s;
+    }
+
+    ND_LOG_OUTPUT method = nd_log_output2id(getenv("NETDATA_LOG_METHOD"));
+    ND_LOG_OUTPUT_FORMAT format = nd_log_format2id(getenv("NETDATA_LOG_FORMAT"));
+
+    if(method != NDLO_JOURNAL && method != NDLO_SYSLOG && method != NDLO_STDERR) {
+        if(is_stderr_connected_to_journal()) {
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING, "NETDATA_LOG_METHOD is not set. Using journal.");
+            method = NDLO_JOURNAL;
+        }
+        else {
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING, "NETDATA_LOG_METHOD is not set. Using stderr.");
+            method = NDLO_STDERR;
+        }
+    }
+
+    switch(method) {
+        case NDLO_JOURNAL:
+            if(!nd_log_journal_direct_init(getenv("NETDATA_SYSTEMD_JOURNAL_PATH")) ||
+               !nd_log_journal_direct_init(NULL) || !nd_log_journal_systemd_init()) {
+                nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to initialize journal. Using stderr.");
+                method = NDLO_STDERR;
+            }
+            break;
+
+        case NDLO_SYSLOG:
+            nd_log_syslog_init();
+            break;
+
+        default:
+            method = NDLO_STDERR;
+            break;
+    }
+
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        nd_log.sources[i].method = method;
+        nd_log.sources[i].format = format;
+        nd_log.sources[i].fd = -1;
+        nd_log.sources[i].fp = NULL;
+    }
+
+//    nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "FINAL_LOG_METHOD: %s", nd_log_id2method(method));
+}
+
+static bool nd_log_replace_existing_fd(struct nd_log_source *e, int new_fd) {
+    if(new_fd == -1 || e->fd == -1 ||
+            (e->fd == STDOUT_FILENO && nd_log.std_output.initialized) ||
+            (e->fd == STDERR_FILENO && nd_log.std_error.initialized))
+        return false;
+
+    if(new_fd != e->fd) {
+        int t = dup2(new_fd, e->fd);
+
+        bool ret = true;
+        if (t == -1) {
+            netdata_log_error("Cannot dup2() new fd %d to old fd %d for '%s'", new_fd, e->fd, e->filename);
+            ret = false;
+        }
+        else
+            close(new_fd);
+
+        if(e->fd == STDOUT_FILENO)
+            nd_log.std_output.initialized = true;
+        else if(e->fd == STDERR_FILENO)
+            nd_log.std_error.initialized = true;
+
+        return ret;
+    }
+
+    return false;
+}
+
+static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
+    if(e->method == NDLO_DEFAULT)
+        nd_log_set_user_settings(source, e->filename);
+
+    if((e->method == NDLO_FILE && !e->filename) ||
+       (e->method == NDLO_DEVNULL && e->fd == -1))
+        e->method = NDLO_DISABLED;
+
+    if(e->fp)
+        fflush(e->fp);
+
+    switch(e->method) {
+        case NDLO_SYSLOG:
+            nd_log_syslog_init();
+            break;
+
+        case NDLO_JOURNAL:
+            nd_log_journal_direct_init(NULL);
+            nd_log_journal_systemd_init();
+            break;
+
+        case NDLO_STDOUT:
+            e->fp = stdout;
+            e->fd = STDOUT_FILENO;
+            break;
+
+        default:
+        case NDLO_DEFAULT:
+        case NDLO_STDERR:
+            e->method = NDLO_STDERR;
+            e->fp = stderr;
+            e->fd = STDERR_FILENO;
+            break;
+
+        case NDLO_DEVNULL:
+        case NDLO_FILE: {
+            int fd = open(e->filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+            if(fd == -1) {
+                if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
+                    e->fd = STDERR_FILENO;
+                    e->method = NDLO_STDERR;
+                    netdata_log_error("Cannot open log file '%s'. Falling back to stderr.", e->filename);
+                }
+                else
+                    netdata_log_error("Cannot open log file '%s'. Leaving fd %d as-is.", e->filename, e->fd);
+            }
+            else {
+                if (!nd_log_replace_existing_fd(e, fd)) {
+                    if(e->fd == STDOUT_FILENO || e->fd == STDERR_FILENO) {
+                        if(e->fd == STDOUT_FILENO)
+                            e->method = NDLO_STDOUT;
+                        else if(e->fd == STDERR_FILENO)
+                            e->method = NDLO_STDERR;
+
+                        // we have dup2() fd, so we can close the one we opened
+                        if(fd != STDOUT_FILENO && fd != STDERR_FILENO)
+                            close(fd);
+                    }
+                    else
+                        e->fd = fd;
+                }
+            }
+
+            // at this point we have e->fd set properly
+
+            if(e->fd == STDOUT_FILENO)
+                e->fp = stdout;
+            else if(e->fd == STDERR_FILENO)
+                e->fp = stderr;
+
+            if(!e->fp) {
+                e->fp = fdopen(e->fd, "a");
+                if (!e->fp) {
+                    netdata_log_error("Cannot fdopen() fd %d ('%s')", e->fd, e->filename);
+
+                    if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO)
+                        close(e->fd);
+
+                    e->fp = stderr;
+                    e->fd = STDERR_FILENO;
+                }
+            }
+            else {
+                if (setvbuf(e->fp, NULL, _IOLBF, 0) != 0)
+                    netdata_log_error("Cannot set line buffering on fd %d ('%s')", e->fd, e->filename);
+            }
+        }
+        break;
+    }
+}
+
+static void nd_log_stdin_init(int fd, const char *filename) {
+    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+    if(f == -1)
+        return;
+
+    if(f != fd) {
+        dup2(f, fd);
+        close(f);
+    }
+}
+
+void nd_log_initialize(void) {
+    nd_log_stdin_init(STDIN_FILENO, "/dev/null");
+
+    for(size_t i = 0 ; i < _NDLS_MAX ; i++)
+        nd_log_open(&nd_log.sources[i], i);
+}
+
+void nd_log_reopen_log_files(void) {
+    netdata_log_info("Reopening all log files.");
+
+    nd_log.std_output.initialized = false;
+    nd_log.std_error.initialized = false;
+    nd_log_initialize();
+
+    netdata_log_info("Log files re-opened.");
+}
+
+void chown_open_file(int fd, uid_t uid, gid_t gid) {
+    if(fd == -1) return;
+
+    struct stat buf;
+
+    if(fstat(fd, &buf) == -1) {
+        netdata_log_error("Cannot fstat() fd %d", fd);
+        return;
+    }
+
+    if((buf.st_uid != uid || buf.st_gid != gid) && S_ISREG(buf.st_mode)) {
+        if(fchown(fd, uid, gid) == -1)
+            netdata_log_error("Cannot fchown() fd %d.", fd);
+    }
+}
+
+void nd_log_chown_log_files(uid_t uid, gid_t gid) {
+    for(size_t i = 0 ; i < _NDLS_MAX ; i++) {
+        if(nd_log.sources[i].fd != -1 && nd_log.sources[i].fd != STDIN_FILENO)
+            chown_open_file(nd_log.sources[i].fd, uid, gid);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// annotators
+struct log_field;
+static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf);
+
+// ----------------------------------------------------------------------------
+
+typedef void (*annotator_t)(BUFFER *wb, const char *key, struct log_field *lf);
+
+struct log_field {
+    const char *journal;
+    const char *logfmt;
+    annotator_t logfmt_annotator;
+    struct log_stack_entry entry;
+};
+
+#define THREAD_LOG_STACK_MAX 50
+
+static __thread struct log_stack_entry *thread_log_stack_base[THREAD_LOG_STACK_MAX];
+static __thread size_t thread_log_stack_next = 0;
+
+static __thread struct log_field thread_log_fields[_NDF_MAX] = {
+        // THE ORDER DEFINES THE ORDER FIELDS WILL APPEAR IN logfmt
+
+        [NDF_STOP] = { // processing will not stop on this - so it is ok to be first
+                .journal = NULL,
+                .logfmt = NULL,
+                .logfmt_annotator = NULL,
+        },
+        [NDF_TIMESTAMP_REALTIME_USEC] = {
+                .journal = NULL,
+                .logfmt = "time",
+                .logfmt_annotator = timestamp_usec_annotator,
+        },
+        [NDF_SYSLOG_IDENTIFIER] = {
+                .journal = "SYSLOG_IDENTIFIER", // standard journald field
+                .logfmt = "comm",
+        },
+        [NDF_LOG_SOURCE] = {
+                .journal = "ND_LOG_SOURCE",
+                .logfmt = "source",
+        },
+        [NDF_PRIORITY] = {
+                .journal = "PRIORITY", // standard journald field
+                .logfmt = "level",
+                .logfmt_annotator = priority_annotator,
+        },
+        [NDF_ERRNO] = {
+                .journal = "ERRNO", // standard journald field
+                .logfmt = "errno",
+                .logfmt_annotator = errno_annotator,
+        },
+        [NDF_INVOCATION_ID] = {
+                .journal = "INVOCATION_ID", // standard journald field
+                .logfmt = NULL,
+        },
+        [NDF_LINE] = {
+                .journal = "CODE_LINE", // standard journald field
+                .logfmt = NULL,
+        },
+        [NDF_FILE] = {
+                .journal = "CODE_FILE", // standard journald field
+                .logfmt = NULL,
+        },
+        [NDF_FUNC] = {
+                .journal = "CODE_FUNC", // standard journald field
+                .logfmt = NULL,
+        },
+        [NDF_TID] = {
+                .journal = "TID", // standard journald field
+                .logfmt = "tid",
+        },
+        [NDF_THREAD_TAG] = {
+                .journal = "THREAD_TAG",
+                .logfmt = "thread",
+        },
+        [NDF_MESSAGE_ID] = {
+                .journal = "MESSAGE_ID",
+                .logfmt = "msg_id",
+        },
+        [NDF_MODULE] = {
+                .journal = "ND_MODULE",
+                .logfmt = "module",
+        },
+        [NDF_NIDL_NODE] = {
+                .journal = "ND_NIDL_NODE",
+                .logfmt = "node",
+        },
+        [NDF_NIDL_INSTANCE] = {
+                .journal = "ND_NIDL_INSTANCE",
+                .logfmt = "instance",
+        },
+        [NDF_NIDL_CONTEXT] = {
+                .journal = "ND_NIDL_CONTEXT",
+                .logfmt = "context",
+        },
+        [NDF_NIDL_DIMENSION] = {
+                .journal = "ND_NIDL_DIMENSION",
+                .logfmt = "dimension",
+        },
+        [NDF_SRC_TRANSPORT] = {
+                .journal = "ND_SRC_TRANSPORT",
+                .logfmt = "src_transport",
+        },
+        [NDF_SRC_IP] = {
+                .journal = "ND_SRC_IP",
+                .logfmt = "src_ip",
+        },
+        [NDF_SRC_PORT] = {
+                .journal = "ND_SRC_PORT",
+                .logfmt = "src_port",
+        },
+        [NDF_SRC_CAPABILITIES] = {
+                .journal = "ND_SRC_CAPABILITIES",
+                .logfmt = "src_capabilities",
+        },
+        [NDF_DST_TRANSPORT] = {
+                .journal = "ND_DST_TRANSPORT",
+                .logfmt = "dst_transport",
+        },
+        [NDF_DST_IP] = {
+                .journal = "ND_DST_IP",
+                .logfmt = "dst_ip",
+        },
+        [NDF_DST_PORT] = {
+                .journal = "ND_DST_PORT",
+                .logfmt = "dst_port",
+        },
+        [NDF_DST_CAPABILITIES] = {
+                .journal = "ND_DST_CAPABILITIES",
+                .logfmt = "dst_capabilities",
+        },
+        [NDF_REQUEST_METHOD] = {
+                .journal = "ND_REQUEST_METHOD",
+                .logfmt = "req_method",
+        },
+        [NDF_RESPONSE_CODE] = {
+                .journal = "ND_RESPONSE_CODE",
+                .logfmt = "code",
+        },
+        [NDF_CONNECTION_ID] = {
+                .journal = "ND_CONNECTION_ID",
+                .logfmt = "conn",
+        },
+        [NDF_TRANSACTION_ID] = {
+                .journal = "ND_TRANSACTION_ID",
+                .logfmt = "transaction",
+        },
+        [NDF_RESPONSE_SENT_BYTES] = {
+                .journal = "ND_RESPONSE_SENT_BYTES",
+                .logfmt = "sent_bytes",
+        },
+        [NDF_RESPONSE_SIZE_BYTES] = {
+                .journal = "ND_RESPONSE_SIZE_BYTES",
+                .logfmt = "size_bytes",
+        },
+        [NDF_RESPONSE_PREPARATION_TIME_USEC] = {
+                .journal = "ND_RESPONSE_PREP_TIME_USEC",
+                .logfmt = "prep_ut",
+        },
+        [NDF_RESPONSE_SENT_TIME_USEC] = {
+                .journal = "ND_RESPONSE_SENT_TIME_USEC",
+                .logfmt = "sent_ut",
+        },
+        [NDF_RESPONSE_TOTAL_TIME_USEC] = {
+                .journal = "ND_RESPONSE_TOTAL_TIME_USEC",
+                .logfmt = "total_ut",
+        },
+        [NDF_ALERT_ID] = {
+                .journal = "ND_ALERT_ID",
+                .logfmt = "alert_id",
+        },
+        [NDF_ALERT_UNIQUE_ID] = {
+                .journal = "ND_ALERT_UNIQUE_ID",
+                .logfmt = "alert_unique_id",
+        },
+        [NDF_ALERT_TRANSITION_ID] = {
+                .journal = "ND_ALERT_TRANSITION_ID",
+                .logfmt = "alert_transition_id",
+        },
+        [NDF_ALERT_EVENT_ID] = {
+                .journal = "ND_ALERT_EVENT_ID",
+                .logfmt = "alert_event_id",
+        },
+        [NDF_ALERT_CONFIG_HASH] = {
+                .journal = "ND_ALERT_CONFIG",
+                .logfmt = "alert_config",
+        },
+        [NDF_ALERT_NAME] = {
+                .journal = "ND_ALERT_NAME",
+                .logfmt = "alert",
+        },
+        [NDF_ALERT_CLASS] = {
+                .journal = "ND_ALERT_CLASS",
+                .logfmt = "alert_class",
+        },
+        [NDF_ALERT_COMPONENT] = {
+                .journal = "ND_ALERT_COMPONENT",
+                .logfmt = "alert_component",
+        },
+        [NDF_ALERT_TYPE] = {
+                .journal = "ND_ALERT_TYPE",
+                .logfmt = "alert_type",
+        },
+        [NDF_ALERT_EXEC] = {
+                .journal = "ND_ALERT_EXEC",
+                .logfmt = "alert_exec",
+        },
+        [NDF_ALERT_RECIPIENT] = {
+                .journal = "ND_ALERT_RECIPIENT",
+                .logfmt = "alert_recipient",
+        },
+        [NDF_ALERT_VALUE] = {
+                .journal = "ND_ALERT_VALUE",
+                .logfmt = "alert_value",
+        },
+        [NDF_ALERT_VALUE_OLD] = {
+                .journal = "ND_ALERT_VALUE_OLD",
+                .logfmt = "alert_value_old",
+        },
+        [NDF_ALERT_STATUS] = {
+                .journal = "ND_ALERT_STATUS",
+                .logfmt = "alert_status",
+        },
+        [NDF_ALERT_STATUS_OLD] = {
+                .journal = "ND_ALERT_STATUS_OLD",
+                .logfmt = "alert_value_old",
+        },
+        [NDF_ALERT_UNITS] = {
+                .journal = "ND_ALERT_UNITS",
+                .logfmt = "alert_units",
+        },
+        [NDF_ALERT_SUMMARY] = {
+                .journal = "ND_ALERT_SUMMARY",
+                .logfmt = "alert_summary",
+        },
+        [NDF_ALERT_INFO] = {
+                .journal = "ND_ALERT_INFO",
+                .logfmt = "alert_info",
+        },
+        [NDF_ALERT_DURATION] = {
+                .journal = "ND_ALERT_DURATION",
+                .logfmt = "alert_duration",
+        },
+        [NDF_ALERT_NOTIFICATION_REALTIME_USEC] = {
+                .journal = "ND_ALERT_NOTIFICATION_TIMESTAMP_USEC",
+                .logfmt = "alert_notification_timestamp",
+                .logfmt_annotator = timestamp_usec_annotator,
+        },
+
+        // put new items here
+        // leave the request URL and the message last
+
+        [NDF_REQUEST] = {
+                .journal = "ND_REQUEST",
+                .logfmt = "request",
+        },
+        [NDF_MESSAGE] = {
+                .journal = "MESSAGE",
+                .logfmt = "msg",
+        },
+};
+
+#define THREAD_FIELDS_MAX (sizeof(thread_log_fields) / sizeof(thread_log_fields[0]))
+
+ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len) {
+    for(size_t i = 0; i < THREAD_FIELDS_MAX ;i++) {
+        if(thread_log_fields[i].journal && strlen(thread_log_fields[i].journal) == len && strncmp(field, thread_log_fields[i].journal, len) == 0)
+            return i;
+    }
+
+    return NDF_STOP;
+}
+
+void log_stack_pop(void *ptr) {
+    if(!ptr) return;
+
+    struct log_stack_entry *lgs = *(struct log_stack_entry (*)[])ptr;
+
+    if(unlikely(!thread_log_stack_next || lgs != thread_log_stack_base[thread_log_stack_next - 1])) {
+        fatal("You cannot pop in the middle of the stack, or an item not in the stack");
+        return;
+    }
+
+    thread_log_stack_next--;
+}
+
+void log_stack_push(struct log_stack_entry *lgs) {
+    if(!lgs || thread_log_stack_next >= THREAD_LOG_STACK_MAX) return;
+    thread_log_stack_base[thread_log_stack_next++] = lgs;
+}
+
+// ----------------------------------------------------------------------------
+// json formatter
+
+static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_max) {
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    CLEAN_BUFFER *tmp = NULL;
+
+    for (size_t i = 0; i < fields_max; i++) {
+        if (!fields[i].entry.set || !fields[i].logfmt)
+            continue;
+
+        const char *key = fields[i].logfmt;
+
+        const char *s = NULL;
+        switch(fields[i].entry.type) {
+            case NDFT_TXT:
+                s = fields[i].entry.txt;
+                break;
+            case NDFT_STR:
+                s = string2str(fields[i].entry.str);
+                break;
+            case NDFT_BFR:
+                s = buffer_tostring(fields[i].entry.bfr);
+                break;
+            case NDFT_U64:
+                buffer_json_member_add_uint64(wb, key, fields[i].entry.u64);
+                break;
+            case NDFT_I64:
+                buffer_json_member_add_int64(wb, key, fields[i].entry.i64);
+                break;
+            case NDFT_DBL:
+                buffer_json_member_add_double(wb, key, fields[i].entry.dbl);
+                break;
+            case NDFT_UUID:{
+                char u[UUID_COMPACT_STR_LEN];
+                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                buffer_json_member_add_string(wb, key, u);
+            }
+                break;
+            case NDFT_CALLBACK: {
+                if(!tmp)
+                    tmp = buffer_create(1024, NULL);
+                else
+                    buffer_flush(tmp);
+                if(fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data))
+                    s = buffer_tostring(tmp);
+                else
+                    s = NULL;
+            }
+                break;
+            default:
+                s = "UNHANDLED";
+                break;
+        }
+
+        if(s && *s)
+            buffer_json_member_add_string(wb, key, s);
+    }
+
+    buffer_json_finalize(wb);
+}
+
+// ----------------------------------------------------------------------------
+// logfmt formatter
+
+
+static int64_t log_field_to_int64(struct log_field *lf) {
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
+    CLEAN_BUFFER *tmp = NULL;
+    const char *s = NULL;
+
+    switch(lf->entry.type) {
+        case NDFT_UUID:
+        case NDFT_UNSET:
+            return 0;
+
+        case NDFT_TXT:
+            s = lf->entry.txt;
+            break;
+
+        case NDFT_STR:
+            s = string2str(lf->entry.str);
+            break;
+
+        case NDFT_BFR:
+            s = buffer_tostring(lf->entry.bfr);
+            break;
+
+        case NDFT_CALLBACK:
+            if(!tmp)
+                tmp = buffer_create(0, NULL);
+            else
+                buffer_flush(tmp);
+
+            if(lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
+                s = buffer_tostring(tmp);
+            else
+                s = NULL;
+            break;
+
+        case NDFT_U64:
+            return lf->entry.u64;
+
+        case NDFT_I64:
+            return lf->entry.i64;
+
+        case NDFT_DBL:
+            return lf->entry.dbl;
+    }
+
+    if(s && *s)
+        return str2ll(s, NULL);
+
+    return 0;
+}
+
+static uint64_t log_field_to_uint64(struct log_field *lf) {
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
+    CLEAN_BUFFER *tmp = NULL;
+    const char *s = NULL;
+
+    switch(lf->entry.type) {
+        case NDFT_UUID:
+        case NDFT_UNSET:
+            return 0;
+
+        case NDFT_TXT:
+            s = lf->entry.txt;
+            break;
+
+        case NDFT_STR:
+            s = string2str(lf->entry.str);
+            break;
+
+        case NDFT_BFR:
+            s = buffer_tostring(lf->entry.bfr);
+            break;
+
+        case NDFT_CALLBACK:
+            if(!tmp)
+                tmp = buffer_create(0, NULL);
+            else
+                buffer_flush(tmp);
+
+            if(lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
+                s = buffer_tostring(tmp);
+            else
+                s = NULL;
+            break;
+
+        case NDFT_U64:
+            return lf->entry.u64;
+
+        case NDFT_I64:
+            return lf->entry.i64;
+
+        case NDFT_DBL:
+            return lf->entry.dbl;
+    }
+
+    if(s && *s)
+        return str2uint64_t(s, NULL);
+
+    return 0;
+}
+
+static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+    usec_t ut = log_field_to_uint64(lf);
+
+    if(!ut)
+        return;
+
+    char datetime[ISO8601_MAX_LENGTH];
+    iso8601_datetime_ut(datetime, sizeof(datetime), ut, ISO8601_LOCAL_TIMEZONE | ISO8601_MILLISECONDS);
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
+
+    buffer_strcat(wb, key);
+    buffer_fast_strcat(wb, "=", 1);
+    buffer_json_strcat(wb, datetime);
+}
+
+static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+    int64_t errnum = log_field_to_int64(lf);
+
+    if(errnum == 0)
+        return;
+
+    char buf[1024];
+    const char *s = errno2str(errnum, buf, sizeof(buf));
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
+
+    buffer_strcat(wb, key);
+    buffer_fast_strcat(wb, "=\"", 2);
+    buffer_print_int64(wb, errnum);
+    buffer_fast_strcat(wb, ", ", 2);
+    buffer_json_strcat(wb, s);
+    buffer_fast_strcat(wb, "\"", 1);
+}
+
+static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
+    uint64_t pri = log_field_to_uint64(lf);
+
+    if(buffer_strlen(wb))
+        buffer_fast_strcat(wb, " ", 1);
+
+    buffer_strcat(wb, key);
+    buffer_fast_strcat(wb, "=", 1);
+    buffer_strcat(wb, nd_log_id2priority(pri));
+}
+
+static bool needs_quotes_for_logfmt(const char *s) {
+    static bool safe_for_logfmt[256] = {
+            [' '] =  true, ['!'] =  true, ['"'] =  false, ['#'] =  true, ['$'] =  true, ['%'] =  true, ['&'] =  true,
+            ['\''] = true, ['('] =  true, [')'] =  true, ['*'] =  true, ['+'] =  true, [','] =  true, ['-'] =  true,
+            ['.'] =  true, ['/'] =  true, ['0'] =  true, ['1'] =  true, ['2'] =  true, ['3'] =  true, ['4'] =  true,
+            ['5'] =  true, ['6'] =  true, ['7'] =  true, ['8'] =  true, ['9'] =  true, [':'] =  true, [';'] =  true,
+            ['<'] =  true, ['='] =  true, ['>'] =  true, ['?'] =  true, ['@'] =  true, ['A'] =  true, ['B'] =  true,
+            ['C'] =  true, ['D'] =  true, ['E'] =  true, ['F'] =  true, ['G'] =  true, ['H'] =  true, ['I'] =  true,
+            ['J'] =  true, ['K'] =  true, ['L'] =  true, ['M'] =  true, ['N'] =  true, ['O'] =  true, ['P'] =  true,
+            ['Q'] =  true, ['R'] =  true, ['S'] =  true, ['T'] =  true, ['U'] =  true, ['V'] =  true, ['W'] =  true,
+            ['X'] =  true, ['Y'] =  true, ['Z'] =  true, ['['] =  true, ['\\'] = false, [']'] =  true, ['^'] =  true,
+            ['_'] =  true, ['`'] =  true, ['a'] =  true, ['b'] =  true, ['c'] =  true, ['d'] =  true, ['e'] =  true,
+            ['f'] =  true, ['g'] =  true, ['h'] =  true, ['i'] =  true, ['j'] =  true, ['k'] =  true, ['l'] =  true,
+            ['m'] =  true, ['n'] =  true, ['o'] =  true, ['p'] =  true, ['q'] =  true, ['r'] =  true, ['s'] =  true,
+            ['t'] =  true, ['u'] =  true, ['v'] =  true, ['w'] =  true, ['x'] =  true, ['y'] =  true, ['z'] =  true,
+            ['{'] =  true, ['|'] =  true, ['}'] =  true, ['~'] =  true, [0x7f] = true,
+    };
+
+    if(!*s)
+        return true;
+
+    while(*s) {
+        if(*s == '=' || isspace(*s) || !safe_for_logfmt[(uint8_t)*s])
+            return true;
+
+        s++;
+    }
+
+    return false;
+}
+
+static void string_to_logfmt(BUFFER *wb, const char *s) {
+    bool spaces = needs_quotes_for_logfmt(s);
+
+    if(spaces)
+        buffer_fast_strcat(wb, "\"", 1);
+
+    buffer_json_strcat(wb, s);
+
+    if(spaces)
+        buffer_fast_strcat(wb, "\"", 1);
+}
+
+static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max) {
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
+    CLEAN_BUFFER *tmp = NULL;
+
+    for (size_t i = 0; i < fields_max; i++) {
+        if (!fields[i].entry.set || !fields[i].logfmt)
+            continue;
+
+        const char *key = fields[i].logfmt;
+
+        if(fields[i].logfmt_annotator)
+            fields[i].logfmt_annotator(wb, key, &fields[i]);
+        else {
+            if(buffer_strlen(wb))
+                buffer_fast_strcat(wb, " ", 1);
+
+            switch(fields[i].entry.type) {
+                case NDFT_TXT:
+                    if(*fields[i].entry.txt) {
+                        buffer_strcat(wb, key);
+                        buffer_fast_strcat(wb, "=", 1);
+                        string_to_logfmt(wb, fields[i].entry.txt);
+                    }
+                    break;
+                case NDFT_STR:
+                    buffer_strcat(wb, key);
+                    buffer_fast_strcat(wb, "=", 1);
+                    string_to_logfmt(wb, string2str(fields[i].entry.str));
+                    break;
+                case NDFT_BFR:
+                    if(buffer_strlen(fields[i].entry.bfr)) {
+                        buffer_strcat(wb, key);
+                        buffer_fast_strcat(wb, "=", 1);
+                        string_to_logfmt(wb, buffer_tostring(fields[i].entry.bfr));
+                    }
+                    break;
+                case NDFT_U64:
+                    buffer_strcat(wb, key);
+                    buffer_fast_strcat(wb, "=", 1);
+                    buffer_print_uint64(wb, fields[i].entry.u64);
+                    break;
+                case NDFT_I64:
+                    buffer_strcat(wb, key);
+                    buffer_fast_strcat(wb, "=", 1);
+                    buffer_print_int64(wb, fields[i].entry.i64);
+                    break;
+                case NDFT_DBL:
+                    buffer_strcat(wb, key);
+                    buffer_fast_strcat(wb, "=", 1);
+                    buffer_print_netdata_double(wb, fields[i].entry.dbl);
+                    break;
+                case NDFT_UUID: {
+                    char u[UUID_COMPACT_STR_LEN];
+                    uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                    buffer_strcat(wb, key);
+                    buffer_fast_strcat(wb, "=", 1);
+                    buffer_fast_strcat(wb, u, sizeof(u) - 1);
+                }
+                    break;
+                case NDFT_CALLBACK: {
+                    if(!tmp)
+                        tmp = buffer_create(1024, NULL);
+                    else
+                        buffer_flush(tmp);
+                    if(fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data)) {
+                        buffer_strcat(wb, key);
+                        buffer_fast_strcat(wb, "=", 1);
+                        string_to_logfmt(wb, buffer_tostring(tmp));
+                    }
+                }
+                    break;
+                default:
+                    buffer_strcat(wb, "UNHANDLED");
+                    break;
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// journal logger
+
+bool nd_log_journal_socket_available(void) {
+    if(netdata_configured_host_prefix && *netdata_configured_host_prefix) {
+        char filename[FILENAME_MAX + 1];
+
+        snprintfz(filename, sizeof(filename), "%s%s",
+                  netdata_configured_host_prefix, "/run/systemd/journal/socket");
+
+        if(is_path_unix_socket(filename))
+            return true;
+    }
+
+    return is_path_unix_socket("/run/systemd/journal/socket");
+}
+
+static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max) {
+#ifdef HAVE_SYSTEMD
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
+    struct iovec iov[fields_max];
+    int iov_count = 0;
+
+    memset(iov, 0, sizeof(iov));
+
+    CLEAN_BUFFER *tmp = NULL;
+
+    for (size_t i = 0; i < fields_max; i++) {
+        if (!fields[i].entry.set || !fields[i].journal)
+            continue;
+
+        const char *key = fields[i].journal;
+        char *value = NULL;
+        switch (fields[i].entry.type) {
+            case NDFT_TXT:
+                if(*fields[i].entry.txt)
+                    asprintf(&value, "%s=%s", key, fields[i].entry.txt);
+                break;
+            case NDFT_STR:
+                asprintf(&value, "%s=%s", key, string2str(fields[i].entry.str));
+                break;
+            case NDFT_BFR:
+                if(buffer_strlen(fields[i].entry.bfr))
+                    asprintf(&value, "%s=%s", key, buffer_tostring(fields[i].entry.bfr));
+                break;
+            case NDFT_U64:
+                asprintf(&value, "%s=%" PRIu64, key, fields[i].entry.u64);
+                break;
+            case NDFT_I64:
+                asprintf(&value, "%s=%" PRId64, key, fields[i].entry.i64);
+                break;
+            case NDFT_DBL:
+                asprintf(&value, "%s=%f", key, fields[i].entry.dbl);
+                break;
+            case NDFT_UUID: {
+                char u[UUID_COMPACT_STR_LEN];
+                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                asprintf(&value, "%s=%s", key, u);
+            }
+                break;
+            case NDFT_CALLBACK: {
+                if(!tmp)
+                    tmp = buffer_create(1024, NULL);
+                else
+                    buffer_flush(tmp);
+                if(fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data))
+                    asprintf(&value, "%s=%s", key, buffer_tostring(tmp));
+            }
+                break;
+            default:
+                asprintf(&value, "%s=%s", key, "UNHANDLED");
+                break;
+        }
+
+        if (value) {
+            iov[iov_count].iov_base = value;
+            iov[iov_count].iov_len = strlen(value);
+            iov_count++;
+        }
+    }
+
+    int r = sd_journal_sendv(iov, iov_count);
+
+    // Clean up allocated memory
+    for (int i = 0; i < iov_count; i++) {
+        if (iov[i].iov_base != NULL) {
+            free(iov[i].iov_base);
+        }
+    }
+
+    return r == 0;
+#else
+    return false;
+#endif
+}
+
+static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max) {
+    if(!nd_log.journal_direct.initialized)
+        return false;
+
+    //  --- FIELD_PARSER_VERSIONS ---
+    //
+    // IMPORTANT:
+    // THERE ARE 6 VERSIONS OF THIS CODE
+    //
+    // 1. journal (direct socket API),
+    // 2. journal (libsystemd API),
+    // 3. logfmt,
+    // 4. json,
+    // 5. convert to uint64
+    // 6. convert to int64
+    //
+    // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
+
+    CLEAN_BUFFER *wb = buffer_create(4096, NULL);
+    CLEAN_BUFFER *tmp = NULL;
+
+    for (size_t i = 0; i < fields_max; i++) {
+        if (!fields[i].entry.set || !fields[i].journal)
+            continue;
+
+        const char *key = fields[i].journal;
+
+        const char *s = NULL;
+        switch(fields[i].entry.type) {
+            case NDFT_TXT:
+                s = fields[i].entry.txt;
+                break;
+            case NDFT_STR:
+                s = string2str(fields[i].entry.str);
+                break;
+            case NDFT_BFR:
+                s = buffer_tostring(fields[i].entry.bfr);
+                break;
+            case NDFT_U64:
+                buffer_strcat(wb, key);
+                buffer_putc(wb, '=');
+                buffer_print_uint64(wb, fields[i].entry.u64);
+                buffer_putc(wb, '\n');
+                break;
+            case NDFT_I64:
+                buffer_strcat(wb, key);
+                buffer_putc(wb, '=');
+                buffer_print_int64(wb, fields[i].entry.i64);
+                buffer_putc(wb, '\n');
+                break;
+            case NDFT_DBL:
+                buffer_strcat(wb, key);
+                buffer_putc(wb, '=');
+                buffer_print_netdata_double(wb, fields[i].entry.dbl);
+                buffer_putc(wb, '\n');
+                break;
+            case NDFT_UUID:{
+                char u[UUID_COMPACT_STR_LEN];
+                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                buffer_strcat(wb, key);
+                buffer_putc(wb, '=');
+                buffer_fast_strcat(wb, u, sizeof(u) - 1);
+                buffer_putc(wb, '\n');
+            }
+                break;
+            case NDFT_CALLBACK: {
+                if(!tmp)
+                    tmp = buffer_create(1024, NULL);
+                else
+                    buffer_flush(tmp);
+                if(fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data))
+                    s = buffer_tostring(tmp);
+                else
+                    s = NULL;
+            }
+                break;
+            default:
+                s = "UNHANDLED";
+                break;
+        }
+
+        if(s && *s) {
+            buffer_strcat(wb, key);
+            if(!strchr(s, '\n')) {
+                buffer_putc(wb, '=');
+                buffer_strcat(wb, s);
+                buffer_putc(wb, '\n');
+            }
+            else {
+                buffer_putc(wb, '\n');
+                size_t size = strlen(s);
+                uint64_t le_size = htole64(size);
+                buffer_memcat(wb, &le_size, sizeof(le_size));
+                buffer_memcat(wb, s, size);
+                buffer_putc(wb, '\n');
+            }
+        }
+    }
+
+    return journal_direct_send(nd_log.journal_direct.fd, buffer_tostring(wb), buffer_strlen(wb));
+}
+
+// ----------------------------------------------------------------------------
+// syslog logger - uses logfmt
+
+static bool nd_logger_syslog(int priority, ND_LOG_OUTPUT_FORMAT format, struct log_field *fields, size_t fields_max) {
+    CLEAN_BUFFER *wb = buffer_create(1024, NULL);
+
+    nd_logger_logfmt(wb, fields, fields_max);
+    syslog(priority, "%s", buffer_tostring(wb));
+
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+// file logger - uses logfmt
+
+static bool nd_logger_file(FILE *fp, ND_LOG_OUTPUT_FORMAT format, struct log_field *fields, size_t fields_max) {
+    BUFFER *wb = buffer_create(1024, NULL);
+
+    if(format == NDLOF_JSON)
+        nd_logger_json(wb, fields, fields_max);
+    else
+        nd_logger_logfmt(wb, fields, fields_max);
+
+    int r = fprintf(fp, "%s\n", buffer_tostring(wb));
+    fflush(fp);
+
+    buffer_free(wb);
+    return r > 0;
+}
+
+// ----------------------------------------------------------------------------
+// logger router
+
+static ND_LOG_OUTPUT nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, SPINLOCK **spinlock) {
+    *spinlock = NULL;
+    ND_LOG_OUTPUT output = nd_log.sources[source].method;
+
+    switch(output) {
+        case NDLO_JOURNAL:
+            if(unlikely(!nd_log.journal_direct.initialized && !nd_log.journal.initialized)) {
+                output = NDLO_FILE;
+                *fpp = stderr;
+                *spinlock = &nd_log.std_error.spinlock;
+            }
+            else {
+                *fpp = NULL;
+                *spinlock = NULL;
+            }
+            break;
+
+        case NDLO_SYSLOG:
+            if(unlikely(!nd_log.syslog.initialized)) {
+                output = NDLO_FILE;
+                *spinlock = &nd_log.std_error.spinlock;
+                *fpp = stderr;
+            }
+            else {
+                *spinlock = NULL;
+                *fpp = NULL;
+            }
+            break;
+
+        case NDLO_FILE:
+            if(!nd_log.sources[source].fp) {
+                *fpp = stderr;
+                *spinlock = &nd_log.std_error.spinlock;
+            }
+            else {
+                *fpp = nd_log.sources[source].fp;
+                *spinlock = &nd_log.sources[source].spinlock;
+            }
+            break;
+
+        case NDLO_STDOUT:
+            output = NDLO_FILE;
+            *fpp = stdout;
+            *spinlock = &nd_log.std_output.spinlock;
+            break;
+
+        default:
+        case NDLO_DEFAULT:
+        case NDLO_STDERR:
+            output = NDLO_FILE;
+            *fpp = stderr;
+            *spinlock = &nd_log.std_error.spinlock;
+            break;
+
+        case NDLO_DISABLED:
+        case NDLO_DEVNULL:
+            output = NDLO_DISABLED;
+            *fpp = NULL;
+            *spinlock = NULL;
+            break;
+    }
+
+    return output;
+}
+
+// ----------------------------------------------------------------------------
+// high level logger
+
+static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+                                 ND_LOG_OUTPUT output, struct nd_log_source *source,
+                                 struct log_field *fields, size_t fields_max) {
+    if(spinlock)
+        spinlock_lock(spinlock);
+
+    // check the limits
+    if(limit && nd_log_limit_reached(source))
+        goto cleanup;
+
+    if(output == NDLO_JOURNAL) {
+        if(!nd_logger_journal_direct(fields, fields_max) && !nd_logger_journal_libsystemd(fields, fields_max)) {
+            // we can't log to journal, let's log to stderr
+            if(spinlock)
+                spinlock_unlock(spinlock);
+
+            output = NDLO_FILE;
+            spinlock = &nd_log.std_error.spinlock;
+            fp = stderr;
+
+            if(spinlock)
+                spinlock_lock(spinlock);
+        }
+    }
+
+    if(output == NDLO_SYSLOG)
+        nd_logger_syslog(priority, source->format, fields, fields_max);
+
+    if(output == NDLO_FILE)
+        nd_logger_file(fp, source->format, fields, fields_max);
+
+
+cleanup:
+    if(spinlock)
+        spinlock_unlock(spinlock);
+}
+
+static void nd_logger_unset_all_thread_fields(void) {
+    size_t fields_max = THREAD_FIELDS_MAX;
+    for(size_t i = 0; i < fields_max ; i++)
+        thread_log_fields[i].entry.set = false;
+}
+
+static void nd_logger_merge_log_stack_to_thread_fields(void) {
+    for(size_t c = 0; c < thread_log_stack_next ;c++) {
+        struct log_stack_entry *lgs = thread_log_stack_base[c];
+
+        for(size_t i = 0; lgs[i].id != NDF_STOP ; i++) {
+            if(lgs[i].id >= _NDF_MAX || !lgs[i].set)
+                continue;
+
+            struct log_stack_entry *e = &lgs[i];
+            ND_LOG_STACK_FIELD_TYPE type = lgs[i].type;
+
+            // do not add empty / unset fields
+            if((type == NDFT_TXT && (!e->txt || !*e->txt)) ||
+                (type == NDFT_BFR && (!e->bfr || !buffer_strlen(e->bfr))) ||
+                (type == NDFT_STR && !e->str) ||
+                (type == NDFT_UUID && !e->uuid) ||
+                (type == NDFT_CALLBACK && !e->cb.formatter) ||
+                type == NDFT_UNSET)
+                continue;
+
+            thread_log_fields[lgs[i].id].entry = *e;
+        }
+    }
+}
+
+static void nd_logger(const char *file, const char *function, const unsigned long line,
+               ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, bool limit, int saved_errno,
+               const char *fmt, va_list ap) {
+
+    SPINLOCK *spinlock;
+    FILE *fp;
+    ND_LOG_OUTPUT output = nd_logger_select_output(source, &fp, &spinlock);
+    if(output != NDLO_FILE && output != NDLO_JOURNAL && output != NDLO_SYSLOG)
+        return;
+
+    // mark all fields as unset
+    nd_logger_unset_all_thread_fields();
+
+    // flatten the log stack into the fields
+    nd_logger_merge_log_stack_to_thread_fields();
+
+    // set the common fields that are automatically set by the logging subsystem
+
+    if(likely(!thread_log_fields[NDF_INVOCATION_ID].entry.set))
+        thread_log_fields[NDF_INVOCATION_ID].entry = ND_LOG_FIELD_UUID(NDF_INVOCATION_ID, &nd_log.invocation_id);
+
+    if(likely(!thread_log_fields[NDF_LOG_SOURCE].entry.set))
+        thread_log_fields[NDF_LOG_SOURCE].entry = ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, nd_log_source2str(source));
+
+    if(likely(!thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry.set))
+        thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry = ND_LOG_FIELD_TXT(NDF_SYSLOG_IDENTIFIER, program_name);
+
+    if(likely(!thread_log_fields[NDF_LINE].entry.set)) {
+        thread_log_fields[NDF_LINE].entry = ND_LOG_FIELD_U64(NDF_LINE, line);
+        thread_log_fields[NDF_FILE].entry = ND_LOG_FIELD_TXT(NDF_FILE, file);
+        thread_log_fields[NDF_FUNC].entry = ND_LOG_FIELD_TXT(NDF_FUNC, function);
+    }
+
+    if(likely(!thread_log_fields[NDF_PRIORITY].entry.set)) {
+        thread_log_fields[NDF_PRIORITY].entry = ND_LOG_FIELD_U64(NDF_PRIORITY, priority);
+    }
+
+    if(likely(!thread_log_fields[NDF_TID].entry.set))
+        thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid());
+
+    if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
+        char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
+        const char *thread_tag = netdata_thread_tag();
+        if(!netdata_thread_tag_exists()) {
+            if (!netdata_thread_tag_exists()) {
+                os_thread_get_current_name_np(os_threadname);
+                if ('\0' != os_threadname[0])
+                    /* If it is not an empty string replace "MAIN" thread_tag */
+                    thread_tag = os_threadname;
+            }
+        }
+        thread_log_fields[NDF_THREAD_TAG].entry = ND_LOG_FIELD_TXT(NDF_THREAD_TAG, thread_tag);
+
+        // TODO: fix the ND_MODULE in logging by setting proper module name in threads
+//        if(!thread_log_fields[NDF_MODULE].entry.set)
+//            thread_log_fields[NDF_MODULE].entry = ND_LOG_FIELD_CB(NDF_MODULE, thread_tag_to_module, (void *)thread_tag);
+    }
+
+    if(likely(!thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry.set))
+        thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry = ND_LOG_FIELD_U64(NDF_TIMESTAMP_REALTIME_USEC, now_realtime_usec());
+
+    if(saved_errno != 0 && !thread_log_fields[NDF_ERRNO].entry.set)
+        thread_log_fields[NDF_ERRNO].entry = ND_LOG_FIELD_I64(NDF_ERRNO, saved_errno);
+
+    CLEAN_BUFFER *wb = NULL;
+    if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
+        wb = buffer_create(1024, NULL);
+        buffer_vsprintf(wb, fmt, ap);
+        thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
+    }
+
+    nd_logger_log_fields(spinlock, fp, limit, priority, output, &nd_log.sources[source],
+                         thread_log_fields, THREAD_FIELDS_MAX);
+
+    if(nd_log.sources[source].pending_msg) {
+        // log a pending message
+
+        nd_logger_unset_all_thread_fields();
+
+        thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_U64,
+                .u64 = now_realtime_usec(),
+        };
+
+        thread_log_fields[NDF_LOG_SOURCE].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_TXT,
+                .txt = nd_log_source2str(source),
+        };
+
+        thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_TXT,
+                .txt = program_name,
+        };
+
+        thread_log_fields[NDF_MESSAGE].entry = (struct log_stack_entry){
+                .set = true,
+                .type = NDFT_TXT,
+                .txt = nd_log.sources[source].pending_msg,
+        };
+
+        nd_logger_log_fields(spinlock, fp, false, priority, output,
+                             &nd_log.sources[source],
+                             thread_log_fields, THREAD_FIELDS_MAX);
+
+        freez((void *)nd_log.sources[source].pending_msg);
+        nd_log.sources[source].pending_msg = NULL;
+    }
+
+    errno = 0;
+}
+
+static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
+    if(source >= _NDLS_MAX)
+        source = NDLS_DAEMON;
+
+    if(overwrite_thread_source)
+        source = overwrite_thread_source;
+
+    if(nd_log.overwrite_process_source)
+        source = nd_log.overwrite_process_source;
+
+    return source;
+}
+
+// ----------------------------------------------------------------------------
+// public API for loggers
+
+void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
+    int saved_errno = errno;
+    source = nd_log_validate_source(source);
+
+    if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority > nd_log.sources[source].min_priority)
+        return;
+
+    va_list args;
+    va_start(args, fmt);
+    nd_logger(file, function, line, source, priority,
+              source == NDLS_DAEMON || source == NDLS_COLLECTORS,
+              saved_errno, fmt, args);
+    va_end(args);
+}
+
+void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+    int saved_errno = errno;
+    source = nd_log_validate_source(source);
 
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
 
-    // save a copy of errno - just in case this function generates a new error
-    int __errno = errno;
-
-    va_list args;
-
-    log_lock();
+    spinlock_lock(&erl->spinlock);
 
     erl->count++;
     time_t now = now_boottime_sec();
     if(now - erl->last_logged < erl->log_every) {
-        log_unlock();
+        spinlock_unlock(&erl->spinlock);
         return;
     }
 
-    // prevent logging too much
-    if (error_log_limit(0)) {
-        log_unlock();
-        return;
-    }
-
-    if(collector_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_ERR,  fmt, args );
-        va_end( args );
-    }
-
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    va_start( args, fmt );
-#ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(fp, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ",
-            date, program_name, prefix, netdata_thread_tag(), line, file, function);
-#else
-    fprintf(fp, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
-#endif
-    vfprintf(fp, fmt, args );
-    va_end( args );
-
-    if(erl->count > 1)
-        fprintf(fp, " (similar messages repeated %zu times in the last %llu secs)",
-                erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
-
-    if(erl->sleep_ut)
-        fprintf(fp, " (sleeping for %"PRIu64" microseconds every time this happens)", erl->sleep_ut);
-
-    if(__errno) {
-        char buf[1024];
-        fprintf(fp,
-                " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
-        errno = 0;
-    }
-    else
-        fputc('\n', fp);
-
-    erl->last_logged = now;
-    erl->count = 0;
-
-    log_unlock();
-}
-
-void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
-#if !defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_DEV_MODE)
-    if (NETDATA_LOG_LEVEL_ERROR > global_log_severity_level)
-        return;
-#endif
-
-    // save a copy of errno - just in case this function generates a new error
-    int __errno = errno;
-    FILE *fp = (is_collector || !stderror) ? stderr : stderror;
+    spinlock_unlock(&erl->spinlock);
 
     va_list args;
-
-    log_lock();
-
-    // prevent logging too much
-    if (error_log_limit(0)) {
-        log_unlock();
-        return;
-    }
-
-    if(collector_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_ERR,  fmt, args );
-        va_end( args );
-    }
-
-    char date[LOG_DATE_LENGTH];
-    log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    va_start( args, fmt );
-#ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(fp, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ",
-            date, program_name, prefix, netdata_thread_tag(), line, file, function);
-#else
-    fprintf(fp, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
-#endif
-    vfprintf(fp, fmt, args );
-    va_end( args );
-
-    if(__errno) {
-        char buf[1024];
-        fprintf(fp,
-                " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
-        errno = 0;
-    }
-    else
-        fputc('\n', fp);
-
-    log_unlock();
+    va_start(args, fmt);
+    nd_logger(file, function, line, source, priority,
+            source == NDLS_DAEMON || source == NDLS_COLLECTORS,
+            saved_errno, fmt, args);
+    va_end(args);
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-static void crash_netdata(void) {
-    // make Netdata core dump
-    abort();
-}
-#endif
+void netdata_logger_fatal( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+    int saved_errno = errno;
+    ND_LOG_SOURCES source = NDLS_DAEMON;
+    source = nd_log_validate_source(source);
 
-#ifdef HAVE_BACKTRACE
-#define BT_BUF_SIZE 100
-static void print_call_stack(void) {
-    FILE *fp = (!stderror) ? stderr : stderror;
-
-    int nptrs;
-    void *buffer[BT_BUF_SIZE];
-
-    nptrs = backtrace(buffer, BT_BUF_SIZE);
-    if(nptrs)
-        backtrace_symbols_fd(buffer, nptrs, fileno(fp));
-}
-#endif
-
-void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    FILE *fp = stderror ? stderror : stderr;
-
-    // save a copy of errno - just in case this function generates a new error
-    int __errno = errno;
     va_list args;
-    const char *thread_tag;
-    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
-
-    if(collector_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_CRIT,  fmt, args );
-        va_end( args );
-    }
-
-    thread_tag = netdata_thread_tag();
-    if (!netdata_thread_tag_exists()) {
-        os_thread_get_current_name_np(os_threadname);
-        if ('\0' != os_threadname[0]) { /* If it is not an empty string replace "MAIN" thread_tag */
-            thread_tag = os_threadname;
-        }
-    }
+    va_start(args, fmt);
+    nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, fmt, args);
+    va_end(args);
 
     char date[LOG_DATE_LENGTH];
     log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-
-    log_lock();
-
-    va_start( args, fmt );
-#ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(fp,
-            "%s: %s FATAL : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
-#else
-    fprintf(fp, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
-#endif
-    vfprintf(fp, fmt, args );
-    va_end( args );
-
-    perror(" # ");
-    fputc('\n', fp);
-
-    log_unlock();
 
     char action_data[70+1];
-    snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
+    snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
     char action_result[60+1];
+
+    const char *thread_tag = thread_log_fields[NDF_THREAD_TAG].entry.txt;
+    if(!thread_tag)
+        thread_tag = "UNKNOWN";
 
     const char *tag_to_send =  thread_tag;
 
@@ -1045,129 +2240,120 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     send_statistics("FATAL", action_result, action_data);
 
 #ifdef HAVE_BACKTRACE
-    print_call_stack();
+    int fd = nd_log.sources[NDLS_DAEMON].fd;
+    if(fd == -1)
+        fd = STDERR_FILENO;
+
+    int nptrs;
+    void *buffer[10000];
+
+    nptrs = backtrace(buffer, sizeof(buffer));
+    if(nptrs)
+        backtrace_symbols_fd(buffer, nptrs, fd);
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    crash_netdata();
+    abort();
 #endif
 
     netdata_cleanup_and_exit(1);
 }
 
 // ----------------------------------------------------------------------------
-// access log
+// log limits
 
-void netdata_log_access( const char *fmt, ... ) {
-    va_list args;
+void nd_log_limits_reset(void) {
+    usec_t now_ut = now_monotonic_usec();
 
-    if(access_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_INFO,  fmt, args );
-        va_end( args );
+    spinlock_lock(&nd_log.std_output.spinlock);
+    spinlock_lock(&nd_log.std_error.spinlock);
+
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        spinlock_lock(&nd_log.sources[i].spinlock);
+        nd_log.sources[i].limits.prevented = 0;
+        nd_log.sources[i].limits.counter = 0;
+        nd_log.sources[i].limits.started_monotonic_ut = now_ut;
+        nd_log.sources[i].limits.logs_per_period = nd_log.sources[i].limits.logs_per_period_backup;
+        spinlock_unlock(&nd_log.sources[i].spinlock);
     }
 
-    if(stdaccess) {
-        static netdata_mutex_t access_mutex = NETDATA_MUTEX_INITIALIZER;
+    spinlock_unlock(&nd_log.std_output.spinlock);
+    spinlock_unlock(&nd_log.std_error.spinlock);
+}
 
-        if(web_server_is_multithreaded)
-            netdata_mutex_lock(&access_mutex);
-
-        char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-        fprintf(stdaccess, "%s: ", date);
-
-        va_start( args, fmt );
-        vfprintf( stdaccess, fmt, args );
-        va_end( args );
-        fputc('\n', stdaccess);
-
-        if(web_server_is_multithreaded)
-            netdata_mutex_unlock(&access_mutex);
+void nd_log_limits_unlimited(void) {
+    nd_log_limits_reset();
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        nd_log.sources[i].limits.logs_per_period = 0;
     }
 }
 
-// ----------------------------------------------------------------------------
-// health log
+static bool nd_log_limit_reached(struct nd_log_source *source) {
+    if(source->limits.throttle_period == 0 || source->limits.logs_per_period == 0)
+        return false;
 
-void netdata_log_health( const char *fmt, ... ) {
-    va_list args;
+    usec_t now_ut = now_monotonic_usec();
+    if(!source->limits.started_monotonic_ut)
+        source->limits.started_monotonic_ut = now_ut;
 
-    if(health_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_INFO,  fmt, args );
-        va_end( args );
+    source->limits.counter++;
+
+    if(now_ut - source->limits.started_monotonic_ut > (usec_t)source->limits.throttle_period) {
+        if(source->limits.prevented) {
+            BUFFER *wb = buffer_create(1024, NULL);
+            buffer_sprintf(wb,
+                           "LOG FLOOD PROTECTION: resuming logging "
+                           "(prevented %"PRIu32" logs in the last %"PRIu32" seconds).",
+                           source->limits.prevented,
+                           source->limits.throttle_period);
+
+            if(source->pending_msg)
+                freez((void *)source->pending_msg);
+
+            source->pending_msg = strdupz(buffer_tostring(wb));
+
+            buffer_free(wb);
+        }
+
+        // restart the period accounting
+        source->limits.started_monotonic_ut = now_ut;
+        source->limits.counter = 1;
+        source->limits.prevented = 0;
+
+        // log this error
+        return false;
     }
 
-    if(stdhealth) {
-        static netdata_mutex_t health_mutex = NETDATA_MUTEX_INITIALIZER;
+    if(source->limits.counter > source->limits.logs_per_period) {
+        if(!source->limits.prevented) {
+            BUFFER *wb = buffer_create(1024, NULL);
+            buffer_sprintf(wb,
+                    "LOG FLOOD PROTECTION: too many logs (%"PRIu32" logs in %"PRId64" seconds, threshold is set to %"PRIu32" logs "
+                    "in %"PRIu32" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.",
+                    source->limits.counter,
+                    (int64_t)((now_ut - source->limits.started_monotonic_ut) / USEC_PER_SEC),
+                    source->limits.logs_per_period,
+                    source->limits.throttle_period,
+                    program_name,
+                    (int64_t)((source->limits.started_monotonic_ut + (source->limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
 
-        if(web_server_is_multithreaded)
-            netdata_mutex_lock(&health_mutex);
+            if(source->pending_msg)
+                freez((void *)source->pending_msg);
 
-        char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-        fprintf(stdhealth, "%s: ", date);
+            source->pending_msg = strdupz(buffer_tostring(wb));
 
-        va_start( args, fmt );
-        vfprintf( stdhealth, fmt, args );
-        va_end( args );
-        fputc('\n', stdhealth);
+            buffer_free(wb);
+        }
 
-        if(web_server_is_multithreaded)
-            netdata_mutex_unlock(&health_mutex);
-    }
-}
+        source->limits.prevented++;
 
-#ifdef ENABLE_ACLK
-void log_aclk_message_bin( const char *data, const size_t data_len, int tx, const char *mqtt_topic, const char *message_name) {
-    if (aclklog) {
-        static netdata_mutex_t aclklog_mutex = NETDATA_MUTEX_INITIALIZER;
-        netdata_mutex_lock(&aclklog_mutex);
-
-        char date[LOG_DATE_LENGTH];
-        log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
-        fprintf(aclklog, "%s: %s Msg:\"%s\", MQTT-topic:\"%s\": ", date, tx ? "OUTGOING" : "INCOMING", message_name, mqtt_topic);
-
-        fwrite(data, data_len, 1, aclklog);
-
-        fputc('\n', aclklog);
-
-        netdata_mutex_unlock(&aclklog_mutex);
-    }
-}
+        // prevent logging this error
+#ifdef NETDATA_INTERNAL_CHECKS
+        return false;
+#else
+        return true;
 #endif
-
-void log_set_global_severity_level(netdata_log_level_t value)
-{
-    global_log_severity_level = value;
-}
-
-netdata_log_level_t log_severity_string_to_severity_level(char *level)
-{
-    if (!strcmp(level, NETDATA_LOG_LEVEL_INFO_STR))
-        return NETDATA_LOG_LEVEL_INFO;
-    if (!strcmp(level, NETDATA_LOG_LEVEL_ERROR_STR) || !strcmp(level, NETDATA_LOG_LEVEL_ERROR_SHORT_STR))
-        return NETDATA_LOG_LEVEL_ERROR;
-
-    return NETDATA_LOG_LEVEL_INFO;
-}
-
-char *log_severity_level_to_severity_string(netdata_log_level_t level)
-{
-    switch (level) {
-        case NETDATA_LOG_LEVEL_ERROR:
-            return NETDATA_LOG_LEVEL_ERROR_STR;
-        case NETDATA_LOG_LEVEL_INFO:
-        default:
-            return NETDATA_LOG_LEVEL_INFO_STR;
     }
-}
 
-void log_set_global_severity_for_external_plugins() {
-    char *s = getenv("NETDATA_LOG_SEVERITY_LEVEL");
-    if (!s)
-        return;
-    netdata_log_level_t level = log_severity_string_to_severity_level(s);
-    log_set_global_severity_level(level);
+    return false;
 }

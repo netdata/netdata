@@ -54,6 +54,8 @@ else
   AC_CHECK_TOOL([AR], [ar])
 fi
 
+CFLAGS="$CFLAGS -fexceptions"
+
 # -----------------------------------------------------------------------------
 # configurable options
 
@@ -570,6 +572,48 @@ AC_CHECK_LIB(
     [LZ4_compress_fast_continue],
     [LZ4_LIBS="-llz4"]
 )
+
+# -----------------------------------------------------------------------------
+# libcurl
+
+PKG_CHECK_MODULES(
+    [LIBCURL],
+    [libcurl],
+    [AC_CHECK_LIB(
+        [curl],
+        [curl_easy_init],
+        [have_libcurl=yes],
+        [have_libcurl=no]
+    )],
+    [have_libcurl=no]
+)
+
+if test "x$have_libcurl" = "xyes"; then
+    AC_DEFINE([HAVE_CURL], [1], [libcurl usability])
+    OPTIONAL_CURL_LIBS="-lcurl"
+fi
+
+# -----------------------------------------------------------------------------
+# PCRE2
+
+PKG_CHECK_MODULES(
+    [LIBPCRE2],
+    [libpcre2-8],
+    [AC_CHECK_LIB(
+        [pcre2-8],
+        [pcre2_compile_8],
+        [have_libpcre2=yes],
+        [have_libpcre2=no]
+    )],
+    [have_libpcre2=no]
+)
+
+if test "x$have_libpcre2" = "xyes"; then
+    AC_DEFINE([HAVE_PCRE2], [1], [PCRE2 usability])
+    OPTIONAL_PCRE2_LIBS="-lpcre2-8"
+fi
+
+AM_CONDITIONAL([ENABLE_LOG2JOURNAL], [test "${have_libpcre2}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # zstd
@@ -1591,18 +1635,6 @@ PKG_CHECK_MODULES(
 )
 
 PKG_CHECK_MODULES(
-    [LIBCURL],
-    [libcurl],
-    [AC_CHECK_LIB(
-        [curl],
-        [curl_easy_init],
-        [have_libcurl=yes],
-        [have_libcurl=no]
-    )],
-    [have_libcurl=no]
-)
-
-PKG_CHECK_MODULES(
     [AWS_CPP_SDK_CORE],
     [aws-cpp-sdk-core],
     [have_libaws_cpp_sdk_core=yes],
@@ -1946,6 +1978,8 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_BROTLIENC_LIBS])
 AC_SUBST([OPTIONAL_BROTLIDEC_LIBS])
+AC_SUBST([OPTIONAL_CURL_LIBS])
+AC_SUBST([OPTIONAL_PCRE2_LIBS])
 AC_SUBST([OPTIONAL_ZSTD_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
@@ -2073,15 +2107,18 @@ AC_CONFIG_FILES([
     libnetdata/aral/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
+    libnetdata/buffered_reader/Makefile
     libnetdata/clocks/Makefile
     libnetdata/completion/Makefile
     libnetdata/config/Makefile
+    libnetdata/datetime/Makefile
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
     libnetdata/facets/Makefile
     libnetdata/functions_evloop/Makefile
     libnetdata/july/Makefile
+    libnetdata/line_splitter/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile
@@ -2095,6 +2132,7 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
+    libnetdata/uuid/Makefile
     libnetdata/json/Makefile
     libnetdata/health/Makefile
     libnetdata/worker_utilization/Makefile

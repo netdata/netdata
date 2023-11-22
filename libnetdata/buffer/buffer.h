@@ -94,6 +94,8 @@ typedef struct web_buffer {
     } json;
 } BUFFER;
 
+#define CLEAN_BUFFER _cleanup_(buffer_freep) BUFFER
+
 #define buffer_cacheable(wb)    do { (wb)->options |= WB_CONTENT_CACHEABLE;    if((wb)->options & WB_CONTENT_NO_CACHEABLE) (wb)->options &= ~WB_CONTENT_NO_CACHEABLE; } while(0)
 #define buffer_no_cacheable(wb) do { (wb)->options |= WB_CONTENT_NO_CACHEABLE; if((wb)->options & WB_CONTENT_CACHEABLE)    (wb)->options &= ~WB_CONTENT_CACHEABLE;  (wb)->expires = 0; } while(0)
 
@@ -134,6 +136,10 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
 BUFFER *buffer_create(size_t size, size_t *statistics);
 void buffer_free(BUFFER *b);
 void buffer_increase(BUFFER *b, size_t free_size_required);
+
+static inline void buffer_freep(BUFFER **bp) {
+    if(bp) buffer_free(*bp);
+}
 
 void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...) PRINTFLIKE(3, 4);
 void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args);
@@ -210,6 +216,13 @@ static inline void buffer_fast_rawcat(BUFFER *wb, const char *txt, size_t len) {
     buffer_overflow_check(wb);
 }
 
+static inline void buffer_putc(BUFFER *wb, char c) {
+    buffer_need_bytes(wb, 2);
+    wb->buffer[wb->len++] = c;
+    wb->buffer[wb->len] = '\0';
+    buffer_overflow_check(wb);
+}
+
 static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt || !len)) return;
 
@@ -278,6 +291,19 @@ static inline void buffer_strncat(BUFFER *wb, const char *txt, size_t len) {
     memcpy(&wb->buffer[wb->len], txt, len);
 
     wb->len += len;
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
+static inline void buffer_memcat(BUFFER *wb, const void *mem, size_t bytes) {
+    if(unlikely(!mem)) return;
+
+    buffer_need_bytes(wb, bytes + 1);
+
+    memcpy(&wb->buffer[wb->len], mem, bytes);
+
+    wb->len += bytes;
     wb->buffer[wb->len] = '\0';
 
     buffer_overflow_check(wb);

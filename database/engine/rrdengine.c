@@ -1478,12 +1478,19 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
         spinlock_unlock(&datafile->writers.spinlock);
 
         if(!available) {
-            netdata_log_info("DBENGINE: journal file %u needs to be indexed, but it has writers working on it - skipping it for now", datafile->fileno);
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "DBENGINE: journal file %u needs to be indexed, but it has writers working on it - "
+                   "skipping it for now",
+                   datafile->fileno);
+
             datafile = datafile->next;
             continue;
         }
 
-        netdata_log_info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "DBENGINE: journal file %u is ready to be indexed",
+               datafile->fileno);
+
         pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                      journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
 
@@ -1496,7 +1503,10 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
     }
 
     errno = 0;
-    internal_error(count, "DBENGINE: journal indexing done; %u files processed", count);
+    if(count)
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "DBENGINE: journal indexing done; %u files processed",
+               count);
 
     worker_is_idle();
 

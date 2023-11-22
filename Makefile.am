@@ -128,6 +128,7 @@ AM_CFLAGS = \
     $(OPTIONAL_CUPS_CFLAGS) \
     $(OPTIONAL_XENSTAT_CFLAGS) \
     $(OPTIONAL_BPF_CFLAGS) \
+    $(OPTIONAL_SYSTEMD_CFLAGS) \
     $(OPTIONAL_GTEST_CFLAGS) \
     $(NULL)
 
@@ -145,12 +146,18 @@ LIBNETDATA_FILES = \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
     libnetdata/buffer/buffer.h \
+    libnetdata/buffered_reader/buffered_reader.c \
+    libnetdata/buffered_reader/buffered_reader.h \
     libnetdata/circular_buffer/circular_buffer.c \
     libnetdata/circular_buffer/circular_buffer.h \
     libnetdata/clocks/clocks.c \
     libnetdata/clocks/clocks.h \
     libnetdata/completion/completion.c \
     libnetdata/completion/completion.h \
+    libnetdata/datetime/iso8601.c \
+    libnetdata/datetime/iso8601.h \
+    libnetdata/datetime/rfc7231.c \
+    libnetdata/datetime/rfc7231.h \
     libnetdata/dictionary/dictionary.c \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
@@ -167,8 +174,12 @@ LIBNETDATA_FILES = \
     libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
     libnetdata/required_dummies.h \
+    libnetdata/line_splitter/line_splitter.c \
+    libnetdata/line_splitter/line_splitter.h \
     libnetdata/locks/locks.c \
     libnetdata/locks/locks.h \
+    libnetdata/log/journal.c \
+    libnetdata/log/journal.h \
     libnetdata/log/log.c \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
@@ -195,6 +206,8 @@ LIBNETDATA_FILES = \
     libnetdata/threads/threads.h \
     libnetdata/url/url.c \
     libnetdata/url/url.h \
+    libnetdata/uuid/uuid.c \
+    libnetdata/uuid/uuid.h \
     libnetdata/json/json.c \
     libnetdata/json/json.h \
     libnetdata/json/jsmn.c \
@@ -321,6 +334,16 @@ SYSTEMD_JOURNAL_PLUGIN_FILES = \
     collectors/systemd-journal.plugin/systemd-journal-files.c \
     collectors/systemd-journal.plugin/systemd-journal-fstat.c \
     $(LIBNETDATA_FILES) \
+    $(NULL)
+
+SYSTEMD_CAT_NATIVE_FILES = \
+    libnetdata/log/systemd-cat-native.c \
+    libnetdata/log/systemd-cat-native.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+LOG2JOURNAL_FILES = \
+    libnetdata/log/log2journal.c \
     $(NULL)
 
 CUPS_PLUGIN_FILES = \
@@ -1179,6 +1202,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
+    $(OPTIONAL_CURL_LIBS) \
     $(OPTIONAL_ZSTD_LIBS) \
     $(OPTIONAL_BROTLIENC_LIBS) \
     $(OPTIONAL_BROTLIDEC_LIBS) \
@@ -1190,6 +1214,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
+    $(OPTIONAL_SYSTEMD_LIBS) \
     $(OPTIONAL_GTEST_LIBS) \
     $(NULL)
 
@@ -1290,6 +1315,14 @@ if ENABLE_PLUGIN_FREEIPMI
         $(NULL)
 endif
 
+if ENABLE_LOG2JOURNAL
+    sbin_PROGRAMS += log2journal
+    log2journal_SOURCES = $(LOG2JOURNAL_FILES)
+    log2journal_LDADD = \
+            $(OPTIONAL_PCRE2_LIBS) \
+            $(NULL)
+endif
+
 if ENABLE_PLUGIN_SYSTEMD_JOURNAL
     plugins_PROGRAMS += systemd-journal.plugin
     systemd_journal_plugin_SOURCES = $(SYSTEMD_JOURNAL_PLUGIN_FILES)
@@ -1298,6 +1331,12 @@ if ENABLE_PLUGIN_SYSTEMD_JOURNAL
         $(OPTIONAL_SYSTEMD_LIBS) \
         $(NULL)
 endif
+
+sbin_PROGRAMS += systemd-cat-native
+systemd_cat_native_SOURCES = $(SYSTEMD_CAT_NATIVE_FILES)
+systemd_cat_native_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
 
 if ENABLE_PLUGIN_EBPF
     plugins_PROGRAMS += ebpf.plugin

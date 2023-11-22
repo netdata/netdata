@@ -9,19 +9,8 @@ netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    stderror = stderr;
     clocks_init();
-
-    program_name = "systemd-journal.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
-
-    // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
-
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);

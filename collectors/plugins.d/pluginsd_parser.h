@@ -97,7 +97,6 @@ typedef struct parser {
     PARSER_REPERTOIRE repertoire;
     uint32_t flags;
     int fd;                         // Socket
-    size_t line;
     FILE *fp_input;                 // Input source e.g. stream
     FILE *fp_output;                // Stream to send commands to plugin
 
@@ -111,6 +110,8 @@ typedef struct parser {
     PARSER_USER_OBJECT user;        // User defined structure to hold extra state between calls
 
     struct buffered_reader reader;
+    struct line_splitter line;
+    PARSER_KEYWORD *keyword;
 
     struct {
         const char *end_keyword;
@@ -162,13 +163,17 @@ static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *co
     return NULL;
 }
 
+bool parser_reconstruct_node(BUFFER *wb, void *ptr);
+bool parser_reconstruct_instance(BUFFER *wb, void *ptr);
+bool parser_reconstruct_context(BUFFER *wb, void *ptr);
+
 static inline int parser_action(PARSER *parser, char *input) {
 #ifdef NETDATA_LOG_STREAM_RECEIVE
     static __thread char line[PLUGINSD_LINE_MAX + 1];
     strncpyz(line, input, sizeof(line) - 1);
 #endif
 
-    parser->line++;
+    parser->line.count++;
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
         char command[100 + 1];
@@ -200,24 +205,25 @@ static inline int parser_action(PARSER *parser, char *input) {
         return 0;
     }
 
-    static __thread char *words[PLUGINSD_MAX_WORDS];
-    size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
-    const char *command = get_word(words, num_words, 0);
+    parser->line.num_words = quoted_strings_splitter_pluginsd(input, parser->line.words, PLUGINSD_MAX_WORDS);
+    const char *command = get_word(parser->line.words, parser->line.num_words, 0);
 
-    if(unlikely(!command))
+    if(unlikely(!command)) {
+        line_splitter_reset(&parser->line);
         return 0;
+    }
 
     PARSER_RC rc;
-    PARSER_KEYWORD *t = parser_find_keyword(parser, command);
-    if(likely(t)) {
-        worker_is_busy(t->worker_job_id);
+    parser->keyword = parser_find_keyword(parser, command);
+    if(likely(parser->keyword)) {
+        worker_is_busy(parser->keyword->worker_job_id);
 
 #ifdef NETDATA_LOG_STREAM_RECEIVE
-        if(parser->user.stream_log_fp && t->repertoire & parser->user.stream_log_repertoire)
+        if(parser->user.stream_log_fp && parser->keyword->repertoire & parser->user.stream_log_repertoire)
             fprintf(parser->user.stream_log_fp, "%s", line);
 #endif
 
-        rc = parser_execute(parser, t, words, num_words);
+        rc = parser_execute(parser, parser->keyword, parser->line.words, parser->line.num_words);
         // rc = (*t->func)(words, num_words, parser);
         worker_is_idle();
     }
@@ -225,22 +231,13 @@ static inline int parser_action(PARSER *parser, char *input) {
         rc = PARSER_RC_ERROR;
 
     if(rc == PARSER_RC_ERROR) {
-        BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-        for(size_t i = 0; i < num_words ;i++) {
-            if(i) buffer_fast_strcat(wb, " ", 1);
-
-            buffer_fast_strcat(wb, "\"", 1);
-            const char *s = get_word(words, num_words, i);
-            buffer_strcat(wb, s?s:"");
-            buffer_fast_strcat(wb, "\"", 1);
-        }
-
+        CLEAN_BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+        line_splitter_reconstruct_line(wb, &parser->line);
         netdata_log_error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
-                          command, parser->line, buffer_tostring(wb));
-
-        buffer_free(wb);
+                command, parser->line.count, buffer_tostring(wb));
     }
 
+    line_splitter_reset(&parser->line);
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
 }
 

@@ -272,7 +272,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
         if (host != NULL)
             uuid_unparse_lower(host->host_uuid, host_uuid_str);
 
-        netdata_log_access("HTTPD OK method: " PRINTF_H2O_IOVEC_FMT
+        nd_log(NDLS_ACCESS, NDLP_DEBUG, "HTTPD OK method: " PRINTF_H2O_IOVEC_FMT
                    ", path: " PRINTF_H2O_IOVEC_FMT
                    ", as host: %s"
                    ", response: %d",
@@ -281,7 +281,7 @@ static int netdata_uberhandler(h2o_handler_t *self, h2o_req_t *req)
                    host == NULL ? "unknown" : (localhost ? "localhost" : host_uuid_str),
                    req->res.status);
     } else {
-        netdata_log_access("HTTPD %d"
+        nd_log(NDLS_ACCESS, NDLP_DEBUG, "HTTPD %d"
                    " method: " PRINTF_H2O_IOVEC_FMT
                    ", path: " PRINTF_H2O_IOVEC_FMT
                    ", forwarding to file handler as path: " PRINTF_H2O_IOVEC_FMT,

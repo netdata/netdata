@@ -41,6 +41,8 @@ sha256sums.txt
 # netdata binaries
 netdata
 netdatacli
+systemd-cat-native
+log2journal
 !netdata/
 upload/
 artifacts/

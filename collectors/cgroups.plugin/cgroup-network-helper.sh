@@ -29,65 +29,117 @@
 
 export LC_ALL=C
 
+cmd_line="'${0}' $(printf "'%s' " "${@}")"
+
+# -----------------------------------------------------------------------------
+# logging
+
 PROGRAM_NAME="$(basename "${0}")"
 
-LOG_LEVEL_ERR=1
-LOG_LEVEL_WARN=2
-LOG_LEVEL_INFO=3
-LOG_LEVEL="$LOG_LEVEL_INFO"
+# these should be the same with syslog() priorities
+NDLP_EMERG=0   # system is unusable
+NDLP_ALERT=1   # action must be taken immediately
+NDLP_CRIT=2    # critical conditions
+NDLP_ERR=3     # error conditions
+NDLP_WARN=4    # warning conditions
+NDLP_NOTICE=5  # normal but significant condition
+NDLP_INFO=6    # informational
+NDLP_DEBUG=7   # debug-level messages
 
-set_log_severity_level() {
-  case ${NETDATA_LOG_SEVERITY_LEVEL,,} in
-    "info") LOG_LEVEL="$LOG_LEVEL_INFO";;
-    "warn" | "warning") LOG_LEVEL="$LOG_LEVEL_WARN";;
-    "err" | "error") LOG_LEVEL="$LOG_LEVEL_ERR";;
+# the max (numerically) log level we will log
+LOG_LEVEL=$NDLP_INFO
+
+set_log_min_priority() {
+  case "${NETDATA_LOG_PRIORITY_LEVEL,,}" in
+    "emerg" | "emergency")
+      LOG_LEVEL=$NDLP_EMERG
+      ;;
+
+    "alert")
+      LOG_LEVEL=$NDLP_ALERT
+      ;;
+
+    "crit" | "critical")
+      LOG_LEVEL=$NDLP_CRIT
+      ;;
+
+    "err" | "error")
+      LOG_LEVEL=$NDLP_ERR
+      ;;
+
+    "warn" | "warning")
+      LOG_LEVEL=$NDLP_WARN
+      ;;
+
+    "notice")
+      LOG_LEVEL=$NDLP_NOTICE
+      ;;
+
+    "info")
+      LOG_LEVEL=$NDLP_INFO
+      ;;
+
+    "debug")
+      LOG_LEVEL=$NDLP_DEBUG
+      ;;
   esac
 }
 
-set_log_severity_level
-
-logdate() {
-    date "+%Y-%m-%d %H:%M:%S"
-}
+set_log_min_priority
 
 log() {
-    local status="${1}"
-    shift
+  local level="${1}"
+  shift 1
 
-    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+  [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
+  systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
+INVOCATION_ID=${NETDATA_INVOCATION_ID}
+SYSLOG_IDENTIFIER=${PROGRAM_NAME}
+PRIORITY=${level}
+THREAD_TAG="cgroup-network-helper.sh"
+ND_LOG_SOURCE=collector
+ND_REQUEST=${cmd_line}
+MESSAGE=${*//[$'\r\n']/{NEWLINE}}
+
+EOFLOG
+  # AN EMPTY LINE IS NEEDED ABOVE
 }
 
 info() {
-    [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_INFO" -gt "$LOG_LEVEL" ]] && return
-    log INFO "${@}"
+  log "$NDLP_INFO" "${@}"
 }
 
 warning() {
-    [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_WARN" -gt "$LOG_LEVEL" ]] && return
-    log WARNING "${@}"
+  log "$NDLP_WARN" "${@}"
 }
 
 error() {
-    [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_ERR" -gt "$LOG_LEVEL" ]] && return
-    log ERROR "${@}"
+  log "$NDLP_ERR" "${@}"
 }
 
 fatal() {
-    log FATAL "${@}"
-    exit 1
+  log "$NDLP_ALERT" "${@}"
+  exit 1
 }
 
-debug=${NETDATA_CGROUP_NETWORK_HELPER_DEBUG=0}
 debug() {
-    [ "${debug}" = "1" ] && log DEBUG "${@}"
+  log "$NDLP_DEBUG" "${@}"
 }
+
+debug=0
+if [ "${NETDATA_CGROUP_NETWORK_HELPER_DEBUG-0}" = "1" ]; then
+  debug=1
+  LOG_LEVEL=$NDLP_DEBUG
+fi
 
 # -----------------------------------------------------------------------------
 # check for BASH v4+ (required for associative arrays)
 
-[ $(( BASH_VERSINFO[0] )) -lt 4 ] && \
-    fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
+if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
+  echo >&2 "BASH version 4 or later is required (this is ${BASH_VERSION})."
+  exit 1
+fi
 
 # -----------------------------------------------------------------------------
 # parse the arguments
@@ -99,7 +151,10 @@ do
     case "${1}" in
         --cgroup) cgroup="${2}"; shift 1;;
         --pid|-p) pid="${2}"; shift 1;;
-        --debug|debug) debug=1;;
+        --debug|debug)
+          debug=1
+          LOG_LEVEL=$NDLP_DEBUG
+          ;;
         *) fatal "Cannot understand argument '${1}'";;
     esac
 

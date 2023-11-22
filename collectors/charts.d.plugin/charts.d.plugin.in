@@ -16,24 +16,111 @@
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 
 PROGRAM_FILE="$0"
-PROGRAM_NAME="$(basename $0)"
-PROGRAM_NAME="${PROGRAM_NAME/.plugin/}"
 MODULE_NAME="main"
 
-LOG_LEVEL_ERR=1
-LOG_LEVEL_WARN=2
-LOG_LEVEL_INFO=3
-LOG_LEVEL="$LOG_LEVEL_INFO"
+# -----------------------------------------------------------------------------
+# logging
 
-set_log_severity_level() {
-  case ${NETDATA_LOG_SEVERITY_LEVEL,,} in
-    "info") LOG_LEVEL="$LOG_LEVEL_INFO";;
-    "warn" | "warning") LOG_LEVEL="$LOG_LEVEL_WARN";;
-    "err" | "error") LOG_LEVEL="$LOG_LEVEL_ERR";;
+PROGRAM_NAME="$(basename "${0}")"
+
+# these should be the same with syslog() priorities
+NDLP_EMERG=0   # system is unusable
+NDLP_ALERT=1   # action must be taken immediately
+NDLP_CRIT=2    # critical conditions
+NDLP_ERR=3     # error conditions
+NDLP_WARN=4    # warning conditions
+NDLP_NOTICE=5  # normal but significant condition
+NDLP_INFO=6    # informational
+NDLP_DEBUG=7   # debug-level messages
+
+# the max (numerically) log level we will log
+LOG_LEVEL=$NDLP_INFO
+
+set_log_min_priority() {
+  case "${NETDATA_LOG_PRIORITY_LEVEL,,}" in
+    "emerg" | "emergency")
+      LOG_LEVEL=$NDLP_EMERG
+      ;;
+
+    "alert")
+      LOG_LEVEL=$NDLP_ALERT
+      ;;
+
+    "crit" | "critical")
+      LOG_LEVEL=$NDLP_CRIT
+      ;;
+
+    "err" | "error")
+      LOG_LEVEL=$NDLP_ERR
+      ;;
+
+    "warn" | "warning")
+      LOG_LEVEL=$NDLP_WARN
+      ;;
+
+    "notice")
+      LOG_LEVEL=$NDLP_NOTICE
+      ;;
+
+    "info")
+      LOG_LEVEL=$NDLP_INFO
+      ;;
+
+    "debug")
+      LOG_LEVEL=$NDLP_DEBUG
+      ;;
   esac
 }
 
-set_log_severity_level
+set_log_min_priority
+
+log() {
+  local level="${1}"
+  shift 1
+
+  [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
+
+  systemd-cat-native --log-as-netdata <<EOFLOG
+INVOCATION_ID=${NETDATA_INVOCATION_ID}
+SYSLOG_IDENTIFIER=${PROGRAM_NAME}
+PRIORITY=${level}
+THREAD_TAG="charts.d.plugin"
+ND_LOG_SOURCE=collector
+MESSAGE=${MODULE_NAME}: ${*//[$'\r\n']}
+
+EOFLOG
+  # AN EMPTY LINE IS NEEDED ABOVE
+}
+
+info() {
+  log "$NDLP_INFO" "${@}"
+}
+
+warning() {
+  log "$NDLP_WARN" "${@}"
+}
+
+error() {
+  log "$NDLP_ERR" "${@}"
+}
+
+fatal() {
+  log "$NDLP_ALERT" "${@}"
+	echo "DISABLE"
+  exit 1
+}
+
+debug() {
+  [ "$debug" = "1" ] && log "$NDLP_DEBUG" "${@}"
+}
+
+# -----------------------------------------------------------------------------
+# check for BASH v4+ (required for associative arrays)
+
+if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
+  echo >&2 "BASH version 4 or later is required (this is ${BASH_VERSION})."
+  exit 1
+fi
 
 # -----------------------------------------------------------------------------
 # create temp dir
@@ -60,39 +147,6 @@ fi
 
 logdate() {
 	date "+%Y-%m-%d %H:%M:%S"
-}
-
-log() {
-	local status="${1}"
-	shift
-
-	echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: ${*}"
-
-}
-
-info() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_INFO" -gt "$LOG_LEVEL" ]] && return
-  log INFO "${@}"
-}
-
-warning() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_WARN" -gt "$LOG_LEVEL" ]] && return
-  log WARNING "${@}"
-}
-
-error() {
-  [[ -n "$LOG_LEVEL" && "$LOG_LEVEL_ERR" -gt "$LOG_LEVEL" ]] && return
-  log ERROR "${@}"
-}
-
-fatal() {
-	log FATAL "${@}"
-	echo "DISABLE"
-	exit 1
-}
-
-debug() {
-	[ $debug -eq 1 ] && log DEBUG "${@}"
 }
 
 # -----------------------------------------------------------------------------
@@ -194,12 +248,14 @@ while [ ! -z "$1" ]; do
 
 	if [ "$1" = "debug" -o "$1" = "all" ]; then
 		debug=1
+		LOG_LEVEL=$NDLP_DEBUG
 		shift
 		continue
 	fi
 
 	if [ -f "$chartsd/$1.chart.sh" ]; then
 		debug=1
+		LOG_LEVEL=$NDLP_DEBUG
 		chart_only="$(echo $1.chart.sh | sed "s/\.chart\.sh$//g")"
 		shift
 		continue
@@ -207,6 +263,7 @@ while [ ! -z "$1" ]; do
 
 	if [ -f "$chartsd/$1" ]; then
 		debug=1
+		LOG_LEVEL=$NDLP_DEBUG
 		chart_only="$(echo $1 | sed "s/\.chart\.sh$//g")"
 		shift
 		continue

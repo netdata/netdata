@@ -1368,7 +1368,10 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
                                                 CONFIG_BOOLEAN_YES);
 
     if (!stock_enabled) {
-        netdata_log_health("[%s]: Netdata will not load stock alarms.", rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "[%s]: Netdata will not load stock alarms.",
+               rrdhost_hostname(host));
+
         stock_path = user_path;
     }
 
@@ -1376,6 +1379,10 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
         health_rrdvars = health_rrdvariables_create();
 
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
-    netdata_log_health("[%s]: Read health configuration.", rrdhost_hostname(host));
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "[%s]: Read health configuration.",
+           rrdhost_hostname(host));
+
     sql_store_hashes = 0;
 }
