@@ -154,13 +154,13 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata <<EOFLOG
+  systemd-cat-native --log-as-netdata --newline="--NEWLINE--" <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
 THREAD_TAG=ioping.plugin
 ND_LOG_SOURCE=collector
-MESSAGE=${MODULE_NAME}: ${*//[$'\r\n']}
+MESSAGE=${MODULE_NAME}: ${*//\\n/--NEWLINE--}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE
@@ -178,10 +178,14 @@ error() {
   log "$NDLP_ERR" "${@}"
 }
 
-fatal() {
-  log "$NDLP_ALERT" "${@}"
+disable() {
+  log "${@}"
 	echo "DISABLE"
   exit 1
+}
+
+fatal() {
+  disable "$NDLP_ALERT" "${@}"
 }
 
 debug() {
@@ -233,35 +237,36 @@ ioping_opts="-T 1000000"
 
 for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"; do
   if [ -f "${CONFIG}" ]; then
-    info "Loading config file '${CONFIG}'..."
+    debug "Loading config file '${CONFIG}'..."
     source "${CONFIG}"
-    [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+    [ $? -ne 0 ] && warn "Failed to load config file '${CONFIG}'."
   elif [[ $CONFIG =~ ^$NETDATA_USER_CONFIG_DIR ]]; then
-    warning "Cannot find file '${CONFIG}'."
+    debug "Cannot find file '${CONFIG}'."
   fi
 done
 
 if [ -z "${destination}" ]
 then
-	fatal "destination is not configured - nothing to do."
+	disable $NDLP_DEBUG "destination is not configured - nothing to do."
 fi
 
 if [ ! -f "${ioping}" ]
 then
-	fatal "ioping command is not found. Please set its full path in '${NETDATA_USER_CONFIG_DIR}/${plugin}.conf'"
+	disable $NDLP_ERR "ioping command is not found. Please set its full path in '${NETDATA_USER_CONFIG_DIR}/${plugin}.conf'"
 fi
 
 if [ ! -x "${ioping}" ]
 then
-	fatal "ioping command '${ioping}' is not executable - cannot proceed."
+	disable $NDLP_ERR "ioping command '${ioping}' is not executable - cannot proceed."
 fi
 
 # the ioping options we will use
 options=( -N -i ${update_every} -s ${request_size} ${ioping_opts} ${destination} )
 
 # execute ioping
-info "starting ioping: ${ioping} ${options[*]}"
+debug "starting ioping: ${ioping} ${options[*]}"
+
 exec "${ioping}" "${options[@]}"
 
 # if we cannot execute ioping, stop
-fatal "command '${ioping} ${options[*]}' failed to be executed (returned code $?)."
+error "command '${ioping} ${options[*]}' failed to be executed (returned code $?)."
