@@ -57,11 +57,11 @@ Each time Netdata logs, it assigns a priority to the log. It can be one of this 
 
 | Level     | Description                                                                            |
 |-----------|----------------------------------------------------------------------------------------|
-| emergency | a fatal condition; most likely Netdata will exit immediately after.                    |
+| emergency | a fatal condition, Netdata will most likely exit immediately after.                    |
 | alert     | a very important issue that may affect how Netdata operates.                           |
 | critical  | a very important issue the user should know which, Netdata thinks it can survive.      |
 | error     | an error condition indicating that Netdata is trying to do something, but it fails.    |
-| warning   | Something unexpected has happened that may or may not affect the operation of Netdata. |
+| warning   | something unexpected has happened that may or may not affect the operation of Netdata. |
 | notice    | something that does not affect the operation of Netdata, but the user should notice.   |
 | info      | the default log level about information the user should know.                          |
 | debug     | these are more verbose logs that can be ignored.                                       |
