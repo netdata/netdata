@@ -876,7 +876,7 @@ def main():
     cmd = parse_command_line()
     log = PythonDLogger()
 
-    level = os.getenv('NETDATA_LOG_SEVERITY_LEVEL') or str()
+    level = os.getenv('NETDATA_LOG_LEVEL') or str()
     level = level.lower()
     if level == 'debug':
         log.logger.severity = 'DEBUG'

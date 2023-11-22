@@ -10,12 +10,16 @@
 #include <sched.h>
 #endif
 
-char environment_variable2[FILENAME_MAX + 50] = "";
-char environment_variable3[FILENAME_MAX + 50] = "";
+char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
+char env_netdata_log_method[FILENAME_MAX + 50] = "";
+char env_netdata_log_format[FILENAME_MAX + 50] = "";
+char env_netdata_log_level[FILENAME_MAX + 50] = "";
 char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
-        environment_variable2,
-        environment_variable3,
+        env_netdata_host_prefix,
+        env_netdata_log_method,
+        env_netdata_log_format,
+        env_netdata_log_level,
         NULL
 };
 
@@ -671,11 +675,20 @@ int main(int argc, char **argv) {
     // build a safe environment for our script
 
     // the first environment variable is a fixed PATH=
-    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
+    snprintfz(env_netdata_host_prefix, sizeof(env_netdata_host_prefix) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
 
-    char *s = getenv("NETDATA_LOG_SEVERITY_LEVEL");
+    char *s;
+
+    s = getenv("NETDATA_LOG_METHOD");
+    snprintfz(env_netdata_log_method, sizeof(env_netdata_log_method) - 1, "NETDATA_LOG_METHOD=%s", nd_log_method_for_external_plugins(s));
+
+    s = getenv("NETDATA_LOG_FORMAT");
     if (s)
-        snprintfz(environment_variable3, sizeof(environment_variable3) - 1, "NETDATA_LOG_SEVERITY_LEVEL=%s", s);
+        snprintfz(env_netdata_log_format, sizeof(env_netdata_log_format) - 1, "NETDATA_LOG_FORMAT=%s", s);
+
+    s = getenv("NETDATA_LOG_LEVEL");
+    if (s)
+        snprintfz(env_netdata_log_level, sizeof(env_netdata_log_level) - 1, "NETDATA_LOG_LEVEL=%s", s);
 
     // ------------------------------------------------------------------------
 

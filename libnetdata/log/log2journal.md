@@ -11,14 +11,13 @@ The overall process looks like this:
 ```bash
 tail -F /var/log/nginx/*.log       |\  # outputs log lines
   log2journal 'PATTERN'            |\  # outputs Journal Export Format
-  sed -u -e SEARCH-REPLACE-RULES   |\  # optional rewriting rules
   systemd-cat-native                   # send to local/remote journald
 ```
 
 Let's see the steps:
 
 1. `tail -F /var/log/nginx/*.log`<br/>this command will tail all `*.log` files in `/var/log/nginx/`. We use `-F` instead of `-f` to ensure that files will still be tailed after log rotation.
-2. `log2joural` is a Netdata program. It reads log entries and extracts fields, according to the PCRE2 pattern it accepts. It can also apply some basic operations on the fields, like injecting new fields or duplicating existing ones. The output of `log2journal` is in Systemd Journal Export Format, and it looks like this:
+2. `log2joural` is a Netdata program. It reads log entries and extracts fields, according to the PCRE2 pattern it accepts. It can also apply some basic operations on the fields, like injecting new fields or duplicating existing ones or rewriting their values. The output of `log2journal` is in Systemd Journal Export Format, and it looks like this:
     ```bash
    KEY1=VALUE1 # << start of the first log line
    KEY2=VALUE2
@@ -26,8 +25,7 @@ Let's see the steps:
    KEY1=VALUE1 # << start of the second log line
    KEY2=VALUE2
     ```
-3. `sed` is an optional step and is an example. Any kind of processing can be applied at this stage, in case we want to alter the fields in some way. For example, we may want to set the PRIORITY field of systemd-journal to make Netdata dashboards and `journalctl` color the internal server errors. Or we may want to anonymize the logs, to remove sensitive information from them. Or even we may want to remove the variable parts of the requests, to make them uniform. We will see below how such processing can be done.
-4. `systemd-cat-native` is a Netdata program. I can send the logs to a local `systemd-journald` (journal namespaces supported), or to a remote `systemd-journal-remote`.
+3. `systemd-cat-native` is a Netdata program. I can send the logs to a local `systemd-journald` (journal namespaces supported), or to a remote `systemd-journal-remote`.
 
 ## Real-life example
 
@@ -142,10 +140,10 @@ Avoid setting priority to 0 (`LOG_EMERG`), because these will be on your termina
 
 To set the PRIORITY field in the output, we can use `NGINX_STATUS` fields. We need a copy of it, which we will alter later.
 
-We can instruct `log2journal` to duplicate `NGINX_STATUS`, like this: `log2journal --duplicate=STATUS2PRIORITY=NGINX_STATUS`. Let's try it:
+We can instruct `log2journal` to duplicate `NGINX_STATUS`, like this: `log2journal --duplicate=PRIORITY=NGINX_STATUS`. Let's try it:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=PRIORITY=NGINX_STATUS
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -157,24 +155,16 @@ NGINX_REMOTE_USER=-
 NGINX_REQUEST_LENGTH=104
 NGINX_REQUEST_TIME=0.001
 NGINX_STATUS=200
-STATUS2PRIORITY=200                          # <<<<<<<<< STATUS2PRIORITY IS HERE
+PRIORITY=200                                 # <<<<<<<<< PRIORITY IS HERE
 NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
 NGINX_URL=/index.html
 
 ```
 
-Now that we have the `STATUS2PRIORITY` field equal to the `NGINX_STATUS`, we can use a `sed` command to change it to the `PRIORITY` field we want. The `sed` command could be:
+Now that we have the `PRIORITY` field equal to the `NGINX_STATUS`, we can use instruct `log2journal` to change it to a valid priority, by appending: `--rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6`. These rewrite commands say to match everything that starts with `5` and replace it with priority `3` (error) and everything else with priority `6` (info). Let's see it:
 
 ```bash
-sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' 
-```
-
-We use `-u` for unbuffered communication.
-
-This command first changes all 5xx `STATUS2PRIORITY` fields to `PRIORITY=3` (error) and then changes all the rest to `PRIORITY=6` (info). Let's see the whole of it:
-
-```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -186,7 +176,7 @@ NGINX_REMOTE_USER=-
 NGINX_REQUEST_LENGTH=104
 NGINX_REQUEST_TIME=0.001
 NGINX_STATUS=200
-PRIORITY=6                                     # <<<<<<<<< PRIORITY IS HERE
+PRIORITY=6                                   # <<<<<<<<<< PRIORITY changed to 6
 NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
 NGINX_URL=/index.html
 
@@ -194,10 +184,10 @@ NGINX_URL=/index.html
 
 Similarly, we could duplicate `NGINX_URL` to `NGINX_ENDPOINT` and then process it with sed to remove any query string, or replace IDs in the URL path with constant names, thus giving us uniform endpoints independently of the parameters.
 
-To complete the example, we can also inject a `SYSLOG_IDENTIFIER` with `log2journal`, using `--inject=SYSLOG_IDENTIFIER=nginx`, like this:
+To complete the example, we can also inject a `SYSLOG_IDENTIFIER` with `log2journal`, using `--inject=SYSLOG_IDENTIFIER=nginx-log`, like this:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|'
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx -rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -212,7 +202,7 @@ NGINX_STATUS=200
 PRIORITY=6
 NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
 NGINX_URL=/index.html
-SYSLOG_IDENTIFIER=nginx                  # <<<<<<<<< THIS HAS BEEN ADDED
+SYSLOG_IDENTIFIER=nginx-log               # <<<<<<<<< THIS HAS BEEN ADDED
 
 ```
 
@@ -220,7 +210,7 @@ Now the message is ready to be sent to a systemd-journal. For this we use `syste
 
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx | sed -u -e 's|STATUS2PRIORITY=5.*|PRIORITY=3|' -e 's|STATUS2PRIORITY=.*|PRIORITY=6|' | systemd-cat-native
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx -rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6 | systemd-cat-native
 # no output
 
 # let's find the message
@@ -258,7 +248,7 @@ Sun 2023-11-19 04:34:06.583912 EET [s=1eb59e7934984104ab3b61f5d9648057;i=115b6d4
     NGINX_STATUS=200                              # <<<<<<<<< CHECK
     NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000   # <<<<<<<<< CHECK
     NGINX_URL=/index.html                         # <<<<<<<<< CHECK
-    SYSLOG_IDENTIFIER=nginx                       # <<<<<<<<< CHECK
+    SYSLOG_IDENTIFIER=nginx-log                   # <<<<<<<<< CHECK
     _PID=354312
     _SOURCE_REALTIME_TIMESTAMP=1700361246583912
 
@@ -304,20 +294,18 @@ pattern='(?x)                          # Enable PCRE2 extended mode
 "(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT
 '
 
-tail -n $last -F /var/log/nginx/*access.log |\
-	log2journal "${pattern}" \
+tail -n $last -F /var/log/nginx/*access.log \
+	| log2journal "${pattern}" \
 		--filename-key=NGINX_LOG_FILE \
-		--duplicate=STATUS2PRIORITY=NGINX_STATUS \
-		--duplicate=STATUS_FAMILY=NGINX_STATUS \
-		--inject=SYSLOG_IDENTIFIER=nginx \
+		--duplicate=PRIORITY=NGINX_STATUS \
+		--duplicate=NGINX_STATUS_FAMILY=NGINX_STATUS \
+		--inject=SYSLOG_IDENTIFIER=nginx-log \
 		--unmatched-key=MESSAGE \
 		--inject-unmatched=PRIORITY=1 \
-		| sed -u \
-			-e 's|^STATUS2PRIORITY=5.*$|PRIORITY=3|' \
-			-e 's|^STATUS2PRIORITY=.*$|PRIORITY=6|' \
-			-e 's|^STATUS_FAMILY=\([0-9]\).*$|NGINX_STATUS_FAMILY=\1xx|' \
-			-e 's|^STATUS_FAMILY=.*$|NGINX_STATUS_FAMILY=UNKNOWN|' \
-			| $send_or_show
+		--rewrite='PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6' \
+		--rewrite='NGINX_STATUS_FAMILY=/^(?<first_digit>[0-9]).*$/${first_digit}xx' \
+		--rewrite='NGINX_STATUS_FAMILY=/^.*$/UNKNOWN' \
+		| $send_or_show
 ```
 
 
@@ -325,14 +313,14 @@ tail -n $last -F /var/log/nginx/*access.log |\
 
 ```
 
-Netdata log2journal v1.43.0-337-g116dc1bc3
+Netdata log2journal v1.40.0-1214-gae733dd49
 
 Convert structured log input to systemd Journal Export Format.
 
 Using PCRE2 patterns, extract the fields from structured logs on the standard
-input, and generate output according to systemd Journal Export Format
+input, and generate output according to systemd Journal Export Format.
 
-Usage: ./log2journal [OPTIONS] PATTERN
+Usage: log2journal [OPTIONS] PATTERN
 
 Options:
 
@@ -353,20 +341,43 @@ Options:
        Create a new key called TARGET, duplicating the values of the keys
        given. Useful for further processing. When multiple keys are given,
        their values are separated by comma.
-       Up to 2048 duplications can be given on the command line, and up to
-       10 keys per duplication command are allowed.
+       Up to 512 duplications can be given on the command line, and up to
+       20 keys per duplication command are allowed.
 
   --inject=LINE
        Inject constant fields to the output (both matched and unmatched logs).
        --inject entries are added to unmatched lines too, when their key is
        not used in --inject-unmatched (--inject-unmatched override --inject).
-       Up to 2048 fields can be injected.
+       Up to 512 fields can be injected.
 
   --inject-unmatched=LINE
        Inject lines into the output for each unmatched log entry.
        Usually, --inject-unmatched=PRIORITY=3 is needed to mark the unmatched
        lines as errors, so that they can easily be spotted in the journals.
-       Up to 2048 such lines can be injected.
+       Up to 512 such lines can be injected.
+
+  --rewrite=KEY=/SearchPattern/ReplacePattern
+       Apply a rewrite rule to the values of a specific key.
+       The first character after KEY= is the separator, which should also
+       be used between the search pattern and the replacement pattern.
+       The search pattern is a PCRE2 regular expression, and the replacement
+       pattern supports literals and named capture groups from the search pattern.
+       Example:
+              --rewrite=DATE=/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/
+                             ${day}/${month}/${year}
+       This will rewrite dates in the format YYYY-MM-DD to DD/MM/YYYY.
+
+       Only one rewrite rule is applied per key; the sequence of rewrites stops
+       for the key once a rule matches it. This allows providing a sequence of
+       independent rewriting rules for the same key, matching the different values
+       the key may get, and also provide a catch-all rewrite rule at the end of the
+       sequence for setting the key value if no other rule matched it.
+
+       The combination of duplicating keys with the values of multiple other keys
+       combined with multiple rewrite rules, allows creating complex rules for
+       rewriting key values.
+
+       Up to 512 rewriting rules are allowed.
 
   -h, --help
        Display this help and exit.
@@ -378,7 +389,34 @@ Options:
        Regular expressions without named groups are ignored.
 
 The maximum line length accepted is 1048576 characters.
-The maximum number of fields in the PCRE2 pattern is 8192.
+The maximum number of fields in the PCRE2 pattern is 1024.
+
+PIPELINE AND SEQUENCE OF PROCESSING
+
+This is a simple diagram of the pipeline taking place:
+
+           +---------------------------------------------------+
+           |                       INPUT                       |
+           +---------------------------------------------------+
+                            v                          v
+           +---------------------------------+         |
+           |   EXTRACT FIELDS AND VALUES     |         |
+           +---------------------------------+         |
+                  v                  v                 |
+           +---------------+         |                 |
+           |   DUPLICATE   |         |                 |
+           | create fields |         |                 |
+           |  with values  |         |                 |
+           +---------------+         |                 |
+                  v                  v                 v
+           +---------------------------------+  +--------------+
+           |         REWRITE PIPELINES       |  |    INJECT    |
+           |        altering the values      |  |   constants  |
+           +---------------------------------+  +--------------+
+                             v                          v
+           +---------------------------------------------------+
+           |                       OUTPUT                      |
+           +---------------------------------------------------+
 
 JOURNAL FIELDS RULES (enforced by systemd-journald)
 
@@ -417,7 +455,7 @@ You can find the most common fields at 'man systemd.journal-fields'.
 
 ```
 
-Netdata systemd-cat-native v1.43.0-319-g4ada93a6e
+Netdata systemd-cat-native v1.40.0-1214-gae733dd49
 
 This program reads from its standard input, lines in the format:
 
@@ -436,7 +474,7 @@ and sends them to systemd-journal.
 
 Usage:
 
-   ./systemd-cat-native
+   systemd-cat-native
           [--newline=STRING]
           [--log-as-netdata|-N]
           [--namespace=NAMESPACE] [--socket=PATH]
@@ -476,6 +514,9 @@ The program has the following modes of logging:
     systemd, or even it is not Linux, allowing a remote Linux systemd
     journald to become the logs database of the local system.
 
+    Unfortunately systemd-journal-remote does not accept compressed
+    data over the network, so the stream will be uncompressed.
+
       --url=URL
         The destination systemd-journal-remote address and port, similarly
         to what /etc/systemd/journal-upload.conf accepts.
@@ -495,6 +536,9 @@ The program has the following modes of logging:
         The filename of the trusted CA public key.
         The default is: /etc/ssl/ca/trusted.pem
         The keyword 'all' can be used to trust all CAs.
+
+      --keep-trying
+        Keep trying to send the message, if the remote journal is not there.
 
     NEWLINES PROCESSING
     systemd-journal logs entries may have newlines in them. However the

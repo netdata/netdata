@@ -37,7 +37,7 @@ NDLP_DEBUG=7   # debug-level messages
 LOG_LEVEL=$NDLP_INFO
 
 set_log_min_priority() {
-  case "${NETDATA_LOG_PRIORITY_LEVEL,,}" in
+  case "${NETDATA_LOG_LEVEL,,}" in
     "emerg" | "emergency")
       LOG_LEVEL=$NDLP_EMERG
       ;;
@@ -84,7 +84,7 @@ log() {
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
-THREAD_TAG="charts.d.plugin"
+THREAD_TAG=charts.d.plugin
 ND_LOG_SOURCE=collector
 MESSAGE=${MODULE_NAME}: ${*//[$'\r\n']}
 

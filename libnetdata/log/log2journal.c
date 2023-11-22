@@ -381,7 +381,7 @@ static pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
     return re;
 }
 
-static inline bool jb_pcre2_match(pcre2_code *re, pcre2_match_data *match_data, char *line, size_t len) {
+static inline bool jb_pcre2_match(pcre2_code *re, pcre2_match_data *match_data, char *line, size_t len, bool log) {
     int rc = pcre2_match(re, (PCRE2_SPTR)line, len, 0, 0, match_data, NULL);
     if(rc < 0) {
         PCRE2_UCHAR errbuf[1024];
@@ -402,7 +402,7 @@ static char *rewrite_value(struct log_job *jb, const char *key, XXH64_hash_t has
         struct key_rewrite *rw = &jb->rewrites.array[i];
 
         if (rw->hash == hash && strcmp(rw->key, key) == 0) {
-            if (!jb_pcre2_match(rw->re, rw->match_data, (char *)value, value_len)) {
+            if (!jb_pcre2_match(rw->re, rw->match_data, (char *)value, value_len, false)) {
                 continue; // No match found, skip to next rewrite rule
             }
 
@@ -718,7 +718,7 @@ bool parse_parameters(struct log_job *jb, int argc, char **argv) {
             if (!jb->pattern) {
                 jb->pattern = arg;
             } else {
-                log2stderr("Error: Multiple patterns detected. Specify only one pattern.");
+                log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
                 return false;
             }
         }
@@ -978,7 +978,7 @@ int main(int argc, char *argv[]) {
         jb_reset_injections(jb);
 
         bool line_is_matched;
-        if(!jb_pcre2_match(re, match_data, line, len)) {
+        if(!jb_pcre2_match(re, match_data, line, len, true)) {
             line_is_matched = false;
 
             if (jb->unmatched.key) {

@@ -3,7 +3,7 @@
 
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2023 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Script to find a better name for cgroups
@@ -33,7 +33,7 @@ NDLP_DEBUG=7   # debug-level messages
 LOG_LEVEL=$NDLP_INFO
 
 set_log_min_priority() {
-  case "${NETDATA_LOG_PRIORITY_LEVEL,,}" in
+  case "${NETDATA_LOG_LEVEL,,}" in
     "emerg" | "emergency")
       LOG_LEVEL=$NDLP_EMERG
       ;;
@@ -76,14 +76,14 @@ log() {
 
   [[ -n "$level" && -n "$LOG_LEVEL" && "$level" -gt "$LOG_LEVEL" ]] && return
 
-  systemd-cat-native --log-as-netdata --newline="{NEWLINE}" <<EOFLOG
+  systemd-cat-native --log-as-netdata --newline="--NEWLINE--" <<EOFLOG
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
-THREAD_TAG="cgroup-name"
+THREAD_TAG=cgroup-name
 ND_LOG_SOURCE=collector
 ND_REQUEST=${cmd_line}
-MESSAGE=${*//[$'\r\n']/{NEWLINE}}
+MESSAGE=${*//\\n/--NEWLINE--}
 
 EOFLOG
   # AN EMPTY LINE IS NEEDED ABOVE
