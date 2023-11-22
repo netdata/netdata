@@ -105,11 +105,11 @@ BuildRequires: libuuid-devel
 BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
 BuildRequires: libcurl-devel
-%if 0%{?suse_version} || 0%{?amazon_linux} == 2 || 0%{?centos_ver} == 7
+# %if 0%{?suse_version} || 0%{?amazon_linux} == 2 || 0%{?centos_ver} == 7
 # log2journal is not available on these systems
-%else
+# %else
 BuildRequires: pcre2-devel
-%endif
+# %endif
 %if 0%{?suse_version}
 BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
@@ -556,11 +556,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
-%if 0%{?suse_version} || 0%{?amazon_linux} == 2 || 0%{?centos_ver} == 7
+# %if 0%{?suse_version} || 0%{?amazon_linux} == 2 || 0%{?centos_ver} == 7
 # log2journal is not available on these systems
-%else
+# %else
 %{_sbindir}/log2journal
-%endif
+# %endif
 %{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
 
