@@ -745,7 +745,7 @@ declare -A pkg_libcurl_dev=(
   ['default']="libcurl-devel"
 )
 
-declare -A pkg_pcre2_dev(
+declare -A pkg_pcre2_dev=(
   ['alpine']="pcre2-dev"
   ['suse']="libpcre2-8-0"
   ['debian']="libpcre2-dev"
