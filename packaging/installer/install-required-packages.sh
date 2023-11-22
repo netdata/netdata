@@ -738,20 +738,6 @@ declare -A pkg_curl=(
   ['default']="curl"
 )
 
-declare -A pkg_libcurl_dev=(
-  ['alpine']="curl-dev"
-  ['debian']="libcurl4-openssl-dev"
-  ['ubuntu']="libcurl4-openssl-dev"
-  ['default']="libcurl-devel"
-)
-
-declare -A pkg_pcre2_dev=(
-  ['alpine']="pcre2-dev"
-  ['suse']="libpcre2-8-0"
-  ['debian']="libpcre2-dev"
-  ['ubuntu']="libpcre2-dev"
-  ['default']="pcre2-devel"
-)
 declare -A pkg_gzip=(
   ['gentoo']="app-arch/gzip"
   ['macos']="NOTREQUIRED"
@@ -1291,8 +1277,6 @@ packages() {
     suitable_package json-c-dev
     suitable_package libyaml-dev
     suitable_package libsystemd-dev
-    suitable_package pkg_libcurl_dev
-    suitable_package pkg_pcre2_dev
   fi
 
   # -------------------------------------------------------------------------
