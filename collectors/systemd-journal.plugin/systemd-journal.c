@@ -202,6 +202,7 @@ typedef struct function_query_status {
     struct {
         usec_t start_ut;     // the starting time of the query - we start from this
         usec_t stop_ut;      // the ending time of the query - we stop at this
+        usec_t first_msg_ut;
     } query_file;
 
     struct {
@@ -357,8 +358,8 @@ static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct
         usec_t msg_ut, usec_t *total_time_ut, usec_t *remaining_start_ut, usec_t *remaining_end_ut) {
 
     // fqs->query_file.start/stop follow the direction of the query
-    usec_t after_ut = MIN(fqs->query_file.start_ut, fqs->query_file.stop_ut);
-    usec_t before_ut = MAX(fqs->query_file.start_ut, fqs->query_file.stop_ut);
+    usec_t after_ut = MIN(fqs->query_file.first_msg_ut, fqs->query_file.stop_ut);
+    usec_t before_ut = MAX(fqs->query_file.first_msg_ut, fqs->query_file.stop_ut);
 
     if(jf->msg_first_ut && after_ut < jf->msg_first_ut)
         after_ut = jf->msg_first_ut;
@@ -447,7 +448,7 @@ typedef enum {
 } sampling_t;
 
 static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
-    if(!fqs->sampling)
+    if(!fqs->sampling || candidate_to_keep)
         return SAMPLING_FULL;
 
     if(unlikely(msg_ut < fqs->samples_per_time_slot.start_ut))
@@ -459,7 +460,7 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
     if(slot >= fqs->samples.slots)
         slot = fqs->samples.slots - 1;
 
-    bool should_sample = candidate_to_keep;
+    bool should_sample = false;
 
     if(fqs->samples.sampled < fqs->samples.enable_after_samples ||
         fqs->samples_per_file.sampled < fqs->samples_per_file.enable_after_samples ||
@@ -482,8 +483,6 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
             fqs->samples_per_file.skipped++;
     }
 
-    fqs->samples_per_file.recalibrate++;
-
     if(should_sample) {
         fqs->samples.sampled++;
         fqs->samples_per_file.sampled++;
@@ -492,13 +491,18 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
         return SAMPLING_FULL;
     }
 
+    fqs->samples_per_file.recalibrate++;
+
     fqs->samples.unsampled++;
     fqs->samples_per_file.unsampled++;
     fqs->samples_per_time_slot.unsampled[slot]++;
 
     if(fqs->samples.sampled + fqs->samples.unsampled > fqs->sampling &&
-        fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled)
-        return SAMPLING_STOP_AND_ESTIMATE;
+        fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
+        usec_t dt_from_start_ut = MAX(fqs->query_file.first_msg_ut, msg_ut) - MIN(fqs->query_file.first_msg_ut, msg_ut);
+        if(dt_from_start_ut > 2 * USEC_PER_SEC)
+            return SAMPLING_STOP_AND_ESTIMATE;
+    }
 
     return SAMPLING_SKIP_FIELDS;
 }
@@ -616,7 +620,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
-    usec_t earliest_msg_ut = 0;
+    usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
+    usec_t first_msg_ut = 0; // the first message we got from the db
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
@@ -633,14 +638,17 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
             continue;
         }
 
-        if(unlikely(msg_ut > earliest_msg_ut))
-            earliest_msg_ut = msg_ut;
-
         if (unlikely(msg_ut > start_ut))
             continue;
 
         if (unlikely(msg_ut < stop_ut))
             break;
+
+        if(unlikely(msg_ut > latest_msg_ut))
+            latest_msg_ut = msg_ut;
+
+        if(unlikely(!first_msg_ut))
+            first_msg_ut = msg_ut;
 
         sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_BACKWARD,
@@ -694,8 +702,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
-    if(earliest_msg_ut > fqs->last_modified)
-        fqs->last_modified = earliest_msg_ut;
+    if(latest_msg_ut > fqs->last_modified)
+        fqs->last_modified = latest_msg_ut;
 
     return status;
 }
@@ -717,7 +725,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         return ND_SD_JOURNAL_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
-    usec_t earliest_msg_ut = 0;
+    usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
+    usec_t first_msg_ut = 0; // the first message we got from the db
     size_t row_counter = 0, last_row_counter = 0, rows_useful = 0;
     size_t bytes = 0, last_bytes = 0;
 
@@ -734,14 +743,17 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
             continue;
         }
 
-        if(likely(msg_ut > earliest_msg_ut))
-            earliest_msg_ut = msg_ut;
-
         if (unlikely(msg_ut < start_ut))
             continue;
 
         if (unlikely(msg_ut > stop_ut))
             break;
+
+        if(likely(msg_ut > latest_msg_ut))
+            latest_msg_ut = msg_ut;
+
+        if(unlikely(!first_msg_ut))
+            first_msg_ut = msg_ut;
 
         sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_FORWARD,
@@ -795,8 +807,8 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
     if(errors_no_timestamp)
         netdata_log_error("SYSTEMD-JOURNAL: %zu lines did not have timestamps", errors_no_timestamp);
 
-    if(earliest_msg_ut > fqs->last_modified)
-        fqs->last_modified = earliest_msg_ut;
+    if(latest_msg_ut > fqs->last_modified)
+        fqs->last_modified = latest_msg_ut;
 
     return status;
 }
