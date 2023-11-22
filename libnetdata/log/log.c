@@ -780,7 +780,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     ND_LOG_METHOD method = nd_log_method2id(getenv("NETDATA_LOG_METHOD"));
     ND_LOG_FORMAT format = nd_log_format2id(getenv("NETDATA_LOG_FORMAT"));
 
-    if(IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(method)) {
+    if(!IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(method)) {
         if(is_stderr_connected_to_journal()) {
             nd_log(NDLS_COLLECTORS, NDLP_WARNING, "NETDATA_LOG_METHOD is not set. Using journal.");
             method = NDLM_JOURNAL;

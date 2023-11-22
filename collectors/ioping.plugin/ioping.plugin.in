@@ -9,7 +9,7 @@
 # This plugin requires a latest version of ioping.
 # You can compile it from source, by running me with option: install
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin:@sbindir_POST@"
 export LC_ALL=C
 
 usage="$(basename "$0") [install] [-h] [-e]
@@ -158,7 +158,7 @@ log() {
 INVOCATION_ID=${NETDATA_INVOCATION_ID}
 SYSLOG_IDENTIFIER=${PROGRAM_NAME}
 PRIORITY=${level}
-THREAD_TAG="ioping.plugin"
+THREAD_TAG=ioping.plugin
 ND_LOG_SOURCE=collector
 MESSAGE=${MODULE_NAME}: ${*//[$'\r\n']}
 
