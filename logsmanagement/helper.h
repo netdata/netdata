@@ -46,7 +46,7 @@
 #endif  // COMPILE_TIME_ASSERT
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(LOGS_MANAGEMENT_STRESS_TEST)
-#define debug_log(args...) error_int(1, "DEBUG", __FILE__, __FUNCTION__, __LINE__, ##args)
+#define debug_log(args...) netdata_logger(NDLS_COLLECTORS, NDLP_DEBUG,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #else
 #define debug_log(fmt, args...) do {} while(0)
 #endif

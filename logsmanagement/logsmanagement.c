@@ -73,31 +73,16 @@ int main(int argc, char **argv) {
     /* Static asserts */
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-local-typedefs" 
-    /* Ensure VALIDATE_COMPRESSION is disabled in release versions. */
-    // COMPILE_TIME_ASSERT(LOGS_MANAG_DEBUG ? 1 : !VALIDATE_COMPRESSION);
     COMPILE_TIME_ASSERT(SAVE_BLOB_TO_DB_MIN <= SAVE_BLOB_TO_DB_MAX);
     COMPILE_TIME_ASSERT(CIRCULAR_BUFF_DEFAULT_MAX_SIZE >= CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN); 
     COMPILE_TIME_ASSERT(CIRCULAR_BUFF_DEFAULT_MAX_SIZE <= CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX);
     #pragma GCC diagnostic pop
 
-    stderror = stderr;
     clocks_init();
 
     program_name = LOGS_MANAGEMENT_PLUGIN_STR;
 
-    // disable syslog
-    error_log_syslog = 0;
-
-    /* set errors flood protection to 100 logs per hour, or disable
-     * it completely (i.e. unlimited logs allowed) if stress testing */
-    error_log_errors_per_period = 100;
-#if defined(LOGS_MANAGEMENT_STRESS_TEST)
-    error_log_throttle_period = 0;
-#else
-    error_log_throttle_period = 3600;
-#endif // LOGS_MANAGEMENT_STRESS_TEST
-
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins(program_name);
 
     // netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     // if(verify_netdata_host_prefix() == -1) exit(1);
@@ -217,7 +202,7 @@ int main(int argc, char **argv) {
 #endif // defined(__STDC_VERSION__)
     debug_log( "libuv version: %s", uv_version_string());
     debug_log( "LZ4 version: %s", LZ4_versionString());
-    debug_log("SQLITE version: " SQLITE_VERSION);
+    debug_log( "SQLITE version: " SQLITE_VERSION);
 
 #if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
     debug_log( "Running Netdata with logs_management stress test enabled!");
@@ -241,7 +226,7 @@ int main(int argc, char **argv) {
     /* If there are valid log sources, there should always be valid handles */
     collector_info("uv_run(main_loop, ...); no handles or requests - cleaning up...");
     
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
 
     // TODO: Clean up stats charts memory
     uv_thread_join(&stats_charts_thread_id);

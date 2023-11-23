@@ -88,7 +88,6 @@ typedef enum {
 /*                                Compression                                 */
 /* -------------------------------------------------------------------------- */
 
-#define VALIDATE_COMPRESSION 0                          /**< For testing purposes only as it slows down compression considerably. **/
 #define COMPRESSION_ACCELERATION_DEFAULT 1              /**< Global default value for compression acceleration **/
 
 /* -------------------------------------------------------------------------- */
