@@ -645,11 +645,11 @@ static void config_section_init(uv_loop_t *main_loop,
             
         switch(p_file_info->log_type){
             case FLB_TAIL:
-                if(!strcasecmp(p_file_info->chartname, "Netdata_error.log")){
+                if(!strcasecmp(p_file_info->chartname, "Netdata_daemon.log")){
                     char path[FILENAME_MAX + 1];
-                    snprintfz(path, FILENAME_MAX, "%s/error.log", get_log_dir());
+                    snprintfz(path, FILENAME_MAX, "%s/daemon.log", get_log_dir());
                     if(access(path, R_OK)) {
-                        collector_error("[%s]: 'Netdata_error.log' path (%s) invalid, unknown or needs permissions", 
+                        collector_error("[%s]: 'Netdata_daemon.log' path (%s) invalid, unknown or needs permissions", 
                             p_file_info->chartname, path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(path);
