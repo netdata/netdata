@@ -73,6 +73,8 @@ Metrics:
 | apcupsd.temperature | temp | Celsius |
 | apcupsd.time | time | Minutes |
 | apcupsd.online | online | boolean |
+| apcupsd.selftest | OK, NO, BT, NG | status |
+| apcupsd.status | ONLINE, ONBATT, OVERLOAD, LOWBATT, REPLACEBATT, NOBATT, SLAVE, SLAVEDOWN, COMMLOST, CAL, TRIM, BOOST, SHUTTING_DOWN | status |
 
 
 
@@ -86,6 +88,13 @@ The following alerts are available:
 | [ apcupsd_ups_charge ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.charge | average UPS charge over the last minute |
 | [ apcupsd_10min_ups_load ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.load | average UPS load over the last 10 minutes |
 | [ apcupsd_last_collected_secs ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.load | number of seconds since the last successful data collection |
+| [ apcupsd_selftest_warning ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.selftest | self-test failed due to insufficient battery capacity or due to overload. |
+| [ apcupsd_status_onbatt ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.status | APC UPS has switched to battery power because the input power has failed |
+| [ apcupsd_status_overload ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.status | APC UPS is overloaded and cannot supply enough power to the load |
+| [ apcupsd_status_lowbatt ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.status | APC UPS battery is low and needs to be recharged |
+| [ apcupsd_status_replacebatt ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.status | APC UPS battery has reached the end of its lifespan and needs to be replaced |
+| [ apcupsd_status_nobatt ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.status | APC UPS has no battery |
+| [ apcupsd_status_commlost ](https://github.com/netdata/netdata/blob/master/health/health.d/apcupsd.conf) | apcupsd.status | APC UPS communication link is lost |
 
 
 ## Setup

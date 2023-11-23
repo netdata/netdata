@@ -80,8 +80,6 @@ static inline void rrdhost_init() {
 }
 
 RRDHOST_ACQUIRED *rrdhost_find_and_acquire(const char *machine_guid) {
-    netdata_log_debug(D_RRD_CALLS, "rrdhost_find_and_acquire() host %s", machine_guid);
-
     return (RRDHOST_ACQUIRED *)dictionary_get_and_acquire_item(rrdhost_root_index, machine_guid);
 }
 
@@ -116,8 +114,9 @@ static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
         rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
     else {
         rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
-        netdata_log_error("RRDHOST: %s() host with machine guid '%s' is already indexed",
-                          __FUNCTION__, host->machine_guid);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDHOST: host with machine guid '%s' is already indexed. Not adding it again.",
+               host->machine_guid);
     }
 
     return host;
@@ -126,8 +125,9 @@ static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
 static void rrdhost_index_del_by_guid(RRDHOST *host) {
     if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID)) {
         if(!dictionary_del(rrdhost_root_index, host->machine_guid))
-            netdata_log_error("RRDHOST: %s() failed to delete machine guid '%s' from index",
-                              __FUNCTION__, host->machine_guid);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDHOST: failed to delete machine guid '%s' from index",
+               host->machine_guid);
 
         rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID);
     }
@@ -148,8 +148,9 @@ static inline void rrdhost_index_del_hostname(RRDHOST *host) {
 
     if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_HOSTNAME)) {
         if(!dictionary_del(rrdhost_root_index_hostname, rrdhost_hostname(host)))
-            netdata_log_error("RRDHOST: %s() failed to delete hostname '%s' from index",
-                              __FUNCTION__, rrdhost_hostname(host));
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "RRDHOST: failed to delete hostname '%s' from index",
+                   rrdhost_hostname(host));
 
         rrdhost_option_clear(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     }
@@ -303,11 +304,11 @@ static RRDHOST *rrdhost_create(
         int is_localhost,
         bool archived
 ) {
-    netdata_log_debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
-
     if(memory_mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled) {
-        netdata_log_error("memory mode 'dbengine' is not enabled, but host '%s' is configured for it. Falling back to 'alloc'",
-                          hostname);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "memory mode 'dbengine' is not enabled, but host '%s' is configured for it. Falling back to 'alloc'",
+               hostname);
+
         memory_mode = RRD_MEMORY_MODE_ALLOC;
     }
 
@@ -392,7 +393,9 @@ int is_legacy = 1;
              (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy))) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
-                netdata_log_error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->cache_dir);
+                nd_log(NDLS_DAEMON, NDLP_CRIT,
+                       "Host '%s': cannot create directory '%s'",
+                       rrdhost_hostname(host), host->cache_dir);
         }
     }
 
@@ -418,7 +421,9 @@ int is_legacy = 1;
         ret = mkdir(dbenginepath, 0775);
 
         if (ret != 0 && errno != EEXIST)
-            netdata_log_error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), dbenginepath);
+            nd_log(NDLS_DAEMON, NDLP_CRIT,
+                   "Host '%s': cannot create directory '%s'",
+                   rrdhost_hostname(host), dbenginepath);
         else
             ret = 0; // succeed
 
@@ -459,8 +464,9 @@ int is_legacy = 1;
         }
 
         if (ret) { // check legacy or multihost initialization success
-            netdata_log_error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
-                              rrdhost_hostname(host), host->machine_guid, host->cache_dir);
+            nd_log(NDLS_DAEMON, NDLP_CRIT,
+                   "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
+                   rrdhost_hostname(host), host->machine_guid, host->cache_dir);
 
             rrd_wrlock();
             rrdhost_free___while_having_rrd_wrlock(host, true);
@@ -508,10 +514,13 @@ int is_legacy = 1;
 
     RRDHOST *t = rrdhost_index_add_by_guid(host);
     if(t != host) {
-        netdata_log_error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.",
-                          rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.",
+               rrdhost_hostname(host), host->machine_guid, rrdhost_hostname(t), t->machine_guid);
+
         if (!is_localhost)
             rrdhost_free___while_having_rrd_wrlock(host, true);
+
         rrd_unlock();
         return NULL;
     }
@@ -527,21 +536,22 @@ int is_legacy = 1;
 
     // ------------------------------------------------------------------------
 
-    netdata_log_info("Host '%s' (at registry as '%s') with guid '%s' initialized"
-                 ", os '%s'"
-                 ", timezone '%s'"
-                 ", tags '%s'"
-                 ", program_name '%s'"
-                 ", program_version '%s'"
-                 ", update every %d"
-                 ", memory mode %s"
-                 ", history entries %d"
-                 ", streaming %s"
-                 " (to '%s' with api key '%s')"
-                 ", health %s"
-                 ", cache_dir '%s'"
-                 ", alarms default handler '%s'"
-                 ", alarms default recipient '%s'"
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "Host '%s' (at registry as '%s') with guid '%s' initialized"
+           ", os '%s'"
+           ", timezone '%s'"
+           ", tags '%s'"
+           ", program_name '%s'"
+           ", program_version '%s'"
+           ", update every %d"
+           ", memory mode %s"
+           ", history entries %d"
+           ", streaming %s"
+           " (to '%s' with api key '%s')"
+           ", health %s"
+           ", cache_dir '%s'"
+           ", alarms default handler '%s'"
+           ", alarms default recipient '%s'"
          , rrdhost_hostname(host)
          , rrdhost_registry_hostname(host)
          , host->machine_guid
@@ -621,44 +631,56 @@ static void rrdhost_update(RRDHOST *host
     host->registry_hostname = string_strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
     if(strcmp(rrdhost_hostname(host), hostname) != 0) {
-        netdata_log_info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", rrdhost_hostname(host), hostname);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.",
+               rrdhost_hostname(host), hostname);
+
         rrdhost_init_hostname(host, hostname, true);
     } else {
         rrdhost_index_add_hostname(host);
     }
 
     if(strcmp(rrdhost_program_name(host), program_name) != 0) {
-        netdata_log_info("Host '%s' switched program name from '%s' to '%s'", rrdhost_hostname(host), rrdhost_program_name(host), program_name);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Host '%s' switched program name from '%s' to '%s'",
+               rrdhost_hostname(host), rrdhost_program_name(host), program_name);
+
         STRING *t = host->program_name;
         host->program_name = string_strdupz(program_name);
         string_freez(t);
     }
 
     if(strcmp(rrdhost_program_version(host), program_version) != 0) {
-        netdata_log_info("Host '%s' switched program version from '%s' to '%s'", rrdhost_hostname(host), rrdhost_program_version(host), program_version);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Host '%s' switched program version from '%s' to '%s'",
+               rrdhost_hostname(host), rrdhost_program_version(host), program_version);
+
         STRING *t = host->program_version;
         host->program_version = string_strdupz(program_version);
         string_freez(t);
     }
 
     if(host->rrd_update_every != update_every)
-        netdata_log_error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. "
-                          "Restart netdata here to apply the new settings.",
-                          rrdhost_hostname(host), host->rrd_update_every, update_every);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. "
+               "Restart netdata here to apply the new settings.",
+               rrdhost_hostname(host), host->rrd_update_every, update_every);
 
     if(host->rrd_memory_mode != mode)
-        netdata_log_error("Host '%s' has memory mode '%s', but the wanted one is '%s'. "
-                          "Restart netdata here to apply the new settings.",
-                          rrdhost_hostname(host),
-                          rrd_memory_mode_name(host->rrd_memory_mode),
-                          rrd_memory_mode_name(mode));
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Host '%s' has memory mode '%s', but the wanted one is '%s'. "
+               "Restart netdata here to apply the new settings.",
+               rrdhost_hostname(host),
+               rrd_memory_mode_name(host->rrd_memory_mode),
+               rrd_memory_mode_name(mode));
 
     else if(host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && host->rrd_history_entries < history)
-        netdata_log_error("Host '%s' has history of %d entries, but the wanted one is %ld entries. "
-                          "Restart netdata here to apply the new settings.",
-                          rrdhost_hostname(host),
-                          host->rrd_history_entries,
-                          history);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Host '%s' has history of %d entries, but the wanted one is %ld entries. "
+               "Restart netdata here to apply the new settings.",
+               rrdhost_hostname(host),
+               host->rrd_history_entries,
+               history);
 
     // update host tags
     rrdhost_init_tags(host, tags);
@@ -700,7 +722,9 @@ static void rrdhost_update(RRDHOST *host
         ml_host_new(host);
         
         rrdhost_load_rrdcontext_data(host);
-        netdata_log_info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "Host %s is not in archived mode anymore",
+               rrdhost_hostname(host));
     }
 
     spinlock_unlock(&host->rrdhost_update_lock);
@@ -731,8 +755,6 @@ RRDHOST *rrdhost_find_or_create(
         , struct rrdhost_system_info *system_info
         , bool archived
 ) {
-    netdata_log_debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
-
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
 
@@ -740,10 +762,11 @@ RRDHOST *rrdhost_find_or_create(
             return host;
 
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
-        netdata_log_error("Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
-                          rrdhost_hostname(host),
-                          rrd_memory_mode_name(host->rrd_memory_mode),
-                          rrd_memory_mode_name(mode));
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
+               rrdhost_hostname(host),
+               rrd_memory_mode_name(host->rrd_memory_mode),
+               rrd_memory_mode_name(mode));
 
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
@@ -851,18 +874,26 @@ void dbengine_init(char *hostname) {
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
         rrdeng_pages_per_extent = read_num;
     else {
-        netdata_log_error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Invalid dbengine pages per extent %u given. Using %u.",
+               read_num, rrdeng_pages_per_extent);
+
         config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
     }
 
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     if(storage_tiers < 1) {
-        netdata_log_error("At least 1 storage tier is required. Assuming 1.");
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "At least 1 storage tier is required. Assuming 1.");
+
         storage_tiers = 1;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
     if(storage_tiers > RRD_STORAGE_TIERS) {
-        netdata_log_error("Up to %d storage tier are supported. Assuming %d.", RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Up to %d storage tier are supported. Assuming %d.",
+               RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
+
         storage_tiers = RRD_STORAGE_TIERS;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
@@ -884,7 +915,9 @@ void dbengine_init(char *hostname) {
 
         int ret = mkdir(dbenginepath, 0775);
         if (ret != 0 && errno != EEXIST) {
-            netdata_log_error("DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
+            nd_log(NDLS_DAEMON, NDLP_CRIT,
+                   "DBENGINE on '%s': cannot create directory '%s'",
+                   hostname, dbenginepath);
             break;
         }
 
@@ -904,9 +937,9 @@ void dbengine_init(char *hostname) {
             if(grouping_iterations < 2) {
                 grouping_iterations = 2;
                 config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-                netdata_log_error("DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
-                                  hostname,
-                                  tier);
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
+                       hostname, tier);
             }
 
             snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);
@@ -915,7 +948,10 @@ void dbengine_init(char *hostname) {
             else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;
             else if(strcmp(bf, "none") == 0) backfill = RRD_BACKFILL_NONE;
             else {
-                netdata_log_error("DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "DBENGINE: unknown backfill value '%s', assuming 'new'",
+                       bf);
+
                 config_set(CONFIG_SECTION_DB, dbengineconfig, "new");
                 backfill = RRD_BACKFILL_NEW;
             }
@@ -926,10 +962,10 @@ void dbengine_init(char *hostname) {
 
         if(tier > 0 && get_tier_grouping(tier) > 65535) {
             storage_tiers_grouping_iterations[tier] = 1;
-            netdata_log_error("DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. Disabling tiers above %zu",
-                              hostname,
-                              tier,
-                              tier);
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. "
+                   "Disabling tiers above %zu",
+                   hostname, tier, tier);
             break;
         }
 
@@ -957,21 +993,19 @@ void dbengine_init(char *hostname) {
             netdata_thread_join(tiers_init[tier].thread, &ptr);
 
         if(tiers_init[tier].ret != 0) {
-            netdata_log_error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
-                              hostname,
-                              tiers_init[tier].tier,
-                              tiers_init[tier].path);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
+                   hostname, tiers_init[tier].tier, tiers_init[tier].path);
         }
         else if(created_tiers == tier)
             created_tiers++;
     }
 
     if(created_tiers && created_tiers < storage_tiers) {
-        netdata_log_error("DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
-                          hostname,
-                          created_tiers,
-                          storage_tiers,
-                          created_tiers);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
+               hostname, created_tiers, storage_tiers, created_tiers);
+
         storage_tiers = created_tiers;
     }
     else if(!created_tiers)
@@ -984,7 +1018,10 @@ void dbengine_init(char *hostname) {
 #else
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
     if(storage_tiers != 1) {
-        netdata_log_error("DBENGINE is not available on '%s', so only 1 database tier can be supported.", hostname);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "DBENGINE is not available on '%s', so only 1 database tier can be supported.",
+               hostname);
+
         storage_tiers = 1;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
@@ -1000,7 +1037,9 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             set_late_global_environment(system_info);
             fatal("Failed to initialize SQLite");
         }
-        netdata_log_info("Skipping SQLITE metadata initialization since memory mode is not dbengine");
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "Skipping SQLITE metadata initialization since memory mode is not dbengine");
     }
 
     if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {
@@ -1015,23 +1054,28 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         rrdpush_init();
 
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
-            netdata_log_info("DBENGINE: Initializing ...");
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "DBENGINE: Initializing ...");
+
             dbengine_init(hostname);
         }
-        else {
-            netdata_log_info("DBENGINE: Not initializing ...");
+        else
             storage_tiers = 1;
-        }
 
         if (!dbengine_enabled) {
             if (storage_tiers > 1) {
-                netdata_log_error("dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
-                                  storage_tiers);
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
+                       storage_tiers);
+
                 storage_tiers = 1;
             }
 
             if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-                netdata_log_error("dbengine is not enabled, but it has been given as the default db mode. Resetting db mode to alloc");
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "dbengine is not enabled, but it has been given as the default db mode. "
+                       "Resetting db mode to alloc");
+
                 default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
             }
         }
@@ -1040,7 +1084,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     if(!unittest)
         metadata_sync_init();
 
-    netdata_log_debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     localhost = rrdhost_create(
             hostname
             , registry_get_this_machine_hostname()
@@ -1177,7 +1220,9 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
 
     if (netdata_exit || force) {
-        netdata_log_info("RRD: 'host:%s' freeing memory...", rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "RRD: 'host:%s' freeing memory...",
+               rrdhost_hostname(host));
 
         // ------------------------------------------------------------------------
         // first remove it from the indexes, so that it will not be discoverable
@@ -1243,7 +1288,10 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 #endif
 
     if (!netdata_exit && !force) {
-        netdata_log_info("RRD: 'host:%s' is now in archive mode...", rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "RRD: 'host:%s' is now in archive mode...",
+               rrdhost_hostname(host));
+
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
         return;
     }
@@ -1313,7 +1361,9 @@ void rrd_finalize_collection_for_all_hosts(void) {
 void rrdhost_save_charts(RRDHOST *host) {
     if(!host) return;
 
-    netdata_log_info("RRD: 'host:%s' saving / closing database...", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: 'host:%s' saving / closing database...",
+           rrdhost_hostname(host));
 
     RRDSET *st;
 
@@ -1442,7 +1492,9 @@ static void rrdhost_load_config_labels(void) {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
     if(!status) {
         char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
-        netdata_log_error("RRDLABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDLABEL: Cannot reload the configuration file '%s', using labels in memory",
+               filename);
     }
 
     struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
@@ -1462,11 +1514,12 @@ static void rrdhost_load_kubernetes_labels(void) {
     sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
 
     if (unlikely(access(label_script, R_OK) != 0)) {
-        netdata_log_error("Kubernetes pod label fetching script %s not found.",label_script);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Kubernetes pod label fetching script %s not found.",
+               label_script);
+
         return;
     }
-
-    netdata_log_debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
 
     pid_t pid;
     FILE *fp_child_input;
@@ -1481,7 +1534,9 @@ static void rrdhost_load_kubernetes_labels(void) {
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
     int rc = netdata_pclose(fp_child_input, fp_child_output, pid);
     if(rc)
-        netdata_log_error("%s exited abnormally. Failed to get kubernetes labels.", label_script);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "%s exited abnormally. Failed to get kubernetes labels.",
+               label_script);
 }
 
 void reload_host_labels(void) {
@@ -1501,7 +1556,9 @@ void reload_host_labels(void) {
 }
 
 void rrdhost_finalize_collection(RRDHOST *host) {
-    netdata_log_info("RRD: 'host:%s' stopping data collection...", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: 'host:%s' stopping data collection...",
+           rrdhost_hostname(host));
 
     RRDSET *st;
     rrdset_foreach_read(st, host)
@@ -1515,7 +1572,9 @@ void rrdhost_finalize_collection(RRDHOST *host) {
 void rrdhost_delete_charts(RRDHOST *host) {
     if(!host) return;
 
-    netdata_log_info("RRD: 'host:%s' deleting disk files...", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: 'host:%s' deleting disk files...",
+           rrdhost_hostname(host));
 
     RRDSET *st;
 
@@ -1523,8 +1582,8 @@ void rrdhost_delete_charts(RRDHOST *host) {
         // we get a write lock
         // to ensure only one thread is saving the database
         rrdset_foreach_write(st, host){
-                    rrdset_delete_files(st);
-                }
+            rrdset_delete_files(st);
+        }
         rrdset_foreach_done(st);
     }
 
@@ -1537,7 +1596,9 @@ void rrdhost_delete_charts(RRDHOST *host) {
 void rrdhost_cleanup_charts(RRDHOST *host) {
     if(!host) return;
 
-    netdata_log_info("RRD: 'host:%s' cleaning up disk files...", rrdhost_hostname(host));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: 'host:%s' cleaning up disk files...",
+           rrdhost_hostname(host));
 
     RRDSET *st;
     uint32_t rrdhost_delete_obsolete_charts = rrdhost_option_check(host, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS);
@@ -1564,7 +1625,9 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
 // RRDHOST - save all hosts to disk
 
 void rrdhost_save_all(void) {
-    netdata_log_info("RRD: saving databases [%zu hosts(s)]...", rrdhost_hosts_available());
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: saving databases [%zu hosts(s)]...",
+           rrdhost_hosts_available());
 
     rrd_rdlock();
 
@@ -1579,7 +1642,9 @@ void rrdhost_save_all(void) {
 // RRDHOST - save or delete all hosts from disk
 
 void rrdhost_cleanup_all(void) {
-    netdata_log_info("RRD: cleaning up database [%zu hosts(s)]...", rrdhost_hosts_available());
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRD: cleaning up database [%zu hosts(s)]...",
+           rrdhost_hosts_available());
 
     rrd_rdlock();
 

@@ -81,6 +81,7 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
 
     va_list args;
     va_start(args, fmt);
+    // vsnprintfz() returns the number of bytes actually written - after possible truncation
     wb->len += vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
     va_end(args);
 
@@ -89,53 +90,39 @@ void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)
     // the buffer is \0 terminated by vsnprintfz
 }
 
-void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args)
-{
+inline void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args) {
     if(unlikely(!fmt || !*fmt)) return;
 
-    size_t wrote = 0, need = 2, space_remaining = 0;
+    size_t full_size_bytes = 0, need = 2, space_remaining = 0;
 
     do {
-        need += space_remaining * 2;
+        need += full_size_bytes + 2;
 
-        netdata_log_debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
         buffer_need_bytes(wb, need);
 
         space_remaining = wb->size - wb->len - 1;
 
-        wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], space_remaining, fmt, args);
+        // Use the copy of va_list for vsnprintf
+        va_list args_copy;
+        va_copy(args_copy, args);
+        // vsnprintf() returns the number of bytes required, even if bigger than the buffer provided
+        full_size_bytes = (size_t) vsnprintf(&wb->buffer[wb->len], space_remaining, fmt, args_copy);
+        va_end(args_copy);
 
-    } while(wrote >= space_remaining);
+    } while(full_size_bytes >= space_remaining);
 
-    wb->len += wrote;
+    wb->len += full_size_bytes;
 
-    // the buffer is \0 terminated by vsnprintf
+    wb->buffer[wb->len] = '\0';
+    buffer_overflow_check(wb);
 }
 
 void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 {
-    if(unlikely(!fmt || !*fmt)) return;
-
     va_list args;
-    size_t wrote = 0, need = 2, space_remaining = 0;
-
-    do {
-        need += space_remaining * 2;
-
-        netdata_log_debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
-        buffer_need_bytes(wb, need);
-
-        space_remaining = wb->size - wb->len - 1;
-
-        va_start(args, fmt);
-        wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], space_remaining, fmt, args);
-        va_end(args);
-
-    } while(wrote >= space_remaining);
-
-    wb->len += wrote;
-
-    // the buffer is \0 terminated by vsnprintf
+    va_start(args, fmt);
+    buffer_vsprintf(wb, fmt, args);
+    va_end(args);
 }
 
 // generate a javascript date, the fastest possible way...
@@ -301,12 +288,15 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
     strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
     strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
-    wb->json.options = options;
     wb->json.depth = (int8_t)(depth - 1);
     _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 
     if(add_anonymous_object)
         buffer_fast_strcat(wb, "{", 1);
+    else
+        options |= BUFFER_JSON_OPTIONS_NON_ANONYMOUS;
+
+    wb->json.options = options;
 
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
@@ -316,9 +306,14 @@ void buffer_json_finalize(BUFFER *wb) {
     while(wb->json.depth >= 0) {
         switch(wb->json.stack[wb->json.depth].type) {
             case BUFFER_JSON_OBJECT:
-                buffer_json_object_close(wb);
+                if (wb->json.depth == 0)
+                    if (!(wb->json.options & BUFFER_JSON_OPTIONS_NON_ANONYMOUS))
+                        buffer_json_object_close(wb);
+                    else
+                        _buffer_json_depth_pop(wb);
+                else
+                    buffer_json_object_close(wb);
                 break;
-
             case BUFFER_JSON_ARRAY:
                 buffer_json_array_close(wb);
                 break;

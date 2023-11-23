@@ -240,8 +240,8 @@ int do_proc_sys_devices_pci_aer(int update_every, usec_t dt __maybe_unused) {
             continue;
 
         if(!a->st) {
-            const char *title;
-            const char *context;
+            const char *title = "";
+            const char *context = "";
 
             switch(a->type) {
                 case AER_DEV_NONFATAL:

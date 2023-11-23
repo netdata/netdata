@@ -118,25 +118,29 @@ Metrics:
 
 These Metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.file_deleted | a dimension per app group | calls/s |
-| apps.vfs_write_call | a dimension per app group | calls/s |
-| apps.vfs_write_error | a dimension per app group | calls/s |
-| apps.vfs_read_call | a dimension per app group | calls/s |
-| apps.vfs_read_error | a dimension per app group | calls/s |
-| apps.vfs_write_bytes | a dimension per app group | bytes/s |
-| apps.vfs_read_bytes | a dimension per app group | bytes/s |
-| apps.vfs_fsync | a dimension per app group | calls/s |
-| apps.vfs_fsync_error | a dimension per app group | calls/s |
-| apps.vfs_open | a dimension per app group | calls/s |
-| apps.vfs_open_error | a dimension per app group | calls/s |
-| apps.vfs_create | a dimension per app group | calls/s |
-| apps.vfs_create_error | a dimension per app group | calls/s |
+| app.ebpf_call_vfs_unlink | calls | calls/s |
+| app.ebpf_call_vfs_write | calls | calls/s |
+| app.ebpf_call_vfs_write_error | calls | calls/s |
+| app.ebpf_call_vfs_read | calls | calls/s |
+| app.ebpf_call_vfs_read_error | calls | calls/s |
+| app.ebpf_call_vfs_write_bytes | writes | bytes/s |
+| app.ebpf_call_vfs_read_bytes | reads | bytes/s |
+| app.ebpf_call_vfs_fsync | calls | calls/s |
+| app.ebpf_call_vfs_fsync_error | calls | calls/s |
+| app.ebpf_call_vfs_open | calls | calls/s |
+| app.ebpf_call_vfs_open_error | calls | calls/s |
+| app.ebpf_call_vfs_create | calls | calls/s |
+| app.ebpf_call_vfs_create_error | calls | calls/s |
 
 
 

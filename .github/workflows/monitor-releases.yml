@@ -1,0 +1,73 @@
+---
+name: Monitor-releases
+
+on:
+  release:
+    types: [released, deleted]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Specify the release channel'
+        required: true
+        default: 'stable'
+
+
+concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
+  group: monitor-{{ github.event.inputs.channel }}-releases-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  update-stable-agents-metadata:
+    name: update-stable-agents-metadata
+    if: ${{ github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Init python environment
+        uses: actions/setup-python@v4
+        id: init-python
+        with:
+          python-version: "3.12"
+      - name: Setup python environment
+        id: setup-python
+        run: |
+          pip install -r .github/scripts/modules/requirements.txt
+      - name: Check for newer versions
+        id: check-newer-releases
+        run: |
+          python .github/scripts/check_latest_versions_per_channel.py "${{ github.event.inputs.channel }}"
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Sync newer releases
+        id: sync-releases
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
+        run: |
+          .github/scripts/upload-new-version-tags.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to prepare changelog:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to update stable Agent's metadata.
+              Checkout: ${{ steps.checkout.outcome }}
+              Init python: ${{ steps.init-python.outcome }}
+              Setup python: ${{ steps.setup-python.outcome }}
+              Check for newer stable releaes: ${{ steps.check-newer-releases.outcome }}
+              Setup ssh: ${{ steps.ssh-setup.outcome }}
+              Syncing newer release to packages.netdata.cloud : ${{ steps.sync-releases.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()

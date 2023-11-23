@@ -865,6 +865,37 @@ jobs:
           makeLatest: true
           tag: ${{ steps.version.outputs.version }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Checkout netdata main Repo # Checkout back to netdata/netdata repo to the update latest packaged versions
+        id: checkout-netdata
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+      - name: Init python environment for publish release metadata
+        uses: actions/setup-python@v4
+        id: init-python
+        with:
+          python-version: "3.12"
+      - name: Setup python environment
+        id: setup-python
+        run: |
+          pip install -r .github/scripts/modules/requirements.txt
+      - name: Check if the version is latest and published
+        id: check-latest-version
+        run: |
+          python .github/scripts/check_latest_versions.py  ${{ steps.version.outputs.version }}
+      - name: SSH setup
+        id: ssh-setup
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Sync newer releases
+        id: sync-releases
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
+        run: |
+          .github/scripts/upload-new-version-tags.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -880,6 +911,12 @@ jobs:
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Prepare version info: ${{ steps.version.outcome }}
               Create release: ${{ steps.create-release.outcome }}
+              Checkout back netdata/netdata: ${{ steps.checkout-netdata.outcome }}
+              Init python environment: ${{ steps.init-python.outcome }}
+              Setup python environment: ${{ steps.setup-python.outcome }}
+              Check the nearly published release against the advertised: ${{ steps.check-latest-version.outcome }}
+              Setup ssh: ${{ steps.ssh-setup.outcome }}
+              Sync with the releases: ${{ steps.sync-releases.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

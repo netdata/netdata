@@ -100,6 +100,7 @@ Metrics:
 | cgroup.io_some_pressure_stall_time | time | ms |
 | cgroup.io_full_pressure | some10, some60, some300 | percentage |
 | cgroup.io_full_pressure_stall_time | time | ms |
+| cgroup.pids_current | pids | pids |
 
 ### Per cgroup network device
 

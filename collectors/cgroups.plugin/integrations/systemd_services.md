@@ -80,6 +80,7 @@ Metrics:
 | systemd.service.disk.throttle.iops | read, write | operations/s |
 | systemd.service.disk.queued_iops | read, write | operations/s |
 | systemd.service.disk.merged_iops | read, write | operations/s |
+| systemd.service.pids.current | pids | pids |
 
 
 

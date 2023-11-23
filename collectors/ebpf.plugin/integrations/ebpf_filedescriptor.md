@@ -92,16 +92,20 @@ Metrics:
 
 These Metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.file_open | a dimension per app group | calls/s |
-| apps.file_open_error | a dimension per app group | calls/s |
-| apps.file_closed | a dimension per app group | calls/s |
-| apps.file_close_error | a dimension per app group | calls/s |
+| app.ebpf_file_open | calls | calls/s |
+| app.ebpf_file_open_error | calls | calls/s |
+| app.ebpf_file_closed | calls | calls/s |
+| app.ebpf_file_close_error | calls | calls/s |
 
 
 

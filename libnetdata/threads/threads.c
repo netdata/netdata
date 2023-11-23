@@ -134,8 +134,6 @@ size_t netdata_threads_init(void) {
     i = pthread_attr_getstacksize(netdata_threads_attr, &stacksize);
     if(i != 0)
         fatal("pthread_attr_getstacksize() failed with code %d.", i);
-    else
-        netdata_log_debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
 
     return stacksize;
 }
@@ -152,12 +150,12 @@ void netdata_threads_init_after_fork(size_t stacksize) {
     if(netdata_threads_attr && stacksize > (size_t)PTHREAD_STACK_MIN) {
         i = pthread_attr_setstacksize(netdata_threads_attr, stacksize);
         if(i != 0)
-            netdata_log_error("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
+            nd_log(NDLS_DAEMON, NDLP_WARNING, "pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
         else
-            netdata_log_info("Set threads stack size to %zu bytes", stacksize);
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "Set threads stack size to %zu bytes", stacksize);
     }
     else
-        netdata_log_error("Invalid pthread stacksize %zu", stacksize);
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "Invalid pthread stacksize %zu", stacksize);
 }
 
 // ----------------------------------------------------------------------------
@@ -183,12 +181,12 @@ void rrd_collector_finished(void);
 static void thread_cleanup(void *ptr) {
     if(netdata_thread != ptr) {
         NETDATA_THREAD *info = (NETDATA_THREAD *)ptr;
-        netdata_log_error("THREADS: internal error - thread local variable does not match the one passed to this function. Expected thread '%s', passed thread '%s'", netdata_thread->tag, info->tag);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "THREADS: internal error - thread local variable does not match the one passed to this function. Expected thread '%s', passed thread '%s'", netdata_thread->tag, info->tag);
     }
     spinlock_lock(&netdata_thread->detach_lock);
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
-        netdata_log_info("thread with task id %d finished", gettid());
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", gettid());
 
     rrd_collector_finished();
     sender_thread_buffer_free();
@@ -222,9 +220,9 @@ static void thread_set_name_np(NETDATA_THREAD *nt) {
 #endif
 
         if (ret != 0)
-            netdata_log_error("cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
+            nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
         else
-            netdata_log_info("set name of thread %d to %s", gettid(), threadname);
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "set name of thread %d to %s", gettid(), threadname);
 
     }
 }
@@ -247,7 +245,7 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
     thread_name_get(true);
 
     if (ret)
-        netdata_log_info("cannot set libuv thread name to %s. Err: %d", threadname, ret);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "cannot set libuv thread name to %s. Err: %d", threadname, ret);
 }
 
 void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1])
@@ -264,13 +262,13 @@ static void *netdata_thread_init(void *ptr) {
     netdata_thread = (NETDATA_THREAD *)ptr;
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_STARTUP))
-        netdata_log_info("thread created with task id %d", gettid());
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        netdata_log_error("cannot set pthread cancel type to DEFERRED.");
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        netdata_log_error("cannot set pthread cancel state to ENABLE.");
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
 
     thread_set_name_np(ptr);
 
@@ -294,13 +292,13 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
 
     int ret = pthread_create(thread, netdata_threads_attr, netdata_thread_init, info);
     if(ret != 0)
-        netdata_log_error("failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
 
     else {
         if (!(options & NETDATA_THREAD_OPTION_JOINABLE)) {
             int ret2 = pthread_detach(*thread);
             if (ret2 != 0)
-                netdata_log_error("cannot request detach of newly created %s thread. pthread_detach() failed with code %d", tag, ret2);
+                nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot request detach of newly created %s thread. pthread_detach() failed with code %d", tag, ret2);
         }
     }
 
@@ -318,9 +316,9 @@ int netdata_thread_cancel(netdata_thread_t thread) {
     int ret = pthread_cancel(thread);
     if(ret != 0)
 #ifdef NETDATA_INTERNAL_CHECKS
-        netdata_log_error("cannot cancel thread. pthread_cancel() failed with code %d at %d@%s, function %s()", ret, line, file, function);
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot cancel thread. pthread_cancel() failed with code %d at %d@%s, function %s()", ret, line, file, function);
 #else
-        netdata_log_error("cannot cancel thread. pthread_cancel() failed with code %d.", ret);
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot cancel thread. pthread_cancel() failed with code %d.", ret);
 #endif
 
     return ret;
@@ -332,7 +330,7 @@ int netdata_thread_cancel(netdata_thread_t thread) {
 int netdata_thread_join(netdata_thread_t thread, void **retval) {
     int ret = pthread_join(thread, retval);
     if(ret != 0)
-        netdata_log_error("cannot join thread. pthread_join() failed with code %d.", ret);
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot join thread. pthread_join() failed with code %d.", ret);
 
     return ret;
 }
@@ -340,7 +338,7 @@ int netdata_thread_join(netdata_thread_t thread, void **retval) {
 int netdata_thread_detach(pthread_t thread) {
     int ret = pthread_detach(thread);
     if(ret != 0)
-        netdata_log_error("cannot detach thread. pthread_detach() failed with code %d.", ret);
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot detach thread. pthread_detach() failed with code %d.", ret);
 
     return ret;
 }

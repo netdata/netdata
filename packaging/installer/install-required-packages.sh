@@ -28,6 +28,7 @@ PACKAGES_UPDATE_IPSETS=${PACKAGES_UPDATE_IPSETS-0}
 PACKAGES_NETDATA_DEMO_SITE=${PACKAGES_NETDATA_DEMO_SITE-0}
 PACKAGES_NETDATA_SENSORS=${PACKAGES_NETDATA_SENSORS-0}
 PACKAGES_NETDATA_DATABASE=${PACKAGES_NETDATA_DATABASE-1}
+PACKAGES_NETDATA_STREAMING_COMPRESSION=${PACKAGES_NETDATA_STREAMING_COMPRESSION-0}
 PACKAGES_NETDATA_EBPF=${PACKAGES_NETDATA_EBPF-1}
 
 # needed commands
@@ -1040,6 +1041,18 @@ declare -A pkg_lz4=(
   ['default']="lz4-devel"
 )
 
+declare -A pkg_zstd=(
+  ['alpine']="zstd-dev"
+  ['debian']="libzstd-dev"
+  ['ubuntu']="libzstd-dev"
+  ['gentoo']="app-arch/zstd"
+  ['clearlinux']="zstd-devel"
+  ['arch']="zstd"
+  ['macos']="zstd"
+  ['freebsd']="zstd"
+  ['default']="libzstd-devel"
+)
+
 declare -A pkg_libuv=(
   ['alpine']="libuv-dev"
   ['debian']="libuv1-dev"
@@ -1307,6 +1320,10 @@ packages() {
     suitable_package libuv
     suitable_package lz4
     suitable_package openssl
+  fi
+
+  if [ "${PACKAGES_NETDATA_STREAMING_COMPRESSION}" -ne 0 ]; then
+    suitable_package zstd
   fi
 
   # -------------------------------------------------------------------------
@@ -1951,6 +1968,7 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA_SENSORS=1
       PACKAGES_NETDATA_DATABASE=1
       PACKAGES_NETDATA_EBPF=1
+      PACKAGES_NETDATA_STREAMING_COMPRESSION=1
       ;;
 
     netdata)
@@ -1958,6 +1976,7 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA_PYTHON3=1
       PACKAGES_NETDATA_DATABASE=1
       PACKAGES_NETDATA_EBPF=1
+      PACKAGES_NETDATA_STREAMING_COMPRESSION=1
       ;;
 
     python | netdata-python)

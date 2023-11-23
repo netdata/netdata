@@ -63,14 +63,20 @@ The remainder of the document outlines the public API of the Netdata agent.
 
 We define two categories of components within the public API:
 
-- Strictly defined components are guaranteed not to change in a backwards incompatible manner without an associated major version bump, and will have impending changes announced in the release notes at least one minor release before they are changed.
-- Loosely defined components are guaranteed not to change in a backwards incompatible manner without an associated minor version bump, and will have impending changes announced in the release notes at least one minor release before they are changed.
+- Strictly defined components are guaranteed not to change in a backwards incompatible manner without an associated
+  major version bump, and will have impending changes announced in the release notes at least one minor release
+  before they are changed.
+- Loosely defined components are guaranteed not to change in a backwards incompatible manner without an associated
+  minor version bump, and will have impending changes announced in the release notes at least one minor release
+  before they are changed.
 
 There are also a few things we handle specially, which will be noted later in the document.
 
 ### Strictly Defined Public API Components
 
-The following aspects of the public API are strictly defined, and are guaranteed not to change in a backwards incompatible manner without an associated major version increase, and such changes will be announced in the release notes at least one minor release prior to being merged:
+The following aspects of the public API are strictly defined, and are guaranteed not to change in a backwards
+incompatible manner without an associated major version increase, and such changes will be announced in the release
+notes at least one minor release prior to being merged:
 
 - All mandatory build dependencies which are not vendored in the Netdata Agent code. This includes, but is not
   limited to:
@@ -80,7 +86,11 @@ The following aspects of the public API are strictly defined, and are guaranteed
 - The REST API provided by the Netdata Agent’s internal web server, accessible via the `/api` endpoint. This
   does not extend to the charts, labels, or other system-specific data returned by some API endpoints.
 - The protocol used for streaming and replicating data between Netdata Agents.
-- The set of features provided by default in our pre-built packages.
+- The protocol used for communicating with external data collection plugins.
+- The APIs provided by the `python.d.plugin` and `charts.d.plugin` data collection frameworks.
+- The set of optional features supported by the Agent which are provided by default in our pre-built packages. If
+  support for an optional feature is being completely removed from the agent, that is instead covered by what
+  component that feature is part of.
 
 ### Loosely Defined Public API Components
 
@@ -88,14 +98,20 @@ The following aspects of the public API are loosely defined. They are guaranteed
 incompatible manner without an associated minor version increase, and such changes will be announced in the release
 notes at least one minor release prior to being merged:
 
-- Configuration options in any configuration file normally located under `/etc/netdata` on a typical install.
+- Configuration options in any configuration file normally located under `/etc/netdata` on a typical install,
+  as well as their default values.
 - Environment variables that are interpreted by the Netdata Agent, or by the startup code in our official OCI
   container images.
 - The exact set of charts provided, including chart families, chart names, and provided metrics.
 - The exact set of supported data collection sources and data export targets.
 - The exact set of system service managers we officially support running the Netdata Agent under.
+- The exact set of alert delivery mechanisms supported by the Netdata Agent.
 - The high-level implementation of the Netdata Agent’s integrated web server.
 - The v0 and v1 dashboard UIs provided through the Netdata Agent’s internal web server.
+
+All loosely defined API components may also change in a backwards incompatible manner if the major version is
+increased. Large scale changes to these components may also warrant a major version increase even if there are no
+backwards incompatible changes to strictly defined public API components.
 
 ### Special Cases
 

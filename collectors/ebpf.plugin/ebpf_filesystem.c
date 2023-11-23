@@ -351,20 +351,22 @@ static void ebpf_obsolete_fs_charts(int update_every)
             flags &= ~NETDATA_FILESYSTEM_FLAG_CHART_CREATED;
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hread.name,
+                                      "",
                                       efp->hread.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hread.order, update_every);
 
             ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hwrite.name,
+                                      "",
                                       efp->hwrite.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hwrite.order, update_every);
 
-            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name, efp->hopen.title,
+            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hopen.name, "", efp->hopen.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hopen.order, update_every);
 
-            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name, efp->hadditional.title,
+            ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY, efp->hadditional.name,"",  efp->hadditional.title,
                                       EBPF_COMMON_DIMENSION_CALL, efp->family_name,
                                       NULL, NETDATA_EBPF_CHART_TYPE_STACKED, efp->hadditional.order,
                                       update_every);
@@ -671,6 +673,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
 
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   efp->hread.name,
+                                  "",
                                   efp->hread.title,
                                   EBPF_COMMON_DIMENSION_CALL,
                                   efp->family_name,
@@ -681,6 +684,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
 
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   efp->hwrite.name,
+                                  "",
                                   efp->hwrite.title,
                                   EBPF_COMMON_DIMENSION_CALL,
                                   efp->family_name,
@@ -691,6 +695,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
 
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   efp->hopen.name,
+                                  "",
                                   efp->hopen.title,
                                   EBPF_COMMON_DIMENSION_CALL,
                                   efp->family_name,
@@ -701,6 +706,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
 
         ebpf_write_chart_obsolete(NETDATA_FILESYSTEM_FAMILY,
                                   efp->hadditional.name,
+                                  "",
                                   efp->hadditional.title,
                                   EBPF_COMMON_DIMENSION_CALL,
                                   efp->family_name,

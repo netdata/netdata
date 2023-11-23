@@ -60,16 +60,20 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 These Metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.dc_ratio | a dimension per app group | % |
-| apps.dc_reference | a dimension per app group | files |
-| apps.dc_not_cache | a dimension per app group | files |
-| apps.dc_not_found | a dimension per app group | files |
+| app.ebpf_dc_ratio | ratio | % |
+| app.ebpf_dc_reference | files | files |
+| app.ebpf_dc_not_cache | files | files |
+| app.ebpf_dc_not_found | files | files |
 
 ### Per filesystem
 

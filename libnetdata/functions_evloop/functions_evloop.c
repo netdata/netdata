@@ -64,6 +64,12 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
         pthread_mutex_unlock(&wg->worker_mutex);
 
         if(acquired) {
+            ND_LOG_STACK lgs[] = {
+                    ND_LOG_FIELD_TXT(NDF_REQUEST, j->cmd),
+                    ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
             last_acquired = true;
             j = dictionary_acquired_item_value(acquired);
             j->cb(j->transaction, j->cmd, j->timeout, &j->cancelled);

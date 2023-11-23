@@ -1023,7 +1023,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
-            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
+            netdata_logger(NDLS_DEBUG, NDLP_DEBUG, __FILE__, __FUNCTION__, __LINE__, "%s: " fmt, rrdset_name(st), ##args); } while(0)
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
@@ -1273,7 +1273,7 @@ struct rrdhost {
     struct sender_state *sender;
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
-    void *aclk_sync_host_config;
+    struct aclk_sync_cfg_t *aclk_config;
 
     uint32_t rrdpush_receiver_connection_counter;   // the number of times this receiver has connected
     uint32_t rrdpush_sender_connection_counter;     // the number of times this sender has connected

@@ -65,6 +65,11 @@ static struct global_statistics {
     uint64_t backfill_queries_made;
     uint64_t backfill_db_points_read;
 
+    uint64_t tier0_hot_gorilla_buffers;
+
+    uint64_t tier0_disk_compressed_bytes;
+    uint64_t tier0_disk_uncompressed_bytes;
+
     uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
 
 } global_statistics = {
@@ -80,6 +85,10 @@ static struct global_statistics {
         .api_data_queries_made = 0,
         .api_data_db_points_read = 0,
         .api_data_result_points_generated = 0,
+
+        .tier0_hot_gorilla_buffers = 0,
+        .tier0_disk_compressed_bytes = 0,
+        .tier0_disk_uncompressed_bytes = 0,
 };
 
 void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array) {
@@ -106,6 +115,18 @@ void global_statistics_exporters_query_completed(size_t points_read) {
 void global_statistics_backfill_query_completed(size_t points_read) {
     __atomic_fetch_add(&global_statistics.backfill_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&global_statistics.backfill_db_points_read, points_read, __ATOMIC_RELAXED);
+}
+
+void global_statistics_gorilla_buffer_add_hot() {
+    __atomic_fetch_add(&global_statistics.tier0_hot_gorilla_buffers, 1, __ATOMIC_RELAXED);
+}
+
+void global_statistics_tier0_disk_compressed_bytes(uint32_t size) {
+    __atomic_fetch_add(&global_statistics.tier0_disk_compressed_bytes, size, __ATOMIC_RELAXED);
+}
+
+void global_statistics_tier0_disk_uncompressed_bytes(uint32_t size) {
+    __atomic_fetch_add(&global_statistics.tier0_disk_uncompressed_bytes, size, __ATOMIC_RELAXED);
 }
 
 void global_statistics_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
@@ -209,6 +230,11 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->exporters_db_points_read     = __atomic_load_n(&global_statistics.exporters_db_points_read, __ATOMIC_RELAXED);
     gs->backfill_queries_made       = __atomic_load_n(&global_statistics.backfill_queries_made, __ATOMIC_RELAXED);
     gs->backfill_db_points_read     = __atomic_load_n(&global_statistics.backfill_db_points_read, __ATOMIC_RELAXED);
+
+    gs->tier0_hot_gorilla_buffers     = __atomic_load_n(&global_statistics.tier0_hot_gorilla_buffers, __ATOMIC_RELAXED);
+
+    gs->tier0_disk_compressed_bytes = __atomic_load_n(&global_statistics.tier0_disk_compressed_bytes, __ATOMIC_RELAXED);
+    gs->tier0_disk_uncompressed_bytes = __atomic_load_n(&global_statistics.tier0_disk_uncompressed_bytes, __ATOMIC_RELAXED);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++)
         gs->db_points_stored_per_tier[tier] = __atomic_load_n(&global_statistics.db_points_stored_per_tier[tier], __ATOMIC_RELAXED);
@@ -828,6 +854,70 @@ static void global_statistics_charts(void) {
     }
 
     ml_update_global_statistics_charts(gs.ml_models_consulted);
+
+    // ----------------------------------------------------------------
+
+    if (tier_page_type[0] == PAGE_GORILLA_METRICS)
+    {
+        static RRDSET *st_tier0_gorilla_pages = NULL;
+        static RRDDIM *rd_num_gorilla_pages = NULL;
+
+        if (unlikely(!st_tier0_gorilla_pages)) {
+            st_tier0_gorilla_pages = rrdset_create_localhost(
+                    "netdata"
+                    , "tier0_gorilla_pages"
+                    , NULL
+                    , "tier0_gorilla_pages"
+                    , NULL
+                    , "Number of gorilla_pages"
+                    , "count"
+                    , "netdata"
+                    , "stats"
+                    , 131004
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_num_gorilla_pages = rrddim_add(st_tier0_gorilla_pages, "count", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_tier0_gorilla_pages, rd_num_gorilla_pages, (collected_number)gs.tier0_hot_gorilla_buffers);
+
+        rrdset_done(st_tier0_gorilla_pages);
+    }
+
+    if (tier_page_type[0] == PAGE_GORILLA_METRICS)
+    {
+        static RRDSET *st_tier0_compression_info = NULL;
+
+        static RRDDIM *rd_compressed_bytes = NULL;
+        static RRDDIM *rd_uncompressed_bytes = NULL;
+
+        if (unlikely(!st_tier0_compression_info)) {
+            st_tier0_compression_info = rrdset_create_localhost(
+                    "netdata"
+                    , "tier0_compression_info"
+                    , NULL
+                    , "tier0_compression_info"
+                    , NULL
+                    , "Tier 0 compression info"
+                    , "bytes"
+                    , "netdata"
+                    , "stats"
+                    , 131005
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_compressed_bytes = rrddim_add(st_tier0_compression_info, "compressed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_uncompressed_bytes = rrddim_add(st_tier0_compression_info, "uncompressed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_compressed_bytes, (collected_number)gs.tier0_disk_compressed_bytes);
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_uncompressed_bytes, (collected_number)gs.tier0_disk_uncompressed_bytes);
+
+        rrdset_done(st_tier0_compression_info);
+    }
 }
 
 // ----------------------------------------------------------------------------

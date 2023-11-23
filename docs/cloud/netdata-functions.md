@@ -30,11 +30,19 @@ functions - [plugins.d](https://github.com/netdata/netdata/blob/master/collector
 
 #### What functions are currently available?
 
-| Function | Description | plugin - module |
-| :-- | :-- | :-- |
-| processes | Detailed information on the currently running processes on the node. | [apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) |
-| ebpf_socket | Detailed socket information. | [ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md#ebpf_thread) |
-| ebpf_thread | Controller for eBPF threads. | [ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md#ebpf_socket) |
+| Function           | Description                                                                                                                                                    | Alternative to CLI tools        | plugin - module                                                                                            |
+|:-------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------|:-----------------------------------------------------------------------------------------------------------|
+| block-devices      | Disk I/O activity for all block devices, offering insights into both data transfer volume and operation performance.                                           | `iostat`                        | [proc](https://github.com/netdata/netdata/tree/master/collectors/proc.plugin#readme)                       |
+| containers-vms     | Insights into the resource utilization of containers and QEMU virtual machines: CPU usage, memory consumption, disk I/O, and network traffic.                  | `docker stats`, `systemd-cgtop` | [cgroups](https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#readme)                 |
+| ipmi-sensors       | Readings and status of IPMI sensors.                                                                                                                           | `ipmi-sensors`                  | [freeipmi](https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin#readme)               |
+| mount-points       | Disk usage for each mount point, including used and available space, both in terms of percentage and actual bytes, as well as used and available inode counts. | `df`                            | [diskspace](https://github.com/netdata/netdata/tree/master/collectors/diskspace.plugin#readme)             |
+| network interfaces | Network traffic, packet drop rates, interface states, MTU, speed, and duplex mode for all network interfaces.                                                  | `bmon`, `bwm-ng`                | [proc](https://github.com/netdata/netdata/tree/master/collectors/proc.plugin#readme)                       |
+| processes          | Real-time information about the system's resource usage, including CPU utilization, memory consumption, and disk IO for every running process.                 | `top`, `htop`                   | [apps](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md)                    |
+| systemd-journal    | Viewing, exploring and analyzing systemd journal logs.                                                                                                         | `journalctl`                    | [systemd-journal](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin#readme) |
+| systemd-list-units | Information about all systemd units, including their active state, description, whether or not they are enabled, and more.                                     | `systemctl list-units`          | [systemd-journal](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin#readme) |
+| systemd-services   | System resource utilization for all running systemd services: CPU, memory, and disk IO.                                                                        | `systemd-cgtop`                 | [cgroups](https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#readme)                 |
+| streaming          | Comprehensive overview of all Netdata children instances, offering detailed information about their status, replication completion time, and many more.        |                                 |                                                                                                            |
+
 
 If you have ideas or requests for other functions:
 * Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
@@ -43,7 +51,7 @@ If you have ideas or requests for other functions:
 
 #### How do functions work with streaming?
 
-Via streaming, the definitions of functions are transmitted to a parent node so it knows all the functions available on
+Via streaming, the definitions of functions are transmitted to a parent node, so it knows all the functions available on
 any children connected to it.
 
 If the parent node is the one connected to Netdata Cloud it is capable of triggering the call to the respective children
@@ -51,7 +59,7 @@ node to run the function.
 
 #### Why are they available only on Netdata Cloud?
 
-Since these functions are able to execute routines on the node and due the potential use cases that they can cover, our
+Since these functions are able to execute routines on the node and due to the potential use cases that they can cover, our
 concern is to ensure no sensitive
 information or disruptive actions are exposed through the Agent's API.
 

@@ -1323,6 +1323,14 @@ void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDAT
 #else // !NETDATA_LOG_COLLECTION_ERRORS
 void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
 #endif // !NETDATA_LOG_COLLECTION_ERRORS
+
+    static __thread struct log_stack_entry lgs[] = {
+            [0] = ND_LOG_FIELD_STR(NDF_NIDL_DIMENSION, NULL),
+            [1] = ND_LOG_FIELD_END(),
+    };
+    lgs[0].str = rd->id;
+    log_stack_push(lgs);
+
 #ifdef NETDATA_LOG_COLLECTION_ERRORS
     rd->rrddim_store_metric_count++;
 
@@ -1384,6 +1392,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     }
 
     rrdcontext_collected_rrddim(rd);
+    log_stack_pop(&lgs);
 }
 
 void store_metric_collection_completed() {
