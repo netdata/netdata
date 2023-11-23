@@ -623,6 +623,10 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
 
+    bool is_ephemeral = false;
+    is_ephemeral = appconfig_get_boolean(&stream_config, rpt->key, "is ephemeral node", CONFIG_BOOLEAN_NO);
+    is_ephemeral = appconfig_get_boolean(&stream_config, rpt->machine_guid, "is ephemeral node", is_ephemeral);
+
     if(rpt->config.rrdpush_compression) {
         char *order = appconfig_get(&stream_config, rpt->key, "compression algorithms order", RRDPUSH_COMPRESSION_ALGORITHMS_ORDER);
         order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithms order", order);
@@ -635,30 +639,31 @@ static void rrdpush_receive(struct receiver_state *rpt)
     {
         // this will also update the host with our system_info
         RRDHOST *host = rrdhost_find_or_create(
-                rpt->hostname
-                , rpt->registry_hostname
-                , rpt->machine_guid
-                , rpt->os
-                , rpt->timezone
-                , rpt->abbrev_timezone
-                , rpt->utc_offset
-                , rpt->tags
-                , rpt->program_name
-                , rpt->program_version
-                , rpt->config.update_every
-                , rpt->config.history
-                , rpt->config.mode
-                , (unsigned int)(rpt->config.health_enabled != CONFIG_BOOLEAN_NO)
-                , (unsigned int)(rpt->config.rrdpush_enabled && rpt->config.rrdpush_destination && *rpt->config.rrdpush_destination && rpt->config.rrdpush_api_key && *rpt->config.rrdpush_api_key)
-                , rpt->config.rrdpush_destination
-                , rpt->config.rrdpush_api_key
-                , rpt->config.rrdpush_send_charts_matching
-                , rpt->config.rrdpush_enable_replication
-                , rpt->config.rrdpush_seconds_to_replicate
-                , rpt->config.rrdpush_replication_step
-                , rpt->system_info
-                , 0
-        );
+            rpt->hostname,
+            rpt->registry_hostname,
+            rpt->machine_guid,
+            rpt->os,
+            rpt->timezone,
+            rpt->abbrev_timezone,
+            rpt->utc_offset,
+            rpt->tags,
+            rpt->program_name,
+            rpt->program_version,
+            rpt->config.update_every,
+            rpt->config.history,
+            rpt->config.mode,
+            (unsigned int)(rpt->config.health_enabled != CONFIG_BOOLEAN_NO),
+            (unsigned int)(rpt->config.rrdpush_enabled && rpt->config.rrdpush_destination &&
+                           *rpt->config.rrdpush_destination && rpt->config.rrdpush_api_key &&
+                           *rpt->config.rrdpush_api_key),
+            rpt->config.rrdpush_destination,
+            rpt->config.rrdpush_api_key,
+            rpt->config.rrdpush_send_charts_matching,
+            rpt->config.rrdpush_enable_replication,
+            rpt->config.rrdpush_seconds_to_replicate,
+            rpt->config.rrdpush_replication_step,
+            rpt->system_info,
+            0);
 
         if(!host) {
             rrdpush_receive_log_status(
@@ -807,10 +812,13 @@ static void rrdpush_receive(struct receiver_state *rpt)
     // in case we have cloud connection we inform cloud
     // new child connected
     if (netdata_cloud_enabled)
-        aclk_host_state_update(rpt->host, 1);
+        aclk_host_state_update(rpt->host, 1, 1);
 #endif
 
     rrdhost_set_is_parent_label();
+
+    if (is_ephemeral)
+        rrdhost_option_set(rpt->host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
     // let it reconnect to parent immediately
     rrdpush_reset_destinations_postpone_time(rpt->host);
@@ -837,7 +845,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     // in case we have cloud connection we inform cloud
     // a child disconnected
     if (netdata_cloud_enabled)
-        aclk_host_state_update(rpt->host, 0);
+        aclk_host_state_update(rpt->host, 0, 1);
 #endif
 
 cleanup:

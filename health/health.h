@@ -102,7 +102,6 @@ void *health_cmdapi_thread(void *ptr);
 char *health_edit_command_from_source(const char *source);
 void sql_refresh_hashes(void);
 
-void health_add_host_labels(void);
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);

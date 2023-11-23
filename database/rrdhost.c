@@ -31,6 +31,7 @@ netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
 time_t rrdset_free_obsolete_time_s = 3600;
 time_t rrdhost_free_orphan_time_s = 3600;
+time_t rrdhost_free_ephemeral_time_s = 86400;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
@@ -838,7 +839,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && rrdhost_receiver_replicating_charts(host) == 0
        && rrdhost_sender_replicating_charts(host) == 0
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)
+       && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)
        && !host->receiver
        && host->child_disconnected_time
        && host->child_disconnected_time + rrdhost_free_orphan_time_s < now_s)
@@ -1464,7 +1465,14 @@ static void rrdhost_load_auto_labels(void) {
 
     add_aclk_host_labels();
 
-    health_add_host_labels();
+    // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
+    // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
+
+    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "is ephemeral node", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
+
+    int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     rrdlabels_add(labels, "_is_parent", (localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 

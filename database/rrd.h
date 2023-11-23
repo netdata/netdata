@@ -1043,6 +1043,7 @@ typedef enum __attribute__ ((__packed__)) {
     RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
 
     RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 6), // when set, this host is a virtual one
+    RRDHOST_OPTION_EPHEMERAL_HOST           = (1 << 7), // when set, this host is an ephemeral one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
@@ -1426,6 +1427,7 @@ void rrddim_index_destroy(RRDSET *st);
 // ----------------------------------------------------------------------------
 
 extern time_t rrdhost_free_orphan_time_s;
+extern time_t rrdhost_free_ephemeral_time_s;
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest);
 
@@ -1434,30 +1436,29 @@ RRDHOST *rrdhost_find_by_guid(const char *guid);
 RRDHOST *find_host_by_node_id(char *node_id);
 
 RRDHOST *rrdhost_find_or_create(
-        const char *hostname
-        , const char *registry_hostname
-        , const char *guid
-        , const char *os
-        , const char *timezone
-        , const char *abbrev_timezone
-        , int32_t utc_offset
-        , const char *tags
-        , const char *program_name
-        , const char *program_version
-        , int update_every
-        , long history
-        , RRD_MEMORY_MODE mode
-        , unsigned int health_enabled
-        , unsigned int rrdpush_enabled
-        , char *rrdpush_destination
-        , char *rrdpush_api_key
-        , char *rrdpush_send_charts_matching
-        , bool rrdpush_enable_replication
-        , time_t rrdpush_seconds_to_replicate
-        , time_t rrdpush_replication_step
-        , struct rrdhost_system_info *system_info
-        , bool is_archived
-);
+    const char *hostname,
+    const char *registry_hostname,
+    const char *guid,
+    const char *os,
+    const char *timezone,
+    const char *abbrev_timezone,
+    int32_t utc_offset,
+    const char *tags,
+    const char *program_name,
+    const char *program_version,
+    int update_every,
+    long history,
+    RRD_MEMORY_MODE mode,
+    unsigned int health_enabled,
+    unsigned int rrdpush_enabled,
+    char *rrdpush_destination,
+    char *rrdpush_api_key,
+    char *rrdpush_send_charts_matching,
+    bool rrdpush_enable_replication,
+    time_t rrdpush_seconds_to_replicate,
+    time_t rrdpush_replication_step,
+    struct rrdhost_system_info *system_info,
+    bool is_archived);
 
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
 

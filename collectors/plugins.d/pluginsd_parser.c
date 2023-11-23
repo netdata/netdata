@@ -566,30 +566,29 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
     RRDHOST *host = rrdhost_find_or_create(
-            string2str(parser->user.host_define.hostname),
-            string2str(parser->user.host_define.hostname),
-            parser->user.host_define.machine_guid_str,
-            "Netdata Virtual Host 1.0",
-            netdata_configured_timezone,
-            netdata_configured_abbrev_timezone,
-            netdata_configured_utc_offset,
-            NULL,
-            program_name,
-            program_version,
-            default_rrd_update_every,
-            default_rrd_history_entries,
-            default_rrd_memory_mode,
-            default_health_enabled,
-            default_rrdpush_enabled,
-            default_rrdpush_destination,
-            default_rrdpush_api_key,
-            default_rrdpush_send_charts_matching,
-            default_rrdpush_enable_replication,
-            default_rrdpush_seconds_to_replicate,
-            default_rrdpush_replication_step,
-            rrdhost_labels_to_system_info(parser->user.host_define.rrdlabels),
-            false
-            );
+        string2str(parser->user.host_define.hostname),
+        string2str(parser->user.host_define.hostname),
+        parser->user.host_define.machine_guid_str,
+        "Netdata Virtual Host 1.0",
+        netdata_configured_timezone,
+        netdata_configured_abbrev_timezone,
+        netdata_configured_utc_offset,
+        NULL,
+        program_name,
+        program_version,
+        default_rrd_update_every,
+        default_rrd_history_entries,
+        default_rrd_memory_mode,
+        default_health_enabled,
+        default_rrdpush_enabled,
+        default_rrdpush_destination,
+        default_rrdpush_api_key,
+        default_rrdpush_send_charts_matching,
+        default_rrdpush_enable_replication,
+        default_rrdpush_seconds_to_replicate,
+        default_rrdpush_replication_step,
+        rrdhost_labels_to_system_info(parser->user.host_define.rrdlabels),
+        false);
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
 
@@ -1412,6 +1411,14 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
     if(unlikely(!(parser->user.new_host_labels)))
         parser->user.new_host_labels = rrdlabels_create();
 
+    if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
+        int is_ephemeral = appconfig_test_boolean_value((char *) value);
+        if (is_ephemeral) {
+            RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
+            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+        }
+    }
+
     rrdlabels_add(parser->user.new_host_labels, name, store, str2l(label_source));
 
     if (allocated_store)
@@ -1430,6 +1437,8 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
         host->rrdlabels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
+    if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST))
+        rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdlabels_destroy(parser->user.new_host_labels);

@@ -1824,30 +1824,29 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
     /* We don't want to drop metrics when generating load, we prefer to block data generation itself */
 
     return rrdhost_find_or_create(
-            name
-            , name
-            , name
-            , os_type
-            , netdata_configured_timezone
-            , netdata_configured_abbrev_timezone
-            , netdata_configured_utc_offset
-            , ""
-            , program_name
-            , program_version
-            , default_rrd_update_every
-            , default_rrd_history_entries
-            , RRD_MEMORY_MODE_DBENGINE
-            , default_health_enabled
-            , default_rrdpush_enabled
-            , default_rrdpush_destination
-            , default_rrdpush_api_key
-            , default_rrdpush_send_charts_matching
-            , default_rrdpush_enable_replication
-            , default_rrdpush_seconds_to_replicate
-            , default_rrdpush_replication_step
-            , NULL
-            , 0
-    );
+        name,
+        name,
+        name,
+        os_type,
+        netdata_configured_timezone,
+        netdata_configured_abbrev_timezone,
+        netdata_configured_utc_offset,
+        "",
+        program_name,
+        program_version,
+        default_rrd_update_every,
+        default_rrd_history_entries,
+        RRD_MEMORY_MODE_DBENGINE,
+        default_health_enabled,
+        default_rrdpush_enabled,
+        default_rrdpush_destination,
+        default_rrdpush_api_key,
+        default_rrdpush_send_charts_matching,
+        default_rrdpush_enable_replication,
+        default_rrdpush_seconds_to_replicate,
+        default_rrdpush_replication_step,
+        NULL,
+        0);
 }
 
 // constants for test_dbengine
