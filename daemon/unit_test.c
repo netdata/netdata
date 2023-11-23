@@ -97,7 +97,7 @@ static int check_number_printing(void) {
     int i, failed = 0;
     for(i = 0; values[i].correct ; i++) {
         print_netdata_double(netdata, values[i].n);
-        snprintfz(system, 512, "%0.12" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)values[i].n);
+        snprintfz(system, sizeof(system) - 1, "%0.12" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)values[i].n);
 
         int ok = 1;
         if(strcmp(netdata, values[i].correct) != 0) {
@@ -319,7 +319,7 @@ void benchmark_storage_number(int loop, int multiplier) {
         for(i = 0; i < loop ;i++) {
             n *= multiplier;
             if(n > storage_number_positive_max) n = storage_number_positive_min;
-            snprintfz(buffer, 100, NETDATA_DOUBLE_FORMAT, n);
+            snprintfz(buffer, sizeof(buffer) - 1, NETDATA_DOUBLE_FORMAT, n);
         }
     }
 
@@ -507,7 +507,7 @@ int unit_test_buffer() {
 
     const char *fmt = "string1: %s\nstring2: %s\nstring3: %s\nstring4: %s";
     buffer_sprintf(wb, fmt, string, string, string, string);
-    snprintfz(final, 9000, fmt, string, string, string, string);
+    snprintfz(final, sizeof(final) - 1, fmt, string, string, string, string);
 
     const char *s = buffer_tostring(wb);
 
@@ -1272,7 +1272,7 @@ int run_test(struct test *test)
     default_rrd_update_every = test->update_every;
 
     char name[101];
-    snprintfz(name, 100, "unittest-%s", test->name);
+    snprintfz(name, sizeof(name) - 1, "unittest-%s", test->name);
 
     // create the chart
     RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1
@@ -1534,7 +1534,7 @@ int unit_test(long delay, long shift)
     repeat++;
 
     char name[101];
-    snprintfz(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
+    snprintfz(name, sizeof(name) - 1, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
     //debug_flags = 0xffffffff;
     default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
@@ -1870,7 +1870,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     char name[101];
 
     for (i = 0 ; i < CHARTS ; ++i) {
-        snprintfz(name, 100, "dbengine-chart-%d", i);
+        snprintfz(name, sizeof(name) - 1, "dbengine-chart-%d", i);
 
         // create the chart
         st[i] = rrdset_create(host, "netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest",
@@ -1878,7 +1878,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
         rrdset_flag_set(st[i], RRDSET_FLAG_DEBUG);
         rrdset_flag_set(st[i], RRDSET_FLAG_STORE_FIRST);
         for (j = 0 ; j < DIMS ; ++j) {
-            snprintfz(name, 100, "dim-%d", j);
+            snprintfz(name, sizeof(name) - 1, "dim-%d", j);
 
             rd[i][j] = rrddim_add(st[i], name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }

@@ -822,7 +822,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
 
     char buffer[2048 + 1];
-    snprintfz(buffer, 2048, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
+    snprintfz(buffer, sizeof(buffer) - 1, PLUGINSD_KEYWORD_REPLAY_CHART " \"%s\" \"%s\" %llu %llu\n",
               rrdset_id(st), r->wanted.start_streaming ? "true" : "false",
               (unsigned long long)r->wanted.after, (unsigned long long)r->wanted.before);
 

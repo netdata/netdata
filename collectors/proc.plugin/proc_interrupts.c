@@ -201,10 +201,10 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         for(c = 0; c < cpus ;c++) {
             if(unlikely(!core_st[c])) {
                 char id[50+1];
-                snprintfz(id, 50, "cpu%d_interrupts", c);
+                snprintfz(id, sizeof(id) - 1, "cpu%d_interrupts", c);
 
                 char title[100+1];
-                snprintfz(title, 100, "CPU Interrupts");
+                snprintfz(title, sizeof(title) - 1, "CPU Interrupts");
                 core_st[c] = rrdset_create_localhost(
                         "cpu"
                         , id
@@ -221,7 +221,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 );
 
                 char core[50+1];
-                snprintfz(core, 50, "cpu%d", c);
+                snprintfz(core, sizeof(core) - 1, "cpu%d", c);
                 rrdlabels_add(core_st[c]->rrdlabels, "cpu", core, RRDLABEL_SRC_AUTO);
             }
 

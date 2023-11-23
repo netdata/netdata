@@ -2514,7 +2514,7 @@ void *statsd_main(void *ptr) {
     }
     {
         char buffer[314 + 1];
-        snprintfz(buffer, 314, "%0.1f%%", statsd.histogram_percentile);
+        snprintfz(buffer, sizeof(buffer) - 1, "%0.1f%%", statsd.histogram_percentile);
         statsd.histogram_percentile_str = strdupz(buffer);
     }
 

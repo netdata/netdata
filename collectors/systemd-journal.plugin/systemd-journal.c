@@ -1564,7 +1564,7 @@ static void function_systemd_journal_progress(BUFFER *wb, const char *transactio
     buffer_json_member_add_uint64(wb, "running_duration_usec", duration_ut);
     buffer_json_member_add_double(wb, "progress", (double)file_working * 100.0 / (double)files_matched);
     char msg[1024 + 1];
-    snprintfz(msg, 1024,
+    snprintfz(msg, sizeof(msg) - 1,
               "Read %zu rows (%0.0f rows/s), "
               "data %0.1f MB (%0.1f MB/s), "
               "file %zu of %zu",

@@ -149,7 +149,7 @@ void analytics_log_prometheus(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
         analytics_data.prometheus_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.prometheus_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.prometheus_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, b);
     }
 }
@@ -162,7 +162,7 @@ void analytics_log_shell(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
         analytics_data.shell_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.shell_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.shell_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_shell_used, b);
     }
 }
@@ -175,7 +175,7 @@ void analytics_log_json(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
         analytics_data.json_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.json_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.json_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_json_used, b);
     }
 }
@@ -188,7 +188,7 @@ void analytics_log_dashboard(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
         analytics_data.dashboard_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.dashboard_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
     }
 }
@@ -198,7 +198,7 @@ void analytics_log_dashboard(void)
  */
 void analytics_report_oom_score(long long int score){
     char b[21];
-    snprintfz(b, 20, "%lld", score);
+    snprintfz(b, sizeof(b) - 1, "%lld", score);
     analytics_set_data(&analytics_data.netdata_config_oom_score, b);
 }
 
@@ -222,11 +222,11 @@ void analytics_mirrored_hosts(void)
     }
     rrd_unlock();
 
-    snprintfz(b, 20, "%zu", count);
+    snprintfz(b, sizeof(b) - 1, "%zu", count);
     analytics_set_data(&analytics_data.netdata_mirrored_host_count, b);
-    snprintfz(b, 20, "%zu", reachable);
+    snprintfz(b, sizeof(b) - 1, "%zu", reachable);
     analytics_set_data(&analytics_data.netdata_mirrored_hosts_reachable, b);
-    snprintfz(b, 20, "%zu", unreachable);
+    snprintfz(b, sizeof(b) - 1, "%zu", unreachable);
     analytics_set_data(&analytics_data.netdata_mirrored_hosts_unreachable, b);
 }
 
@@ -281,7 +281,7 @@ void analytics_collectors(void)
             .plugin = rrdset_plugin_name(st),
             .module = rrdset_module_name(st)
         };
-        snprintfz(name, 499, "%s:%s", col.plugin, col.module);
+        snprintfz(name, sizeof(name) - 1, "%s:%s", col.plugin, col.module);
         dictionary_set(dict, name, &col, sizeof(struct collector));
     }
     rrdset_foreach_done(st);
@@ -297,7 +297,7 @@ void analytics_collectors(void)
 
     {
         char b[21];
-        snprintfz(b, 20, "%d", ap.c);
+        snprintfz(b, sizeof(b) - 1, "%d", ap.c);
         analytics_set_data(&analytics_data.netdata_collectors_count, b);
     }
 
@@ -402,7 +402,7 @@ void analytics_charts(void)
     analytics_data.charts_count = c;
     {
         char b[21];
-        snprintfz(b, 20, "%zu", c);
+        snprintfz(b, sizeof(b) - 1, "%zu", c);
         analytics_set_data(&analytics_data.netdata_charts_count, b);
     }
 }
@@ -427,7 +427,7 @@ void analytics_metrics(void)
     analytics_data.metrics_count = dimensions;
     {
         char b[21];
-        snprintfz(b, 20, "%zu", dimensions);
+        snprintfz(b, sizeof(b) - 1, "%zu", dimensions);
         analytics_set_data(&analytics_data.netdata_metrics_count, b);
     }
 }
@@ -454,11 +454,11 @@ void analytics_alarms(void)
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
-    snprintfz(b, 20, "%zu", alarm_normal);
+    snprintfz(b, sizeof(b) - 1, "%zu", alarm_normal);
     analytics_set_data(&analytics_data.netdata_alarms_normal, b);
-    snprintfz(b, 20, "%zu", alarm_warn);
+    snprintfz(b, sizeof(b) - 1, "%zu", alarm_warn);
     analytics_set_data(&analytics_data.netdata_alarms_warning, b);
-    snprintfz(b, 20, "%zu", alarm_crit);
+    snprintfz(b, sizeof(b) - 1, "%zu", alarm_crit);
     analytics_set_data(&analytics_data.netdata_alarms_critical, b);
 }
 
@@ -540,19 +540,19 @@ void analytics_gather_mutable_meta_data(void)
 
     {
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.prometheus_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.prometheus_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, b);
 
-        snprintfz(b, 20, "%zu", analytics_data.shell_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.shell_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_shell_used, b);
 
-        snprintfz(b, 20, "%zu", analytics_data.json_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.json_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_json_used, b);
 
-        snprintfz(b, 20, "%zu", analytics_data.dashboard_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
 
-        snprintfz(b, 20, "%zu", rrdhost_hosts_available());
+        snprintfz(b, sizeof(b) - 1, "%zu", rrdhost_hosts_available());
         analytics_set_data(&analytics_data.netdata_config_hosts_available, b);
     }
 }
@@ -664,10 +664,10 @@ void set_late_global_environment(struct rrdhost_system_info *system_info)
 #ifdef ENABLE_DBENGINE
     {
         char b[16];
-        snprintfz(b, 15, "%d", default_rrdeng_page_cache_mb);
+        snprintfz(b, sizeof(b) - 1, "%d", default_rrdeng_page_cache_mb);
         analytics_set_data(&analytics_data.netdata_config_page_cache_size, b);
 
-        snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
+        snprintfz(b, sizeof(b) - 1, "%d", default_multidb_disk_quota_mb);
         analytics_set_data(&analytics_data.netdata_config_multidb_disk_quota, b);
     }
 #endif
@@ -827,7 +827,7 @@ void get_system_timezone(void)
 void set_global_environment() {
     {
         char b[16];
-        snprintfz(b, 15, "%d", default_rrd_update_every);
+        snprintfz(b, sizeof(b) - 1, "%d", default_rrd_update_every);
         setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 

@@ -1038,7 +1038,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                         );
 
                         char corebuf[50+1];
-                        snprintfz(corebuf, 50, "cpu%zu", core);
+                        snprintfz(corebuf, sizeof(corebuf) - 1, "cpu%zu", core);
                         rrdlabels_add(cpuidle_charts[core].st->rrdlabels, "cpu", corebuf, RRDLABEL_SRC_AUTO);
 
                         char cpuidle_dim_id[RRD_ID_LENGTH_MAX + 1];

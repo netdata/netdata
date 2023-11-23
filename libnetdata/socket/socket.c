@@ -240,16 +240,16 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 
     switch(family) {
         case AF_INET:
-            snprintfz(buffer, 100, "%s:%s:%d", protocol, ip, port);
+            snprintfz(buffer, sizeof(buffer) - 1, "%s:%s:%d", protocol, ip, port);
             break;
 
         case AF_INET6:
         default:
-            snprintfz(buffer, 100, "%s:[%s]:%d", protocol, ip, port);
+            snprintfz(buffer, sizeof(buffer) - 1, "%s:[%s]:%d", protocol, ip, port);
             break;
 
         case AF_UNIX:
-            snprintfz(buffer, 100, "%s:%s", protocol, ip);
+            snprintfz(buffer, sizeof(buffer) - 1, "%s:%s", protocol, ip);
             break;
     }
 

@@ -211,7 +211,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             );
             for (o = 0; o < pageorders_cnt; o++) {
                 char id[3+1];
-                snprintfz(id, 3, "%lu", o);
+                snprintfz(id, sizeof(id) - 1, "%lu", o);
 
                 char name[20+1];
                 dim_name(name, o, pagesize);
@@ -234,7 +234,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
             // "pagetype Node" + NUMA-NodeId + ZoneName + TypeName
             char setid[13+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME+1];
-            snprintfz(setid, 13+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME, "pagetype_Node%d_%s_%s", pgl->node, pgl->zone, pgl->type);
+            snprintfz(setid, sizeof(setid) - 1, "pagetype_Node%d_%s_%s", pgl->node, pgl->zone, pgl->type);
 
             // Skip explicitly refused charts
             if (simple_pattern_matches(filter_types, setid))
@@ -260,14 +260,14 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             );
 
             char node[50+1];
-            snprintfz(node, 50, "node%d", pgl->node);
+            snprintfz(node, sizeof(node) - 1, "node%d", pgl->node);
             rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_id", node, RRDLABEL_SRC_AUTO);
             rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_zone", pgl->zone, RRDLABEL_SRC_AUTO);
             rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_type", pgl->type, RRDLABEL_SRC_AUTO);
 
             for (o = 0; o < pageorders_cnt; o++) {
                 char dimid[3+1];
-                snprintfz(dimid, 3, "%lu", o);
+                snprintfz(dimid, sizeof(dimid) - 1, "%lu", o);
                 char dimname[20+1];
                 dim_name(dimname, o, pagesize);
 

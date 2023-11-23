@@ -392,9 +392,9 @@ static void ebpf_create_fs_charts(int update_every)
         ebpf_filesystem_partitions_t *efp = &localfs[i];
         uint32_t flags = efp->flags;
         if (flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION && !(flags & test)) {
-            snprintfz(title, 255, "%s latency for each read request.", efp->filesystem);
-            snprintfz(family, 63, "%s_latency", efp->family);
-            snprintfz(chart_name, 63, "%s_read_latency", efp->filesystem);
+            snprintfz(title, sizeof(title) - 1, "%s latency for each read request.", efp->filesystem);
+            snprintfz(family, sizeof(family) - 1, "%s_latency", efp->family);
+            snprintfz(chart_name, sizeof(chart_name) - 1, "%s_read_latency", efp->filesystem);
             efp->hread.name = strdupz(chart_name);
             efp->hread.title = strdupz(title);
             efp->hread.ctx = NULL;
@@ -410,8 +410,8 @@ static void ebpf_create_fs_charts(int update_every)
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
-            snprintfz(title, 255, "%s latency for each write request.", efp->filesystem);
-            snprintfz(chart_name, 63, "%s_write_latency", efp->filesystem);
+            snprintfz(title, sizeof(title) - 1, "%s latency for each write request.", efp->filesystem);
+            snprintfz(chart_name, sizeof(chart_name) - 1, "%s_write_latency", efp->filesystem);
             efp->hwrite.name = strdupz(chart_name);
             efp->hwrite.title = strdupz(title);
             efp->hwrite.ctx = NULL;
@@ -425,8 +425,8 @@ static void ebpf_create_fs_charts(int update_every)
                               update_every, NETDATA_EBPF_MODULE_NAME_FILESYSTEM);
             order++;
 
-            snprintfz(title, 255, "%s latency for each open request.", efp->filesystem);
-            snprintfz(chart_name, 63, "%s_open_latency", efp->filesystem);
+            snprintfz(title, sizeof(title) - 1, "%s latency for each open request.", efp->filesystem);
+            snprintfz(chart_name, sizeof(chart_name) - 1, "%s_open_latency", efp->filesystem);
             efp->hopen.name = strdupz(chart_name);
             efp->hopen.title = strdupz(title);
             efp->hopen.ctx = NULL;
@@ -441,9 +441,9 @@ static void ebpf_create_fs_charts(int update_every)
             order++;
 
             char *type = (efp->flags & NETDATA_FILESYSTEM_ATTR_CHARTS) ? "attribute" : "sync";
-            snprintfz(title, 255, "%s latency for each %s request.", efp->filesystem, type);
-            snprintfz(chart_name, 63, "%s_%s_latency", efp->filesystem, type);
-            snprintfz(ctx, 63, "filesystem.%s_latency", type);
+            snprintfz(title, sizeof(title) - 1, "%s latency for each %s request.", efp->filesystem, type);
+            snprintfz(chart_name, sizeof(chart_name) - 1, "%s_%s_latency", efp->filesystem, type);
+            snprintfz(ctx, sizeof(ctx) - 1, "filesystem.%s_latency", type);
             efp->hadditional.name = strdupz(chart_name);
             efp->hadditional.title = strdupz(title);
             efp->hadditional.ctx = strdupz(ctx);

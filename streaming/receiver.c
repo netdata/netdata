@@ -835,7 +835,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     {
         char msg[100 + 1];
-        snprintfz(msg, 100, "disconnected (completed %zu updates)", count);
+        snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
         rrdpush_receive_log_status(
                 rpt, msg,
                 RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
