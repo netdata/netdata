@@ -334,6 +334,10 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-ml)}" | sed 's/$/ --enable-ml/g')"
       NETDATA_ENABLE_ML=1
       ;;
+    "--disable-ml")
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
+      NETDATA_ENABLE_ML=0
+      ;;
     "--enable-gtests")
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-gtests)}" | sed 's/$/ --enable-gtests/g')"
       NETDATA_ENABLE_GTESTS=1
