@@ -68,11 +68,11 @@ The following log collectors are supported at the moment. The table will be upda
 
 </a>
 
-Since version `XXXXX`, Netdata is distributed with logs management functionality as an external plugin, but it is disabled by default and must be explicitly enabled at runtime by running `./edit-config logsmanagement.d.conf` and changing the respective configuration option:
+Since version `XXXXX`, Netdata is distributed with logs management functionality as an external plugin, but it is disabled by default and must be explicitly enabled using `./edit-config netdata.conf` and changing the respective configuration option:
 
 ```
-[global]
-	enabled = yes
+[plugins]
+	logs-management = yes
 ```
 
 There are some pre-configured log sources that Netdata will attempt to automatically discover and monitor that can be edited using `./edit-config logsmanagement.d/default.conf` in Netdata's configuration directory. More sources can be configured for monitoring by adding them in `logsmanagement.d/default.conf` or in other `.conf` files in the `logsmanagement.d` directory.
@@ -106,7 +106,6 @@ There are some fundamental configuration options that are common to all log coll
 
 |  Configuration Option | Default 		| Description  |
 |      :------------:  	| :------------:  | ------------ |
-| `enabled` | `no` 		| Whether this log source will be monitored or not.
 | `update every` 		| Equivalent value in `logsmanagement.d.conf` (or in `netdata.conf` under `[plugin:logs-management]`, if higher). | How often metrics in charts will be updated every (in seconds).
 | `update timeout` 		| Equivalent value in `[logs management]` section of `netdata.conf` (or Netdata global value, if higher). | Maximum timeout charts may be delayed by while waiting for new logs.
 | `use log timestamp` 	| Equivalent value in `logsmanagement.d.conf` (`auto` by default). | If set to `auto`, log timestamps (when available) will be used for precise metrics aggregation. Otherwise (if set to `no`), collection timestamps will be used instead (which may result in lagged metrics under heavy system load, but it will reduce CPU usage).

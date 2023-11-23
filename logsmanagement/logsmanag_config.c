@@ -234,9 +234,8 @@ void p_file_info_destroy_all(void){
 /**
  * @brief Load logs management configuration.
  * @returns  0 if success, 
- *          -1 if disabled in global config, 
- *          -2 if config file not found
- *          -3 if p_flb_srvc_config if is NULL (no flb_srvc_config_t provided)
+ *          -1 if config file not found
+ *          -2 if p_flb_srvc_config if is NULL (no flb_srvc_config_t provided)
  */
 int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config, 
                             Flb_socket_config_t **forward_in_config_p,
@@ -275,15 +274,6 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
     /* [global] section */
 
     snprintfz(section, 100, "global");
-
-    if(!appconfig_get_boolean(
-            &logsmanagement_d_conf, 
-            section, 
-            "enabled", 
-            ENABLE_LOGS_MANAGEMENT_DEFAULT)){
-        collector_info("CONFIG: Logs management disabled due to configuration option.");
-        rc = LOGS_MANAG_CONFIG_LOAD_ERROR_DISABLED;
-    }
 
     g_logs_manag_config.update_every = appconfig_get_number(
         &logsmanagement_d_conf, 

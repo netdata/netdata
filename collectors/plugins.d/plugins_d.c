@@ -239,6 +239,13 @@ void *pluginsd_main(void *ptr)
 
     // disable some plugins by default
     config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
+    config_get_boolean(CONFIG_SECTION_PLUGINS, "logs-management", 
+#if defined(LOGS_MANAGEMENT_STRESS_TEST)
+        CONFIG_BOOLEAN_YES
+#else 
+        CONFIG_BOOLEAN_NO
+#endif
+    );
     // it crashes (both threads) on Alpine after we made it multi-threaded
     // works with "--device /dev/ipmi0", but this is not default
     // see https://github.com/netdata/netdata/pull/15564 for details

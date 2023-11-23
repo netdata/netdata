@@ -18,9 +18,8 @@ char *get_cache_dir(void);
 void p_file_info_destroy_all(void);
 
 #define LOGS_MANAG_CONFIG_LOAD_ERROR_OK                  0
-#define LOGS_MANAG_CONFIG_LOAD_ERROR_DISABLED           -1
-#define LOGS_MANAG_CONFIG_LOAD_ERROR_NO_STOCK_CONFIG    -2
-#define LOGS_MANAG_CONFIG_LOAD_ERROR_P_FLB_SRVC_NULL    -3
+#define LOGS_MANAG_CONFIG_LOAD_ERROR_NO_STOCK_CONFIG    -1
+#define LOGS_MANAG_CONFIG_LOAD_ERROR_P_FLB_SRVC_NULL    -2
 
 int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config, 
                             Flb_socket_config_t **forward_in_config_p,

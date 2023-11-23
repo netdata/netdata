@@ -634,8 +634,7 @@ static int test_logsmanag_config_funcs(){
     rc = logs_manag_config_load(&flb_srvc_config, &p_forward_in_config, 1);
     UNSUPRESS_STDERR();
 
-    if( LOGS_MANAG_CONFIG_LOAD_ERROR_OK != rc && 
-        LOGS_MANAG_CONFIG_LOAD_ERROR_DISABLED != rc){
+    if( LOGS_MANAG_CONFIG_LOAD_ERROR_OK != rc){
         fprintf(stderr, "- Error, logs_manag_config_load() returns %d.\n", rc);
         ++errors;
     }

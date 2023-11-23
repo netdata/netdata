@@ -15,12 +15,6 @@
 #define MiB * 1048576ULL
 #define GiB * 1073741824ULL
 
-#if !defined(LOGS_MANAGEMENT_STRESS_TEST)
-#define ENABLE_LOGS_MANAGEMENT_DEFAULT CONFIG_BOOLEAN_NO        /**< Whether to enable or not logs management in netdata.conf by default **/
-#else 
-#define ENABLE_LOGS_MANAGEMENT_DEFAULT CONFIG_BOOLEAN_YES       /**< Whether to enable or not logs management in netdata.conf by default, if stress tests are enabled */
-#endif
-
 #define MAX_LOG_MSG_SIZE 50 MiB                                 /**< Maximum allowable log message size (in Bytes) to be stored in message queue and DB. **/
 
 #define MAX_CUS_CHARTS_PER_SOURCE 100                           /**< Hard limit of maximum custom charts per log source **/
