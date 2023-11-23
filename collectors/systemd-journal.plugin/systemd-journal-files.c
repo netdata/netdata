@@ -217,6 +217,9 @@ static void journal_file_update_header(const char *filename, struct journal_file
     jf->msg_first_ut = first_ut;
     jf->msg_last_ut = last_ut;
 
+    if(!jf->msg_last_ut)
+        jf->msg_last_ut = jf->file_last_modified_ut;
+
     if(last_seqnum > first_seqnum) {
         if(!sd_id128_equal(first_writer_id, last_writer_id)) {
             jf->messages_in_file = 0;
@@ -230,8 +233,8 @@ static void journal_file_update_header(const char *filename, struct journal_file
     else
         jf->messages_in_file = 0;
 
-    if(!jf->messages_in_file)
-        journal_file_get_header_from_journalctl(filename, jf);
+//    if(!jf->messages_in_file)
+//        journal_file_get_header_from_journalctl(filename, jf);
 }
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
@@ -601,12 +604,21 @@ int journal_file_dict_items_backward_compar(const void *a, const void *b) {
     struct journal_file *jfa = dictionary_acquired_item_value(*ad);
     struct journal_file *jfb = dictionary_acquired_item_value(*bd);
 
+    // compare the last message timestamps
     if(jfa->msg_last_ut < jfb->msg_last_ut)
         return 1;
 
     if(jfa->msg_last_ut > jfb->msg_last_ut)
         return -1;
 
+    // compare the file last modification timestamps
+    if(jfa->file_last_modified_ut < jfb->file_last_modified_ut)
+        return 1;
+
+    if(jfa->file_last_modified_ut > jfb->file_last_modified_ut)
+        return -1;
+
+    // compare the first message timestamps
     if(jfa->msg_first_ut < jfb->msg_first_ut)
         return 1;
 
