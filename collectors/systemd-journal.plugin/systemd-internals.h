@@ -61,6 +61,7 @@ struct journal_file {
     bool logged_journalctl_failure;
     usec_t max_journal_vs_realtime_delta_ut;
 
+    usec_t last_scan_header_ut;
     uint64_t first_seqnum;
     uint64_t last_seqnum;
     sd_id128_t first_writer_id;

@@ -109,7 +109,7 @@ static void journal_file_get_header_from_journalctl(const char *filename, struct
     }
 }
 
-static void journal_file_update_from_header(const char *filename, struct journal_file *jf) {
+static void journal_file_update_header(const char *filename, struct journal_file *jf) {
     fstat_cache_enable_on_thread();
 
     const char *files[2] = {
@@ -325,15 +325,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
     else
         jf->source_type |= SDJF_LOCAL_ALL | SDJF_LOCAL_OTHER;
 
-    journal_file_update_from_header(jf->filename, jf);
-
-    internal_error(true,
-            "found journal file '%s', type %d, source '%s', "
-            "file modified: %"PRIu64", "
-            "msg {first: %"PRIu64", last: %"PRIu64"}",
-            jf->filename, jf->source_type, jf->source ? string2str(jf->source) : "<unset>",
-            jf->file_last_modified_ut,
-            jf->msg_first_ut, jf->msg_last_ut);
+    jf->msg_last_ut = jf->file_last_modified_ut;
 }
 
 static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -347,16 +339,7 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
         jf->file_last_modified_ut = njf->file_last_modified_ut;
         jf->size = njf->size;
 
-        const char *filename = dictionary_acquired_item_name(item);
-        journal_file_update_from_header(filename, jf);
-
-//        internal_error(true,
-//                "updated journal file '%s', type %d, "
-//                "file modified: %"PRIu64", "
-//                                        "msg {first: %"PRIu64", last: %"PRIu64"}",
-//                filename, jf->source_type,
-//                jf->file_last_modified_ut,
-//                jf->msg_first_ut, jf->msg_last_ut);
+        jf->msg_last_ut = jf->file_last_modified_ut;
     }
 
     return false;
@@ -555,6 +538,19 @@ bool journal_files_completed_once(void) {
     return journal_files_scans > 0;
 }
 
+static int journal_file_dict_items_last_modified_compar(const void *a, const void *b) {
+    const DICTIONARY_ITEM **ad = (const DICTIONARY_ITEM **)a, **bd = (const DICTIONARY_ITEM **)b;
+    struct journal_file *jfa = dictionary_acquired_item_value(*ad);
+    struct journal_file *jfb = dictionary_acquired_item_value(*bd);
+
+    if(jfa->file_last_modified_ut > jfb->file_last_modified_ut)
+        return -1;
+    else if(jfa->file_last_modified_ut < jfb->file_last_modified_ut)
+        return 1;
+
+    return 0;
+}
+
 void journal_files_registry_update(void) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
@@ -568,12 +564,30 @@ void journal_files_registry_update(void) {
             journal_directory_scan(journal_directories[i].path, 0, scan_ut);
         }
 
+        const DICTIONARY_ITEM *file_items[dictionary_entries(journal_files_registry)];
+        size_t files_used = 0;
+
         struct journal_file *jf;
         dfe_start_write(journal_files_registry, jf){
-                    if(jf->last_scan_ut < scan_ut)
-                        dictionary_del(journal_files_registry, jf_dfe.name);
-                }
+            if(jf->last_scan_ut < scan_ut)
+                dictionary_del(journal_files_registry, jf_dfe.name);
+            else if(jf->last_scan_header_ut < jf->file_last_modified_ut)
+                file_items[files_used++] = dictionary_acquired_item_dup(journal_files_registry, jf_dfe.item);
+        }
         dfe_done(jf);
+
+        // sort them in reverse order (newer first)
+        qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
+              journal_file_dict_items_last_modified_compar);
+
+        // update the header (first and last message ut, sequence numbers, etc)
+        for(size_t i = 0; i < files_used ; i++) {
+            jf = dictionary_acquired_item_value(file_items[i]);
+            journal_file_update_header(jf->filename, jf);
+            jf->last_scan_header_ut = jf->file_last_modified_ut;
+            dictionary_acquired_item_release(journal_files_registry, file_items[i]);
+            send_newline_and_flush();
+        }
 
         journal_files_scans++;
         spinlock_unlock(&spinlock);
