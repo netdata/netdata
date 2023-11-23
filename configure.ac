@@ -1231,6 +1231,11 @@ if test "${have_sd_journal_restart_fields}" = "yes"; then
     AC_DEFINE([HAVE_SD_JOURNAL_RESTART_FIELDS], [1], [sd_journal_restart_fields usability])
 fi
 
+AC_CHECK_LIB([systemd], [sd_journal_get_seqnum], [have_sd_journal_get_seqnum=yes], [have_sd_journal_get_seqnum=no])
+if test "${have_sd_journal_get_seqnum}" = "yes"; then
+    AC_DEFINE([HAVE_SD_JOURNAL_GET_SEQNUM], [1], [sd_journal_get_seqnum usability])
+fi
+
 AC_CHECK_LIB([systemd], [sd_bus_default_system, sd_bus_call_method, sd_bus_message_enter_container, sd_bus_message_read, sd_bus_message_exit_container],
              [SYSTEMD_DBUS_FOUND=yes],
              [SYSTEMD_DBUS_FOUND=no])

@@ -58,7 +58,15 @@ struct journal_file {
     usec_t last_scan_ut;
     size_t size;
     bool logged_failure;
+    bool logged_journalctl_failure;
     usec_t max_journal_vs_realtime_delta_ut;
+
+    uint64_t first_seqnum;
+    uint64_t last_seqnum;
+    sd_id128_t first_writer_id;
+    sd_id128_t last_writer_id;
+
+    uint64_t messages_in_file;
 };
 
 #define SDJF_SOURCE_ALL_NAME "all"

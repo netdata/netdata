@@ -1696,6 +1696,30 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
+
+BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_length) {
+    BUFFER *wb = buffer_create(0, NULL);
+
+    pid_t pid;
+    FILE *fp = netdata_popen(command, &pid, NULL);
+
+    if(fp) {
+        char buffer[max_line_length + 1];
+        while (fgets(buffer, max_line_length, fp)) {
+            buffer[max_line_length] = '\0';
+            buffer_strcat(wb, buffer);
+        }
+    }
+    else {
+        buffer_free(wb);
+        netdata_log_error("Failed to execute command '%s'.", command);
+        return NULL;
+    }
+
+    netdata_pclose(NULL, fp, pid);
+    return wb;
+}
+
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
     pid_t pid;
     FILE *fp = netdata_popen(command, &pid, NULL);

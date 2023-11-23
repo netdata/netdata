@@ -471,6 +471,8 @@ static size_t sampling_file_estimate_remaining_lines(FUNCTION_QUERY_STATUS *fqs,
 
     // Estimate the total number of lines in the file
     size_t total_lines_estimated = (size_t)((double)scanned_lines / time_proportion);
+    if(jf->messages_in_file && total_lines_estimated > jf->messages_in_file)
+        total_lines_estimated = jf->messages_in_file;
 
     // Calculate the estimated number of remaining lines
     size_t expected_lines = total_lines_estimated - scanned_lines;

@@ -26,7 +26,90 @@ void buffer_json_journal_versions(BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-static void journal_file_update_msg_ut(const char *filename, struct journal_file *jf) {
+static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret) {
+    while(isspace(*in))
+        in++;
+
+    char uuid[33];
+    strncpyz(uuid, in, 32);
+    uuid[32] = '\0';
+
+    if(strlen(uuid) == 32) {
+        sd_id128_t read;
+        if(sd_id128_from_string(uuid, &read) == 0) {
+            *ret = read;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void journal_file_get_header_from_journalctl(const char *filename, struct journal_file *jf) {
+    bool read_writer = false, read_head = false, read_tail = false;
+
+    char cmd[FILENAME_MAX * 2];
+    snprintfz(cmd, sizeof(cmd), "journalctl --header --file '%s'", filename);
+    CLEAN_BUFFER *wb = run_command_and_get_output_to_buffer(cmd, 1024);
+    if(wb) {
+        const char *s = buffer_tostring(wb);
+
+        const char *sequential_id_header = "Sequential Number ID:";
+        const char *sequential_id_data = strcasestr(s, sequential_id_header);
+        if(sequential_id_data) {
+            sequential_id_data += strlen(sequential_id_header);
+            if(journal_sd_id128_parse(sequential_id_data, &jf->first_writer_id))
+                read_writer = true;
+        }
+
+        const char *head_sequential_number_header = "Head sequential number:";
+        const char *head_sequential_number_data = strcasestr(s, head_sequential_number_header);
+        if(head_sequential_number_data) {
+            head_sequential_number_data += strlen(head_sequential_number_header);
+
+            while(isspace(*head_sequential_number_data))
+                head_sequential_number_data++;
+
+            if(isdigit(*head_sequential_number_data)) {
+                jf->first_seqnum = strtoul(head_sequential_number_data, NULL, 10);
+                if(jf->first_seqnum)
+                    read_head = true;
+            }
+        }
+
+        const char *tail_sequential_number_header = "Tail sequential number:";
+        const char *tail_sequential_number_data = strcasestr(s, tail_sequential_number_header);
+        if(tail_sequential_number_data) {
+            tail_sequential_number_data += strlen(tail_sequential_number_header);
+
+            while(isspace(*tail_sequential_number_data))
+                tail_sequential_number_data++;
+
+            if(isdigit(*tail_sequential_number_data)) {
+                jf->last_seqnum = strtoul(tail_sequential_number_data, NULL, 10);
+                if(jf->last_seqnum)
+                    read_tail = true;
+            }
+        }
+
+        if(read_head && read_tail && jf->last_seqnum > jf->first_seqnum)
+            jf->messages_in_file = jf->last_seqnum - jf->first_seqnum;
+    }
+
+    if(!jf->logged_journalctl_failure && (!read_head || !read_head || !read_tail)) {
+
+        nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
+               "Failed to read %s%s%s from journalctl's output on filename '%s', using the command: %s",
+               read_writer?"":"writer id,",
+               read_head?"":"head id,",
+               read_tail?"":"tail id,",
+               filename, cmd);
+
+        jf->logged_journalctl_failure = true;
+    }
+}
+
+static void journal_file_update_from_header(const char *filename, struct journal_file *jf) {
     fstat_cache_enable_on_thread();
 
     const char *files[2] = {
@@ -50,16 +133,36 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
     }
 
     usec_t first_ut = 0, last_ut = 0;
+    uint64_t first_seqnum = 0, last_seqnum = 0;
+    sd_id128_t first_writer_id = SD_ID128_NULL, last_writer_id = SD_ID128_NULL;
 
     if(sd_journal_seek_head(j) < 0 || sd_journal_next(j) < 0 || sd_journal_get_realtime_usec(j, &first_ut) < 0 || !first_ut) {
         internal_error(true, "cannot find the timestamp of the first message in '%s'", filename);
         first_ut = 0;
     }
+#ifdef HAVE_SD_JOURNAL_GET_SEQNUM
+    else {
+        if(sd_journal_get_seqnum(j, &first_seqnum, &first_writer_id) < 0 || !first_seqnum) {
+            internal_error(true, "cannot find the first seqnums of the first message in '%s'", filename);
+            first_seqnum = 0;
+            memset(&first_writer_id, 0, sizeof(first_writer_id));
+        }
+    }
+#endif
 
     if(sd_journal_seek_tail(j) < 0 || sd_journal_previous(j) < 0 || sd_journal_get_realtime_usec(j, &last_ut) < 0 || !last_ut) {
         internal_error(true, "cannot find the timestamp of the last message in '%s'", filename);
         last_ut = jf->file_last_modified_ut;
     }
+#ifdef HAVE_SD_JOURNAL_GET_SEQNUM
+    else {
+        if(sd_journal_get_seqnum(j, &last_seqnum, &last_writer_id) < 0 || !last_seqnum) {
+            internal_error(true, "cannot find the last seqnums of the first message in '%s'", filename);
+            last_seqnum = 0;
+            memset(&last_writer_id, 0, sizeof(last_writer_id));
+        }
+    }
+#endif
 
     sd_journal_close(j);
     fstat_cache_disable_on_thread();
@@ -71,8 +174,64 @@ static void journal_file_update_msg_ut(const char *filename, struct journal_file
         last_ut = t;
     }
 
+    if(!first_seqnum || !first_ut) {
+        // extract these from the filename - if possible
+
+        const char *at = strchr(filename, '@');
+        if(at) {
+            const char *dash_seqnum = strchr(at + 1, '-');
+            if(dash_seqnum) {
+                const char *dash_first_msg_ut = strchr(dash_seqnum + 1, '-');
+                if(dash_first_msg_ut) {
+                    const char *dot_journal = strstr(dash_first_msg_ut + 1, ".journal");
+                    if(dot_journal) {
+                        if(dash_seqnum - at - 1 == 32 &&
+                            dash_first_msg_ut - dash_seqnum - 1 == 16 &&
+                            dot_journal - dash_first_msg_ut - 1 == 16) {
+                            sd_id128_t writer;
+                            if(journal_sd_id128_parse(at + 1, &writer)) {
+                                char *endptr = NULL;
+                                uint64_t seqnum = strtoul(dash_seqnum + 1, &endptr, 16);
+                                if(endptr == dash_first_msg_ut) {
+                                    uint64_t ts = strtoul(dash_first_msg_ut + 1, &endptr, 16);
+                                    if(endptr == dot_journal) {
+                                        first_seqnum = seqnum;
+                                        first_writer_id = writer;
+                                        first_ut = ts;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    jf->first_seqnum = first_seqnum;
+    jf->last_seqnum = last_seqnum;
+
+    jf->first_writer_id = first_writer_id;
+    jf->last_writer_id = last_writer_id;
+
     jf->msg_first_ut = first_ut;
     jf->msg_last_ut = last_ut;
+
+    if(last_seqnum > first_seqnum) {
+        if(!sd_id128_equal(first_writer_id, last_writer_id)) {
+            jf->messages_in_file = 0;
+            nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
+                    "The writers of the first and the last message in file '%s' differ."
+                   , filename);
+        }
+        else
+            jf->messages_in_file = last_seqnum - first_seqnum + 1;
+    }
+    else
+        jf->messages_in_file = 0;
+
+    if(!jf->messages_in_file)
+        journal_file_get_header_from_journalctl(filename, jf);
 }
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
@@ -166,7 +325,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
     else
         jf->source_type |= SDJF_LOCAL_ALL | SDJF_LOCAL_OTHER;
 
-    journal_file_update_msg_ut(jf->filename, jf);
+    journal_file_update_from_header(jf->filename, jf);
 
     internal_error(true,
             "found journal file '%s', type %d, source '%s', "
@@ -189,7 +348,7 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
         jf->size = njf->size;
 
         const char *filename = dictionary_acquired_item_name(item);
-        journal_file_update_msg_ut(filename, jf);
+        journal_file_update_from_header(filename, jf);
 
 //        internal_error(true,
 //                "updated journal file '%s', type %d, "
