@@ -46,6 +46,9 @@ static bool journal_sd_id128_parse(const char *in, sd_id128_t *ret) {
 }
 
 static void journal_file_get_header_from_journalctl(const char *filename, struct journal_file *jf) {
+    // unfortunately, our capabilities are not inheritted by journalctl
+    // so, it fails to give us the information we need.
+
     bool read_writer = false, read_head = false, read_tail = false;
 
     char cmd[FILENAME_MAX * 2];
@@ -329,6 +332,8 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
         jf->source_type |= SDJF_LOCAL_ALL | SDJF_LOCAL_OTHER;
 
     jf->msg_last_ut = jf->file_last_modified_ut;
+
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file added '%s'", jf->filename);
 }
 
 static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -343,6 +348,7 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
         jf->size = njf->size;
 
         jf->msg_last_ut = jf->file_last_modified_ut;
+        nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file updated '%s'", jf->filename);
     }
 
     return false;
@@ -589,6 +595,7 @@ void journal_files_registry_update(void) {
             journal_file_update_header(jf->filename, jf);
             jf->last_scan_header_ut = jf->file_last_modified_ut;
             dictionary_acquired_item_release(journal_files_registry, file_items[i]);
+            nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file header updated '%s'", jf->filename);
             send_newline_and_flush();
         }
 

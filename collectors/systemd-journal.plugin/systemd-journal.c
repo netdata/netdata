@@ -613,7 +613,7 @@ static inline sampling_t is_row_in_sample(sd_journal *j, FUNCTION_QUERY_STATUS *
     if(fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
         double progress_by_time = sampling_running_file_query_progress_by_time(fqs, jf, direction, msg_ut);
 
-        if(progress_by_time > 0.01)
+        if(progress_by_time > 0.05)
             return SAMPLING_STOP_AND_ESTIMATE;
     }
 
@@ -1084,8 +1084,13 @@ static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
     if((fqs->source_type == SDJF_NONE && !fqs->sources) || (jf->source_type & fqs->source_type) ||
        (fqs->sources && simple_pattern_matches(fqs->sources, string2str(jf->source)))) {
 
+        if(!jf->msg_last_ut || !jf->msg_last_ut)
+            // the file is not scanned yet, or the timestamps have not been updated,
+            // so we don't know if it can contribute or not - let's add it.
+            return true;
+
         usec_t anchor_delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
-        usec_t first_ut = jf->msg_first_ut;
+        usec_t first_ut = jf->msg_first_ut - anchor_delta;
         usec_t last_ut = jf->msg_last_ut + anchor_delta;
 
         if(last_ut >= fqs->after_ut && first_ut <= fqs->before_ut)
