@@ -494,26 +494,26 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
     size_t remaining_logs_by_time = expected_matching_logs_by_time - scanned_lines;
     if (remaining_logs_by_time < 1) remaining_logs_by_time = 1;
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO,
-           "JOURNAL ESTIMATION: '%s' "
-           "scanned_lines=%zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
-           "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
-           "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
-           "first message read from the file at %"PRIu64", current message at %"PRIu64", "
-           "proportion of time %.2f %%, "
-           "expected total lines in file %zu, "
-           "remaining lines %zu, "
-           "remaining time %"PRIu64" [%"PRIu64" - %"PRIu64", duration %"PRId64"]"
-           , jf->filename
-           , scanned_lines, fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
-           , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
-           , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
-           , fqs->query_file.first_msg_ut, msg_ut
-           , proportion_by_time * 100.0
-           , expected_matching_logs_by_time
-           , remaining_logs_by_time
-           , remaining_time_ut, remaining_start_ut, remaining_end_ut, remaining_end_ut - remaining_start_ut
-           );
+//    nd_log(NDLS_COLLECTORS, NDLP_INFO,
+//           "JOURNAL ESTIMATION: '%s' "
+//           "scanned_lines=%zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
+//           "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
+//           "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
+//           "first message read from the file at %"PRIu64", current message at %"PRIu64", "
+//           "proportion of time %.2f %%, "
+//           "expected total lines in file %zu, "
+//           "remaining lines %zu, "
+//           "remaining time %"PRIu64" [%"PRIu64" - %"PRIu64", duration %"PRId64"]"
+//           , jf->filename
+//           , scanned_lines, fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
+//           , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
+//           , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
+//           , fqs->query_file.first_msg_ut, msg_ut
+//           , proportion_by_time * 100.0
+//           , expected_matching_logs_by_time
+//           , remaining_logs_by_time
+//           , remaining_time_ut, remaining_start_ut, remaining_end_ut, remaining_end_ut - remaining_start_ut
+//           );
 
     return remaining_logs_by_time;
 }
@@ -1186,17 +1186,17 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
         ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file(filename, wb, facets, jf, fqs);
 
-        nd_log(NDLS_COLLECTORS, NDLP_INFO,
-               "JOURNAL ESTIMATION FINAL: '%s' "
-               "total lines %zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
-               "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
-               "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
-               , jf->filename
-               , fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled + fqs->samples_per_file.estimated
-               , fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
-               , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
-               , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
-        );
+//        nd_log(NDLS_COLLECTORS, NDLP_INFO,
+//               "JOURNAL ESTIMATION FINAL: '%s' "
+//               "total lines %zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
+//               "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
+//               "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
+//               , jf->filename
+//               , fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled + fqs->samples_per_file.estimated
+//               , fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
+//               , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
+//               , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
+//        );
 
         rows_useful = fqs->rows_useful - rows_useful;
         rows_read = fqs->rows_read - rows_read;
