@@ -1553,7 +1553,6 @@ static void function_systemd_journal_progress(BUFFER *wb, const char *transactio
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
     fstat_thread_calls = 0;
     fstat_thread_cached_responses = 0;
-    journal_files_registry_update();
 
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);

@@ -55,13 +55,14 @@ struct journal_file {
     usec_t file_last_modified_ut;
     usec_t msg_first_ut;
     usec_t msg_last_ut;
-    usec_t last_scan_ut;
     size_t size;
     bool logged_failure;
     bool logged_journalctl_failure;
     usec_t max_journal_vs_realtime_delta_ut;
 
-    usec_t last_scan_header_ut;
+    usec_t last_scan_monotonic_ut;
+    usec_t last_scan_header_vs_last_modified_ut;
+
     uint64_t first_seqnum;
     uint64_t last_seqnum;
     sd_id128_t first_writer_id;
@@ -93,6 +94,7 @@ int journal_file_dict_items_forward_compar(const void *a, const void *b);
 void buffer_json_journal_versions(BUFFER *wb);
 void available_journal_file_sources_to_json_array(BUFFER *wb);
 bool journal_files_completed_once(void);
+void journal_files_updater_all_headers_sorted(void);
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 
@@ -108,13 +110,23 @@ void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets, BUFFER *wb
 
 usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct journal_file *jf, const char *boot_id);
 
+#define MAX_JOURNAL_DIRECTORIES 100
+struct journal_directory {
+    char *path;
+    bool logged_failure;
+};
+extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
+
 void journal_init_files_and_directories(void);
 void journal_init_query_status(void);
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled);
 void journal_files_registry_update(void);
+void journal_file_update_header(const char *filename, struct journal_file *jf);
 
 void netdata_systemd_journal_message_ids_init(void);
 void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused);
+
+void *journal_watcher_main(void *arg);
 
 #ifdef ENABLE_SYSTEMD_DBUS
 void function_systemd_units(const char *transaction, char *function, int timeout, bool *cancelled);

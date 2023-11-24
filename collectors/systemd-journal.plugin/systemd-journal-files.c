@@ -4,14 +4,8 @@
 
 #define SYSTEMD_JOURNAL_MAX_SOURCE_LEN 64
 #define VAR_LOG_JOURNAL_MAX_DEPTH 10
-#define MAX_JOURNAL_DIRECTORIES 100
 
-struct journal_directory {
-    char *path;
-    bool logged_failure;
-};
-
-static struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = { 0 };
+struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES] = { 0 };
 DICTIONARY *journal_files_registry = NULL;
 DICTIONARY *used_hashes_registry = NULL;
 
@@ -216,7 +210,10 @@ static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, s
 #endif
 }
 
-static void journal_file_update_header(const char *filename, struct journal_file *jf) {
+void journal_file_update_header(const char *filename, struct journal_file *jf) {
+    if(jf->last_scan_header_vs_last_modified_ut == jf->file_last_modified_ut)
+        return;
+
     fstat_cache_enable_on_thread();
 
     const char *files[2] = {
@@ -236,6 +233,7 @@ static void journal_file_update_header(const char *filename, struct journal_file
 
         jf->msg_first_ut = 0;
         jf->msg_last_ut = jf->file_last_modified_ut;
+        jf->last_scan_header_vs_last_modified_ut = jf->file_last_modified_ut;
         return;
     }
 
@@ -343,6 +341,10 @@ static void journal_file_update_header(const char *filename, struct journal_file
     journal_file_get_boot_id_annotations(j, jf);
     sd_journal_close(j);
     fstat_cache_disable_on_thread();
+
+    jf->last_scan_header_vs_last_modified_ut = jf->file_last_modified_ut;
+
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file header updated '%s'", jf->filename);
 }
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
@@ -445,8 +447,8 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
     struct journal_file *jf = old_value;
     struct journal_file *njf = new_value;
 
-    if(njf->last_scan_ut > jf->last_scan_ut)
-        jf->last_scan_ut = njf->last_scan_ut;
+    if(njf->last_scan_monotonic_ut > jf->last_scan_monotonic_ut)
+        jf->last_scan_monotonic_ut = njf->last_scan_monotonic_ut;
 
     if(njf->file_last_modified_ut > jf->file_last_modified_ut) {
         jf->file_last_modified_ut = njf->file_last_modified_ut;
@@ -593,7 +595,7 @@ static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, v
     string_freez(jf->source);
 }
 
-void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut) {
+void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_monotonic_ut) {
     static const char *ext = ".journal";
     static const size_t ext_len = sizeof(".journal") - 1;
 
@@ -623,7 +625,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
         if (S_ISDIR(info.st_mode)) {
             // If entry is a directory, call traverse recursively.
             if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0)
-                journal_directory_scan(absolute_path, depth + 1, last_scan_ut);
+                journal_directory_scan(absolute_path, depth + 1, last_scan_monotonic_ut);
 
         }
         else if (S_ISREG(info.st_mode)) {
@@ -634,7 +636,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
             if (len > ext_len && strcmp(filename + len - ext_len, ext) == 0) {
                 struct journal_file t = {
                         .file_last_modified_ut = info.st_mtim.tv_sec * USEC_PER_SEC + info.st_mtim.tv_nsec / NSEC_PER_USEC,
-                        .last_scan_ut = last_scan_ut,
+                        .last_scan_monotonic_ut = last_scan_monotonic_ut,
                         .size = info.st_size,
                         .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
                 };
@@ -665,47 +667,58 @@ static int journal_file_dict_items_last_modified_compar(const void *a, const voi
     return 0;
 }
 
+void journal_files_updater_all_headers_sorted(void) {
+    const DICTIONARY_ITEM *file_items[dictionary_entries(journal_files_registry)];
+    size_t files_used = 0;
+
+    struct journal_file *jf;
+    dfe_start_write(journal_files_registry, jf){
+        if(jf->last_scan_header_vs_last_modified_ut < jf->file_last_modified_ut)
+            file_items[files_used++] = dictionary_acquired_item_dup(journal_files_registry, jf_dfe.item);
+    }
+    dfe_done(jf);
+
+    // sort them in reverse order (newer first)
+    qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
+          journal_file_dict_items_last_modified_compar);
+
+    // update the header (first and last message ut, sequence numbers, etc)
+    for(size_t i = 0; i < files_used ; i++) {
+        jf = dictionary_acquired_item_value(file_items[i]);
+        journal_file_update_header(jf->filename, jf);
+        dictionary_acquired_item_release(journal_files_registry, file_items[i]);
+        send_newline_and_flush();
+    }
+}
+
 void journal_files_registry_update(void) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
     if(spinlock_trylock(&spinlock)) {
-        usec_t scan_ut = now_monotonic_usec();
+        usec_t scan_monotonic_ut = now_monotonic_usec();
 
         for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
             if(!journal_directories[i].path)
                 break;
 
-            journal_directory_scan(journal_directories[i].path, 0, scan_ut);
+            journal_directory_scan(journal_directories[i].path, 0, scan_monotonic_ut);
         }
-
-        const DICTIONARY_ITEM *file_items[dictionary_entries(journal_files_registry)];
-        size_t files_used = 0;
 
         struct journal_file *jf;
         dfe_start_write(journal_files_registry, jf){
-            if(jf->last_scan_ut < scan_ut)
+            if(jf->last_scan_monotonic_ut < scan_monotonic_ut)
                 dictionary_del(journal_files_registry, jf_dfe.name);
-            else if(jf->last_scan_header_ut < jf->file_last_modified_ut)
-                file_items[files_used++] = dictionary_acquired_item_dup(journal_files_registry, jf_dfe.item);
         }
         dfe_done(jf);
 
-        // sort them in reverse order (newer first)
-        qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
-              journal_file_dict_items_last_modified_compar);
-
-        // update the header (first and last message ut, sequence numbers, etc)
-        for(size_t i = 0; i < files_used ; i++) {
-            jf = dictionary_acquired_item_value(file_items[i]);
-            journal_file_update_header(jf->filename, jf);
-            jf->last_scan_header_ut = jf->file_last_modified_ut;
-            dictionary_acquired_item_release(journal_files_registry, file_items[i]);
-            nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file header updated '%s'", jf->filename);
-            send_newline_and_flush();
-        }
+        journal_files_updater_all_headers_sorted();
 
         journal_files_scans++;
         spinlock_unlock(&spinlock);
+
+        internal_error(true,
+               "Journal library scan completed in %.3f ms",
+                       (double)(now_monotonic_usec() - scan_monotonic_ut) / (double)USEC_PER_MS);
     }
 }
 
@@ -748,8 +761,10 @@ static bool boot_id_conflict_cb(const DICTIONARY_ITEM *item, void *old_value, vo
     usec_t *old_usec = old_value;
     usec_t *new_usec = new_value;
 
-    if(*new_usec < *old_usec)
+    if(*new_usec < *old_usec) {
         *old_usec = *new_usec;
+        return true;
+    }
 
     return false;
 }

@@ -330,6 +330,7 @@ SYSTEMD_JOURNAL_PLUGIN_FILES = \
     collectors/systemd-journal.plugin/systemd-main.c \
     collectors/systemd-journal.plugin/systemd-units.c \
     collectors/systemd-journal.plugin/systemd-journal.c \
+    collectors/systemd-journal.plugin/systemd-journal-watcher.c \
     collectors/systemd-journal.plugin/systemd-journal-annotations.c \
     collectors/systemd-journal.plugin/systemd-journal-files.c \
     collectors/systemd-journal.plugin/systemd-journal-fstat.c \
