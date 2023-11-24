@@ -18,6 +18,9 @@
 #define SYSTEMD_UNITS_FUNCTION_NAME              "systemd-list-units"
 #define SYSTEMD_UNITS_DEFAULT_TIMEOUT            30
 
+#define EXECUTE_WATCHER_PENDING_EVERY_MS 500
+#define FULL_JOURNAL_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
+
 extern __thread size_t fstat_thread_calls;
 extern __thread size_t fstat_thread_cached_responses;
 void fstat_cache_enable_on_thread(void);

@@ -8,8 +8,6 @@
 
 #define WATCH_FOR (IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF | IN_MOVED_FROM | IN_MOVED_TO | IN_UNMOUNT)
 
-#define EXECUTE_PENDING_EVERY_MS 100
-
 typedef struct watch_entry {
     int slot;
 
@@ -24,6 +22,8 @@ typedef struct {
     WatchEntry *freeList;
     int watchCount;
     int watchListSize;
+
+    size_t errors;
 
     DICTIONARY *pending;
 } Watcher;
@@ -75,6 +75,13 @@ static int add_watch(Watcher *watcher, int inotifyFd, const char *path) {
                path);
 
         free_slot(watcher, t);
+
+        struct stat info;
+        if(stat(path, &info) == 0 && S_ISDIR(info.st_mode)) {
+            // the directory exists, but we failed to add the watch
+            // increase errors
+            watcher->errors++;
+        }
     }
     else {
         t->path = strdupz(path);
@@ -291,6 +298,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
                 .watchCount = 0,
                 .watchListSize = INITIAL_WATCHES,
                 .pending = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE|DICT_OPTION_SINGLE_THREADED),
+                .errors = 0,
         };
 
         int inotifyFd = inotify_init();
@@ -309,11 +317,12 @@ void *journal_watcher_main(void *arg __maybe_unused) {
         struct buffered_reader reader;
         while (1) {
             buffered_reader_ret_t rc = buffered_reader_read_timeout(
-                    &reader, inotifyFd, EXECUTE_PENDING_EVERY_MS, false);
+                    &reader, inotifyFd, EXECUTE_WATCHER_PENDING_EVERY_MS, false);
 
             if (rc != BUFFERED_READER_READ_OK && rc != BUFFERED_READER_READ_POLL_TIMEOUT) {
                 nd_log(NDLS_COLLECTORS, NDLP_CRIT,
-                       "JOURNAL WATCHER: cannot read inotify events, buffered_reader_read_timeout() returned %d",
+                       "JOURNAL WATCHER: cannot read inotify events, buffered_reader_read_timeout() returned %d - "
+                       "restarting the watcher.",
                        rc);
                 break;
             }
@@ -344,9 +353,14 @@ void *journal_watcher_main(void *arg __maybe_unused) {
 
             usec_t ut = now_monotonic_usec();
             if (dictionary_entries(watcher.pending) && (rc == BUFFERED_READER_READ_POLL_TIMEOUT ||
-                last_headers_update_ut + (EXECUTE_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
+                last_headers_update_ut + (EXECUTE_WATCHER_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
                 process_pending(&watcher);
                 last_headers_update_ut = ut;
+            }
+
+            if(watcher.errors) {
+                nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
+                       "JOURNAL WATCHER: there were errors in setting up inotify watches - restarting the watcher.");
             }
         }
 
@@ -356,8 +370,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
         // this will scan the directories and cleanup the registry
         journal_files_registry_update();
 
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-                "JOURNAL WATCHER: resetting all watches...");
+        sleep_usec(5 * USEC_PER_SEC);
     }
 
     return NULL;
