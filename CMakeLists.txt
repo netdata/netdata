@@ -317,6 +317,10 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/clocks/clocks.h
                      libnetdata/completion/completion.c
                      libnetdata/completion/completion.h
+                     libnetdata/datetime/iso8601.c
+                     libnetdata/datetime/iso8601.h
+                     libnetdata/datetime/rfc7231.c
+                     libnetdata/datetime/rfc7231.h
                      libnetdata/dictionary/dictionary.c
                      libnetdata/dictionary/dictionary.h
                      libnetdata/eval/eval.c
@@ -338,8 +342,13 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/json/jsmn.h
                      libnetdata/libnetdata.c
                      libnetdata/libnetdata.h
+                     libnetdata/line_splitter/line_splitter.c
+                     libnetdata/line_splitter/line_splitter.h
+                     libnetdata/libnetdata.h
                      libnetdata/locks/locks.c
                      libnetdata/locks/locks.h
+                     libnetdata/log/journal.c
+                     libnetdata/log/journal.h
                      libnetdata/log/log.c
                      libnetdata/log/log.h
                      libnetdata/os.c
@@ -367,6 +376,8 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/threads/threads.h
                      libnetdata/url/url.c
                      libnetdata/url/url.h
+                     libnetdata/uuid/uuid.c
+                     libnetdata/uuid/uuid.h
                      libnetdata/string/utf8.h
                      libnetdata/worker_utilization/worker_utilization.c
                      libnetdata/worker_utilization/worker_utilization.h
@@ -678,6 +689,9 @@ if(ENABLE_DBENGINE)
                                  database/engine/rrdengineapi.h
                                  database/engine/pagecache.c
                                  database/engine/pagecache.h
+                                 database/engine/page_test.cc
+                                 database/engine/page.c
+                                 database/engine/page.h
                                  database/engine/cache.c
                                  database/engine/cache.h
                                  database/engine/metric.c
