@@ -1584,7 +1584,13 @@ install(DIRECTORY DESTINATION var/lib/netdata/registry)
 install(DIRECTORY DESTINATION var/lib/netdata/cloud.d)
 install(DIRECTORY DESTINATION var/run)
 install(DIRECTORY DESTINATION etc/netdata)
+install(DIRECTORY DESTINATION etc/netdata/charts.d)
+install(DIRECTORY DESTINATION etc/netdata/custom-plugins.d)
+install(DIRECTORY DESTINATION etc/netdata/ebpf.d)
+install(DIRECTORY DESTINATION etc/netdata/go.d)
 install(DIRECTORY DESTINATION etc/netdata/health.d)
+install(DIRECTORY DESTINATION etc/netdata/python.d)
+install(DIRECTORY DESTINATION etc/netdata/ssl)
 install(DIRECTORY DESTINATION etc/netdata/statsd.d)
 install(DIRECTORY DESTINATION usr/lib/netdata/conf.d)
 install(DIRECTORY DESTINATION usr/libexec/netdata/plugins.d)
@@ -1633,6 +1639,32 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/cgroups.plugin/cgroup-name.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
+# statsd
+#
+install(FILES collectors/statsd.plugin/asterisk.conf
+              collectors/statsd.plugin/example.conf
+              collectors/statsd.plugin/k6.conf
+        DESTINATION usr/lib/netdata/conf.d/statsd.d)
+
+#
+# exporting
+#
+install(FILES exporting/exporting.conf
+        DESTINATION usr/lib/netdata/conf.d)
+
+#
+# ioping.plugin
+#
+install(FILES collectors/ioping.plugin/ioping.conf
+        DESTINATION usr/lib/netdata/conf.d)
+
+#
+# streaming
+#
+install(FILES streaming/stream.conf
+        DESTINATION usr/lib/netdata/conf.d)
+
+#
 # service files
 #
 
@@ -1641,6 +1673,9 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/system/install-service.sh DESTINATION usr/l
 
 configure_file(system/cron/netdata-updater-daily.in system/cron/netdata-updater-daily @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily DESTINATION usr/lib/netdata/system/cron)
+
+configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist DESTINATION usr/lib/netdata/system/launchd)
 
 configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata DESTINATION usr/lib/netdata/system/freebsd/rc.d)
@@ -1787,7 +1822,6 @@ if(ENABLE_PLUGIN_EBPF)
                       collectors/ebpf.plugin/ebpf.d/ebpf_kernel_reject_list.txt
                       collectors/ebpf.plugin/ebpf.d/fd.conf
                       collectors/ebpf.plugin/ebpf.d/filesystem.conf
-                      collectors/ebpf.plugin/ebpf.d/functions.conf
                       collectors/ebpf.plugin/ebpf.d/hardirq.conf
                       collectors/ebpf.plugin/ebpf.d/mdflush.conf
                       collectors/ebpf.plugin/ebpf.d/mount.conf
@@ -1879,7 +1913,7 @@ install(FILES collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
               collectors/python.d.plugin/changefinder/changefinder.chart.py
               collectors/python.d.plugin/dovecot/dovecot.chart.py
               collectors/python.d.plugin/example/example.chart.py
-              collectors/python.d.plugin/exim/exim.conf
+              collectors/python.d.plugin/exim/exim.chart.py
               collectors/python.d.plugin/fail2ban/fail2ban.chart.py
               collectors/python.d.plugin/gearman/gearman.chart.py
               collectors/python.d.plugin/go_expvar/go_expvar.chart.py
