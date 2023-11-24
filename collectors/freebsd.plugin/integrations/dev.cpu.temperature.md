@@ -11,7 +11,7 @@ endmeta-->
 # dev.cpu.temperature
 
 
-<img src="https://netdata.cloud/img/freebsd.org" width="150"/>
+<img src="https://netdata.cloud/img/freebsd.svg" width="150"/>
 
 
 Plugin: freebsd.plugin
