@@ -775,8 +775,8 @@ void journal_init_files_and_directories(void) {
     // ------------------------------------------------------------------------
     // setup the journal directories
 
-    journal_directories[d++].path = strdupz("/var/log/journal");
     journal_directories[d++].path = strdupz("/run/log/journal");
+    journal_directories[d++].path = strdupz("/var/log/journal");
 
     if(*netdata_configured_host_prefix) {
         char path[PATH_MAX];
