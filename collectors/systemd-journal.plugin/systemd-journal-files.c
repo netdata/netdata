@@ -344,7 +344,9 @@ void journal_file_update_header(const char *filename, struct journal_file *jf) {
 
     jf->last_scan_header_vs_last_modified_ut = jf->file_last_modified_ut;
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file header updated '%s'", jf->filename);
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+           "Journal file header updated '%s'",
+           jf->filename);
 }
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
@@ -440,7 +442,9 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 
     jf->msg_last_ut = jf->file_last_modified_ut;
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file added '%s'", jf->filename);
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
+           "Journal file added to the journal files registry: '%s'",
+           jf->filename);
 }
 
 static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -455,7 +459,10 @@ static bool files_registry_conflict_cb(const DICTIONARY_ITEM *item, void *old_va
         jf->size = njf->size;
 
         jf->msg_last_ut = jf->file_last_modified_ut;
-        nd_log(NDLS_COLLECTORS, NDLP_INFO, "Journal file updated '%s'", jf->filename);
+
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+               "Journal file updated to the journal files registry '%s'",
+               jf->filename);
     }
 
     return false;

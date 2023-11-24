@@ -1382,6 +1382,7 @@ int uuid_unittest(void);
 int main(int argc, char **argv) {
     // initialize the system clocks
     clocks_init();
+    netdata_thread_set_tag("MAIN");
     netdata_start_time = now_realtime_sec();
 
     usec_t started_ut = now_monotonic_usec();
