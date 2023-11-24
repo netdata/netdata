@@ -55,7 +55,8 @@ static int open_data_file(struct rrdengine_datafile *datafile)
     }
 
     datafile->file = file;
-    netdata_log_info("DBENGINE: data file \"%s\" opened (size:%"PRIu64").", path, datafile->pos);
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "DBENGINE: data file \"%s\" opened (size:%" PRIu64 ").", path, datafile->pos);
 
     return 0;
 }
@@ -111,9 +112,16 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
             ended_ut = now_monotonic_usec();
             if (rc)
                 goto error;
-            netdata_log_info(
-                "Accessing datafile %u (tier %d) for superblock check in %0.2f ms ", df->fileno, df->ctx->config.tier, reason,
+
+            nd_log(
+                NDLS_DAEMON,
+                NDLP_DEBUG,
+                "Accessing datafile %u (tier %d) for superblock check in %0.2f ms ",
+                df->fileno,
+                df->ctx->config.tier,
+                reason,
                 (double)(ended_ut - started_ut) / USEC_PER_MS);
+
             df->flags |= DATAFILE_FLAG_IS_AVAILABLE;
             ctx_io_read_op_bytes(df->ctx, sizeof(struct rrdeng_df_sb));
         }
