@@ -474,9 +474,9 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
     size_t scanned_lines = sampling_file_lines_scanned_so_far(fqs);
 
     // Calculate the proportion of time covered
-    usec_t total_time_ut;
+    usec_t total_time_ut, remaining_start_ut, remaining_end_ut;
     usec_t remaining_time_ut = sampling_running_file_query_remaining_time(fqs, jf, direction, msg_ut, &total_time_ut,
-                                                                          NULL, NULL);
+                                                                          &remaining_start_ut, &remaining_end_ut);
     if (total_time_ut == 0) total_time_ut = 1;
 
     double proportion_by_time = (double) (total_time_ut - remaining_time_ut) / (double) total_time_ut;
@@ -493,6 +493,26 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
     // Calculate the estimated number of remaining lines
     size_t remaining_logs_by_time = expected_matching_logs_by_time - scanned_lines;
     if (remaining_logs_by_time < 1) remaining_logs_by_time = 1;
+
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
+           "JOURNAL ESTIMATION: "
+           "scanned_lines=%zu [sampled=%zu, unsampled=%zu], "
+           "file [%zd - %zd, duration %zd, known lines in file %zu], "
+           "query [%zd - %zd, duration %zd], "
+           "message at %zd, "
+           "proportion of time %03.f, "
+           "expected total lines in file %zu, "
+           "remaining lines %zu, "
+           "remaining time %zu [%zd - %zd, duration %zd]"
+           , scanned_lines, fqs->samples.sampled, fqs->samples.unsampled
+           , (ssize_t)(jf->msg_first_ut / USEC_PER_SEC), (ssize_t)(jf->msg_last_ut / USEC_PER_SEC), (ssize_t)((jf->msg_last_ut - jf->msg_first_ut) / USEC_PER_SEC), jf->messages_in_file
+           , (ssize_t)(fqs->query_file.start_ut / USEC_PER_SEC), (ssize_t)(fqs->query_file.stop_ut / USEC_PER_SEC), (ssize_t)((fqs->query_file.stop_ut - fqs->query_file.start_ut) / USEC_PER_SEC)
+           , (ssize_t)(msg_ut / USEC_PER_SEC)
+           , proportion_by_time
+           , expected_matching_logs_by_time
+           , remaining_logs_by_time
+           , remaining_time_ut, (ssize_t)(remaining_start_ut / USEC_PER_SEC), (ssize_t)(remaining_end_ut / USEC_PER_SEC), (ssize_t)((remaining_end_ut - remaining_start_ut) / USEC_PER_SEC)
+           );
 
     return remaining_logs_by_time;
 }
