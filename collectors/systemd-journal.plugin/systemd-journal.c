@@ -496,7 +496,7 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
 
     nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "JOURNAL ESTIMATION: "
-           "scanned_lines=%zu [sampled=%zu, unsampled=%zu], "
+           "scanned_lines=%zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
            "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
            "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
            "first message read from the file at "PRIu64", current message at %"PRIu64", "
@@ -504,7 +504,7 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
            "expected total lines in file %zu, "
            "remaining lines %zu, "
            "remaining time %"PRIu64" [%"PRIu64" - %"PRIu64", duration %"PRId64"]"
-           , scanned_lines, fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled
+           , scanned_lines, fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
            , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
            , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
            , fqs->query_file.first_msg_ut, msg_ut
@@ -1187,7 +1187,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
 
         nd_log(NDLS_COLLECTORS, NDLP_INFO,
                "JOURNAL ESTIMATION FINAL: "
-               "total lines %zu [sampled=%zu, unsampled=%zu, estimated], "
+               "total lines %zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
                "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
                "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
                , fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled + fqs->samples_per_file.estimated
