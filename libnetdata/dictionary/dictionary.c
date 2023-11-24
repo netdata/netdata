@@ -422,7 +422,7 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
     size_t entries; (void)entries;
     if(unlikely(is_dictionary_single_threaded(dict))) {
         dict->version++;
-        entries = dict->entries++;
+        entries = dict->entries--;
     }
     else {
         __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);

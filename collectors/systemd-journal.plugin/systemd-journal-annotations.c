@@ -400,6 +400,7 @@ void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BU
         usec_t ut = UINT64_MAX;
         usec_t *p_ut = dictionary_get(boot_ids_to_first_ut, boot_id);
         if(!p_ut) {
+#ifndef HAVE_SD_JOURNAL_RESTART_FIELDS
             struct journal_file *jf;
             dfe_start_read(journal_files_registry, jf) {
                 const char *files[2] = {
@@ -416,59 +417,16 @@ void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BU
                     continue;
                 }
 
-                char m[100];
-                size_t len = snprintfz(m, sizeof(m), "_BOOT_ID=%s", boot_id);
-
-                r = sd_journal_add_match(j, m, len);
-                if(r < 0) {
-                    internal_error(true, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
-                                         "sd_journal_add_match('%s') on file '%s' returned %d",
-                                         boot_id, m, jf_dfe.name, r);
-                    sd_journal_close(j);
-                    continue;
-                }
-
-                r = sd_journal_seek_head(j);
-                if(r < 0) {
-                    internal_error(true, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
-                                         "sd_journal_seek_head() on file '%s' returned %d",
-                                         boot_id, jf_dfe.name, r);
-                    sd_journal_close(j);
-                    continue;
-                }
-
-                r = sd_journal_next(j);
-                if(r < 0) {
-                    internal_error(true, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
-                                         "sd_journal_next() on file '%s' returned %d",
-                                         boot_id, jf_dfe.name, r);
-                    sd_journal_close(j);
-                    continue;
-                }
-
-                usec_t t_ut = 0;
-                r = sd_journal_get_realtime_usec(j, &t_ut);
-                if(r < 0 || !t_ut) {
-                    internal_error(r != -EADDRNOTAVAIL, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
-                                         "sd_journal_get_realtime_usec() on file '%s' returned %d",
-                                         boot_id, jf_dfe.name, r);
-                    sd_journal_close(j);
-                    continue;
-                }
-
-                if(t_ut < ut)
-                    ut = t_ut;
-
+                ut = journal_file_update_annotation_boot_id(j, jf, boot_id);
                 sd_journal_close(j);
             }
             dfe_done(jf);
-
-            dictionary_set(boot_ids_to_first_ut, boot_id, &ut, sizeof(ut));
+#endif
         }
         else
             ut = *p_ut;
 
-        if(ut != UINT64_MAX) {
+        if(ut && ut != UINT64_MAX) {
             char buffer[ISO8601_MAX_LENGTH];
             iso8601_datetime_ut(buffer, sizeof(buffer), ut, ISO8601_UTC);
 

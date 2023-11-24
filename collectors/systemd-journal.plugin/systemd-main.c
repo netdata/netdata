@@ -10,6 +10,7 @@ static bool plugin_should_exit = false;
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     clocks_init();
+    netdata_thread_set_tag("SDMAIN");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
@@ -26,6 +27,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // debug
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
+        journal_files_registry_update();
+
         bool cancelled = false;
         char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
@@ -41,6 +44,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         exit(1);
     }
 #endif
+
+    // ------------------------------------------------------------------------
+    // watcher thread
+
+    netdata_thread_t watcher_thread;
+    netdata_thread_create(&watcher_thread, "SDWATCH",
+                          NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
 
     // ------------------------------------------------------------------------
     // the event loop for functions
@@ -76,14 +86,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     usec_t step_ut = 100 * USEC_PER_MS;
     usec_t send_newline_ut = 0;
-    usec_t since_last_scan_ut = 1000 * USEC_PER_SEC; // something big to trigger scanning at start
+    usec_t since_last_scan_ut = FULL_JOURNAL_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
     bool tty = isatty(fileno(stderr)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!plugin_should_exit) {
 
-        if(since_last_scan_ut > 60 * USEC_PER_SEC) {
+        if(since_last_scan_ut > FULL_JOURNAL_SCAN_EVERY_USEC) {
             journal_files_registry_update();
             since_last_scan_ut = 0;
         }

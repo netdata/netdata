@@ -215,6 +215,9 @@ typedef struct function_query_status {
         usec_t start_ut;     // the starting time of the query - we start from this
         usec_t stop_ut;      // the ending time of the query - we stop at this
         usec_t first_msg_ut;
+
+        sd_id128_t first_msg_writer;
+        uint64_t first_msg_seqnum;
     } query_file;
 
     struct {
@@ -360,19 +363,20 @@ static void sampling_file_init(FUNCTION_QUERY_STATUS *fqs, struct journal_file *
     fqs->samples_per_file.recalibrate = 0;
 }
 
-static size_t sampling_file_lines_scanned(FUNCTION_QUERY_STATUS *fqs) {
+static size_t sampling_file_lines_scanned_so_far(FUNCTION_QUERY_STATUS *fqs) {
     size_t sampled = fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled;
     if(!sampled) sampled = 1;
     return sampled;
 }
 
-static double sampling_file_query_overlapping_timeframe_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
-        usec_t msg_ut, usec_t *after_ut, usec_t *before_ut) {
+static void sampling_running_file_query_overlapping_timeframe_ut(
+        FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
+                usec_t msg_ut, usec_t *after_ut, usec_t *before_ut) {
+
     // find the overlap of the query and file timeframes
     // taking into account the first message we encountered
 
-    double progress;
-    usec_t oldest_ut, newest_ut, elapsed_ut;
+    usec_t oldest_ut, newest_ut;
     if(direction == FACETS_ANCHOR_DIRECTION_FORWARD) {
         // the first message we know (oldest)
         oldest_ut = fqs->query_file.first_msg_ut ? fqs->query_file.first_msg_ut : jf->msg_first_ut;
@@ -387,8 +391,6 @@ static double sampling_file_query_overlapping_timeframe_ut(FUNCTION_QUERY_STATUS
 
         if(msg_ut < oldest_ut)
             oldest_ut = msg_ut - 1;
-
-        elapsed_ut = msg_ut - oldest_ut;
     }
     else /* BACKWARD */ {
         // the latest message we know (newest)
@@ -402,24 +404,35 @@ static double sampling_file_query_overlapping_timeframe_ut(FUNCTION_QUERY_STATUS
 
         if(newest_ut < msg_ut)
             newest_ut = msg_ut + 1;
-
-        elapsed_ut = newest_ut - msg_ut;
     }
-
-    usec_t total_ut = newest_ut - oldest_ut;
-    progress = (double)elapsed_ut / (double)total_ut;
 
     *after_ut = oldest_ut;
     *before_ut = newest_ut;
+}
+
+static double sampling_running_file_query_progress_by_time(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf,
+                                                           FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
+
+    usec_t after_ut, before_ut, elapsed_ut;
+    sampling_running_file_query_overlapping_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
+
+    if(direction == FACETS_ANCHOR_DIRECTION_FORWARD)
+        elapsed_ut = msg_ut - after_ut;
+    else
+        elapsed_ut = before_ut - msg_ut;
+
+    usec_t total_ut = before_ut - after_ut;
+    double progress = (double)elapsed_ut / (double)total_ut;
 
     return progress;
 }
 
-static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction,
-    usec_t msg_ut, usec_t *total_time_ut, usec_t *remaining_start_ut, usec_t *remaining_end_ut) {
-
+static usec_t sampling_running_file_query_remaining_time(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf,
+                                                         FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut,
+                                                         usec_t *total_time_ut, usec_t *remaining_start_ut,
+                                                         usec_t *remaining_end_ut) {
     usec_t after_ut, before_ut;
-    sampling_file_query_overlapping_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
+    sampling_running_file_query_overlapping_timeframe_ut(fqs, jf, direction, msg_ut, &after_ut, &before_ut);
 
     // since we have a timestamp in msg_ut
     // this timestamp can extend the overlap
@@ -454,38 +467,84 @@ static usec_t sampling_file_remaining_time_ut(FUNCTION_QUERY_STATUS *fqs, struct
     return remaining_ut;
 }
 
-static size_t sampling_file_estimate_remaining_lines(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
-    size_t scanned_lines = sampling_file_lines_scanned(fqs);
-
-    usec_t total_time_ut;
-    usec_t remaining_time_ut = sampling_file_remaining_time_ut(fqs, jf, direction, msg_ut, &total_time_ut, NULL, NULL);
-
-    if (total_time_ut == 0)
-        total_time_ut = 1;
+static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCTION_QUERY_STATUS *fqs,
+                                                                           struct journal_file *jf,
+                                                                           FACETS_ANCHOR_DIRECTION direction,
+                                                                           usec_t msg_ut) {
+    size_t scanned_lines = sampling_file_lines_scanned_so_far(fqs);
 
     // Calculate the proportion of time covered
-    double time_proportion = (double)(total_time_ut - remaining_time_ut) / (double)total_time_ut;
+    usec_t total_time_ut;
+    usec_t remaining_time_ut = sampling_running_file_query_remaining_time(fqs, jf, direction, msg_ut, &total_time_ut,
+                                                                          NULL, NULL);
+    if (total_time_ut == 0) total_time_ut = 1;
 
-    if (time_proportion == 0 || !isfinite(time_proportion))
-        time_proportion = 1.0;
+    double proportion_by_time = (double) (total_time_ut - remaining_time_ut) / (double) total_time_ut;
+
+    if (proportion_by_time == 0 || proportion_by_time > 1.0 || !isfinite(proportion_by_time))
+        proportion_by_time = 1.0;
 
     // Estimate the total number of lines in the file
-    size_t total_lines_estimated = (size_t)((double)scanned_lines / time_proportion);
+    size_t expected_matching_logs_by_time = (size_t)((double)scanned_lines / proportion_by_time);
+
+    if(jf->messages_in_file && expected_matching_logs_by_time > jf->messages_in_file)
+        expected_matching_logs_by_time = jf->messages_in_file;
 
     // Calculate the estimated number of remaining lines
-    size_t expected_lines = total_lines_estimated - scanned_lines;
+    size_t remaining_logs_by_time = expected_matching_logs_by_time - scanned_lines;
+    if (remaining_logs_by_time < 1) remaining_logs_by_time = 1;
 
-    if (expected_lines < 1)
-        expected_lines = 1;
-
-    return expected_lines;
+    return remaining_logs_by_time;
 }
 
-static void sampling_decide_file_sampling_every(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
+
+static size_t sampling_running_file_query_estimate_remaining_lines(sd_journal *j, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
+    size_t expected_matching_logs_by_seqnum = 0;
+    double proportion_by_seqnum = 0.0;
+    size_t remaining_logs_by_seqnum = 0;
+
+#ifdef HAVE_SD_JOURNAL_GET_SEQNUM
+    uint64_t current_msg_seqnum;
+    sd_id128_t current_msg_writer;
+    if(!fqs->query_file.first_msg_seqnum || sd_journal_get_seqnum(j, &current_msg_seqnum, &current_msg_writer) < 0) {
+        fqs->query_file.first_msg_seqnum = 0;
+        fqs->query_file.first_msg_writer = SD_ID128_NULL;
+    }
+    else if(jf->messages_in_file) {
+        size_t scanned_lines = sampling_file_lines_scanned_so_far(fqs);
+
+        double proportion_of_all_lines_so_far;
+        if(direction == FACETS_ANCHOR_DIRECTION_FORWARD)
+            proportion_of_all_lines_so_far = (double)scanned_lines / (double)(current_msg_seqnum - jf->first_seqnum);
+        else
+            proportion_of_all_lines_so_far = (double)scanned_lines / (double)(jf->last_seqnum - current_msg_seqnum);
+
+        if(proportion_of_all_lines_so_far > 1.0)
+            proportion_of_all_lines_so_far = 1.0;
+
+        expected_matching_logs_by_seqnum = (size_t)(proportion_of_all_lines_so_far * (double)jf->messages_in_file);
+
+        proportion_by_seqnum = (double)scanned_lines / (double)expected_matching_logs_by_seqnum;
+
+        if (proportion_by_seqnum == 0 || proportion_by_seqnum > 1.0 || !isfinite(proportion_by_seqnum))
+            proportion_by_seqnum = 1.0;
+
+        remaining_logs_by_seqnum = expected_matching_logs_by_seqnum - scanned_lines;
+        if(!remaining_logs_by_seqnum) remaining_logs_by_seqnum = 1;
+    }
+#endif
+
+    if(remaining_logs_by_seqnum)
+        return remaining_logs_by_seqnum;
+
+    return sampling_running_file_query_estimate_remaining_lines_by_time(fqs, jf, direction, msg_ut);
+}
+
+static void sampling_decide_file_sampling_every(sd_journal *j, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
     size_t files_matched = fqs->files_matched;
     if(!files_matched) files_matched = 1;
 
-    size_t remaining_lines = sampling_file_estimate_remaining_lines(fqs, jf, direction, msg_ut);
+    size_t remaining_lines = sampling_running_file_query_estimate_remaining_lines(j, fqs, jf, direction, msg_ut);
     size_t wanted_samples = (fqs->sampling / 2) / files_matched;
     if(!wanted_samples) wanted_samples = 1;
 
@@ -501,7 +560,7 @@ typedef enum {
     SAMPLING_SKIP_FIELDS = 1,
 } sampling_t;
 
-static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
+static inline sampling_t is_row_in_sample(sd_journal *j, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction, bool candidate_to_keep) {
     if(!fqs->sampling || candidate_to_keep)
         return SAMPLING_FULL;
 
@@ -523,7 +582,7 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
 
     else if(fqs->samples_per_file.recalibrate >= SYSTEMD_JOURNAL_SAMPLING_RECALIBRATE || !fqs->samples_per_file.every) {
         // this is the first to be unsampled for this file
-        sampling_decide_file_sampling_every(fqs, jf, direction, msg_ut);
+        sampling_decide_file_sampling_every(j, fqs, jf, direction, msg_ut);
         fqs->samples_per_file.recalibrate = 0;
         should_sample = true;
     }
@@ -552,47 +611,26 @@ static inline sampling_t is_row_in_sample(FUNCTION_QUERY_STATUS *fqs, struct jou
     fqs->samples_per_time_slot.unsampled[slot]++;
 
     if(fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
-        usec_t after_ut, before_ut;
+        double progress_by_time = sampling_running_file_query_progress_by_time(fqs, jf, direction, msg_ut);
 
-        double progress = sampling_file_query_overlapping_timeframe_ut(
-                fqs, jf, direction, msg_ut, &after_ut, &before_ut);
-
-        if(progress > 0.01)
+        if(progress_by_time > 0.05)
             return SAMPLING_STOP_AND_ESTIMATE;
     }
 
     return SAMPLING_SKIP_FIELDS;
 }
 
-static void sampling_update_file_estimates(FACETS *facets, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction) {
+static void sampling_update_running_query_file_estimates(FACETS *facets, sd_journal *j, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, usec_t msg_ut, FACETS_ANCHOR_DIRECTION direction) {
     usec_t total_time_ut, remaining_start_ut, remaining_end_ut;
-    sampling_file_remaining_time_ut(fqs, jf, direction, msg_ut, &total_time_ut, &remaining_start_ut, &remaining_end_ut);
-    size_t remaining_lines = sampling_file_estimate_remaining_lines(fqs, jf, direction, msg_ut);
+    sampling_running_file_query_remaining_time(fqs, jf, direction, msg_ut, &total_time_ut, &remaining_start_ut,
+                                               &remaining_end_ut);
+    size_t remaining_lines = sampling_running_file_query_estimate_remaining_lines(j, fqs, jf, direction, msg_ut);
     facets_update_estimations(facets, remaining_start_ut, remaining_end_ut, remaining_lines);
     fqs->samples.estimated += remaining_lines;
     fqs->samples_per_file.estimated += remaining_lines;
 }
 
 // ----------------------------------------------------------------------------
-
-static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
-    const char *k = data;
-    const char *equal = strchr(k, '=');
-    if(unlikely(!equal))
-        return false;
-
-    size_t kl = equal - k;
-
-    const char *v = ++equal;
-    size_t vl = data_length - kl - 1;
-
-    *key = k;
-    *key_length = kl;
-    *value = v;
-    *value_length = vl;
-
-    return true;
-}
 
 static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, struct journal_file *jf, usec_t *msg_ut) {
     const void *data;
@@ -707,9 +745,16 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         if(unlikely(!first_msg_ut)) {
             first_msg_ut = msg_ut;
             fqs->query_file.first_msg_ut = msg_ut;
+
+#ifdef HAVE_SD_JOURNAL_GET_SEQNUM
+            if(sd_journal_get_seqnum(j, &fqs->query_file.first_msg_seqnum, &fqs->query_file.first_msg_writer) < 0) {
+                fqs->query_file.first_msg_seqnum = 0;
+                fqs->query_file.first_msg_writer = SD_ID128_NULL;
+            }
+#endif
         }
 
-        sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
+        sampling_t sample = is_row_in_sample(j, fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_BACKWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
@@ -748,7 +793,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
         else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
         else {
-            sampling_update_file_estimates(facets, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_BACKWARD);
+            sampling_update_running_query_file_estimates(facets, j, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_BACKWARD);
             break;
         }
     }
@@ -816,7 +861,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
             fqs->query_file.first_msg_ut = msg_ut;
         }
 
-        sampling_t sample = is_row_in_sample(fqs, jf, msg_ut,
+        sampling_t sample = is_row_in_sample(j, fqs, jf, msg_ut,
                                         FACETS_ANCHOR_DIRECTION_FORWARD,
                                         facets_row_candidate_to_keep(facets, msg_ut));
 
@@ -855,7 +900,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
         else if(sample == SAMPLING_SKIP_FIELDS)
             facets_row_finished_unsampled(facets, msg_ut);
         else {
-            sampling_update_file_estimates(facets, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_FORWARD);
+            sampling_update_running_query_file_estimates(facets, j, fqs, jf, msg_ut, FACETS_ANCHOR_DIRECTION_FORWARD);
             break;
         }
     }
@@ -1020,8 +1065,13 @@ static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
     if((fqs->source_type == SDJF_NONE && !fqs->sources) || (jf->source_type & fqs->source_type) ||
        (fqs->sources && simple_pattern_matches(fqs->sources, string2str(jf->source)))) {
 
+        if(!jf->msg_last_ut || !jf->msg_last_ut)
+            // the file is not scanned yet, or the timestamps have not been updated,
+            // so we don't know if it can contribute or not - let's add it.
+            return true;
+
         usec_t anchor_delta = JOURNAL_VS_REALTIME_DELTA_MAX_UT;
-        usec_t first_ut = jf->msg_first_ut;
+        usec_t first_ut = jf->msg_first_ut - anchor_delta;
         usec_t last_ut = jf->msg_last_ut + anchor_delta;
 
         if(last_ut >= fqs->after_ut && first_ut <= fqs->before_ut)
@@ -1503,7 +1553,6 @@ static void function_systemd_journal_progress(BUFFER *wb, const char *transactio
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
     fstat_thread_calls = 0;
     fstat_thread_cached_responses = 0;
-    journal_files_registry_update();
 
     BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);

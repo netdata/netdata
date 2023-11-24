@@ -18,6 +18,8 @@ typedef enum {
 #define netdata_thread_cleanup_push(func, arg) pthread_cleanup_push(func, arg)
 #define netdata_thread_cleanup_pop(execute) pthread_cleanup_pop(execute)
 
+void netdata_thread_set_tag(const char *tag);
+
 typedef pthread_t netdata_thread_t;
 
 struct netdata_static_thread {
