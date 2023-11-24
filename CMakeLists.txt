@@ -1384,14 +1384,6 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT cgroup_network_plugin
             DESTINATION usr/libexec/netdata/plugins.d)
-    install(PROGRAMS collectors/cgroups.plugin/cgroup-network-helper.sh
-            COMPONENT cgroup_network_plugin
-            DESTINATION usr/libexec/netdata/plugins.d)
-else()
-        # FIXME: rpm builders need this either way.
-        install(PROGRAMS collectors/cgroups.plugin/cgroup-network-helper.sh
-            COMPONENT cgroup_network_plugin
-            DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
@@ -1586,9 +1578,6 @@ configure_file(config.cmake.h.in config.h)
 
 install(TARGETS netdata DESTINATION usr/sbin)
 
-install(PROGRAMS collectors/cgroups.plugin/cgroup-name.sh
-        DESTINATION usr/libexec/netdata/plugins.d)
-
 install(DIRECTORY DESTINATION var/cache/netdata)
 install(DIRECTORY DESTINATION var/log/netdata)
 install(DIRECTORY DESTINATION var/lib/netdata/registry)
@@ -1627,6 +1616,21 @@ endif()
 
 configure_file(claim/netdata-claim.sh.in claim/netdata-claim.sh @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/claim/netdata-claim.sh DESTINATION usr/sbin)
+
+#
+# We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
+# the files exists unconditionally.
+#
+configure_file(collectors/cgroups.plugin/cgroup-network-helper.sh.in
+               collectors/cgroups.plugin/cgroup-network-helper.sh @ONLY)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/cgroups.plugin/cgroup-network-helper.sh
+        COMPONENT cgroup_network_plugin
+        DESTINATION usr/libexec/netdata/plugins.d)
+
+configure_file(collectors/cgroups.plugin/cgroup-name.sh.in
+               collectors/cgroups.plugin/cgroup-name.sh @ONLY)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/cgroups.plugin/cgroup-name.sh
+        DESTINATION usr/libexec/netdata/plugins.d)
 
 #
 # service files
