@@ -22,6 +22,7 @@ MODULE_NAME="main"
 # logging
 
 PROGRAM_NAME="$(basename "${0}")"
+SHORT_PROGRAM_NAME="${PROGRAM_NAME/.plugin/}"
 
 # these should be the same with syslog() priorities
 NDLP_EMERG=0   # system is unusable
@@ -304,7 +305,7 @@ source "$pluginsd/loopsleepms.sh.inc"
 # -----------------------------------------------------------------------------
 # load my configuration
 
-for myconfig in "${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}.conf" "${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}.conf"; do
+for myconfig in "${NETDATA_STOCK_CONFIG_DIR}/${SHORT_PROGRAM_NAME}.conf" "${NETDATA_USER_CONFIG_DIR}/${SHORT_PROGRAM_NAME}.conf"; do
 	if [ -f "$myconfig" ]; then
 		source "$myconfig"
 		if [ $? -ne 0 ]; then
