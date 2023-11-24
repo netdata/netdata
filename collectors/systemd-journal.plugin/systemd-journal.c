@@ -499,7 +499,7 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
            "scanned_lines=%zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
            "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
            "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
-           "first message read from the file at "PRIu64", current message at %"PRIu64", "
+           "first message read from the file at %"PRIu64", current message at %"PRIu64", "
            "proportion of time %.2f %%, "
            "expected total lines in file %zu, "
            "remaining lines %zu, "
