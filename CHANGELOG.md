@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- update go.d plugin version to v0.57.1 [\#16465](https://github.com/netdata/netdata/pull/16465) ([ilyam8](https://github.com/ilyam8))
+- Add option to disable ML. [\#16463](https://github.com/netdata/netdata/pull/16463) ([vkalintiris](https://github.com/vkalintiris))
 - fix analytics logs [\#16462](https://github.com/netdata/netdata/pull/16462) ([ktsaou](https://github.com/ktsaou))
 - fix logs bashism [\#16461](https://github.com/netdata/netdata/pull/16461) ([ktsaou](https://github.com/ktsaou))
 - fix log2journal incorrect log [\#16460](https://github.com/netdata/netdata/pull/16460) ([ktsaou](https://github.com/ktsaou))
@@ -14,6 +16,7 @@
 - set journal path for logging [\#16457](https://github.com/netdata/netdata/pull/16457) ([ktsaou](https://github.com/ktsaou))
 - add sbindir\_POST to PATH of bash scripts that use `systemd-cat-native` [\#16456](https://github.com/netdata/netdata/pull/16456) ([ilyam8](https://github.com/ilyam8))
 - add LogNamespace to systemd units [\#16454](https://github.com/netdata/netdata/pull/16454) ([ilyam8](https://github.com/ilyam8))
+- Update non-zero uuid key + child conf. [\#16452](https://github.com/netdata/netdata/pull/16452) ([vkalintiris](https://github.com/vkalintiris))
 - Add missing argument. [\#16451](https://github.com/netdata/netdata/pull/16451) ([vkalintiris](https://github.com/vkalintiris))
 - log flood protection to 1000 log lines / 1 minute [\#16450](https://github.com/netdata/netdata/pull/16450) ([ilyam8](https://github.com/ilyam8))
 - fix: link daemon.log to stderr in docker [\#16447](https://github.com/netdata/netdata/pull/16447) ([ilyam8](https://github.com/ilyam8))
@@ -52,6 +55,7 @@
 - skip spaces when reading cpuset [\#16385](https://github.com/netdata/netdata/pull/16385) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16384](https://github.com/netdata/netdata/pull/16384) ([netdatabot](https://github.com/netdatabot))
 - use pre-configured message\_ids to identify common logs [\#16383](https://github.com/netdata/netdata/pull/16383) ([ktsaou](https://github.com/ktsaou))
+- Handle ephemeral hosts [\#16381](https://github.com/netdata/netdata/pull/16381) ([stelfrag](https://github.com/stelfrag))
 - docs: remove 'families' from health reference [\#16380](https://github.com/netdata/netdata/pull/16380) ([ilyam8](https://github.com/ilyam8))
 - fix cloud aws sns notification meta [\#16379](https://github.com/netdata/netdata/pull/16379) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16378](https://github.com/netdata/netdata/pull/16378) ([netdatabot](https://github.com/netdatabot))
@@ -422,8 +426,6 @@
 - Add a chart that groups anomaly rate by chart type. [\#15856](https://github.com/netdata/netdata/pull/15856) ([vkalintiris](https://github.com/vkalintiris))
 - fix packaging static build openssl 32bit [\#15855](https://github.com/netdata/netdata/pull/15855) ([ilyam8](https://github.com/ilyam8))
 - fix packaging mark stable static build [\#15854](https://github.com/netdata/netdata/pull/15854) ([ilyam8](https://github.com/ilyam8))
-- eBPF socket function [\#15850](https://github.com/netdata/netdata/pull/15850) ([thiagoftsm](https://github.com/thiagoftsm))
-- Facets histograms [\#15846](https://github.com/netdata/netdata/pull/15846) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
