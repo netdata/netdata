@@ -442,7 +442,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 
     jf->msg_last_ut = jf->file_last_modified_ut;
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO,
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
            "Journal file added to the journal files registry: '%s'",
            jf->filename);
 }
