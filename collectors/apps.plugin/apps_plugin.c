@@ -5234,24 +5234,10 @@ static void function_processes(const char *transaction, char *function __maybe_u
 static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
-    // debug_flags = D_PROCFILE;
-    stderror = stderr;
-
     clocks_init();
+    nd_log_initialize_for_external_plugins("apps.plugin");
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
-
-    // set the name for logging
-    program_name = "apps.plugin";
-
-    // disable syslog for apps.plugin
-    error_log_syslog = 0;
-
-    // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
-
-    log_set_global_severity_for_external_plugins();
 
     bool send_resource_usage = true;
     {

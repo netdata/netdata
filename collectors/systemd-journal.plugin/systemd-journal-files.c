@@ -333,8 +333,8 @@ static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, v
     struct journal_file *jf = value; (void)jf;
     const char *filename = dictionary_acquired_item_name(item); (void)filename;
 
-    string_freez(jf->source);
     internal_error(true, "removed journal file '%s'", filename);
+    string_freez(jf->source);
 }
 
 void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut) {
@@ -383,6 +383,7 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
                         .max_journal_vs_realtime_delta_ut = JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT,
                 };
                 dictionary_set(journal_files_registry, absolute_path, &t, sizeof(t));
+                send_newline_and_flush();
             }
         }
     }
@@ -390,22 +391,34 @@ void journal_directory_scan(const char *dirname, int depth, usec_t last_scan_ut)
     closedir(dir);
 }
 
+static size_t journal_files_scans = 0;
+bool journal_files_completed_once(void) {
+    return journal_files_scans > 0;
+}
+
 void journal_files_registry_update(void) {
-    usec_t scan_ut = now_monotonic_usec();
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
-    for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES ;i++) {
-        if(!journal_directories[i].path)
-            break;
+    if(spinlock_trylock(&spinlock)) {
+        usec_t scan_ut = now_monotonic_usec();
 
-        journal_directory_scan(journal_directories[i].path, 0, scan_ut);
+        for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
+            if(!journal_directories[i].path)
+                break;
+
+            journal_directory_scan(journal_directories[i].path, 0, scan_ut);
+        }
+
+        struct journal_file *jf;
+        dfe_start_write(journal_files_registry, jf){
+                    if(jf->last_scan_ut < scan_ut)
+                        dictionary_del(journal_files_registry, jf_dfe.name);
+                }
+        dfe_done(jf);
+
+        journal_files_scans++;
+        spinlock_unlock(&spinlock);
     }
-
-    struct journal_file *jf;
-    dfe_start_write(journal_files_registry, jf) {
-        if(jf->last_scan_ut < scan_ut)
-            dictionary_del(journal_files_registry, jf_dfe.name);
-    }
-    dfe_done(jf);
 }
 
 // ----------------------------------------------------------------------------
@@ -472,6 +485,4 @@ void journal_init_files_and_directories(void) {
     boot_ids_to_first_ut = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(usec_t));
-
-    journal_files_registry_update();
 }

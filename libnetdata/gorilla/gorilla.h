@@ -11,47 +11,64 @@
 extern "C" {
 #endif
 
-/*
- * Low-level public API
-*/
+struct gorilla_buffer;
 
-// 32-bit API
+typedef struct {
+    struct gorilla_buffer *next;
+    uint32_t entries;
+    uint32_t nbits;
+} gorilla_header_t;
 
-typedef struct bit_code_writer_u32 bit_code_writer_u32_t;
-typedef struct bit_code_reader_u32 bit_code_reader_u32_t;
+typedef struct gorilla_buffer {
+    gorilla_header_t header;
+    uint32_t data[];
+} gorilla_buffer_t;
 
-void bit_code_writer_u32_init(bit_code_writer_u32_t *bcw, uint32_t *buffer, uint32_t capacity);
-bool bit_code_writer_u32_write(bit_code_writer_u32_t *bcw, const uint32_t number);
-bool bit_code_writer_u32_flush(bit_code_writer_u32_t *bcw);
+typedef struct {
+    gorilla_buffer_t *head_buffer;
+    gorilla_buffer_t *last_buffer;
 
-void bit_code_reader_u32_init(bit_code_reader_u32_t *bcr, uint32_t *buffer, uint32_t capacity);
-bool bit_code_reader_u32_read(bit_code_reader_u32_t *bcr, uint32_t *number);
-bool bit_code_reader_u32_info(bit_code_reader_u32_t *bcr, uint32_t *num_entries_written,
-                                                          uint64_t *num_bits_written);
+    uint32_t prev_number;
+    uint32_t prev_xor_lzc;
 
-// 64-bit API
+    // in bits
+    uint32_t capacity;
+} gorilla_writer_t;
 
-typedef struct bit_code_writer_u64 bit_code_writer_u64_t;
-typedef struct bit_code_reader_u64 bit_code_reader_u64_t;
+typedef struct {
+    const gorilla_buffer_t *buffer;
 
-void bit_code_writer_u64_init(bit_code_writer_u64_t *bcw, uint64_t *buffer, uint64_t capacity);
-bool bit_code_writer_u64_write(bit_code_writer_u64_t *bcw, const uint64_t number);
-bool bit_code_writer_u64_flush(bit_code_writer_u64_t *bcw);
+    // number of values
+    size_t entries;
+    size_t index;
 
-void bit_code_reader_u64_init(bit_code_reader_u64_t *bcr, uint64_t *buffer, uint64_t capacity);
-bool bit_code_reader_u64_read(bit_code_reader_u64_t *bcr, uint64_t *number);
-bool bit_code_reader_u64_info(bit_code_reader_u64_t *bcr, uint64_t *num_entries_written,
-                                                          uint64_t *num_bits_written);
+    // in bits
+    size_t capacity; // FIXME: this not needed on the reader's side
+    size_t position;
 
-/*
- * High-level public API
-*/
+    uint32_t prev_number;
+    uint32_t prev_xor_lzc;
+    uint32_t prev_xor;
+} gorilla_reader_t;
 
-size_t gorilla_encode_u32(uint32_t *dst, size_t dst_len, const uint32_t *src, size_t src_len);
-size_t gorilla_decode_u32(uint32_t *dst, size_t dst_len, const uint32_t *src, size_t src_len);
+gorilla_writer_t gorilla_writer_init(gorilla_buffer_t *gbuf, size_t n);
+void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, size_t n);
+bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number);
+uint32_t gorilla_writer_entries(const gorilla_writer_t *gw);
 
-size_t gorilla_encode_u64(uint64_t *dst, size_t dst_len, const uint64_t *src, size_t src_len);
-size_t gorilla_decode_u64(uint64_t *dst, size_t dst_len, const uint64_t *src, size_t src_len);
+gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw);
+
+gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw);
+
+uint32_t gorilla_writer_nbytes(const gorilla_writer_t *gw);
+bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size);
+
+uint32_t gorilla_buffer_patch(gorilla_buffer_t *buf);
+gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *buf);
+bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number);
+
+#define GORILLA_BUFFER_SLOTS 128
+#define GORILLA_BUFFER_SIZE (GORILLA_BUFFER_SLOTS * sizeof(uint32_t))
 
 #ifdef __cplusplus
 }

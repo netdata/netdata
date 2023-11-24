@@ -8,6 +8,79 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     sql_health_alarm_log_save(host, ae);
 }
 
+
+void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &health_alert_transition_msgid),
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, host->hostname),
+            ND_LOG_FIELD_STR(NDF_NIDL_INSTANCE, ae->chart_name),
+            ND_LOG_FIELD_STR(NDF_NIDL_CONTEXT, ae->chart_context),
+            ND_LOG_FIELD_U64(NDF_ALERT_ID, ae->alarm_id),
+            ND_LOG_FIELD_U64(NDF_ALERT_UNIQUE_ID, ae->unique_id),
+            ND_LOG_FIELD_U64(NDF_ALERT_EVENT_ID, ae->alarm_event_id),
+            ND_LOG_FIELD_UUID(NDF_ALERT_CONFIG_HASH, &ae->config_hash_id),
+            ND_LOG_FIELD_UUID(NDF_ALERT_TRANSITION_ID, &ae->transition_id),
+            ND_LOG_FIELD_STR(NDF_ALERT_NAME, ae->name),
+            ND_LOG_FIELD_STR(NDF_ALERT_CLASS, ae->classification),
+            ND_LOG_FIELD_STR(NDF_ALERT_COMPONENT, ae->component),
+            ND_LOG_FIELD_STR(NDF_ALERT_TYPE, ae->type),
+            ND_LOG_FIELD_STR(NDF_ALERT_EXEC, ae->exec),
+            ND_LOG_FIELD_STR(NDF_ALERT_RECIPIENT, ae->recipient),
+            ND_LOG_FIELD_STR(NDF_ALERT_SOURCE, ae->exec),
+            ND_LOG_FIELD_STR(NDF_ALERT_UNITS, ae->units),
+            ND_LOG_FIELD_STR(NDF_ALERT_SUMMARY, ae->summary),
+            ND_LOG_FIELD_STR(NDF_ALERT_INFO, ae->info),
+            ND_LOG_FIELD_DBL(NDF_ALERT_VALUE, ae->new_value),
+            ND_LOG_FIELD_DBL(NDF_ALERT_VALUE_OLD, ae->old_value),
+            ND_LOG_FIELD_TXT(NDF_ALERT_STATUS, rrdcalc_status2string(ae->new_status)),
+            ND_LOG_FIELD_TXT(NDF_ALERT_STATUS_OLD, rrdcalc_status2string(ae->old_status)),
+            ND_LOG_FIELD_I64(NDF_ALERT_DURATION, ae->duration),
+            ND_LOG_FIELD_I64(NDF_RESPONSE_CODE, ae->exec_code),
+            ND_LOG_FIELD_U64(NDF_ALERT_NOTIFICATION_REALTIME_USEC, ae->delay_up_to_timestamp * USEC_PER_SEC),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    errno = 0;
+
+    ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
+
+    switch(ae->new_status) {
+        case RRDCALC_STATUS_UNDEFINED:
+            if(ae->old_status >= RRDCALC_STATUS_CLEAR)
+                priority = NDLP_NOTICE;
+            else
+                priority = NDLP_DEBUG;
+            break;
+
+        default:
+        case RRDCALC_STATUS_UNINITIALIZED:
+        case RRDCALC_STATUS_REMOVED:
+            priority = NDLP_DEBUG;
+            break;
+
+        case RRDCALC_STATUS_CLEAR:
+            priority = NDLP_INFO;
+            break;
+
+        case RRDCALC_STATUS_WARNING:
+            if(ae->old_status < RRDCALC_STATUS_WARNING)
+                priority = NDLP_WARNING;
+            break;
+
+        case RRDCALC_STATUS_CRITICAL:
+            if(ae->old_status < RRDCALC_STATUS_CRITICAL)
+                priority = NDLP_CRIT;
+            break;
+    }
+
+    netdata_logger(NDLS_HEALTH, priority, file, function, line,
+           "ALERT '%s' of instance '%s' on node '%s', transitioned from %s to %s",
+           string2str(ae->name), string2str(ae->chart), string2str(host->hostname),
+           rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status)
+           );
+}
+
 // ----------------------------------------------------------------------------
 // health alarm log management
 

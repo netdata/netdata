@@ -6,6 +6,7 @@ Description=Real time performance monitoring
 After=network.target
 
 [Service]
+LogNamespace=netdata
 Type=simple
 User=root
 EnvironmentFile=-/etc/default/netdata

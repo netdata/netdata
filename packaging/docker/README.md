@@ -453,9 +453,9 @@ above section on [configuring Agent containers](#configure-agent-containers) to 
 how you created the container.
 
 Alternatively, you can directly use the hostname from the node running the container by mounting `/etc/hostname` from
-the host in the container. With `docker run`, this can be done by adding `--volume /etc/hostname:/etc/hostname:ro` to
+the host in the container. With `docker run`, this can be done by adding `--volume /etc/hostname:/host/etc/hostname:ro` to
 the options. If you are using Docker Compose, you can add an entry to the container's `volumes` section
-reading `- /etc/hostname:/etc/hostname:ro`.
+reading `- /etc/hostname:/host/etc/hostname:ro`.
 
 ## Adding extra packages at runtime
 

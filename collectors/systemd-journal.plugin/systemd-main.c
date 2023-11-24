@@ -9,19 +9,8 @@ netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    stderror = stderr;
     clocks_init();
-
-    program_name = "systemd-journal.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
-
-    // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
-
-    log_set_global_severity_for_external_plugins();
+    nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);
@@ -38,7 +27,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
         bool cancelled = false;
-        char buf[] = "systemd-journal after:-16000000 before:0 last:1";
+        char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
         function_systemd_journal("123", buf, 600, &cancelled);
@@ -68,12 +57,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 #endif
 
     // ------------------------------------------------------------------------
-
-    time_t started_t = now_monotonic_sec();
-
-    size_t iteration = 0;
-    usec_t step = 1000 * USEC_PER_MS;
-    bool tty = isatty(fileno(stderr)) == 1;
+    // register functions to netdata
 
     netdata_mutex_lock(&stdout_mutex);
 
@@ -85,26 +69,33 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             SYSTEMD_UNITS_FUNCTION_NAME, SYSTEMD_UNITS_DEFAULT_TIMEOUT, SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
 #endif
 
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
+
+    // ------------------------------------------------------------------------
+
+    usec_t step_ut = 100 * USEC_PER_MS;
+    usec_t send_newline_ut = 0;
+    usec_t since_last_scan_ut = 1000 * USEC_PER_SEC; // something big to trigger scanning at start
+    bool tty = isatty(fileno(stderr)) == 1;
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!plugin_should_exit) {
-        iteration++;
 
-        netdata_mutex_unlock(&stdout_mutex);
-        heartbeat_next(&hb, step);
-        netdata_mutex_lock(&stdout_mutex);
-
-        if(!tty)
-            fprintf(stdout, "\n");
-
-        if(iteration % 60 == 0)
+        if(since_last_scan_ut > 60 * USEC_PER_SEC) {
             journal_files_registry_update();
+            since_last_scan_ut = 0;
+        }
 
-        fflush(stdout);
+        usec_t dt_ut = heartbeat_next(&hb, step_ut);
+        since_last_scan_ut += dt_ut;
+        send_newline_ut += dt_ut;
 
-        time_t now = now_monotonic_sec();
-        if(now - started_t > 86400)
-            break;
+        if(!tty && send_newline_ut > USEC_PER_SEC) {
+            send_newline_and_flush();
+            send_newline_ut = 0;
+        }
     }
 
     exit(0);

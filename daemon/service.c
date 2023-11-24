@@ -272,22 +272,45 @@ restart_after_removal:
         if(!rrdhost_should_be_removed(host, protected_host, now))
             continue;
 
-        netdata_log_info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
+        bool is_archived = rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED);
+        if (!is_archived) {
+            netdata_log_info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
-        if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
-            /* don't delete multi-host DB host files */
-            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
-        ) {
-            worker_is_busy(WORKER_JOB_DELETE_HOST_CHARTS);
-            rrdhost_delete_charts(host);
+            if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
+                /* don't delete multi-host DB host files */
+                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
+            ) {
+                worker_is_busy(WORKER_JOB_DELETE_HOST_CHARTS);
+                rrdhost_delete_charts(host);
+            }
+            else {
+                worker_is_busy(WORKER_JOB_SAVE_HOST_CHARTS);
+                rrdhost_save_charts(host);
+            }
         }
-        else {
-            worker_is_busy(WORKER_JOB_SAVE_HOST_CHARTS);
-            rrdhost_save_charts(host);
+
+        bool force = false;
+
+        if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) && now - host->last_connected > rrdhost_free_ephemeral_time_s)
+            force = true;
+
+        if (!force && is_archived)
+            continue;
+
+       if (force) {
+            netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
         }
 
         worker_is_busy(WORKER_JOB_FREE_HOST);
-        rrdhost_free___while_having_rrd_wrlock(host, false);
+#ifdef ENABLE_ACLK
+        // in case we have cloud connection we inform cloud
+        // a child disconnected
+        if (netdata_cloud_enabled && force) {
+            aclk_host_state_update(host, 0, 0);
+            unregister_node(host->machine_guid);
+        }
+#endif
+        rrdhost_free___while_having_rrd_wrlock(host, force);
         goto restart_after_removal;
     }
 

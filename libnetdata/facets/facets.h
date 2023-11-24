@@ -6,6 +6,8 @@
 #include "../libnetdata.h"
 
 #define FACET_VALUE_UNSET "-"
+#define FACET_VALUE_UNSAMPLED "[unsampled]"
+#define FACET_VALUE_ESTIMATED "[estimated]"
 
 typedef enum __attribute__((packed)) {
     FACETS_ANCHOR_DIRECTION_FORWARD,
@@ -85,11 +87,16 @@ void facets_accepted_param(FACETS *facets, const char *param);
 void facets_rows_begin(FACETS *facets);
 bool facets_row_finished(FACETS *facets, usec_t usec);
 
+void facets_row_finished_unsampled(FACETS *facets, usec_t usec);
+void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, size_t entries);
+size_t facets_histogram_slots(FACETS *facets);
+
 FACET_KEY *facets_register_key_name(FACETS *facets, const char *key, FACET_KEY_OPTIONS options);
 void facets_set_query(FACETS *facets, const char *query);
 void facets_set_items(FACETS *facets, uint32_t items);
 void facets_set_anchor(FACETS *facets, usec_t start_ut, usec_t stop_ut, FACETS_ANCHOR_DIRECTION direction);
 void facets_enable_slice_mode(FACETS *facets);
+bool facets_row_candidate_to_keep(FACETS *facets, usec_t usec);
 
 FACET_KEY *facets_register_facet_id(FACETS *facets, const char *key_id, FACET_KEY_OPTIONS options);
 void facets_register_facet_id_filter(FACETS *facets, const char *key_id, char *value_id, FACET_KEY_OPTIONS options);

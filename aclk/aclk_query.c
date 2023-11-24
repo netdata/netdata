@@ -90,6 +90,12 @@ static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, vo
 }
 
 static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) {
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "aclk"),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     int retval = 0;
     BUFFER *local_buffer = NULL;
     size_t size = 0;
@@ -110,7 +116,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     usec_t t;
     web_client_timeout_checkpoint_set(w, query->timeout);
     if(web_client_timeout_checkpoint_and_check(w, &t)) {
-        netdata_log_access("QUERY CANCELED: QUEUE TIME EXCEEDED %llu ms (LIMIT %d ms)", t / USEC_PER_MS, query->timeout);
+        nd_log(NDLS_ACCESS, NDLP_ERR, "QUERY CANCELED: QUEUE TIME EXCEEDED %llu ms (LIMIT %d ms)", t / USEC_PER_MS, query->timeout);
         retval = 1;
         w->response.code = HTTP_RESP_SERVICE_UNAVAILABLE;
         aclk_http_msg_v2_err(query_thr->client, query->callback_topic, query->msg_id, w->response.code, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
@@ -217,25 +223,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     // send msg.
     w->response.code = aclk_http_msg_v2(query_thr->client, query->callback_topic, query->msg_id, t, query->created, w->response.code, local_buffer->buffer, local_buffer->len);
 
-    struct timeval tv;
-
 cleanup:
-    now_monotonic_high_precision_timeval(&tv);
-    netdata_log_access("%llu: %d '[ACLK]:%d' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
-        w->id
-        , gettid()
-        , query_thr->idx
-        , "DATA"
-        , sent
-        , size
-        , size > sent ? -(((size - sent) / (double)size) * 100.0) : ((size > 0) ? (((sent - size ) / (double)size) * 100.0) : 0.0)
-        , dt_usec(&w->timings.tv_ready, &w->timings.tv_in) / 1000.0
-        , dt_usec(&tv, &w->timings.tv_ready) / 1000.0
-        , dt_usec(&tv, &w->timings.tv_in) / 1000.0
-        , w->response.code
-        , strip_control_characters((char *)buffer_tostring(w->url_as_received))
-    );
-
+    web_client_log_completed_request(w, false);
     web_client_release_to_cache(w);
 
     pending_req_list_rm(query->msg_id);

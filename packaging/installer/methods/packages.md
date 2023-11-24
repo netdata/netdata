@@ -44,7 +44,9 @@ repositories at that top level:
 
 Within each top level group of repositories, there are directories for each supported group of distributions:
 
-- `el`: Is for Red Hat Enterprise Linux and binary compatible distros, such as CentOS, Alma Linux, and Rocky Linux.
+- `amazonlinux`: Is for Amazon Linux and binary compatible distros.
+- `el`: Is for Red Hat Enterprise Linux and binary compatible distros that are not covered by other repos, such
+  as CentOS, Alma Linux, and Rocky Linux.
 - `fedora`: Is for Fedora and binary compatible distros.
 - `ol`: Is for Oracle Linux and binary compatible distros.
 - `opensuse`: Is for openSUSE and binary compatible distros.
@@ -63,6 +65,13 @@ If you are explicitly configuring a system to use our repositories, the recommen
 appropriate repository configuration package from https://repo.netdata.cloud/repos/repoconfig and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
+
+> ### Note
+>
+> On RHEL and other systems that use the `el` repostiroies, some of the dependencies for Netdata can only be found
+> in the EPEL repository, which is not enabled or installed by default on most of these systems. This additional
+> repository _should_ be pulled in automatically by our repository config packages, but if it is not you may need
+> to manually install `epel-release` to be able to successfully install the Netdata packages.
 
 ## Manual setup of DEB packages.
 

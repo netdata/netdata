@@ -159,16 +159,8 @@ static void debugfs_parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    // debug_flags = D_PROCFILE;
-    stderror = stderr;
-
-    // set the name for logging
-    program_name = "debugfs.plugin";
-
-    // disable syslog for debugfs.plugin
-    error_log_syslog = 0;
-
-    log_set_global_severity_for_external_plugins();
+    clocks_init();
+    nd_log_initialize_for_external_plugins("debugfs.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if (verify_netdata_host_prefix() == -1)

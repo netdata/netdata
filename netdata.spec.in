@@ -156,9 +156,15 @@ BuildRequires: pkgconfig(zlib)
 BuildRequires: pkgconfig(uuid)
 BuildRequires: pkgconfig(libuv)
 BuildRequires: pkgconfig(openssl)
+BuildRequires: pkgconfig(curl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
+%if 0%{?suse_version}
+# log2journal is not available on these systems
+%else
+BuildRequires: pkgconfig(pcre2)
+%endif
 %if 0%{?suse_version}
 BuildRequires: protobuf-devel
 BuildRequires: libprotobuf-c-devel
@@ -603,6 +609,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
+%if 0%{?suse_version}
+# log2journal is not available on these systems
+%else
+%{_sbindir}/log2journal
+%endif
+%{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
 
 %{_unitdir}/%{name}.service

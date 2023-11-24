@@ -83,6 +83,7 @@ int journal_file_dict_items_backward_compar(const void *a, const void *b);
 int journal_file_dict_items_forward_compar(const void *a, const void *b);
 void buffer_json_journal_versions(BUFFER *wb);
 void available_journal_file_sources_to_json_array(BUFFER *wb);
+bool journal_files_completed_once(void);
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 
@@ -107,5 +108,12 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
 #ifdef ENABLE_SYSTEMD_DBUS
 void function_systemd_units(const char *transaction, char *function, int timeout, bool *cancelled);
 #endif
+
+static inline void send_newline_and_flush(void) {
+    netdata_mutex_lock(&stdout_mutex);
+    fprintf(stdout, "\n");
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
+}
 
 #endif //NETDATA_COLLECTORS_SYSTEMD_INTERNALS_H

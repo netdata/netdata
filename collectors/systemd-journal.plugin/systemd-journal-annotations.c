@@ -408,35 +408,50 @@ void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BU
                 };
 
                 sd_journal *j = NULL;
-                if(sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
-                    internal_error(true, "JOURNAL: cannot open file '%s' to get boot_id", jf_dfe.name);
+                int r = sd_journal_open_files(&j, files, ND_SD_JOURNAL_OPEN_FLAGS);
+                if(r < 0 || !j) {
+                    internal_error(true, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                                         "sd_journal_open_files('%s') returned %d",
+                                         boot_id, jf_dfe.name, r);
                     continue;
                 }
 
                 char m[100];
                 size_t len = snprintfz(m, sizeof(m), "_BOOT_ID=%s", boot_id);
 
-                if(sd_journal_add_match(j, m, len) < 0) {
-                    internal_error(true, "JOURNAL: cannot add match '%s' to file '%s'", m, jf_dfe.name);
+                r = sd_journal_add_match(j, m, len);
+                if(r < 0) {
+                    internal_error(true, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                                         "sd_journal_add_match('%s') on file '%s' returned %d",
+                                         boot_id, m, jf_dfe.name, r);
                     sd_journal_close(j);
                     continue;
                 }
 
-                if(sd_journal_seek_head(j) < 0) {
-                    internal_error(true, "JOURNAL: cannot seek head to file '%s'", jf_dfe.name);
+                r = sd_journal_seek_head(j);
+                if(r < 0) {
+                    internal_error(true, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                                         "sd_journal_seek_head() on file '%s' returned %d",
+                                         boot_id, jf_dfe.name, r);
                     sd_journal_close(j);
                     continue;
                 }
 
-                if(sd_journal_next(j) < 0) {
-                    internal_error(true, "JOURNAL: cannot get next of file '%s'", jf_dfe.name);
+                r = sd_journal_next(j);
+                if(r < 0) {
+                    internal_error(true, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                                         "sd_journal_next() on file '%s' returned %d",
+                                         boot_id, jf_dfe.name, r);
                     sd_journal_close(j);
                     continue;
                 }
 
                 usec_t t_ut = 0;
-                if(sd_journal_get_realtime_usec(j, &t_ut) < 0 || !t_ut) {
-                    internal_error(true, "JOURNAL: cannot get realtime_usec of file '%s'", jf_dfe.name);
+                r = sd_journal_get_realtime_usec(j, &t_ut);
+                if(r < 0 || !t_ut) {
+                    internal_error(r != -EADDRNOTAVAIL, "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                                         "sd_journal_get_realtime_usec() on file '%s' returned %d",
+                                         boot_id, jf_dfe.name, r);
                     sd_journal_close(j);
                     continue;
                 }
@@ -454,25 +469,21 @@ void netdata_systemd_journal_transform_boot_id(FACETS *facets __maybe_unused, BU
             ut = *p_ut;
 
         if(ut != UINT64_MAX) {
-            time_t timestamp_sec = (time_t)(ut / USEC_PER_SEC);
-            struct tm tm;
-            char buffer[30];
-
-            gmtime_r(&timestamp_sec, &tm);
-            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+            char buffer[ISO8601_MAX_LENGTH];
+            iso8601_datetime_ut(buffer, sizeof(buffer), ut, ISO8601_UTC);
 
             switch(scope) {
                 default:
                 case FACETS_TRANSFORM_DATA:
                 case FACETS_TRANSFORM_VALUE:
-                    buffer_sprintf(wb, " (%s UTC)  ", buffer);
+                    buffer_sprintf(wb, " (%s)  ", buffer);
                     break;
 
                 case FACETS_TRANSFORM_FACET:
                 case FACETS_TRANSFORM_FACET_SORT:
                 case FACETS_TRANSFORM_HISTOGRAM:
                     buffer_flush(wb);
-                    buffer_sprintf(wb, "%s UTC", buffer);
+                    buffer_sprintf(wb, "%s", buffer);
                     break;
             }
         }
@@ -537,13 +548,9 @@ void netdata_systemd_journal_transform_timestamp_usec(FACETS *facets __maybe_unu
     if(*v && isdigit(*v)) {
         uint64_t ut = str2ull(buffer_tostring(wb), NULL);
         if(ut) {
-            time_t timestamp_sec = (time_t)(ut / USEC_PER_SEC);
-            struct tm tm;
-            char buffer[30];
-
-            gmtime_r(&timestamp_sec, &tm);
-            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
-            buffer_sprintf(wb, " (%s.%06llu UTC)", buffer, ut % USEC_PER_SEC);
+            char buffer[ISO8601_MAX_LENGTH];
+            iso8601_datetime_ut(buffer, sizeof(buffer), ut, ISO8601_UTC | ISO8601_MICROSECONDS);
+            buffer_sprintf(wb, " (%s)", buffer);
         }
     }
 }
@@ -703,6 +710,23 @@ void netdata_systemd_journal_message_ids_init(void) {
     // gnome-shell
     // https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/main.js#L56
     i.msg = "Gnome shell started";dictionary_set(known_journal_messages_ids, "f3ea493c22934e26811cd62abe8e203a", &i, sizeof(i));
+
+    // flathub
+    // https://docs.flatpak.org/de/latest/flatpak-command-reference.html
+    i.msg = "Flatpak cache"; dictionary_set(known_journal_messages_ids, "c7b39b1e006b464599465e105b361485", &i, sizeof(i));
+
+    // ???
+    i.msg = "Flathub pulls"; dictionary_set(known_journal_messages_ids, "75ba3deb0af041a9a46272ff85d9e73e", &i, sizeof(i));
+    i.msg = "Flathub pull errors"; dictionary_set(known_journal_messages_ids, "f02bce89a54e4efab3a94a797d26204a", &i, sizeof(i));
+
+    // ??
+    i.msg = "Boltd starting"; dictionary_set(known_journal_messages_ids, "dd11929c788e48bdbb6276fb5f26b08a", &i, sizeof(i));
+
+    // Netdata
+    i.msg = "Netdata connection from child"; dictionary_set(known_journal_messages_ids, "ed4cdb8f1beb4ad3b57cb3cae2d162fa", &i, sizeof(i));
+    i.msg = "Netdata connection to parent"; dictionary_set(known_journal_messages_ids, "6e2e3839067648968b646045dbf28d66", &i, sizeof(i));
+    i.msg = "Netdata alert transition"; dictionary_set(known_journal_messages_ids, "9ce0cb58ab8b44df82c4bf1ad9ee22de", &i, sizeof(i));
+    i.msg = "Netdata alert notification"; dictionary_set(known_journal_messages_ids, "6db0018e83e34320ae2a659d78019fb7", &i, sizeof(i));
 }
 
 void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
