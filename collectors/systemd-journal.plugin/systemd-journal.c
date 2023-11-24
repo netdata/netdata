@@ -495,7 +495,7 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
     if (remaining_logs_by_time < 1) remaining_logs_by_time = 1;
 
     nd_log(NDLS_COLLECTORS, NDLP_INFO,
-           "JOURNAL ESTIMATION: "
+           "JOURNAL ESTIMATION: '%s' "
            "scanned_lines=%zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
            "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
            "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
@@ -504,6 +504,7 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
            "expected total lines in file %zu, "
            "remaining lines %zu, "
            "remaining time %"PRIu64" [%"PRIu64" - %"PRIu64", duration %"PRId64"]"
+           , jf->filename
            , scanned_lines, fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
            , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
            , fqs->query_file.start_ut, fqs->query_file.stop_ut, fqs->query_file.stop_ut - fqs->query_file.start_ut
@@ -1186,10 +1187,11 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         ND_SD_JOURNAL_STATUS tmp_status = netdata_systemd_journal_query_one_file(filename, wb, facets, jf, fqs);
 
         nd_log(NDLS_COLLECTORS, NDLP_INFO,
-               "JOURNAL ESTIMATION FINAL: "
+               "JOURNAL ESTIMATION FINAL: '%s' "
                "total lines %zu [sampled=%zu, unsampled=%zu, estimated=%zu], "
                "file [%"PRIu64" - %"PRIu64", duration %"PRId64", known lines in file %zu], "
                "query [%"PRIu64" - %"PRIu64", duration %"PRId64"], "
+               , jf->filename
                , fqs->samples_per_file.sampled + fqs->samples_per_file.unsampled + fqs->samples_per_file.estimated
                , fqs->samples_per_file.sampled, fqs->samples_per_file.unsampled, fqs->samples_per_file.estimated
                , jf->msg_first_ut, jf->msg_last_ut, jf->msg_last_ut - jf->msg_first_ut, jf->messages_in_file
