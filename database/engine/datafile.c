@@ -399,7 +399,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
         return 1;
     }
 
-    if (statbuf.st_size < (__off_t) sizeof(struct rrdeng_df_sb)) {
+    if (statbuf.st_size < (uint64_t) sizeof(struct rrdeng_df_sb)) {
         netdata_log_error("File length is too short.\n");
         return 1;
     }
