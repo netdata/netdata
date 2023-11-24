@@ -632,25 +632,6 @@ static void sampling_update_running_query_file_estimates(FACETS *facets, sd_jour
 
 // ----------------------------------------------------------------------------
 
-static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
-    const char *k = data;
-    const char *equal = strchr(k, '=');
-    if(unlikely(!equal))
-        return false;
-
-    size_t kl = equal - k;
-
-    const char *v = ++equal;
-    size_t vl = data_length - kl - 1;
-
-    *key = k;
-    *key_length = kl;
-    *value = v;
-    *value_length = vl;
-
-    return true;
-}
-
 static inline size_t netdata_systemd_journal_process_row(sd_journal *j, FACETS *facets, struct journal_file *jf, usec_t *msg_ut) {
     const void *data;
     size_t length, bytes = 0;

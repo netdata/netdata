@@ -112,6 +112,110 @@ static void journal_file_get_header_from_journalctl(const char *filename, struct
     }
 }
 
+usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct journal_file *jf, const char *boot_id) {
+    usec_t ut = UINT64_MAX;
+    int r;
+
+    char m[100];
+    size_t len = snprintfz(m, sizeof(m), "_BOOT_ID=%s", boot_id);
+
+    sd_journal_flush_matches(j);
+
+    r = sd_journal_add_match(j, m, len);
+    if(r < 0) {
+        errno = -r;
+        internal_error(true,
+                       "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                       "sd_journal_add_match('%s') on file '%s' returned %d",
+                       boot_id, m, jf->filename, r);
+        return UINT64_MAX;
+    }
+
+    r = sd_journal_seek_head(j);
+    if(r < 0) {
+        errno = -r;
+        internal_error(true,
+                       "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                       "sd_journal_seek_head() on file '%s' returned %d",
+                       boot_id, jf->filename, r);
+        return UINT64_MAX;
+    }
+
+    r = sd_journal_next(j);
+    if(r < 0) {
+        errno = -r;
+        internal_error(true,
+                       "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                       "sd_journal_next() on file '%s' returned %d",
+                       boot_id, jf->filename, r);
+        return UINT64_MAX;
+    }
+
+    r = sd_journal_get_realtime_usec(j, &ut);
+    if(r < 0 || !ut || ut == UINT64_MAX) {
+        errno = -r;
+        internal_error(r != -EADDRNOTAVAIL,
+                       "JOURNAL: while looking for the first timestamp of boot_id '%s', "
+                       "sd_journal_get_realtime_usec() on file '%s' returned %d",
+                       boot_id, jf->filename, r);
+        return UINT64_MAX;
+    }
+
+    if(ut && ut != UINT64_MAX) {
+        dictionary_set(boot_ids_to_first_ut, boot_id, &ut, sizeof(ut));
+        return ut;
+    }
+
+    return UINT64_MAX;
+}
+
+static void journal_file_get_boot_id_annotations(sd_journal *j __maybe_unused, struct journal_file *jf __maybe_unused) {
+#ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
+    sd_journal_flush_matches(j);
+
+    int r = sd_journal_query_unique(j, "_BOOT_ID");
+    if (r < 0) {
+        errno = -r;
+        internal_error(true,
+                       "JOURNAL: while querying for the unique _BOOT_ID values, "
+                       "sd_journal_query_unique() on file '%s' returned %d",
+                       jf->filename, r);
+        errno = -r;
+        return;
+    }
+
+    const void *data = NULL;
+    size_t data_length;
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+
+    SD_JOURNAL_FOREACH_UNIQUE(j, data, data_length) {
+        const char *key, *value;
+        size_t key_length, value_length;
+
+        if(!parse_journal_field(data, data_length, &key, &key_length, &value, &value_length))
+            continue;
+
+        if(value_length != 32)
+            continue;
+
+        char buf[33];
+        memcpy(buf, value, 32);
+        buf[32] = '\0';
+
+        dictionary_set(dict, buf, NULL, 0);
+    }
+
+    void *nothing;
+    dfe_start_read(dict, nothing){
+        journal_file_update_annotation_boot_id(j, jf, nothing_dfe.name);
+    }
+    dfe_done(nothing);
+
+    dictionary_destroy(dict);
+#endif
+}
+
 static void journal_file_update_header(const char *filename, struct journal_file *jf) {
     fstat_cache_enable_on_thread();
 
@@ -166,9 +270,6 @@ static void journal_file_update_header(const char *filename, struct journal_file
         }
     }
 #endif
-
-    sd_journal_close(j);
-    fstat_cache_disable_on_thread();
 
     if(first_ut > last_ut) {
         internal_error(true, "timestamps are flipped in file '%s'", filename);
@@ -238,6 +339,10 @@ static void journal_file_update_header(const char *filename, struct journal_file
 
 //    if(!jf->messages_in_file)
 //        journal_file_get_header_from_journalctl(filename, jf);
+
+    journal_file_get_boot_id_annotations(j, jf);
+    sd_journal_close(j);
+    fstat_cache_disable_on_thread();
 }
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix) {
@@ -639,6 +744,16 @@ int journal_file_dict_items_forward_compar(const void *a, const void *b) {
     return -journal_file_dict_items_backward_compar(a, b);
 }
 
+static bool boot_id_conflict_cb(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data __maybe_unused) {
+    usec_t *old_usec = old_value;
+    usec_t *new_usec = new_value;
+
+    if(*new_usec < *old_usec)
+        *old_usec = *new_usec;
+
+    return false;
+}
+
 void journal_init_files_and_directories(void) {
     unsigned d = 0;
 
@@ -677,4 +792,7 @@ void journal_init_files_and_directories(void) {
     boot_ids_to_first_ut = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(usec_t));
+
+    dictionary_register_conflict_callback(boot_ids_to_first_ut, boot_id_conflict_cb, NULL);
+
 }
