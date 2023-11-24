@@ -1534,6 +1534,19 @@ target_link_libraries(netdata PRIVATE
 )
 
 #
+# build systemd-cat-native
+#
+set(SYSTEMD_CAT_NATIVE_FILES libnetdata/log/systemd-cat-native.c
+                             libnetdata/log/systemd-cat-native.h)
+
+add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
+target_link_libraries(systemd-cat-native libnetdata)
+
+install(TARGETS systemd-cat-native
+        COMPONENT systemd-cat-native
+        DESTINATION usr/sbin)
+
+#
 # build netdatacli
 #
 
