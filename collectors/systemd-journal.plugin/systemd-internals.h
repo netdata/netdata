@@ -13,13 +13,13 @@
 #define SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION    "View, search and analyze systemd journal entries."
 #define SYSTEMD_JOURNAL_FUNCTION_NAME           "systemd-journal"
 #define SYSTEMD_JOURNAL_DEFAULT_TIMEOUT         60
+#define SYSTEMD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE 0.01
+#define SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS 250
+#define SYSTEMD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 
 #define SYSTEMD_UNITS_FUNCTION_DESCRIPTION      "View the status of systemd units"
 #define SYSTEMD_UNITS_FUNCTION_NAME              "systemd-list-units"
 #define SYSTEMD_UNITS_DEFAULT_TIMEOUT            30
-
-#define EXECUTE_WATCHER_PENDING_EVERY_MS 500
-#define FULL_JOURNAL_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 
 extern __thread size_t fstat_thread_calls;
 extern __thread size_t fstat_thread_cached_responses;
@@ -27,7 +27,6 @@ void fstat_cache_enable_on_thread(void);
 void fstat_cache_disable_on_thread(void);
 
 extern netdata_mutex_t stdout_mutex;
-
 
 typedef enum {
     ND_SD_JOURNAL_NO_FILE_MATCHED,
@@ -97,7 +96,8 @@ int journal_file_dict_items_forward_compar(const void *a, const void *b);
 void buffer_json_journal_versions(BUFFER *wb);
 void available_journal_file_sources_to_json_array(BUFFER *wb);
 bool journal_files_completed_once(void);
-void journal_files_updater_all_headers_sorted(void);
+void journal_files_registry_update(void);
+void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth);
 
 FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets, FACET_ROW *row, void *data);
 
@@ -116,14 +116,12 @@ usec_t journal_file_update_annotation_boot_id(sd_journal *j, struct journal_file
 #define MAX_JOURNAL_DIRECTORIES 100
 struct journal_directory {
     char *path;
-    bool logged_failure;
 };
 extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
 
 void journal_init_files_and_directories(void);
 void journal_init_query_status(void);
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled);
-void journal_files_registry_update(void);
 void journal_file_update_header(const char *filename, struct journal_file *jf);
 
 void netdata_systemd_journal_message_ids_init(void);

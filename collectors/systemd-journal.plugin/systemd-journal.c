@@ -633,7 +633,7 @@ static inline sampling_t is_row_in_sample(sd_journal *j, FUNCTION_QUERY_STATUS *
     if(fqs->samples_per_file.unsampled > fqs->samples_per_file.sampled) {
         double progress_by_time = sampling_running_file_query_progress_by_time(fqs, jf, direction, msg_ut);
 
-        if(progress_by_time > 0.05)
+        if(progress_by_time > SYSTEMD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE)
             return SAMPLING_STOP_AND_ESTIMATE;
     }
 
