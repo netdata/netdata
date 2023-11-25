@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- SEO changes for Collector names [\#16473](https://github.com/netdata/netdata/pull/16473) ([sashwathn](https://github.com/sashwathn))
+- fix charts.d plugin loading configuration [\#16471](https://github.com/netdata/netdata/pull/16471) ([ilyam8](https://github.com/ilyam8))
+- Fix error limit to respect the log every [\#16469](https://github.com/netdata/netdata/pull/16469) ([stelfrag](https://github.com/stelfrag))
+- Journal better estimations and watcher [\#16467](https://github.com/netdata/netdata/pull/16467) ([ktsaou](https://github.com/ktsaou))
 - update go.d plugin version to v0.57.1 [\#16465](https://github.com/netdata/netdata/pull/16465) ([ilyam8](https://github.com/ilyam8))
 - Add option to disable ML. [\#16463](https://github.com/netdata/netdata/pull/16463) ([vkalintiris](https://github.com/vkalintiris))
 - fix analytics logs [\#16462](https://github.com/netdata/netdata/pull/16462) ([ktsaou](https://github.com/ktsaou))
@@ -420,12 +424,6 @@
 - Regenerate integrations.js [\#15862](https://github.com/netdata/netdata/pull/15862) ([netdatabot](https://github.com/netdatabot))
 - Explicitly depend on version-matched plugins in native packages. [\#15861](https://github.com/netdata/netdata/pull/15861) ([Ferroin](https://github.com/Ferroin))
 - Apply a label prefix for netdata labels [\#15860](https://github.com/netdata/netdata/pull/15860) ([kevin-fwu](https://github.com/kevin-fwu))
-- fix proc meminfo cached calculation [\#15859](https://github.com/netdata/netdata/pull/15859) ([ilyam8](https://github.com/ilyam8))
-- Fix compilation warnings [\#15858](https://github.com/netdata/netdata/pull/15858) ([stelfrag](https://github.com/stelfrag))
-- packaging cleanup after \#15842 [\#15857](https://github.com/netdata/netdata/pull/15857) ([ilyam8](https://github.com/ilyam8))
-- Add a chart that groups anomaly rate by chart type. [\#15856](https://github.com/netdata/netdata/pull/15856) ([vkalintiris](https://github.com/vkalintiris))
-- fix packaging static build openssl 32bit [\#15855](https://github.com/netdata/netdata/pull/15855) ([ilyam8](https://github.com/ilyam8))
-- fix packaging mark stable static build [\#15854](https://github.com/netdata/netdata/pull/15854) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
