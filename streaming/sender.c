@@ -557,8 +557,8 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    char buf[ISO8601_MAX_LENGTH];
-    iso8601_datetime_ut(buf, sizeof(buf), host->destination->postpone_reconnection_until * USEC_PER_SEC, 0);
+    char buf[RFC3339_MAX_LENGTH];
+    rfc3339_datetime_ut(buf, sizeof(buf), host->destination->postpone_reconnection_until * USEC_PER_SEC, 0, false);
 
     nd_log(NDLS_DAEMON, priority,
            "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
