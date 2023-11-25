@@ -621,7 +621,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
     }
 
     bool existing = false;
-    bool *found = dictionary_set(dirs, full_path, &existing, sizeof(existing));
+    bool *found = dictionary_set(dirs, dirname, &existing, sizeof(existing));
     if(*found) return;
     *found = true;
 
