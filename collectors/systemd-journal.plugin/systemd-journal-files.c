@@ -628,7 +628,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
     // Read each entry in the directory.
     while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-            return;
+            continue;
 
         ssize_t len = snprintfz(full_path, sizeof(full_path), "%s/%s", dirname, entry->d_name);
 
