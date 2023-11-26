@@ -1120,7 +1120,7 @@ enable_feature DBENGINE "${ENABLE_DBENGINE}"
 enable_feature H2O "${ENABLE_H2O}"
 enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
 
-enable_feature PLUGIN_APPS 1
+enable_feature PLUGIN_APPS "${IS_LINUX}"
 
 check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
 check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
