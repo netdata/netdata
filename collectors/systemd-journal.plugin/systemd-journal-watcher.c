@@ -136,29 +136,31 @@ static char* get_path_from_wd(Watcher *watcher, int wd) {
     return NULL;
 }
 
-static void watch_directory_recursively(Watcher *watcher, int inotifyFd, const char *basePath) {
-    // First, add a watch for the top-level directory itself
-    add_watch(watcher, inotifyFd, basePath);
-
-    char path[PATH_MAX];
-    struct dirent *dp;
-    DIR *dir = opendir(basePath);
-
-    if (!dir)
-        return;
-
-    while ((dp = readdir(dir)) != NULL) {
-        if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0) {
-            snprintfz(path, sizeof(path), "%s/%s", basePath, dp->d_name);
-
-            if (dp->d_type == DT_DIR) {
-                // Recursively watch this directory
-                watch_directory_recursively(watcher, inotifyFd, path);
-            }
+static bool is_directory_watched(Watcher *watcher, const char *path) {
+    for (int i = 0; i < watcher->watchCount; ++i) {
+        if (watcher->watchList[i].wd != -1 && strcmp(watcher->watchList[i].path, path) == 0) {
+            return true;
         }
     }
+    return false;
+}
 
-    closedir(dir);
+static void watch_directory_and_subdirectories(Watcher *watcher, int inotifyFd, const char *basePath) {
+    DICTIONARY *dirs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+    journal_directory_scan_recursively(NULL, dirs, basePath, 0);
+
+    void *x;
+    dfe_start_read(dirs, x) {
+        const char *dirname = x_dfe.name;
+        // Check if this directory is already being watched
+        if (!is_directory_watched(watcher, dirname)) {
+            add_watch(watcher, inotifyFd, dirname);
+        }
+    }
+    dfe_done(x);
+
+    dictionary_destroy(dirs);
 }
 
 static bool is_subpath(const char *path, const char *subpath) {
@@ -236,7 +238,7 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
                     fullPath);
 
             // Start watching the new directory - recursive watch
-            watch_directory_recursively(watcher, inotifyFd, fullPath);
+            watch_directory_and_subdirectories(watcher, inotifyFd, fullPath);
         }
         else
             nd_log(NDLS_COLLECTORS, NDLP_WARNING,
@@ -310,14 +312,14 @@ void *journal_watcher_main(void *arg __maybe_unused) {
 
         for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
             if (!journal_directories[i].path) break;
-            watch_directory_recursively(&watcher, inotifyFd, journal_directories[i].path);
+            watch_directory_and_subdirectories(&watcher, inotifyFd, journal_directories[i].path);
         }
 
         usec_t last_headers_update_ut = now_monotonic_usec();
         struct buffered_reader reader;
         while (1) {
             buffered_reader_ret_t rc = buffered_reader_read_timeout(
-                    &reader, inotifyFd, EXECUTE_WATCHER_PENDING_EVERY_MS, false);
+                    &reader, inotifyFd, SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS, false);
 
             if (rc != BUFFERED_READER_READ_OK && rc != BUFFERED_READER_READ_POLL_TIMEOUT) {
                 nd_log(NDLS_COLLECTORS, NDLP_CRIT,
@@ -353,7 +355,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
 
             usec_t ut = now_monotonic_usec();
             if (dictionary_entries(watcher.pending) && (rc == BUFFERED_READER_READ_POLL_TIMEOUT ||
-                last_headers_update_ut + (EXECUTE_WATCHER_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
+                last_headers_update_ut + (SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS * USEC_PER_MS) <= ut)) {
                 process_pending(&watcher);
                 last_headers_update_ut = ut;
             }

@@ -1498,8 +1498,8 @@ static void timestamp_usec_annotator(BUFFER *wb, const char *key, struct log_fie
     if(!ut)
         return;
 
-    char datetime[ISO8601_MAX_LENGTH];
-    iso8601_datetime_ut(datetime, sizeof(datetime), ut, ISO8601_LOCAL_TIMEZONE | ISO8601_MILLISECONDS);
+    char datetime[RFC3339_MAX_LENGTH];
+    rfc3339_datetime_ut(datetime, sizeof(datetime), ut, 3, false);
 
     if(buffer_strlen(wb))
         buffer_fast_strcat(wb, " ", 1);

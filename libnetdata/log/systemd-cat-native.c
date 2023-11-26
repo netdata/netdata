@@ -135,7 +135,12 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
 
 char global_hostname[HOST_NAME_MAX] = "";
 char global_boot_id[UUID_COMPACT_STR_LEN] = "";
+char global_machine_id[UUID_COMPACT_STR_LEN] = "";
+char global_stream_id[UUID_COMPACT_STR_LEN] = "";
+char global_namespace[1024] = "";
+char global_systemd_invocation_id[1024] = "";
 #define BOOT_ID_PATH "/proc/sys/kernel/random/boot_id"
+#define MACHINE_ID_PATH "/etc/machine-id"
 
 #define DEFAULT_PRIVATE_KEY "/etc/ssl/private/journal-upload.pem"
 #define DEFAULT_PUBLIC_KEY "/etc/ssl/certs/journal-upload.pem"
@@ -197,16 +202,25 @@ static void journal_remote_complete_event(BUFFER *msg, usec_t *monotonic_ut) {
         *monotonic_ut = ut;
 
     buffer_sprintf(msg,
-            ""
-            "__REALTIME_TIMESTAMP=%llu\n"
-            "__MONOTONIC_TIMESTAMP=%llu\n"
-            "_BOOT_ID=%s\n"
-            "_HOSTNAME=%s\n"
-            "\n"
+                   ""
+                   "__REALTIME_TIMESTAMP=%llu\n"
+                   "__MONOTONIC_TIMESTAMP=%llu\n"
+                   "_MACHINE_ID=%s\n"
+                   "_BOOT_ID=%s\n"
+                   "_HOSTNAME=%s\n"
+                   "_TRANSPORT=stdout\n"
+                   "_LINE_BREAK=nul\n"
+                   "_STREAM_ID=%s\n"
+                   "_RUNTIME_SCOPE=system\n"
+                   "%s%s\n"
                    , now_realtime_usec()
                    , ut
+                   , global_machine_id
                    , global_boot_id
                    , global_hostname
+                   , global_stream_id
+                   , global_namespace
+                   , global_systemd_invocation_id
                   );
 }
 
@@ -245,10 +259,10 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
         timeout_ms = 10;
 
     global_boot_id[0] = '\0';
-    char boot_id[1024];
-    if(read_file(BOOT_ID_PATH, boot_id, sizeof(boot_id)) == 0) {
+    char buffer[1024];
+    if(read_file(BOOT_ID_PATH, buffer, sizeof(buffer)) == 0) {
         uuid_t uuid;
-        if(uuid_parse_flexi(boot_id, uuid) == 0)
+        if(uuid_parse_flexi(buffer, uuid) == 0)
             uuid_unparse_lower_compact(uuid, global_boot_id);
         else
             fprintf(stderr, "WARNING: cannot parse the UUID found in '%s'.\n", BOOT_ID_PATH);
@@ -261,12 +275,36 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
         uuid_unparse_lower_compact(uuid, global_boot_id);
     }
 
+    if(read_file(MACHINE_ID_PATH, buffer, sizeof(buffer)) == 0) {
+        uuid_t uuid;
+        if(uuid_parse_flexi(buffer, uuid) == 0)
+            uuid_unparse_lower_compact(uuid, global_machine_id);
+        else
+            fprintf(stderr, "WARNING: cannot parse the UUID found in '%s'.\n", MACHINE_ID_PATH);
+    }
+
+    if(global_machine_id[0] == '\0') {
+        fprintf(stderr, "WARNING: cannot read '%s'. Will generate a random _MACHINE_ID.\n", MACHINE_ID_PATH);
+        uuid_t uuid;
+        uuid_generate_random(uuid);
+        uuid_unparse_lower_compact(uuid, global_boot_id);
+    }
+
+    if(global_stream_id[0] == '\0') {
+        uuid_t uuid;
+        uuid_generate_random(uuid);
+        uuid_unparse_lower_compact(uuid, global_stream_id);
+    }
+
     if(global_hostname[0] == '\0') {
         if(gethostname(global_hostname, sizeof(global_hostname)) != 0) {
             fprintf(stderr, "WARNING: cannot get system's hostname. Will use internal default.\n");
             snprintfz(global_hostname, sizeof(global_hostname), "systemd-cat-native-unknown-hostname");
         }
     }
+
+    if(global_systemd_invocation_id[0] == '\0' && getenv("INVOCATION_ID"))
+        snprintfz(global_systemd_invocation_id, sizeof(global_systemd_invocation_id), "_SYSTEMD_INVOCATION_ID=%s\n", getenv("INVOCATION_ID"));
 
     if(!key)
         key = DEFAULT_PRIVATE_KEY;
@@ -482,6 +520,9 @@ static int help(void) {
             "        The filename of the trusted CA public key.\n"
             "        The default is: " DEFAULT_CA_CERT "\n"
             "        The keyword 'all' can be used to trust all CAs.\n"
+            "\n"
+            "      --namespace=NAMESPACE\n"
+            "        Set the namespace of the messages sent.\n"
             "\n"
             "      --keep-trying\n"
             "        Keep trying to send the message, if the remote journal is not there.\n"
@@ -752,11 +793,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if(url && namespace) {
-        fprintf(stderr, "Cannot log to a systemd-journal-remote URL using a namespace. "
-                        "Please either give --url or --namespace, not both.\n");
-        return 1;
-    }
 #endif
 
     if(log_as_netdata && namespace) {
@@ -770,6 +806,9 @@ int main(int argc, char *argv[]) {
 
 #ifdef HAVE_CURL
     if(url) {
+        if(url && namespace && *namespace)
+            snprintfz(global_namespace, sizeof(global_namespace), "_NAMESPACE=%s\n", namespace);
+
         log_to_journal_remote_ret_t rc;
         do {
             rc = log_input_to_journal_remote(url, key, cert, trust, newline, timeout_ms);

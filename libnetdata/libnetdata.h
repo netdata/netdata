@@ -723,6 +723,7 @@ extern char *netdata_configured_host_prefix;
 #include "line_splitter/line_splitter.h"
 #include "clocks/clocks.h"
 #include "datetime/iso8601.h"
+#include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
 #include "completion/completion.h"
 #include "popen/popen.h"
