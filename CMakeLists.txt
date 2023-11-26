@@ -353,6 +353,7 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/log/log.h
                      libnetdata/os.c
                      libnetdata/os.h
+                     libnetdata/endian.h
                      libnetdata/onewayalloc/onewayalloc.c
                      libnetdata/onewayalloc/onewayalloc.h
                      libnetdata/popen/popen.c
