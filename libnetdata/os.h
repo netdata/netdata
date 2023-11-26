@@ -37,6 +37,7 @@ int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_t *len)
 #if __APPLE__
 
 #include <sys/sysctl.h>
+#include "endian.h"
 
 #define GETSYSCTL_BY_NAME(name, var) getsysctl_by_name(name, &(var), sizeof(var))
 int getsysctl_by_name(const char *name, void *ptr, size_t len);
