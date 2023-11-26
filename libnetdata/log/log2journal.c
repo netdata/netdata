@@ -41,46 +41,46 @@ void display_help(const char *name) {
     printf("\n");
     printf("Options:\n");
     printf("\n");
-    printf("  --filename-key=KEY\n");
+    printf("  --filename-key KEY\n");
     printf("       Add a field with KEY as the key and the current filename as value.\n");
     printf("       Automatically detects filenames when piped after 'tail -F',\n");
     printf("       and tail matches multiple filenames.\n");
     printf("       To inject the filename when tailing a single file, use --inject.\n");
     printf("\n");
-    printf("  --unmatched-key=KEY\n");
+    printf("  --unmatched-key KEY\n");
     printf("       Include unmatched log entries in the output with KEY as the field name.\n");
     printf("       Use this to include unmatched entries to the output stream.\n");
     printf("       Usually it should be set to --unmatched-key=MESSAGE so that the\n");
     printf("       unmatched entry will appear as the log message in the journals.\n");
     printf("       Use --inject-unmatched to inject additional fields to unmatched lines.\n");
     printf("\n");
-    printf("  --duplicate=TARGET=KEY1[,KEY2[,KEY3[,...]]\n");
+    printf("  --duplicate TARGET=KEY1[,KEY2[,KEY3[,...]]\n");
     printf("       Create a new key called TARGET, duplicating the values of the keys\n");
     printf("       given. Useful for further processing. When multiple keys are given,\n");
     printf("       their values are separated by comma.\n");
     printf("       Up to %d duplications can be given on the command line, and up to\n", MAX_KEY_DUPS);
     printf("       %d keys per duplication command are allowed.\n", MAX_KEY_DUPS_KEYS);
     printf("\n");
-    printf("  --inject=LINE\n");
+    printf("  --inject LINE\n");
     printf("       Inject constant fields to the output (both matched and unmatched logs).\n");
     printf("       --inject entries are added to unmatched lines too, when their key is\n");
     printf("       not used in --inject-unmatched (--inject-unmatched override --inject).\n");
     printf("       Up to %d fields can be injected.\n", MAX_INJECTIONS);
     printf("\n");
-    printf("  --inject-unmatched=LINE\n");
+    printf("  --inject-unmatched LINE\n");
     printf("       Inject lines into the output for each unmatched log entry.\n");
     printf("       Usually, --inject-unmatched=PRIORITY=3 is needed to mark the unmatched\n");
     printf("       lines as errors, so that they can easily be spotted in the journals.\n");
     printf("       Up to %d such lines can be injected.\n", MAX_INJECTIONS);
     printf("\n");
-    printf("  --rewrite=KEY=/SearchPattern/ReplacePattern\n");
+    printf("  --rewrite KEY=/SearchPattern/ReplacePattern\n");
     printf("       Apply a rewrite rule to the values of a specific key.\n");
     printf("       The first character after KEY= is the separator, which should also\n");
     printf("       be used between the search pattern and the replacement pattern.\n");
     printf("       The search pattern is a PCRE2 regular expression, and the replacement\n");
     printf("       pattern supports literals and named capture groups from the search pattern.\n");
     printf("       Example:\n");
-    printf("              --rewrite=DATE=/^(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})$/\n");
+    printf("              --rewrite DATE=/^(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})$/\n");
     printf("                             ${day}/${month}/${year}\n");
     printf("       This will rewrite dates in the format YYYY-MM-DD to DD/MM/YYYY.\n");
     printf("\n");
@@ -104,6 +104,8 @@ void display_help(const char *name) {
     printf("       RE2 regular expressions (like the ones usually used in Go applications),\n");
     printf("       are usually valid PCRE2 patterns too.\n");
     printf("       Regular expressions without named groups are ignored.\n");
+    printf("\n");
+    printf("The program accepts all parameters as both --option=value and --option value.\n");
     printf("\n");
     printf("The maximum line length accepted is %d characters.\n", MAX_LINE_LENGTH);
     printf("The maximum number of fields in the PCRE2 pattern is %d.\n", OVECCOUNT / 3);
@@ -169,6 +171,7 @@ void display_help(const char *name) {
 }
 
 // ----------------------------------------------------------------------------
+// logging
 
 // enable the compiler to check for printf like errors on our log2stderr() function
 static void log2stderr(const char *format, ...) __attribute__ ((format(__printf__, 1, 2)));
@@ -178,6 +181,41 @@ static void log2stderr(const char *format, ...) {
     vfprintf(stderr, format, args);
     va_end(args);
     fprintf(stderr, "\n");
+}
+
+// ----------------------------------------------------------------------------
+// allocation functions abstraction
+
+void *mallocz(size_t size) {
+    void *ptr = malloc(size);
+    if (!ptr) {
+        log2stderr("Fatal Error: Memory allocation failed. Requested size: %zu bytes.", size);
+        exit(EXIT_FAILURE);
+    }
+    return ptr;
+}
+
+char *strdupz(const char *s) {
+    char *ptr = strdup(s);
+    if (!ptr) {
+        log2stderr("Fatal Error: Memory allocation failed in strdup.");
+        exit(EXIT_FAILURE);
+    }
+    return ptr;
+}
+
+char *strndupz(const char *s, size_t n) {
+    char *ptr = strndup(s, n);
+    if (!ptr) {
+        log2stderr("Fatal Error: Memory allocation failed in strndup. Requested size: %zu bytes.", n);
+        exit(EXIT_FAILURE);
+    }
+    return ptr;
+}
+
+void freez(void *ptr) {
+    if (ptr)
+        free(ptr);
 }
 
 // ----------------------------------------------------------------------------
@@ -210,6 +248,11 @@ typedef struct txt {
 } TEXT;
 
 static void txt_replace(TEXT *txt, const char *s, size_t len) {
+    if(!s || !*s || len == 0) {
+        s = "";
+        len = 0;
+    }
+
     if(len + 1 <= txt->size) {
         // the existing value allocation, fits our value
 
@@ -220,9 +263,9 @@ static void txt_replace(TEXT *txt, const char *s, size_t len) {
         // no existing value allocation, or too small for our value
 
         if(txt->s)
-            free(txt->s);
+            freez(txt->s);
 
-        txt->s = strndup(s, len);
+        txt->s = strndupz(s, len);
         txt->size = len + 1;
     }
 }
@@ -304,26 +347,26 @@ struct log_job {
 void jb_cleanup(struct log_job *jb) {
     for(size_t i = 0; i < jb->injections.used ;i++) {
         if(jb->injections.keys[i].value.s)
-            free(jb->injections.keys[i].value.s);
+            freez(jb->injections.keys[i].value.s);
     }
 
     for(size_t i = 0; i < jb->unmatched.injections.used ;i++) {
         if(jb->unmatched.injections.keys[i].value.s)
-            free(jb->unmatched.injections.keys[i].value.s);
+            freez(jb->unmatched.injections.keys[i].value.s);
     }
 
     for(size_t i = 0; i < jb->dups.used ;i++) {
         struct key_dup *kd = &jb->dups.array[i];
 
         if(kd->target)
-            free(kd->target);
+            freez(kd->target);
 
         for(size_t j = 0; j < kd->used ; j++) {
             if (kd->keys[j])
-                free(kd->keys[j]);
+                freez(kd->keys[j]);
 
             if (kd->values[j].s)
-                free(kd->values[j].s);
+                freez(kd->values[j].s);
         }
     }
 
@@ -331,13 +374,13 @@ void jb_cleanup(struct log_job *jb) {
         struct key_rewrite *rw = &jb->rewrites.array[i];
 
         if (rw->key)
-            free(rw->key);
+            freez(rw->key);
 
         if (rw->search_pattern)
-            free(rw->search_pattern);
+            freez(rw->search_pattern);
 
         if (rw->replace_pattern)
-            free(rw->replace_pattern);
+            freez(rw->replace_pattern);
 
         if(rw->match_data)
             pcre2_match_data_free(rw->match_data);
@@ -351,9 +394,9 @@ void jb_cleanup(struct log_job *jb) {
             struct replacement_node *next = current->next;
 
             if (current->s)
-                free((void *)current->s);
+                freez((void *)current->s);
 
-            free(current);
+            freez(current);
             current = next;
         }
     }
@@ -469,7 +512,7 @@ static inline void send_key_value_constant(struct log_job *jb, const char *key, 
 // command line params
 
 struct replacement_node *add_replacement_node(struct replacement_node **head, bool is_variable, const char *text) {
-    struct replacement_node *new_node = malloc(sizeof(struct replacement_node));
+    struct replacement_node *new_node = mallocz(sizeof(struct replacement_node));
     if (!new_node)
         return NULL;
 
@@ -507,7 +550,7 @@ bool parse_replacement_pattern(struct key_rewrite *rw) {
             }
 
             size_t name_length = end - current - 2; // Length of the variable name
-            char *variable_name = strndup(current + 2, name_length);
+            char *variable_name = strndupz(current + 2, name_length);
             if (!variable_name) {
                 log2stderr("Error: Memory allocation failed for variable name.");
                 return false;
@@ -515,7 +558,7 @@ bool parse_replacement_pattern(struct key_rewrite *rw) {
 
             struct replacement_node *node = add_replacement_node(&(rw->nodes), true, variable_name);
             if (!node) {
-                free(variable_name);
+                freez(variable_name);
                 log2stderr("Error: Failed to add replacement node for variable.");
                 return false;
             }
@@ -530,7 +573,7 @@ bool parse_replacement_pattern(struct key_rewrite *rw) {
             }
 
             size_t text_length = current - start;
-            char *text = strndup(start, text_length);
+            char *text = strndupz(start, text_length);
             if (!text) {
                 log2stderr("Error: Memory allocation failed for literal text.");
                 return false;
@@ -538,7 +581,7 @@ bool parse_replacement_pattern(struct key_rewrite *rw) {
 
             struct replacement_node *node = add_replacement_node(&(rw->nodes), false, text);
             if (!node) {
-                free(text);
+                freez(text);
                 log2stderr("Error: Failed to add replacement node for text.");
                 return false;
             }
@@ -593,16 +636,16 @@ static bool parse_rewrite(struct log_job *jb, const char *param) {
     }
 
     // Extract key, search pattern, and replacement pattern
-    char *key = strndup(param, equal_sign - param);
-    char *search_pattern = strndup(equal_sign + 2, second_separator - (equal_sign + 2));
-    char *replace_pattern = strdup(second_separator + 1);
+    char *key = strndupz(param, equal_sign - param);
+    char *search_pattern = strndupz(equal_sign + 2, second_separator - (equal_sign + 2));
+    char *replace_pattern = strdupz(second_separator + 1);
 
     // Create the PCRE2 pattern
     pcre2_code *re = jb_compile_pcre2_pattern(search_pattern);
     if (!re) {
-        free(key);
-        free(search_pattern);
-        free(replace_pattern);
+        freez(key);
+        freez(search_pattern);
+        freez(replace_pattern);
         return false;
     }
 
@@ -618,11 +661,88 @@ static bool parse_rewrite(struct log_job *jb, const char *param) {
     if (!parse_replacement_pattern(rw)) {
         pcre2_match_data_free(rw->match_data);
         pcre2_code_free(rw->re);
-        free(rw->key);
-        free(rw->search_pattern);
-        free(rw->replace_pattern);
+        freez(rw->key);
+        freez(rw->search_pattern);
+        freez(rw->replace_pattern);
         jb->rewrites.used--;
         return false;
+    }
+
+    return true;
+}
+
+static bool parse_inject(struct log_job *jb, const char *value, bool is_unmatched) {
+    if (is_unmatched) {
+        if (jb->unmatched.injections.used >= MAX_INJECTIONS) {
+            log2stderr("Error: too many unmatched injections. You can inject up to %d lines.", MAX_INJECTIONS);
+            return false;
+        }
+    } else {
+        if (jb->injections.used >= MAX_INJECTIONS) {
+            log2stderr("Error: too many injections. You can inject up to %d lines.", MAX_INJECTIONS);
+            return false;
+        }
+    }
+
+    const char *equal = strchr(value, '=');
+    if (!equal) {
+        log2stderr("Error: injection '%s' does not have an equal sign.", value);
+        return false;
+    }
+
+    const char *key = value;
+    const char *val = equal + 1;
+
+    if (is_unmatched) {
+        key_value_replace(&jb->unmatched.injections.keys[jb->unmatched.injections.used++],
+                          key, equal - key,
+                          val, strlen(val));
+    } else {
+        key_value_replace(&jb->injections.keys[jb->injections.used++],
+                          key, equal - key,
+                          val, strlen(val));
+    }
+
+    return true;
+}
+
+static bool parse_duplicate(struct log_job *jb, const char *value) {
+    const char *target = value;
+    const char *equal_sign = strchr(value, '=');
+    if (!equal_sign || equal_sign == target) {
+        log2stderr("Error: Invalid duplicate format, '=' not found or at the start in %s", value);
+        return false;
+    }
+
+    if (jb->dups.used >= MAX_KEY_DUPS) {
+        log2stderr("Error: too many duplications. You can duplicate up to %d keys.", MAX_KEY_DUPS);
+        return false;
+    }
+
+    size_t target_len = equal_sign - target;
+    struct key_dup *kd = &jb->dups.array[jb->dups.used++];
+    kd->target = strndupz(target, target_len);
+    kd->hash = XXH3_64bits(target, target_len);
+    kd->used = 0;
+
+    const char *key = equal_sign + 1;
+    while (key) {
+        if (kd->used >= MAX_KEY_DUPS_KEYS) {
+            log2stderr("Error: too many keys in duplication of target '%s'.", kd->target);
+            return false;
+        }
+
+        const char *comma = strchr(key, ',');
+        size_t key_len;
+        if (comma) {
+            key_len = comma - key;
+            kd->keys[kd->used++] = strndupz(key, key_len);
+            key = comma + 1;
+        }
+        else {
+            kd->keys[kd->used++] = strdupz(key);
+            break;  // No more keys
+        }
     }
 
     return true;
@@ -635,94 +755,55 @@ bool parse_parameters(struct log_job *jb, int argc, char **argv) {
             display_help(argv[0]);
             exit(0);
         }
-        else if (strncmp(arg, "--filename-key=", 15) == 0)
-            jb->filename.key = arg + 15;
-        else if (strncmp(arg, "--unmatched-key=", 16) == 0)
-            jb->unmatched.key = arg + 16;
-        else if(strncmp(arg, "--duplicate=", 12) == 0) {
-            const char *first_key = arg + 12;
-            const char *comma = strchr(first_key, '=');
-            if(!comma) {
-                log2stderr("Error: --duplicate=TARGET=KEY1,... is missing the equal sign.");
-                return false;
+        else {
+            char *param = NULL;
+            char *value = NULL;
+
+            char *equal_sign = strchr(arg, '=');
+            if (equal_sign) {
+                *equal_sign = '\0';
+                param = arg;
+                value = equal_sign + 1;
             }
-            const char *next_key = comma + 1;
-
-            if (jb->dups.used >= MAX_KEY_DUPS) {
-                log2stderr("Error: too many duplications. You can duplicate up to %d keys.", MAX_KEY_DUPS);
-                return false;
-            }
-
-            size_t first_key_len = comma - first_key;
-            struct key_dup *kd = &jb->dups.array[jb->dups.used++];
-            kd->target = strndup(first_key, first_key_len);
-            kd->hash = XXH3_64bits(first_key, first_key_len);
-            kd->used = 0;
-
-            while(next_key) {
-                if(kd->used >= MAX_KEY_DUPS_KEYS) {
-                    log2stderr("Error: too many keys in duplication of target '%s'.", kd->target);
-                    return false;
-                }
-
-                first_key = next_key;
-                comma = strchr(first_key, ',');
-
-                if(comma) {
-                    first_key_len = comma - first_key;
-                    kd->keys[kd->used++] = strndup(first_key, first_key_len);
-                    next_key = comma + 1;
+            else {
+                param = arg;
+                if (i + 1 < argc) {
+                    value = argv[++i];
                 }
                 else {
-                    kd->keys[kd->used++] = strdup(first_key);
-                    next_key = NULL;
+                    log2stderr("Error: Expected value for parameter '%s'", param);
+                    return false;
                 }
             }
-        }
-        else if(strncmp(arg, "--inject=", 9) == 0) {
-            if(jb->injections.used >= MAX_INJECTIONS) {
-                log2stderr("Error: too many injections. You can inject up to %d lines.", MAX_INJECTIONS);
-                return false;
-            }
 
-            const char *key = arg + 9;
-            const char *equal = strchr(key, '=');
-            if(!equal) {
-                log2stderr("Error: injection '%s' does not have an equal sign.", key);
-                return false;
+            if (strcmp(param, "--filename-key") == 0)
+                jb->filename.key = value;
+            else if (strcmp(param, "--unmatched-key") == 0)
+                jb->unmatched.key = value;
+            else if (strcmp(param, "--duplicate") == 0) {
+                if (!parse_duplicate(jb, value))
+                    return false;
             }
-
-            key_value_replace(&jb->injections.keys[jb->injections.used++],
-                              key, equal - key,
-                              equal + 1, strlen(equal + 1));
-        }
-        else if(strncmp(arg, "--inject-unmatched=", 19) == 0) {
-            if(jb->unmatched.injections.used >= MAX_INJECTIONS) {
-                log2stderr("Error: too many unmatched injections. You can inject up to %d lines.", MAX_INJECTIONS);
-                return false;
+            else if (strcmp(param, "--inject") == 0) {
+                if (!parse_inject(jb, value, false))
+                    return false;
             }
-            const char *key = arg + 19;
-            const char *equal = strchr(key, '=');
-            if(!equal) {
-                log2stderr("Error: unmatched injection '%s' does not have an equal sign.", key);
-                return false;
+            else if (strcmp(param, "--inject-unmatched") == 0) {
+                if (!parse_inject(jb, value, true))
+                    return false;
             }
-
-            key_value_replace(&jb->unmatched.injections.keys[jb->unmatched.injections.used++],
-                              key, equal - key,
-                              equal + 1, strlen(equal + 1));
-        }
-        else if(strncmp(arg, "--rewrite=", 10) == 0) {
-            if(!parse_rewrite(jb, arg + 10))
-                return false;
-        }
-        else {
-            // Assume it's the pattern if not recognized as a parameter
-            if (!jb->pattern) {
-                jb->pattern = arg;
-            } else {
-                log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
-                return false;
+            else if (strcmp(param, "--rewrite") == 0) {
+                if (!parse_rewrite(jb, value))
+                    return false;
+            }
+            else {
+                // Assume it's the pattern if not recognized as a parameter
+                if (!jb->pattern) {
+                    jb->pattern = arg;
+                } else {
+                    log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
+                    return false;
+                }
             }
         }
     }
