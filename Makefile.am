@@ -346,7 +346,7 @@ SYSTEMD_CAT_NATIVE_FILES = \
     $(NULL)
 
 LOG2JOURNAL_FILES = \
-    libnetdata/log/log2journal.c \
+    collectors/log2journal/log2journal.c \
     $(NULL)
 
 CUPS_PLUGIN_FILES = \
