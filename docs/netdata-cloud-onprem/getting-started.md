@@ -1,5 +1,8 @@
 # Getting started with Netdata Cloud On-Prem
 Helm charts are designed for kubernetes to run as the local equivalent of the netdata.cloud public offering. This means that no data is sent outside of your cluster. By default On-Prem installation is trying to reach for outside resources only when pulling the container images.
+There are 2 helm charts in total:
+- netdata-cloud-onprem - installs onprem itself.
+- netdata-cloud-dependency - installs all necessary dependency applications. Not for production use, PoC only.
 
 ## Requirements
 #### Install host:
