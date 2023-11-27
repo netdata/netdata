@@ -10,8 +10,8 @@ struct logfmt_state {
     size_t pos;
     char msg[ERROR_LINE_MAX];
 
-    char *prefix;
     char key[KEY_MAX];
+    size_t key_start;
 
     struct log_job *jb;
 };
@@ -173,11 +173,7 @@ static inline bool logfmt_parse_key(LOGFMT_STATE *lfs) {
 
     logfmt_skip_spaces(lfs);
 
-    char *d = lfs->key;
-    if(lfs->prefix) {
-        size_t len = copy_to_buffer(lfs->key, sizeof(lfs->key), lfs->prefix, strlen(lfs->prefix));
-        d = &lfs->key[len];
-    }
+    char *d = &lfs->key[lfs->key_start];
 
     size_t remaining = sizeof(lfs->key) - (d - lfs->key);
 
@@ -226,7 +222,7 @@ LOGFMT_STATE *logfmt_parser_create(struct log_job *jb) {
     lfs->jb = jb;
 
     if(jb->prefix)
-        copy_to_buffer(lfs->key, sizeof(lfs->key), lfs->jb->prefix, strlen(lfs->jb->prefix));
+        lfs->key_start = copy_to_buffer(lfs->key, sizeof(lfs->key), lfs->jb->prefix, strlen(lfs->jb->prefix));
 
     return lfs;
 }
@@ -263,7 +259,7 @@ bool logfmt_parse_document(LOGFMT_STATE *lfs, const char *txt) {
 
 
 void logfmt_test(void) {
-    struct log_job jb = { 0 };
+    struct log_job jb = { .prefix = "NIGNX_" };
     LOGFMT_STATE *logfmt = logfmt_parser_create(&jb);
 
     logfmt_parse_document(logfmt, "x=1 y=2 z=\"3 \\ 4\" 5  ");
