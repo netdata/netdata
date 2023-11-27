@@ -29,6 +29,7 @@
 #cmakedefine HAVE_CLOCK_GETTIME
 #cmakedefine HAVE_STRERROR_R
 #cmakedefine HAVE_SD_JOURNAL_OS_ROOT
+#cmakedefine HAVE_SD_JOURNAL_GET_SEQNUM
 
 // checked source compilation
 #cmakedefine STRERROR_R_CHAR_P

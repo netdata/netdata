@@ -183,6 +183,7 @@ check_symbol_exists(major sys/mkdev.h MAJOR_IN_MKDEV)
 check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
 check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
 check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
+check_symbol_exists(systemd sd_journal_get_seqnum "systemd/sd-journal.h" HAVE_SD_JOURNAL_GET_SEQNUM)
 
 #
 # check source compilation
@@ -321,6 +322,8 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/datetime/iso8601.h
                      libnetdata/datetime/rfc7231.c
                      libnetdata/datetime/rfc7231.h
+                     libnetdata/datetime/rfc3339.c
+                     libnetdata/datetime/rfc3339.h
                      libnetdata/dictionary/dictionary.c
                      libnetdata/dictionary/dictionary.h
                      libnetdata/eval/eval.c
@@ -722,7 +725,8 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES collectors/systemd-journal.plugin/systemd-journ
                                  collectors/systemd-journal.plugin/systemd-journal.c
                                  collectors/systemd-journal.plugin/systemd-journal-annotations.c
                                  collectors/systemd-journal.plugin/systemd-journal-files.c
-                                 collectors/systemd-journal.plugin/systemd-journal-fstat.c)
+                                 collectors/systemd-journal.plugin/systemd-journal-fstat.c
+                                 collectors/systemd-journal.plugin/systemd-journal-watcher.c)
 
 set(STREAMING_PLUGIN_FILES streaming/rrdpush.c
                            streaming/rrdpush.h
