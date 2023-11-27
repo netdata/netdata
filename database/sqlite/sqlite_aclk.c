@@ -257,9 +257,10 @@ static void sql_unregister_node(char *machine_guid)
         return;
 
     rc = uuid_parse(machine_guid, host_uuid);
-    freez(machine_guid);
-    if (rc)
+    if (rc) {
+        freez(machine_guid);
         return;
+    }
 
     sqlite3_stmt *res = NULL;
 
@@ -275,8 +276,14 @@ static void sql_unregister_node(char *machine_guid)
         goto failed;
     }
     rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
+    if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute command to remove node id");
+       freez(machine_guid);
+    }
+    else {
+       // node: machine guid will be freed after processing
+       metadata_delete_host_chart_labels(machine_guid);
+    }
 
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
@@ -448,6 +455,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
                     break;
                 case ACLK_DATABASE_NODE_UNREGISTER:
                     sql_unregister_node(cmd.param[0]);
+
                     break;
 // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
