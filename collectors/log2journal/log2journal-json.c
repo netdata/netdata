@@ -319,7 +319,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
         if (*s == '\\') {
             s++;
-            c = (*s == 'u') ? '_' : valid_journal_key_chars[(unsigned char)*s];
+            c = (char)((*s == 'u') ? '_' : valid_journal_key_chars[(unsigned char)*s]);
             s += (*s == 'u') ? 5 : 1;
         }
         else
