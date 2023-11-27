@@ -234,7 +234,6 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`plugin`](#alert-line-plugin)                      | no              | Restrict an alert or template to only a certain plugin.                               |
 | [`module`](#alert-line-module)                      | no              | Restrict an alert or template to only a certain module.                               |
 | [`charts`](#alert-line-charts)                      | no              | Restrict an alert or template to only certain charts.                                 |
-| [`families`](#alert-line-families)                  | no              | Restrict a template to only certain families.                                         |
 | [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
 | [`every`](#alert-line-every)                        | no              | The frequency of the alert.                                                           |
@@ -437,23 +436,6 @@ template: disk_svctm_alert
       on: disk.svctm
   charts: !*sdb* *
 ```
-
-#### Alert line `families`
-
-The `families` line, used only alongside templates, filters which families within the context this alert should apply
-to. The value is a space-separated list.
-
-The value is a space-separate list of simple patterns. See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for
-some examples.
-
-For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
-
-```yaml
-families: sda sdb
-```
-
-Please note that the use of the `families` filter is planned to be deprecated in upcoming Netdata releases. 
-Please use [`chart labels`](#alert-line-chart-labels) instead.
 
 #### Alert line `lookup`
 
@@ -719,14 +701,14 @@ If you have an e.g. external disk mounted on `/mnt/disk1` and you don't wish any
 it (but you do for all other mount points), you can add the following to the alert's configuration:
 
 ```yaml
-chart labels: mount_point=!/mnt/disk1 *`
+chart labels: mount_point=!/mnt/disk1 *
 ```
 
 The `chart labels` is a space-separated list that accepts simple patterns. If you use multiple different chart labels,
 then the result is an OR between them. i.e. the following:
 
 ```yaml
-chart labels: mount_point=/mnt/disk1 device=sda`
+chart labels: mount_point=/mnt/disk1 device=sda
 ```
 
 Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`. Furthermore, if a chart label name
@@ -751,7 +733,7 @@ alert information. Current variables supported are:
 | ${family}           | Will be replaced by the family instance for the alert (e.g. eth0) |
 | ${label:LABEL_NAME} | The variable will be replaced with the value of the chart label   |
 
-For example, a summry field like the following:
+For example, a summary field like the following:
 
 ```yaml
 summary: 1 minute received traffic overflow for ${label:device}
@@ -760,7 +742,7 @@ summary: 1 minute received traffic overflow for ${label:device}
 Will be rendered on the alert acting on interface `eth0` as:
 
 ```yaml
-info: 1 minute received traffic overflow for ${label:device}
+summary: 1 minute received traffic overflow for eth0
 ```
 
 > Please note that variable names are case-sensitive.
@@ -882,13 +864,11 @@ registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
-<details markdown="1"><summary>The variables below can be used in both chart alerts and context templates.</summary>
+<details><summary>The variables below can be used in both chart alerts and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
 templates for charts belonging to a given [context](https://github.com/netdata/netdata/blob/master/web/README.md#contexts). The reason is that all charts of a given
-context are essentially identical, with the only difference being the [family](https://github.com/netdata/netdata/blob/master/web/README.md#families) that
-identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway,
-unless if you explicitly limit an alert with the [alert line `families`](#alert-line-families).
+context are essentially identical, with the only difference being the family that identifies a particular hardware or software instance.
 
 </details>
 

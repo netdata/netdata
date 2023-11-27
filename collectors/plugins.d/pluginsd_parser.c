@@ -153,11 +153,12 @@ static inline bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const ch
 
     if(unlikely(old_collector_tid)) {
         if(old_collector_tid != my_collector_tid) {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "PLUGINSD: keyword %s: 'host:%s/chart:%s' is collected twice (my tid %d, other collector tid %d)",
-                        keyword ? keyword : "UNKNOWN",
-                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                        my_collector_tid, old_collector_tid);
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_WARNING,
+                         "PLUGINSD: keyword %s: 'host:%s/chart:%s' is collected twice (my tid %d, other collector tid %d)",
+                         keyword ? keyword : "UNKNOWN",
+                         rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                         my_collector_tid, old_collector_tid);
 
             return false;
         }
@@ -389,8 +390,9 @@ static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyw
     parser->user.enabled = 0;
 
     if(keyword && msg) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "PLUGINSD: keyword %s: %s", keyword, msg);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_INFO,
+                     "PLUGINSD: keyword %s: %s", keyword, msg);
     }
 
     return PARSER_RC_ERROR;
@@ -477,8 +479,9 @@ static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *p
 }
 
 static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *parser) {
-    UNUSED(words);
-    UNUSED(num_words);
+    char *tv_sec = get_word(words, num_words, 1);
+    char *tv_usec = get_word(words, num_words, 2);
+    char *pending_rrdset_next = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -492,9 +495,15 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END);
     parser->user.data_collections_count++;
 
-    struct timeval now;
-    now_realtime_timeval(&now);
-    rrdset_timed_done(st, now, /* pending_rrdset_next = */ false);
+    struct timeval tv = {
+        .tv_sec  = (tv_sec  && *tv_sec)  ? str2ll(tv_sec,  NULL) : 0,
+        .tv_usec = (tv_usec && *tv_usec) ? str2ll(tv_usec, NULL) : 0
+    };
+    
+    if(!tv.tv_sec)
+        now_realtime_timeval(&tv);
+
+    rrdset_timed_done(st, tv, pending_rrdset_next && *pending_rrdset_next ? true : false);
 
     return PARSER_RC_OK;
 }
@@ -564,30 +573,29 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
     RRDHOST *host = rrdhost_find_or_create(
-            string2str(parser->user.host_define.hostname),
-            string2str(parser->user.host_define.hostname),
-            parser->user.host_define.machine_guid_str,
-            "Netdata Virtual Host 1.0",
-            netdata_configured_timezone,
-            netdata_configured_abbrev_timezone,
-            netdata_configured_utc_offset,
-            NULL,
-            program_name,
-            program_version,
-            default_rrd_update_every,
-            default_rrd_history_entries,
-            default_rrd_memory_mode,
-            default_health_enabled,
-            default_rrdpush_enabled,
-            default_rrdpush_destination,
-            default_rrdpush_api_key,
-            default_rrdpush_send_charts_matching,
-            default_rrdpush_enable_replication,
-            default_rrdpush_seconds_to_replicate,
-            default_rrdpush_replication_step,
-            rrdhost_labels_to_system_info(parser->user.host_define.rrdlabels),
-            false
-            );
+        string2str(parser->user.host_define.hostname),
+        string2str(parser->user.host_define.hostname),
+        parser->user.host_define.machine_guid_str,
+        "Netdata Virtual Host 1.0",
+        netdata_configured_timezone,
+        netdata_configured_abbrev_timezone,
+        netdata_configured_utc_offset,
+        NULL,
+        program_name,
+        program_version,
+        default_rrd_update_every,
+        default_rrd_history_entries,
+        default_rrd_memory_mode,
+        default_health_enabled,
+        default_rrdpush_enabled,
+        default_rrdpush_destination,
+        default_rrdpush_api_key,
+        default_rrdpush_send_charts_matching,
+        default_rrdpush_enable_replication,
+        default_rrdpush_seconds_to_replicate,
+        default_rrdpush_replication_step,
+        rrdhost_labels_to_system_info(parser->user.host_define.rrdlabels),
+        false);
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
 
@@ -1109,7 +1117,8 @@ void pluginsd_function_cancel(void *data) {
     dfe_done(t);
 
     if(sent <= 0)
-        netdata_log_error("PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
 }
 
 // this is the function that is called from
@@ -1409,6 +1418,14 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
     if(unlikely(!(parser->user.new_host_labels)))
         parser->user.new_host_labels = rrdlabels_create();
 
+    if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
+        int is_ephemeral = appconfig_test_boolean_value((char *) value);
+        if (is_ephemeral) {
+            RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
+            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+        }
+    }
+
     rrdlabels_add(parser->user.new_host_labels, name, store, str2l(label_source));
 
     if (allocated_store)
@@ -1427,6 +1444,8 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
         host->rrdlabels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
+    if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST))
+        rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdlabels_destroy(parser->user.new_host_labels);
@@ -1626,9 +1645,10 @@ static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
     if(!parser->user.replay.rset_enabled) {
-        error_limit_static_thread_var(erl, 1, 0);
-        error_limit(&erl, "PLUGINSD: 'host:%s/chart:%s' got a %s but it is disabled by %s errors",
-                    rrdhost_hostname(host), rrdset_id(st), PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+        nd_log_limit_static_thread_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
+                     "PLUGINSD: 'host:%s/chart:%s' got a %s but it is disabled by %s errors",
+                     rrdhost_hostname(host), rrdset_id(st), PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
         // we have to return OK here
         return PARSER_RC_OK;
@@ -1675,8 +1695,10 @@ static inline PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
             rd->collector.counter++;
         }
         else {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "PLUGINSD: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. Ignoring data.",
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_WARNING,
+                         "PLUGINSD: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. "
+                         "Ignoring data.",
                         rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_name(rd));
         }
     }
@@ -2832,61 +2854,6 @@ static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PAR
 
 // ----------------------------------------------------------------------------
 
-static inline bool buffered_reader_read(struct buffered_reader *reader, int fd) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(reader->read_buffer[reader->read_len] != '\0')
-        fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
-#endif
-
-    ssize_t bytes_read = read(fd, reader->read_buffer + reader->read_len, sizeof(reader->read_buffer) - reader->read_len - 1);
-    if(unlikely(bytes_read <= 0))
-        return false;
-
-    reader->read_len += bytes_read;
-    reader->read_buffer[reader->read_len] = '\0';
-
-    return true;
-}
-
-static inline bool buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms) {
-    errno = 0;
-    struct pollfd fds[1];
-
-    fds[0].fd = fd;
-    fds[0].events = POLLIN;
-
-    int ret = poll(fds, 1, timeout_ms);
-
-    if (ret > 0) {
-        /* There is data to read */
-        if (fds[0].revents & POLLIN)
-            return buffered_reader_read(reader, fd);
-
-        else if(fds[0].revents & POLLERR) {
-            netdata_log_error("PARSER: read failed: POLLERR.");
-            return false;
-        }
-        else if(fds[0].revents & POLLHUP) {
-            netdata_log_error("PARSER: read failed: POLLHUP.");
-            return false;
-        }
-        else if(fds[0].revents & POLLNVAL) {
-            netdata_log_error("PARSER: read failed: POLLNVAL.");
-            return false;
-        }
-
-        netdata_log_error("PARSER: poll() returned positive number, but POLLIN|POLLERR|POLLHUP|POLLNVAL are not set.");
-        return false;
-    }
-    else if (ret == 0) {
-        netdata_log_error("PARSER: timeout while waiting for data.");
-        return false;
-    }
-
-    netdata_log_error("PARSER: poll() failed with code %d.", ret);
-    return false;
-}
-
 void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
 
@@ -2903,6 +2870,33 @@ void pluginsd_process_thread_cleanup(void *ptr) {
 #endif
 
     parser_destroy(parser);
+}
+
+bool parser_reconstruct_node(BUFFER *wb, void *ptr) {
+    PARSER *parser = ptr;
+    if(!parser || !parser->user.host)
+        return false;
+
+    buffer_strcat(wb, rrdhost_hostname(parser->user.host));
+    return true;
+}
+
+bool parser_reconstruct_instance(BUFFER *wb, void *ptr) {
+    PARSER *parser = ptr;
+    if(!parser || !parser->user.st)
+        return false;
+
+    buffer_strcat(wb, rrdset_name(parser->user.st));
+    return true;
+}
+
+bool parser_reconstruct_context(BUFFER *wb, void *ptr) {
+    PARSER *parser = ptr;
+    if(!parser || !parser->user.st)
+        return false;
+
+    buffer_strcat(wb, string2str(parser->user.st->context));
+    return true;
 }
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
@@ -2952,33 +2946,51 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     // so, parser needs to be allocated before pushing it
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
-    buffered_reader_init(&parser->reader);
-    BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
-    while(likely(service_running(SERVICE_COLLECTORS))) {
-        if (unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
-            if(unlikely(!buffered_reader_read_timeout(&parser->reader, fileno((FILE *)parser->fp_input), 2 * 60 * MSEC_PER_SEC)))
-                break;
+            {
+                ND_LOG_STACK lgs[] = {
+                        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+                        ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+                        ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+                        ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
+                        ND_LOG_FIELD_END(),
+                };
+                ND_LOG_STACK_PUSH(lgs);
 
-            continue;
-        }
+                buffered_reader_init(&parser->reader);
+                BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
+                while(likely(service_running(SERVICE_COLLECTORS))) {
 
-        if(unlikely(parser_action(parser,  buffer->buffer)))
-            break;
+                    if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
+                        buffered_reader_ret_t ret = buffered_reader_read_timeout(
+                                &parser->reader,
+                                fileno((FILE *) parser->fp_input),
+                                2 * 60 * MSEC_PER_SEC, true
+                                                                                );
 
-        buffer->len = 0;
-        buffer->buffer[0] = '\0';
-    }
-    buffer_free(buffer);
+                        if(unlikely(ret != BUFFERED_READER_READ_OK))
+                            break;
 
-    cd->unsafe.enabled = parser->user.enabled;
-    count = parser->user.data_collections_count;
+                        continue;
+                    }
 
-    if (likely(count)) {
-        cd->successful_collections += count;
-        cd->serial_failures = 0;
-    }
-    else
-        cd->serial_failures++;
+                    if(unlikely(parser_action(parser, buffer->buffer)))
+                        break;
+
+                    buffer->len = 0;
+                    buffer->buffer[0] = '\0';
+                }
+                buffer_free(buffer);
+
+                cd->unsafe.enabled = parser->user.enabled;
+                count = parser->user.data_collections_count;
+
+                if(likely(count)) {
+                    cd->successful_collections += count;
+                    cd->serial_failures = 0;
+                }
+                else
+                    cd->serial_failures++;
+            }
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);

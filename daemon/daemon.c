@@ -31,22 +31,6 @@ void get_netdata_execution_path(void) {
     dirname(netdata_exe_path);
 }
 
-static void chown_open_file(int fd, uid_t uid, gid_t gid) {
-    if(fd == -1) return;
-
-    struct stat buf;
-
-    if(fstat(fd, &buf) == -1) {
-        netdata_log_error("Cannot fstat() fd %d", fd);
-        return;
-    }
-
-    if((buf.st_uid != uid || buf.st_gid != gid) && S_ISREG(buf.st_mode)) {
-        if(fchown(fd, uid, gid) == -1)
-            netdata_log_error("Cannot fchown() fd %d.", fd);
-    }
-}
-
 static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
 {
     char filename[FILENAME_MAX + 1];
@@ -150,9 +134,9 @@ int become_user(const char *username, int pid_fd) {
         }
     }
 
+    nd_log_chown_log_files(uid, gid);
     chown_open_file(STDOUT_FILENO, uid, gid);
     chown_open_file(STDERR_FILENO, uid, gid);
-    chown_open_file(stdaccess_fd, uid, gid);
     chown_open_file(pid_fd, uid, gid);
 
     if(supplementary_groups && ngroups > 0) {

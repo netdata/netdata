@@ -1824,30 +1824,29 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
     /* We don't want to drop metrics when generating load, we prefer to block data generation itself */
 
     return rrdhost_find_or_create(
-            name
-            , name
-            , name
-            , os_type
-            , netdata_configured_timezone
-            , netdata_configured_abbrev_timezone
-            , netdata_configured_utc_offset
-            , ""
-            , program_name
-            , program_version
-            , default_rrd_update_every
-            , default_rrd_history_entries
-            , RRD_MEMORY_MODE_DBENGINE
-            , default_health_enabled
-            , default_rrdpush_enabled
-            , default_rrdpush_destination
-            , default_rrdpush_api_key
-            , default_rrdpush_send_charts_matching
-            , default_rrdpush_enable_replication
-            , default_rrdpush_seconds_to_replicate
-            , default_rrdpush_replication_step
-            , NULL
-            , 0
-    );
+        name,
+        name,
+        name,
+        os_type,
+        netdata_configured_timezone,
+        netdata_configured_abbrev_timezone,
+        netdata_configured_utc_offset,
+        "",
+        program_name,
+        program_version,
+        default_rrd_update_every,
+        default_rrd_history_entries,
+        RRD_MEMORY_MODE_DBENGINE,
+        default_health_enabled,
+        default_rrdpush_enabled,
+        default_rrdpush_destination,
+        default_rrdpush_api_key,
+        default_rrdpush_send_charts_matching,
+        default_rrdpush_enable_replication,
+        default_rrdpush_seconds_to_replicate,
+        default_rrdpush_replication_step,
+        NULL,
+        0);
 }
 
 // constants for test_dbengine
@@ -2118,7 +2117,7 @@ int test_dbengine(void)
     RRDDIM *rd[CHARTS][DIMS];
     time_t time_start[REGIONS], time_end[REGIONS];
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
@@ -2347,7 +2346,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
                                    (1024 * 1024);
     default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
 
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
@@ -2522,7 +2521,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     unsigned i, j;
     time_t time_start, test_duration;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
 
     if (!TEST_DURATION_SEC)
         TEST_DURATION_SEC = 10;

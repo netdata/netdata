@@ -676,8 +676,6 @@ static void update_freezer_state(UnitInfo *u, UnitAttribute *ua) {
 // ----------------------------------------------------------------------------
 // common helpers
 
-#define _cleanup_(x) __attribute__((__cleanup__(x)))
-
 static void log_dbus_error(int r, const char *msg) {
     netdata_log_error("SYSTEMD_UNITS: %s failed with error %d (%s)", msg, r, strerror(-r));
 }
@@ -1957,7 +1955,7 @@ void function_systemd_units(const char *transaction, char *function, int timeout
     buffer_json_finalize(wb);
 
     netdata_mutex_lock(&stdout_mutex);
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_realtime_sec() + 3600, wb);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_realtime_sec() + 1, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
     buffer_free(wb);

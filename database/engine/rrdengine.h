@@ -22,6 +22,7 @@
 #include "metric.h"
 #include "cache.h"
 #include "pdc.h"
+#include "page.h"
 
 extern unsigned rrdeng_pages_per_extent;
 
@@ -119,7 +120,6 @@ struct page_details {
     time_t first_time_s;
     time_t last_time_s;
     uint32_t update_every_s;
-    uint16_t page_length;
     PDC_PAGE_STATUS status;
 
     struct {
@@ -192,9 +192,9 @@ struct rrdeng_collect_handle {
 
     struct rrdengine_instance *ctx;
     struct metric *metric;
-    struct pgc_page *page;
-    void *data;
-    size_t data_size;
+    struct pgc_page *pgc_page;
+    struct pgd *page_data;
+    size_t page_data_size;
     struct pg_alignment *alignment;
     uint32_t page_entries_max;
     uint32_t page_position;                   // keep track of the current page size, to make sure we don't exceed it
@@ -207,7 +207,7 @@ struct rrdeng_query_handle {
     struct metric *metric;
     struct pgc_page *page;
     struct rrdengine_instance *ctx;
-    storage_number *metric_data;
+    struct pgd_cursor pgdc;
     struct page_details_control *pdc;
 
     // the request
@@ -446,9 +446,6 @@ static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, uns
 
 #define ctx_is_available_for_queries(ctx) (__atomic_load_n(&(ctx)->quiesce.enabled, __ATOMIC_RELAXED) == false && __atomic_load_n(&(ctx)->quiesce.exit_mode, __ATOMIC_RELAXED) == false)
 
-void *dbengine_page_alloc(size_t size);
-void dbengine_page_free(void *page, size_t size);
-
 void *dbengine_extent_alloc(size_t size);
 void dbengine_extent_free(void *extent, size_t size);
 
@@ -491,8 +488,6 @@ typedef struct validated_page_descriptor {
     uint8_t type;
     bool is_valid;
 } VALIDATED_PAGE_DESCRIPTOR;
-
-#define DBENGINE_EMPTY_PAGE (void *)(-1)
 
 #define page_entries_by_time(start_time_s, end_time_s, update_every_s) \
         ((update_every_s) ? (((end_time_s) - ((start_time_s) - (update_every_s))) / (update_every_s)) : 1)

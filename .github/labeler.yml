@@ -153,3 +153,6 @@ area/tests:
 
 area/web:
   - web/**
+
+area/logs-management:
+  - logsmanagement/**

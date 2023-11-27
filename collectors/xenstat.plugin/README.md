@@ -1,1 +1,1 @@
-integrations/xen-xcp-ng.md
+integrations/xen_xcp-ng.md

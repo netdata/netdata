@@ -80,22 +80,25 @@ Metrics:
 
 These metrics show grouped information per apps group.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| apps.outbound_conn_v4 | a dimension per app group | connections/s |
-| apps.outbound_conn_v6 | a dimension per app group | connections/s |
-| apps.total_bandwidth_sent | a dimension per app group | kilobits/s |
-| apps.total_bandwidth_recv | a dimension per app group | kilobits/s |
-| apps.bandwidth_tcp_send | a dimension per app group | calls/s |
-| apps.bandwidth_tcp_recv | a dimension per app group | calls/s |
-| apps.bandwidth_tcp_retransmit | a dimension per app group | calls/s |
-| apps.bandwidth_udp_send | a dimension per app group | calls/s |
-| apps.bandwidth_udp_recv | a dimension per app group | calls/s |
-| services.net_conn_ipv4 | a dimension per systemd service | connections/s |
+| app.ebpf_call_tcp_v4_connection | connections | connections/s |
+| app.app.ebpf_call_tcp_v6_connection | connections | connections/s |
+| app.ebpf_sock_bytes_sent | bandwidth | kilobits/s |
+| app.ebpf_sock_bytes_received | bandwidth | kilobits/s |
+| app.ebpf_call_tcp_sendmsg | calls | calls/s |
+| app.ebpf_call_tcp_cleanup_rbuf | calls | calls/s |
+| app.ebpf_call_tcp_retransmit | calls | calls/s |
+| app.ebpf_call_udp_sendmsg | calls | calls/s |
+| app.ebpf_call_udp_recvmsg | calls | calls/s |
 
 ### Per cgroup
 

@@ -310,6 +310,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: time
+            - name: cgroup.pids_current
+              description: Number of processes
+              unit: "pids"
+              chart_type: line
+              dimensions:
+                - name: pids
         - name: cgroup network device
           description: ""
           labels:
@@ -688,6 +694,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: time
+            - name: k8s.cgroup.pids_current
+              description: Number of processes
+              unit: "pids"
+              chart_type: line
+              dimensions:
+                - name: pids
         - name: k8s cgroup network device
           description: These metrics refer to the Pod container network interface.
           labels:
@@ -915,6 +927,12 @@ modules:
               dimensions:
                 - name: read
                 - name: write
+            - name: systemd.service.pids.current
+              description: Systemd Services Number of Processes
+              unit: pids
+              chart_type: line
+              dimensions:
+                - name: pids
   - <<: *module
     meta:
       <<: *meta

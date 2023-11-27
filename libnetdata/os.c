@@ -162,7 +162,11 @@ unsigned long read_cpuset_cpus(const char *filename, long system_cpus) {
         unsigned long ncpus = 0;
 
         // parse the cpuset string and calculate the number of cpus the cgroup is allowed to use
-        while(*s) {
+        while (*s) {
+            if (isspace(*s)) {
+                s++;
+                continue;
+            }
             unsigned long n = cpuset_str2ul(&s);
             ncpus++;
             if(*s == ',') {

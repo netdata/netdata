@@ -5,5 +5,6 @@ services:
     command: /usr/sbin/netdata -D
     volumes:
       - ./child_stream.conf:/etc/netdata/stream.conf:ro
+      - ./child_netdata.conf:/etc/netdata/netdata.conf:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

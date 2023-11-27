@@ -114,6 +114,7 @@ SUBDIRS += \
     web \
     claim \
     spawn \
+    logsmanagement \
     $(NULL)
 
 AM_CFLAGS = \
@@ -128,6 +129,8 @@ AM_CFLAGS = \
     $(OPTIONAL_CUPS_CFLAGS) \
     $(OPTIONAL_XENSTAT_CFLAGS) \
     $(OPTIONAL_BPF_CFLAGS) \
+    $(OPTIONAL_SYSTEMD_CFLAGS) \
+    $(OPTIONAL_GTEST_CFLAGS) \
     $(NULL)
 
 sbin_PROGRAMS =
@@ -144,12 +147,20 @@ LIBNETDATA_FILES = \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
     libnetdata/buffer/buffer.h \
+    libnetdata/buffered_reader/buffered_reader.c \
+    libnetdata/buffered_reader/buffered_reader.h \
     libnetdata/circular_buffer/circular_buffer.c \
     libnetdata/circular_buffer/circular_buffer.h \
     libnetdata/clocks/clocks.c \
     libnetdata/clocks/clocks.h \
     libnetdata/completion/completion.c \
     libnetdata/completion/completion.h \
+    libnetdata/datetime/iso8601.c \
+    libnetdata/datetime/iso8601.h \
+    libnetdata/datetime/rfc3339.c \
+    libnetdata/datetime/rfc3339.h \
+    libnetdata/datetime/rfc7231.c \
+    libnetdata/datetime/rfc7231.h \
     libnetdata/dictionary/dictionary.c \
     libnetdata/dictionary/dictionary.h \
     libnetdata/eval/eval.c \
@@ -166,8 +177,12 @@ LIBNETDATA_FILES = \
     libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
     libnetdata/required_dummies.h \
+    libnetdata/line_splitter/line_splitter.c \
+    libnetdata/line_splitter/line_splitter.h \
     libnetdata/locks/locks.c \
     libnetdata/locks/locks.h \
+    libnetdata/log/journal.c \
+    libnetdata/log/journal.h \
     libnetdata/log/log.c \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
@@ -194,6 +209,8 @@ LIBNETDATA_FILES = \
     libnetdata/threads/threads.h \
     libnetdata/url/url.c \
     libnetdata/url/url.h \
+    libnetdata/uuid/uuid.c \
+    libnetdata/uuid/uuid.h \
     libnetdata/json/json.c \
     libnetdata/json/json.h \
     libnetdata/json/jsmn.c \
@@ -316,10 +333,66 @@ SYSTEMD_JOURNAL_PLUGIN_FILES = \
     collectors/systemd-journal.plugin/systemd-main.c \
     collectors/systemd-journal.plugin/systemd-units.c \
     collectors/systemd-journal.plugin/systemd-journal.c \
+    collectors/systemd-journal.plugin/systemd-journal-watcher.c \
     collectors/systemd-journal.plugin/systemd-journal-annotations.c \
     collectors/systemd-journal.plugin/systemd-journal-files.c \
     collectors/systemd-journal.plugin/systemd-journal-fstat.c \
     $(LIBNETDATA_FILES) \
+    $(NULL)
+
+SYSTEMD_CAT_NATIVE_FILES = \
+    libnetdata/log/systemd-cat-native.c \
+    libnetdata/log/systemd-cat-native.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+LOG2JOURNAL_FILES = \
+    libnetdata/log/log2journal.c \
+    $(NULL)
+
+
+LOGSMANAGEMENT_FILES = \
+    logsmanagement/circular_buffer.c \
+    logsmanagement/circular_buffer.h \
+    logsmanagement/db_api.c \
+    logsmanagement/db_api.h \
+    logsmanagement/defaults.h \
+    logsmanagement/file_info.h \
+    logsmanagement/flb_plugin.c \
+    logsmanagement/flb_plugin.h \
+    logsmanagement/functions.c \
+    logsmanagement/functions.h \
+    logsmanagement/helper.h \
+    logsmanagement/logsmanag_config.c \
+    logsmanagement/logsmanag_config.h \
+    logsmanagement/logsmanagement.c \
+    logsmanagement/parser.c \
+    logsmanagement/parser.h \
+    logsmanagement/query.c \
+    logsmanagement/query.h \
+    logsmanagement/rrd_api/rrd_api_docker_ev.c \
+    logsmanagement/rrd_api/rrd_api_docker_ev.h \
+    logsmanagement/rrd_api/rrd_api_generic.c \
+    logsmanagement/rrd_api/rrd_api_generic.h \
+    logsmanagement/rrd_api/rrd_api_kernel.c \
+    logsmanagement/rrd_api/rrd_api_kernel.h \
+    logsmanagement/rrd_api/rrd_api_mqtt.c \
+    logsmanagement/rrd_api/rrd_api_mqtt.h \
+    logsmanagement/rrd_api/rrd_api_stats.c \
+    logsmanagement/rrd_api/rrd_api_stats.h \
+    logsmanagement/rrd_api/rrd_api_systemd.c \
+    logsmanagement/rrd_api/rrd_api_systemd.h \
+    logsmanagement/rrd_api/rrd_api_web_log.c \
+    logsmanagement/rrd_api/rrd_api_web_log.h \
+    logsmanagement/rrd_api/rrd_api.h \
+    database/sqlite/sqlite3.c \
+    database/sqlite/sqlite3.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+LOGSMANAGEMENT_TESTS_FILES = \
+    logsmanagement/unit_test/unit_test.c \
+    logsmanagement/unit_test/unit_test.h \
     $(NULL)
 
 CUPS_PLUGIN_FILES = \
@@ -589,10 +662,14 @@ if ENABLE_DBENGINE
         database/engine/cache.h \
         database/engine/metric.c \
         database/engine/metric.h \
+        database/engine/page.c \
+        database/engine/page.h \
+        database/engine/page_test.cc \
+        database/engine/page_test.h \
         database/engine/pdc.c \
         database/engine/pdc.h \
         $(NULL)
-    
+
     RRD_PLUGIN_KSY_BUILTFILES = \
         database/engine/journalfile_v2.ksy \
         database/engine/journalfile_v2_virtmemb.ksy \
@@ -1174,6 +1251,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
+    $(OPTIONAL_CURL_LIBS) \
     $(OPTIONAL_ZSTD_LIBS) \
     $(OPTIONAL_BROTLIENC_LIBS) \
     $(OPTIONAL_BROTLIDEC_LIBS) \
@@ -1185,6 +1263,8 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_YAML_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(OPTIONAL_DL_LIBS) \
+    $(OPTIONAL_SYSTEMD_LIBS) \
+    $(OPTIONAL_GTEST_LIBS) \
     $(NULL)
 
 if ENABLE_ACLK
@@ -1284,12 +1364,38 @@ if ENABLE_PLUGIN_FREEIPMI
         $(NULL)
 endif
 
+if ENABLE_LOG2JOURNAL
+    sbin_PROGRAMS += log2journal
+    log2journal_SOURCES = $(LOG2JOURNAL_FILES)
+    log2journal_LDADD = \
+            $(OPTIONAL_PCRE2_LIBS) \
+            $(OPTIONAL_YAML_LIBS) \
+            $(NULL)
+endif
+
 if ENABLE_PLUGIN_SYSTEMD_JOURNAL
     plugins_PROGRAMS += systemd-journal.plugin
     systemd_journal_plugin_SOURCES = $(SYSTEMD_JOURNAL_PLUGIN_FILES)
     systemd_journal_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_SYSTEMD_LIBS) \
+        $(NULL)
+endif
+
+sbin_PROGRAMS += systemd-cat-native
+systemd_cat_native_SOURCES = $(SYSTEMD_CAT_NATIVE_FILES)
+systemd_cat_native_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+
+if ENABLE_LOGSMANAGEMENT
+    plugins_PROGRAMS += logs-management.plugin
+    logs_management_plugin_SOURCES = $(LOGSMANAGEMENT_FILES)
+if ENABLE_LOGSMANAGEMENT_TESTS
+    logs_management_plugin_SOURCES += $(LOGSMANAGEMENT_TESTS_FILES)
+endif
+    logs_management_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 

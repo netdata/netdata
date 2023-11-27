@@ -64,6 +64,12 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
         pthread_mutex_unlock(&wg->worker_mutex);
 
         if(acquired) {
+            ND_LOG_STACK lgs[] = {
+                    ND_LOG_FIELD_TXT(NDF_REQUEST, j->cmd),
+                    ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
             last_acquired = true;
             j = dictionary_acquired_item_value(acquired);
             j->cb(j->transaction, j->cmd, j->timeout, &j->cancelled);
@@ -207,4 +213,11 @@ void functions_evloop_add_function(struct functions_evloop_globals *wg, const ch
     we->cb = cb;
     we->default_timeout = default_timeout;
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wg->expectations, we, prev, next);
+}
+
+void functions_evloop_cancel_threads(struct functions_evloop_globals *wg){
+    for(size_t i = 0; i < wg->workers ; i++)
+        netdata_thread_cancel(wg->worker_threads[i]);
+
+    netdata_thread_cancel(wg->reader_thread);
 }

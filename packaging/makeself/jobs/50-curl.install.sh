@@ -36,7 +36,7 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run autoreconf -fi
 
     run ./configure \
-        --prefix="${NETDATA_INSTALL_PATH}" \
+        --prefix="/curl-local" \
         --enable-optimize \
         --disable-shared \
         --enable-static \
@@ -69,6 +69,7 @@ run make install
 
 store_cache curl "${NETDATA_MAKESELF_PATH}/tmp/curl"
 
+cp /curl-local/bin/curl "${NETDATA_INSTALL_PATH}"/bin/curl
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
   run strip "${NETDATA_INSTALL_PATH}"/bin/curl
 fi

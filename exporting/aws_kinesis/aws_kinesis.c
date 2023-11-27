@@ -153,8 +153,8 @@ void aws_kinesis_connector_worker(void *instance_p)
             char error_message[ERROR_LINE_MAX + 1] = "";
 
             netdata_log_debug(D_EXPORTING,
-                              "EXPORTING: kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \ "
-                              "                 buffer = %zu, record = %zu",
+                              "EXPORTING: kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, "
+                              "buffer = %zu, record = %zu",
                               instance->config.destination,
                               connector_specific_config->auth_key_id,
                               connector_specific_config->secure_key,

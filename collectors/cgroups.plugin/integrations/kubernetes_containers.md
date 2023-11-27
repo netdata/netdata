@@ -107,6 +107,7 @@ Metrics:
 | k8s.cgroup.io_some_pressure_stall_time | time | ms |
 | k8s.cgroup.io_full_pressure | some10, some60, some300 | percentage |
 | k8s.cgroup.io_full_pressure_stall_time | time | ms |
+| k8s.cgroup.pids_current | pids | pids |
 
 ### Per k8s cgroup network device
 

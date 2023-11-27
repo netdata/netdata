@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << Fedora: [24->35] >>
+# << Fedora: [24->38] >>
 
 set -e
 
@@ -28,10 +28,12 @@ declare -a package_tree=(
   autoconf-archive
   autogen
   automake
+  bison
   cmake
   curl
   elfutils-libelf-devel
   findutils
+  flex
   gcc
   gcc-c++
   git

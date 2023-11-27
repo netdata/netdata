@@ -392,14 +392,14 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
             continue;
         }
 
-        collector_info("BTRFS: device found '%s'", de->d_name);
+        // internal_error("BTRFS: device found '%s'", de->d_name);
 
         // --------------------------------------------------------------------
         // search for it
 
         for(d = node->devices ; d ; d = d->next) {
             if(str2ll(de->d_name, NULL) == d->id){
-                collector_info("BTRFS: existing device id '%d'", d->id);
+                // collector_info("BTRFS: existing device id '%d'", d->id);
                 break;
             }
         }
@@ -411,11 +411,11 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
             d = callocz(sizeof(BTRFS_DEVICE), 1);
 
             d->id = str2ll(de->d_name, NULL);
-            collector_info("BTRFS: new device with id '%d'", d->id);
+            // collector_info("BTRFS: new device with id '%d'", d->id);
 
             snprintfz(filename, FILENAME_MAX, "%s/%d/error_stats", path, d->id);
             d->error_stats_filename = strdupz(filename);
-            collector_info("BTRFS: error_stats_filename '%s'", filename);
+            // collector_info("BTRFS: error_stats_filename '%s'", filename);
 
             // link it
             d->next = node->devices;

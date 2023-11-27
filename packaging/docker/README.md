@@ -69,6 +69,7 @@ docker run -d --name=netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
+  -v /etc/localtime:/etc/localtime:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
@@ -108,6 +109,7 @@ services:
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
@@ -153,6 +155,7 @@ docker run -d --name=netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
   -v /etc/group:/host/etc/group:ro \
+  -v /etc/localtime:/etc/localtime:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
@@ -192,6 +195,7 @@ services:
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
@@ -261,6 +265,7 @@ services:
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
@@ -310,6 +315,7 @@ services:
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
@@ -355,6 +361,7 @@ services:
       - netdatacache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
@@ -446,9 +453,9 @@ above section on [configuring Agent containers](#configure-agent-containers) to 
 how you created the container.
 
 Alternatively, you can directly use the hostname from the node running the container by mounting `/etc/hostname` from
-the host in the container. With `docker run`, this can be done by adding `--volume /etc/hostname:/etc/hostname:ro` to
+the host in the container. With `docker run`, this can be done by adding `--volume /etc/hostname:/host/etc/hostname:ro` to
 the options. If you are using Docker Compose, you can add an entry to the container's `volumes` section
-reading `- /etc/hostname:/etc/hostname:ro`.
+reading `- /etc/hostname:/host/etc/hostname:ro`.
 
 ## Adding extra packages at runtime
 

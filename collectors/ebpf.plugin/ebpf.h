@@ -238,6 +238,7 @@ void ebpf_global_labels(netdata_syscall_stat_t *is,
 
 void ebpf_write_chart_cmd(char *type,
                                  char *id,
+                                 char *suffix,
                                  char *title,
                                  char *units,
                                  char *family,
@@ -265,8 +266,6 @@ void ebpf_create_chart(char *type,
                               int update_every,
                               char *module);
 
-void write_begin_chart(char *family, char *name);
-
 void write_chart_dimension(char *dim, long long value);
 
 void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end);
@@ -276,18 +275,47 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
 void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite,
                            char *dread, long long vread);
 
-void ebpf_create_charts_on_apps(char *name,
-                                       char *title,
-                                       char *units,
-                                       char *family,
-                                       char *charttype,
-                                       int order,
-                                       char *algorithm,
-                                       struct ebpf_target *root,
-                                       int update_every,
-                                       char *module);
+/**
+ * Create Chart labels
+ *
+ * @param name    the label name.
+ * @param value   the label value.
+ * @param origin  the labeel source.
+ */
+static inline void ebpf_create_chart_labels(char *name, char *value, int source)
+{
+    fprintf(stdout, "CLABEL '%s' '%s' %d\n", name, value, source);
+}
 
-void write_end_chart();
+/**
+ * Commit label
+ *
+ * Write commit label to stdout
+ */
+static inline void ebpf_commit_label()
+{
+    fprintf(stdout, "CLABEL_COMMIT\n");
+}
+
+/**
+ * Write begin command on standard output
+ *
+ * @param family the chart family name
+ * @param name   the chart name
+ * @param metric the chart suffix (used with apps and cgroups)
+ */
+static inline void ebpf_write_begin_chart(char *family, char *name, char *metric)
+{
+    printf("BEGIN %s.%s%s\n", family, name, metric);
+}
+
+/**
+ * Write END command on stdout.
+ */
+static inline void ebpf_write_end_chart()
+{
+    printf("END\n");
+}
 
 int ebpf_enable_tracepoint(ebpf_tracepoint_t *tp);
 int ebpf_disable_tracepoint(ebpf_tracepoint_t *tp);
@@ -295,6 +323,9 @@ uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps);
 
 void ebpf_pid_file(char *filename, size_t length);
 
+#define EBPF_PROGRAMS_SECTION "ebpf programs"
+
+#define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
 #define EBPF_PROGRAMS_SECTION "ebpf programs"
 
 #define EBPF_COMMON_DIMENSION_PERCENTAGE "%"
@@ -334,7 +365,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
 void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1);
 collected_number get_value_from_structure(char *basis, size_t offset);
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
-void ebpf_write_chart_obsolete(char *type, char *id, char *title, char *units, char *family,
+void ebpf_write_chart_obsolete(char *type, char *id, char *suffix, char *title, char *units, char *family,
                                       char *charttype, char *context, int order, int update_every);
 void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);

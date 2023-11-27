@@ -4,7 +4,7 @@ modules:
       plugin_name: xenstat.plugin
       module_name: xenstat.plugin
       monitored_instance:
-        name: Xen/XCP-ng
+        name: Xen XCP-ng
         link: "https://xenproject.org/"
         categories:
           - data-collection.containers-and-vms

@@ -13,3 +13,8 @@
 	path = web/server/h2o/libh2o
 	url = https://github.com/h2o/h2o.git
 	ignore = untracked
+[submodule "fluent-bit"]
+	path = fluent-bit
+	url = https://github.com/fluent/fluent-bit.git
+	shallow = true
+	ignore = dirty

@@ -1410,7 +1410,10 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    return rrd_function_run(host, wb, timeout, function, true, NULL,
+    char transaction[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(w->transaction, transaction);
+
+    return rrd_function_run(host, wb, timeout, function, true, transaction,
                             NULL, NULL,
                             web_client_interrupt_callback, w, NULL);
 }

@@ -30,15 +30,6 @@
 
 <hr class="solid">
 
-<p align="center">
-<a href="https://www.netdata.cloud#gh-light-mode-only">
-  <img src="https://www.netdata.cloud/img/readme-images/srecon_light.png" alt="ObservabilityCon23" width="600"/>
-</a>
-<a href="https://www.netdata.cloud#gh-dark-mode-only">
-  <img src="https://www.netdata.cloud/img/readme-images/srecon_dark.png" alt="ObservabilityCon23" width="600"/>
-</a>
-</p>
-
 MENU: **[WHAT IS NEW](#whats-new-and-coming)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)**
 
 Netdata collects metrics per second and presents them in beautiful low-latency dashboards. It is designed to run on all of your physical and virtual servers, cloud deployments, Kubernetes clusters, and edge/IoT devices, to monitor your systems, containers, and applications.
@@ -466,6 +457,8 @@ Using the above, the Netdata Agent on your production system will not use a disk
 ### :raised_eyebrow: How is Netdata different from a Prometheus and Grafana setup?
 
 Netdata is a "ready to use" monitoring solution. Prometheus and Grafana are tools to build your own monitoring solution.
+
+Netdata is also a lot faster, requires singificantly less resources and puts almost no stress on the server it runs. For a performance comparison check [this blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>

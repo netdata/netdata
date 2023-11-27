@@ -780,6 +780,49 @@ netdataDashboard.menu = {
         title: 'Consul',
         icon: '<i class="fas fa-circle-notch"></i>',
         info: 'Consul performance and health metrics. For details, see <a href="https://developer.hashicorp.com/consul/docs/agent/telemetry#key-metrics" target="_blank">Key Metrics</a>.'
+    },
+
+    'kmsg Logs': {
+        title: 'kmsg Logs',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Metrics extracted from log messages collected from the Kernel log buffer. For details, see <a href="https://docs.fluentbit.io/manual/pipeline/inputs/kernel-logs" target="_blank">the Fluent Bit Kernel Logs plugin</a>.'
+    },
+
+    'Systemd Logs': {
+        title: 'Systemd Logs',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Metrics extracted from log messages collected from the Journald daemon. For details, see <a href="https://docs.fluentbit.io/manual/pipeline/inputs/systemd" target="_blank">the Fluent Bit Systemd plugin</a>.'
+    },
+
+    'docker_events_logs': {
+        title: 'Docker Events Logs',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Docker server events metrics. For details, see <a href="https://docs.fluentbit.io/manual/pipeline/inputs/docker-events" target="_blank">the Fluent Bit Docker Events plugin</a> ' +
+        'and <a href="https://docs.docker.com/engine/reference/commandline/events/" target="_blank">the official Docker Events documentation</a>.'
+    },
+
+    'Apache access.log': {
+        title: 'Apache access.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Performance metrics exctracted from the Apache server <b>access.log</b>. If Go plugins are enabled, see also <a href="#menu_web_log_apache" target="_blank">the web log apache collector</a>.'
+    },
+
+    'Nginx access.log': {
+        title: 'Nginx access.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Performance metrics exctracted from the Nginx server <b>access.log</b>. If Go plugins are enabled, see also <a href="#menu_web_log_nginx" target="_blank">the web log nginx collector</a>.'
+    },
+
+    'Netdata error.log': {
+        title: 'Netdata error.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Metrics extracted from Netdata\'s error.log.'
+    },
+
+    'Netdata fluentbit.log': {
+        title: 'Netdata fluentbit.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Metrics extracted from Netdata\'s embedded Fluent Bit logs.'
     }
 };
 
@@ -8208,6 +8251,14 @@ netdataDashboard.context = {
     'nvme.device_thermal_mgmt_temp2_time': {
         info: 'The amount of time the controller has entered lower active power states or performed vendor-specific thermal management actions, <b>regardless of the impact on performance (e.g., heavy throttling)</b>, to attempt to lower the Combined Temperature due to the host-managed thermal management feature.'
     },
+
+    // ------------------------------------------------------------------------
+    // Logs Management
+
+    'docker_events_logs.events_type': {
+        info: 'The Docker object type of the event. See <a href="https://docs.docker.com/engine/reference/commandline/events/#description" target="_blank">here</a> for more information.'
+    },
+
     // ------------------------------------------------------------------------
 
 };

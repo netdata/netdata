@@ -48,9 +48,10 @@ RUN find . -type f >/opt/netdata/manifest
 RUN CFLAGS="-Og -g -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1\
     -DNETDATA_VERIFY_LOCKS=1 ${EXTRA_CFLAGS}" ./netdata-installer.sh --require-cloud --disable-lto
 
-RUN ln -sf /dev/stdout /var/log/netdata/access.log
-RUN ln -sf /dev/stdout /var/log/netdata/debug.log
-RUN ln -sf /dev/stderr /var/log/netdata/error.log
+RUN ln -sf /dev/stdout /var/log/netdata/access.log && \
+    ln -sf /dev/stdout /var/log/netdata/debug.log && \
+    ln -sf /dev/stderr /var/log/netdata/error.log && \
+    ln -sf /dev/stdout /var/log/netdata/fluentbit.log
 
 RUN rm /var/lib/netdata/registry/netdata.public.unique.id
 

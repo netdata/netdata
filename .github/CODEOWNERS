@@ -32,6 +32,7 @@ system/ @Ferroin @tkatsoulas
 tests/ @Ferroin @vkalintiris @tkatsoulas
 web/ @thiagoftsm @vkalintiris
 web/gui/ @novykh
+logsmanagement/ @Dim-P @thiagoftsm
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin @tkatsoulas

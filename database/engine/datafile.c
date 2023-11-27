@@ -479,14 +479,18 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
     int ret;
     char path[RRDENG_PATH_MAX];
 
-    netdata_log_info("DBENGINE: creating new data and journal files in path %s", ctx->config.dbfiles_path);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "DBENGINE: creating new data and journal files in path %s",
+           ctx->config.dbfiles_path);
+
     datafile = datafile_alloc_and_init(ctx, 1, fileno);
     ret = create_data_file(datafile);
     if(ret)
         goto error_after_datafile;
 
     generate_datafilepath(datafile, path, sizeof(path));
-    netdata_log_info("DBENGINE: created data file \"%s\".", path);
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "DBENGINE: created data file \"%s\".", path);
 
     journalfile = journalfile_alloc_and_init(datafile);
     ret = journalfile_create(journalfile, datafile);
@@ -494,7 +498,8 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
         goto error_after_journalfile;
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    netdata_log_info("DBENGINE: created journal file \"%s\".", path);
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "DBENGINE: created journal file \"%s\".", path);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile, having_lock);
