@@ -420,7 +420,8 @@ bool parse_log2journal_parameters(struct log_job *jb, int argc, char **argv) {
         }
 #if defined(NETDATA_DEV_MODE) || defined(NETDATA_INTERNAL_CHECKS)
         else if(strcmp(arg, "--test") == 0) {
-            logfmt_test();
+            // logfmt_test();
+            json_test();
             exit(1);
         }
 #endif

@@ -261,6 +261,7 @@ LOG_JSON_STATE *json_parser_create(struct log_job *jb);
 void json_parser_destroy(LOG_JSON_STATE *js);
 const char *json_parser_error(LOG_JSON_STATE *js);
 bool json_parse_document(LOG_JSON_STATE *js, const char *txt);
+void json_test(void);
 
 typedef struct logfmt_state LOGFMT_STATE;
 LOGFMT_STATE *logfmt_parser_create(struct log_job *jb);

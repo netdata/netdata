@@ -48,7 +48,7 @@ static inline bool json_expect_char_after_white_space(LOG_JSON_STATE *js, const 
 
     snprintf(js->msg, sizeof(js->msg),
              "JSON PARSER: character '%c' is not one of the expected characters (%s), at pos %zu",
-             *s, expected, js->pos);
+             *s ? *s : '?', expected, js->pos);
 
     return false;
 }
@@ -167,6 +167,44 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
     }
 }
 
+static bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
+    if (codepoint <= 0x7F) {
+        // 1-byte sequence
+        if (*remaining < 2) return false; // +1 for the null
+        *(*d)++ = (char)codepoint;
+        (*remaining)--;
+    }
+    else if (codepoint <= 0x7FF) {
+        // 2-byte sequence
+        if (*remaining < 3) return false; // +1 for the null
+        *(*d)++ = (char)(0xC0 | ((codepoint >> 6) & 0x1F));
+        *(*d)++ = (char)(0x80 | (codepoint & 0x3F));
+        (*remaining) -= 2;
+    }
+    else if (codepoint <= 0xFFFF) {
+        // 3-byte sequence
+        if (*remaining < 4) return false; // +1 for the null
+        *(*d)++ = (char)(0xE0 | ((codepoint >> 12) & 0x0F));
+        *(*d)++ = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        *(*d)++ = (char)(0x80 | (codepoint & 0x3F));
+        (*remaining) -= 3;
+    }
+    else if (codepoint <= 0x10FFFF) {
+        // 4-byte sequence
+        if (*remaining < 5) return false; // +1 for the null
+        *(*d)++ = (char)(0xF0 | ((codepoint >> 18) & 0x07));
+        *(*d)++ = (char)(0x80 | ((codepoint >> 12) & 0x3F));
+        *(*d)++ = (char)(0x80 | ((codepoint >> 6) & 0x3F));
+        *(*d)++ = (char)(0x80 | (codepoint & 0x3F));
+        (*remaining) -= 4;
+    }
+    else
+        // Invalid code point
+        return false;
+
+    return true;
+}
+
 static inline bool json_parse_string(LOG_JSON_STATE *js) {
     static __thread char value[MAX_VALUE_LEN];
 
@@ -207,6 +245,33 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
                     c = '\r';
                     s++;
                     break;
+                case 'u':
+                    if(isxdigit(s[1]) && isxdigit(s[2]) && isxdigit(s[3]) && isxdigit(s[4])) {
+                        char b[5] = {
+                                [0] = s[1],
+                                [1] = s[2],
+                                [2] = s[3],
+                                [3] = s[4],
+                                [4] = '\0',
+                        };
+                        unsigned codepoint = strtoul(b, NULL, 16);
+                        if(encode_utf8(codepoint, &d, &remaining)) {
+                            s += 5;
+                            continue;
+                        }
+                        else {
+                            *d++ = '\\';
+                            remaining--;
+                            c = *s++;
+                        }
+                    }
+                    else {
+                        *d++ = '\\';
+                        remaining--;
+                        c = *s++;
+                    }
+                    break;
+
                 default:
                     c = *s++;
                     break;
@@ -556,4 +621,13 @@ bool json_parse_document(LOG_JSON_STATE *js, const char *txt) {
     }
 
     return true;
+}
+
+void json_test(void) {
+    struct log_job jb = { .prefix = "NIGNX_" };
+    LOG_JSON_STATE *json = json_parser_create(&jb);
+
+    json_parse_document(json, "{\"value\":\"\\u\\u039A\\u03B1\\u03BB\\u03B7\\u03BC\\u03AD\\u03C1\\u03B1\"}");
+
+    json_parser_destroy(json);
 }
