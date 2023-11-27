@@ -49,6 +49,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
     mv /usr/sbin/netdata-claim.sh    /app/usr/sbin/ && \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
+    mv /usr/sbin/systemd-cat-native    /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
     mkdir -p /deps/etc && \
