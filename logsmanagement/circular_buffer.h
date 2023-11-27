@@ -37,6 +37,7 @@ typedef struct Circ_buff_item {
 } Circ_buff_item_t;
 
 typedef struct Circ_buff {
+    int num_of_items_initial;                   /**< Initial number of preallocated items in the buffer - useful when reclaiming space **/
     int num_of_items;                           /**< Number of preallocated items in the buffer **/
     Circ_buff_item_t *items;                    /**< Array of all circular buffer items **/
     Circ_buff_item_t *in;                       /**< Circular buffer item to write new data into **/

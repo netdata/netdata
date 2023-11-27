@@ -149,6 +149,10 @@ void circ_buff_search(logs_query_params_t *const p_query_params, struct File_inf
         uv_rwlock_rdunlock(&p_file_infos[pfi_off]->circ_buff->buff_realloc_rwlock);
 }
 
+/**
+ * @brief Reduce number of empty items in buffer to reclaim space.
+ * @param buff Circular buffer to work on.
+ */
 void circ_buff_reclaim_empty_items_space(Circ_buff_t *const buff){
     
     // TODO: Probably can be changed to __ATOMIC_RELAXED, but ideally a mutex should be used here.
@@ -156,20 +160,17 @@ void circ_buff_reclaim_empty_items_space(Circ_buff_t *const buff){
     int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
     int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
 
-    if((head == tail && full) || (now_monotonic_sec() - buff->buff_realloc_last < 30))
+    if((now_monotonic_sec() - buff->buff_realloc_last < CIRC_BUFF_DO_NOT_RECLAIM_SPACE_FOR_SEC) || (head == tail && full))
         return;
-
-    // TODO: Before anything, check for how long buffer has stayed at this size.
 
     int num_of_valid_items = 0;
 
-    for(int i = tail; i != head; i = (i + 1) % buff->num_of_items){
+    for(int i = tail; i != head; i = (i + 1) % buff->num_of_items)
         ++num_of_valid_items;
-    }
 
-    int num_of_items_new = num_of_valid_items * 1.5;
-    if(num_of_items_new < 10) // TODO: Check if num_of_items_new < initial buff->num_of_items 
-        num_of_items_new = 10;
+    int num_of_items_new = num_of_valid_items * CIRC_BUFF_SCALE_FACTOR + 1;
+    if(num_of_items_new < buff->num_of_items_initial)
+        num_of_items_new = buff->num_of_items_initial;
 
     Circ_buff_item_t *items_new = callocz(num_of_items_new, sizeof(Circ_buff_item_t));
 
@@ -307,22 +308,25 @@ int circ_buff_insert(Circ_buff_t *const buff){
     int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
    
     /* If circular buffer does not have any free items, it will be expanded
-     * by reallocating the `items` array and adding one more item. */
+     * by reallocating a larger `items` array. */
     if (unlikely(( head == tail ) && full )) {
         debug_log( "buff out of space! will be expanded.");
         uv_rwlock_wrlock(&buff->buff_realloc_rwlock);
 
-        Circ_buff_item_t *items_new = callocz(buff->num_of_items + 1, sizeof(Circ_buff_item_t));
+        int num_of_items_new = buff->num_of_items * CIRC_BUFF_SCALE_FACTOR + 1;
+
+        Circ_buff_item_t *items_new = callocz(num_of_items_new, sizeof(Circ_buff_item_t));
 
         for(int i = 0; i < buff->num_of_items; i++)
-            items_new[i] = buff->items[head++ % buff->num_of_items];
-
-        freez(buff->items);
-        buff->items = items_new;
+            items_new[i] = buff->items[head % buff->num_of_items];
 
         head = buff->head = buff->num_of_items++;
         buff->tail = buff->read = 0;
-        buff->full = 0; 
+        buff->full = 0;
+
+        freez(buff->items);
+        buff->items = items_new;
+        buff->num_of_items = num_of_items_new;
 
         __atomic_add_fetch(&buff->buff_realloc_cnt, 1, __ATOMIC_RELAXED);
 
@@ -424,16 +428,18 @@ void circ_buff_read_done(Circ_buff_t *const buff){
 
 /**
  * @brief Create a new circular buffer.
- * @param num_of_items Number of Circ_buff_item_t items in the buffer.
+ * @param num_of_items_min Minimum number of Circ_buff_item_t items needed in the buffer.
  * @param max_size Maximum memory the circular buffer can occupy.
  * @param allow_dropped_logs Maximum memory the circular buffer can occupy.
  * @return Pointer to the new circular buffer structure.
  */
-Circ_buff_t *circ_buff_init(const int num_of_items, 
+Circ_buff_t *circ_buff_init(const int num_of_items_min, 
                             const size_t max_size,
                             const int allow_dropped_logs ) {
+
     Circ_buff_t *buff = callocz(1, sizeof(Circ_buff_t));
-    buff->num_of_items = num_of_items;
+
+    buff->num_of_items = buff->num_of_items_initial = num_of_items_min * CIRC_BUFF_SCALE_FACTOR + 1;
     buff->items = callocz(buff->num_of_items, sizeof(Circ_buff_item_t));
     buff->in = callocz(1, sizeof(Circ_buff_item_t));
 
@@ -452,7 +458,8 @@ Circ_buff_t *circ_buff_init(const int num_of_items,
  * @param buff Circular buffer to be destroyed.
  */
 void circ_buff_destroy(Circ_buff_t *buff){
-    for (int i = 0; i < buff->num_of_items; i++) freez(buff->items[i].data);
+    for (int i = 0; i < buff->num_of_items; i++) 
+        freez(buff->items[i].data);
     freez(buff->items);
     freez(buff->in->data);
     freez(buff->in);
