@@ -149,6 +149,47 @@ void circ_buff_search(logs_query_params_t *const p_query_params, struct File_inf
         uv_rwlock_rdunlock(&p_file_infos[pfi_off]->circ_buff->buff_realloc_rwlock);
 }
 
+void circ_buff_reclaim_empty_items_space(Circ_buff_t *const buff){
+    
+    // TODO: Probably can be changed to __ATOMIC_RELAXED, but ideally a mutex should be used here.
+    int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
+    int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
+    int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
+
+    if((head == tail && full) || (now_monotonic_sec() - buff->buff_realloc_last < 30))
+        return;
+
+    // TODO: Before anything, check for how long buffer has stayed at this size.
+
+    int num_of_valid_items = 0;
+
+    for(int i = tail; i != head; i = (i + 1) % buff->num_of_items){
+        ++num_of_valid_items;
+    }
+
+    int num_of_items_new = num_of_valid_items * 1.5;
+    if(num_of_items_new < 10) // TODO: Check if num_of_items_new < initial buff->num_of_items 
+        num_of_items_new = 10;
+
+    Circ_buff_item_t *items_new = callocz(num_of_items_new, sizeof(Circ_buff_item_t));
+
+    buff->total_cached_mem = buff->in->data_max_size;
+
+    /* Copy items that are not empty */
+    int new_off = 0;
+    for(int i = tail; i != head; i = (i + 1) % buff->num_of_items){
+        items_new[new_off++] = buff->items[i];
+        buff->total_cached_mem += buff->items[i].data_max_size;
+    }
+
+    freez(buff->items);
+    buff->items = items_new;
+    buff->num_of_items = num_of_items_new;
+    head = buff->head = new_off;
+    tail = buff->tail = buff->read = 0;
+
+}
+
 /**
  * @brief Query circular buffer if there is space for item insertion.
  * @param buff Circular buffer to query for available space.
@@ -188,24 +229,33 @@ try_to_acquire_space:
     * buffer allocated memory from any empty items. 
     * 
     * c) If after reclaiming the total memory consumption is still beyond the 
-    * configuration limit, either 0 will be returned as the available space 
-    * for raw logs in the input buffer, or the function will block and repeat
-    * the same process, until there is available space to be returned, depending
-    * of the configuration value of buff->allow_dropped_logs.
+    * configuration limit, either:
+    * 
+    *   c1) 0 will be returned as the available space for raw logs in the input 
+    * buffer, or 
+    * 
+    *   c2) the function will block and repeat the same process, until there 
+    * is available space to be returned, depending of the configuration 
+    * value of buff->allow_dropped_logs.
     * */
     if(required_space > buff->in->data_max_size) {
+
+        /* (a) */
         if(likely(total_cached_mem_ex_in + required_space <= buff->total_cached_mem_max)){
             buff->in->data_max_size = required_space;
             buff->in->data = reallocz(buff->in->data, buff->in->data_max_size);
 
             available_text_space = requested_text_space;
         }
+
+        /* (b) */
         else if(likely(__atomic_load_n(&buff->full, __ATOMIC_SEQ_CST) == 0)){
             int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
             int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
 
-            for (int i = (head == tail ? (head + 1) % buff->num_of_items : head); 
-                i != tail; i = (i + 1) % buff->num_of_items) {
+            for(int i = (head == tail ? (head + 1) % buff->num_of_items : head); 
+                    i != tail; 
+                    i = (i + 1) % buff->num_of_items) {
                 
                 m_assert(i <= buff->num_of_items, "i > buff->num_of_items");
                 buff->items[i].data_max_size = 1;
@@ -223,12 +273,17 @@ try_to_acquire_space:
 
                 available_text_space = requested_text_space;
             }
-            else available_text_space = 0;
+
+            /* (c1) */
+            else {
+                available_text_space = 0;
+            }
         }
     } else available_text_space = requested_text_space;
 
     __atomic_store_n(&buff->total_cached_mem, total_cached_mem_ex_in + buff->in->data_max_size, __ATOMIC_RELAXED);
 
+    /* (c2) */
     if(unlikely(!buff->allow_dropped_logs && !available_text_space)){
         sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
         goto try_to_acquire_space;
@@ -259,19 +314,19 @@ int circ_buff_insert(Circ_buff_t *const buff){
 
         Circ_buff_item_t *items_new = callocz(buff->num_of_items + 1, sizeof(Circ_buff_item_t));
 
-        for(int i = 0; i < buff->num_of_items; i++){
-            Circ_buff_item_t *item_old = &buff->items[head++ % buff->num_of_items];
-            items_new[i] = *item_old;
-        }
+        for(int i = 0; i < buff->num_of_items; i++)
+            items_new[i] = buff->items[head++ % buff->num_of_items];
+
         freez(buff->items);
         buff->items = items_new;
 
-        buff->parse = buff->parse - buff->tail;
         head = buff->head = buff->num_of_items++;
         buff->tail = buff->read = 0;
         buff->full = 0; 
 
         __atomic_add_fetch(&buff->buff_realloc_cnt, 1, __ATOMIC_RELAXED);
+
+        buff->buff_realloc_last = now_monotonic_sec();
 
         uv_rwlock_wrunlock(&buff->buff_realloc_rwlock);
     }
@@ -381,6 +436,8 @@ Circ_buff_t *circ_buff_init(const int num_of_items,
     buff->num_of_items = num_of_items;
     buff->items = callocz(buff->num_of_items, sizeof(Circ_buff_item_t));
     buff->in = callocz(1, sizeof(Circ_buff_item_t));
+
+    buff->buff_realloc_last = now_monotonic_sec();
 
     uv_rwlock_init(&buff->buff_realloc_rwlock);
 
