@@ -36,6 +36,102 @@ struct key_rewrite;
 static pcre2_code *jb_compile_pcre2_pattern(const char *pattern);
 static bool parse_replacement_pattern(struct key_rewrite *rw);
 
+#define YAML_CONFIG_NGINX_COMBINED \
+    "# Netdata log2journal Configuration Template\n" \
+    "# The following parses nginx log files using the combined format.\n" \
+    "\n" \
+    "# The PCRE2 pattern to match log entries and give names to the fields.\n" \
+    "# The journal will have these names, so follow their rules. You can\n" \
+    "# initiate an extended PCRE2 pattern by starting the pattern with (?x)\n" \
+    "pattern: |\n" \
+    "  (?x)                                   # Enable PCRE2 extended mode\n" \
+    "  ^\n" \
+    "  (?<NGINX_REMOTE_ADDR>[^ ]+) \\s - \\s    # NGINX_REMOTE_ADDR\n" \
+    "  (?<NGINX_REMOTE_USER>[^ ]+) \\s         # NGINX_REMOTE_USER\n" \
+    "  \\[\n" \
+    "    (?<NGINX_TIME_LOCAL>[^\\]]+)          # NGINX_TIME_LOCAL\n" \
+    "  \\]\n" \
+    "  \\s+ \"\n" \
+    "  (?<MESSAGE>\n" \
+    "    (?<NGINX_METHOD>[A-Z]+) \\s+          # NGINX_METHOD\n" \
+    "    (?<NGINX_URL>[^ ]+) \\s+\n" \
+    "    HTTP/(?<NGINX_HTTP_VERSION>[^\"]+)\n" \
+    "  )\n" \
+    "  \" \\s+\n" \
+    "  (?<NGINX_STATUS>\\d+) \\s+               # NGINX_STATUS\n" \
+    "  (?<NGINX_BODY_BYTES_SENT>\\d+) \\s+      # NGINX_BODY_BYTES_SENT\n" \
+    "  \"(?<NGINX_HTTP_REFERER>[^\"]*)\" \\s+     # NGINX_HTTP_REFERER\n" \
+    "  \"(?<NGINX_HTTP_USER_AGENT>[^\"]*)\"      # NGINX_HTTP_USER_AGENT\n" \
+    "\n" \
+    "# When log2journal can detect the filename of each log entry (tail gives it\n" \
+    "# only when it tails multiple files), this key will be used to send the\n" \
+    "# filename to the journals.\n" \
+    "filename:\n" \
+    "  key: NGINX_LOG_FILENAME\n" \
+    "\n" \
+    "# Duplicate fields under a different name. You can duplicate multiple fields\n" \
+    "# to a new one and then use rewrite rules to change its value.\n" \
+    "duplicate:\n" \
+    "\n" \
+    "  # we insert the field PRIORITY as a copy of NGINX_STATUS.\n" \
+    "  - key: PRIORITY\n" \
+    "    values_of:\n" \
+    "    - NGINX_STATUS\n" \
+    "\n" \
+    "  # we inject the field NGINX_STATUS_FAMILY as a copy of NGINX_STATUS.\n" \
+    "  - key: NGINX_STATUS_FAMILY\n" \
+    "    values_of: \n" \
+    "    - NGINX_STATUS\n" \
+    "\n" \
+    "# Inject constant fields into the journal logs.\n" \
+    "inject:\n" \
+    "  - key: SYSLOG_IDENTIFIER\n" \
+    "    value: \"nginx-log\"\n" \
+    "\n" \
+    "# Rewrite the value of fields (including the duplicated ones).\n" \
+    "# The search pattern can have named groups, and the replace pattern can use\n" \
+    "# them as ${name}.\n" \
+    "rewrite:\n" \
+    "  # PRIORTY is a duplicate of NGINX_STATUS\n" \
+    "  # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug\n" \
+    "  - key: \"PRIORITY\"\n" \
+    "    search: \"^[123]\"\n" \
+    "    replace: 6\n" \
+    "\n" \
+    "  - key: \"PRIORITY\"\n" \
+    "    search: \"^4\"\n" \
+    "    replace: 5\n" \
+    "\n" \
+    "  - key: \"PRIORITY\"\n" \
+    "    search: \"^5\"\n" \
+    "    replace: 3\n" \
+    "\n" \
+    "  - key: \"PRIORITY\"\n" \
+    "    search: \".*\"\n" \
+    "    replace: 4\n" \
+    "  \n" \
+    "  # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS\n" \
+    "  - key: \"NGINX_STATUS_FAMILY\"\n" \
+    "    search: \"^(?<first_digit>[1-5])\"\n" \
+    "    replace: \"${first_digit}xx\"\n" \
+    "\n" \
+    "  - key: \"NGINX_STATUS_FAMILY\"\n" \
+    "    search: \".*\"\n" \
+    "    replace: \"UNKNOWN\"\n" \
+    "\n" \
+    "# Control what to do when input logs do not match the main PCRE2 pattern.\n" \
+    "unmatched:\n" \
+    "  # The journal key to log the PCRE2 error message to.\n" \
+    "  # Set this to MESSAGE, so you to see the error in the log.\n" \
+    "  key: MESSAGE\n" \
+    "  \n" \
+    "  # Inject static fields to the unmatched entries.\n" \
+    "  # Set PRIORITY=1 (alert) to help you spot unmatched entries in the logs.\n" \
+    "  inject:\n" \
+    "   - key: PRIORITY\n" \
+    "     value: 1\n" \
+    "\n"
+
 void display_help(const char *name) {
     printf("\n");
     printf("Netdata log2journal " PACKAGE_VERSION "\n");
@@ -51,6 +147,10 @@ void display_help(const char *name) {
     printf("\n");
     printf("  --file /path/to/file.yaml\n");
     printf("       Read yaml configuration file for instructions.\n");
+    printf("\n");
+    printf("  --config CONFIG_NAME\n");
+    printf("       Run with the internal configuration named CONFIG_NAME\n");
+    printf("       Available internal configs: nginx-combined\n");
     printf("\n");
     printf("  --show-config\n");
     printf("       Show the configuration in yaml format before starting the job.\n");
@@ -185,103 +285,10 @@ void display_help(const char *name) {
     printf("\n");
     printf("Example YAML file:\n\n"
            "--------------------------------------------------------------------------------\n"
-           "# Netdata log2journal Configuration Template\n"
-           "# The following parses nginx log files using the combined format.\n"
-           "\n"
-           "# The PCRE2 pattern to match log entries and give names to the fields.\n"
-           "# The journal will have these names, so follow their rules. You can\n"
-           "# initiate an extended PCRE2 pattern by starting the pattern with (?x)\n"
-           "pattern: |\n"
-           "  (?x)                                   # Enable PCRE2 extended mode\n"
-           "  ^\n"
-           "  (?<NGINX_REMOTE_ADDR>[^ ]+) \\s - \\s    # NGINX_REMOTE_ADDR\n"
-           "  (?<NGINX_REMOTE_USER>[^ ]+) \\s         # NGINX_REMOTE_USER\n"
-           "  \\[\n"
-           "    (?<NGINX_TIME_LOCAL>[^\\]]+)          # NGINX_TIME_LOCAL\n"
-           "  \\]\n"
-           "  \\s+ \"\n"
-           "  (?<MESSAGE>\n"
-           "    (?<NGINX_METHOD>[A-Z]+) \\s+          # NGINX_METHOD\n"
-           "    (?<NGINX_URL>[^ ]+) \\s+\n"
-           "    HTTP/(?<NGINX_HTTP_VERSION>[^\"]+)\n"
-           "  )\n"
-           "  \" \\s+\n"
-           "  (?<NGINX_STATUS>\\d+) \\s+               # NGINX_STATUS\n"
-           "  (?<NGINX_BODY_BYTES_SENT>\\d+) \\s+      # NGINX_BODY_BYTES_SENT\n"
-           "  \"(?<NGINX_HTTP_REFERER>[^\"]*)\" \\s+     # NGINX_HTTP_REFERER\n"
-           "  \"(?<NGINX_HTTP_USER_AGENT>[^\"]*)\"      # NGINX_HTTP_USER_AGENT\n"
-           "\n"
-           "# When log2journal can detect the filename of each log entry (tail gives it\n"
-           "# only when it tails multiple files), this key will be used to send the\n"
-           "# filename to the journals.\n"
-           "filename:\n"
-           "  key: NGINX_LOG_FILENAME\n"
-           "\n"
-           "# Duplicate fields under a different name. You can duplicate multiple fields\n"
-           "# to a new one and then use rewrite rules to change its value.\n"
-           "duplicate:\n"
-           "\n"
-           "  # we insert the field PRIORITY as a copy of NGINX_STATUS.\n"
-           "  - key: PRIORITY\n"
-           "    values_of:\n"
-           "    - NGINX_STATUS\n"
-           "\n"
-           "  # we inject the field NGINX_STATUS_FAMILY as a copy of NGINX_STATUS.\n"
-           "  - key: NGINX_STATUS_FAMILY\n"
-           "    values_of: \n"
-           "    - NGINX_STATUS\n"
-           "\n"
-           "# Inject constant fields into the journal logs.\n"
-           "inject:\n"
-           "  - key: SYSLOG_IDENTIFIER\n"
-           "    value: \"nginx-log\"\n"
-           "\n"
-           "# Rewrite the value of fields (including the duplicated ones).\n"
-           "# The search pattern can have named groups, and the replace pattern can use\n"
-           "# them as ${name}.\n"
-           "rewrite:\n"
-           "  # PRIORTY is a duplicate of NGINX_STATUS\n"
-           "  # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug\n"
-           "  - key: \"PRIORITY\"\n"
-           "    search: \"^[123]\"\n"
-           "    replace: 6\n"
-           "\n"
-           "  - key: \"PRIORITY\"\n"
-           "    search: \"^4\"\n"
-           "    replace: 5\n"
-           "\n"
-           "  - key: \"PRIORITY\"\n"
-           "    search: \"^5\"\n"
-           "    replace: 3\n"
-           "\n"
-           "  - key: \"PRIORITY\"\n"
-           "    search: \".*\"\n"
-           "    replace: 4\n"
-           "  \n"
-           "  # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS\n"
-           "  - key: \"NGINX_STATUS_FAMILY\"\n"
-           "    search: \"^(?<first_digit>[1-5])\"\n"
-           "    replace: \"${first_digit}xx\"\n"
-           "\n"
-           "  - key: \"NGINX_STATUS_FAMILY\"\n"
-           "    search: \".*\"\n"
-           "    replace: \"UNKNOWN\"\n"
-           "\n"
-           "# Control what to do when input logs do not match the main PCRE2 pattern.\n"
-           "unmatched:\n"
-           "  # The journal key to log the PCRE2 error message to.\n"
-           "  # Set this to MESSAGE, so you to see the error in the log.\n"
-           "  key: MESSAGE\n"
-           "  \n"
-           "  # Inject static fields to the unmatched entries.\n"
-           "  # Set PRIORITY=1 (alert) to help you spot unmatched entries in the logs.\n"
-           "  inject:\n"
-           "   - key: PRIORITY\n"
-           "     value: 1\n"
-           "\n"
+           "%s"
            "--------------------------------------------------------------------------------\n"
-           "\n"
-           );
+           "\n",
+           YAML_CONFIG_NGINX_COMBINED);
 }
 
 // ----------------------------------------------------------------------------
@@ -459,6 +466,20 @@ struct log_job {
         size_t used;
     } rewrites;
 };
+
+static bool log_job_add_filename_key(struct log_job *jb, const char *key, size_t key_len) {
+    if(!key || !*key) {
+        log2stderr("filename key cannot be empty.");
+        return false;
+    }
+
+    if(jb->filename.key)
+        freez((char*)jb->filename.key);
+
+    jb->filename.key = strndupz(key, key_len);
+
+    return true;
+}
 
 static bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched) {
     if (unmatched) {
@@ -913,10 +934,8 @@ static size_t yaml_parse_filename_injection(yaml_parser_t *parser, struct log_jo
 
         else {
             if (event.type == YAML_SCALAR_EVENT) {
-                if(jb->filename.key)
-                    freez((char *)jb->filename.key);
-
-                jb->filename.key = strndupz((char *) sub_event.data.scalar.value, sub_event.data.scalar.length);
+                if(!log_job_add_filename_key(jb, (char *)sub_event.data.scalar.value, sub_event.data.scalar.length))
+                    errors++;
             }
 
             else {
@@ -1292,29 +1311,20 @@ static size_t yaml_parse_pattern(yaml_parser_t *parser, struct log_job *jb) {
     return errors;
 }
 
-static bool yaml_parse_file(const char *config_file_path, struct log_job *jb) {
-    FILE *fp = fopen(config_file_path, "r");
-    if (!fp) {
-        log2stderr("Error opening config file: %s", config_file_path);
-        return false;
-    }
-
-    yaml_parser_t parser;
-    yaml_parser_initialize(&parser);
-    yaml_parser_set_input_file(&parser, fp);
+static size_t yaml_parse_initialized(yaml_parser_t *parser, struct log_job *jb) {
     size_t errors = 0;
 
-    if(!yaml_parse_expect_event(&parser, YAML_STREAM_START_EVENT)) {
+    if(!yaml_parse_expect_event(parser, YAML_STREAM_START_EVENT)) {
         errors++;
         goto cleanup;
     }
 
-    if(!yaml_parse_expect_event(&parser, YAML_DOCUMENT_START_EVENT)) {
+    if(!yaml_parse_expect_event(parser, YAML_DOCUMENT_START_EVENT)) {
         errors++;
         goto cleanup;
     }
 
-    if(!yaml_parse_expect_event(&parser, YAML_MAPPING_START_EVENT)) {
+    if(!yaml_parse_expect_event(parser, YAML_MAPPING_START_EVENT)) {
         errors++;
         goto cleanup;
     }
@@ -1322,14 +1332,14 @@ static bool yaml_parse_file(const char *config_file_path, struct log_job *jb) {
     bool finished = false;
     while (!errors && !finished) {
         yaml_event_t event;
-        if(!yaml_parse(&parser, &event)) {
+        if(!yaml_parse(parser, &event)) {
             errors++;
             continue;
         }
 
         switch(event.type) {
             default:
-                yaml_error(&parser, &event, "unexpected type");
+                yaml_error(parser, &event, "unexpected type");
                 errors++;
                 break;
 
@@ -1339,25 +1349,25 @@ static bool yaml_parse_file(const char *config_file_path, struct log_job *jb) {
 
             case YAML_SCALAR_EVENT:
                 if (yaml_scalar_matches(&event, "pattern", strlen("pattern")))
-                    errors += yaml_parse_pattern(&parser, jb);
+                    errors += yaml_parse_pattern(parser, jb);
 
                 else if (yaml_scalar_matches(&event, "filename", strlen("filename")))
-                    errors += yaml_parse_filename_injection(&parser, jb);
+                    errors += yaml_parse_filename_injection(parser, jb);
 
                 else if (yaml_scalar_matches(&event, "duplicate", strlen("duplicate")))
-                    errors += yaml_parse_duplicates_injection(&parser, jb);
+                    errors += yaml_parse_duplicates_injection(parser, jb);
 
                 else if (yaml_scalar_matches(&event, "inject", strlen("inject")))
-                    errors += yaml_parse_injections(&parser, jb, false);
+                    errors += yaml_parse_injections(parser, jb, false);
 
                 else if (yaml_scalar_matches(&event, "unmatched", strlen("unmatched")))
-                    errors += yaml_parse_unmatched(&parser, jb);
+                    errors += yaml_parse_unmatched(parser, jb);
 
                 else if (yaml_scalar_matches(&event, "rewrite", strlen("rewrite")))
-                    errors += yaml_parse_rewrites(&parser, jb);
+                    errors += yaml_parse_rewrites(parser, jb);
 
                 else {
-                    yaml_error(&parser, &event, "unexpected scalar");
+                    yaml_error(parser, &event, "unexpected scalar");
                     errors++;
                 }
                 break;
@@ -1366,19 +1376,61 @@ static bool yaml_parse_file(const char *config_file_path, struct log_job *jb) {
         yaml_event_delete(&event);
     }
 
-    if(!yaml_parse_expect_event(&parser, YAML_DOCUMENT_END_EVENT)) {
+    if(!yaml_parse_expect_event(parser, YAML_DOCUMENT_END_EVENT)) {
         errors++;
         goto cleanup;
     }
 
-    if(!yaml_parse_expect_event(&parser, YAML_STREAM_END_EVENT)) {
+    if(!yaml_parse_expect_event(parser, YAML_STREAM_END_EVENT)) {
         errors++;
         goto cleanup;
     }
 
 cleanup:
+    return errors;
+}
+
+static bool yaml_parse_file(const char *config_file_path, struct log_job *jb) {
+    if(!config_file_path || !*config_file_path) {
+        log2stderr("yaml configuration filename cannot be empty.");
+        return false;
+    }
+
+    FILE *fp = fopen(config_file_path, "r");
+    if (!fp) {
+        log2stderr("Error opening config file: %s", config_file_path);
+        return false;
+    }
+
+    yaml_parser_t parser;
+    yaml_parser_initialize(&parser);
+    yaml_parser_set_input_file(&parser, fp);
+
+    size_t errors = yaml_parse_initialized(&parser, jb);
+
     yaml_parser_delete(&parser);
     fclose(fp);
+    return errors == 0;
+}
+
+static bool yaml_parse_config(const char *config_name, struct log_job *jb) {
+
+    const char *config = NULL;
+
+    if(strcmp(config_name, "nginx-combined") == 0)
+        config = YAML_CONFIG_NGINX_COMBINED;
+    else {
+        log2stderr("Unknown configuration: '%s'", config_name);
+        return false;
+    }
+
+    yaml_parser_t parser;
+    yaml_parser_initialize(&parser);
+    yaml_parser_set_input_string(&parser, (const unsigned char *)config, strlen(config));
+
+    size_t errors = yaml_parse_initialized(&parser, jb);
+
+    yaml_parser_delete(&parser);
     return errors == 0;
 }
 
@@ -1586,13 +1638,14 @@ bool parse_parameters(struct log_job *jb, int argc, char **argv) {
             jb->show_config = true;
         }
         else {
+            char buffer[1024];
             char *param = NULL;
             char *value = NULL;
 
             char *equal_sign = strchr(arg, '=');
             if (equal_sign) {
-                *equal_sign = '\0';
-                param = arg;
+                copy_to_buffer(buffer, sizeof(buffer), arg, equal_sign - arg);
+                param = buffer;
                 value = equal_sign + 1;
             }
             else {
@@ -1601,16 +1654,27 @@ bool parse_parameters(struct log_job *jb, int argc, char **argv) {
                     value = argv[++i];
                 }
                 else {
-                    log2stderr("Error: Expected value for parameter '%s'", param);
-                    return false;
+                    if (!jb->pattern) {
+                        jb->pattern = arg;
+                        continue;
+                    } else {
+                        log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
+                        return false;
+                    }
                 }
             }
 
-            if (strcmp(param, "--filename-key") == 0)
-                jb->filename.key = value;
+            if (strcmp(param, "--filename-key") == 0) {
+                if(!log_job_add_filename_key(jb, value, value ? strlen(value) : 0))
+                    return false;
+            }
 #ifdef HAVE_LIBYAML
-            else if (strcmp(param, "-f") == 0 || strcmp(param, "--file=") == 0) {
+            else if (strcmp(param, "-f") == 0 || strcmp(param, "--file") == 0) {
                 if (!yaml_parse_file(value, jb))
+                    return false;
+            }
+            else if (strcmp(param, "--config") == 0) {
+                if (!yaml_parse_config(value, jb))
                     return false;
             }
 #endif
@@ -1633,9 +1697,9 @@ bool parse_parameters(struct log_job *jb, int argc, char **argv) {
                     return false;
             }
             else {
-                // Assume it's the pattern if not recognized as a parameter
                 if (!jb->pattern) {
                     jb->pattern = arg;
+                    continue;
                 } else {
                     log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
                     return false;
@@ -2018,6 +2082,9 @@ int main(int argc, char *argv[]) {
     jb_select_which_injections_should_be_injected_on_unmatched(jb);
 
     pcre2_code *re = jb_compile_pcre2_pattern(jb->pattern);
+    if(!re)
+        return 1;
+
     pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
 
     char buffer[MAX_LINE_LENGTH];
