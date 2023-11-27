@@ -51,7 +51,7 @@ void ml_config_load(ml_config_t *cfg) {
     size_t suppression_window = config_get_number(config_section_ml, "dimension anomaly rate suppression window", 900);
     size_t suppression_threshold = config_get_number(config_section_ml, "dimension anomaly rate suppression threshold", suppression_window / 2);
 
-    bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", true);
+    bool enable_statistics_charts = config_get_boolean(config_section_ml, "enable statistics charts", false);
 
     /*
      * Clamp
