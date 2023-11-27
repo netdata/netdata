@@ -1549,6 +1549,8 @@ if(PCRE2_FOUND)
         set(LOG2JOURNAL_FILES libnetdata/log/log2journal.c)
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
+        target_include_directories(log2journal BEFORE PUBLIC ${PCRE2_INCLUDE_DIRS})
+        target_compile_definitions(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
         target_link_libraries(log2journal libnetdata "${PCRE2_LDFLAGS}")
 
         install(TARGETS log2journal
