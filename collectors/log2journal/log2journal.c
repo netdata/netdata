@@ -328,8 +328,12 @@ int main(int argc, char *argv[]) {
     pcre2_code *pcre2 = NULL;
     pcre2_match_data *match_data = NULL;
     LOG_JSON_STATE *json = NULL;
+    LOGFMT_STATE *logfmt = NULL;
     if(strcmp(jb->pattern, "json") == 0) {
         json = json_parser_create(jb);
+    }
+    else if(strcmp(jb->pattern, "logfmt") == 0) {
+        logfmt = logfmt_parser_create(jb);
     }
     else {
         pcre2 = jb_compile_pcre2_pattern(jb->pattern);
@@ -355,12 +359,16 @@ int main(int argc, char *argv[]) {
 
         if(json)
             line_is_matched = json_parse_document(json, line);
+        else if(logfmt)
+            line_is_matched = logfmt_parse_document(logfmt, line);
         else
             line_is_matched = jb_pcre2_match(pcre2, match_data, line, len, true);
 
         if(!line_is_matched) {
             if(json)
                 log2stderr("%s", json_parser_error(json));
+            else if(logfmt)
+                log2stderr("%s", logfmt_parser_error(logfmt));
 
             if (jb->unmatched.key) {
                 // we are sending errors to systemd-journal
@@ -392,6 +400,9 @@ int main(int argc, char *argv[]) {
 
     if(json)
         json_parser_destroy(json);
+
+    else if(logfmt)
+        logfmt_parser_destroy(logfmt);
 
     else if(pcre2) {
         pcre2_match_data_free(match_data);

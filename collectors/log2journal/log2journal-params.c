@@ -418,6 +418,12 @@ bool parse_log2journal_parameters(struct log_job *jb, int argc, char **argv) {
             log2journal_command_line_help(argv[0]);
             exit(0);
         }
+#if defined(NETDATA_DEV_MODE) || defined(NETDATA_INTERNAL_CHECKS)
+        else if(strcmp(arg, "--test") == 0) {
+            logfmt_test();
+            exit(1);
+        }
+#endif
         else if (strcmp(arg, "--show-config") == 0) {
             jb->show_config = true;
         }

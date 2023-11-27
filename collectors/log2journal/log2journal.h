@@ -262,6 +262,13 @@ void json_parser_destroy(LOG_JSON_STATE *js);
 const char *json_parser_error(LOG_JSON_STATE *js);
 bool json_parse_document(LOG_JSON_STATE *js, const char *txt);
 
+typedef struct logfmt_state LOGFMT_STATE;
+LOGFMT_STATE *logfmt_parser_create(struct log_job *jb);
+void logfmt_parser_destroy(LOGFMT_STATE *lfs);
+const char *logfmt_parser_error(LOGFMT_STATE *lfs);
+bool logfmt_parse_document(LOGFMT_STATE *js, const char *txt);
+void logfmt_test(void);
+
 // ----------------------------------------------------------------------------
 // PCRE2 patters handling
 
