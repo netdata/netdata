@@ -16,7 +16,7 @@
 #include <stdarg.h>
 
 #define XXH_INLINE_ALL
-#include "../xxhash.h"
+#include "../../libnetdata/xxhash.h"
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
