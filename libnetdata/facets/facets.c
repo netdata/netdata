@@ -931,7 +931,23 @@ static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
     facets_histogram_update_value_slot(facets, usec, v);
 }
 
+static usec_t overlap_duration_ut(usec_t start1, usec_t end1, usec_t start2, usec_t end2) {
+    usec_t overlap_start = MAX(start1, start2);
+    usec_t overlap_end = MIN(end1, end2);
+
+    if (overlap_start < overlap_end)
+        return overlap_end - overlap_start;
+    else
+        return 0; // No overlap
+}
+
 void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, size_t entries) {
+    if(unlikely(!facets->histogram.enabled))
+        return;
+
+    if(unlikely(!overlap_duration_ut(facets->histogram.after_ut, facets->histogram.before_ut, from_ut, to_ut)))
+        return;
+
     facets->operations.rows.evaluated += entries;
     facets->operations.rows.matched += entries;
     facets->operations.rows.estimated += entries;
@@ -952,29 +968,28 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
 
     FACET_VALUE *v = facets->histogram.key->estimated_value.v;
 
-    size_t from_slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
-    size_t to_slot = facets_histogram_slot_at_time_ut(facets, to_ut, v);
+    size_t slots = 0;
     size_t total_ut = to_ut - from_ut;
     ssize_t remaining_entries = (ssize_t)entries;
-
-    for (size_t slot = from_slot; slot <= to_slot; slot++) {
-        if (unlikely(slot >= facets->histogram.slots))
-            break;
-
+    size_t slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
+    for(; slot < facets->histogram.slots ;slot++) {
         usec_t slot_start_ut = facets->histogram.after_ut + slot * facets->histogram.slot_width_ut;
         usec_t slot_end_ut = slot_start_ut + facets->histogram.slot_width_ut;
-        usec_t overlap_start_ut = (from_ut > slot_start_ut) ? from_ut : slot_start_ut;
-        usec_t overlap_end_ut = (to_ut < slot_end_ut) ? to_ut : slot_end_ut;
-        usec_t overlap_ut = (overlap_end_ut > overlap_start_ut) ? (overlap_end_ut - overlap_start_ut) : 0;
+
+        if(slot_start_ut > to_ut)
+            break;
+
+        usec_t overlap_ut = overlap_duration_ut(from_ut, to_ut, slot_start_ut, slot_end_ut);
 
         size_t slot_entries = (overlap_ut * entries) / total_ut;
         v->histogram[slot] += slot_entries;
         remaining_entries -= (ssize_t)slot_entries;
+        slots++;
     }
 
     // Check if all entries are assigned
     // This should always be true if the distribution is correct
-    internal_fatal(remaining_entries < 0 || remaining_entries > (ssize_t)(to_slot - from_slot),
+    internal_fatal(remaining_entries < 0 || remaining_entries >= (ssize_t)(slots),
                    "distribution of estimations is not accurate - there are %zd remaining entries",
                    remaining_entries);
 }

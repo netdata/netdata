@@ -685,6 +685,7 @@ static inline BITMAPX *bitmapX_create(uint32_t bits) {
 #define PLUGINSD_LINE_MAX (COMPRESSION_MAX_MSG_SIZE - 768)
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
+struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int max_line_length);
 
 typedef enum {
     OPEN_FD_ACTION_CLOSE,
@@ -718,6 +719,7 @@ extern char *netdata_configured_host_prefix;
 #include "line_splitter/line_splitter.h"
 #include "clocks/clocks.h"
 #include "datetime/iso8601.h"
+#include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
 #include "completion/completion.h"
 #include "popen/popen.h"

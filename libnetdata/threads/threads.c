@@ -203,27 +203,30 @@ static void thread_cleanup(void *ptr) {
     netdata_thread = NULL;
 }
 
-static void thread_set_name_np(NETDATA_THREAD *nt) {
+void netdata_thread_set_tag(const char *tag) {
+    if(!tag || !*tag)
+        return;
 
-    if (nt && nt->tag[0]) {
-        int ret = 0;
+    int ret = 0;
 
-        char threadname[NETDATA_THREAD_NAME_MAX+1];
-        strncpyz(threadname, nt->tag, NETDATA_THREAD_NAME_MAX);
+    char threadname[NETDATA_THREAD_NAME_MAX+1];
+    strncpyz(threadname, tag, NETDATA_THREAD_NAME_MAX);
 
 #if defined(__FreeBSD__)
-        pthread_set_name_np(pthread_self(), threadname);
+    pthread_set_name_np(pthread_self(), threadname);
 #elif defined(__APPLE__)
-        ret = pthread_setname_np(threadname);
+    ret = pthread_setname_np(threadname);
 #else
-        ret = pthread_setname_np(pthread_self(), threadname);
+    ret = pthread_setname_np(pthread_self(), threadname);
 #endif
 
-        if (ret != 0)
-            nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
-        else
-            nd_log(NDLS_DAEMON, NDLP_DEBUG, "set name of thread %d to %s", gettid(), threadname);
+    if (ret != 0)
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
+    else
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "set name of thread %d to %s", gettid(), threadname);
 
+    if(netdata_thread) {
+        strncpyz(netdata_thread->tag, threadname, sizeof(netdata_thread->tag) - 1);
     }
 }
 
@@ -270,7 +273,7 @@ static void *netdata_thread_init(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
 
-    thread_set_name_np(ptr);
+    netdata_thread_set_tag(netdata_thread->tag);
 
     void *ret = NULL;
     pthread_cleanup_push(thread_cleanup, ptr);
