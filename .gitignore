@@ -43,6 +43,7 @@ netdata
 netdatacli
 systemd-cat-native
 log2journal
+!log2journal/
 !netdata/
 upload/
 artifacts/

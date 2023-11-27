@@ -346,7 +346,11 @@ SYSTEMD_CAT_NATIVE_FILES = \
     $(NULL)
 
 LOG2JOURNAL_FILES = \
+    collectors/log2journal/log2journal.h \
     collectors/log2journal/log2journal.c \
+    collectors/log2journal/log2journal-help.c \
+    collectors/log2journal/log2journal-yaml.c \
+    collectors/log2journal/log2journal-params.c \
     $(NULL)
 
 CUPS_PLUGIN_FILES = \
