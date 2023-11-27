@@ -22,6 +22,35 @@ Helm charts are designed for kubernetes to run as the local equivalent of the ne
 - Default storage class configured and working (Persistent volumes based on SSDs are preferred)
 `*` - available in dependencies helm chart for PoC applications.
 
+#### Hardware requirements:
+##### How we tested it:
+- A number of VMs on the AWS EC2, size of the instance was c6a.32xlarge (128CPUs / 256GiB memory).
+- Host system - Ubuntu 22.04.
+- Each VM hosts 200 Agent nodes as docker containers.
+- Agents are connected DIRECTLY to cloud (no Parent-Child relationships). This is the worst option for the cloud.
+- Cloud hosted on 1 kubernetes node c6a.8xlarge (32CPUs / 64GiB memory).
+- Dependencies were also installed on the same node.
+- Maximum connected nodes was ~2000.
+
+##### Results
+There was no point in trying to connect more nodes as we are covering the PoC purposes.
+- In a peak connection phase - All nodes startup were triggered in ~15 minues:
+  - Up to 60% (20 cores) CPU usage of the kubernetes node. Top usage came from:
+    - Ingress controller (we used haproxy ingress controller)
+    - Postgres
+    - Pulsar
+    - EMQX
+  Combined they were responsible for ~30-35% of CPU usage of the node.
+- When all nodes connected and synchronized their state CPU usage floated between 30% and 40% - depending on what we did on the cloud (browsing different). Here top offenders were:
+  - Pulsar
+  - Postgres
+  Combined they were responsible for ~15-20% of CPU usage of the node.
+- Memory usage - 45GiB in a peak. Most of it (~20GiB) was consumed by:
+  - Postgres
+  - Elastic
+  - Pulsar
+
+For a comparison - Netdata Cloud On-prem installation with just 100 nodes connected, without dependencies is going to consume ~2CPUs and ~2GiB of memory (REAL usage, not requests on a Kubernetes).
 
 ## Pulling the helm chart
 Helm chart for the Netdata Cloud On-Prem installation on Kubernetes is available at ECR registry.
