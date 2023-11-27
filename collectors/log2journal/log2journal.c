@@ -47,6 +47,20 @@ static char *rewrite_value(struct log_job *jb, const char *key, XXH64_hash_t has
     return NULL;
 }
 
+static inline const char *rename_key(struct log_job *jb, const char *key, XXH64_hash_t hash, XXH64_hash_t *new_hash) {
+    for(size_t i = 0; i < jb->renames.used ;i++) {
+        struct key_rename *rn = &jb->renames.array[i];
+
+        if(rn->old_hash == hash && strcmp(rn->old_key, key) == 0) {
+            *new_hash = rn->new_hash;
+            return rn->new_key;
+        }
+    }
+
+    *new_hash = hash;
+    return key;
+}
+
 // ----------------------------------------------------------------------------
 
 static inline void send_key_value_error(const char *key, const char *format, ...) __attribute__ ((format(__printf__, 2, 3)));
@@ -59,12 +73,28 @@ static inline void send_key_value_error(const char *key, const char *format, ...
     printf("\n");
 }
 
-static inline void send_key_value_and_rewrite(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t len) {
+inline void jb_send_key_value_and_rewrite(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t len) {
     char *rewritten = rewrite_value(jb, key, hash, value, len);
     if(!rewritten)
         printf("%s=%.*s\n", key, (int)len, value);
     else
         printf("%s=%s\n", key, rewritten);
+}
+
+inline void jb_send_extracted_key_value(struct log_job *jb, const char *key, const char *value, size_t len) {
+    XXH64_hash_t hash = XXH3_64bits(key, strlen(key));
+
+    // process renames (changing the key)
+    XXH64_hash_t new_hash;
+    const char *new_key = rename_key(jb, key, hash, &new_hash);
+
+    // process rewrites (changing the value)
+    // and send it to output
+    jb_send_key_value_and_rewrite(jb, new_key, new_hash, value, len);
+
+    // process the duplications (using the original key)
+    // and send them to output
+    jb_send_duplications_for_key(jb, key, hash, value, len);
 }
 
 static inline void send_key_value_constant(struct log_job *jb, const char *key, const char *value) {
@@ -119,7 +149,7 @@ static inline void jb_reset_injections(struct log_job *jb) {
 // ----------------------------------------------------------------------------
 // duplications
 
-static inline void jb_send_duplications_for_key(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len) {
+inline void jb_send_duplications_for_key(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len) {
     // IMPORTANT:
     // The 'value' may not be NULL terminated and have more data that the value we need
 
@@ -132,7 +162,7 @@ static inline void jb_send_duplications_for_key(struct log_job *jb, const char *
         if(kd->used == 1) {
             // just one key to be duplicated
             if(strcmp(kd->keys[0], key) == 0) {
-                send_key_value_and_rewrite(jb, kd->target, kd->hash, value, value_len);
+                jb_send_key_value_and_rewrite(jb, kd->target, kd->hash, value, value_len);
                 kd->exposed = true;
             }
         }
@@ -186,7 +216,7 @@ static inline void jb_send_remaining_duplications(struct log_job *jb) {
                 break;
             }
         }
-        send_key_value_and_rewrite(jb, kd->target, kd->hash, buffer, s - buffer);
+        jb_send_key_value_and_rewrite(jb, kd->target, kd->hash, buffer, s - buffer);
     }
 }
 
@@ -275,18 +305,9 @@ static inline void jb_traverse_pcre2_named_groups_and_send_keys(struct log_job *
             PCRE2_SIZE end_offset = ovector[2 * n + 1];
             PCRE2_SIZE group_length = end_offset - start_offset;
 
-            XXH64_hash_t hash = XXH3_64bits(group_name, strlen(group_name));
-
-            send_key_value_and_rewrite(jb, group_name, hash, line + start_offset, group_length);
-
-            // process the duplications
-            jb_send_duplications_for_key(jb, group_name, hash, line + start_offset, group_length);
-
+            jb_send_extracted_key_value(jb, group_name, line + start_offset, group_length);
             tabptr += name_entry_size;
         }
-
-        // print all non-exposed duplications
-        jb_send_remaining_duplications(jb);
     }
 }
 
@@ -304,11 +325,21 @@ int main(int argc, char *argv[]) {
 
     jb_select_which_injections_should_be_injected_on_unmatched(jb);
 
-    pcre2_code *re = jb_compile_pcre2_pattern(jb->pattern);
-    if(!re)
-        return 1;
+    pcre2_code *pcre2 = NULL;
+    pcre2_match_data *match_data = NULL;
+    LOG_JSON_STATE *json = NULL;
+    if(strcmp(jb->pattern, "json") == 0) {
+        json = json_parser_create(jb);
+    }
+    else {
+        pcre2 = jb_compile_pcre2_pattern(jb->pattern);
+        if(!pcre2)
+            return 1;
 
-    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+        match_data = pcre2_match_data_create_from_pattern(pcre2, NULL);
+        if(!match_data)
+            return 1;
+    }
 
     char buffer[MAX_LINE_LENGTH];
     char *line;
@@ -321,12 +352,19 @@ int main(int argc, char *argv[]) {
         jb_reset_injections(jb);
 
         bool line_is_matched;
-        if(!jb_pcre2_match(re, match_data, line, len, true)) {
-            line_is_matched = false;
+
+        if(json)
+            line_is_matched = json_parse_document(json, line);
+        else
+            line_is_matched = jb_pcre2_match(pcre2, match_data, line, len, true);
+
+        if(!line_is_matched) {
+            if(json)
+                log2stderr("%s", json_parser_error(json));
 
             if (jb->unmatched.key) {
                 // we are sending errors to systemd-journal
-                send_key_value_error(jb->unmatched.key, "PCRE2 error on: %s", line);
+                send_key_value_error(jb->unmatched.key, "Parsing error on: %s", line);
 
                 for (size_t j = 0; j < jb->unmatched.injections.used; j++)
                     send_key_value_constant(jb, jb->unmatched.injections.keys[j].key,
@@ -338,8 +376,11 @@ int main(int argc, char *argv[]) {
             }
         }
         else {
-            line_is_matched = true;
-            jb_traverse_pcre2_named_groups_and_send_keys(jb, re, match_data, line);
+            if(pcre2)
+                jb_traverse_pcre2_named_groups_and_send_keys(jb, pcre2, match_data, line);
+
+            // print all non-exposed duplications
+            jb_send_remaining_duplications(jb);
         }
 
         jb_inject_filename(jb);
@@ -349,10 +390,14 @@ int main(int argc, char *argv[]) {
         fflush(stdout);
     }
 
-    // Release memory used for the compiled regular expression and match data
-    pcre2_match_data_free(match_data);
-    pcre2_code_free(re);
-    nd_log_destroy(jb);
+    if(json)
+        json_parser_destroy(json);
 
+    else if(pcre2) {
+        pcre2_match_data_free(match_data);
+        pcre2_code_free(pcre2);
+    }
+
+    nd_log_destroy(jb);
     return 0;
 }

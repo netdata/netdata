@@ -763,6 +763,11 @@ void log_job_to_yaml(struct log_job *jb) {
     if(jb->pattern)
         yaml_print_node("pattern", jb->pattern, 0, false);
 
+    if(jb->prefix) {
+        fprintf(stderr, "\n");
+        yaml_print_node("prefix", jb->prefix, 0, false);
+    }
+
     if(jb->filename.key) {
         fprintf(stderr, "\n");
         yaml_print_node("filename", NULL, 0, false);
@@ -800,6 +805,16 @@ void log_job_to_yaml(struct log_job *jb) {
             yaml_print_node("key", jb->rewrites.array[i].key, 1, true);
             yaml_print_node("search", jb->rewrites.array[i].search_pattern, 2, false);
             yaml_print_node("replace", jb->rewrites.array[i].replace_pattern, 2, false);
+        }
+    }
+
+    if(jb->renames.used) {
+        fprintf(stderr, "\n");
+        yaml_print_node("rename", NULL, 0, false);
+
+        for(size_t i = 0; i < jb->renames.used ;i++) {
+            yaml_print_node("new_key", jb->renames.array[i].new_key, 1, true);
+            yaml_print_node("old_key", jb->renames.array[i].old_key, 2, false);
         }
     }
 

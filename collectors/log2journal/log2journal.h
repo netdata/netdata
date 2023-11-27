@@ -32,6 +32,7 @@
 #define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 2)
 #define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
 #define MAX_REWRITES (MAX_OUTPUT_KEYS / 2)
+#define MAX_RENAMES (MAX_OUTPUT_KEYS / 2)
 #define MAX_KEY_DUPS_KEYS 20
 
 #define MAX_KEY_LEN 64              // according to systemd-journald
@@ -163,6 +164,13 @@ struct key_dup {
     bool exposed;
 };
 
+struct key_rename {
+    XXH64_hash_t new_hash;
+    XXH64_hash_t old_hash;
+    char *new_key;
+    char *old_key;
+};
+
 struct replacement_node {
     bool is_variable;
     const char *s;
@@ -184,6 +192,7 @@ struct log_job {
     bool show_config;
 
     const char *pattern;
+    const char *prefix;
 
     struct {
         const char *key;
@@ -213,13 +222,24 @@ struct log_job {
         struct key_rewrite array[MAX_REWRITES];
         size_t used;
     } rewrites;
+
+    struct {
+        struct key_rename array[MAX_RENAMES];
+        size_t used;
+    } renames;
 };
+
+void jb_send_key_value_and_rewrite(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t len);
+void jb_send_duplications_for_key(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len);
+void jb_send_extracted_key_value(struct log_job *jb, const char *key, const char *value, size_t len);
 
 struct key_dup *log_job_add_duplication_to_job(struct log_job *jb, const char *target, size_t target_len);
 bool log_job_add_key_to_duplication(struct key_dup *kd, const char *key, size_t key_len);
 bool log_job_add_filename_key(struct log_job *jb, const char *key, size_t key_len);
+bool log_job_add_key_prefix(struct log_job *jb, const char *prefix, size_t prefix_len);
 bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched);
 bool log_job_add_rewrite(struct log_job *jb, const char *key, const char *search_pattern, const char *replace_pattern);
+bool log_job_add_rename(struct log_job *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len);
 
 // entry point to parse command line parameters
 bool parse_log2journal_parameters(struct log_job *jb, int argc, char **argv);
@@ -235,6 +255,12 @@ bool yaml_parse_config(const char *config_name, struct log_job *jb);
 #endif
 
 void log_job_to_yaml(struct log_job *jb);
+
+typedef struct log_json_state LOG_JSON_STATE;
+LOG_JSON_STATE *json_parser_create(struct log_job *jb);
+void json_parser_destroy(LOG_JSON_STATE *js);
+const char *json_parser_error(LOG_JSON_STATE *js);
+bool json_parse_document(LOG_JSON_STATE *js, const char *txt);
 
 // ----------------------------------------------------------------------------
 // PCRE2 patters handling

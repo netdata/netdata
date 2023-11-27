@@ -82,6 +82,20 @@ bool log_job_add_filename_key(struct log_job *jb, const char *key, size_t key_le
     return true;
 }
 
+bool log_job_add_key_prefix(struct log_job *jb, const char *prefix, size_t prefix_len) {
+    if(!prefix || !*prefix) {
+        log2stderr("filename key cannot be empty.");
+        return false;
+    }
+
+    if(jb->prefix)
+        freez((char*)jb->prefix);
+
+    jb->prefix = strndupz(prefix, prefix_len);
+
+    return true;
+}
+
 bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched) {
     if (unmatched) {
         if (jb->unmatched.injections.used >= MAX_INJECTIONS) {
@@ -109,7 +123,27 @@ bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, 
     return true;
 }
 
+bool log_job_add_rename(struct log_job *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len) {
+    if(jb->renames.used >= MAX_RENAMES) {
+        log2stderr("Error: too many renames. You can rename up to %d fields.", MAX_RENAMES);
+        return false;
+    }
+
+    struct key_rename *rn = &jb->renames.array[jb->renames.used++];
+    rn->new_key = strndupz(new_key, new_key_len);
+    rn->new_hash = XXH3_64bits(rn->new_key, strlen(rn->new_key));
+    rn->old_key = strndupz(old_key, old_key_len);
+    rn->old_hash = XXH3_64bits(rn->old_key, strlen(rn->old_key));
+
+    return true;
+}
+
 bool log_job_add_rewrite(struct log_job *jb, const char *key, const char *search_pattern, const char *replace_pattern) {
+    if(jb->rewrites.used >= MAX_REWRITES) {
+        log2stderr("Error: too many rewrites. You can add up to %d rewrite rules.", MAX_REWRITES);
+        return false;
+    }
+
     pcre2_code *re = jb_compile_pcre2_pattern(search_pattern);
     if (!re) {
         return false;
@@ -253,6 +287,23 @@ static bool parse_replacement_pattern(struct key_rewrite *rw) {
     return true;
 }
 
+static bool parse_rename(struct log_job *jb, const char *param) {
+    // Search for '=' in param
+    const char *equal_sign = strchr(param, '=');
+    if (!equal_sign || equal_sign == param) {
+        log2stderr("Error: Invalid rename format, '=' not found in %s", param);
+        return false;
+    }
+
+    const char *new_key = param;
+    size_t new_key_len = equal_sign - new_key;
+
+    const char *old_key = equal_sign + 1;
+    size_t old_key_len = strlen(old_key);
+
+    return log_job_add_rename(jb, new_key, new_key_len, old_key, old_key_len);
+}
+
 static bool is_symbol(char c) {
     return !isalpha(c) && !isdigit(c) && !iscntrl(c);
 }
@@ -261,7 +312,7 @@ static bool parse_rewrite(struct log_job *jb, const char *param) {
     // Search for '=' in param
     const char *equal_sign = strchr(param, '=');
     if (!equal_sign || equal_sign == param) {
-        log2stderr("Error: Invalid rewrite format, '=' not found or at the start in %s", param);
+        log2stderr("Error: Invalid rewrite format, '=' not found in %s", param);
         return false;
     }
 
@@ -401,6 +452,10 @@ bool parse_log2journal_parameters(struct log_job *jb, int argc, char **argv) {
                 if(!log_job_add_filename_key(jb, value, value ? strlen(value) : 0))
                     return false;
             }
+            if (strcmp(param, "--prefix") == 0) {
+                if(!log_job_add_key_prefix(jb, value, value ? strlen(value) : 0))
+                    return false;
+            }
 #ifdef HAVE_LIBYAML
             else if (strcmp(param, "-f") == 0 || strcmp(param, "--file") == 0) {
                 if (!yaml_parse_file(value, jb))
@@ -429,7 +484,12 @@ bool parse_log2journal_parameters(struct log_job *jb, int argc, char **argv) {
                 if (!parse_rewrite(jb, value))
                     return false;
             }
+            else if (strcmp(param, "--rename") == 0) {
+                if (!parse_rename(jb, value))
+                    return false;
+            }
             else {
+                i--;
                 if (!jb->pattern) {
                     jb->pattern = arg;
                     continue;
