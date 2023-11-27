@@ -1539,6 +1539,23 @@ install(TARGETS systemd-cat-native
         DESTINATION usr/sbin)
 
 #
+# build log2journal
+#
+
+pkg_check_modules(PCRE2 libpcre2-8)
+
+if(PCRE2_FOUND)
+        set(LOG2JOURNAL_FILES libnetdata/log/log2journal.c)
+
+        add_executable(log2journal ${LOG2JOURNAL_FILES})
+        target_link_libraries(log2journal libnetdata "${PCRE2_LDFLAGS}")
+
+        install(TARGETS log2journal
+                COMPONENT log2journal
+                DESTINATION usr/sbin)
+endif()
+
+#
 # build netdatacli
 #
 

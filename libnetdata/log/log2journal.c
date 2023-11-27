@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// only for PACKAGE_VERSION
+// only for VERSION
 #include "config.h"
 
 #include <stdio.h>
@@ -30,7 +30,7 @@
 
 void display_help(const char *name) {
     printf("\n");
-    printf("Netdata log2journal " PACKAGE_VERSION "\n");
+    printf("Netdata log2journal " VERSION "\n");
     printf("\n");
     printf("Convert structured log input to systemd Journal Export Format.\n");
     printf("\n");
