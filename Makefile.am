@@ -1323,6 +1323,7 @@ if ENABLE_LOG2JOURNAL
     log2journal_SOURCES = $(LOG2JOURNAL_FILES)
     log2journal_LDADD = \
             $(OPTIONAL_PCRE2_LIBS) \
+            $(OPTIONAL_YAML_LIBS) \
             $(NULL)
 endif
 

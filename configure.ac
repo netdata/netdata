@@ -853,6 +853,26 @@ AC_MSG_RESULT([${enable_jsonc}])
 AM_CONDITIONAL([ENABLE_JSONC], [test "${enable_jsonc}" = "yes"])
 
 # -----------------------------------------------------------------------------
+# libyaml
+
+PKG_CHECK_MODULES(
+    [LIBYAML],
+    [yaml-0.1],
+    [AC_CHECK_LIB(
+        [yaml],
+        [yaml_parser_initialize],
+        [have_libyaml=yes],
+        [have_libyaml=no]
+    )],
+    [have_libyaml=no]
+)
+
+if test "x$have_libyaml" = "xyes"; then
+    AC_DEFINE([HAVE_LIBYAML], [1], [libyaml usability])
+    OPTIONAL_YAML_LIBS="-lyaml"
+fi
+
+# -----------------------------------------------------------------------------
 # YAML
 
 if test -z "${YAML_LIBS}"; then
@@ -1983,6 +2003,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_BROTLIENC_LIBS])
 AC_SUBST([OPTIONAL_BROTLIDEC_LIBS])
+AC_SUBST([OPTIONAL_YAML_LIBS])
 AC_SUBST([OPTIONAL_CURL_LIBS])
 AC_SUBST([OPTIONAL_PCRE2_LIBS])
 AC_SUBST([OPTIONAL_ZSTD_LIBS])
