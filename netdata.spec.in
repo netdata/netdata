@@ -156,14 +156,14 @@ BuildRequires: pkgconfig(zlib)
 BuildRequires: pkgconfig(uuid)
 BuildRequires: pkgconfig(libuv)
 BuildRequires: pkgconfig(openssl)
-BuildRequires: pkgconfig(curl)
+BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
 %if 0%{?suse_version}
 # log2journal is not available on these systems
 %else
-BuildRequires: pkgconfig(pcre2)
+BuildRequires: pkgconfig(libpcre2-8)
 %endif
 %if 0%{?suse_version}
 BuildRequires: protobuf-devel
