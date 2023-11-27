@@ -69,7 +69,7 @@ const struct netdata_static_thread static_threads_common[] = {
     {
         .name = "STATS_WORKERS",
         .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata monitoring",
+        .config_name = "netdata monitoring extended",
         .env_name = "NETDATA_INTERNALS_MONITORING",
         .global_variable = &global_statistics_enabled,
         .enabled = 0,
@@ -80,7 +80,7 @@ const struct netdata_static_thread static_threads_common[] = {
     {
         .name = "STATS_SQLITE3",
         .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata monitoring",
+        .config_name = "netdata monitoring extended",
         .env_name = "NETDATA_INTERNALS_MONITORING",
         .global_variable = &global_statistics_enabled,
         .enabled = 0,
