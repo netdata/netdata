@@ -1075,6 +1075,7 @@ endif()
 # message(FATAL_ERROR "jsonc ldflags: ${JSONC_LDFLAGS}")
 
 # yaml
+set(HAVE_LIBYAML  True)
 if(ENABLE_BUNDLED_YAML)
         add_library(yaml STATIC IMPORTED)
         set_property(TARGET yaml PROPERTY
