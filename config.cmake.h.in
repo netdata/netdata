@@ -28,8 +28,13 @@
 #cmakedefine MAJOR_IN_MKDEV
 #cmakedefine HAVE_CLOCK_GETTIME
 #cmakedefine HAVE_STRERROR_R
+
+#cmakedefine HAVE_SYSTEMD
 #cmakedefine HAVE_SD_JOURNAL_OS_ROOT
+#cmakedefine HAVE_SD_JOURNAL_OPEN_FILES_FD
+#cmakedefine HAVE_SD_JOURNAL_RESTART_FIELDS
 #cmakedefine HAVE_SD_JOURNAL_GET_SEQNUM
+#cmakedefine ENABLE_SYSTEMD_DBUS
 
 // checked source compilation
 #cmakedefine STRERROR_R_CHAR_P

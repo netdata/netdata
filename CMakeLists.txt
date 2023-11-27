@@ -167,9 +167,6 @@ check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
 
 include(CheckLibraryExists)
 
-check_library_exists(systemd sd_journal_open "" HAVE_SYSTEMD_LIB)
-check_include_file("systemd/sd-journal.h" HAVE_SYSTEMD_SD_JOURNAL_H)
-
 check_library_exists(snappy snappy_compress "" HAVE_SNAPPY_LIB)
 #check_include_file("snappy.h" HAVE_SNAPPY_H)
 
@@ -183,7 +180,6 @@ check_symbol_exists(major sys/mkdev.h MAJOR_IN_MKDEV)
 check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
 check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
 check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
-check_symbol_exists(systemd sd_journal_get_seqnum "systemd/sd-journal.h" HAVE_SD_JOURNAL_GET_SEQNUM)
 
 #
 # check source compilation
@@ -198,14 +194,6 @@ int main() {
         char x = *strerror_r(0, &x, sizeof(x)); return 0;
 }
 " STRERROR_R_CHAR_P)
-
-check_c_source_compiles("
-#include <systemd/sd-journal.h>
-int main() {
-        int x = SD_JOURNAL_OS_ROOT;
-        return 0;
-}
-" HAVE_SD_JOURNAL_OS_ROOT)
 
 # openssl/crypto
 if(NOT MACOS)
@@ -1032,6 +1020,8 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
+include(systemd.cmake)
+
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR})
@@ -1047,7 +1037,8 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 
 target_link_libraries(libnetdata PUBLIC
         "$<$<OR:$<BOOL:${LINUX}>,$<BOOL:${FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${LINK_LIBM}>:m>")
+        "$<$<BOOL:${LINK_LIBM}>:m>"
+        "${SYSTEMD_LDFLAGS}")
 
 # ebpf
 if(ENABLE_PLUGIN_EBPF)
@@ -1392,12 +1383,8 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
-        if (NOT HAVE_SYSTEMD_LIB OR NOT HAVE_SYSTEMD_SD_JOURNAL_H)
-                message(FATAL_ERROR "Can not build systemd-journal plugin because we can't find the library/headers.")
-        endif()
-
         add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
-        target_link_libraries(systemd-journal.plugin libnetdata -lsystemd)
+        target_link_libraries(systemd-journal.plugin libnetdata)
 
         install(TARGETS systemd-journal.plugin
                 COMPONENT systemd_journal_plugin
