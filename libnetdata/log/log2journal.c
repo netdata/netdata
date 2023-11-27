@@ -807,7 +807,7 @@ static void yaml_error_with_trace(yaml_parser_t *parser, yaml_event_t *event, si
 
     fprintf(stderr, "YAML %zu@%s, %s(): (line %d, column %d, %s%s%s): ",
             line, file, function,
-            parser->mark.line + 1, parser->mark.column + 1,
+            (int)(parser->mark.line + 1), (int)(parser->mark.column + 1),
             type, buf[0]? ", near ": "", buf);
 
     va_list args;
@@ -1953,7 +1953,7 @@ static void yaml_print_multiline_value(const char *s, size_t depth) {
         buf[len] = '\0';
 
         fprintf(stderr, "%.*s%s%s",
-                depth * 2, "                    ",
+                (int)(depth * 2), "                    ",
                 buf, next ? "" : "\n");
 
         s = next;
@@ -1997,7 +1997,7 @@ static void yaml_print_node(const char *key, const char *value, size_t depth, bo
         quote = "";
 
     fprintf(stderr, "%.*s%s%s%s%s%s%s\n",
-            depth * 2, "                    ", dash ? "- ": "",
+            (int)(depth * 2), "                    ", dash ? "- ": "",
             key ? key : "", key ? ": " : "",
             quote, value ? value : "", quote);
 
