@@ -313,57 +313,64 @@ tail -n $last -F /var/log/nginx/*access.log \
 
 ```
 
-Netdata log2journal v1.40.0-1214-gae733dd49
+Netdata log2journal v1.43.0-276-gfff8d1181
 
 Convert structured log input to systemd Journal Export Format.
 
 Using PCRE2 patterns, extract the fields from structured logs on the standard
 input, and generate output according to systemd Journal Export Format.
 
-Usage: log2journal [OPTIONS] PATTERN
+Usage: ./log2journal [OPTIONS] PATTERN
 
 Options:
 
-  --filename-key=KEY
+  --file /path/to/file.yaml
+       Read yaml configuration file for instructions.
+
+  --show-config
+       Show the configuration in yaml format before starting the job.
+       This is also an easy way to convert command line parameters to yaml.
+
+  --filename-key KEY
        Add a field with KEY as the key and the current filename as value.
        Automatically detects filenames when piped after 'tail -F',
        and tail matches multiple filenames.
        To inject the filename when tailing a single file, use --inject.
 
-  --unmatched-key=KEY
+  --unmatched-key KEY
        Include unmatched log entries in the output with KEY as the field name.
        Use this to include unmatched entries to the output stream.
        Usually it should be set to --unmatched-key=MESSAGE so that the
        unmatched entry will appear as the log message in the journals.
        Use --inject-unmatched to inject additional fields to unmatched lines.
 
-  --duplicate=TARGET=KEY1[,KEY2[,KEY3[,...]]
+  --duplicate TARGET=KEY1[,KEY2[,KEY3[,...]]
        Create a new key called TARGET, duplicating the values of the keys
        given. Useful for further processing. When multiple keys are given,
        their values are separated by comma.
        Up to 512 duplications can be given on the command line, and up to
        20 keys per duplication command are allowed.
 
-  --inject=LINE
+  --inject LINE
        Inject constant fields to the output (both matched and unmatched logs).
        --inject entries are added to unmatched lines too, when their key is
        not used in --inject-unmatched (--inject-unmatched override --inject).
        Up to 512 fields can be injected.
 
-  --inject-unmatched=LINE
+  --inject-unmatched LINE
        Inject lines into the output for each unmatched log entry.
        Usually, --inject-unmatched=PRIORITY=3 is needed to mark the unmatched
        lines as errors, so that they can easily be spotted in the journals.
        Up to 512 such lines can be injected.
 
-  --rewrite=KEY=/SearchPattern/ReplacePattern
+  --rewrite KEY=/SearchPattern/ReplacePattern
        Apply a rewrite rule to the values of a specific key.
        The first character after KEY= is the separator, which should also
        be used between the search pattern and the replacement pattern.
        The search pattern is a PCRE2 regular expression, and the replacement
        pattern supports literals and named capture groups from the search pattern.
        Example:
-              --rewrite=DATE=/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/
+              --rewrite DATE=/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/
                              ${day}/${month}/${year}
        This will rewrite dates in the format YYYY-MM-DD to DD/MM/YYYY.
 
@@ -387,6 +394,8 @@ Options:
        RE2 regular expressions (like the ones usually used in Go applications),
        are usually valid PCRE2 patterns too.
        Regular expressions without named groups are ignored.
+
+The program accepts all parameters as both --option=value and --option value.
 
 The maximum line length accepted is 1048576 characters.
 The maximum number of fields in the PCRE2 pattern is 1024.
@@ -448,6 +457,105 @@ JOURNAL FIELDS RULES (enforced by systemd-journald)
       Use something descriptive, like: SYSLOG_IDENTIFIER=nginx-logs
 
 You can find the most common fields at 'man systemd.journal-fields'.
+
+Example YAML file:
+
+--------------------------------------------------------------------------------
+# Netdata log2journal Configuration Template
+# The following parses nginx log files using the combined format.
+
+# The PCRE2 pattern to match log entries and give names to the fields.
+# The journal will have these names, so follow their rules. You can
+# initiate an extended PCRE2 pattern by starting the pattern with (?x)
+pattern: |
+  (?x)                                   # Enable PCRE2 extended mode
+  ^
+  (?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR
+  (?<NGINX_REMOTE_USER>[^ ]+) \s         # NGINX_REMOTE_USER
+  \[
+    (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
+  \]
+  \s+ "
+  (?<MESSAGE>
+    (?<NGINX_METHOD>[A-Z]+) \s+          # NGINX_METHOD
+    (?<NGINX_URL>[^ ]+) \s+
+    HTTP/(?<NGINX_HTTP_VERSION>[^"]+)
+  )
+  " \s+
+  (?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
+  (?<NGINX_BODY_BYTES_SENT>\d+) \s+      # NGINX_BODY_BYTES_SENT
+  "(?<NGINX_HTTP_REFERER>[^"]*)" \s+     # NGINX_HTTP_REFERER
+  "(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT
+
+# When log2journal can detect the filename of each log entry (tail gives it
+# only when it tails multiple files), this key will be used to send the
+# filename to the journals.
+filename:
+  key: NGINX_LOG_FILENAME
+
+# Duplicate fields under a different name. You can duplicate multiple fields
+# to a new one and then use rewrite rules to change its value.
+duplicate:
+
+  # we insert the field PRIORITY as a copy of NGINX_STATUS.
+  - key: PRIORITY
+    values_of:
+    - NGINX_STATUS
+
+  # we inject the field NGINX_STATUS_FAMILY as a copy of NGINX_STATUS.
+  - key: NGINX_STATUS_FAMILY
+    values_of: 
+    - NGINX_STATUS
+
+# Inject constant fields into the journal logs.
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: "nginx-log"
+
+# Rewrite the value of fields (including the duplicated ones).
+# The search pattern can have named groups, and the replace pattern can use
+# them as ${name}.
+rewrite:
+  # PRIORTY is a duplicate of NGINX_STATUS
+  # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
+  - key: "PRIORITY"
+    search: "^[123]"
+    replace: 6
+
+  - key: "PRIORITY"
+    search: "^4"
+    replace: 5
+
+  - key: "PRIORITY"
+    search: "^5"
+    replace: 3
+
+  - key: "PRIORITY"
+    search: ".*"
+    replace: 4
+  
+  # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
+  - key: "NGINX_STATUS_FAMILY"
+    search: "^(?<first_digit>[1-5])"
+    replace: "${first_digit}xx"
+
+  - key: "NGINX_STATUS_FAMILY"
+    search: ".*"
+    replace: "UNKNOWN"
+
+# Control what to do when input logs do not match the main PCRE2 pattern.
+unmatched:
+  # The journal key to log the PCRE2 error message to.
+  # Set this to MESSAGE, so you to see the error in the log.
+  key: MESSAGE
+  
+  # Inject static fields to the unmatched entries.
+  # Set PRIORITY=1 (alert) to help you spot unmatched entries in the logs.
+  inject:
+   - key: PRIORITY
+     value: 1
+
+--------------------------------------------------------------------------------
 
 ```
 
