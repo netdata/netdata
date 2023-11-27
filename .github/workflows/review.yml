@@ -234,6 +234,7 @@ jobs:
             ./.git/*
             packaging/makeself/makeself.sh
             packaging/makeself/makeself-header.sh
+            ./fluent-bit/*
 
   yamllint:
     name: yamllint

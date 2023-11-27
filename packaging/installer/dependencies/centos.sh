@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package tree used for installing netdata on distribution:
-# << CentOS: [7] [8] >>
+# << CentOS: [7] [8] [9] >>
 
 set -e
 
@@ -8,9 +8,12 @@ declare -a package_tree=(
   autoconf
   autoconf-archive
   automake
+  bison
   cmake
+  cmake3
   curl
   elfutils-libelf-devel
+  flex
   findutils
   gcc
   gcc-c++

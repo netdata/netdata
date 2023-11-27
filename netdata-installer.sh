@@ -136,12 +136,12 @@ ACLK="${ACLK}"
 
 # keep a log of this command
 {
-	printf "\n# "
-	date
-	printf 'CFLAGS="%s" ' "${CFLAGS}"
-	printf 'LDFLAGS="%s" ' "${LDFLAGS}"
-	printf "%s" "${PROGRAM}" "${@}"
-	printf "\n"
+  printf "\n# "
+  date
+  printf 'CFLAGS="%s" ' "${CFLAGS}"
+  printf 'LDFLAGS="%s" ' "${LDFLAGS}"
+  printf "%s" "${PROGRAM}" "${@}"
+  printf "\n"
 } >> netdata-installer.log
 
 REINSTALL_OPTIONS="$(
@@ -240,6 +240,8 @@ USAGE: ${PROGRAM} [options]
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
+  --disable-logsmanagement   Disable the logs management plugin. Default: autodetect.
+  --enable-logsmanagement-tests Enable the logs management tests. Default: disabled.
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -338,6 +340,11 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
       NETDATA_ENABLE_ML=0
       ;;
+    "--disable-logsmanagement") 
+      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-logsmanagement)}" | sed 's/$/ --disable-logsmanagement/g')"
+      NETDATA_DISABLE_LOGS_MANAGEMENT=1
+      ;;
+    "--enable-logsmanagement-tests") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement-tests)}" | sed 's/$/ --enable-logsmanagement-tests/g')" ;;
     "--enable-gtests")
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-gtests)}" | sed 's/$/ --enable-gtests/g')"
       NETDATA_ENABLE_GTESTS=1
@@ -964,6 +971,85 @@ bundle_ebpf_co_re() {
 bundle_ebpf_co_re
 
 # -----------------------------------------------------------------------------
+build_fluentbit() {
+  env_cmd="env CFLAGS='-w' CXXFLAGS='-w' LDFLAGS="
+
+  if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
+    env_cmd="env CFLAGS='-fPIC -pipe -w' CXXFLAGS='-fPIC -pipe -w' LDFLAGS="
+  fi
+  
+  mkdir -p fluent-bit/build || return 1
+  cd fluent-bit/build > /dev/null || return 1
+  
+  rm CMakeCache.txt > /dev/null 2>&1
+
+  if ! run eval "${env_cmd} $1 -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
+    cd - > /dev/null || return 1
+    rm -rf fluent-bit/build > /dev/null 2>&1
+    return 1
+  fi
+
+  if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
+    cd - > /dev/null || return 1
+    rm -rf fluent-bit/build > /dev/null 2>&1
+    return 1
+  fi
+  
+  cd - > /dev/null || return 1
+}
+
+bundle_fluentbit() {
+  progress "Prepare Fluent-Bit"
+
+  if [ -n "${NETDATA_DISABLE_LOGS_MANAGEMENT}" ]; then
+    warning "You have explicitly requested to disable Netdata Logs Management support, Fluent-Bit build is skipped."
+    return 0
+  fi
+
+  if [ ! -d "fluent-bit" ]; then
+    run_failed "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
+    return 0
+  fi
+
+  if [ "$(command -v cmake)" ] && [ "$(cmake --version | head -1 | cut -d ' ' -f 3 | cut -c-1)" -ge 3 ]; then
+    cmake="cmake"
+  elif [ "$(command -v cmake3)" ]; then
+    cmake="cmake3"
+  else
+    run_failed "Could not find a compatible CMake version (>= 3.0), which is required to build Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
+    return 0
+  fi
+
+  patch -N -p1 fluent-bit/CMakeLists.txt -i logsmanagement/fluent_bit_build/CMakeLists.patch
+  patch -N -p1 fluent-bit/src/flb_log.c -i logsmanagement/fluent_bit_build/flb-log-fmt.patch
+
+  # If musl is used, we need to patch chunkio, providing fts has been previously installed.
+  libc="$(detect_libc)"
+  if [ "${libc}" = "musl" ]; then
+    patch -N -p1 fluent-bit/lib/chunkio/src/CMakeLists.txt -i logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
+    patch -N -p1 fluent-bit/cmake/luajit.cmake -i logsmanagement/fluent_bit_build/exclude-luajit.patch
+    patch -N -p1 fluent-bit/src/flb_network.c -i logsmanagement/fluent_bit_build/xsi-strerror.patch
+  fi
+  
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
+
+  if build_fluentbit "$cmake"; then
+    # If Fluent-Bit built with inotify support, use it.
+    if [ "$(grep -o '^FLB_HAVE_INOTIFY:INTERNAL=.*' fluent-bit/build/CMakeCache.txt | cut -d '=' -f 2)" ]; then 
+      CFLAGS="${CFLAGS} -DFLB_HAVE_INOTIFY"
+    fi
+    FLUENT_BIT_BUILD_SUCCESS=1
+    run_ok "Fluent-Bit built successfully."
+  else
+    run_failed "Failed to build Fluent-Bit, Netdata Logs Management support will be disabled in this build."
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+bundle_fluentbit
+
+# -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
 if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
@@ -1264,6 +1350,21 @@ if [ "$(id -u)" -eq 0 ]; then
 
     if [ $capabilities -eq 0 ]; then
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"
+    fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
+    capabilities=0
+    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
+      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
+      if run setcap cap_dac_read_search,cap_syslog+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"; then
+        capabilities=1 
+      fi
+    fi
+
+    if [ $capabilities -eq 0 ]; then
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/logs-management.plugin"
     fi
   fi
 
@@ -1636,6 +1737,43 @@ install_ebpf() {
 
 progress "eBPF Kernel Collector"
 install_ebpf
+
+should_install_fluentbit() {
+  if [ -n "${NETDATA_DISABLE_LOGS_MANAGEMENT}" ]; then
+    warning "netdata-installer.sh run with --disable-logsmanagement, Fluent-Bit installation is skipped."
+    return 1
+  elif [ "${FLUENT_BIT_BUILD_SUCCESS:=0}" -eq 0 ]; then
+    run_failed "Fluent-Bit was not built successfully, Netdata Logs Management support will be disabled in this build."
+    return 1
+  elif [ ! -f fluent-bit/build/lib/libfluent-bit.so ]; then
+    run_failed "libfluent-bit.so is missing, Netdata Logs Management support will be disabled in this build."
+    return 1
+  fi
+  
+  return 0
+}
+
+install_fluentbit() {
+  if ! should_install_fluentbit; then
+    return 0
+  fi
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Fluent-Bit."
+
+  run chown "root:${NETDATA_GROUP}" fluent-bit/build/lib
+  run chmod 0644 fluent-bit/build/lib/libfluent-bit.so
+
+  run cp -a -v fluent-bit/build/lib/libfluent-bit.so "${NETDATA_PREFIX}"/usr/lib/netdata
+
+  # Fix paths in logsmanagement.d.conf
+  run sed -i -e "s|# db dir =.*|db dir = ${NETDATA_CACHE_DIR}\/logs_management_db|g" "${NETDATA_STOCK_CONFIG_DIR}"/logsmanagement.d.conf
+  run sed -i -e "s|# log file =.*|log file = ${NETDATA_LOG_DIR}\/fluentbit.log|g" "${NETDATA_STOCK_CONFIG_DIR}"/logsmanagement.d.conf
+
+  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
+}
+
+progress "Installing Fluent-Bit plugin"
+install_fluentbit
 
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"

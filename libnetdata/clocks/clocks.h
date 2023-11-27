@@ -117,6 +117,7 @@ usec_t now_realtime_usec(void);
 
 int now_monotonic_timeval(struct timeval *tv);
 time_t now_monotonic_sec(void);
+msec_t now_realtime_msec(void);
 usec_t now_monotonic_usec(void);
 int now_monotonic_high_precision_timeval(struct timeval *tv);
 time_t now_monotonic_high_precision_sec(void);

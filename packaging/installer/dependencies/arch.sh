@@ -32,6 +32,8 @@ declare -a package_tree=(
   gzip
   python3
   binutils
+  bison
+  flex
 )
 
 usage() {

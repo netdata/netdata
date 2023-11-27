@@ -78,6 +78,18 @@ AC_ARG_ENABLE(
     [enable_plugin_systemd_journal="detect"]
 )
 AC_ARG_ENABLE(
+    [logsmanagement],
+    [AS_HELP_STRING([--disable-logsmanagement], [Disable logsmanagement @<:@default autodetect@:>@])],
+    ,
+    [enable_logsmanagement="detect"]
+)
+AC_ARG_ENABLE(
+    [logsmanagement_tests],
+    [AS_HELP_STRING([--enable-logsmanagement-tests], [Enable logsmanagement tests @<:@default disabled@:>@])],
+    ,
+    [enable_logsmanagement_tests="no"]
+)
+AC_ARG_ENABLE(
     [plugin-cups],
     [AS_HELP_STRING([--enable-plugin-cups], [enable cups plugin @<:@default autodetect@:>@])],
     ,
@@ -736,7 +748,7 @@ AC_CHECK_SIZEOF(void *)
 if test "$ac_cv_sizeof_void_p" = 8; then
     AC_MSG_RESULT(Detected 64-bit Build Environment)
     	LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -DJU_64BIT"
-else 
+else
     AC_MSG_RESULT(Detected 32-bit Build Environment)
         LIBJUDY_CFLAGS="$LIBJUDY_CFLAGS -UJU_64BIT"
 fi
@@ -938,6 +950,27 @@ if test "${enable_pedantic}" = "yes"; then
     CFLAGS="${CFLAGS} -pedantic -Wall -Wextra -Wno-long-long"
 fi
 
+# -----------------------------------------------------------------------------
+# dlsym check
+
+AC_MSG_CHECKING(whether we can use dlsym)
+OLD_LIBS="${LIBS}"
+LIBS="-ldl"
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+  #include <dlfcn.h>
+  static void *(*libc_malloc)(size_t);
+  int main() {
+    libc_malloc = dlsym(RTLD_NEXT, "malloc");
+  }
+]])], CAN_USE_DLSYM=yes, CAN_USE_DLSYM=no)
+LIBS="${OLD_LIBS}"
+AC_MSG_RESULT($CAN_USE_DLSYM)
+
+if test "x$CAN_USE_DLSYM" = xyes; then
+    AC_DEFINE([HAVE_DLSYM], [1], [dlsym usability])
+    OPTIONAL_DL_LIBS="-ldl"
+fi
+AC_SUBST([OPTIONAL_DL_LIBS])
 
 # -----------------------------------------------------------------------------
 # memory allocation library
@@ -1162,7 +1195,6 @@ else
 fi
 AC_MSG_RESULT([${enable_plugin_apps}])
 AM_CONDITIONAL([ENABLE_PLUGIN_APPS], [test "${enable_plugin_apps}" = "yes"])
-
 
 # -----------------------------------------------------------------------------
 # freeipmi.plugin - libipmimonitoring
@@ -1563,6 +1595,56 @@ fi
 
 
 # -----------------------------------------------------------------------------
+# logsmanagement
+
+LIBS_BAK="${LIBS}"
+
+# Check if submodules have not been fetched. Fail if Logs Management was explicitly requested.
+
+AC_MSG_CHECKING([if git submodules are present for logs management functionality])
+if test -f "fluent-bit/CMakeLists.txt"; then
+    AC_MSG_RESULT([yes])
+    have_logsmanagement_submodules="yes"
+else
+    AC_MSG_RESULT([no])
+    have_logsmanagement_submodules="no"
+fi
+
+if test "${enable_logsmanagement}" != "no" -a "${have_logsmanagement_submodules}" = "no"; then
+    AC_MSG_WARN([Logs management cannot be built because the required git submodules are missing.])
+fi
+
+if test "${enable_logsmanagement}" != "no" -a "x$CAN_USE_DLSYM" = xno; then
+    AC_MSG_WARN([Logs management cannot be built because dlsym cannot be used.])
+fi
+
+# Decide if we should build Logs Management
+if test "${enable_logsmanagement}" != "no" -a "${have_logsmanagement_submodules}" = "yes" -a "x$CAN_USE_DLSYM" = xyes; then
+    build_logsmanagement="yes"
+else
+    build_logsmanagement="no"
+fi
+
+AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT], [test "${build_logsmanagement}" = "yes"])
+if test "${build_logsmanagement}" = "yes"; then
+    AC_DEFINE([ENABLE_LOGSMANAGEMENT], [1], [enable logs management functionality])
+fi
+
+# Decide if we should build Logs Management tests.
+if test "${build_logsmanagement}" = "yes" -a "${enable_logsmanagement_tests}" = "yes"; then
+    build_logsmanagement_tests="yes"
+else
+    build_logsmanagement_tests="no"
+fi
+
+AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT_TESTS], [test "${build_logsmanagement_tests}" = "yes"])
+if test "${build_logsmanagement_tests}" = "yes"; then
+    AC_DEFINE([ENABLE_LOGSMANAGEMENT_TESTS], [1], [logs management tests])
+fi
+
+LIBS="${LIBS_BAK}"
+
+# -----------------------------------------------------------------------------
 # debugfs.plugin
 
 if test "${build_target}" = "linux"; then
@@ -1927,27 +2009,6 @@ AC_LANG_POP([C++])
 
 # -----------------------------------------------------------------------------
 
-AC_MSG_CHECKING(whether we can use dlsym)
-OLD_LIBS="${LIBS}"
-LIBS="-ldl"
-AC_LINK_IFELSE([AC_LANG_SOURCE([[
-  #include <dlfcn.h>
-  static void *(*libc_malloc)(size_t);
-  int main() {
-    libc_malloc = dlsym(RTLD_NEXT, "malloc");
-  }
-]])], CAN_USE_DLSYM=yes, CAN_USE_DLSYM=no)
-LIBS="${OLD_LIBS}"
-AC_MSG_RESULT($CAN_USE_DLSYM)
-
-if test "x$CAN_USE_DLSYM" = xyes; then
-    AC_DEFINE([HAVE_DLSYM], [1], [dlsym usability])
-    OPTIONAL_DL_LIBS="-ldl"
-fi
-AC_SUBST([OPTIONAL_DL_LIBS])
-
-# -----------------------------------------------------------------------------
-
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
@@ -2200,6 +2261,7 @@ AC_CONFIG_FILES([
     web/server/static/Makefile
     claim/Makefile
     spawn/Makefile
+    logsmanagement/Makefile
 ])
 
 AC_OUTPUT

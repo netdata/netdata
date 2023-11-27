@@ -214,3 +214,10 @@ void functions_evloop_add_function(struct functions_evloop_globals *wg, const ch
     we->default_timeout = default_timeout;
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wg->expectations, we, prev, next);
 }
+
+void functions_evloop_cancel_threads(struct functions_evloop_globals *wg){
+    for(size_t i = 0; i < wg->workers ; i++)
+        netdata_thread_cancel(wg->worker_threads[i]);
+
+    netdata_thread_cancel(wg->reader_thread);
+}

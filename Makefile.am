@@ -114,6 +114,7 @@ SUBDIRS += \
     web \
     claim \
     spawn \
+    logsmanagement \
     $(NULL)
 
 AM_CFLAGS = \
@@ -347,6 +348,51 @@ SYSTEMD_CAT_NATIVE_FILES = \
 
 LOG2JOURNAL_FILES = \
     libnetdata/log/log2journal.c \
+    $(NULL)
+
+
+LOGSMANAGEMENT_FILES = \
+    logsmanagement/circular_buffer.c \
+    logsmanagement/circular_buffer.h \
+    logsmanagement/db_api.c \
+    logsmanagement/db_api.h \
+    logsmanagement/defaults.h \
+    logsmanagement/file_info.h \
+    logsmanagement/flb_plugin.c \
+    logsmanagement/flb_plugin.h \
+    logsmanagement/functions.c \
+    logsmanagement/functions.h \
+    logsmanagement/helper.h \
+    logsmanagement/logsmanag_config.c \
+    logsmanagement/logsmanag_config.h \
+    logsmanagement/logsmanagement.c \
+    logsmanagement/parser.c \
+    logsmanagement/parser.h \
+    logsmanagement/query.c \
+    logsmanagement/query.h \
+    logsmanagement/rrd_api/rrd_api_docker_ev.c \
+    logsmanagement/rrd_api/rrd_api_docker_ev.h \
+    logsmanagement/rrd_api/rrd_api_generic.c \
+    logsmanagement/rrd_api/rrd_api_generic.h \
+    logsmanagement/rrd_api/rrd_api_kernel.c \
+    logsmanagement/rrd_api/rrd_api_kernel.h \
+    logsmanagement/rrd_api/rrd_api_mqtt.c \
+    logsmanagement/rrd_api/rrd_api_mqtt.h \
+    logsmanagement/rrd_api/rrd_api_stats.c \
+    logsmanagement/rrd_api/rrd_api_stats.h \
+    logsmanagement/rrd_api/rrd_api_systemd.c \
+    logsmanagement/rrd_api/rrd_api_systemd.h \
+    logsmanagement/rrd_api/rrd_api_web_log.c \
+    logsmanagement/rrd_api/rrd_api_web_log.h \
+    logsmanagement/rrd_api/rrd_api.h \
+    database/sqlite/sqlite3.c \
+    database/sqlite/sqlite3.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+LOGSMANAGEMENT_TESTS_FILES = \
+    logsmanagement/unit_test/unit_test.c \
+    logsmanagement/unit_test/unit_test.h \
     $(NULL)
 
 CUPS_PLUGIN_FILES = \
@@ -1341,6 +1387,17 @@ systemd_cat_native_SOURCES = $(SYSTEMD_CAT_NATIVE_FILES)
 systemd_cat_native_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
+
+if ENABLE_LOGSMANAGEMENT
+    plugins_PROGRAMS += logs-management.plugin
+    logs_management_plugin_SOURCES = $(LOGSMANAGEMENT_FILES)
+if ENABLE_LOGSMANAGEMENT_TESTS
+    logs_management_plugin_SOURCES += $(LOGSMANAGEMENT_TESTS_FILES)
+endif
+    logs_management_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
 
 if ENABLE_PLUGIN_EBPF
     plugins_PROGRAMS += ebpf.plugin

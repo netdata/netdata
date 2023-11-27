@@ -85,6 +85,9 @@ debugfs.plugin
 systemd-journal.plugin
 !systemd-journal.plugin/
 
+logs-management.plugin
+!logs-management.plugin/
+
 # protoc generated files
 *.pb.cc
 *.pb.h
@@ -152,6 +155,8 @@ collectors/python.d.plugin/python.d.plugin
 collectors/ioping.plugin/ioping.plugin
 collectors/go.d.plugin
 web/netdata-switch-dashboard.sh
+
+logsmanagement/stress_test/stress_test
 
 # installer generated files
 /netdata-uninstaller.sh

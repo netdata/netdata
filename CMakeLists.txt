@@ -1074,6 +1074,44 @@ ELSE()
     message(STATUS "ML: disabled")
 ENDIF()
 
+set(LOGSMANAGEMENT_FILES
+        logsmanagement/rrd_api/rrd_api_docker_ev.c
+        logsmanagement/rrd_api/rrd_api_docker_ev.h
+        logsmanagement/rrd_api/rrd_api_generic.c
+        logsmanagement/rrd_api/rrd_api_generic.h
+        logsmanagement/rrd_api/rrd_api_kernel.c
+        logsmanagement/rrd_api/rrd_api_kernel.h
+        logsmanagement/rrd_api/rrd_api_mqtt.c
+        logsmanagement/rrd_api/rrd_api_mqtt.h
+        logsmanagement/rrd_api/rrd_api_stats.c
+        logsmanagement/rrd_api/rrd_api_stats.h
+        logsmanagement/rrd_api/rrd_api_systemd.c
+        logsmanagement/rrd_api/rrd_api_systemd.h
+        logsmanagement/rrd_api/rrd_api_web_log.c
+        logsmanagement/rrd_api/rrd_api_web_log.h
+        logsmanagement/rrd_api/rrd_api.h
+        logsmanagement/unit_test/unit_test.c
+        logsmanagement/unit_test/unit_test.h
+        logsmanagement/circular_buffer.c
+        logsmanagement/circular_buffer.h
+        logsmanagement/db_api.c
+        logsmanagement/db_api.h
+        logsmanagement/file_info.h
+        logsmanagement/flb_plugin.c
+        logsmanagement/flb_plugin.h
+        logsmanagement/functions.c
+        logsmanagement/functions.h
+        logsmanagement/helper.h
+        logsmanagement/defaults.h
+        logsmanagement/logsmanag_config.c
+        logsmanagement/logsmanag_config.h
+        logsmanagement/logsmanagement.c
+        logsmanagement/parser.c
+        logsmanagement/parser.h
+        logsmanagement/query.c
+        logsmanagement/query.h
+        )
+
 set(NETDATA_FILES
         collectors/all.h
         ${DAEMON_FILES}
@@ -1111,6 +1149,13 @@ add_definitions(
         -DWEB_DIR="/usr/share/netdata/web"
         -DVARLIB_DIR="/var/lib/netdata"
 )
+
+# -----------------------------------------------------------------------------
+# logs management
+
+IF(ENABLE_LOGSMANAGEMENT) 
+    list(APPEND NETDATA_FILES ${LOGSMANAGEMENT_FILES})
+ENDIF()
 
 # -----------------------------------------------------------------------------
 # kinesis exporting connector
@@ -1747,7 +1792,6 @@ endif()
 
 endif()
 endif()
-
 
 # generate config.h so that CMake becomes independent of automake
 

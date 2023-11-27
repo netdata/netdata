@@ -171,6 +171,7 @@ Suggests: %{name}-plugin-freeipmi = %{version}
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: %{name}-plugin-cups = %{version}
 Recommends: %{name}-plugin-systemd-journal = %{version}
+Recommends: %{name}-plugin-logs-management = %{version}
 %endif
 
 
@@ -224,6 +225,11 @@ BuildRequires: systemd-devel
 # Prometheus remote write dependencies
 BuildRequires: snappy-devel
 # end - prometheus remote write dependencies
+
+# logs-management dependencies
+BuildRequires: bison
+BuildRequires: flex
+# end - logs-management dependencies
 
 # #####################################################################
 # End of dependency management configuration
@@ -346,6 +352,10 @@ install -m 0750 -p debugfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugi
 # ###########################################################
 # Install systemd-journal.plugin
 install -m 4750 -p systemd-journal.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin"
+
+# ###########################################################
+# Install logs-management.plugin
+#install -m 4750 -p logs-management.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/logs-management.plugin"
 
 # ###########################################################
 # Install perf.plugin
@@ -660,6 +670,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # systemd-journal belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+
+# logs management belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
+%exclude %{_libdir}/%{name}/conf.d/logsmanagement.d.conf
+%exclude %{_libdir}/%{name}/conf.d/logsmanagement.d
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -979,7 +994,33 @@ fi
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
+%package plugin-logs-management
+Summary: The logs-management plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+
+%description plugin-logs-management
+ This plugin allows the Netdata Agent to collect logs from the system
+ and parse them to extract metrics.
+
+%pre plugin-logs-management
+
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%files plugin-logs-management
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/logsmanagement.d.conf
+%{_libdir}/%{name}/conf.d/logsmanagement.d
+%defattr(0750,root,netdata,0750)
+# CAP_DAC_READ_SEARCH and CAP_SYSLOG needed for data collection.
+%caps(cap_dac_read_search,cap_syslog=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
+
 %changelog
+* Thu Oct 26 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-24
+- Add package for logs-management plugin
 * Mon Aug 28 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-23
 - Build go.d.plugin natively for CentOS Stream distro
 * Mon Aug 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-22

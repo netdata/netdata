@@ -479,8 +479,9 @@ static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *p
 }
 
 static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *parser) {
-    UNUSED(words);
-    UNUSED(num_words);
+    char *tv_sec = get_word(words, num_words, 1);
+    char *tv_usec = get_word(words, num_words, 2);
+    char *pending_rrdset_next = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
@@ -494,9 +495,15 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END);
     parser->user.data_collections_count++;
 
-    struct timeval now;
-    now_realtime_timeval(&now);
-    rrdset_timed_done(st, now, /* pending_rrdset_next = */ false);
+    struct timeval tv = {
+        .tv_sec  = (tv_sec  && *tv_sec)  ? str2ll(tv_sec,  NULL) : 0,
+        .tv_usec = (tv_usec && *tv_usec) ? str2ll(tv_usec, NULL) : 0
+    };
+    
+    if(!tv.tv_sec)
+        now_realtime_timeval(&tv);
+
+    rrdset_timed_done(st, tv, pending_rrdset_next && *pending_rrdset_next ? true : false);
 
     return PARSER_RC_OK;
 }
