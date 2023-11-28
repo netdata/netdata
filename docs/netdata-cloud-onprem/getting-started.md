@@ -67,7 +67,7 @@ export AWS_ACCESS_KEY_ID=<your_secret_id>
 export AWS_SECRET_ACCESS_KEY=<your_secret_key>
 ```
 
-The Second one is to use an interactive shell:
+The second one is to use an interactive shell:
 ```bash
 aws configure
 ```
