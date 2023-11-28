@@ -94,10 +94,10 @@ bool log_job_add_key_prefix(LOG_JOB *jb, const char *prefix, size_t prefix_len) 
 
 static inline void log_job_injection_replace(INJECTION *kv, const char *key, size_t key_len, const char *value, size_t value_len) {
     if(key_len > JOURNAL_MAX_KEY_LEN)
-        log2stderr("WARNING: injection key '%.*s' is too long for journal. Will be truncated.", key_len, key);
+        log2stderr("WARNING: injection key '%.*s' is too long for journal. Will be truncated.", (int)key_len, key);
 
     if(value_len > JOURNAL_MAX_VALUE_LEN)
-        log2stderr("WARNING: injection value of key '%.*s' is too long for journal. Will be truncated.", key_len, key);
+        log2stderr("WARNING: injection value of key '%.*s' is too long for journal. Will be truncated.", (int)key_len, key);
 
     copy_to_buffer(kv->key, sizeof(kv->key), key, key_len);
     txt_replace(&kv->value, value, value_len);
@@ -202,7 +202,7 @@ DUPLICATION *log_job_add_duplication_to_job(LOG_JOB *jb, const char *target, siz
     }
 
     if(target_len > JOURNAL_MAX_KEY_LEN) {
-        log2stderr("WARNING: key of duplicate '%s.*' is too long for journals. Will be truncated.", target_len, target);
+        log2stderr("WARNING: key of duplicate '%.*s' is too long for journals. Will be truncated.", (int)target_len, target);
         target_len = JOURNAL_MAX_KEY_LEN;
     }
 
