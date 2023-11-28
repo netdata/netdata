@@ -724,7 +724,7 @@ static void config_section_init(uv_loop_t *main_loop,
                     return p_file_info_destroy(p_file_info);
                 } else p_file_info->filename = strdupz(KMSG_DEFAULT_PATH);
                 break;
-            case FLB_SYSTEMD:
+            case FLB_SYSTEMD:{
                 const char *const systemd_path_default[] = {
                     "/run/log/journal",
                     "/var/log/journal",
@@ -749,6 +749,7 @@ static void config_section_init(uv_loop_t *main_loop,
                 }
                 if(!p_file_info->filename)
                     p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH); // last resort, try to open local only
+            }
                 break;
             case FLB_DOCKER_EV:
                 if(access(DOCKER_EV_DEFAULT_PATH, R_OK)){
