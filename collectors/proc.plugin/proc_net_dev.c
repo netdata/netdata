@@ -366,6 +366,10 @@ static void netdev_free_chart_strings(struct netdev *d) {
 }
 
 static void netdev_free(struct netdev *d) {
+    char buf[FILENAME_MAX + 1];
+    snprintfz(buf, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
+    config_section_destroy(buf);
+
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
     rrdlabels_destroy(d->chart_labels);
