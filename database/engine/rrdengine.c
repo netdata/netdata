@@ -1345,9 +1345,6 @@ static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, vo
 static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_SHUTDOWN);
 
-    completion_wait_for(&ctx->quiesce.completion);
-    completion_destroy(&ctx->quiesce.completion);
-
     bool logged = false;
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED) ||
             __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED)) {
