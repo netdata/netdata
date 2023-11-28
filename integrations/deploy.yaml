@@ -255,6 +255,7 @@
             -v /proc:/host/proc:ro \
             -v /sys:/host/sys:ro \
             -v /etc/os-release:/host/etc/os-release:ro \
+            -v /var/log:/host/var/log:ro \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
             --restart unless-stopped \
             --cap-add SYS_PTRACE \
@@ -280,6 +281,7 @@
             -v /proc:/host/proc:ro \
             -v /sys:/host/sys:ro \
             -v /etc/os-release:/host/etc/os-release:ro \
+            -v /var/log:/host/var/log:ro \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
             --restart unless-stopped \
             --cap-add SYS_PTRACE \
@@ -318,6 +320,7 @@
                   - /proc:/host/proc:ro
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
+                  - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
@@ -354,6 +357,7 @@
                   - /proc:/host/proc:ro
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
+                  - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
@@ -391,6 +395,7 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+                  - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
@@ -430,6 +435,7 @@
                   - /sys:/host/sys:ro
                   - /etc/os-release:/host/etc/os-release:ro
                   - /etc/hostname:/etc/hostname:ro
+                  - /var/log:/host/var/log:ro
                   - /var/run/docker.sock:/var/run/docker.sock:ro
             {% if $showClaimingOptions %}
                 environment:
