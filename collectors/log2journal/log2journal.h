@@ -39,6 +39,11 @@
 #define LOG2JOURNAL_CONFIG_PATH LIBCONFIG_DIR "/log2journal.d"
 
 // ----------------------------------------------------------------------------
+// character conversion for journal keys
+
+extern const char journal_key_characters_map[256];
+
+// ----------------------------------------------------------------------------
 // logging
 
 // enable the compiler to check for printf like errors on our log2stderr() function

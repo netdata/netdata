@@ -138,6 +138,7 @@ void log_job_command_line_help(const char *name) {
     printf("       Prefix all fields with PREFIX. The PREFIX is added before processing\n");
     printf("       duplications, renames and rewrites, so that the extracted keys have to\n");
     printf("       be matched with the PREFIX in them.\n");
+    printf("       PREFIX is assumed to be systemd-journal friendly.\n");
     printf("\n");
     printf("  --rename NEW=OLD\n");
     printf("       Rename fields, before rewriting their values.\n");
@@ -198,6 +199,7 @@ void log_job_command_line_help(const char *name) {
     printf("          +---------------------------------------------------+  \n");
     printf("                                                                 \n");
     printf("IMPORTANT:\n");
+    printf(" - Extraction of keys includes formatting them according to journal rules.\n");
     printf(" - Duplication rules use the original extracted field names, after they have\n");
     printf("   been prefixed (when a PREFIX is set) and before they are renamed.\n");
     printf(" - Rewriting is always the last stage, so the final field names are matched.\n");
