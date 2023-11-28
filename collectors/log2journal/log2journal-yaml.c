@@ -221,6 +221,22 @@ static size_t yaml_parse_filename_injection(yaml_parser_t *parser, struct log_jo
     return errors;
 }
 
+static size_t yaml_parse_prefix(yaml_parser_t *parser, struct log_job *jb) {
+    yaml_event_t event;
+    size_t errors = 0;
+
+    if (!yaml_parse(parser, &event))
+        return 1;
+
+    if (event.type == YAML_SCALAR_EVENT) {
+        if(!log_job_add_key_prefix(jb, (char *)event.data.scalar.value, event.data.scalar.length))
+            errors++;
+    }
+
+    yaml_event_delete(&event);
+    return errors;
+}
+
 static size_t yaml_parse_duplicates_injection(yaml_parser_t *parser, struct log_job *jb) {
     if (!yaml_parse_expect_event(parser, YAML_SEQUENCE_START_EVENT))
         return 1;
@@ -560,6 +576,96 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, struct log_job *jb) {
     return errors;
 }
 
+static size_t yaml_parse_renames(yaml_parser_t *parser, struct log_job *jb) {
+    size_t errors = 0;
+
+    if (!yaml_parse_expect_event(parser, YAML_SEQUENCE_START_EVENT))
+        return 1;
+
+    bool finished = false;
+    while (!errors && !finished) {
+        yaml_event_t event;
+        if (!yaml_parse(parser, &event)) {
+            errors++;
+            continue;
+        }
+
+        switch (event.type) {
+            case YAML_MAPPING_START_EVENT:
+            {
+                struct key_rename rn = {0};
+
+                bool mapping_finished = false;
+                while (!errors && !mapping_finished) {
+                    yaml_event_t sub_event;
+                    if (!yaml_parse(parser, &sub_event)) {
+                        errors++;
+                        continue;
+                    }
+
+                    switch (sub_event.type) {
+                        case YAML_SCALAR_EVENT:
+                            if (yaml_scalar_matches(&sub_event, "new_key", strlen("new_key"))) {
+                                if (!yaml_parse(parser, &sub_event) || sub_event.type != YAML_SCALAR_EVENT) {
+                                    yaml_error(parser, &sub_event, "Expected scalar for rename new_key");
+                                    errors++;
+                                } else {
+                                    rn.new_key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    yaml_event_delete(&sub_event);
+                                }
+                            } else if (yaml_scalar_matches(&sub_event, "old_key", strlen("old_key"))) {
+                                if (!yaml_parse(parser, &sub_event) || sub_event.type != YAML_SCALAR_EVENT) {
+                                    yaml_error(parser, &sub_event, "Expected scalar for rename old_key");
+                                    errors++;
+                                } else {
+                                    rn.old_key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    yaml_event_delete(&sub_event);
+                                }
+                            } else {
+                                yaml_error(parser, &sub_event, "Unexpected scalar in rewrite mapping");
+                                errors++;
+                            }
+                            break;
+
+                        case YAML_MAPPING_END_EVENT:
+                            if(rn.old_key && rn.new_key) {
+                                if (!log_job_add_rename(jb, rn.new_key, strlen(rn.new_key), rn.old_key, strlen(rn.old_key)))
+                                    errors++;
+                            }
+                            freez(rn.new_key);
+                            freez(rn.old_key);
+                            memset(&rn, 0, sizeof(rn));
+
+                            mapping_finished = true;
+                            break;
+
+                        default:
+                            yaml_error(parser, &sub_event, "Unexpected event in rewrite mapping");
+                            errors++;
+                            break;
+                    }
+
+                    yaml_event_delete(&sub_event);
+                }
+            }
+                break;
+
+            case YAML_SEQUENCE_END_EVENT:
+                finished = true;
+                break;
+
+            default:
+                yaml_error(parser, &event, "Unexpected event in rewrites sequence");
+                errors++;
+                break;
+        }
+
+        yaml_event_delete(&event);
+    }
+
+    return errors;
+}
+
 static size_t yaml_parse_pattern(yaml_parser_t *parser, struct log_job *jb) {
     yaml_event_t event;
     size_t errors = 0;
@@ -618,6 +724,9 @@ static size_t yaml_parse_initialized(yaml_parser_t *parser, struct log_job *jb) 
                 if (yaml_scalar_matches(&event, "pattern", strlen("pattern")))
                     errors += yaml_parse_pattern(parser, jb);
 
+                else if (yaml_scalar_matches(&event, "prefix", strlen("prefix")))
+                    errors += yaml_parse_prefix(parser, jb);
+
                 else if (yaml_scalar_matches(&event, "filename", strlen("filename")))
                     errors += yaml_parse_filename_injection(parser, jb);
 
@@ -632,6 +741,9 @@ static size_t yaml_parse_initialized(yaml_parser_t *parser, struct log_job *jb) 
 
                 else if (yaml_scalar_matches(&event, "rewrite", strlen("rewrite")))
                     errors += yaml_parse_rewrites(parser, jb);
+
+                else if (yaml_scalar_matches(&event, "rename", strlen("rename")))
+                    errors += yaml_parse_renames(parser, jb);
 
                 else {
                     yaml_error(parser, &event, "unexpected scalar");
