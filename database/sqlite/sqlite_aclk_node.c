@@ -136,6 +136,7 @@ void aclk_check_node_info_and_collectors(void)
 
     size_t context_loading = 0;
     size_t replicating = 0;
+    size_t context_pp = 0;
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         struct aclk_sync_cfg_t *wc = host->aclk_config;
@@ -154,13 +155,18 @@ void aclk_check_node_info_and_collectors(void)
             continue;
         }
 
-        if (wc->node_info_send_time && wc->node_info_send_time + 30 < now_realtime_sec()) {
+        bool pp_queue_empty = !(host->rrdctx.pp_queue && dictionary_entries(host->rrdctx.pp_queue));
+
+        if (!pp_queue_empty && (wc->node_info_send_time || wc->node_collectors_send))
+            context_pp++;
+
+        if (pp_queue_empty && wc->node_info_send_time && wc->node_info_send_time + 30 < now_realtime_sec()) {
             wc->node_info_send_time = 0;
             build_node_info(host);
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
         }
 
-        if (wc->node_collectors_send && wc->node_collectors_send + 30 < now_realtime_sec()) {
+        if (pp_queue_empty && wc->node_collectors_send && wc->node_collectors_send + 30 < now_realtime_sec()) {
             build_node_collectors(host);
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
             wc->node_collectors_send = 0;
@@ -168,10 +174,16 @@ void aclk_check_node_info_and_collectors(void)
     }
     dfe_done(host);
 
-    if (context_loading || replicating) {
+    if (context_loading || replicating || context_pp) {
         nd_log_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                     "%zu nodes loading contexts, %zu replicating data", context_loading, replicating);
+        nd_log_limit(
+            &erl,
+            NDLS_DAEMON,
+            NDLP_INFO,
+            "%zu nodes loading contexts, %zu replicating data, %zu pending context post processing",
+            context_loading,
+            replicating,
+            context_pp);
     }
 }
 
