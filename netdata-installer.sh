@@ -1104,7 +1104,7 @@ else
   NETDATA_USER="${USER}"
   ROOT_USER="${USER}"
 fi
-NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
+NETDATA_GROUP="$(id -g -n "${NETDATA_USER}" 2> /dev/null)"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
@@ -1177,7 +1177,7 @@ if [ "$(id -u)" -eq 0 ]; then
     # shellcheck disable=SC2086
     portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
   done
-  # Netdata must be able to read /etc/pve/qemu-server/* and /etc/pve/lxc/* 
+  # Netdata must be able to read /etc/pve/qemu-server/* and /etc/pve/lxc/*
   # for reading VMs/containers names, CPU and memory limits on Proxmox.
   if [ -d "/etc/pve" ]; then
     portable_add_user_to_group "www-data" netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} www-data"
@@ -1344,7 +1344,7 @@ if [ "$(id -u)" -eq 0 ]; then
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"
       if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
-        capabilities=1 
+        capabilities=1
       fi
     fi
 

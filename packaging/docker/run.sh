@@ -41,9 +41,9 @@ export DOCKER_HOST
 
 if [ -n "${PGID}" ]; then
   echo "Creating docker group ${PGID}"
-  addgroup -g "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"
+  addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"
   echo "Assign netdata user to docker group ${PGID}"
-  usermod -a -G "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
+  usermod --append --groups "docker" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
 # Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
@@ -98,13 +98,20 @@ if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /v
 fi
 
 if [ -n "${NETDATA_EXTRA_APK_PACKAGES}" ]; then
-  echo "Fetching APK repository metadata."
-  if ! apk update; then
-    echo "Failed to fetch APK repository metadata."
+  echo >&2 "WARNING: Netdata’s Docker images have switched from Alpine to Debian as a base platform. Supplementary package support is now handled through the NETDATA_EXTRA_DEB_PACKAGES variable instead of NETDATA_EXTRA_APK_PACKAGES."
+  echo >&2 "WARNING: The container will still run, but supplementary packages listed in NETDATA_EXTRA_APK_PACKAGES will not be installed."
+  echo >&2 "WARNING: To remove these messages, either undefine NETDATA_EXTRA_APK_PACKAGES, or define it to an empty string."
+fi
+
+if [ -n "${NETDATA_EXTRA_DEB_PACKAGES}" ]; then
+  echo "Fetching APT repository metadata."
+  if ! apt-get update; then
+    echo "Failed to fetch APT repository metadata."
   else
     echo "Installing supplementary packages."
+    export DEBIAN_FRONTEND="noninteractive"
     # shellcheck disable=SC2086
-    if ! apk add --no-cache ${NETDATA_EXTRA_APK_PACKAGES}; then
+    if ! apt-get install -y --no-install-recommends ${NETDATA_EXTRA_DEB_PACKAGES}; then
       echo "Failed to install supplementary packages."
     fi
   fi

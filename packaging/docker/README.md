@@ -460,15 +460,13 @@ reading `- /etc/hostname:/host/etc/hostname:ro`.
 ## Adding extra packages at runtime
 
 By default, the official Netdata container images do not include a number of optional runtime dependencies. You
-can add these dependencies, or any other APK packages, at runtime by listing them in the environment variable
-`NETDATA_EXTRA_APK_PACKAGES`.
+can add these dependencies, or any other APT packages, at runtime by listing them in the environment variable
+`NETDATA_EXTRA_DEB_PACKAGES`.
 
 Commonly useful packages include:
 
 - `apcupsd`: For monitoring APC UPS devices.
-- `libvirt-daemon`: For resolving cgroup names for libvirt domains.
 - `lm-sensors`: For monitoring hardware sensors.
-- `msmtp`: For email alert support.
 - `netcat-openbsd`: For IRC alert support.
 
 ## Health Checks

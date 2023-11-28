@@ -3,7 +3,7 @@
 
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/builder:v1 as builder
+FROM netdata/builder:v2 as builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
@@ -29,7 +29,7 @@ RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
    CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it --use-system-protobuf \
-   ${EXTRA_INSTALL_OPTS} --one-time-build --enable-lto "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
+   ${EXTRA_INSTALL_OPTS} --disable-ebpf --one-time-build --enable-lto "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)"
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -49,6 +49,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
     mv /usr/sbin/netdata-claim.sh    /app/usr/sbin/ && \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
+    mv /usr/sbin/systemd-cat-native /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
     mkdir -p /deps/etc && \
@@ -59,7 +60,7 @@ RUN mkdir -p /app/usr/sbin/ \
 #####################################################################
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007
-FROM netdata/base:v1 as base
+FROM netdata/base:v2 as base
 
 LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
 LABEL org.opencontainers.image.url="https://netdata.cloud"
@@ -83,7 +84,7 @@ ENV DOCKER_USR netdata
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
 
-ENV NETDATA_EXTRA_APK_PACKAGES=""
+ENV NETDATA_EXTRA_DEB_PACKAGES=""
 
 RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stdout /var/log/netdata/access.log && \
@@ -92,16 +93,16 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stderr /var/log/netdata/daemon.log && \
     ln -sf /dev/stdout /var/log/netdata/collector.log && \
     ln -sf /dev/stdout /var/log/netdata/fluentbit.log && \
-    ln -sf /dev/stdout /var/log/netdata/health.log && \
-    addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
+    ln -sf /dev/stdout /var/log/netdata/health.log
 
 COPY --from=builder /app /
 
-# Apply the permissions as described in
+# Create netdata user and apply the permissions as described in
 # https://docs.netdata.cloud/docs/netdata-security/#netdata-directories, but own everything by root group due to https://github.com/netdata/netdata/pull/6543
 # hadolint ignore=DL3013
-RUN chown -R root:root \
+RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
+    adduser --system --no-create-home --shell /usr/sbin/nologin --uid ${NETDATA_UID} --home /etc/netdata --group "${DOCKER_USR}" && \
+    chown -R root:root \
         /etc/netdata \
         /usr/share/netdata \
         /usr/libexec/netdata && \
@@ -113,17 +114,17 @@ RUN chown -R root:root \
     chown -R netdata:netdata /var/lib/netdata/cloud.d && \
     chmod 0700 /var/lib/netdata/cloud.d && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
-    chmod 4755 \
-        /usr/libexec/netdata/plugins.d/cgroup-network \
-        /usr/libexec/netdata/plugins.d/local-listeners \
-        /usr/libexec/netdata/plugins.d/apps.plugin \
-        /usr/libexec/netdata/plugins.d/debugfs.plugin && \
-    if [ -f /usr/libexec/netdata/plugins.d/freeipmi.plugin ]; then \
-        chmod 4755 /usr/libexec/netdata/plugins.d/freeipmi.plugin; \
-    fi && \
-    if [ -f /usr/libexec/netdata/plugins.d/go.d.plugin ]; then \
-        chmod 4755 /usr/libexec/netdata/plugins.d/go.d.plugin; \
-    fi && \
+    for name in cgroup-network \
+                local-listeners \
+                apps.plugin \
+                debugfs.plugin \
+                freeipmi.plugin \
+                go.d.plugin \
+                perf.plugin \
+                slabinfo.plugin \
+                systemd-journal.plugin; do \
+        [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
+    done && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
