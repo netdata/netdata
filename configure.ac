@@ -2156,6 +2156,7 @@ AC_CONFIG_FILES([
     collectors/freebsd.plugin/Makefile
     collectors/freeipmi.plugin/Makefile
     collectors/cups.plugin/Makefile
+    collectors/log2journal/Makefile
     collectors/idlejitter.plugin/Makefile
     collectors/macos.plugin/Makefile
     collectors/nfacct.plugin/Makefile

@@ -347,7 +347,13 @@ SYSTEMD_CAT_NATIVE_FILES = \
     $(NULL)
 
 LOG2JOURNAL_FILES = \
-    libnetdata/log/log2journal.c \
+    collectors/log2journal/log2journal.h \
+    collectors/log2journal/log2journal.c \
+    collectors/log2journal/log2journal-help.c \
+    collectors/log2journal/log2journal-yaml.c \
+    collectors/log2journal/log2journal-json.c \
+    collectors/log2journal/log2journal-logfmt.c \
+    collectors/log2journal/log2journal-params.c \
     $(NULL)
 
 

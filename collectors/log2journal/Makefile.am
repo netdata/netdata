@@ -6,3 +6,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 dist_noinst_DATA = \
     README.md \
     $(NULL)
+
+dist_libconfig_DATA = \
+    log2journal.d/nginx-combined.yaml \
+    $(NULL)
