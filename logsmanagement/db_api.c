@@ -137,7 +137,7 @@ static void db_writer_db_mode_none(void *arg){
         uv_rwlock_rdlock(&p_file_info->circ_buff->buff_realloc_rwlock);
         do{ item = circ_buff_read_item(p_file_info->circ_buff);} while(item);
         circ_buff_read_done(p_file_info->circ_buff);
-        circ_buff_reclaim_empty_items_space(p_file_info->circ_buff);
+        circ_buff_reclaim_empty_items_space_unsafe(p_file_info->circ_buff);
         uv_rwlock_rdunlock(&p_file_info->circ_buff->buff_realloc_rwlock);
         for(int i = 0; i < p_file_info->buff_flush_to_db_interval * 4; i++){
             if(__atomic_load_n(&p_file_info->state, __ATOMIC_RELAXED) != LOG_SRC_READY)
@@ -455,7 +455,7 @@ static void db_writer_db_mode_full(void *arg){
             return_db_writer_db_mode_none(p_file_info, 1);
         }
 
-        circ_buff_reclaim_empty_items_space(p_file_info->circ_buff);
+        circ_buff_reclaim_empty_items_space_unsafe(p_file_info->circ_buff);
 
         // TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
         uv_mutex_unlock(p_file_info->db_mut);

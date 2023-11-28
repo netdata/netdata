@@ -10,6 +10,9 @@
 #include "helper.h"
 #include "parser.h"
 
+#define is_buff_full()  (head == tail && full)
+#define is_buff_empty() (head == tail && !full)
+
 struct qsort_item {
     Circ_buff_item_t *cbi;
     struct File_info *pfi;
@@ -62,7 +65,7 @@ void circ_buff_search(logs_query_params_t *const p_query_params, struct File_inf
         int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
         int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
 
-        if ((head == tail) && !full) continue;  // Nothing to do if buff is empty
+        if (is_buff_empty()) continue;  // Nothing to do if buff is empty
 
         for (int i = tail; i != head; i = (i + 1) % buff->num_of_items){
             items[items_off].cbi = &buff->items[i];
@@ -153,14 +156,14 @@ void circ_buff_search(logs_query_params_t *const p_query_params, struct File_inf
  * @brief Reduce number of empty items in buffer to reclaim space.
  * @param buff Circular buffer to work on.
  */
-void circ_buff_reclaim_empty_items_space(Circ_buff_t *const buff){
+void circ_buff_reclaim_empty_items_space_unsafe(Circ_buff_t *const buff){
     
     // TODO: Probably can be changed to __ATOMIC_RELAXED, but ideally a mutex should be used here.
     int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
     int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
     int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
 
-    if((now_monotonic_sec() - buff->buff_realloc_last < CIRC_BUFF_DO_NOT_RECLAIM_SPACE_FOR_SEC) || (head == tail && full))
+    if((now_monotonic_sec() - buff->buff_realloc_last < CIRC_BUFF_DO_NOT_RECLAIM_SPACE_FOR_SEC) || is_buff_full())
         return;
 
     int num_of_valid_items = 0;
@@ -179,8 +182,20 @@ void circ_buff_reclaim_empty_items_space(Circ_buff_t *const buff){
     /* Copy items that are not empty */
     int new_off = 0;
     for(int i = tail; i != head; i = (i + 1) % buff->num_of_items){
+        buff->items[i].data_max_size = (buff->items[i].text_size + buff->items[i].text_compressed_size) * CIRC_BUFF_SCALE_FACTOR;
+        buff->items[i].data = reallocz(buff->items[i].data, buff->items[i].data_max_size);
+
         items_new[new_off++] = buff->items[i];
         buff->total_cached_mem += buff->items[i].data_max_size;
+    }
+
+    if(is_buff_empty()){
+        for(int i = 0; i < buff->num_of_items; i++)
+            freez(buff->items[i].data);
+    } 
+    else {
+        for(int i = head; i != tail; i = (i + 1) % buff->num_of_items)
+            freez(buff->items[i].data);
     }
 
     freez(buff->items);
@@ -309,7 +324,7 @@ int circ_buff_insert(Circ_buff_t *const buff){
    
     /* If circular buffer does not have any free items, it will be expanded
      * by reallocating a larger `items` array. */
-    if (unlikely(( head == tail ) && full )) {
+    if (unlikely(is_buff_full())) {
         debug_log( "buff out of space! will be expanded.");
         uv_rwlock_wrlock(&buff->buff_realloc_rwlock);
 
@@ -318,7 +333,7 @@ int circ_buff_insert(Circ_buff_t *const buff){
         Circ_buff_item_t *items_new = callocz(num_of_items_new, sizeof(Circ_buff_item_t));
 
         for(int i = 0; i < buff->num_of_items; i++)
-            items_new[i] = buff->items[head % buff->num_of_items];
+            items_new[i] = buff->items[head++ % buff->num_of_items];
 
         head = buff->head = buff->num_of_items++;
         buff->tail = buff->read = 0;

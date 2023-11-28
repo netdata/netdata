@@ -81,8 +81,8 @@ typedef enum {
 
 #define CIRC_BUFF_PREP_WR_RETRY_AFTER_MS 1000           /**< If circ_buff_prepare_write() fails due to not enough space, how many millisecs to wait before retrying **/
 
-#define CIRC_BUFF_SCALE_FACTOR 1.5                      /**< **/
-#define CIRC_BUFF_DO_NOT_RECLAIM_SPACE_FOR_SEC 60       /**< Minimum time that must have passed after a buffer realloc operation to attempt to reclaim empty items space **/
+#define CIRC_BUFF_SCALE_FACTOR 1.5                      /**< Multiplier to use when scaling circular buffers in terms of items or data allocated memory for each item **/
+#define CIRC_BUFF_DO_NOT_RECLAIM_SPACE_FOR_SEC 300      /**< Minimum time that must have passed after a buffer realloc operation to attempt to reclaim empty items space **/
 
 /* -------------------------------------------------------------------------- */
 

@@ -57,7 +57,7 @@ typedef struct Circ_buff {
 } Circ_buff_t;
 
 void circ_buff_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]);
-void circ_buff_reclaim_empty_items_space(Circ_buff_t *const buff);
+void circ_buff_reclaim_empty_items_space_unsafe(Circ_buff_t *const buff);
 size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space);
 int circ_buff_insert(Circ_buff_t *const buff);
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff);
