@@ -102,6 +102,17 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
     return &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_OK];
 }
 
+bool terminate_logs_manag_query(logs_query_params_t *const p_query_params){
+    if(p_query_params->cancelled && __atomic_load_n(p_query_params->cancelled, __ATOMIC_RELAXED)) {
+        return true;
+    }
+
+    if(now_monotonic_usec() > p_query_params->stop_monotonic_ut)
+        return true;
+
+    return false;
+}
+
 const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_params) {
     struct File_info *p_file_infos[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
 
@@ -182,12 +193,12 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
         db_search(p_query_params, p_file_infos);
 
     if( p_query_params->results_buff->len < p_query_params->quota && 
-        now_monotonic_usec() <= p_query_params->stop_monotonic_ut)
+        !terminate_logs_manag_query(p_query_params))
             circ_buff_search(p_query_params, p_file_infos);
 
     if(!p_query_params->order_by_asc && 
         p_query_params->results_buff->len < p_query_params->quota &&
-        now_monotonic_usec() <= p_query_params->stop_monotonic_ut) 
+        !terminate_logs_manag_query(p_query_params)) 
             db_search(p_query_params, p_file_infos);
 
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++)
@@ -212,6 +223,13 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
     /* If keyword has been sanitised, it needs to be freed - otherwise it's just a pointer to a substring */
     if(p_query_params->sanitize_keyword && p_query_params->keyword){
         freez(p_query_params->keyword);
+    }
+
+    if(terminate_logs_manag_query(p_query_params)){
+        return  (p_query_params->cancelled && 
+                __atomic_load_n(p_query_params->cancelled, __ATOMIC_RELAXED)) ?
+                &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_CANCELLED]  /* cancelled */ :
+                &logs_qry_res_err[LOGS_QRY_RES_ERR_CODE_TIMEOUT]    /* timed out */ ;
     }
 
     if(!p_query_params->results_buff->len) 
