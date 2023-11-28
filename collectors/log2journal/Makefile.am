@@ -7,6 +7,7 @@ dist_noinst_DATA = \
     README.md \
     $(NULL)
 
-dist_libconfig_DATA = \
+log2journalconfigdir=$(libconfigdir)/log2journal.d
+dist_log2journalconfig_DATA = \
     log2journal.d/nginx-combined.yaml \
     $(NULL)

@@ -10,12 +10,12 @@ static void config_dir_print_available(void) {
     dir = opendir(path);
 
     if (dir == NULL) {
-        log2stderr(" >>> Cannot open directory '%s'", path);
+        log2stderr("       >>> Cannot open directory:\n       %s", path);
         return;
     }
 
     size_t column_width = 80;
-    size_t current_columns = 0;
+    size_t current_columns = 7; // Start with 7 spaces for the first line
 
     while ((entry = readdir(dir))) {
         if (entry->d_type == DT_REG) { // Check if it's a regular file
@@ -24,10 +24,13 @@ static void config_dir_print_available(void) {
             if (len >= 5 && strcmp(file_name + len - 5, ".yaml") == 0) {
                 // Remove the ".yaml" extension
                 len -= 5;
+                if (current_columns == 7) {
+                    printf("       "); // Print 7 spaces at the beginning of a new line
+                }
                 if (current_columns + len + 1 > column_width) {
                     // Start a new line if the current line is full
-                    printf("\n       ");
-                    current_columns = 0;
+                    printf("\n       "); // Print newline and 7 spaces
+                    current_columns = 7;
                 }
                 printf("%.*s ", (int)len, file_name); // Print the filename without extension
                 current_columns += len + 1; // Add filename length and a space
@@ -54,11 +57,11 @@ void log_job_command_line_help(const char *name) {
     printf("Options:\n");
     printf("\n");
 #ifdef HAVE_LIBYAML
-    printf("  --file /path/to/file.yaml\n");
+    printf("  --file /path/to/file.yaml or -f /path/to/file.yaml\n");
     printf("       Read yaml configuration file for instructions.\n");
     printf("\n");
     printf("  --config CONFIG_NAME\n");
-    printf("       Run with the internal configuration named CONFIG_NAME\n");
+    printf("       Run with the internal configuration named CONFIG_NAME.\n");
     printf("       Available internal configs:\n");
     printf("\n");
     config_dir_print_available();
@@ -89,6 +92,7 @@ void log_job_command_line_help(const char *name) {
     printf("       Create a new key called TARGET, duplicating the values of the keys\n");
     printf("       given. Useful for further processing. When multiple keys are given,\n");
     printf("       their values are separated by comma.\n");
+    printf("\n");
     printf("       Up to %d duplications can be given on the command line, and up to\n", MAX_KEY_DUPS);
     printf("       %d keys per duplication command are allowed.\n", MAX_KEY_DUPS_KEYS);
     printf("\n");
@@ -96,12 +100,14 @@ void log_job_command_line_help(const char *name) {
     printf("       Inject constant fields to the output (both matched and unmatched logs).\n");
     printf("       --inject entries are added to unmatched lines too, when their key is\n");
     printf("       not used in --inject-unmatched (--inject-unmatched override --inject).\n");
+    printf("\n");
     printf("       Up to %d fields can be injected.\n", MAX_INJECTIONS);
     printf("\n");
     printf("  --inject-unmatched LINE\n");
     printf("       Inject lines into the output for each unmatched log entry.\n");
     printf("       Usually, --inject-unmatched=PRIORITY=3 is needed to mark the unmatched\n");
     printf("       lines as errors, so that they can easily be spotted in the journals.\n");
+    printf("\n");
     printf("       Up to %d such lines can be injected.\n", MAX_INJECTIONS);
     printf("\n");
     printf("  --rewrite KEY=/SearchPattern/ReplacePattern\n");
@@ -110,6 +116,7 @@ void log_job_command_line_help(const char *name) {
     printf("       be used between the search pattern and the replacement pattern.\n");
     printf("       The search pattern is a PCRE2 regular expression, and the replacement\n");
     printf("       pattern supports literals and named capture groups from the search pattern.\n");
+    printf("\n");
     printf("       Example:\n");
     printf("              --rewrite DATE=/^(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})$/\n");
     printf("                             ${day}/${month}/${year}\n");
@@ -117,13 +124,14 @@ void log_job_command_line_help(const char *name) {
     printf("\n");
     printf("       Only one rewrite rule is applied per key; the sequence of rewrites stops\n");
     printf("       for the key once a rule matches it. This allows providing a sequence of\n");
-    printf("       independent rewriting rules for the same key, matching the different values\n");
-    printf("       the key may get, and also provide a catch-all rewrite rule at the end of the\n");
-    printf("       sequence for setting the key value if no other rule matched it.\n");
+    printf("       independent rewriting rules for the same key, matching the different\n");
+    printf("       values the key may get, and also provide a catch-all rewrite rule at the\n");
+    printf("       end, for setting the key value if no other rule matched it.\n");
     printf("\n");
-    printf("       The combination of duplicating keys with the values of multiple other keys\n");
-    printf("       combined with multiple rewrite rules, allows creating complex rules for\n");
-    printf("       rewriting key values.\n");
+    printf("       Duplication of keys with the values of multiple other keys, combined with\n");
+    printf("       multiple value rewriting rules, allows creating complex rules for adding\n");
+    printf("       new keys, based on the values of existing keys.\n");
+    printf("\n");
     printf("       Up to %d rewriting rules are allowed.\n", MAX_REWRITES);
     printf("\n");
     printf("  --prefix PREFIX\n");
@@ -133,17 +141,18 @@ void log_job_command_line_help(const char *name) {
     printf("\n");
     printf("  --rename NEW=OLD\n");
     printf("       Rename fields, before rewriting their values.\n");
+    printf("\n");
     printf("       Up to %d renaming rules are allowed.\n", MAX_RENAMES);
     printf("\n");
-    printf("  -h, --help\n");
+    printf("  -h, or --help\n");
     printf("       Display this help and exit.\n");
     printf("\n");
     printf("  PATTERN\n");
     printf("       PATTERN should be a valid PCRE2 regular expression.\n");
     printf("       RE2 regular expressions (like the ones usually used in Go applications),\n");
     printf("       are usually valid PCRE2 patterns too.\n");
-    printf("       Regular expressions without named groups are evaluated but their matches\n");
-    printf("       are not added to the output.\n");
+    printf("       Sub-expressions without named groups are evaluated, but their matches are\n");
+    printf("       not added to the output.\n");
     printf("\n");
     printf("  JSON mode\n");
     printf("       JSON mode is enabled when the pattern is set to: json\n");
@@ -158,41 +167,42 @@ void log_job_command_line_help(const char *name) {
     printf("\n");
     printf("The program accepts all parameters as both --option=value and --option value.\n");
     printf("\n");
-    printf("The maximum line length accepted is %d characters.\n", MAX_LINE_LENGTH);
+    printf("The maximum log line length accepted is %d characters.\n", MAX_LINE_LENGTH);
     printf("\n");
     printf("PIPELINE AND SEQUENCE OF PROCESSING\n");
     printf("\n");
     printf("This is a simple diagram of the pipeline taking place:\n");
-    printf("\n");
-    printf("           +---------------------------------------------------+\n");
-    printf("           |                       INPUT                       |\n");
-    printf("           +---------------------------------------------------+\n");
-    printf("                            v                          v\n");
-    printf("           +---------------------------------+         |\n");
-    printf("           |   EXTRACT FIELDS AND VALUES     |         |\n");
-    printf("           |  prefixed with PREFIX when set  |         |\n");
-    printf("           +---------------------------------+         |\n");
-    printf("                  v                  v                 |\n");
-    printf("           +---------------+  +--------------+         |\n");
-    printf("           |   DUPLICATE   |  |    RENAME    |         |\n");
-    printf("           | create fields |  |  change the  |         |\n");
-    printf("           |  with values  |  |  field name  |         |\n");
-    printf("           +---------------+  +--------------+         |\n");
-    printf("                  v                  v                 v\n");
-    printf("           +---------------------------------+  +--------------+\n");
-    printf("           |        REWRITE PIPELINES        |  |    INJECT    |\n");
-    printf("           |    altering keys and values     |  |   constants  |\n");
-    printf("           +---------------------------------+  +--------------+\n");
-    printf("                             v                          v\n");
-    printf("           +---------------------------------------------------+\n");
-    printf("           |                       OUTPUT                      |\n");
-    printf("           +---------------------------------------------------+\n");
-    printf("\n");
-    printf("IMPORTANT:");
+    printf("                                                                 \n");
+    printf("          +---------------------------------------------------+  \n");
+    printf("          |                       INPUT                       |  \n");
+    printf("          +---------------------------------------------------+  \n");
+    printf("                           v                          v          \n");
+    printf("          +---------------------------------+         |          \n");
+    printf("          |   EXTRACT FIELDS AND VALUES     |         |          \n");
+    printf("          |  prefixed with PREFIX when set  |         |          \n");
+    printf("          +---------------------------------+         |          \n");
+    printf("                 v                  v                 |          \n");
+    printf("          +---------------+  +--------------+         |          \n");
+    printf("          |   DUPLICATE   |  |    RENAME    |         |          \n");
+    printf("          | create fields |  |  change the  |         |          \n");
+    printf("          |  with values  |  |  field name  |         |          \n");
+    printf("          +---------------+  +--------------+         |          \n");
+    printf("                 v                  v                 v          \n");
+    printf("          +---------------------------------+  +--------------+  \n");
+    printf("          |        REWRITE PIPELINES        |  |    INJECT    |  \n");
+    printf("          |    altering keys and values     |  |   constants  |  \n");
+    printf("          +---------------------------------+  +--------------+  \n");
+    printf("                            v                          v         \n");
+    printf("          +---------------------------------------------------+  \n");
+    printf("          |                       OUTPUT                      |  \n");
+    printf("          +---------------------------------------------------+  \n");
+    printf("                                                                 \n");
+    printf("IMPORTANT:\n");
     printf(" - Duplication rules use the original extracted field names, after they have\n");
     printf("   been prefixed (when a PREFIX is set) and before they are renamed.\n");
     printf(" - Rewriting is always the last stage, so the final field names are matched.\n");
     printf("\n");
+    printf("--------------------------------------------------------------------------------\n");
     printf("JOURNAL FIELDS RULES (enforced by systemd-journald)\n");
     printf("\n");
     printf("     - field names can be up to 64 characters\n");
