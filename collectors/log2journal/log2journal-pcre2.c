@@ -19,7 +19,7 @@ struct pcre2_state {
     char msg[PCRE2_ERROR_LINE_MAX];
 };
 
-static inline void jb_traverse_pcre2_named_groups_and_send_keys(LOG_JOB *jb, pcre2_code *re, pcre2_match_data *match_data, char *line) {
+static inline void jb_traverse_pcre2_named_groups_and_send_keys(PCRE2_STATE *pcre2, pcre2_code *re, pcre2_match_data *match_data, char *line) {
     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
     uint32_t namecount;
     pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &namecount);
@@ -39,7 +39,15 @@ static inline void jb_traverse_pcre2_named_groups_and_send_keys(LOG_JOB *jb, pcr
             PCRE2_SIZE end_offset = ovector[2 * n + 1];
             PCRE2_SIZE group_length = end_offset - start_offset;
 
-            log_job_send_extracted_key_value(jb, group_name, line + start_offset, group_length);
+            if(pcre2->key_start) {
+                copy_to_buffer(&pcre2->key[pcre2->key_start], sizeof(pcre2->key) - pcre2->key_start,
+                               group_name, strlen(group_name));
+
+                log_job_send_extracted_key_value(pcre2->jb, pcre2->key, line + start_offset, group_length);
+            }
+            else
+                log_job_send_extracted_key_value(pcre2->jb, group_name, line + start_offset, group_length);
+
             tabptr += name_entry_size;
         }
     }
@@ -104,7 +112,7 @@ bool pcre2_parse_document(PCRE2_STATE *pcre2, const char *txt, size_t len) {
         return false;
     }
 
-    jb_traverse_pcre2_named_groups_and_send_keys(pcre2->jb, pcre2->re, pcre2->match_data, (char *)pcre2->line);
+    jb_traverse_pcre2_named_groups_and_send_keys(pcre2, pcre2->re, pcre2->match_data, (char *)pcre2->line);
 
     return true;
 }

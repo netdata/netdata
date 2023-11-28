@@ -127,7 +127,9 @@ void log_job_command_line_help(const char *name) {
     printf("       Up to %d rewriting rules are allowed.\n", MAX_REWRITES);
     printf("\n");
     printf("  --prefix PREFIX\n");
-    printf("       Prefix all JSON or logfmt fields with PREFIX.\n");
+    printf("       Prefix all fields with PREFIX. The PREFIX is added before processing\n");
+    printf("       duplications, renames and rewrites, so that the extracted keys have to\n");
+    printf("       be matched with the PREFIX in them.\n");
     printf("\n");
     printf("  --rename NEW=OLD\n");
     printf("       Rename fields, before rewriting their values.\n");
@@ -147,13 +149,11 @@ void log_job_command_line_help(const char *name) {
     printf("       JSON mode is enabled when the pattern is set to: json\n");
     printf("       Field names are extracted from the JSON logs and are converted to the\n");
     printf("       format expected by Journal Export Format (all caps, only _ is allowed).\n");
-    printf("       Prefixing is enabled in this mode.\n");
     printf("\n");
     printf("  logfmt mode\n");
     printf("       logfmt mode is enabled when the pattern is set to: logfmt\n");
     printf("       Field names are extracted from the logfmt logs and are converted to the\n");
     printf("       format expected by Journal Export Format (all caps, only _ is allowed).\n");
-    printf("       Prefixing is enabled in this mode.\n");
     printf("\n");
     printf("\n");
     printf("The program accepts all parameters as both --option=value and --option value.\n");
@@ -170,6 +170,7 @@ void log_job_command_line_help(const char *name) {
     printf("                            v                          v\n");
     printf("           +---------------------------------+         |\n");
     printf("           |   EXTRACT FIELDS AND VALUES     |         |\n");
+    printf("           |  prefixed with PREFIX when set  |         |\n");
     printf("           +---------------------------------+         |\n");
     printf("                  v                  v                 |\n");
     printf("           +---------------+  +--------------+         |\n");
@@ -186,6 +187,11 @@ void log_job_command_line_help(const char *name) {
     printf("           +---------------------------------------------------+\n");
     printf("           |                       OUTPUT                      |\n");
     printf("           +---------------------------------------------------+\n");
+    printf("\n");
+    printf("IMPORTANT:");
+    printf(" - Duplication rules use the original extracted field names, after they have\n");
+    printf("   been prefixed (when a PREFIX is set) and before they are renamed.\n");
+    printf(" - Rewriting is always the last stage, so the final field names are matched.\n");
     printf("\n");
     printf("JOURNAL FIELDS RULES (enforced by systemd-journald)\n");
     printf("\n");
