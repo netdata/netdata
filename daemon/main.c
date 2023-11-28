@@ -424,6 +424,13 @@ void netdata_cleanup_and_exit(int ret) {
             delta_shutdown_time("flush dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
+
+            for (size_t tier = 0; tier < storage_tiers; tier++) {
+                if (!multidb_ctx[tier])
+                    continue;
+                completion_wait_for(&multidb_ctx[tier]->quiesce.completion);
+                completion_destroy(&multidb_ctx[tier]->quiesce.completion);
+            }
         }
 #endif
 
