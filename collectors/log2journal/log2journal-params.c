@@ -150,9 +150,9 @@ static inline pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
 
     pcre2_code *re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, 0, &error_number, &error_offset, NULL);
     if (re == NULL) {
-        PCRE2_UCHAR errbuf[1024];
-        pcre2_get_error_message(error_number, errbuf, sizeof(errbuf));
-        log2stderr("PCRE2 compilation failed at offset %d: %s", (int)error_offset, errbuf);
+        PCRE2_UCHAR buffer[1024];
+        pcre2_get_error_message(error_number, buffer, sizeof(buffer));
+        log2stderr("PCRE2 compilation failed at offset %d: %s", (int)error_offset, buffer);
         log2stderr("Check for common regex syntax errors or unsupported PCRE2 patterns.");
         return NULL;
     }
@@ -227,7 +227,10 @@ bool log_job_add_key_to_duplication(DUPLICATION *kd, const char *key, size_t key
         return false;
     }
 
-    kd->keys[kd->used++] = strndupz(key, key_len);
+    kd->keys[kd->used] = strndupz(key, key_len);
+    kd->keys_hashes[kd->used] = XXH3_64bits(key, key_len);
+    kd->used++;
+
     return true;
 }
 

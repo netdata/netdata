@@ -35,19 +35,19 @@ static inline void copy_and_convert_key(PCRE2_STATE *pcre2, const char *key) {
 
 static inline void jb_traverse_pcre2_named_groups_and_send_keys(PCRE2_STATE *pcre2, pcre2_code *re, pcre2_match_data *match_data, char *line) {
     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
-    uint32_t namecount;
-    pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &namecount);
+    uint32_t names_count;
+    pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &names_count);
 
-    if (namecount > 0) {
+    if (names_count > 0) {
         PCRE2_SPTR name_table;
         pcre2_pattern_info(re, PCRE2_INFO_NAMETABLE, &name_table);
         uint32_t name_entry_size;
         pcre2_pattern_info(re, PCRE2_INFO_NAMEENTRYSIZE, &name_entry_size);
 
-        const unsigned char *tabptr = name_table;
-        for (uint32_t i = 0; i < namecount; i++) {
-            int n = (tabptr[0] << 8) | tabptr[1];
-            const char *group_name = (const char *)(tabptr + 2);
+        const unsigned char *table_ptr = name_table;
+        for (uint32_t i = 0; i < names_count; i++) {
+            int n = (table_ptr[0] << 8) | table_ptr[1];
+            const char *group_name = (const char *)(table_ptr + 2);
 
             PCRE2_SIZE start_offset = ovector[2 * n];
             PCRE2_SIZE end_offset = ovector[2 * n + 1];
@@ -56,7 +56,7 @@ static inline void jb_traverse_pcre2_named_groups_and_send_keys(PCRE2_STATE *pcr
             copy_and_convert_key(pcre2, group_name);
             log_job_send_extracted_key_value(pcre2->jb, pcre2->key, line + start_offset, group_length);
 
-            tabptr += name_entry_size;
+            table_ptr += name_entry_size;
         }
     }
 }

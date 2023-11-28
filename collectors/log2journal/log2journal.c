@@ -155,7 +155,7 @@ inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const
     send_duplications_for_key(jb, key, hash, value, len);
 }
 
-static inline void send_key_value_constant(LOG_JOB *jb, const char *key, const char *value) {
+static inline void send_key_value_constant(LOG_JOB *jb __maybe_unused, const char *key, const char *value) {
     printf("%s=%s\n", key, value);
 }
 
@@ -219,7 +219,7 @@ static inline void send_duplications_for_key(LOG_JOB *jb, const char *key, XXH64
 
         if(kd->used == 1) {
             // just one key to be duplicated
-            if(strcmp(kd->keys[0], key) == 0) {
+            if(kd->keys_hashes[0] == hash && strcmp(kd->keys[0], key) == 0) {
                 send_key_value_and_rewrite(jb, kd->target, kd->hash, value, value_len);
                 kd->exposed = true;
             }
@@ -227,7 +227,7 @@ static inline void send_duplications_for_key(LOG_JOB *jb, const char *key, XXH64
         else {
             // multiple keys to be duplicated
             for(size_t g = 0; g < kd->used ; g++) {
-                if(strcmp(kd->keys[g], key) == 0)
+                if(kd->keys_hashes[g] == hash && strcmp(kd->keys[g], key) == 0)
                     txt_replace(&kd->values[g], value, value_len);
             }
         }
@@ -318,7 +318,7 @@ static inline bool jb_switched_filename(LOG_JOB *jb, const char *line, size_t le
 // ----------------------------------------------------------------------------
 // running a job
 
-static char *get_next_line(LOG_JOB *jb, char *buffer, size_t size, size_t *line_length) {
+static char *get_next_line(LOG_JOB *jb __maybe_unused, char *buffer, size_t size, size_t *line_length) {
     if(!fgets(buffer, (int)size, stdin)) {
         *line_length = 0;
         return NULL;

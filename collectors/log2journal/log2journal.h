@@ -174,6 +174,7 @@ typedef struct duplication {
     uint32_t used;
     bool exposed;
     char *keys[MAX_KEY_DUPS_KEYS];
+    XXH64_hash_t keys_hashes[MAX_KEY_DUPS_KEYS];
     TEXT values[MAX_KEY_DUPS_KEYS];
 } DUPLICATION;
 

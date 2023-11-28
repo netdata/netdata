@@ -83,7 +83,7 @@ static void yaml_error_with_trace(yaml_parser_t *parser, yaml_event_t *event, si
 }
 
 #define yaml_parse(parser, event) yaml_parse_with_trace(parser, event, __LINE__, __FUNCTION__, __FILE__)
-static bool yaml_parse_with_trace(yaml_parser_t *parser, yaml_event_t *event, size_t line, const char *function, const char *file) {
+static bool yaml_parse_with_trace(yaml_parser_t *parser, yaml_event_t *event, size_t line __maybe_unused, const char *function __maybe_unused, const char *file __maybe_unused) {
     if (!yaml_parser_parse(parser, event)) {
         yaml_error(parser, NULL, "YAML parser error %d", parser->error);
         return false;
@@ -147,23 +147,23 @@ static DUPLICATION *yaml_parse_duplicate_key(LOG_JOB *jb, yaml_parser_t *parser)
     return kd;
 }
 
-static size_t yaml_parse_duplicate_from(LOG_JOB *jb, yaml_parser_t *parser, DUPLICATION *kd) {
+static size_t yaml_parse_duplicate_from(LOG_JOB *jb __maybe_unused, yaml_parser_t *parser, DUPLICATION *kd) {
     size_t errors = 0;
     yaml_event_t event;
 
     if (!yaml_parse(parser, &event))
         return 1;
 
-    bool ret = true;
-    if(event.type == YAML_SCALAR_EVENT)
-        ret = log_job_add_key_to_duplication(kd, (char *) event.data.scalar.value, event.data.scalar.length);
-
+    if(event.type == YAML_SCALAR_EVENT) {
+        if(!log_job_add_key_to_duplication(kd, (char *) event.data.scalar.value, event.data.scalar.length))
+            errors++;
+    }
     else if(event.type == YAML_SEQUENCE_START_EVENT) {
         bool finished = false;
         while(!errors && !finished) {
             yaml_event_t sub_event;
             if (!yaml_parse(parser, &sub_event))
-                return errors++;
+                return ++errors;
             else {
                 if (sub_event.type == YAML_SCALAR_EVENT) {
                     if(!log_job_add_key_to_duplication(kd, (char *)sub_event.data.scalar.value,
