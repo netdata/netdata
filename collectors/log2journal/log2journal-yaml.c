@@ -814,8 +814,7 @@ static void yaml_print_multiline_value(const char *s, size_t depth) {
 
         size_t len = next ? (size_t)(next - s) : strlen(s);
         char buf[len + 1];
-        strncpy(buf, s, len);
-        buf[len] = '\0';
+        copy_to_buffer(buf, sizeof(buf), s, len);
 
         fprintf(stderr, "%.*s%s%s",
                 (int)(depth * 2), "                    ",
