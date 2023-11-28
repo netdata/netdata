@@ -142,9 +142,9 @@ static inline void txt_replace(TEXT *txt, const char *s, size_t len) {
 // ----------------------------------------------------------------------------
 
 typedef struct injection {
-    char key[JOURNAL_MAX_KEY_LEN + 1];
-    TEXT value;
     bool on_unmatched;
+    TEXT value;
+    char key[JOURNAL_MAX_KEY_LEN + 1];
 } INJECTION;
 
 // ----------------------------------------------------------------------------
@@ -152,10 +152,10 @@ typedef struct injection {
 struct key_dup {
     XXH64_hash_t hash;
     char *target;
+    uint32_t used;
+    bool exposed;
     char *keys[MAX_KEY_DUPS_KEYS];
     TEXT values[MAX_KEY_DUPS_KEYS];
-    size_t used;
-    bool exposed;
 };
 
 struct key_rename {
@@ -166,9 +166,10 @@ struct key_rename {
 };
 
 struct replacement_node {
-    bool is_variable;
     const char *s;
-    size_t len;
+    uint32_t len;
+    bool is_variable;
+
     struct replacement_node *next;
 };
 
@@ -189,37 +190,37 @@ struct log_job {
     const char *prefix;
 
     struct {
+        bool last_line_was_empty;
         const char *key;
         char current[FILENAME_MAX + 1];
-        bool last_line_was_empty;
     } filename;
 
     struct {
+        uint32_t used;
         INJECTION keys[MAX_INJECTIONS];
-        size_t used;
     } injections;
 
     struct {
         const char *key;
         struct {
+            uint32_t used;
             INJECTION keys[MAX_INJECTIONS];
-            size_t used;
         } injections;
     } unmatched;
 
     struct {
+        uint32_t used;
         struct key_dup array[MAX_KEY_DUPS];
-        size_t used;
     } dups;
 
     struct {
+        uint32_t used;
         struct key_rewrite array[MAX_REWRITES];
-        size_t used;
     } rewrites;
 
     struct {
+        uint32_t used;
         struct key_rename array[MAX_RENAMES];
-        size_t used;
     } renames;
 };
 
