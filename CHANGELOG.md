@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix incorrect DEB package build dep. [\#16483](https://github.com/netdata/netdata/pull/16483) ([Ferroin](https://github.com/Ferroin))
+- Bump new version to cov-analysis tool [\#16482](https://github.com/netdata/netdata/pull/16482) ([tkatsoulas](https://github.com/tkatsoulas))
+- log2journal moved to collectors [\#16481](https://github.com/netdata/netdata/pull/16481) ([ktsaou](https://github.com/ktsaou))
+- Disable netdata monitoring section by default [\#16480](https://github.com/netdata/netdata/pull/16480) ([MrZammler](https://github.com/MrZammler))
+- Log2journal yaml configuration support [\#16479](https://github.com/netdata/netdata/pull/16479) ([ktsaou](https://github.com/ktsaou))
 - journals management improvements [\#16475](https://github.com/netdata/netdata/pull/16475) ([ktsaou](https://github.com/ktsaou))
 - SEO changes for Collector names [\#16473](https://github.com/netdata/netdata/pull/16473) ([sashwathn](https://github.com/sashwathn))
 - fix charts.d plugin loading configuration [\#16471](https://github.com/netdata/netdata/pull/16471) ([ilyam8](https://github.com/ilyam8))
@@ -28,6 +33,7 @@
 - Doc change: Curl no longer supports spaces in the URL. [\#16446](https://github.com/netdata/netdata/pull/16446) ([luisj1983](https://github.com/luisj1983))
 - journal estimations [\#16445](https://github.com/netdata/netdata/pull/16445) ([ktsaou](https://github.com/ktsaou))
 - journal startup [\#16443](https://github.com/netdata/netdata/pull/16443) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#16442](https://github.com/netdata/netdata/pull/16442) ([netdatabot](https://github.com/netdatabot))
 - Fix icon filename  [\#16441](https://github.com/netdata/netdata/pull/16441) ([shyamvalsan](https://github.com/shyamvalsan))
 - Minor: Small health docs typo fix [\#16439](https://github.com/netdata/netdata/pull/16439) ([MrZammler](https://github.com/MrZammler))
 - Removes Observabilitycon banner README.md [\#16434](https://github.com/netdata/netdata/pull/16434) ([Aliki92](https://github.com/Aliki92))
@@ -417,13 +423,6 @@
 - Regenerate integrations.js [\#15879](https://github.com/netdata/netdata/pull/15879) ([netdatabot](https://github.com/netdatabot))
 - use the newer XXH3 128bits algorithm, instead of the classic XXH128 [\#15878](https://github.com/netdata/netdata/pull/15878) ([ktsaou](https://github.com/ktsaou))
 - Skip copying environment/install-type files when checking existing installs. [\#15876](https://github.com/netdata/netdata/pull/15876) ([Ferroin](https://github.com/Ferroin))
-- ML add new `delete old models param` to readme [\#15873](https://github.com/netdata/netdata/pull/15873) ([andrewm4894](https://github.com/andrewm4894))
-- Update SQLITE version to 3.42.0 [\#15870](https://github.com/netdata/netdata/pull/15870) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#15867](https://github.com/netdata/netdata/pull/15867) ([netdatabot](https://github.com/netdatabot))
-- Add a fail reason to pinpoint exactly what went wrong [\#15866](https://github.com/netdata/netdata/pull/15866) ([stelfrag](https://github.com/stelfrag))
-- Add plugin and module information to collector integrations. [\#15864](https://github.com/netdata/netdata/pull/15864) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#15862](https://github.com/netdata/netdata/pull/15862) ([netdatabot](https://github.com/netdatabot))
-- Explicitly depend on version-matched plugins in native packages. [\#15861](https://github.com/netdata/netdata/pull/15861) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
