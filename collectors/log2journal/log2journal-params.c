@@ -489,7 +489,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                 if(!log_job_add_filename_key(jb, value, value ? strlen(value) : 0))
                     return false;
             }
-            if (strcmp(param, "--prefix") == 0) {
+            else if (strcmp(param, "--prefix") == 0) {
                 if(!log_job_add_key_prefix(jb, value, value ? strlen(value) : 0))
                     return false;
             }
