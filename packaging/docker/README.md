@@ -21,7 +21,7 @@ The Netdata container requires different privileges and mounts to provide functi
 Netdata installed on the host. Below you can find a list of Netdata components that need these privileges and mounts,
 along with their descriptions.
 
-<details>
+<details open>
 <summary>Privileges</summary>
 
 |    Component    |          Privileges           | Description                                                                                                              | 
@@ -33,7 +33,7 @@ along with their descriptions.
 
 </details>
 
-<details>
+<details open>
 <summary>Mounts</summary>
 
 |   Component    |           Mounts           | Description                                                                                                                         | 
