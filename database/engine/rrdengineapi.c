@@ -1227,6 +1227,8 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
 
     completion_init(&ctx->quiesce.completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    completion_wait_for(&ctx->quiesce.completion);
+    completion_destroy(&ctx->quiesce.completion);
 }
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
