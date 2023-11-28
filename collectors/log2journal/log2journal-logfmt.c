@@ -2,25 +2,25 @@
 
 #include "log2journal.h"
 
-#define ERROR_LINE_MAX 1024
-#define KEY_MAX 1024
+#define LOGFMT_ERROR_LINE_MAX 1024
+#define LOGFMT_KEY_MAX 1024
 
 struct logfmt_state {
-    const char *line;
-    size_t pos;
-    char msg[ERROR_LINE_MAX];
-
-    char key[KEY_MAX];
-    size_t key_start;
-
     struct log_job *jb;
+
+    const char *line;
+    uint32_t pos;
+    uint32_t key_start;
+
+    char key[LOGFMT_KEY_MAX];
+    char msg[LOGFMT_ERROR_LINE_MAX];
 };
 
 #define logfmt_current_pos(lfs) &(lfs)->line[(lfs)->pos]
 #define logfmt_consume_char(lfs) ++(lfs)->pos
 
 static inline void logfmt_process_key_value(LOGFMT_STATE *lfs, const char *value, size_t len) {
-    jb_send_extracted_key_value(lfs->jb, lfs->key, value, len);
+    log_job_send_extracted_key_value(lfs->jb, lfs->key, value, len);
 }
 
 static inline void logfmt_skip_spaces(LOGFMT_STATE *lfs) {
@@ -33,7 +33,7 @@ static inline void logfmt_skip_spaces(LOGFMT_STATE *lfs) {
 }
 
 static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
-    static __thread char value[MAX_VALUE_LEN];
+    static __thread char value[JOURNAL_MAX_VALUE_LEN];
 
     char quote = '\0';
     const char *s = logfmt_current_pos(lfs);

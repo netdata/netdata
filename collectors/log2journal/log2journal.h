@@ -27,7 +27,6 @@
 
 
 #define MAX_OUTPUT_KEYS 1024
-#define OVECCOUNT (MAX_OUTPUT_KEYS * 3)    // should be a multiple of 3
 #define MAX_LINE_LENGTH (1024 * 1024)
 #define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 2)
 #define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
@@ -35,8 +34,8 @@
 #define MAX_RENAMES (MAX_OUTPUT_KEYS / 2)
 #define MAX_KEY_DUPS_KEYS 20
 
-#define MAX_KEY_LEN 64              // according to systemd-journald
-#define MAX_VALUE_LEN (48 * 1024)   // according to systemd-journald
+#define JOURNAL_MAX_KEY_LEN 64              // according to systemd-journald
+#define JOURNAL_MAX_VALUE_LEN (48 * 1024)   // according to systemd-journald
 
 #define LOG2JOURNAL_CONFIG_PATH LIBCONFIG_DIR "/log2journal.d"
 
@@ -142,16 +141,11 @@ static inline void txt_replace(TEXT *txt, const char *s, size_t len) {
 
 // ----------------------------------------------------------------------------
 
-typedef struct key_value {
-    char key[MAX_KEY_LEN + 1];
+typedef struct injection {
+    char key[JOURNAL_MAX_KEY_LEN + 1];
     TEXT value;
     bool on_unmatched;
-} KEY_VALUE;
-
-static inline void key_value_replace(KEY_VALUE *kv, const char *key, size_t key_len, const char *value, size_t value_len) {
-    copy_to_buffer(kv->key, sizeof(kv->key), key, key_len);
-    txt_replace(&kv->value, value, value_len);
-}
+} INJECTION;
 
 // ----------------------------------------------------------------------------
 
@@ -201,14 +195,14 @@ struct log_job {
     } filename;
 
     struct {
-        KEY_VALUE keys[MAX_INJECTIONS];
+        INJECTION keys[MAX_INJECTIONS];
         size_t used;
     } injections;
 
     struct {
         const char *key;
         struct {
-            KEY_VALUE keys[MAX_INJECTIONS];
+            INJECTION keys[MAX_INJECTIONS];
             size_t used;
         } injections;
     } unmatched;
@@ -229,9 +223,7 @@ struct log_job {
     } renames;
 };
 
-void jb_send_key_value_and_rewrite(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t len);
-void jb_send_duplications_for_key(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len);
-void jb_send_extracted_key_value(struct log_job *jb, const char *key, const char *value, size_t len);
+void log_job_send_extracted_key_value(struct log_job *jb, const char *key, const char *value, size_t len);
 
 struct key_dup *log_job_add_duplication_to_job(struct log_job *jb, const char *target, size_t target_len);
 bool log_job_add_key_to_duplication(struct key_dup *kd, const char *key, size_t key_len);
@@ -270,39 +262,12 @@ const char *logfmt_parser_error(LOGFMT_STATE *lfs);
 bool logfmt_parse_document(LOGFMT_STATE *js, const char *txt);
 void logfmt_test(void);
 
-// ----------------------------------------------------------------------------
-// PCRE2 patters handling
-
-static inline pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
-    int error_number;
-    PCRE2_SIZE error_offset;
-    PCRE2_SPTR pattern_ptr = (PCRE2_SPTR)pattern;
-
-    pcre2_code *re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, 0, &error_number, &error_offset, NULL);
-    if (re == NULL) {
-        PCRE2_UCHAR errbuf[1024];
-        pcre2_get_error_message(error_number, errbuf, sizeof(errbuf));
-        log2stderr("PCRE2 compilation failed at offset %d: %s", (int)error_offset, errbuf);
-        log2stderr("Check for common regex syntax errors or unsupported PCRE2 patterns.");
-        return NULL;
-    }
-
-    return re;
-}
-
-static inline bool jb_pcre2_match(pcre2_code *re, pcre2_match_data *match_data, char *line, size_t len, bool log) {
-    int rc = pcre2_match(re, (PCRE2_SPTR)line, len, 0, 0, match_data, NULL);
-    if(rc < 0) {
-        PCRE2_UCHAR errbuf[1024];
-        pcre2_get_error_message(rc, errbuf, sizeof(errbuf));
-
-        if(log)
-            log2stderr("PCRE2 error %d: %s on: %s", rc, errbuf, line);
-
-        return false;
-    }
-
-    return true;
-}
+typedef struct pcre2_state PCRE2_STATE;
+PCRE2_STATE *pcre2_parser_create(struct log_job *jb);
+void pcre2_parser_destroy(PCRE2_STATE *pcre2);
+const char *pcre2_parser_error(PCRE2_STATE *pcre2);
+bool pcre2_parse_document(PCRE2_STATE *pcre2, const char *txt, size_t len);
+bool pcre2_has_error(PCRE2_STATE *pcre2);
+void pcre2_test(void);
 
 #endif //NETDATA_LOG2JOURNAL_H

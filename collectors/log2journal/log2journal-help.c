@@ -148,6 +148,7 @@ void log2journal_command_line_help(const char *name) {
     printf("       Field names are extracted from the JSON logs and are converted to the\n");
     printf("       format expected by Journal Export Format (all caps, only _ is allowed).\n");
     printf("       Prefixing is enabled in this mode.\n");
+    printf("\n");
     printf("  logfmt mode\n");
     printf("       logfmt mode is enabled when the pattern is set to: logfmt\n");
     printf("       Field names are extracted from the logfmt logs and are converted to the\n");
@@ -158,7 +159,6 @@ void log2journal_command_line_help(const char *name) {
     printf("The program accepts all parameters as both --option=value and --option value.\n");
     printf("\n");
     printf("The maximum line length accepted is %d characters.\n", MAX_LINE_LENGTH);
-    printf("The maximum number of fields in the PCRE2 pattern is %d.\n", OVECCOUNT / 3);
     printf("\n");
     printf("PIPELINE AND SEQUENCE OF PROCESSING\n");
     printf("\n");

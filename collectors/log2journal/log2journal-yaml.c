@@ -165,11 +165,11 @@ static size_t yaml_parse_duplicate_from(struct log_job *jb, yaml_parser_t *parse
             if (!yaml_parse(parser, &sub_event))
                 return errors++;
             else {
-                if (sub_event.type == YAML_SCALAR_EVENT)
-                    log_job_add_key_to_duplication(kd, (char *) sub_event.data.scalar.value
-                                                   , sub_event.data.scalar.length
-                                                  );
-
+                if (sub_event.type == YAML_SCALAR_EVENT) {
+                    if(!log_job_add_key_to_duplication(kd, (char *)sub_event.data.scalar.value,
+                                                       sub_event.data.scalar.length))
+                        errors++;
+                }
                 else if (sub_event.type == YAML_SEQUENCE_END_EVENT)
                     finished = true;
 

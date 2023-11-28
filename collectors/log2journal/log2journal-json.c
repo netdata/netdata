@@ -2,20 +2,20 @@
 
 #include "log2journal.h"
 
-#define ERROR_LINE_MAX 1024
-#define KEY_MAX 1024
+#define JSON_ERROR_LINE_MAX 1024
+#define JSON_KEY_MAX 1024
 #define JSON_DEPTH_MAX 100
 
 struct log_json_state {
-    const char *line;
-    size_t pos;
-    char msg[ERROR_LINE_MAX];
-
-    char key[KEY_MAX];
-    char *key_stack[JSON_DEPTH_MAX];
-    size_t depth;
-
     struct log_job *jb;
+
+    const char *line;
+    uint32_t pos;
+    uint32_t depth;
+    char *stack[JSON_DEPTH_MAX];
+
+    char key[JSON_KEY_MAX];
+    char msg[JSON_ERROR_LINE_MAX];
 };
 
 static inline bool json_parse_object(LOG_JSON_STATE *js);
@@ -25,7 +25,7 @@ static inline bool json_parse_array(LOG_JSON_STATE *js);
 #define json_consume_char(js) ++(js)->pos
 
 static inline void json_process_key_value(LOG_JSON_STATE *js, const char *value, size_t len) {
-    jb_send_extracted_key_value(js->jb, js->key, value, len);
+    log_job_send_extracted_key_value(js->jb, js->key, value, len);
 }
 
 static inline void json_skip_spaces(LOG_JSON_STATE *js) {
@@ -206,7 +206,7 @@ static bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
 }
 
 static inline bool json_parse_string(LOG_JSON_STATE *js) {
-    static __thread char value[MAX_VALUE_LEN];
+    static __thread char value[JOURNAL_MAX_VALUE_LEN];
 
     if(!json_expect_char_after_white_space(js, "\""))
         return false;
@@ -371,7 +371,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    char *d = js->key_stack[js->depth];
+    char *d = js->stack[js->depth];
     if(js->depth)
         *d++ = '_';
 
@@ -412,7 +412,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    js->key_stack[++js->depth] = d;
+    js->stack[++js->depth] = d;
 
     return true;
 }
@@ -424,7 +424,7 @@ static inline bool json_key_pop(LOG_JSON_STATE *js) {
         return false;
     }
 
-    char *k = js->key_stack[js->depth--];
+    char *k = js->stack[js->depth--];
     *k = '\0';
     return true;
 }
@@ -473,7 +473,7 @@ static inline bool json_parse_value(LOG_JSON_STATE *js) {
 }
 
 static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
-    char *d = js->key_stack[js->depth];
+    char *d = js->stack[js->depth];
     if(js->depth > 0) {
         *d++ = '_';
     }
@@ -503,7 +503,7 @@ static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
     }
 
     *d = '\0'; // Null-terminate the key
-    js->key_stack[++js->depth] = d;
+    js->stack[++js->depth] = d;
 
     return true;
 }
@@ -587,7 +587,7 @@ LOG_JSON_STATE *json_parser_create(struct log_job *jb) {
     if(jb->prefix)
         copy_to_buffer(js->key, sizeof(js->key), js->jb->prefix, strlen(js->jb->prefix));
 
-    js->key_stack[0] = &js->key[strlen(js->key)];
+    js->stack[0] = &js->key[strlen(js->key)];
 
     return js;
 }
@@ -605,7 +605,7 @@ bool json_parse_document(LOG_JSON_STATE *js, const char *txt) {
     js->line = txt;
     js->pos = 0;
     js->msg[0] = '\0';
-    js->key_stack[0][0] = '\0';
+    js->stack[0][0] = '\0';
     js->depth = 0;
 
     if(!json_parse_object(js))

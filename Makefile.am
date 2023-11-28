@@ -353,6 +353,7 @@ LOG2JOURNAL_FILES = \
     collectors/log2journal/log2journal-yaml.c \
     collectors/log2journal/log2journal-json.c \
     collectors/log2journal/log2journal-logfmt.c \
+    collectors/log2journal/log2journal-pcre2.c \
     collectors/log2journal/log2journal-params.c \
     $(NULL)
 

@@ -96,6 +96,17 @@ bool log_job_add_key_prefix(struct log_job *jb, const char *prefix, size_t prefi
     return true;
 }
 
+static inline void log_job_injection_replace(INJECTION *kv, const char *key, size_t key_len, const char *value, size_t value_len) {
+    if(key_len > JOURNAL_MAX_KEY_LEN)
+        log2stderr("WARNING: injection key '%.*s' is too long for journal. Will be truncated.", key_len, key);
+
+    if(value_len > JOURNAL_MAX_VALUE_LEN)
+        log2stderr("WARNING: injection value of key '%.*s' is too long for journal. Will be truncated.", key_len, key);
+
+    copy_to_buffer(kv->key, sizeof(kv->key), key, key_len);
+    txt_replace(&kv->value, value, value_len);
+}
+
 bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched) {
     if (unmatched) {
         if (jb->unmatched.injections.used >= MAX_INJECTIONS) {
@@ -111,13 +122,11 @@ bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, 
     }
 
     if (unmatched) {
-        key_value_replace(&jb->unmatched.injections.keys[jb->unmatched.injections.used++],
-                key, key_len,
-                value, value_len);
+        log_job_injection_replace(&jb->unmatched.injections.keys[jb->unmatched.injections.used++], key, key_len, value
+                                  , value_len
+                                 );
     } else {
-        key_value_replace(&jb->injections.keys[jb->injections.used++],
-                key, key_len,
-                value, value_len);
+        log_job_injection_replace(&jb->injections.keys[jb->injections.used++], key, key_len, value, value_len);
     }
 
     return true;
@@ -136,6 +145,23 @@ bool log_job_add_rename(struct log_job *jb, const char *new_key, size_t new_key_
     rn->old_hash = XXH3_64bits(rn->old_key, strlen(rn->old_key));
 
     return true;
+}
+
+static inline pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
+    int error_number;
+    PCRE2_SIZE error_offset;
+    PCRE2_SPTR pattern_ptr = (PCRE2_SPTR)pattern;
+
+    pcre2_code *re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, 0, &error_number, &error_offset, NULL);
+    if (re == NULL) {
+        PCRE2_UCHAR errbuf[1024];
+        pcre2_get_error_message(error_number, errbuf, sizeof(errbuf));
+        log2stderr("PCRE2 compilation failed at offset %d: %s", (int)error_offset, errbuf);
+        log2stderr("Check for common regex syntax errors or unsupported PCRE2 patterns.");
+        return NULL;
+    }
+
+    return re;
 }
 
 bool log_job_add_rewrite(struct log_job *jb, const char *key, const char *search_pattern, const char *replace_pattern) {
@@ -175,8 +201,13 @@ bool log_job_add_rewrite(struct log_job *jb, const char *key, const char *search
 
 struct key_dup *log_job_add_duplication_to_job(struct log_job *jb, const char *target, size_t target_len) {
     if (jb->dups.used >= MAX_KEY_DUPS) {
-        log2stderr("Error: Too many duplicates defined. Maximum allowed is %d.", MAX_KEY_DUPS);
+        log2stderr("ERROR: Too many duplicates defined. Maximum allowed is %d.", MAX_KEY_DUPS);
         return NULL;
+    }
+
+    if(target_len > JOURNAL_MAX_KEY_LEN) {
+        log2stderr("WARNING: key of duplicate '%s.*' is too long for journals. Will be truncated.", target_len, target);
+        target_len = JOURNAL_MAX_KEY_LEN;
     }
 
     struct key_dup *kd = &jb->dups.array[jb->dups.used++];
@@ -196,7 +227,7 @@ struct key_dup *log_job_add_duplication_to_job(struct log_job *jb, const char *t
 
 bool log_job_add_key_to_duplication(struct key_dup *kd, const char *key, size_t key_len) {
     if (kd->used >= MAX_KEY_DUPS_KEYS) {
-        log2stderr("Error: Too many keys in duplication of target '%s'.", kd->target);
+        log2stderr("ERROR: Too many keys in duplication of target '%s'.", kd->target);
         return false;
     }
 
