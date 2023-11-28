@@ -2,23 +2,19 @@
 
 #include "log2journal.h"
 
-static bool parse_replacement_pattern(struct key_rewrite *rw);
+static bool parse_replacement_pattern(REWRITE *rw);
 
 // ----------------------------------------------------------------------------
 
-void nd_log_destroy(struct log_job *jb) {
-    for(size_t i = 0; i < jb->injections.used ;i++) {
-        if(jb->injections.keys[i].value.s)
-            freez(jb->injections.keys[i].value.s);
-    }
+void nd_log_cleanup(LOG_JOB *jb) {
+    for(size_t i = 0; i < jb->injections.used ;i++)
+        txt_cleanup(&jb->injections.keys[i].value);
 
-    for(size_t i = 0; i < jb->unmatched.injections.used ;i++) {
-        if(jb->unmatched.injections.keys[i].value.s)
-            freez(jb->unmatched.injections.keys[i].value.s);
-    }
+    for(size_t i = 0; i < jb->unmatched.injections.used ;i++)
+        txt_cleanup(&jb->unmatched.injections.keys[i].value);
 
     for(size_t i = 0; i < jb->dups.used ;i++) {
-        struct key_dup *kd = &jb->dups.array[i];
+        DUPLICATION *kd = &jb->dups.array[i];
 
         if(kd->target)
             freez(kd->target);
@@ -33,7 +29,7 @@ void nd_log_destroy(struct log_job *jb) {
     }
 
     for(size_t i = 0; i < jb->rewrites.used; i++) {
-        struct key_rewrite *rw = &jb->rewrites.array[i];
+        REWRITE *rw = &jb->rewrites.array[i];
 
         if (rw->key)
             freez(rw->key);
@@ -51,9 +47,9 @@ void nd_log_destroy(struct log_job *jb) {
             pcre2_code_free(rw->re);
 
         // Cleanup for replacement nodes linked list
-        struct replacement_node *current = rw->nodes;
+        REWRITE_REPLACEMENT_NODE *current = rw->nodes;
         while (current != NULL) {
-            struct replacement_node *next = current->next;
+            REWRITE_REPLACEMENT_NODE *next = current->next;
 
             if (current->s)
                 freez((void *)current->s);
@@ -68,7 +64,7 @@ void nd_log_destroy(struct log_job *jb) {
 
 // ----------------------------------------------------------------------------
 
-bool log_job_add_filename_key(struct log_job *jb, const char *key, size_t key_len) {
+bool log_job_add_filename_key(LOG_JOB *jb, const char *key, size_t key_len) {
     if(!key || !*key) {
         log2stderr("filename key cannot be empty.");
         return false;
@@ -82,7 +78,7 @@ bool log_job_add_filename_key(struct log_job *jb, const char *key, size_t key_le
     return true;
 }
 
-bool log_job_add_key_prefix(struct log_job *jb, const char *prefix, size_t prefix_len) {
+bool log_job_add_key_prefix(LOG_JOB *jb, const char *prefix, size_t prefix_len) {
     if(!prefix || !*prefix) {
         log2stderr("filename key cannot be empty.");
         return false;
@@ -107,7 +103,7 @@ static inline void log_job_injection_replace(INJECTION *kv, const char *key, siz
     txt_replace(&kv->value, value, value_len);
 }
 
-bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched) {
+bool log_job_add_injection(LOG_JOB *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched) {
     if (unmatched) {
         if (jb->unmatched.injections.used >= MAX_INJECTIONS) {
             log2stderr("Error: too many unmatched injections. You can inject up to %d lines.", MAX_INJECTIONS);
@@ -132,13 +128,13 @@ bool log_job_add_injection(struct log_job *jb, const char *key, size_t key_len, 
     return true;
 }
 
-bool log_job_add_rename(struct log_job *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len) {
+bool log_job_add_rename(LOG_JOB *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len) {
     if(jb->renames.used >= MAX_RENAMES) {
         log2stderr("Error: too many renames. You can rename up to %d fields.", MAX_RENAMES);
         return false;
     }
 
-    struct key_rename *rn = &jb->renames.array[jb->renames.used++];
+    RENAME *rn = &jb->renames.array[jb->renames.used++];
     rn->new_key = strndupz(new_key, new_key_len);
     rn->new_hash = XXH3_64bits(rn->new_key, strlen(rn->new_key));
     rn->old_key = strndupz(old_key, old_key_len);
@@ -164,7 +160,7 @@ static inline pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
     return re;
 }
 
-bool log_job_add_rewrite(struct log_job *jb, const char *key, const char *search_pattern, const char *replace_pattern) {
+bool log_job_add_rewrite(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern) {
     if(jb->rewrites.used >= MAX_REWRITES) {
         log2stderr("Error: too many rewrites. You can add up to %d rewrite rules.", MAX_REWRITES);
         return false;
@@ -175,7 +171,7 @@ bool log_job_add_rewrite(struct log_job *jb, const char *key, const char *search
         return false;
     }
 
-    struct key_rewrite *rw = &jb->rewrites.array[jb->rewrites.used++];
+    REWRITE *rw = &jb->rewrites.array[jb->rewrites.used++];
     rw->key = strdupz(key);
     rw->hash = XXH3_64bits(rw->key, strlen(rw->key));
     rw->search_pattern = strdupz(search_pattern);
@@ -199,7 +195,7 @@ bool log_job_add_rewrite(struct log_job *jb, const char *key, const char *search
 
 // ----------------------------------------------------------------------------
 
-struct key_dup *log_job_add_duplication_to_job(struct log_job *jb, const char *target, size_t target_len) {
+DUPLICATION *log_job_add_duplication_to_job(LOG_JOB *jb, const char *target, size_t target_len) {
     if (jb->dups.used >= MAX_KEY_DUPS) {
         log2stderr("ERROR: Too many duplicates defined. Maximum allowed is %d.", MAX_KEY_DUPS);
         return NULL;
@@ -210,7 +206,7 @@ struct key_dup *log_job_add_duplication_to_job(struct log_job *jb, const char *t
         target_len = JOURNAL_MAX_KEY_LEN;
     }
 
-    struct key_dup *kd = &jb->dups.array[jb->dups.used++];
+    DUPLICATION *kd = &jb->dups.array[jb->dups.used++];
     kd->target = strndupz(target, target_len);
     kd->hash = XXH3_64bits(kd->target, target_len);
     kd->used = 0;
@@ -225,7 +221,7 @@ struct key_dup *log_job_add_duplication_to_job(struct log_job *jb, const char *t
     return kd;
 }
 
-bool log_job_add_key_to_duplication(struct key_dup *kd, const char *key, size_t key_len) {
+bool log_job_add_key_to_duplication(DUPLICATION *kd, const char *key, size_t key_len) {
     if (kd->used >= MAX_KEY_DUPS_KEYS) {
         log2stderr("ERROR: Too many keys in duplication of target '%s'.", kd->target);
         return false;
@@ -238,8 +234,8 @@ bool log_job_add_key_to_duplication(struct key_dup *kd, const char *key, size_t 
 // ----------------------------------------------------------------------------
 // command line params
 
-struct replacement_node *add_replacement_node(struct replacement_node **head, bool is_variable, const char *text) {
-    struct replacement_node *new_node = mallocz(sizeof(struct replacement_node));
+REWRITE_REPLACEMENT_NODE *add_replacement_node(REWRITE_REPLACEMENT_NODE **head, bool is_variable, const char *text) {
+    REWRITE_REPLACEMENT_NODE *new_node = mallocz(sizeof(REWRITE_REPLACEMENT_NODE));
     if (!new_node)
         return NULL;
 
@@ -252,7 +248,7 @@ struct replacement_node *add_replacement_node(struct replacement_node **head, bo
         *head = new_node;
 
     else {
-        struct replacement_node *current = *head;
+        REWRITE_REPLACEMENT_NODE *current = *head;
 
         // append it
         while (current->next != NULL)
@@ -264,7 +260,7 @@ struct replacement_node *add_replacement_node(struct replacement_node **head, bo
     return new_node;
 }
 
-static bool parse_replacement_pattern(struct key_rewrite *rw) {
+static bool parse_replacement_pattern(REWRITE *rw) {
     const char *current = rw->replace_pattern;
 
     while (*current != '\0') {
@@ -283,7 +279,7 @@ static bool parse_replacement_pattern(struct key_rewrite *rw) {
                 return false;
             }
 
-            struct replacement_node *node = add_replacement_node(&(rw->nodes), true, variable_name);
+            REWRITE_REPLACEMENT_NODE *node = add_replacement_node(&(rw->nodes), true, variable_name);
             if (!node) {
                 freez(variable_name);
                 log2stderr("Error: Failed to add replacement node for variable.");
@@ -306,7 +302,7 @@ static bool parse_replacement_pattern(struct key_rewrite *rw) {
                 return false;
             }
 
-            struct replacement_node *node = add_replacement_node(&(rw->nodes), false, text);
+            REWRITE_REPLACEMENT_NODE *node = add_replacement_node(&(rw->nodes), false, text);
             if (!node) {
                 freez(text);
                 log2stderr("Error: Failed to add replacement node for text.");
@@ -318,7 +314,7 @@ static bool parse_replacement_pattern(struct key_rewrite *rw) {
     return true;
 }
 
-static bool parse_rename(struct log_job *jb, const char *param) {
+static bool parse_rename(LOG_JOB *jb, const char *param) {
     // Search for '=' in param
     const char *equal_sign = strchr(param, '=');
     if (!equal_sign || equal_sign == param) {
@@ -339,7 +335,7 @@ static bool is_symbol(char c) {
     return !isalpha(c) && !isdigit(c) && !iscntrl(c);
 }
 
-static bool parse_rewrite(struct log_job *jb, const char *param) {
+static bool parse_rewrite(LOG_JOB *jb, const char *param) {
     // Search for '=' in param
     const char *equal_sign = strchr(param, '=');
     if (!equal_sign || equal_sign == param) {
@@ -393,7 +389,7 @@ static bool parse_rewrite(struct log_job *jb, const char *param) {
     return ret;
 }
 
-static bool parse_inject(struct log_job *jb, const char *value, bool unmatched) {
+static bool parse_inject(LOG_JOB *jb, const char *value, bool unmatched) {
     const char *equal = strchr(value, '=');
     if (!equal) {
         log2stderr("Error: injection '%s' does not have an equal sign.", value);
@@ -407,7 +403,7 @@ static bool parse_inject(struct log_job *jb, const char *value, bool unmatched) 
     return true;
 }
 
-static bool parse_duplicate(struct log_job *jb, const char *value) {
+static bool parse_duplicate(LOG_JOB *jb, const char *value) {
     const char *target = value;
     const char *equal_sign = strchr(value, '=');
     if (!equal_sign || equal_sign == target) {
@@ -416,7 +412,7 @@ static bool parse_duplicate(struct log_job *jb, const char *value) {
     }
 
     size_t target_len = equal_sign - target;
-    struct key_dup *kd = log_job_add_duplication_to_job(jb, target, target_len);
+    DUPLICATION *kd = log_job_add_duplication_to_job(jb, target, target_len);
     if(!kd) return false;
 
     const char *key = equal_sign + 1;
@@ -442,11 +438,11 @@ static bool parse_duplicate(struct log_job *jb, const char *value) {
     return true;
 }
 
-bool parse_log2journal_parameters(struct log_job *jb, int argc, char **argv) {
+bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
         if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
-            log2journal_command_line_help(argv[0]);
+            log_job_command_line_help(argv[0]);
             exit(0);
         }
 #if defined(NETDATA_DEV_MODE) || defined(NETDATA_INTERNAL_CHECKS)
@@ -542,7 +538,7 @@ bool parse_log2journal_parameters(struct log_job *jb, int argc, char **argv) {
     // Check if a pattern is set and exactly one pattern is specified
     if (!jb->pattern) {
         log2stderr("Error: Pattern not specified.");
-        log2journal_command_line_help(argv[0]);
+        log_job_command_line_help(argv[0]);
         return false;
     }
 

@@ -6,7 +6,7 @@
 #define LOGFMT_KEY_MAX 1024
 
 struct logfmt_state {
-    struct log_job *jb;
+    LOG_JOB *jb;
 
     const char *line;
     uint32_t pos;
@@ -216,7 +216,7 @@ static inline bool logfmt_parse_key(LOGFMT_STATE *lfs) {
     return true;
 }
 
-LOGFMT_STATE *logfmt_parser_create(struct log_job *jb) {
+LOGFMT_STATE *logfmt_parser_create(LOG_JOB *jb) {
     LOGFMT_STATE *lfs = mallocz(sizeof(LOGFMT_STATE));
     memset(lfs, 0, sizeof(LOGFMT_STATE));
     lfs->jb = jb;
@@ -259,7 +259,7 @@ bool logfmt_parse_document(LOGFMT_STATE *lfs, const char *txt) {
 
 
 void logfmt_test(void) {
-    struct log_job jb = { .prefix = "NIGNX_" };
+    LOG_JOB jb = { .prefix = "NIGNX_" };
     LOGFMT_STATE *logfmt = logfmt_parser_create(&jb);
 
     logfmt_parse_document(logfmt, "x=1 y=2 z=\"3 \\ 4\" 5  ");

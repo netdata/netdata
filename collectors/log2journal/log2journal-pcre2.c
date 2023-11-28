@@ -6,7 +6,7 @@
 #define PCRE2_KEY_MAX 1024
 
 struct pcre2_state {
-    struct log_job *jb;
+    LOG_JOB *jb;
 
     const char *line;
     uint32_t pos;
@@ -19,7 +19,7 @@ struct pcre2_state {
     char msg[PCRE2_ERROR_LINE_MAX];
 };
 
-static inline void jb_traverse_pcre2_named_groups_and_send_keys(struct log_job *jb, pcre2_code *re, pcre2_match_data *match_data, char *line) {
+static inline void jb_traverse_pcre2_named_groups_and_send_keys(LOG_JOB *jb, pcre2_code *re, pcre2_match_data *match_data, char *line) {
     PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
     uint32_t namecount;
     pcre2_pattern_info(re, PCRE2_INFO_NAMECOUNT, &namecount);
@@ -60,7 +60,7 @@ bool pcre2_has_error(PCRE2_STATE *pcre2) {
     return !pcre2->re || pcre2->msg[0];
 }
 
-PCRE2_STATE *pcre2_parser_create(struct log_job *jb) {
+PCRE2_STATE *pcre2_parser_create(LOG_JOB *jb) {
     PCRE2_STATE *pcre2 = mallocz(sizeof(PCRE2_STATE));
     memset(pcre2, 0, sizeof(PCRE2_STATE));
     pcre2->jb = jb;
@@ -110,7 +110,7 @@ bool pcre2_parse_document(PCRE2_STATE *pcre2, const char *txt, size_t len) {
 }
 
 void pcre2_test(void) {
-    struct log_job jb = { .prefix = "NIGNX_" };
+    LOG_JOB jb = { .prefix = "NIGNX_" };
     PCRE2_STATE *pcre2 = pcre2_parser_create(&jb);
 
     pcre2_parse_document(pcre2, "{\"value\":\"\\u\\u039A\\u03B1\\u03BB\\u03B7\\u03BC\\u03AD\\u03C1\\u03B1\"}", 0);

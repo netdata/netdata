@@ -7,7 +7,7 @@
 #define JSON_DEPTH_MAX 100
 
 struct log_json_state {
-    struct log_job *jb;
+    LOG_JOB *jb;
 
     const char *line;
     uint32_t pos;
@@ -579,7 +579,7 @@ static inline bool json_parse_object(LOG_JSON_STATE *js) {
     return true;
 }
 
-LOG_JSON_STATE *json_parser_create(struct log_job *jb) {
+LOG_JSON_STATE *json_parser_create(LOG_JOB *jb) {
     LOG_JSON_STATE *js = mallocz(sizeof(LOG_JSON_STATE));
     memset(js, 0, sizeof(LOG_JSON_STATE));
     js->jb = jb;
@@ -624,7 +624,7 @@ bool json_parse_document(LOG_JSON_STATE *js, const char *txt) {
 }
 
 void json_test(void) {
-    struct log_job jb = { .prefix = "NIGNX_" };
+    LOG_JOB jb = { .prefix = "NIGNX_" };
     LOG_JSON_STATE *json = json_parser_create(&jb);
 
     json_parse_document(json, "{\"value\":\"\\u\\u039A\\u03B1\\u03BB\\u03B7\\u03BC\\u03AD\\u03C1\\u03B1\"}");

@@ -39,7 +39,7 @@ static void config_dir_print_available(void) {
     printf("\n"); // Add a newline at the end
 }
 
-void log2journal_command_line_help(const char *name) {
+void log_job_command_line_help(const char *name) {
     printf("\n");
     printf("Netdata log2journal " PACKAGE_VERSION "\n");
     printf("\n");

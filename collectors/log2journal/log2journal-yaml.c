@@ -130,13 +130,13 @@ static bool yaml_scalar_matches_with_trace(yaml_event_t *event, const char *s, s
 
 // ----------------------------------------------------------------------------
 
-static struct key_dup *yaml_parse_duplicate_key(struct log_job *jb, yaml_parser_t *parser) {
+static DUPLICATION *yaml_parse_duplicate_key(LOG_JOB *jb, yaml_parser_t *parser) {
     yaml_event_t event;
 
     if (!yaml_parse(parser, &event))
         return false;
 
-    struct key_dup *kd = NULL;
+    DUPLICATION *kd = NULL;
     if(event.type == YAML_SCALAR_EVENT) {
         kd = log_job_add_duplication_to_job(jb, (char *) event.data.scalar.value, event.data.scalar.length);
     }
@@ -147,7 +147,7 @@ static struct key_dup *yaml_parse_duplicate_key(struct log_job *jb, yaml_parser_
     return kd;
 }
 
-static size_t yaml_parse_duplicate_from(struct log_job *jb, yaml_parser_t *parser, struct key_dup *kd) {
+static size_t yaml_parse_duplicate_from(LOG_JOB *jb, yaml_parser_t *parser, DUPLICATION *kd) {
     size_t errors = 0;
     yaml_event_t event;
 
@@ -184,7 +184,7 @@ static size_t yaml_parse_duplicate_from(struct log_job *jb, yaml_parser_t *parse
     return errors;
 }
 
-static size_t yaml_parse_filename_injection(yaml_parser_t *parser, struct log_job *jb) {
+static size_t yaml_parse_filename_injection(yaml_parser_t *parser, LOG_JOB *jb) {
     yaml_event_t event;
     size_t errors = 0;
 
@@ -221,11 +221,11 @@ static size_t yaml_parse_filename_injection(yaml_parser_t *parser, struct log_jo
     return errors;
 }
 
-static size_t yaml_parse_duplicates_injection(yaml_parser_t *parser, struct log_job *jb) {
+static size_t yaml_parse_duplicates_injection(yaml_parser_t *parser, LOG_JOB *jb) {
     if (!yaml_parse_expect_event(parser, YAML_SEQUENCE_START_EVENT))
         return 1;
 
-    struct key_dup *kd = NULL;
+    DUPLICATION *kd = NULL;
 
     // Expecting a key-value pair for each duplicate
     bool finished;
@@ -290,7 +290,7 @@ static size_t yaml_parse_duplicates_injection(yaml_parser_t *parser, struct log_
     return errors;
 }
 
-static bool yaml_parse_constant_field_injection(yaml_parser_t *parser, struct log_job *jb, bool unmatched) {
+static bool yaml_parse_constant_field_injection(yaml_parser_t *parser, LOG_JOB *jb, bool unmatched) {
     yaml_event_t event;
     if (!yaml_parse(parser, &event) || event.type != YAML_SCALAR_EVENT) {
         yaml_error(parser, &event, "Expected scalar for constant field injection key");
@@ -335,7 +335,7 @@ cleanup:
     return !ret ? 1 : 0;
 }
 
-static bool yaml_parse_injection_mapping(yaml_parser_t *parser, struct log_job *jb, bool unmatched) {
+static bool yaml_parse_injection_mapping(yaml_parser_t *parser, LOG_JOB *jb, bool unmatched) {
     yaml_event_t event;
     size_t errors = 0;
     bool finished = false;
@@ -372,7 +372,7 @@ static bool yaml_parse_injection_mapping(yaml_parser_t *parser, struct log_job *
     return errors == 0;
 }
 
-static size_t yaml_parse_injections(yaml_parser_t *parser, struct log_job *jb, bool unmatched) {
+static size_t yaml_parse_injections(yaml_parser_t *parser, LOG_JOB *jb, bool unmatched) {
     yaml_event_t event;
     size_t errors = 0;
     bool finished = false;
@@ -408,7 +408,7 @@ static size_t yaml_parse_injections(yaml_parser_t *parser, struct log_job *jb, b
     return errors;
 }
 
-static size_t yaml_parse_unmatched(yaml_parser_t *parser, struct log_job *jb) {
+static size_t yaml_parse_unmatched(yaml_parser_t *parser, LOG_JOB *jb) {
     size_t errors = 0;
     bool finished = false;
 
@@ -461,7 +461,7 @@ static size_t yaml_parse_unmatched(yaml_parser_t *parser, struct log_job *jb) {
     return errors;
 }
 
-static size_t yaml_parse_rewrites(yaml_parser_t *parser, struct log_job *jb) {
+static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
     size_t errors = 0;
 
     if (!yaml_parse_expect_event(parser, YAML_SEQUENCE_START_EVENT))
@@ -478,7 +478,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, struct log_job *jb) {
         switch (event.type) {
             case YAML_MAPPING_START_EVENT:
             {
-                struct key_rewrite rw = {0};
+                REWRITE rw = {0};
 
                 bool mapping_finished = false;
                 while (!errors && !mapping_finished) {
@@ -560,7 +560,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, struct log_job *jb) {
     return errors;
 }
 
-static size_t yaml_parse_pattern(yaml_parser_t *parser, struct log_job *jb) {
+static size_t yaml_parse_pattern(yaml_parser_t *parser, LOG_JOB *jb) {
     yaml_event_t event;
     size_t errors = 0;
 
@@ -578,7 +578,7 @@ static size_t yaml_parse_pattern(yaml_parser_t *parser, struct log_job *jb) {
     return errors;
 }
 
-static size_t yaml_parse_initialized(yaml_parser_t *parser, struct log_job *jb) {
+static size_t yaml_parse_initialized(yaml_parser_t *parser, LOG_JOB *jb) {
     size_t errors = 0;
 
     if(!yaml_parse_expect_event(parser, YAML_STREAM_START_EVENT)) {
@@ -657,7 +657,7 @@ cleanup:
     return errors;
 }
 
-bool yaml_parse_file(const char *config_file_path, struct log_job *jb) {
+bool yaml_parse_file(const char *config_file_path, LOG_JOB *jb) {
     if(!config_file_path || !*config_file_path) {
         log2stderr("yaml configuration filename cannot be empty.");
         return false;
@@ -680,7 +680,7 @@ bool yaml_parse_file(const char *config_file_path, struct log_job *jb) {
     return errors == 0;
 }
 
-bool yaml_parse_config(const char *config_name, struct log_job *jb) {
+bool yaml_parse_config(const char *config_name, LOG_JOB *jb) {
     char filename[FILENAME_MAX + 1];
 
     snprintf(filename, sizeof(filename), "%s/%s.yaml", LOG2JOURNAL_CONFIG_PATH, config_name);
@@ -759,7 +759,7 @@ static void yaml_print_node(const char *key, const char *value, size_t depth, bo
     }
 }
 
-void log_job_to_yaml(struct log_job *jb) {
+void log_job_configuration_to_yaml(LOG_JOB *jb) {
     if(jb->pattern)
         yaml_print_node("pattern", jb->pattern, 0, false);
 
@@ -778,7 +778,7 @@ void log_job_to_yaml(struct log_job *jb) {
         fprintf(stderr, "\n");
         yaml_print_node("duplicate", NULL, 0, false);
         for(size_t i = 0; i < jb->dups.used ;i++) {
-            struct key_dup *kd = &jb->dups.array[i];
+            DUPLICATION *kd = &jb->dups.array[i];
             yaml_print_node("key", kd->target, 1, true);
             yaml_print_node("values_of", NULL, 2, false);
 

@@ -2,15 +2,15 @@
 
 #include "log2journal.h"
 
-static inline void send_duplications_for_key(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len);
+static inline void send_duplications_for_key(LOG_JOB *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len);
 
 // ----------------------------------------------------------------------------
 
-static char *rewrite_value(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len) {
+static char *rewrite_value(LOG_JOB *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len) {
     static __thread char rewritten_value[JOURNAL_MAX_VALUE_LEN + 1];
 
     for (size_t i = 0; i < jb->rewrites.used; i++) {
-        struct key_rewrite *rw = &jb->rewrites.array[i];
+        REWRITE *rw = &jb->rewrites.array[i];
 
         if (rw->hash == hash && strcmp(rw->key, key) == 0) {
             if(pcre2_match(rw->re, (PCRE2_SPTR)value, value_len, 0, 0, rw->match_data, NULL) < 0)
@@ -22,7 +22,7 @@ static char *rewrite_value(struct log_job *jb, const char *key, XXH64_hash_t has
             size_t buffer_remaining = sizeof(rewritten_value);
 
             // Iterate through the linked list of replacement nodes
-            for (struct replacement_node *node = rw->nodes; node != NULL; node = node->next) {
+            for (REWRITE_REPLACEMENT_NODE *node = rw->nodes; node != NULL; node = node->next) {
                 if (node->is_variable) {
                     uint32_t groupnumber = pcre2_substring_number_from_name(rw->re, (PCRE2_SPTR)node->s);
                     PCRE2_SIZE start_offset = ovector[2 * groupnumber];
@@ -48,9 +48,9 @@ static char *rewrite_value(struct log_job *jb, const char *key, XXH64_hash_t has
     return NULL;
 }
 
-static inline const char *rename_key(struct log_job *jb, const char *key, XXH64_hash_t hash, XXH64_hash_t *new_hash) {
+static inline const char *rename_key(LOG_JOB *jb, const char *key, XXH64_hash_t hash, XXH64_hash_t *new_hash) {
     for(size_t i = 0; i < jb->renames.used ;i++) {
-        struct key_rename *rn = &jb->renames.array[i];
+        RENAME *rn = &jb->renames.array[i];
 
         if(rn->old_hash == hash && strcmp(rn->old_key, key) == 0) {
             *new_hash = rn->new_hash;
@@ -74,7 +74,7 @@ static inline void send_key_value_error(const char *key, const char *format, ...
     printf("\n");
 }
 
-static inline void send_key_value_and_rewrite(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t len) {
+static inline void send_key_value_and_rewrite(LOG_JOB *jb, const char *key, XXH64_hash_t hash, const char *value, size_t len) {
     char *rewritten = rewrite_value(jb, key, hash, value, len);
     if(!rewritten)
         printf("%s=%.*s\n", key, (int)len, value);
@@ -82,7 +82,7 @@ static inline void send_key_value_and_rewrite(struct log_job *jb, const char *ke
         printf("%s=%s\n", key, rewritten);
 }
 
-inline void log_job_send_extracted_key_value(struct log_job *jb, const char *key, const char *value, size_t len) {
+inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *value, size_t len) {
     XXH64_hash_t hash = XXH3_64bits(key, strlen(key));
 
     // process renames (changing the key)
@@ -98,14 +98,14 @@ inline void log_job_send_extracted_key_value(struct log_job *jb, const char *key
     send_duplications_for_key(jb, key, hash, value, len);
 }
 
-static inline void send_key_value_constant(struct log_job *jb, const char *key, const char *value) {
+static inline void send_key_value_constant(LOG_JOB *jb, const char *key, const char *value) {
     printf("%s=%s\n", key, value);
 }
 
 // ----------------------------------------------------------------------------
 // injection of constant fields
 
-static void jb_select_which_injections_should_be_injected_on_unmatched(struct log_job *jb) {
+static void select_which_injections_should_be_injected_on_unmatched(LOG_JOB *jb) {
     // mark all injections to be added to unmatched logs
     for(size_t i = 0; i < jb->injections.used ; i++)
         jb->injections.keys[i].on_unmatched = true;
@@ -126,7 +126,7 @@ static void jb_select_which_injections_should_be_injected_on_unmatched(struct lo
 }
 
 
-static inline void jb_finalize_injections(struct log_job *jb, bool line_is_matched) {
+static inline void jb_finalize_injections(LOG_JOB *jb, bool line_is_matched) {
     for (size_t j = 0; j < jb->injections.used; j++) {
         if(!line_is_matched && !jb->injections.keys[j].on_unmatched)
             continue;
@@ -135,9 +135,9 @@ static inline void jb_finalize_injections(struct log_job *jb, bool line_is_match
     }
 }
 
-static inline void jb_reset_injections(struct log_job *jb) {
+static inline void log_job_duplications_reset(LOG_JOB *jb) {
     for(size_t d = 0; d < jb->dups.used ; d++) {
-        struct key_dup *kd = &jb->dups.array[d];
+        DUPLICATION *kd = &jb->dups.array[d];
         kd->exposed = false;
 
         for(size_t g = 0; g < kd->used ; g++) {
@@ -150,12 +150,12 @@ static inline void jb_reset_injections(struct log_job *jb) {
 // ----------------------------------------------------------------------------
 // duplications
 
-static inline void send_duplications_for_key(struct log_job *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len) {
+static inline void send_duplications_for_key(LOG_JOB *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len) {
     // IMPORTANT:
     // The 'value' may not be NULL terminated and have more data that the value we need
 
     for (size_t d = 0; d < jb->dups.used; d++) {
-        struct key_dup *kd = &jb->dups.array[d];
+        DUPLICATION *kd = &jb->dups.array[d];
 
         if(kd->exposed || kd->used == 0)
             continue;
@@ -177,7 +177,7 @@ static inline void send_duplications_for_key(struct log_job *jb, const char *key
     }
 }
 
-static inline void jb_send_remaining_duplications(struct log_job *jb) {
+static inline void jb_send_remaining_duplications(LOG_JOB *jb) {
     static __thread char buffer[JOURNAL_MAX_VALUE_LEN + 1];
 
     // IMPORTANT:
@@ -185,7 +185,7 @@ static inline void jb_send_remaining_duplications(struct log_job *jb) {
     // so that the output always has the same fields for matched entries.
 
     for(size_t d = 0; d < jb->dups.used ; d++) {
-        struct key_dup *kd = &jb->dups.array[d];
+        DUPLICATION *kd = &jb->dups.array[d];
 
         if(kd->exposed || kd->used == 0)
             continue;
@@ -224,12 +224,12 @@ static inline void jb_send_remaining_duplications(struct log_job *jb) {
 // ----------------------------------------------------------------------------
 // filename injection
 
-static inline void jb_inject_filename(struct log_job *jb) {
+static inline void jb_inject_filename(LOG_JOB *jb) {
     if (jb->filename.key && jb->filename.current[0])
         send_key_value_constant(jb, jb->filename.key, jb->filename.current);
 }
 
-static inline bool jb_switched_filename(struct log_job *jb, const char *line, size_t len) {
+static inline bool jb_switched_filename(LOG_JOB *jb, const char *line, size_t len) {
     // IMPORTANT:
     // Return TRUE when the caller should skip this line (because it is ours).
     // Unfortunately, we have to consume empty lines too.
@@ -259,9 +259,9 @@ static inline bool jb_switched_filename(struct log_job *jb, const char *line, si
 }
 
 // ----------------------------------------------------------------------------
-// input reading
+// running a job
 
-static char *get_next_line(struct log_job *jb, char *buffer, size_t size, size_t *line_length) {
+static char *get_next_line(LOG_JOB *jb, char *buffer, size_t size, size_t *line_length) {
     if(!fgets(buffer, (int)size, stdin)) {
         *line_length = 0;
         return NULL;
@@ -284,19 +284,8 @@ static char *get_next_line(struct log_job *jb, char *buffer, size_t size, size_t
     return line;
 }
 
-// ----------------------------------------------------------------------------
-
-struct log_job log_job = { 0 };
-int main(int argc, char *argv[]) {
-    struct log_job *jb = &log_job;
-
-    if(!parse_log2journal_parameters(jb, argc, argv))
-        exit(1);
-
-    if(jb->show_config)
-        log_job_to_yaml(jb);
-
-    jb_select_which_injections_should_be_injected_on_unmatched(jb);
+int log_job_run(LOG_JOB *jb) {
+    select_which_injections_should_be_injected_on_unmatched(jb);
 
     PCRE2_STATE *pcre2 = NULL;
     LOG_JSON_STATE *json = NULL;
@@ -325,7 +314,7 @@ int main(int argc, char *argv[]) {
         if(jb_switched_filename(jb, line, len))
             continue;
 
-        jb_reset_injections(jb);
+        log_job_duplications_reset(jb);
 
         bool line_is_matched;
 
@@ -350,7 +339,7 @@ int main(int argc, char *argv[]) {
 
                 for (size_t j = 0; j < jb->unmatched.injections.used; j++)
                     send_key_value_constant(jb, jb->unmatched.injections.keys[j].key,
-                                            jb->unmatched.injections.keys[j].value.s);
+                            jb->unmatched.injections.keys[j].value.s);
             }
             else {
                 // we are just logging errors to stderr
@@ -378,6 +367,22 @@ int main(int argc, char *argv[]) {
     else if(pcre2)
         pcre2_parser_destroy(pcre2);
 
-    nd_log_destroy(jb);
     return 0;
+}
+
+// ----------------------------------------------------------------------------
+
+int main(int argc, char *argv[]) {
+    LOG_JOB log_job = { 0 };
+
+    if(!log_job_command_line_parse_parameters(&log_job, argc, argv))
+        exit(1);
+
+    if(log_job.show_config)
+        log_job_configuration_to_yaml(&log_job);
+
+    int ret = log_job_run(&log_job);
+
+    nd_log_cleanup(&log_job);
+    return ret;
 }
