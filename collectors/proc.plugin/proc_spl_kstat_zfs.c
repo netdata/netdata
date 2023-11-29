@@ -335,7 +335,10 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
     if (likely(do_zfs_pool_state)) {
         DIR *dir = opendir(dirname);
         if (unlikely(!dir)) {
-            collector_error("Cannot read directory '%s'", dirname);
+            if (errno == ENOENT)
+                collector_info("Cannot read directory '%s'", dirname);
+            else
+                collector_error("Cannot read directory '%s'", dirname);
             return 1;
         }
 
