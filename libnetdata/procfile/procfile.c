@@ -407,9 +407,14 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 
     int fd = open(filename, procfile_open_flags, 0666);
     if(unlikely(fd == -1)) {
-        if(unlikely(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot open file '%s'", filename);
-        else if(unlikely(flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+        if (unlikely(flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
             netdata_log_error(PF_PREFIX ": Cannot open file '%s'", filename);
+        else if (unlikely(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) {
+            if (errno == ENOENT)
+                collector_info(PF_PREFIX ": Cannot open file '%s'", filename);
+            else
+                collector_error(PF_PREFIX ": Cannot open file '%s'", filename);
+        }
         return NULL;
     }
 
