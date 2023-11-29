@@ -337,7 +337,7 @@ static bool yaml_parse_constant_field_injection(yaml_parser_t *parser, LOG_JOB *
 
     value = strndupz((char *)event.data.scalar.value, event.data.scalar.length);
 
-    if(!log_job_add_injection(jb, key, strlen(key), value, strlen(value), unmatched))
+    if(!log_job_injection_add(jb, key, strlen(key), value, strlen(value), unmatched))
         ret = false;
     else
         ret = true;
@@ -519,7 +519,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite search pattern");
                                     errors++;
                                 } else {
-                                    rw.search_pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    rw.search.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else if (yaml_scalar_matches(&sub_event, "replace", strlen("replace"))) {
@@ -527,7 +527,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite replace pattern");
                                     errors++;
                                 } else {
-                                    rw.replace_pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    rw.replace.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else {
@@ -537,13 +537,13 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                             break;
 
                         case YAML_MAPPING_END_EVENT:
-                            if(rw.key && rw.search_pattern && rw.replace_pattern) {
-                                if (!log_job_add_rewrite(jb, rw.key, rw.search_pattern, rw.replace_pattern))
+                            if(rw.key && rw.search.pattern && rw.replace.pattern) {
+                                if (!log_job_rewrite_add(jb, rw.key, rw.search.pattern, rw.replace.pattern))
                                     errors++;
                             }
                             freez(rw.key);
-                            freez(rw.search_pattern);
-                            freez(rw.replace_pattern);
+                            freez((char *)rw.search.pattern);
+                            freez((char *)rw.replace.pattern);
                             memset(&rw, 0, sizeof(rw));
 
                             mapping_finished = true;
@@ -629,7 +629,9 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
 
                         case YAML_MAPPING_END_EVENT:
                             if(rn.old_key && rn.new_key) {
-                                if (!log_job_add_rename(jb, rn.new_key, strlen(rn.new_key), rn.old_key, strlen(rn.old_key)))
+                                if (!log_job_rename_add(jb, rn.new_key, strlen(rn.new_key), rn.old_key, strlen(
+                                        rn.old_key
+                                                                                                              )))
                                     errors++;
                             }
                             freez(rn.new_key);
@@ -674,7 +676,7 @@ static size_t yaml_parse_pattern(yaml_parser_t *parser, LOG_JOB *jb) {
         return 1;
 
     if(event.type == YAML_SCALAR_EVENT)
-        jb->pattern = strndupz((char *)event.data.scalar.value, event.data.scalar.length);
+        log_job_set_pattern(jb, (char *)event.data.scalar.value, event.data.scalar.length);
     else {
         yaml_error(parser, &event, "unexpected event type");
         errors++;
@@ -885,6 +887,16 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         yaml_print_node("key", jb->filename.key, 1, false);
     }
 
+    if(jb->renames.used) {
+        fprintf(stderr, "\n");
+        yaml_print_node("rename", NULL, 0, false);
+
+        for(size_t i = 0; i < jb->renames.used ;i++) {
+            yaml_print_node("new_key", jb->renames.array[i].new_key, 1, true);
+            yaml_print_node("old_key", jb->renames.array[i].old_key, 2, false);
+        }
+    }
+
     if(jb->dups.used) {
         fprintf(stderr, "\n");
         yaml_print_node("duplicate", NULL, 0, false);
@@ -898,6 +910,17 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         }
     }
 
+    if(jb->rewrites.used) {
+        fprintf(stderr, "\n");
+        yaml_print_node("rewrite", NULL, 0, false);
+
+        for(size_t i = 0; i < jb->rewrites.used ;i++) {
+            yaml_print_node("key", jb->rewrites.array[i].key, 1, true);
+            yaml_print_node("search", jb->rewrites.array[i].search.pattern, 2, false);
+            yaml_print_node("replace", jb->rewrites.array[i].replace.pattern, 2, false);
+        }
+    }
+
     if(jb->injections.used) {
         fprintf(stderr, "\n");
         yaml_print_node("inject", NULL, 0, false);
@@ -905,27 +928,6 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         for (size_t i = 0; i < jb->injections.used; i++) {
             yaml_print_node("key", jb->injections.keys[i].key, 1, true);
             yaml_print_node("value", jb->injections.keys[i].value.s, 2, false);
-        }
-    }
-
-    if(jb->rewrites.used) {
-        fprintf(stderr, "\n");
-        yaml_print_node("rewrite", NULL, 0, false);
-
-        for(size_t i = 0; i < jb->rewrites.used ;i++) {
-            yaml_print_node("key", jb->rewrites.array[i].key, 1, true);
-            yaml_print_node("search", jb->rewrites.array[i].search_pattern, 2, false);
-            yaml_print_node("replace", jb->rewrites.array[i].replace_pattern, 2, false);
-        }
-    }
-
-    if(jb->renames.used) {
-        fprintf(stderr, "\n");
-        yaml_print_node("rename", NULL, 0, false);
-
-        for(size_t i = 0; i < jb->renames.used ;i++) {
-            yaml_print_node("new_key", jb->renames.array[i].new_key, 1, true);
-            yaml_print_node("old_key", jb->renames.array[i].old_key, 2, false);
         }
     }
 

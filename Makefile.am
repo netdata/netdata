@@ -355,6 +355,11 @@ LOG2JOURNAL_FILES = \
     collectors/log2journal/log2journal-logfmt.c \
     collectors/log2journal/log2journal-pcre2.c \
     collectors/log2journal/log2journal-params.c \
+    collectors/log2journal/log2journal-duplicate.c \
+    collectors/log2journal/log2journal-inject.c \
+    collectors/log2journal/log2journal-replace.c \
+    collectors/log2journal/log2journal-rename.c \
+    collectors/log2journal/log2journal-rewrite.c \
     $(NULL)
 
 

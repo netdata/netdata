@@ -23,6 +23,12 @@ prefix: NGINX_
 filename:
   key: NGINX_LOG_FILENAME
 
+rename:
+  - new_key: TEST1
+    old_key: TEST2
+  - new_key: TEST3
+    old_key: TEST4
+
 duplicate:
   - key: PRIORITY
     values_of:
@@ -31,12 +37,6 @@ duplicate:
     values_of:
       - NGINX_STATUS
       - NGINX_METHOD
-
-inject:
-  - key: SYSLOG_IDENTIFIER
-    value: nginx-log
-  - key: SYSLOG_IDENTIFIER2
-    value: nginx-log2
 
 rewrite:
   - key: PRIORITY
@@ -58,11 +58,11 @@ rewrite:
     search: ".*"
     replace: UNKNOWN
 
-rename:
-  - new_key: TEST1
-    old_key: TEST2
-  - new_key: TEST3
-    old_key: TEST4
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: nginx-log
+  - key: SYSLOG_IDENTIFIER2
+    value: nginx-log2
 
 unmatched:
   key: MESSAGE

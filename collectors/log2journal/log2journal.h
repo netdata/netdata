@@ -160,11 +160,61 @@ static inline void txt_replace(TEXT *txt, const char *s, size_t len) {
 
 // ----------------------------------------------------------------------------
 
+typedef struct search_pattern {
+    const char *pattern;
+    pcre2_code *re;
+    pcre2_match_data *match_data;
+    TEXT error;
+} SEARCH_PATTERN;
+
+static inline void search_pattern_cleanup(SEARCH_PATTERN *sp) {
+    if(sp->pattern) {
+        freez((void *)sp->pattern);
+        sp->pattern = NULL;
+    }
+
+    if(sp->re) {
+        pcre2_code_free(sp->re);
+        sp->re = NULL;
+    }
+
+    if(sp->match_data) {
+        pcre2_match_data_free(sp->match_data);
+        sp->match_data = NULL;
+    }
+
+    txt_cleanup(&sp->error);
+}
+
+// ----------------------------------------------------------------------------
+
+typedef struct replacement_node {
+    const char *s;
+    uint32_t len;
+    bool is_variable;
+
+    struct replacement_node *next;
+} REPLACE_NODE;
+
+void replace_node_free(REPLACE_NODE *rpn);
+
+typedef struct replace_pattern {
+    const char *pattern;
+    REPLACE_NODE *nodes;
+} REPLACE_PATTERN;
+
+void replace_pattern_cleanup(REPLACE_PATTERN *rp);
+bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern);
+
+// ----------------------------------------------------------------------------
+
 typedef struct injection {
     bool on_unmatched;
     TEXT value;
     char key[JOURNAL_MAX_KEY_LEN + 1];
 } INJECTION;
+
+void injection_cleanup(INJECTION *inj);
 
 // ----------------------------------------------------------------------------
 
@@ -178,6 +228,8 @@ typedef struct duplication {
     TEXT values[MAX_KEY_DUPS_KEYS];
 } DUPLICATION;
 
+void duplication_cleanup(DUPLICATION *dp);
+
 // ----------------------------------------------------------------------------
 
 typedef struct key_rename {
@@ -187,25 +239,18 @@ typedef struct key_rename {
     char *old_key;
 } RENAME;
 
+void rename_cleanup(RENAME *rn);
+
 // ----------------------------------------------------------------------------
-
-typedef struct replacement_node {
-    const char *s;
-    uint32_t len;
-    bool is_variable;
-
-    struct replacement_node *next;
-} REWRITE_REPLACEMENT_NODE;
 
 typedef struct key_rewrite {
     XXH64_hash_t hash;
     char *key;
-    char *search_pattern;
-    char *replace_pattern;
-    pcre2_code *re;
-    pcre2_match_data *match_data;
-    REWRITE_REPLACEMENT_NODE *nodes;
+    SEARCH_PATTERN search;
+    REPLACE_PATTERN replace;
 } REWRITE;
+
+void rewrite_cleanup(REWRITE *rw);
 
 // ----------------------------------------------------------------------------
 // A job configuration and runtime structures
@@ -268,9 +313,10 @@ DUPLICATION *log_job_add_duplication_to_job(LOG_JOB *jb, const char *target, siz
 bool log_job_add_key_to_duplication(DUPLICATION *kd, const char *key, size_t key_len);
 bool log_job_add_filename_key(LOG_JOB *jb, const char *key, size_t key_len);
 bool log_job_add_key_prefix(LOG_JOB *jb, const char *prefix, size_t prefix_len);
-bool log_job_add_injection(LOG_JOB *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched);
-bool log_job_add_rewrite(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern);
-bool log_job_add_rename(LOG_JOB *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len);
+bool log_job_set_pattern(LOG_JOB *jb, const char *pattern, size_t pattern_len);
+bool log_job_injection_add(LOG_JOB *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched);
+bool log_job_rewrite_add(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern);
+bool log_job_rename_add(LOG_JOB *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len);
 
 // entry point to parse command line parameters
 bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv);

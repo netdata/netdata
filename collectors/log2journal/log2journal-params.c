@@ -2,63 +2,35 @@
 
 #include "log2journal.h"
 
-static bool parse_replacement_pattern(REWRITE *rw);
-
 // ----------------------------------------------------------------------------
 
 void nd_log_cleanup(LOG_JOB *jb) {
+    if(jb->prefix) {
+        freez((void *) jb->prefix);
+        jb->prefix = NULL;
+    }
+
+    if(jb->pattern) {
+        freez((void *) jb->pattern);
+        jb->pattern = NULL;
+    }
+
     for(size_t i = 0; i < jb->injections.used ;i++)
-        txt_cleanup(&jb->injections.keys[i].value);
+        injection_cleanup(&jb->injections.keys[i]);
 
     for(size_t i = 0; i < jb->unmatched.injections.used ;i++)
-        txt_cleanup(&jb->unmatched.injections.keys[i].value);
+        injection_cleanup(&jb->unmatched.injections.keys[i]);
 
-    for(size_t i = 0; i < jb->dups.used ;i++) {
-        DUPLICATION *kd = &jb->dups.array[i];
+    for(size_t i = 0; i < jb->renames.used ;i++)
+        rename_cleanup(&jb->renames.array[i]);
 
-        if(kd->target)
-            freez(kd->target);
+    for(size_t i = 0; i < jb->dups.used ;i++)
+        duplication_cleanup(&jb->dups.array[i]);
 
-        for(size_t j = 0; j < kd->used ; j++) {
-            if (kd->keys[j])
-                freez(kd->keys[j]);
+    for(size_t i = 0; i < jb->rewrites.used; i++)
+        rewrite_cleanup(&jb->rewrites.array[i]);
 
-            if (kd->values[j].s)
-                freez(kd->values[j].s);
-        }
-    }
-
-    for(size_t i = 0; i < jb->rewrites.used; i++) {
-        REWRITE *rw = &jb->rewrites.array[i];
-
-        if (rw->key)
-            freez(rw->key);
-
-        if (rw->search_pattern)
-            freez(rw->search_pattern);
-
-        if (rw->replace_pattern)
-            freez(rw->replace_pattern);
-
-        if(rw->match_data)
-            pcre2_match_data_free(rw->match_data);
-
-        if (rw->re)
-            pcre2_code_free(rw->re);
-
-        // Cleanup for replacement nodes linked list
-        REWRITE_REPLACEMENT_NODE *current = rw->nodes;
-        while (current != NULL) {
-            REWRITE_REPLACEMENT_NODE *next = current->next;
-
-            if (current->s)
-                freez((void *)current->s);
-
-            freez(current);
-            current = next;
-        }
-    }
-
+    // remove references to everything else, to reveal them in valgrind
     memset(jb, 0, sizeof(*jb));
 }
 
@@ -92,103 +64,16 @@ bool log_job_add_key_prefix(LOG_JOB *jb, const char *prefix, size_t prefix_len) 
     return true;
 }
 
-static inline void log_job_injection_replace(INJECTION *kv, const char *key, size_t key_len, const char *value, size_t value_len) {
-    if(key_len > JOURNAL_MAX_KEY_LEN)
-        log2stderr("WARNING: injection key '%.*s' is too long for journal. Will be truncated.", (int)key_len, key);
-
-    if(value_len > JOURNAL_MAX_VALUE_LEN)
-        log2stderr("WARNING: injection value of key '%.*s' is too long for journal. Will be truncated.", (int)key_len, key);
-
-    copy_to_buffer(kv->key, sizeof(kv->key), key, key_len);
-    txt_replace(&kv->value, value, value_len);
-}
-
-bool log_job_add_injection(LOG_JOB *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched) {
-    if (unmatched) {
-        if (jb->unmatched.injections.used >= MAX_INJECTIONS) {
-            log2stderr("Error: too many unmatched injections. You can inject up to %d lines.", MAX_INJECTIONS);
-            return false;
-        }
-    }
-    else {
-        if (jb->injections.used >= MAX_INJECTIONS) {
-            log2stderr("Error: too many injections. You can inject up to %d lines.", MAX_INJECTIONS);
-            return false;
-        }
-    }
-
-    if (unmatched) {
-        log_job_injection_replace(&jb->unmatched.injections.keys[jb->unmatched.injections.used++], key, key_len, value
-                                  , value_len
-                                 );
-    } else {
-        log_job_injection_replace(&jb->injections.keys[jb->injections.used++], key, key_len, value, value_len);
-    }
-
-    return true;
-}
-
-bool log_job_add_rename(LOG_JOB *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len) {
-    if(jb->renames.used >= MAX_RENAMES) {
-        log2stderr("Error: too many renames. You can rename up to %d fields.", MAX_RENAMES);
+bool log_job_set_pattern(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
+    if(!pattern || !*pattern) {
+        log2stderr("filename key cannot be empty.");
         return false;
     }
 
-    RENAME *rn = &jb->renames.array[jb->renames.used++];
-    rn->new_key = strndupz(new_key, new_key_len);
-    rn->new_hash = XXH3_64bits(rn->new_key, strlen(rn->new_key));
-    rn->old_key = strndupz(old_key, old_key_len);
-    rn->old_hash = XXH3_64bits(rn->old_key, strlen(rn->old_key));
+    if(jb->pattern)
+        freez((char*)jb->pattern);
 
-    return true;
-}
-
-static inline pcre2_code *jb_compile_pcre2_pattern(const char *pattern) {
-    int error_number;
-    PCRE2_SIZE error_offset;
-    PCRE2_SPTR pattern_ptr = (PCRE2_SPTR)pattern;
-
-    pcre2_code *re = pcre2_compile(pattern_ptr, PCRE2_ZERO_TERMINATED, 0, &error_number, &error_offset, NULL);
-    if (re == NULL) {
-        PCRE2_UCHAR buffer[1024];
-        pcre2_get_error_message(error_number, buffer, sizeof(buffer));
-        log2stderr("PCRE2 compilation failed at offset %d: %s", (int)error_offset, buffer);
-        log2stderr("Check for common regex syntax errors or unsupported PCRE2 patterns.");
-        return NULL;
-    }
-
-    return re;
-}
-
-bool log_job_add_rewrite(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern) {
-    if(jb->rewrites.used >= MAX_REWRITES) {
-        log2stderr("Error: too many rewrites. You can add up to %d rewrite rules.", MAX_REWRITES);
-        return false;
-    }
-
-    pcre2_code *re = jb_compile_pcre2_pattern(search_pattern);
-    if (!re) {
-        return false;
-    }
-
-    REWRITE *rw = &jb->rewrites.array[jb->rewrites.used++];
-    rw->key = strdupz(key);
-    rw->hash = XXH3_64bits(rw->key, strlen(rw->key));
-    rw->search_pattern = strdupz(search_pattern);
-    rw->replace_pattern = strdupz(replace_pattern);
-    rw->re = re;
-    rw->match_data = pcre2_match_data_create_from_pattern(rw->re, NULL);
-
-    // Parse the replacement pattern and create the linked list
-    if (!parse_replacement_pattern(rw)) {
-        pcre2_match_data_free(rw->match_data);
-        pcre2_code_free(rw->re);
-        freez(rw->key);
-        freez(rw->search_pattern);
-        freez(rw->replace_pattern);
-        jb->rewrites.used--;
-        return false;
-    }
+    jb->pattern = strndupz(pattern, pattern_len);
 
     return true;
 }
@@ -235,87 +120,6 @@ bool log_job_add_key_to_duplication(DUPLICATION *kd, const char *key, size_t key
 }
 
 // ----------------------------------------------------------------------------
-// command line params
-
-REWRITE_REPLACEMENT_NODE *add_replacement_node(REWRITE_REPLACEMENT_NODE **head, bool is_variable, const char *text) {
-    REWRITE_REPLACEMENT_NODE *new_node = mallocz(sizeof(REWRITE_REPLACEMENT_NODE));
-    if (!new_node)
-        return NULL;
-
-    new_node->is_variable = is_variable;
-    new_node->s = text;
-    new_node->len = strlen(text);
-    new_node->next = NULL;
-
-    if (*head == NULL)
-        *head = new_node;
-
-    else {
-        REWRITE_REPLACEMENT_NODE *current = *head;
-
-        // append it
-        while (current->next != NULL)
-            current = current->next;
-
-        current->next = new_node;
-    }
-
-    return new_node;
-}
-
-static bool parse_replacement_pattern(REWRITE *rw) {
-    const char *current = rw->replace_pattern;
-
-    while (*current != '\0') {
-        if (*current == '$' && *(current + 1) == '{') {
-            // Start of a variable
-            const char *end = strchr(current, '}');
-            if (!end) {
-                log2stderr("Error: Missing closing brace in replacement pattern: %s", rw->replace_pattern);
-                return false;
-            }
-
-            size_t name_length = end - current - 2; // Length of the variable name
-            char *variable_name = strndupz(current + 2, name_length);
-            if (!variable_name) {
-                log2stderr("Error: Memory allocation failed for variable name.");
-                return false;
-            }
-
-            REWRITE_REPLACEMENT_NODE *node = add_replacement_node(&(rw->nodes), true, variable_name);
-            if (!node) {
-                freez(variable_name);
-                log2stderr("Error: Failed to add replacement node for variable.");
-                return false;
-            }
-
-            current = end + 1; // Move past the variable
-        }
-        else {
-            // Start of literal text
-            const char *start = current;
-            while (*current != '\0' && !(*current == '$' && *(current + 1) == '{')) {
-                current++;
-            }
-
-            size_t text_length = current - start;
-            char *text = strndupz(start, text_length);
-            if (!text) {
-                log2stderr("Error: Memory allocation failed for literal text.");
-                return false;
-            }
-
-            REWRITE_REPLACEMENT_NODE *node = add_replacement_node(&(rw->nodes), false, text);
-            if (!node) {
-                freez(text);
-                log2stderr("Error: Failed to add replacement node for text.");
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
 
 static bool parse_rename(LOG_JOB *jb, const char *param) {
     // Search for '=' in param
@@ -331,7 +135,7 @@ static bool parse_rename(LOG_JOB *jb, const char *param) {
     const char *old_key = equal_sign + 1;
     size_t old_key_len = strlen(old_key);
 
-    return log_job_add_rename(jb, new_key, new_key_len, old_key, old_key_len);
+    return log_job_rename_add(jb, new_key, new_key_len, old_key, old_key_len);
 }
 
 static bool is_symbol(char c) {
@@ -383,7 +187,7 @@ static bool parse_rewrite(LOG_JOB *jb, const char *param) {
     char *search_pattern = strndupz(equal_sign + 2, second_separator - (equal_sign + 2));
     char *replace_pattern = strdupz(second_separator + 1);
 
-    bool ret = log_job_add_rewrite(jb, key, search_pattern, replace_pattern);
+    bool ret = log_job_rewrite_add(jb, key, search_pattern, replace_pattern);
 
     freez(key);
     freez(search_pattern);
@@ -401,7 +205,7 @@ static bool parse_inject(LOG_JOB *jb, const char *value, bool unmatched) {
 
     const char *key = value;
     const char *val = equal + 1;
-    log_job_add_injection(jb, key, equal - key, val, strlen(val), unmatched);
+    log_job_injection_add(jb, key, equal - key, val, strlen(val), unmatched);
 
     return true;
 }
@@ -476,7 +280,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                 }
                 else {
                     if (!jb->pattern) {
-                        jb->pattern = arg;
+                        log_job_set_pattern(jb, arg, strlen(arg));
                         continue;
                     } else {
                         log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
@@ -528,7 +332,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
             else {
                 i--;
                 if (!jb->pattern) {
-                    jb->pattern = arg;
+                    log_job_set_pattern(jb, arg, strlen(arg));
                     continue;
                 } else {
                     log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);

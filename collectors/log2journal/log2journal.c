@@ -70,18 +70,18 @@ static char *rewrite_value(LOG_JOB *jb, const char *key, XXH64_hash_t hash, cons
         REWRITE *rw = &jb->rewrites.array[i];
 
         if (rw->hash == hash && strcmp(rw->key, key) == 0) {
-            if(pcre2_match(rw->re, (PCRE2_SPTR)value, value_len, 0, 0, rw->match_data, NULL) < 0)
+            if(pcre2_match(rw->search.re, (PCRE2_SPTR)value, value_len, 0, 0, rw->search.match_data, NULL) < 0)
                 continue; // No match found, skip to next rewrite rule
 
-            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(rw->match_data);
+            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(rw->search.match_data);
 
             char *buffer = rewritten_value;
             size_t buffer_remaining = sizeof(rewritten_value);
 
             // Iterate through the linked list of replacement nodes
-            for (REWRITE_REPLACEMENT_NODE *node = rw->nodes; node != NULL; node = node->next) {
+            for (REPLACE_NODE *node = rw->replace.nodes; node != NULL; node = node->next) {
                 if (node->is_variable) {
-                    uint32_t groupnumber = pcre2_substring_number_from_name(rw->re, (PCRE2_SPTR)node->s);
+                    uint32_t groupnumber = pcre2_substring_number_from_name(rw->search.re, (PCRE2_SPTR)node->s);
                     PCRE2_SIZE start_offset = ovector[2 * groupnumber];
                     PCRE2_SIZE end_offset = ovector[2 * groupnumber + 1];
                     PCRE2_SIZE length = end_offset - start_offset;
