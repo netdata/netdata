@@ -828,12 +828,12 @@ static size_t yaml_parse_initialized(yaml_parser_t *parser, LOG_JOB *jb) {
         yaml_event_delete(&event);
     }
 
-    if(!yaml_parse_expect_event(parser, YAML_DOCUMENT_END_EVENT)) {
+    if(!errors && !yaml_parse_expect_event(parser, YAML_DOCUMENT_END_EVENT)) {
         errors++;
         goto cleanup;
     }
 
-    if(!yaml_parse_expect_event(parser, YAML_STREAM_END_EVENT)) {
+    if(!errors && !yaml_parse_expect_event(parser, YAML_STREAM_END_EVENT)) {
         errors++;
         goto cleanup;
     }
