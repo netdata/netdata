@@ -313,22 +313,29 @@ tail -n $last -F /var/log/nginx/*access.log \
 
 ```
 
-Netdata log2journal v1.43.0-276-gfff8d1181
+Netdata log2journal v1.43.0-306-g929866ad3
 
-Convert structured log input to systemd Journal Export Format.
+Convert logs to systemd Journal Export Format.
 
-Using PCRE2 patterns, extract the fields from structured logs on the standard
-input, and generate output according to systemd Journal Export Format.
+ - JSON logs: extracts all JSON fields.
+ - logfmt logs: extracts all logfmt fields.
+ - free-form logs: uses PCRE2 patterns to extracts fields.
 
-Usage: ./log2journal [OPTIONS] PATTERN
+Usage: ./log2journal [OPTIONS] PATTERN|json
 
 Options:
 
-  --file /path/to/file.yaml
+  --file /path/to/file.yaml or -f /path/to/file.yaml
        Read yaml configuration file for instructions.
 
+  --config CONFIG_NAME
+       Run with the internal configuration named CONFIG_NAME.
+       Available internal configs:
+
+       nginx-combined nginx-json 
+
   --show-config
-       Show the configuration in yaml format before starting the job.
+       Show the configuration in YAML format before starting the job.
        This is also an easy way to convert command line parameters to yaml.
 
   --filename-key KEY
@@ -348,6 +355,7 @@ Options:
        Create a new key called TARGET, duplicating the values of the keys
        given. Useful for further processing. When multiple keys are given,
        their values are separated by comma.
+
        Up to 512 duplications can be given on the command line, and up to
        20 keys per duplication command are allowed.
 
@@ -355,12 +363,14 @@ Options:
        Inject constant fields to the output (both matched and unmatched logs).
        --inject entries are added to unmatched lines too, when their key is
        not used in --inject-unmatched (--inject-unmatched override --inject).
+
        Up to 512 fields can be injected.
 
   --inject-unmatched LINE
        Inject lines into the output for each unmatched log entry.
        Usually, --inject-unmatched=PRIORITY=3 is needed to mark the unmatched
        lines as errors, so that they can easily be spotted in the journals.
+
        Up to 512 such lines can be injected.
 
   --rewrite KEY=/SearchPattern/ReplacePattern
@@ -369,6 +379,7 @@ Options:
        be used between the search pattern and the replacement pattern.
        The search pattern is a PCRE2 regular expression, and the replacement
        pattern supports literals and named capture groups from the search pattern.
+
        Example:
               --rewrite DATE=/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/
                              ${day}/${month}/${year}
@@ -376,57 +387,109 @@ Options:
 
        Only one rewrite rule is applied per key; the sequence of rewrites stops
        for the key once a rule matches it. This allows providing a sequence of
-       independent rewriting rules for the same key, matching the different values
-       the key may get, and also provide a catch-all rewrite rule at the end of the
-       sequence for setting the key value if no other rule matched it.
+       independent rewriting rules for the same key, matching the different
+       values the key may get, and also provide a catch-all rewrite rule at the
+       end, for setting the key value if no other rule matched it.
 
-       The combination of duplicating keys with the values of multiple other keys
-       combined with multiple rewrite rules, allows creating complex rules for
-       rewriting key values.
+       Duplication of keys with the values of multiple other keys, combined with
+       multiple value rewriting rules, allows creating complex rules for adding
+       new keys, based on the values of existing keys.
 
        Up to 512 rewriting rules are allowed.
 
-  -h, --help
+  --include PATTERN
+       Include only keys matching the PCRE2 PATTERN.
+       Useful when parsing JSON of logfmt logs, to include only the keys given.
+       The keys are matched after the PREFIX has been added to them.
+
+  --exclude PATTERN
+       Exclude the keys matching the PCRE2 PATTERN.
+       Useful when parsing JSON of logfmt logs, to exclude some of the keys given.
+       The keys are matched after the PREFIX has been added to them.
+
+       When both include and exclude patterns are set and both match a key,
+       exclude wins and the key will not be added, like a pipeline, we first
+       include it and then exclude it.
+
+  --prefix PREFIX
+       Prefix all fields with PREFIX. The PREFIX is added before processing
+       duplications, renames and rewrites, so that the extracted keys have to
+       be matched with the PREFIX in them.
+       PREFIX is assumed to be systemd-journal friendly.
+
+  --rename NEW=OLD
+       Rename fields, before rewriting their values.
+
+       Up to 512 renaming rules are allowed.
+
+  -h, or --help
        Display this help and exit.
 
   PATTERN
        PATTERN should be a valid PCRE2 regular expression.
        RE2 regular expressions (like the ones usually used in Go applications),
        are usually valid PCRE2 patterns too.
-       Regular expressions without named groups are ignored.
+       Sub-expressions without named groups are evaluated, but their matches are
+       not added to the output.
+
+  JSON mode
+       JSON mode is enabled when the pattern is set to: json
+       Field names are extracted from the JSON logs and are converted to the
+       format expected by Journal Export Format (all caps, only _ is allowed).
+
+  logfmt mode
+       logfmt mode is enabled when the pattern is set to: logfmt
+       Field names are extracted from the logfmt logs and are converted to the
+       format expected by Journal Export Format (all caps, only _ is allowed).
+
 
 The program accepts all parameters as both --option=value and --option value.
 
-The maximum line length accepted is 1048576 characters.
-The maximum number of fields in the PCRE2 pattern is 1024.
+The maximum log line length accepted is 1048576 characters.
 
 PIPELINE AND SEQUENCE OF PROCESSING
 
 This is a simple diagram of the pipeline taking place:
+                                                                 
+          +---------------------------------------------------+  
+          |                       INPUT                       |  
+          |             read one log line at a time           |  
+          +---------------------------------------------------+  
+                           v                          v          
+          +---------------------------------+         |          
+          |   EXTRACT FIELDS AND VALUES     |         |          
+          |  JSON, logfmt, or pattern based |         |          
+          |    (apply optional PREFIX)      |         |          
+          +---------------------------------+         |          
+                  v                 v                 |          
+          +---------------+  +--------------+         |          
+          |   DUPLICATE   |  |    FILTER    |         |          
+          |               |  | filter keys  |         |          
+          |  create new   |  +--------------+         |          
+          |  fields by    |         v                 |          
+          |  duplicating  |  +--------------+         |          
+          |  other fields |  |    RENAME    |         |          
+          |  and their    |  |    change    |         |          
+          |  values       |  | field names  |         |          
+          +---------------+  +--------------+         |          
+                  v                 v                 v          
+          +---------------------------------+  +--------------+  
+          |        REWRITE PIPELINES        |  |    INJECT    |  
+          |  altering the values of fields  |  |   constants  |  
+          +---------------------------------+  +--------------+  
+                          v                           v          
+          +---------------------------------------------------+  
+          |                       OUTPUT                      |  
+          |           generate Journal Export Format          |  
+          +---------------------------------------------------+  
+                                                                 
+IMPORTANT:
+ - Extraction of keys includes formatting them according to journal rules.
+ - Duplication rules use the original extracted field names, after they have
+   been prefixed (when a PREFIX is set) and before they are renamed.
+ - Rewriting is always the last stage, so the final field names are matched.
 
-           +---------------------------------------------------+
-           |                       INPUT                       |
-           +---------------------------------------------------+
-                            v                          v
-           +---------------------------------+         |
-           |   EXTRACT FIELDS AND VALUES     |         |
-           +---------------------------------+         |
-                  v                  v                 |
-           +---------------+         |                 |
-           |   DUPLICATE   |         |                 |
-           | create fields |         |                 |
-           |  with values  |         |                 |
-           +---------------+         |                 |
-                  v                  v                 v
-           +---------------------------------+  +--------------+
-           |         REWRITE PIPELINES       |  |    INJECT    |
-           |        altering the values      |  |   constants  |
-           +---------------------------------+  +--------------+
-                             v                          v
-           +---------------------------------------------------+
-           |                       OUTPUT                      |
-           +---------------------------------------------------+
-
+--------------------------------------------------------------------------------
 JOURNAL FIELDS RULES (enforced by systemd-journald)
 
      - field names can be up to 64 characters
@@ -458,106 +521,9 @@ JOURNAL FIELDS RULES (enforced by systemd-journald)
 
 You can find the most common fields at 'man systemd.journal-fields'.
 
-Example YAML file:
-
---------------------------------------------------------------------------------
-# Netdata log2journal Configuration Template
-# The following parses nginx log files using the combined format.
-
-# The PCRE2 pattern to match log entries and give names to the fields.
-# The journal will have these names, so follow their rules. You can
-# initiate an extended PCRE2 pattern by starting the pattern with (?x)
-pattern: |
-  (?x)                                   # Enable PCRE2 extended mode
-  ^
-  (?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR
-  (?<NGINX_REMOTE_USER>[^ ]+) \s         # NGINX_REMOTE_USER
-  \[
-    (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
-  \]
-  \s+ "
-  (?<MESSAGE>
-    (?<NGINX_METHOD>[A-Z]+) \s+          # NGINX_METHOD
-    (?<NGINX_URL>[^ ]+) \s+
-    HTTP/(?<NGINX_HTTP_VERSION>[^"]+)
-  )
-  " \s+
-  (?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
-  (?<NGINX_BODY_BYTES_SENT>\d+) \s+      # NGINX_BODY_BYTES_SENT
-  "(?<NGINX_HTTP_REFERER>[^"]*)" \s+     # NGINX_HTTP_REFERER
-  "(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT
-
-# When log2journal can detect the filename of each log entry (tail gives it
-# only when it tails multiple files), this key will be used to send the
-# filename to the journals.
-filename:
-  key: NGINX_LOG_FILENAME
-
-# Duplicate fields under a different name. You can duplicate multiple fields
-# to a new one and then use rewrite rules to change its value.
-duplicate:
-
-  # we insert the field PRIORITY as a copy of NGINX_STATUS.
-  - key: PRIORITY
-    values_of:
-    - NGINX_STATUS
-
-  # we inject the field NGINX_STATUS_FAMILY as a copy of NGINX_STATUS.
-  - key: NGINX_STATUS_FAMILY
-    values_of: 
-    - NGINX_STATUS
-
-# Inject constant fields into the journal logs.
-inject:
-  - key: SYSLOG_IDENTIFIER
-    value: "nginx-log"
-
-# Rewrite the value of fields (including the duplicated ones).
-# The search pattern can have named groups, and the replace pattern can use
-# them as ${name}.
-rewrite:
-  # PRIORTY is a duplicate of NGINX_STATUS
-  # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
-  - key: "PRIORITY"
-    search: "^[123]"
-    replace: 6
-
-  - key: "PRIORITY"
-    search: "^4"
-    replace: 5
-
-  - key: "PRIORITY"
-    search: "^5"
-    replace: 3
-
-  - key: "PRIORITY"
-    search: ".*"
-    replace: 4
-  
-  # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
-  - key: "NGINX_STATUS_FAMILY"
-    search: "^(?<first_digit>[1-5])"
-    replace: "${first_digit}xx"
-
-  - key: "NGINX_STATUS_FAMILY"
-    search: ".*"
-    replace: "UNKNOWN"
-
-# Control what to do when input logs do not match the main PCRE2 pattern.
-unmatched:
-  # The journal key to log the PCRE2 error message to.
-  # Set this to MESSAGE, so you to see the error in the log.
-  key: MESSAGE
-  
-  # Inject static fields to the unmatched entries.
-  # Set PRIORITY=1 (alert) to help you spot unmatched entries in the logs.
-  inject:
-   - key: PRIORITY
-     value: 1
-
---------------------------------------------------------------------------------
-
 ```
+
+`log2journal` supports YAML configuration files, like the ones found [in this directory](log2journal.d/).
 
 ## `systemd-cat-native` options
 

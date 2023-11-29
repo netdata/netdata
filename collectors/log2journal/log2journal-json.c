@@ -205,6 +205,22 @@ static bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
     return true;
 }
 
+static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 'n';
+        (*remaining) -= 2;
+    }
+}
+
+static inline void copy_tab(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 't';
+        (*remaining) -= 2;
+    }
+}
+
 static inline bool json_parse_string(LOG_JSON_STATE *js) {
     static __thread char value[JOURNAL_MAX_VALUE_LEN];
 
@@ -226,25 +242,22 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
 
             switch (*s) {
                 case 'n':
-                    c = '\n';
+                    copy_newline(js, &d, &remaining);
                     s++;
-                    break;
+                    continue;
+
                 case 't':
-                    c = '\t';
+                    copy_tab(js, &d, &remaining);
                     s++;
-                    break;
-                case 'b':
-                    c = '\b';
-                    s++;
-                    break;
+                    continue;
+
                 case 'f':
-                    c = '\f';
-                    s++;
-                    break;
+                case 'b':
                 case 'r':
-                    c = '\r';
+                    c = ' ';
                     s++;
                     break;
+
                 case 'u':
                     if(isxdigit(s[1]) && isxdigit(s[2]) && isxdigit(s[3]) && isxdigit(s[4])) {
                         char b[5] = {

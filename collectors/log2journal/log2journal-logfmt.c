@@ -32,6 +32,22 @@ static inline void logfmt_skip_spaces(LOGFMT_STATE *lfs) {
     lfs->pos += s - start;
 }
 
+static inline void copy_newline(LOGFMT_STATE *lfs __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 'n';
+        (*remaining) -= 2;
+    }
+}
+
+static inline void copy_tab(LOGFMT_STATE *lfs __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 't';
+        (*remaining) -= 2;
+    }
+}
+
 static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
     static __thread char value[JOURNAL_MAX_VALUE_LEN];
 
@@ -56,25 +72,22 @@ static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
 
             switch (*s) {
                 case 'n':
-                    c = '\n';
+                    copy_newline(lfs, &d, &remaining);
                     s++;
-                    break;
+                    continue;
+
                 case 't':
-                    c = '\t';
+                    copy_tab(lfs, &d, &remaining);
                     s++;
-                    break;
-                case 'b':
-                    c = '\b';
-                    s++;
-                    break;
+                    continue;
+
                 case 'f':
-                    c = '\f';
-                    s++;
-                    break;
+                case 'b':
                 case 'r':
-                    c = '\r';
+                    c = ' ';
                     s++;
                     break;
+
                 default:
                     c = *s++;
                     break;
