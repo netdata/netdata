@@ -170,9 +170,9 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, const char *key) {
             k->flags |= HK_COLLISION_CHECKED;
 
             if(strcmp(k->key, key) != 0)
-                log2stderr("Hashtable collision detected on key '%s' (hash %x) and '%s' (hash %x). "
+                log2stderr("Hashtable collision detected on key '%s' (hash %lx) and '%s' (hash %lx). "
                            "Please report this to Netdata.",
-                        k->key, k->hash, key, key_hash);
+                        k->key, (unsigned long)k->hash, key, (unsigned long)key_hash);
         }
     }
     else {
