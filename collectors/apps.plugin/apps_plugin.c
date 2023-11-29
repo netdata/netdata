@@ -951,17 +951,16 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 }
 
 // read the apps_groups.conf file
-static int read_apps_groups_conf(const char *path, const char *file)
+static int read_apps_groups_conf(const char *path,  bool should_exist)
 {
     char filename[FILENAME_MAX + 1];
-
-    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", path, file);
+    snprintfz(filename, FILENAME_MAX, "%s/apps_groups.conf", path);
 
     debug_log("process groups file: '%s'", filename);
 
     // ----------------------------------------
 
-    procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
+    procfile *ff = procfile_open(filename, " :\t", should_exist ? PROCFILE_FLAG_DEFAULT : PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
     if(!ff) return 1;
 
     procfile_set_quotes(ff, "'\"");
@@ -1017,7 +1016,6 @@ static int read_apps_groups_conf(const char *path, const char *file)
 
     return 0;
 }
-
 
 // ----------------------------------------------------------------------------
 // struct pid_stat management
@@ -4201,10 +4199,10 @@ static void parse_args(int argc, char **argv)
 
     if(freq > 0) update_every = freq;
 
-    if(read_apps_groups_conf(user_config_dir, "groups")) {
+    if(read_apps_groups_conf(user_config_dir, false)) {
         netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
-        if(read_apps_groups_conf(stock_config_dir, "groups")) {
+        if(read_apps_groups_conf(stock_config_dir, true)) {
             netdata_log_error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
             exit(1);
         }
