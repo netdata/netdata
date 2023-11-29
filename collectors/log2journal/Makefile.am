@@ -6,6 +6,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 dist_noinst_DATA = \
     tests.sh \
     README.md \
+    tests.d/* \
     $(NULL)
 
 log2journalconfigdir=$(libconfigdir)/log2journal.d
