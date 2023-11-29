@@ -235,22 +235,22 @@ void aclk_mqtt_wss_log_cb(mqtt_wss_log_type_t log_type, const char* str)
     switch(log_type) {
         case MQTT_WSS_LOG_ERROR:
         case MQTT_WSS_LOG_FATAL:
+            nd_log(NDLS_DAEMON, NDLP_ERR, "%s", str);
+            return;
+
         case MQTT_WSS_LOG_WARN:
-            error_report("%s", str);
+            nd_log(NDLS_DAEMON, NDLP_WARNING, "%s", str);
             return;
 
         case MQTT_WSS_LOG_INFO:
-            nd_log(NDLS_DAEMON, NDLP_INFO,
-                   "%s",
-                   str);
+            nd_log(NDLS_DAEMON, NDLP_INFO, "%s", str);
             return;
 
         case MQTT_WSS_LOG_DEBUG:
             return;
 
         default:
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "Unknown log type from mqtt_wss");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Unknown log type from mqtt_wss");
     }
 }
 
