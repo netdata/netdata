@@ -48,10 +48,10 @@ test_log2journal_config() {
   "${log2journal_bin}" <"${in}" "${@}" >output 2>&1
   ret=$?
 
-  [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && return 1
+  [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && exit 1
 
   diff --ignore-all-space "${out}" output
-  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match!" && return 1
+  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match!" && exit 1
 
   echo >&2 "OK"
   echo >&2
@@ -122,10 +122,10 @@ test_log2journal() {
   "${log2journal_bin}" <"${in}" "${@}" >output 2>&1
   ret=$?
 
-  [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && return 1
+  [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && exit 1
 
   diff "${out}" output
-  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match!" && cat output && return 1
+  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match!" && cat output && exit 1
 
   echo >&2 "OK"
   echo >&2
