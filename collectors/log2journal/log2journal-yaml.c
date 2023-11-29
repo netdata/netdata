@@ -664,7 +664,7 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
         switch (event.type) {
             case YAML_MAPPING_START_EVENT:
             {
-                struct key_rename rn = {0};
+                struct key_rename rn = { 0 };
 
                 bool mapping_finished = false;
                 while (!errors && !mapping_finished) {
@@ -681,7 +681,7 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rename new_key");
                                     errors++;
                                 } else {
-                                    rn.new_key.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    hashed_key_len_set(&rn.new_key, (char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else if (yaml_scalar_matches(&sub_event, "old_key", strlen("old_key"))) {
@@ -689,7 +689,7 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rename old_key");
                                     errors++;
                                 } else {
-                                    rn.old_key.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    hashed_key_len_set(&rn.old_key, (char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else {

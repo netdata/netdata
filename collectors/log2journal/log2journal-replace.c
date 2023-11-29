@@ -22,7 +22,7 @@ void replace_pattern_cleanup(REPLACE_PATTERN *rp) {
 }
 
 static REPLACE_NODE *replace_pattern_add_node(REPLACE_NODE **head, bool is_variable, const char *text) {
-    REPLACE_NODE *new_node = mallocz(sizeof(REPLACE_NODE));
+    REPLACE_NODE *new_node = callocz(1, sizeof(REPLACE_NODE));
     if (!new_node)
         return NULL;
 

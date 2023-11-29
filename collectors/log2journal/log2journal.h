@@ -68,6 +68,12 @@ static inline void *mallocz(size_t size) {
     return ptr;
 }
 
+static inline void *callocz(size_t elements, size_t size) {
+    void *ptr = mallocz(elements * size);
+    memset(ptr, 0, elements * size);
+    return ptr;
+}
+
 static inline char *strdupz(const char *s) {
     char *ptr = strdup(s);
     if (!ptr) {
