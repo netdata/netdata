@@ -224,6 +224,7 @@ LIBNETDATA_FILES = \
     libnetdata/http/http_defs.h \
     libnetdata/dyn_conf/dyn_conf.c \
     libnetdata/dyn_conf/dyn_conf.h \
+    libnetdata/simple_hashtable.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF

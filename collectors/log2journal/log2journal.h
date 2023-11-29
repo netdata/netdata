@@ -15,34 +15,6 @@
 #include <ctype.h>
 #include <stdarg.h>
 
-#define XXH_INLINE_ALL
-#include "../../libnetdata/xxhash.h"
-
-#define PCRE2_CODE_UNIT_WIDTH 8
-#include <pcre2.h>
-
-#ifdef HAVE_LIBYAML
-#include <yaml.h>
-#endif
-
-#define MAX_OUTPUT_KEYS 1024
-#define MAX_LINE_LENGTH (1024 * 1024)
-#define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 2)
-#define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
-#define MAX_REWRITES (MAX_OUTPUT_KEYS / 2)
-#define MAX_RENAMES (MAX_OUTPUT_KEYS / 2)
-#define MAX_KEY_DUPS_KEYS 20
-
-#define JOURNAL_MAX_KEY_LEN 64              // according to systemd-journald
-#define JOURNAL_MAX_VALUE_LEN (48 * 1024)   // according to systemd-journald
-
-#define LOG2JOURNAL_CONFIG_PATH LIBCONFIG_DIR "/log2journal.d"
-
-// ----------------------------------------------------------------------------
-// character conversion for journal keys
-
-extern const char journal_key_characters_map[256];
-
 // ----------------------------------------------------------------------------
 // logging
 
@@ -96,6 +68,37 @@ static inline void freez(void *ptr) {
     if (ptr)
         free(ptr);
 }
+
+// ----------------------------------------------------------------------------
+
+#define XXH_INLINE_ALL
+#include "../../libnetdata/xxhash.h"
+#include "../../libnetdata/simple_hashtable.h"
+
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
+
+#ifdef HAVE_LIBYAML
+#include <yaml.h>
+#endif
+
+#define MAX_OUTPUT_KEYS 1024
+#define MAX_LINE_LENGTH (1024 * 1024)
+#define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 2)
+#define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
+#define MAX_REWRITES (MAX_OUTPUT_KEYS / 2)
+#define MAX_RENAMES (MAX_OUTPUT_KEYS / 2)
+#define MAX_KEY_DUPS_KEYS 20
+
+#define JOURNAL_MAX_KEY_LEN 64              // according to systemd-journald
+#define JOURNAL_MAX_VALUE_LEN (48 * 1024)   // according to systemd-journald
+
+#define LOG2JOURNAL_CONFIG_PATH LIBCONFIG_DIR "/log2journal.d"
+
+// ----------------------------------------------------------------------------
+// character conversion for journal keys
+
+extern const char journal_key_characters_map[256];
 
 // ----------------------------------------------------------------------------
 // copy to buffer, while ensuring there is no buffer overflow
@@ -167,7 +170,17 @@ static inline void txt_replace(TEXT *t, const char *s, size_t len) {
 // ----------------------------------------------------------------------------
 
 typedef enum __attribute__((__packed__)) {
-    HK_NONE = 0,
+    HK_NONE              = 0,
+    HK_ALLOCATED         = (1 << 0),
+    HK_FILTERED          = (1 << 1),
+    HK_FILTERED_INCLUDED = (1 << 2),
+    HK_COLLISION_CHECKED = (1 << 3),
+    HK_RENAMES_CHECKED   = (1 << 4),
+    HK_HAS_RENAMES       = (1 << 5),
+    HK_DUPS_CHECKED      = (1 << 6),
+    HK_HAS_DUPS          = (1 << 7),
+    HK_REWRITES_CHECKED  = (1 << 8),
+    HK_HAS_REWRITES      = (1 << 9),
 } HASHED_KEY_FLAGS;
 
 typedef struct hashed_key {
@@ -190,6 +203,7 @@ static inline void hashed_key_set(HASHED_KEY *k, const char *name) {
     k->key = strdupz(name);
     k->len = strlen(k->key);
     k->hash = XXH3_64bits(k->key, k->len);
+    k->flags = HK_NONE;
 }
 
 static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t len) {
@@ -198,6 +212,7 @@ static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t le
     k->key = strndupz(name, len);
     k->len = len;
     k->hash = XXH3_64bits(k->key, k->len);
+    k->flags = HK_NONE;
 }
 
 // ----------------------------------------------------------------------------
@@ -285,6 +300,8 @@ typedef struct log_job {
 
     const char *pattern;
     const char *prefix;
+
+    SIMPLE_HASHTABLE hashtable;
 
     struct {
         SEARCH_PATTERN include;
