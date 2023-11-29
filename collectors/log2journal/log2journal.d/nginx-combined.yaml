@@ -13,10 +13,10 @@ pattern: |
     (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
   \]
   \s+ "
-  (?<MESSAGE>
-    (?<NGINX_METHOD>[A-Z]+) \s+          # NGINX_METHOD
-    (?<NGINX_URL>[^ ]+) \s+
-    HTTP/(?<NGINX_HTTP_VERSION>[^"]+)
+  (?<NGINX_REQUEST>
+    (?<NGINX_REQUEST_METHOD>[A-Z]+) \s+  # NGINX_METHOD
+    (?<NGINX_REQUEST_URI>[^ ]+) \s+
+    (?<NGINX_SERVER_PROTOCOL>[^"]+)
   )
   " \s+
   (?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
@@ -29,6 +29,10 @@ pattern: |
 # filename to the journals.
 filename:
   key: NGINX_LOG_FILENAME
+
+rename:
+  - new_key: MESSAGE
+    old_key: NGINX_REQUEST
 
 # Duplicate fields under a different name. You can duplicate multiple fields
 # to a new one and then use rewrite rules to change its value.

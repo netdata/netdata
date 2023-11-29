@@ -18,6 +18,7 @@ Makefile.in
 .*.swp
 *.old
 *.log
+!collectors/log2journal/tests.d/*.log
 *.pyc
 
 Makefile

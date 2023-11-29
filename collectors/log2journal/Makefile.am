@@ -4,9 +4,13 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 dist_noinst_DATA = \
+    tests.sh \
     README.md \
+    tests.d/* \
     $(NULL)
 
-dist_libconfig_DATA = \
+log2journalconfigdir=$(libconfigdir)/log2journal.d
+dist_log2journalconfig_DATA = \
     log2journal.d/nginx-combined.yaml \
+    log2journal.d/nginx-json.yaml \
     $(NULL)

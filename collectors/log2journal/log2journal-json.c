@@ -2,20 +2,20 @@
 
 #include "log2journal.h"
 
-#define ERROR_LINE_MAX 1024
-#define KEY_MAX 1024
+#define JSON_ERROR_LINE_MAX 1024
+#define JSON_KEY_MAX 1024
 #define JSON_DEPTH_MAX 100
 
 struct log_json_state {
+    LOG_JOB *jb;
+
     const char *line;
-    size_t pos;
-    char msg[ERROR_LINE_MAX];
+    uint32_t pos;
+    uint32_t depth;
+    char *stack[JSON_DEPTH_MAX];
 
-    char key[KEY_MAX];
-    char *key_stack[JSON_DEPTH_MAX];
-    size_t depth;
-
-    struct log_job *jb;
+    char key[JSON_KEY_MAX];
+    char msg[JSON_ERROR_LINE_MAX];
 };
 
 static inline bool json_parse_object(LOG_JSON_STATE *js);
@@ -25,7 +25,7 @@ static inline bool json_parse_array(LOG_JSON_STATE *js);
 #define json_consume_char(js) ++(js)->pos
 
 static inline void json_process_key_value(LOG_JSON_STATE *js, const char *value, size_t len) {
-    jb_send_extracted_key_value(js->jb, js->key, value, len);
+    log_job_send_extracted_key_value(js->jb, js->key, value, len);
 }
 
 static inline void json_skip_spaces(LOG_JSON_STATE *js) {
@@ -205,8 +205,24 @@ static bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
     return true;
 }
 
+static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 'n';
+        (*remaining) -= 2;
+    }
+}
+
+static inline void copy_tab(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
+    if(*remaining > 3) {
+        *(*d)++ = '\\';
+        *(*d)++ = 't';
+        (*remaining) -= 2;
+    }
+}
+
 static inline bool json_parse_string(LOG_JSON_STATE *js) {
-    static __thread char value[MAX_VALUE_LEN];
+    static __thread char value[JOURNAL_MAX_VALUE_LEN];
 
     if(!json_expect_char_after_white_space(js, "\""))
         return false;
@@ -226,25 +242,22 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
 
             switch (*s) {
                 case 'n':
-                    c = '\n';
+                    copy_newline(js, &d, &remaining);
                     s++;
-                    break;
+                    continue;
+
                 case 't':
-                    c = '\t';
+                    copy_tab(js, &d, &remaining);
                     s++;
-                    break;
-                case 'b':
-                    c = '\b';
-                    s++;
-                    break;
+                    continue;
+
                 case 'f':
-                    c = '\f';
-                    s++;
-                    break;
+                case 'b':
                 case 'r':
-                    c = '\r';
+                    c = ' ';
                     s++;
                     break;
+
                 case 'u':
                     if(isxdigit(s[1]) && isxdigit(s[2]) && isxdigit(s[3]) && isxdigit(s[4])) {
                         char b[5] = {
@@ -305,61 +318,6 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
 }
 
 static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
-    static const char valid_journal_key_chars[256] = {
-            // control characters
-            [0] = '\0', [1] = '_', [2] = '_', [3] = '_', [4] = '_', [5] = '_', [6] = '_', [7] = '_',
-            [8] = '_', [9] = '_', [10] = '_', [11] = '_', [12] = '_', [13] = '_', [14] = '_', [15] = '_',
-            [16] = '_', [17] = '_', [18] = '_', [19] = '_', [20] = '_', [21] = '_', [22] = '_', [23] = '_',
-            [24] = '_', [25] = '_', [26] = '_', [27] = '_', [28] = '_', [29] = '_', [30] = '_', [31] = '_',
-
-            // symbols
-            [' '] = '_', ['!'] = '_', ['"'] = '_', ['#'] = '_', ['$'] = '_', ['%'] = '_', ['&'] = '_', ['\''] = '_',
-            ['('] = '_', [')'] = '_', ['*'] = '_', ['+'] = '_', [','] = '_', ['-'] = '_', ['.'] = '_', ['/'] = '_',
-
-            // numbers
-            ['0'] = '0', ['1'] = '1', ['2'] = '2', ['3'] = '3', ['4'] = '4', ['5'] = '5', ['6'] = '6', ['7'] = '7',
-            ['8'] = '8', ['9'] = '9',
-
-            // symbols
-            [':'] = '_', [';'] = '_', ['<'] = '_', ['='] = '_', ['>'] = '_', ['?'] = '_', ['@'] = '_',
-
-            // capitals
-            ['A'] = 'A', ['B'] = 'B', ['C'] = 'C', ['D'] = 'D', ['E'] = 'E', ['F'] = 'F', ['G'] = 'G', ['H'] = 'H',
-            ['I'] = 'I', ['J'] = 'J', ['K'] = 'K', ['L'] = 'L', ['M'] = 'M', ['N'] = 'N', ['O'] = 'O', ['P'] = 'P',
-            ['Q'] = 'Q', ['R'] = 'R', ['S'] = 'S', ['T'] = 'T', ['U'] = 'U', ['V'] = 'V', ['W'] = 'W', ['X'] = 'X',
-            ['Y'] = 'Y', ['Z'] = 'Z',
-
-            // symbols
-            ['['] = '_', ['\\'] = '_', [']'] = '_', ['^'] = '_', ['_'] = '_', ['`'] = '_',
-
-            // lower to upper
-            ['a'] = 'A', ['b'] = 'B', ['c'] = 'C', ['d'] = 'D', ['e'] = 'E', ['f'] = 'F', ['g'] = 'G', ['h'] = 'H',
-            ['i'] = 'I', ['j'] = 'J', ['k'] = 'K', ['l'] = 'L', ['m'] = 'M', ['n'] = 'N', ['o'] = 'O', ['p'] = 'P',
-            ['q'] = 'Q', ['r'] = 'R', ['s'] = 'S', ['t'] = 'T', ['u'] = 'U', ['v'] = 'V', ['w'] = 'W', ['x'] = 'X',
-            ['y'] = 'Y', ['z'] = 'Z',
-
-            // symbols
-            ['{'] = '_', ['|'] = '_', ['}'] = '_', ['~'] = '_', [127] = '_', // Delete (DEL)
-
-            // Extended ASCII characters (128-255) set to underscore
-            [128] = '_', [129] = '_', [130] = '_', [131] = '_', [132] = '_', [133] = '_', [134] = '_', [135] = '_',
-            [136] = '_', [137] = '_', [138] = '_', [139] = '_', [140] = '_', [141] = '_', [142] = '_', [143] = '_',
-            [144] = '_', [145] = '_', [146] = '_', [147] = '_', [148] = '_', [149] = '_', [150] = '_', [151] = '_',
-            [152] = '_', [153] = '_', [154] = '_', [155] = '_', [156] = '_', [157] = '_', [158] = '_', [159] = '_',
-            [160] = '_', [161] = '_', [162] = '_', [163] = '_', [164] = '_', [165] = '_', [166] = '_', [167] = '_',
-            [168] = '_', [169] = '_', [170] = '_', [171] = '_', [172] = '_', [173] = '_', [174] = '_', [175] = '_',
-            [176] = '_', [177] = '_', [178] = '_', [179] = '_', [180] = '_', [181] = '_', [182] = '_', [183] = '_',
-            [184] = '_', [185] = '_', [186] = '_', [187] = '_', [188] = '_', [189] = '_', [190] = '_', [191] = '_',
-            [192] = '_', [193] = '_', [194] = '_', [195] = '_', [196] = '_', [197] = '_', [198] = '_', [199] = '_',
-            [200] = '_', [201] = '_', [202] = '_', [203] = '_', [204] = '_', [205] = '_', [206] = '_', [207] = '_',
-            [208] = '_', [209] = '_', [210] = '_', [211] = '_', [212] = '_', [213] = '_', [214] = '_', [215] = '_',
-            [216] = '_', [217] = '_', [218] = '_', [219] = '_', [220] = '_', [221] = '_', [222] = '_', [223] = '_',
-            [224] = '_', [225] = '_', [226] = '_', [227] = '_', [228] = '_', [229] = '_', [230] = '_', [231] = '_',
-            [232] = '_', [233] = '_', [234] = '_', [235] = '_', [236] = '_', [237] = '_', [238] = '_', [239] = '_',
-            [240] = '_', [241] = '_', [242] = '_', [243] = '_', [244] = '_', [245] = '_', [246] = '_', [247] = '_',
-            [248] = '_', [249] = '_', [250] = '_', [251] = '_', [252] = '_', [253] = '_', [254] = '_', [255] = '_',
-    };
-
     if (!json_expect_char_after_white_space(js, "\""))
         return false;
 
@@ -371,7 +329,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    char *d = js->key_stack[js->depth];
+    char *d = js->stack[js->depth];
     if(js->depth)
         *d++ = '_';
 
@@ -384,11 +342,11 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
         if (*s == '\\') {
             s++;
-            c = (char)((*s == 'u') ? '_' : valid_journal_key_chars[(unsigned char)*s]);
+            c = (char)((*s == 'u') ? '_' : journal_key_characters_map[(unsigned char)*s]);
             s += (*s == 'u') ? 5 : 1;
         }
         else
-            c = valid_journal_key_chars[(unsigned char)*s++];
+            c = journal_key_characters_map[(unsigned char)*s++];
 
         if(c == '_' && last_c == '_')
             continue;
@@ -412,7 +370,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    js->key_stack[++js->depth] = d;
+    js->stack[++js->depth] = d;
 
     return true;
 }
@@ -424,7 +382,7 @@ static inline bool json_key_pop(LOG_JSON_STATE *js) {
         return false;
     }
 
-    char *k = js->key_stack[js->depth--];
+    char *k = js->stack[js->depth--];
     *k = '\0';
     return true;
 }
@@ -473,7 +431,7 @@ static inline bool json_parse_value(LOG_JSON_STATE *js) {
 }
 
 static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
-    char *d = js->key_stack[js->depth];
+    char *d = js->stack[js->depth];
     if(js->depth > 0) {
         *d++ = '_';
     }
@@ -503,7 +461,7 @@ static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
     }
 
     *d = '\0'; // Null-terminate the key
-    js->key_stack[++js->depth] = d;
+    js->stack[++js->depth] = d;
 
     return true;
 }
@@ -579,7 +537,7 @@ static inline bool json_parse_object(LOG_JSON_STATE *js) {
     return true;
 }
 
-LOG_JSON_STATE *json_parser_create(struct log_job *jb) {
+LOG_JSON_STATE *json_parser_create(LOG_JOB *jb) {
     LOG_JSON_STATE *js = mallocz(sizeof(LOG_JSON_STATE));
     memset(js, 0, sizeof(LOG_JSON_STATE));
     js->jb = jb;
@@ -587,7 +545,7 @@ LOG_JSON_STATE *json_parser_create(struct log_job *jb) {
     if(jb->prefix)
         copy_to_buffer(js->key, sizeof(js->key), js->jb->prefix, strlen(js->jb->prefix));
 
-    js->key_stack[0] = &js->key[strlen(js->key)];
+    js->stack[0] = &js->key[strlen(js->key)];
 
     return js;
 }
@@ -605,7 +563,7 @@ bool json_parse_document(LOG_JSON_STATE *js, const char *txt) {
     js->line = txt;
     js->pos = 0;
     js->msg[0] = '\0';
-    js->key_stack[0][0] = '\0';
+    js->stack[0][0] = '\0';
     js->depth = 0;
 
     if(!json_parse_object(js))
@@ -624,7 +582,7 @@ bool json_parse_document(LOG_JSON_STATE *js, const char *txt) {
 }
 
 void json_test(void) {
-    struct log_job jb = { .prefix = "NIGNX_" };
+    LOG_JOB jb = { .prefix = "NIGNX_" };
     LOG_JSON_STATE *json = json_parser_create(&jb);
 
     json_parse_document(json, "{\"value\":\"\\u\\u039A\\u03B1\\u03BB\\u03B7\\u03BC\\u03AD\\u03C1\\u03B1\"}");

@@ -225,6 +225,7 @@ LIBNETDATA_FILES = \
     libnetdata/http/http_defs.h \
     libnetdata/dyn_conf/dyn_conf.c \
     libnetdata/dyn_conf/dyn_conf.h \
+    libnetdata/simple_hashtable.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF
@@ -354,7 +355,14 @@ LOG2JOURNAL_FILES = \
     collectors/log2journal/log2journal-yaml.c \
     collectors/log2journal/log2journal-json.c \
     collectors/log2journal/log2journal-logfmt.c \
+    collectors/log2journal/log2journal-pcre2.c \
     collectors/log2journal/log2journal-params.c \
+    collectors/log2journal/log2journal-duplicate.c \
+    collectors/log2journal/log2journal-inject.c \
+    collectors/log2journal/log2journal-pattern.c \
+    collectors/log2journal/log2journal-replace.c \
+    collectors/log2journal/log2journal-rename.c \
+    collectors/log2journal/log2journal-rewrite.c \
     $(NULL)
 
 
