@@ -366,10 +366,6 @@ static void netdev_free_chart_strings(struct netdev *d) {
 }
 
 static void netdev_free(struct netdev *d) {
-    char buf[FILENAME_MAX + 1];
-    snprintfz(buf, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
-    config_section_destroy(buf);
-
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
     rrdlabels_destroy(d->chart_labels);
@@ -1152,10 +1148,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(d->enabled)
                 d->enabled = !simple_pattern_matches(disabled_list, d->name);
 
-            char buffer[FILENAME_MAX + 1];
-            snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
+            char buf[FILENAME_MAX + 1];
+            snprintfz(buf, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
 
-            d->virtual = likely(access(buffer, R_OK) == 0) ? 1 : 0;
+            d->virtual = likely(access(buf, R_OK) == 0) ? 1 : 0;
 
             // At least on Proxmox inside LXC: eth0 is virtual.
             // Virtual interfaces are not taken into account in system.net calculations
@@ -1171,41 +1167,69 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed
-                snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_speed, d->name);
-                d->filename_speed = strdupz(buffer);
+                snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_speed, d->name);
+                d->filename_speed = strdupz(buf);
 
-                snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
-                d->filename_duplex = strdupz(buffer);
+                snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
+                d->filename_duplex = strdupz(buf);
             }
 
-            snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
-            d->filename_operstate = strdupz(buffer);
+            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
+            d->filename_operstate = strdupz(buf);
 
-            snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_carrier, d->name);
-            d->filename_carrier = strdupz(buffer);
+            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_carrier, d->name);
+            d->filename_carrier = strdupz(buf);
 
-            snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_mtu, d->name);
-            d->filename_mtu = strdupz(buffer);
+            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_mtu, d->name);
+            d->filename_mtu = strdupz(buf);
 
-            snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
-            d->enabled = config_get_boolean_ondemand(buffer, "enabled", d->enabled);
-            d->virtual = config_get_boolean(buffer, "virtual", d->virtual);
+            snprintfz(buf, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
+
+            if (config_exists(buf, "enabled"))
+                d->enabled = config_get_boolean_ondemand(buf, "enabled", d->enabled);
+            if (config_exists(buf, "virtual"))
+                d->virtual = config_get_boolean(buf, "virtual", d->virtual);
 
             if(d->enabled == CONFIG_BOOLEAN_NO)
                 continue;
 
-            d->do_bandwidth  = config_get_boolean_ondemand(buffer, "bandwidth",  do_bandwidth);
-            d->do_packets    = config_get_boolean_ondemand(buffer, "packets",    do_packets);
-            d->do_errors     = config_get_boolean_ondemand(buffer, "errors",     do_errors);
-            d->do_drops      = config_get_boolean_ondemand(buffer, "drops",      do_drops);
-            d->do_fifo       = config_get_boolean_ondemand(buffer, "fifo",       do_fifo);
-            d->do_compressed = config_get_boolean_ondemand(buffer, "compressed", do_compressed);
-            d->do_events     = config_get_boolean_ondemand(buffer, "events",     do_events);
-            d->do_speed      = config_get_boolean_ondemand(buffer, "speed",      do_speed);
-            d->do_duplex     = config_get_boolean_ondemand(buffer, "duplex",     do_duplex);
-            d->do_operstate  = config_get_boolean_ondemand(buffer, "operstate",  do_operstate);
-            d->do_carrier    = config_get_boolean_ondemand(buffer, "carrier",    do_carrier);
-            d->do_mtu        = config_get_boolean_ondemand(buffer, "mtu",        do_mtu);
+            d->do_bandwidth = do_bandwidth;
+            d->do_packets = do_packets;
+            d->do_errors = do_errors;
+            d->do_drops = do_drops;
+            d->do_fifo = do_fifo;
+            d->do_compressed = do_compressed;
+            d->do_events = do_events;
+            d->do_speed = do_speed;
+            d->do_duplex = do_duplex;
+            d->do_operstate = do_operstate;
+            d->do_carrier = do_carrier;
+            d->do_mtu = do_mtu;
+
+            if (config_exists(buf, "bandwidth"))
+                d->do_bandwidth = config_get_boolean_ondemand(buf, "bandwidth", do_bandwidth);
+            if (config_exists(buf, "packets"))
+                d->do_packets = config_get_boolean_ondemand(buf, "packets", do_packets);
+            if (config_exists(buf, "errors"))
+                d->do_errors = config_get_boolean_ondemand(buf, "errors", do_errors);
+            if (config_exists(buf, "drops"))
+                d->do_drops = config_get_boolean_ondemand(buf, "drops", do_drops);
+            if (config_exists(buf, "fifo"))
+                d->do_fifo = config_get_boolean_ondemand(buf, "fifo", do_fifo);
+            if (config_exists(buf, "compressed"))
+                d->do_compressed = config_get_boolean_ondemand(buf, "compressed", do_compressed);
+            if (config_exists(buf, "events"))
+                d->do_events = config_get_boolean_ondemand(buf, "events", do_events);
+            if (config_exists(buf, "speed"))
+                d->do_speed = config_get_boolean_ondemand(buf, "speed", do_speed);
+            if (config_exists(buf, "duplex"))
+                d->do_duplex = config_get_boolean_ondemand(buf, "duplex", do_duplex);
+            if (config_exists(buf, "operstate"))
+                d->do_operstate = config_get_boolean_ondemand(buf, "operstate", do_operstate);
+            if (config_exists(buf, "carrier"))
+                d->do_carrier = config_get_boolean_ondemand(buf, "carrier", do_carrier);
+            if (config_exists(buf, "mtu"))
+                d->do_mtu = config_get_boolean_ondemand(buf, "mtu", do_mtu);
         }
 
         if(unlikely(!d->enabled))
