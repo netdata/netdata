@@ -139,3 +139,4 @@ echo >&2 "Testing parsing and output..."
 test_log2journal ${tests}/json.log ${tests}/json.output json
 test_log2journal ${tests}/json.log ${tests}/json-include.output json --include "OBJECT"
 test_log2journal ${tests}/json.log ${tests}/json-exclude.output json --exclude "ARRAY[^2]"
+test_log2journal ${tests}/nginx-json.log ${tests}/nginx-json.output -f "${script_dir}/log2journal.d/nginx-json.yaml"

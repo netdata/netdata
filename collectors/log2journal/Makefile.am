@@ -12,4 +12,5 @@ dist_noinst_DATA = \
 log2journalconfigdir=$(libconfigdir)/log2journal.d
 dist_log2journalconfig_DATA = \
     log2journal.d/nginx-combined.yaml \
+    log2journal.d/nginx-json.yaml \
     $(NULL)
