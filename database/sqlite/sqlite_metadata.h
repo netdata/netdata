@@ -17,6 +17,7 @@ void metaqueue_host_update_info(RRDHOST *host);
 void metaqueue_ml_load_models(RRDDIM *rd);
 void migrate_localhost(uuid_t *host_uuid);
 void metadata_queue_load_host_context(RRDHOST *host);
+void metadata_delete_host_chart_labels(char *machine_guid);
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc);
 
 // UNIT TEST
