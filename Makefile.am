@@ -193,6 +193,7 @@ LIBNETDATA_FILES = \
     libnetdata/procfile/procfile.h \
     libnetdata/os.c \
     libnetdata/os.h \
+    libnetdata/endian.h \
     libnetdata/simple_pattern/simple_pattern.c \
     libnetdata/simple_pattern/simple_pattern.h \
     libnetdata/socket/socket.c \
