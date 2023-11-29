@@ -80,6 +80,7 @@ enum metadata_opcode {
     METADATA_ADD_HOST_INFO,
     METADATA_SCAN_HOSTS,
     METADATA_LOAD_HOST_CONTEXT,
+    METADATA_DELETE_HOST_CHART_LABELS,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
@@ -119,6 +120,8 @@ struct metadata_wc {
 #define metadata_flag_set(target_flags, flag)   __atomic_or_fetch(&((target_flags)->flags), (flag), __ATOMIC_SEQ_CST)
 #define metadata_flag_clear(target_flags, flag) __atomic_and_fetch(&((target_flags)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
+struct metadata_wc metasync_worker = {.loop = NULL};
+
 //
 // For unittest
 //
@@ -137,6 +140,33 @@ struct query_build {
     int count;
     char uuid_str[UUID_STR_LEN];
 };
+
+#define SQL_DELETE_CHART_LABELS_BY_HOST                                                                                \
+    "DELETE FROM chart_label WHERE chart_id in (SELECT chart_id FROM chart WHERE host_id = @host_id)"
+
+static void delete_host_chart_labels(uuid_t *host_uuid)
+{
+    sqlite3_stmt *res = NULL;
+
+    int rc = sqlite3_prepare_v2(db_meta, SQL_DELETE_CHART_LABELS_BY_HOST, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to delete chart labels by host");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to host chart labels");
+        goto failed;
+    }
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to execute command to remove host chart labels");
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize statement to remove host chart labels");
+}
 
 static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct query_build *lb = data;
@@ -1173,6 +1203,7 @@ void run_metadata_cleanup(struct metadata_wc *wc)
 struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
+    void *data;
     BUFFER *work_buffer;
     uint32_t max_count;
 };
@@ -1411,6 +1442,11 @@ static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
     }
 }
 
+struct host_chart_label_cleanup {
+    Pvoid_t JudyL;
+    Word_t count;
+};
+
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 {
@@ -1426,6 +1462,29 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     usec_t all_started_ut = now_monotonic_usec(); (void)all_started_ut;
     internal_error(true, "METADATA: checking all hosts...");
     usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+
+    struct host_chart_label_cleanup *cl_cleanup_data = data->data;
+
+    if (cl_cleanup_data) {
+        Word_t Index = 0;
+        bool first = true;
+        Pvoid_t *PValue;
+        while ((PValue = JudyLFirstThenNext(cl_cleanup_data->JudyL, &Index, &first))) {
+            char *machine_guid = *PValue;
+
+            host = rrdhost_find_by_guid(machine_guid);
+            if (unlikely(host))
+                continue;
+
+            uuid_t host_uuid;
+            uuid_parse(machine_guid, host_uuid);
+            delete_host_chart_labels(&host_uuid);
+
+            freez(machine_guid);
+        }
+        JudyLFreeArray(&cl_cleanup_data->JudyL, PJE0);
+        freez(cl_cleanup_data);
+    }
 
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
@@ -1568,6 +1627,7 @@ static void metadata_event_loop(void *arg)
     completion_mark_complete(&wc->start_stop_complete);
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
+    struct host_chart_label_cleanup *cl_cleanup_data = NULL;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         uuid_t  *uuid;
@@ -1624,7 +1684,9 @@ static void metadata_event_loop(void *arg)
                     data = mallocz(sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
+                    data->data = cl_cleanup_data;
                     data->work_buffer = work_buffer;
+                    cl_cleanup_data = NULL;
 
                     if (unlikely(cmd.completion)) {
                         data->max_count = 0;            // 0 will process all pending updates
@@ -1640,6 +1702,7 @@ static void metadata_event_loop(void *arg)
                                           after_metadata_hosts))) {
                         // Failed to launch worker -- let the event loop handle completion
                         cmd.completion = wc->scan_complete;
+                        cl_cleanup_data = data->data;
                         freez(data);
                         metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
                     }
@@ -1656,6 +1719,15 @@ static void metadata_event_loop(void *arg)
                                           after_start_host_load_context))) {
                         freez(data);
                     }
+                    break;
+                case METADATA_DELETE_HOST_CHART_LABELS:;
+                    if (!cl_cleanup_data)
+                        cl_cleanup_data = callocz(1,sizeof(*cl_cleanup_data));
+
+                    Pvoid_t *PValue = JudyLIns(&cl_cleanup_data->JudyL, (Word_t) ++cl_cleanup_data->count, PJE0);
+                    if (PValue)
+                        *PValue = (void *) cmd.param[0];
+
                     break;
                 case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
@@ -1701,8 +1773,6 @@ error_after_loop_init:
     freez(loop);
     worker_unregister();
 }
-
-struct metadata_wc metasync_worker = {.loop = NULL};
 
 void metadata_sync_shutdown(void)
 {
@@ -1827,6 +1897,19 @@ void metadata_queue_load_host_context(RRDHOST *host)
     queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command to load host contexts");
 }
+
+void metadata_delete_host_chart_labels(char *machine_guid)
+{
+    if (unlikely(!metasync_worker.loop)) {
+        freez(machine_guid);
+        return;
+    }
+
+    // Node machine guid is already strdup-ed
+    queue_metadata_cmd(METADATA_DELETE_HOST_CHART_LABELS, machine_guid, NULL);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command delete chart labels for host %s", machine_guid);
+}
+
 
 //
 // unitests

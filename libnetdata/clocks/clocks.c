@@ -113,6 +113,10 @@ inline time_t now_realtime_sec(void) {
     return now_sec(CLOCK_REALTIME);
 }
 
+inline msec_t now_realtime_msec(void) {
+    return now_usec(CLOCK_REALTIME) / USEC_PER_MS;
+}
+
 inline usec_t now_realtime_usec(void) {
     return now_usec(CLOCK_REALTIME);
 }

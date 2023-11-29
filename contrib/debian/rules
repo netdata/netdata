@@ -165,7 +165,17 @@ override_dh_install:
 	# Add systemd-journal plugin install rules
 	mkdir -p $(TOP)-plugin-systemd-journal/usr/libexec/netdata/plugins.d/
 	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/systemd-journal.plugin \
-	$(TOP)-plugin-systemd-journal/usr/libexec/netdata/plugins.d/systemd-journal.plugin; \
+	$(TOP)-plugin-systemd-journal/usr/libexec/netdata/plugins.d/systemd-journal.plugin
+
+	# Add logs-management plugin install rules
+	mkdir -p $(TOP)-plugin-logs-management/usr/libexec/netdata/plugins.d/
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/logs-management.plugin \
+	$(TOP)-plugin-logs-management/usr/libexec/netdata/plugins.d/logs-management.plugin
+	mkdir -p $(TOP)-plugin-logs-management/usr/lib/netdata/conf.d/
+	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/logsmanagement.d.conf \
+	$(TOP)-plugin-logs-management/usr/lib/netdata/conf.d/logsmanagement.d.conf
+	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/logsmanagement.d/ \
+	$(TOP)-plugin-logs-management/usr/lib/netdata/conf.d/logsmanagement.d/
 
 	# Add xenstat plugin install rules
 	if [ $(HAVE_XENSTAT) -eq 1 ]; then \
@@ -269,6 +279,9 @@ override_dh_fixperms:
 	if [ $(HAVE_XENSTAT) -eq 1 ]; then \
 		chmod 4750 $(TOP)-plugin-xenstat/usr/libexec/netdata/plugins.d/xenstat.plugin; \
 	fi
+
+	# logs-management
+	chmod 4750 $(TOP)-plugin-logs-management/usr/libexec/netdata/plugins.d/logs-management.plugin
 
 override_dh_installlogrotate:
 	cp $(BUILDDIR)/system/logrotate/netdata debian/netdata.logrotate

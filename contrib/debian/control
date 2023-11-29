@@ -1,19 +1,12 @@
 Source: netdata
 Build-Depends: debhelper (>= 10),
                dpkg-dev (>= 1.13.19),
+               bison,
                cmake,
                curl,
-               zlib1g-dev,
-               uuid-dev,
-               libcurl4-openssl-dev,
-               libelf-dev,
-               libuv1-dev,
-               liblz4-dev,
-               libssl-dev,
-               libmnl-dev,
-               libjson-c-dev,
-               libyaml-dev,
+               flex,
                libcups2-dev,
+               libcurl4-openssl-dev,
                libelf-dev,
                libipmimonitoring-dev,
                libjson-c-dev,
@@ -21,8 +14,7 @@ Build-Depends: debhelper (>= 10),
                libmnl-dev,
                libmongoc-dev,
                libnetfilter-acct-dev,
-               libsnappy-dev,
-               libpcre2-8-0,
+               libpcre2-dev,
                libprotobuf-dev,
                libprotoc-dev,
                libsnappy-dev,
@@ -64,7 +56,8 @@ Conflicts: netdata-core,
            netdata-web
 Suggests: netdata-plugin-cups (= ${source:Version}),
           netdata-plugin-freeipmi (= ${source:Version})
-Recommends: netdata-plugin-systemd-journal (= ${source:Version})
+Recommends: netdata-plugin-systemd-journal (= ${source:Version}),
+            netdata-plugin-logs-management (= ${source:Version})
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
@@ -219,3 +212,13 @@ Conflicts: netdata (<< ${source:Version})
 Description: The xenstat plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from the Xen
  Hypervisor.
+
+Package: netdata-plugin-logs-management
+Architecture: any
+Depends: ${shlibs:Depends},
+         netdata (= ${source:Version})
+Pre-Depends: libcap2-bin, adduser
+Conflicts: netdata (<< ${source:Version})
+Description: The logs-management plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect logs from the system
+ and parse them to extract metrics.

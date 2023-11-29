@@ -3529,6 +3529,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
     { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
     { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
+    { .name = "LOGSMANAGPLG",.family = "workers plugin logs management",  .priority = 1000000 },
     { .name = "RRDCONTEXT",  .family = "workers contexts",                .priority = 1000000 },
     { .name = "REPLICATION", .family = "workers replication sender",      .priority = 1000000 },
     { .name = "SERVICE",     .family = "workers service",                 .priority = 1000000 },

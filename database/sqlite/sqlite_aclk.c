@@ -257,30 +257,38 @@ static void sql_unregister_node(char *machine_guid)
         return;
 
     rc = uuid_parse(machine_guid, host_uuid);
-    freez(machine_guid);
-    if (rc)
+    if (rc) {
+        freez(machine_guid);
         return;
+    }
 
     sqlite3_stmt *res = NULL;
 
     rc = sqlite3_prepare_v2(db_meta, "UPDATE node_instance SET node_id = NULL WHERE host_id = @host_id", -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement remote node id for a host");
+        error_report("Failed to prepare statement to remove the host node id");
+        freez(machine_guid);
         return;
     }
 
     rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to remove node id");
-        goto failed;
+        error_report("Failed to bind host_id parameter to remove host node id");
+        goto skip;
     }
     rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to execute command to remove node id");
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute command to remove host node id");
+    } else {
+       // node: machine guid will be freed after processing
+       metadata_delete_host_chart_labels(machine_guid);
+       machine_guid = NULL;
+    }
 
-failed:
+skip:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize statement to remove node id");
+        error_report("Failed to finalize statement to remove host node id");
+    freez(machine_guid);
 }
 
 
@@ -448,6 +456,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
                     break;
                 case ACLK_DATABASE_NODE_UNREGISTER:
                     sql_unregister_node(cmd.param[0]);
+
                     break;
 // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:

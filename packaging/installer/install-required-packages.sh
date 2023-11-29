@@ -672,6 +672,30 @@ declare -A pkg_cmake=(
   ['default']="cmake"
 )
 
+# bison and flex are required by Fluent-Bit
+declare -A pkg_bison=(
+  ['default']="bison"
+)
+
+declare -A pkg_flex=(
+  ['default']="flex"
+)
+
+# fts-dev is required by Fluent-Bit on Alpine
+declare -A pkg_fts_dev=(
+  ['default']="NOTREQUIRED"
+  ['alpine']="musl-fts-dev"
+  ['alpine-3.16.7']="fts-dev"
+  ['alpine-3.15.10']="fts-dev"
+  ['alpine-3.14.10']="fts-dev"
+)
+
+# cmake3 is required by Fluent-Bit on CentOS 7
+declare -A pkg_cmake3=(
+  ['default']="NOTREQUIRED"
+  ['centos-7']="cmake3"
+)
+
 declare -A pkg_json_c_dev=(
   ['alpine']="json-c-dev"
   ['arch']="json-c"
@@ -1222,6 +1246,7 @@ packages() {
   require_cmd automake || suitable_package automake
   require_cmd pkg-config || suitable_package pkg-config
   require_cmd cmake || suitable_package cmake
+  require_cmd cmake3 || suitable_package cmake3
 
   # -------------------------------------------------------------------------
   # debugging tools for development
@@ -1244,6 +1269,8 @@ packages() {
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
+    require_cmd bison || suitable_package bison
+    require_cmd flex || suitable_package flex
   fi
 
   # -------------------------------------------------------------------------
@@ -1275,6 +1302,7 @@ packages() {
     suitable_package libuuid-dev
     suitable_package libmnl-dev
     suitable_package json-c-dev
+    suitable_package fts-dev
     suitable_package libyaml-dev
     suitable_package libsystemd-dev
   fi

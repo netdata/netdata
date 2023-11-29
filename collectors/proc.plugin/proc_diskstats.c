@@ -601,7 +601,9 @@ static void get_disk_config(struct disk *d) {
     char var_name[4096 + 1];
     snprintfz(var_name, 4096, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS ":%s", d->disk);
 
-    def_enable = config_get_boolean_ondemand(var_name, "enable", def_enable);
+    if (config_exists(var_name, "enable"))
+        def_enable = config_get_boolean_ondemand(var_name, "enable", def_enable);
+
     if(unlikely(def_enable == CONFIG_BOOLEAN_NO)) {
         // the user does not want any metrics for this disk
         d->do_io = CONFIG_BOOLEAN_NO;
@@ -653,7 +655,8 @@ static void get_disk_config(struct disk *d) {
 
         // def_performance
         // check the user configuration (this will also show our 'on demand' decision)
-        def_performance = config_get_boolean_ondemand(var_name, "enable performance metrics", def_performance);
+        if (config_exists(var_name, "enable performance metrics"))
+            def_performance = config_get_boolean_ondemand(var_name, "enable performance metrics", def_performance);
 
         int ddo_io = CONFIG_BOOLEAN_NO,
                 ddo_ops = CONFIG_BOOLEAN_NO,
@@ -680,19 +683,40 @@ static void get_disk_config(struct disk *d) {
             d->excluded = true;
         }
 
-        d->do_io      = config_get_boolean_ondemand(var_name, "bandwidth", ddo_io);
-        d->do_ops     = config_get_boolean_ondemand(var_name, "operations", ddo_ops);
-        d->do_mops    = config_get_boolean_ondemand(var_name, "merged operations", ddo_mops);
-        d->do_iotime  = config_get_boolean_ondemand(var_name, "i/o time", ddo_iotime);
-        d->do_qops    = config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
-        d->do_util    = config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
-        d->do_ext     = config_get_boolean_ondemand(var_name, "extended operations", ddo_ext);
-        d->do_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
+        d->do_io = ddo_io;
+        d->do_ops = ddo_ops;
+        d->do_mops = ddo_mops;
+        d->do_iotime = ddo_iotime;
+        d->do_qops = ddo_qops;
+        d->do_util = ddo_util;
+        d->do_ext = ddo_ext;
+        d->do_backlog = ddo_backlog;
 
-        if(d->device_is_bcache)
-            d->do_bcache  = config_get_boolean_ondemand(var_name, "bcache", ddo_bcache);
-        else
+        if (config_exists(var_name, "bandwidth"))
+            d->do_io = config_get_boolean_ondemand(var_name, "bandwidth", ddo_io);
+        if (config_exists(var_name, "operations"))
+            d->do_ops = config_get_boolean_ondemand(var_name, "operations", ddo_ops);
+        if (config_exists(var_name, "merged operations"))
+            d->do_mops = config_get_boolean_ondemand(var_name, "merged operations", ddo_mops);
+        if (config_exists(var_name, "i/o time"))
+            d->do_iotime = config_get_boolean_ondemand(var_name, "i/o time", ddo_iotime);
+        if (config_exists(var_name, "queued operations"))
+            d->do_qops = config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
+        if (config_exists(var_name, "utilization percentage"))
+            d->do_util = config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
+        if (config_exists(var_name, "extended operations"))
+            d->do_ext = config_get_boolean_ondemand(var_name, "extended operations", ddo_ext);
+        if (config_exists(var_name, "backlog"))
+            d->do_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
+
+        d->do_bcache = ddo_bcache;
+
+        if (d->device_is_bcache) {
+            if (config_exists(var_name, "bcache"))
+                d->do_bcache = config_get_boolean_ondemand(var_name, "bcache", ddo_bcache);
+        } else {
             d->do_bcache = 0;
+        }
     }
 }
 

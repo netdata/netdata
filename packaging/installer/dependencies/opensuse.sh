@@ -14,8 +14,10 @@ declare -a package_tree=(
   autoconf-archive
   autogen
   automake
+  bison
   cmake
   curl
+  flex
   gcc
   gcc-c++
   git
