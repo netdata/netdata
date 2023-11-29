@@ -2,7 +2,7 @@
 
 #include "log2journal.h"
 
-static inline void send_duplications_for_key(LOG_JOB *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len);
+static inline void send_duplications_for_key(LOG_JOB *jb, HASHED_KEY *k, const char *value, size_t value_len);
 
 // ----------------------------------------------------------------------------
 
@@ -69,8 +69,8 @@ static char *rewrite_value(LOG_JOB *jb, const char *key, XXH64_hash_t hash, cons
     for (size_t i = 0; i < jb->rewrites.used; i++) {
         REWRITE *rw = &jb->rewrites.array[i];
 
-        if (rw->hash == hash && strcmp(rw->key, key) == 0) {
-            if(pcre2_match(rw->search.re, (PCRE2_SPTR)value, value_len, 0, 0, rw->search.match_data, NULL) < 0)
+        if (rw->key.hash == hash && strcmp(rw->key.key, key) == 0) {
+            if(!search_pattern_matches(&rw->search, value, value_len))
                 continue; // No match found, skip to next rewrite rule
 
             PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(rw->search.match_data);
@@ -81,18 +81,27 @@ static char *rewrite_value(LOG_JOB *jb, const char *key, XXH64_hash_t hash, cons
             // Iterate through the linked list of replacement nodes
             for (REPLACE_NODE *node = rw->replace.nodes; node != NULL; node = node->next) {
                 if (node->is_variable) {
-                    uint32_t groupnumber = pcre2_substring_number_from_name(rw->search.re, (PCRE2_SPTR)node->s);
-                    PCRE2_SIZE start_offset = ovector[2 * groupnumber];
-                    PCRE2_SIZE end_offset = ovector[2 * groupnumber + 1];
-                    PCRE2_SIZE length = end_offset - start_offset;
+                    int group_number = pcre2_substring_number_from_name(rw->search.re, (PCRE2_SPTR)node->name.key);
+                    if(group_number >= 0) {
+                        PCRE2_SIZE start_offset = ovector[2 * group_number];
+                        PCRE2_SIZE end_offset = ovector[2 * group_number + 1];
+                        PCRE2_SIZE length = end_offset - start_offset;
 
-                    size_t copied = copy_to_buffer(buffer, buffer_remaining, value + start_offset, length);
-                    buffer += copied;
-                    buffer_remaining -= copied;
+                        size_t copied = copy_to_buffer(buffer, buffer_remaining, value + start_offset, length);
+                        buffer += copied;
+                        buffer_remaining -= copied;
+                    }
+                    else {
+                        // TODO: lookup in key names to get their values
+
+                        if(!node->logged_error) {
+                            log2stderr("WARNING: variable '${%s}' in rewrite rule cannot be resolved.", node->name.key);
+                            node->logged_error = true;
+                        }
+                    }
                 }
                 else {
-                    size_t len = node->len;
-                    size_t copied = copy_to_buffer(buffer, buffer_remaining, node->s, len);
+                    size_t copied = copy_to_buffer(buffer, buffer_remaining, node->name.key, node->name.len);
                     buffer += copied;
                     buffer_remaining -= copied;
                 }
@@ -105,18 +114,15 @@ static char *rewrite_value(LOG_JOB *jb, const char *key, XXH64_hash_t hash, cons
     return NULL;
 }
 
-static inline const char *rename_key(LOG_JOB *jb, const char *key, XXH64_hash_t hash, XXH64_hash_t *new_hash) {
+static inline HASHED_KEY *rename_key(LOG_JOB *jb, HASHED_KEY *k) {
     for(size_t i = 0; i < jb->renames.used ;i++) {
         RENAME *rn = &jb->renames.array[i];
 
-        if(rn->old_hash == hash && strcmp(rn->old_key, key) == 0) {
-            *new_hash = rn->new_hash;
-            return rn->new_key;
-        }
+        if(rn->old_key.hash == k->hash && strcmp(rn->old_key.key, k->key) == 0)
+            return &rn->new_key;
     }
 
-    *new_hash = hash;
-    return key;
+    return k;
 }
 
 // ----------------------------------------------------------------------------
@@ -140,19 +146,26 @@ static inline void send_key_value_and_rewrite(LOG_JOB *jb, const char *key, XXH6
 }
 
 inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *value, size_t len) {
-    XXH64_hash_t hash = XXH3_64bits(key, strlen(key));
+    HASHED_KEY k;
+    k.key = key;
+    k.len = strlen(k.key);
+    k.hash = XXH3_64bits(key, k.len);
 
-    // process renames (changing the key)
-    XXH64_hash_t new_hash;
-    const char *new_key = rename_key(jb, key, hash, &new_hash);
+    bool included = jb->filter.include.re ? search_pattern_matches(&jb->filter.include, k.key, k.len) : true;
+    bool excluded = jb->filter.exclude.re ? search_pattern_matches(&jb->filter.exclude, k.key, k.len) : false;
 
-    // process rewrites (changing the value)
-    // and send it to output
-    send_key_value_and_rewrite(jb, new_key, new_hash, value, len);
+    if(included && !excluded) {
+        // process renames (changing the key)
+        HASHED_KEY *nk = rename_key(jb, &k);
+
+        // process rewrites (changing the value)
+        // and send it to output
+        send_key_value_and_rewrite(jb, nk->key, nk->hash, value, len);
+    }
 
     // process the duplications (using the original key)
     // and send them to output
-    send_duplications_for_key(jb, key, hash, value, len);
+    send_duplications_for_key(jb, &k, value, len);
 }
 
 static inline void send_key_value_constant(LOG_JOB *jb __maybe_unused, const char *key, const char *value) {
@@ -175,7 +188,7 @@ static void select_which_injections_should_be_injected_on_unmatched(LOG_JOB *jb)
 
         for(size_t i = 0; i < jb->injections.used ;i++) {
             for(size_t u = 0; u < jb->unmatched.injections.used ; u++) {
-                if(strcmp(jb->injections.keys[i].key, jb->unmatched.injections.keys[u].key) == 0)
+                if(strcmp(jb->injections.keys[i].key.key, jb->unmatched.injections.keys[u].key.key) == 0)
                     jb->injections.keys[i].on_unmatched = false;
             }
         }
@@ -188,7 +201,7 @@ static inline void jb_finalize_injections(LOG_JOB *jb, bool line_is_matched) {
         if(!line_is_matched && !jb->injections.keys[j].on_unmatched)
             continue;
 
-        send_key_value_constant(jb, jb->injections.keys[j].key, jb->injections.keys[j].value.s);
+        send_key_value_constant(jb, jb->injections.keys[j].key.key, jb->injections.keys[j].value.txt);
     }
 }
 
@@ -198,8 +211,8 @@ static inline void log_job_duplications_reset(LOG_JOB *jb) {
         kd->exposed = false;
 
         for(size_t g = 0; g < kd->used ; g++) {
-            if(kd->values[g].s)
-                kd->values[g].s[0] = '\0';
+            if(kd->values[g].txt)
+                kd->values[g].txt[0] = '\0';
         }
     }
 }
@@ -207,7 +220,7 @@ static inline void log_job_duplications_reset(LOG_JOB *jb) {
 // ----------------------------------------------------------------------------
 // duplications
 
-static inline void send_duplications_for_key(LOG_JOB *jb, const char *key, XXH64_hash_t hash, const char *value, size_t value_len) {
+static inline void send_duplications_for_key(LOG_JOB *jb, HASHED_KEY *k, const char *value, size_t value_len) {
     // IMPORTANT:
     // The 'value' may not be NULL terminated and have more data that the value we need
 
@@ -219,15 +232,15 @@ static inline void send_duplications_for_key(LOG_JOB *jb, const char *key, XXH64
 
         if(kd->used == 1) {
             // just one key to be duplicated
-            if(kd->keys_hashes[0] == hash && strcmp(kd->keys[0], key) == 0) {
-                send_key_value_and_rewrite(jb, kd->target, kd->hash, value, value_len);
+            if(kd->keys[0].hash == k->hash && strcmp(kd->keys[0].key, k->key) == 0) {
+                send_key_value_and_rewrite(jb, kd->target.key, kd->target.hash, value, value_len);
                 kd->exposed = true;
             }
         }
         else {
             // multiple keys to be duplicated
             for(size_t g = 0; g < kd->used ; g++) {
-                if(kd->keys_hashes[g] == hash && strcmp(kd->keys[g], key) == 0)
+                if(kd->keys[g].hash == k->hash && strcmp(kd->keys[g].key, k->key) == 0)
                     txt_replace(&kd->values[g], value, value_len);
             }
         }
@@ -253,7 +266,7 @@ static inline void jb_send_remaining_duplications(LOG_JOB *jb) {
 
         for(size_t g = 0; g < kd->used ; g++) {
             if(remaining < 2) {
-                log2stderr("Warning: duplicated key '%s' cannot fit the values.", kd->target);
+                log2stderr("Warning: duplicated key '%s' cannot fit the values.", kd->target.key);
                 break;
             }
 
@@ -263,18 +276,18 @@ static inline void jb_send_remaining_duplications(LOG_JOB *jb) {
                 remaining--;
             }
 
-            char *value = (kd->values[g].s && kd->values[g].s[0]) ? kd->values[g].s : "[unavailable]";
+            char *value = (kd->values[g].txt && kd->values[g].txt[0]) ? kd->values[g].txt : "[unavailable]";
             size_t len = strlen(value);
             size_t copied = copy_to_buffer(s, remaining, value, len);
             remaining -= copied;
             s += copied;
 
             if(copied != len) {
-                log2stderr("Warning: duplicated key '%s' will have truncated value", jb->dups.array[d].target);
+                log2stderr("Warning: duplicated key '%s' will have truncated value", jb->dups.array[d].target.key);
                 break;
             }
         }
-        send_key_value_and_rewrite(jb, kd->target, kd->hash, buffer, s - buffer);
+        send_key_value_and_rewrite(jb, kd->target.key, kd->target.hash, buffer, s - buffer);
     }
 }
 
@@ -395,8 +408,8 @@ int log_job_run(LOG_JOB *jb) {
                 send_key_value_error(jb->unmatched.key, "Parsing error on: %s", line);
 
                 for (size_t j = 0; j < jb->unmatched.injections.used; j++)
-                    send_key_value_constant(jb, jb->unmatched.injections.keys[j].key,
-                            jb->unmatched.injections.keys[j].value.s);
+                    send_key_value_constant(jb, jb->unmatched.injections.keys[j].key.key,
+                            jb->unmatched.injections.keys[j].value.txt);
             }
             else {
                 // we are just logging errors to stderr

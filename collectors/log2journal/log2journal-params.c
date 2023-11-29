@@ -36,7 +36,7 @@ void nd_log_cleanup(LOG_JOB *jb) {
 
 // ----------------------------------------------------------------------------
 
-bool log_job_add_filename_key(LOG_JOB *jb, const char *key, size_t key_len) {
+bool log_job_filename_key_set(LOG_JOB *jb, const char *key, size_t key_len) {
     if(!key || !*key) {
         log2stderr("filename key cannot be empty.");
         return false;
@@ -50,7 +50,7 @@ bool log_job_add_filename_key(LOG_JOB *jb, const char *key, size_t key_len) {
     return true;
 }
 
-bool log_job_add_key_prefix(LOG_JOB *jb, const char *prefix, size_t prefix_len) {
+bool log_job_key_prefix_set(LOG_JOB *jb, const char *prefix, size_t prefix_len) {
     if(!prefix || !*prefix) {
         log2stderr("filename key cannot be empty.");
         return false;
@@ -64,7 +64,7 @@ bool log_job_add_key_prefix(LOG_JOB *jb, const char *prefix, size_t prefix_len) 
     return true;
 }
 
-bool log_job_set_pattern(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
+bool log_job_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
     if(!pattern || !*pattern) {
         log2stderr("filename key cannot be empty.");
         return false;
@@ -78,43 +78,30 @@ bool log_job_set_pattern(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
     return true;
 }
 
-// ----------------------------------------------------------------------------
-
-DUPLICATION *log_job_add_duplication_to_job(LOG_JOB *jb, const char *target, size_t target_len) {
-    if (jb->dups.used >= MAX_KEY_DUPS) {
-        log2stderr("ERROR: Too many duplicates defined. Maximum allowed is %d.", MAX_KEY_DUPS);
-        return NULL;
-    }
-
-    if(target_len > JOURNAL_MAX_KEY_LEN) {
-        log2stderr("WARNING: key of duplicate '%.*s' is too long for journals. Will be truncated.", (int)target_len, target);
-        target_len = JOURNAL_MAX_KEY_LEN;
-    }
-
-    DUPLICATION *kd = &jb->dups.array[jb->dups.used++];
-    kd->target = strndupz(target, target_len);
-    kd->hash = XXH3_64bits(kd->target, target_len);
-    kd->used = 0;
-    kd->exposed = false;
-
-    // Initialize values array
-    for (size_t i = 0; i < MAX_KEY_DUPS_KEYS; i++) {
-        kd->values[i].s = NULL;
-        kd->values[i].size = 0;
-    }
-
-    return kd;
-}
-
-bool log_job_add_key_to_duplication(DUPLICATION *kd, const char *key, size_t key_len) {
-    if (kd->used >= MAX_KEY_DUPS_KEYS) {
-        log2stderr("ERROR: Too many keys in duplication of target '%s'.", kd->target);
+bool log_job_include_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
+    if(jb->filter.include.re) {
+        log2stderr("FILTER INCLUDE: there is already an include filter set");
         return false;
     }
 
-    kd->keys[kd->used] = strndupz(key, key_len);
-    kd->keys_hashes[kd->used] = XXH3_64bits(key, key_len);
-    kd->used++;
+    if(!search_pattern_set(&jb->filter.include, pattern, pattern_len)) {
+        log2stderr("FILTER INCLUDE: failed: %s", jb->filter.include.error.txt);
+        return false;
+    }
+
+    return true;
+}
+
+bool log_job_exclude_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
+    if(jb->filter.exclude.re) {
+        log2stderr("FILTER INCLUDE: there is already an exclude filter set");
+        return false;
+    }
+
+    if(!search_pattern_set(&jb->filter.exclude, pattern, pattern_len)) {
+        log2stderr("FILTER EXCLUDE: failed: %s", jb->filter.exclude.error.txt);
+        return false;
+    }
 
     return true;
 }
@@ -219,13 +206,13 @@ static bool parse_duplicate(LOG_JOB *jb, const char *value) {
     }
 
     size_t target_len = equal_sign - target;
-    DUPLICATION *kd = log_job_add_duplication_to_job(jb, target, target_len);
+    DUPLICATION *kd = log_job_duplication_add(jb, target, target_len);
     if(!kd) return false;
 
     const char *key = equal_sign + 1;
     while (key) {
         if (kd->used >= MAX_KEY_DUPS_KEYS) {
-            log2stderr("Error: too many keys in duplication of target '%s'.", kd->target);
+            log2stderr("Error: too many keys in duplication of target '%s'.", kd->target.key);
             return false;
         }
 
@@ -233,11 +220,11 @@ static bool parse_duplicate(LOG_JOB *jb, const char *value) {
         size_t key_len;
         if (comma) {
             key_len = comma - key;
-            log_job_add_key_to_duplication(kd, key, key_len);
+            log_job_duplication_key_add(kd, key, key_len);
             key = comma + 1;
         }
         else {
-            log_job_add_key_to_duplication(kd, key, strlen(key));
+            log_job_duplication_key_add(kd, key, strlen(key));
             break;  // No more keys
         }
     }
@@ -280,7 +267,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                 }
                 else {
                     if (!jb->pattern) {
-                        log_job_set_pattern(jb, arg, strlen(arg));
+                        log_job_pattern_set(jb, arg, strlen(arg));
                         continue;
                     } else {
                         log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
@@ -290,11 +277,11 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
             }
 
             if (strcmp(param, "--filename-key") == 0) {
-                if(!log_job_add_filename_key(jb, value, value ? strlen(value) : 0))
+                if(!log_job_filename_key_set(jb, value, value ? strlen(value) : 0))
                     return false;
             }
             else if (strcmp(param, "--prefix") == 0) {
-                if(!log_job_add_key_prefix(jb, value, value ? strlen(value) : 0))
+                if(!log_job_key_prefix_set(jb, value, value ? strlen(value) : 0))
                     return false;
             }
 #ifdef HAVE_LIBYAML
@@ -329,10 +316,18 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                 if (!parse_rename(jb, value))
                     return false;
             }
+            else if (strcmp(param, "--include") == 0) {
+                if (!log_job_include_pattern_set(jb, value, strlen(value)))
+                    return false;
+            }
+            else if (strcmp(param, "--exclude") == 0) {
+                if (!log_job_exclude_pattern_set(jb, value, strlen(value)))
+                    return false;
+            }
             else {
                 i--;
                 if (!jb->pattern) {
-                    log_job_set_pattern(jb, arg, strlen(arg));
+                    log_job_pattern_set(jb, arg, strlen(arg));
                     continue;
                 } else {
                     log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);

@@ -120,42 +120,78 @@ static inline size_t copy_to_buffer(char *dst, size_t dst_size, const char *src,
 // smallest possible allocations.
 
 typedef struct txt {
-    char *s;
+    char *txt;
     size_t size;
 } TEXT;
 
-static inline void txt_cleanup(TEXT *txt) {
-    if(!txt)
+static inline void txt_cleanup(TEXT *t) {
+    if(!t)
         return;
 
-    if(txt->s)
-        freez(txt->s);
+    if(t->txt)
+        freez(t->txt);
 
-    txt->s = NULL;
-    txt->size = 0;
+    t->txt = NULL;
+    t->size = 0;
 }
 
-static inline void txt_replace(TEXT *txt, const char *s, size_t len) {
+static inline void txt_replace(TEXT *t, const char *s, size_t len) {
     if(!s || !*s || len == 0) {
         s = "";
         len = 0;
     }
 
-    if(len + 1 <= txt->size) {
+    if(len + 1 <= t->size) {
         // the existing value allocation, fits our value
 
-        memcpy(txt->s, s, len);
-        txt->s[len] = '\0';
+        memcpy(t->txt, s, len);
+        t->txt[len] = '\0';
     }
     else {
         // no existing value allocation, or too small for our value
         // cleanup and increase the buffer
 
-        txt_cleanup(txt);
+        txt_cleanup(t);
 
-        txt->s = strndupz(s, len);
-        txt->size = len + 1;
+        t->txt = strndupz(s, len);
+        t->size = len + 1;
     }
+}
+
+// ----------------------------------------------------------------------------
+
+typedef enum __attribute__((__packed__)) {
+    HK_NONE = 0,
+} HASHED_KEY_FLAGS;
+
+typedef struct hashed_key {
+    const char *key;
+    uint32_t len;
+    HASHED_KEY_FLAGS flags;
+    XXH64_hash_t hash;
+} HASHED_KEY;
+
+static inline void hashed_key_cleanup(HASHED_KEY *k) {
+    if(k->key) {
+        freez((void *)k->key);
+        k->key = NULL;
+    }
+}
+
+static inline void hashed_key_set(HASHED_KEY *k, const char *name) {
+    hashed_key_cleanup(k);
+
+    k->key = strdupz(name);
+    k->len = strlen(k->key);
+    k->hash = XXH3_64bits(k->key, k->len);
+}
+
+static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t len) {
+    hashed_key_cleanup(k);
+
+    k->key = strndupz(name, len);
+    k->len = len;
+    k->hash = XXH3_64bits(k->key, k->len);
 }
 
 // ----------------------------------------------------------------------------
@@ -167,31 +203,19 @@ typedef struct search_pattern {
     TEXT error;
 } SEARCH_PATTERN;
 
-static inline void search_pattern_cleanup(SEARCH_PATTERN *sp) {
-    if(sp->pattern) {
-        freez((void *)sp->pattern);
-        sp->pattern = NULL;
-    }
+void search_pattern_cleanup(SEARCH_PATTERN *sp);
+bool search_pattern_set(SEARCH_PATTERN *sp, const char *search_pattern, size_t search_pattern_len);
 
-    if(sp->re) {
-        pcre2_code_free(sp->re);
-        sp->re = NULL;
-    }
-
-    if(sp->match_data) {
-        pcre2_match_data_free(sp->match_data);
-        sp->match_data = NULL;
-    }
-
-    txt_cleanup(&sp->error);
+static inline bool search_pattern_matches(SEARCH_PATTERN *sp, const char *value, size_t value_len) {
+    return pcre2_match(sp->re, (PCRE2_SPTR)value, value_len, 0, 0, sp->match_data, NULL) >= 0;
 }
 
 // ----------------------------------------------------------------------------
 
 typedef struct replacement_node {
-    const char *s;
-    uint32_t len;
+    HASHED_KEY name;
     bool is_variable;
+    bool logged_error;
 
     struct replacement_node *next;
 } REPLACE_NODE;
@@ -211,7 +235,7 @@ bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern);
 typedef struct injection {
     bool on_unmatched;
     TEXT value;
-    char key[JOURNAL_MAX_KEY_LEN + 1];
+    HASHED_KEY key;
 } INJECTION;
 
 void injection_cleanup(INJECTION *inj);
@@ -219,12 +243,10 @@ void injection_cleanup(INJECTION *inj);
 // ----------------------------------------------------------------------------
 
 typedef struct duplication {
-    XXH64_hash_t hash;
-    char *target;
+    HASHED_KEY target;
     uint32_t used;
     bool exposed;
-    char *keys[MAX_KEY_DUPS_KEYS];
-    XXH64_hash_t keys_hashes[MAX_KEY_DUPS_KEYS];
+    HASHED_KEY keys[MAX_KEY_DUPS_KEYS];
     TEXT values[MAX_KEY_DUPS_KEYS];
 } DUPLICATION;
 
@@ -233,10 +255,8 @@ void duplication_cleanup(DUPLICATION *dp);
 // ----------------------------------------------------------------------------
 
 typedef struct key_rename {
-    XXH64_hash_t new_hash;
-    XXH64_hash_t old_hash;
-    char *new_key;
-    char *old_key;
+    HASHED_KEY new_key;
+    HASHED_KEY old_key;
 } RENAME;
 
 void rename_cleanup(RENAME *rn);
@@ -244,8 +264,7 @@ void rename_cleanup(RENAME *rn);
 // ----------------------------------------------------------------------------
 
 typedef struct key_rewrite {
-    XXH64_hash_t hash;
-    char *key;
+    HASHED_KEY key;
     SEARCH_PATTERN search;
     REPLACE_PATTERN replace;
 } REWRITE;
@@ -260,6 +279,11 @@ typedef struct log_job {
 
     const char *pattern;
     const char *prefix;
+
+    struct {
+        SEARCH_PATTERN include;
+        SEARCH_PATTERN exclude;
+    } filter;
 
     struct {
         bool last_line_was_empty;
@@ -309,14 +333,16 @@ void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *
 // configuration related
 
 // management of configuration to set settings
-DUPLICATION *log_job_add_duplication_to_job(LOG_JOB *jb, const char *target, size_t target_len);
-bool log_job_add_key_to_duplication(DUPLICATION *kd, const char *key, size_t key_len);
-bool log_job_add_filename_key(LOG_JOB *jb, const char *key, size_t key_len);
-bool log_job_add_key_prefix(LOG_JOB *jb, const char *prefix, size_t prefix_len);
-bool log_job_set_pattern(LOG_JOB *jb, const char *pattern, size_t pattern_len);
+DUPLICATION *log_job_duplication_add(LOG_JOB *jb, const char *target, size_t target_len);
+bool log_job_duplication_key_add(DUPLICATION *kd, const char *key, size_t key_len);
+bool log_job_filename_key_set(LOG_JOB *jb, const char *key, size_t key_len);
+bool log_job_key_prefix_set(LOG_JOB *jb, const char *prefix, size_t prefix_len);
+bool log_job_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);
 bool log_job_injection_add(LOG_JOB *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched);
 bool log_job_rewrite_add(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern);
 bool log_job_rename_add(LOG_JOB *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len);
+bool log_job_include_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);
+bool log_job_exclude_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);
 
 // entry point to parse command line parameters
 bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv);
@@ -362,5 +388,7 @@ const char *pcre2_parser_error(PCRE2_STATE *pcre2);
 bool pcre2_parse_document(PCRE2_STATE *pcre2, const char *txt, size_t len);
 bool pcre2_has_error(PCRE2_STATE *pcre2);
 void pcre2_test(void);
+
+void pcre2_get_error_in_buffer(char *msg, size_t msg_len, int rc, int pos);
 
 #endif //NETDATA_LOG2JOURNAL_H

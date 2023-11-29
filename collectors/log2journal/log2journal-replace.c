@@ -3,13 +3,8 @@
 #include "log2journal.h"
 
 void replace_node_free(REPLACE_NODE *rpn) {
-    if(rpn->s) {
-        freez((void *) rpn->s);
-        rpn->s = NULL;
-    }
-
+    hashed_key_cleanup(&rpn->name);
     rpn->next = NULL;
-
     freez(rpn);
 }
 
@@ -31,9 +26,8 @@ static REPLACE_NODE *replace_pattern_add_node(REPLACE_NODE **head, bool is_varia
     if (!new_node)
         return NULL;
 
+    hashed_key_set(&new_node->name, text);
     new_node->is_variable = is_variable;
-    new_node->s = text;
-    new_node->len = strlen(text);
     new_node->next = NULL;
 
     if (*head == NULL)

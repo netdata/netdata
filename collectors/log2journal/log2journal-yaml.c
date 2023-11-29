@@ -138,7 +138,7 @@ static DUPLICATION *yaml_parse_duplicate_key(LOG_JOB *jb, yaml_parser_t *parser)
 
     DUPLICATION *kd = NULL;
     if(event.type == YAML_SCALAR_EVENT) {
-        kd = log_job_add_duplication_to_job(jb, (char *) event.data.scalar.value, event.data.scalar.length);
+        kd = log_job_duplication_add(jb, (char *) event.data.scalar.value, event.data.scalar.length);
     }
     else
         yaml_error(parser, &event, "duplicate key must be a scalar.");
@@ -155,7 +155,7 @@ static size_t yaml_parse_duplicate_from(LOG_JOB *jb __maybe_unused, yaml_parser_
         return 1;
 
     if(event.type == YAML_SCALAR_EVENT) {
-        if(!log_job_add_key_to_duplication(kd, (char *) event.data.scalar.value, event.data.scalar.length))
+        if(!log_job_duplication_key_add(kd, (char *) event.data.scalar.value, event.data.scalar.length))
             errors++;
     }
     else if(event.type == YAML_SEQUENCE_START_EVENT) {
@@ -166,8 +166,9 @@ static size_t yaml_parse_duplicate_from(LOG_JOB *jb __maybe_unused, yaml_parser_
                 return ++errors;
             else {
                 if (sub_event.type == YAML_SCALAR_EVENT) {
-                    if(!log_job_add_key_to_duplication(kd, (char *)sub_event.data.scalar.value,
-                                                       sub_event.data.scalar.length))
+                    if(!log_job_duplication_key_add(kd, (char *) sub_event.data.scalar.value
+                                                    , sub_event.data.scalar.length
+                                                   ))
                         errors++;
                 }
                 else if (sub_event.type == YAML_SEQUENCE_END_EVENT)
@@ -200,8 +201,9 @@ static size_t yaml_parse_filename_injection(yaml_parser_t *parser, LOG_JOB *jb) 
             errors++;
 
         else {
-            if (event.type == YAML_SCALAR_EVENT) {
-                if(!log_job_add_filename_key(jb, (char *)sub_event.data.scalar.value, sub_event.data.scalar.length))
+            if (sub_event.type == YAML_SCALAR_EVENT) {
+                if(!log_job_filename_key_set(jb, (char *) sub_event.data.scalar.value,
+                                             sub_event.data.scalar.length))
                     errors++;
             }
 
@@ -221,6 +223,78 @@ static size_t yaml_parse_filename_injection(yaml_parser_t *parser, LOG_JOB *jb) 
     return errors;
 }
 
+static size_t yaml_parse_filters(yaml_parser_t *parser, LOG_JOB *jb) {
+    if(!yaml_parse_expect_event(parser, YAML_MAPPING_START_EVENT))
+        return 1;
+
+    size_t errors = 0;
+    bool finished = false;
+
+    while(!errors && !finished) {
+        yaml_event_t event;
+
+        if(!yaml_parse(parser, &event))
+            return 1;
+
+        if(event.type == YAML_SCALAR_EVENT) {
+            if(yaml_scalar_matches(&event, "include", strlen("include"))) {
+                yaml_event_t sub_event;
+                if(!yaml_parse(parser, &sub_event))
+                    errors++;
+
+                else {
+                    if(sub_event.type == YAML_SCALAR_EVENT) {
+                        if(!log_job_include_pattern_set(jb, (char *) sub_event.data.scalar.value,
+                                                        sub_event.data.scalar.length))
+                            errors++;
+                    }
+
+                    else {
+                        yaml_error(parser, &sub_event, "expected the include as %s",
+                                   yaml_event_name(YAML_SCALAR_EVENT));
+                        errors++;
+                    }
+
+                    yaml_event_delete(&sub_event);
+                }
+            }
+            else if(yaml_scalar_matches(&event, "exclude", strlen("exclude"))) {
+                yaml_event_t sub_event;
+                if(!yaml_parse(parser, &sub_event))
+                    errors++;
+
+                else {
+                    if(sub_event.type == YAML_SCALAR_EVENT) {
+                        if(!log_job_exclude_pattern_set(jb,(char *) sub_event.data.scalar.value,
+                                                        sub_event.data.scalar.length))
+                            errors++;
+                    }
+
+                    else {
+                        yaml_error(parser, &sub_event, "expected the exclude as %s",
+                                   yaml_event_name(YAML_SCALAR_EVENT));
+                        errors++;
+                    }
+
+                    yaml_event_delete(&sub_event);
+                }
+            }
+        }
+        else if(event.type == YAML_MAPPING_END_EVENT)
+            finished = true;
+        else {
+            yaml_error(parser, &event, "expected %s or %s",
+                       yaml_event_name(YAML_SCALAR_EVENT),
+                       yaml_event_name(YAML_MAPPING_END_EVENT));
+            errors++;
+        }
+
+        yaml_event_delete(&event);
+    }
+
+    return errors;
+}
+
 static size_t yaml_parse_prefix(yaml_parser_t *parser, LOG_JOB *jb) {
     yaml_event_t event;
     size_t errors = 0;
@@ -229,7 +303,7 @@ static size_t yaml_parse_prefix(yaml_parser_t *parser, LOG_JOB *jb) {
         return 1;
 
     if (event.type == YAML_SCALAR_EVENT) {
-        if(!log_job_add_key_prefix(jb, (char *)event.data.scalar.value, event.data.scalar.length))
+        if(!log_job_key_prefix_set(jb, (char *) event.data.scalar.value, event.data.scalar.length))
             errors++;
     }
 
@@ -494,7 +568,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
         switch (event.type) {
             case YAML_MAPPING_START_EVENT:
             {
-                REWRITE rw = {0};
+                REWRITE rw = { 0 };
 
                 bool mapping_finished = false;
                 while (!errors && !mapping_finished) {
@@ -511,7 +585,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite key");
                                     errors++;
                                 } else {
-                                    rw.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    rw.key.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else if (yaml_scalar_matches(&sub_event, "search", strlen("search"))) {
@@ -537,14 +611,11 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                             break;
 
                         case YAML_MAPPING_END_EVENT:
-                            if(rw.key && rw.search.pattern && rw.replace.pattern) {
-                                if (!log_job_rewrite_add(jb, rw.key, rw.search.pattern, rw.replace.pattern))
+                            if(rw.key.key && rw.search.pattern && rw.replace.pattern) {
+                                if (!log_job_rewrite_add(jb, rw.key.key, rw.search.pattern, rw.replace.pattern))
                                     errors++;
                             }
-                            freez(rw.key);
-                            freez((char *)rw.search.pattern);
-                            freez((char *)rw.replace.pattern);
-                            memset(&rw, 0, sizeof(rw));
+                            rewrite_cleanup(&rw);
 
                             mapping_finished = true;
                             break;
@@ -610,7 +681,7 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rename new_key");
                                     errors++;
                                 } else {
-                                    rn.new_key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    rn.new_key.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else if (yaml_scalar_matches(&sub_event, "old_key", strlen("old_key"))) {
@@ -618,7 +689,7 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rename old_key");
                                     errors++;
                                 } else {
-                                    rn.old_key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    rn.old_key.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else {
@@ -628,15 +699,12 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
                             break;
 
                         case YAML_MAPPING_END_EVENT:
-                            if(rn.old_key && rn.new_key) {
-                                if (!log_job_rename_add(jb, rn.new_key, strlen(rn.new_key), rn.old_key, strlen(
-                                        rn.old_key
-                                                                                                              )))
+                            if(rn.old_key.key && rn.new_key.key) {
+                                if (!log_job_rename_add(jb, rn.new_key.key, rn.new_key.len,
+                                                        rn.old_key.key, rn.old_key.len))
                                     errors++;
                             }
-                            freez(rn.new_key);
-                            freez(rn.old_key);
-                            memset(&rn, 0, sizeof(rn));
+                            rename_cleanup(&rn);
 
                             mapping_finished = true;
                             break;
@@ -676,7 +744,7 @@ static size_t yaml_parse_pattern(yaml_parser_t *parser, LOG_JOB *jb) {
         return 1;
 
     if(event.type == YAML_SCALAR_EVENT)
-        log_job_set_pattern(jb, (char *)event.data.scalar.value, event.data.scalar.length);
+        log_job_pattern_set(jb, (char *) event.data.scalar.value, event.data.scalar.length);
     else {
         yaml_error(parser, &event, "unexpected event type");
         errors++;
@@ -731,6 +799,9 @@ static size_t yaml_parse_initialized(yaml_parser_t *parser, LOG_JOB *jb) {
 
                 else if (yaml_scalar_matches(&event, "filename", strlen("filename")))
                     errors += yaml_parse_filename_injection(parser, jb);
+
+                else if (yaml_scalar_matches(&event, "filter", strlen("filter")))
+                    errors += yaml_parse_filters(parser, jb);
 
                 else if (yaml_scalar_matches(&event, "duplicate", strlen("duplicate")))
                     errors += yaml_parse_duplicates_injection(parser, jb);
@@ -887,13 +958,24 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         yaml_print_node("key", jb->filename.key, 1, false);
     }
 
+    if(jb->filter.include.pattern || jb->filter.exclude.pattern) {
+        fprintf(stderr, "\n");
+        yaml_print_node("filter", NULL, 0, false);
+
+        if(jb->filter.include.pattern)
+            yaml_print_node("include", jb->filter.include.pattern, 1, false);
+
+        if(jb->filter.exclude.pattern)
+            yaml_print_node("exclude", jb->filter.exclude.pattern, 1, false);
+    }
+
     if(jb->renames.used) {
         fprintf(stderr, "\n");
         yaml_print_node("rename", NULL, 0, false);
 
         for(size_t i = 0; i < jb->renames.used ;i++) {
-            yaml_print_node("new_key", jb->renames.array[i].new_key, 1, true);
-            yaml_print_node("old_key", jb->renames.array[i].old_key, 2, false);
+            yaml_print_node("new_key", jb->renames.array[i].new_key.key, 1, true);
+            yaml_print_node("old_key", jb->renames.array[i].old_key.key, 2, false);
         }
     }
 
@@ -902,11 +984,11 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         yaml_print_node("duplicate", NULL, 0, false);
         for(size_t i = 0; i < jb->dups.used ;i++) {
             DUPLICATION *kd = &jb->dups.array[i];
-            yaml_print_node("key", kd->target, 1, true);
+            yaml_print_node("key", kd->target.key, 1, true);
             yaml_print_node("values_of", NULL, 2, false);
 
             for(size_t k = 0; k < kd->used ;k++)
-                yaml_print_node(NULL, kd->keys[k], 3, true);
+                yaml_print_node(NULL, kd->keys[k].key, 3, true);
         }
     }
 
@@ -915,7 +997,7 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         yaml_print_node("rewrite", NULL, 0, false);
 
         for(size_t i = 0; i < jb->rewrites.used ;i++) {
-            yaml_print_node("key", jb->rewrites.array[i].key, 1, true);
+            yaml_print_node("key", jb->rewrites.array[i].key.key, 1, true);
             yaml_print_node("search", jb->rewrites.array[i].search.pattern, 2, false);
             yaml_print_node("replace", jb->rewrites.array[i].replace.pattern, 2, false);
         }
@@ -926,8 +1008,8 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         yaml_print_node("inject", NULL, 0, false);
 
         for (size_t i = 0; i < jb->injections.used; i++) {
-            yaml_print_node("key", jb->injections.keys[i].key, 1, true);
-            yaml_print_node("value", jb->injections.keys[i].value.s, 2, false);
+            yaml_print_node("key", jb->injections.keys[i].key.key, 1, true);
+            yaml_print_node("value", jb->injections.keys[i].value.txt, 2, false);
         }
     }
 
@@ -943,8 +1025,8 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
             yaml_print_node("inject", NULL, 1, false);
 
             for (size_t i = 0; i < jb->unmatched.injections.used; i++) {
-                yaml_print_node("key", jb->unmatched.injections.keys[i].key, 2, true);
-                yaml_print_node("value", jb->unmatched.injections.keys[i].value.s, 3, false);
+                yaml_print_node("key", jb->unmatched.injections.keys[i].key.key, 2, true);
+                yaml_print_node("value", jb->unmatched.injections.keys[i].value.txt, 3, false);
             }
         }
     }

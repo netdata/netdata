@@ -61,15 +61,19 @@ static inline void jb_traverse_pcre2_named_groups_and_send_keys(PCRE2_STATE *pcr
     }
 }
 
-static void pcre2_error_message(PCRE2_STATE *pcre2, int rc, int pos) {
+void pcre2_get_error_in_buffer(char *msg, size_t msg_len, int rc, int pos) {
     int l;
 
     if(pos >= 0)
-        l = snprintf(pcre2->msg, sizeof(pcre2->msg), "PCRE2 error %d at pos %d on: ", rc, pos);
+        l = snprintf(msg, msg_len, "PCRE2 error %d at pos %d on: ", rc, pos);
     else
-        l = snprintf(pcre2->msg, sizeof(pcre2->msg), "PCRE2 error %d on: ", rc);
+        l = snprintf(msg, msg_len, "PCRE2 error %d on: ", rc);
 
-    pcre2_get_error_message(rc, (PCRE2_UCHAR *)&pcre2->msg[l], sizeof(pcre2->msg) - l);
+    pcre2_get_error_message(rc, (PCRE2_UCHAR *)&msg[l], msg_len - l);
+}
+
+static void pcre2_error_message(PCRE2_STATE *pcre2, int rc, int pos) {
+    pcre2_get_error_in_buffer(pcre2->msg, sizeof(pcre2->msg), rc, pos);
 }
 
 bool pcre2_has_error(PCRE2_STATE *pcre2) {

@@ -83,6 +83,8 @@ test_log2journal_config /dev/null "${tests}/full.output" --show-config      \
   --unmatched-key MESSAGE                                                   \
   --inject-unmatched PRIORITY=1                                             \
   --inject-unmatched=PRIORITY2=2                                            \
+  --include=".*"                                                            \
+  --exclude ".*HELLO.*WORLD.*"                                              \
   '(?x)                                   # Enable PCRE2 extended mode
    ^
    (?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR

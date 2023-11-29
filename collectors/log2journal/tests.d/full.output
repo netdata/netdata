@@ -23,6 +23,10 @@ prefix: NGINX_
 filename:
   key: NGINX_LOG_FILENAME
 
+filter:
+  include: ".*"
+  exclude: ".*HELLO.*WORLD.*"
+
 rename:
   - new_key: TEST1
     old_key: TEST2
