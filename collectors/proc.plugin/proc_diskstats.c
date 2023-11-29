@@ -366,7 +366,10 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
     DIR *dir = opendir(path);
     if (!dir) {
-        collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
+        if (errno == ENOENT)
+            collector_info("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
+        else
+            collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
         goto failed;
     }
 
