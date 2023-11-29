@@ -978,8 +978,10 @@ void send_statistics(const char *action, const char *action_result, const char *
     if (!netdata_anonymous_statistics_enabled || !action)
         return;
 
-    if (!action_result || !action_data)
+    if (!action_result)
         action_result = "";
+    if (!action_data)
+        action_data = "";
 
     char *command_to_run = mallocz(
         sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) +
