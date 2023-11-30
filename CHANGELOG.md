@@ -6,11 +6,19 @@
 
 **Merged pull requests:**
 
+- convert some error messages to info [\#16505](https://github.com/netdata/netdata/pull/16505) ([ilyam8](https://github.com/ilyam8))
+- diskspace/diskstats: don't create runtime disk config by default [\#16503](https://github.com/netdata/netdata/pull/16503) ([ilyam8](https://github.com/ilyam8))
+- Fix CID 410152 Dereference after null check [\#16502](https://github.com/netdata/netdata/pull/16502) ([stelfrag](https://github.com/stelfrag))
+- proc\_net\_dev: don't create runtime device config by default [\#16501](https://github.com/netdata/netdata/pull/16501) ([ilyam8](https://github.com/ilyam8))
+- remove discourse badge from readme [\#16499](https://github.com/netdata/netdata/pull/16499) ([ilyam8](https://github.com/ilyam8))
 - add /var/log mount to docker [\#16496](https://github.com/netdata/netdata/pull/16496) ([ilyam8](https://github.com/ilyam8))
 - Fix occasional shutdown deadlock [\#16495](https://github.com/netdata/netdata/pull/16495) ([stelfrag](https://github.com/stelfrag))
+- Log2journal improvements part2 [\#16494](https://github.com/netdata/netdata/pull/16494) ([ktsaou](https://github.com/ktsaou))
 - proc\_net\_dev: remove device config section [\#16492](https://github.com/netdata/netdata/pull/16492) ([ilyam8](https://github.com/ilyam8))
 - Spelling fixes to documentation [\#16490](https://github.com/netdata/netdata/pull/16490) ([M4itee](https://github.com/M4itee))
+- Fix builds on macOS due to missing endianness functions [\#16489](https://github.com/netdata/netdata/pull/16489) ([vkalintiris](https://github.com/vkalintiris))
 - log2journal: added missing yaml elements [\#16488](https://github.com/netdata/netdata/pull/16488) ([ktsaou](https://github.com/ktsaou))
+- When unregistering an ephemeral host, delete its chart labels [\#16486](https://github.com/netdata/netdata/pull/16486) ([stelfrag](https://github.com/stelfrag))
 - logs-management: Add function cancellability [\#16484](https://github.com/netdata/netdata/pull/16484) ([Dim-P](https://github.com/Dim-P))
 - Fix incorrect DEB package build dep. [\#16483](https://github.com/netdata/netdata/pull/16483) ([Ferroin](https://github.com/Ferroin))
 - Bump new version to cov-analysis tool [\#16482](https://github.com/netdata/netdata/pull/16482) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -418,13 +426,6 @@
 - Improve shutdown of the metadata thread [\#15901](https://github.com/netdata/netdata/pull/15901) ([stelfrag](https://github.com/stelfrag))
 - bump ui to v6.32.0 [\#15897](https://github.com/netdata/netdata/pull/15897) ([andrewm4894](https://github.com/andrewm4894))
 - Update change-metrics-storage.md [\#15896](https://github.com/netdata/netdata/pull/15896) ([Ancairon](https://github.com/Ancairon))
-- make `anomaly_detection.type_anomaly_rate` stacked [\#15895](https://github.com/netdata/netdata/pull/15895) ([andrewm4894](https://github.com/andrewm4894))
-- Update pfsense.md [\#15894](https://github.com/netdata/netdata/pull/15894) ([Ancairon](https://github.com/Ancairon))
-- Initial tooling for Integrations Documentation [\#15893](https://github.com/netdata/netdata/pull/15893) ([Ancairon](https://github.com/Ancairon))
-- Reset the obsolete flag on service thread [\#15892](https://github.com/netdata/netdata/pull/15892) ([MrZammler](https://github.com/MrZammler))
-- Add better recovery for corrupted metadata [\#15891](https://github.com/netdata/netdata/pull/15891) ([stelfrag](https://github.com/stelfrag))
-- Add index to ACLK table to improve update statements [\#15890](https://github.com/netdata/netdata/pull/15890) ([stelfrag](https://github.com/stelfrag))
-- Limit atomic operations for statistics [\#15887](https://github.com/netdata/netdata/pull/15887) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
