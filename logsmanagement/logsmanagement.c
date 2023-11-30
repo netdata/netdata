@@ -35,8 +35,6 @@ struct File_infos_arr *p_file_infos_arr = NULL;
 
 static uv_loop_t *main_loop;
 
-static uv_thread_t stats_charts_thread_id;
-
 static struct {
     uv_signal_t sig;
     const int signum;
@@ -193,7 +191,15 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    fatal_assert(0 == uv_thread_create(&stats_charts_thread_id, stats_charts_init, &stdout_mut));
+    uv_thread_t *p_stats_charts_thread_id = NULL;
+    const char *const netdata_internals_monitoring = getenv("NETDATA_INTERNALS_MONITORING");
+    if( netdata_internals_monitoring && 
+        *netdata_internals_monitoring && 
+        strcmp(netdata_internals_monitoring, "YES") == 0){
+
+        p_stats_charts_thread_id = mallocz(sizeof(uv_thread_t));
+        fatal_assert(0 == uv_thread_create(p_stats_charts_thread_id, stats_charts_init, &stdout_mut));
+    }
     
 #if defined(__STDC_VERSION__)
     debug_log( "__STDC_VERSION__: %ld", __STDC_VERSION__);
@@ -229,7 +235,10 @@ int main(int argc, char **argv) {
     nd_log_limits_unlimited();
 
     // TODO: Clean up stats charts memory
-    uv_thread_join(&stats_charts_thread_id);
+    if(p_stats_charts_thread_id){
+        uv_thread_join(p_stats_charts_thread_id);
+        freez(p_stats_charts_thread_id);
+    }
 
     uv_stop(main_loop);
 
