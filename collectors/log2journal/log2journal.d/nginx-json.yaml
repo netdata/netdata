@@ -12,7 +12,7 @@ filename:
   key: NGINX_LOG_FILENAME
 
 filter:
-  exclude: "^NGINX_BINARY_REMOTE_ADDR$"
+  exclude: "NGINX_BINARY_REMOTE_ADDR"
 
 rename:
   - new_key: MESSAGE
@@ -66,19 +66,19 @@ rename:
   - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL_KEY_ALG
     old_key: NGINX_PROXY_PROTOCOL_TLV_SSL_0X25
 
-# Duplicate fields under a different name. You can duplicate multiple fields
-# to a new one and then use rewrite rules to change its value.
-duplicate:
+# Inject constant fields into the journal logs.
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: "nginx-log"
 
-  # we insert the field PRIORITY as a copy of NGINX_STATUS.
-  - key: PRIORITY
-    values_of:
-      - NGINX_STATUS
+  # inject PRIORITY is a duplicate of NGINX_STATUS
+  - key: "PRIORITY"
+    value: "${NGINX_STATUS}"
 
-  # we inject the field NGINX_STATUS_FAMILY as a copy of NGINX_STATUS.
-  - key: NGINX_STATUS_FAMILY
-    values_of:
-      - NGINX_STATUS
+  # Inject NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
+  - key: "NGINX_STATUS_FAMILY"
+    value: "${NGINX_STATUS}"
+
 
 # Rewrite the value of fields (including the duplicated ones).
 # The search pattern can have named groups, and the replace pattern can use
@@ -150,11 +150,6 @@ rewrite:
   - key: "NGINX_STATUS_FAMILY"
     match: ".*"
     value: "UNKNOWN"
-
-# Inject constant fields into the journal logs.
-inject:
-  - key: SYSLOG_IDENTIFIER
-    value: "nginx-log"
 
 # Control what to do when input logs do not match the main PCRE2 pattern.
 unmatched:

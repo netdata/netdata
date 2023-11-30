@@ -140,10 +140,10 @@ Avoid setting priority to 0 (`LOG_EMERG`), because these will be on your termina
 
 To set the PRIORITY field in the output, we can use `NGINX_STATUS` fields. We need a copy of it, which we will alter later.
 
-We can instruct `log2journal` to duplicate `NGINX_STATUS`, like this: `log2journal --duplicate=PRIORITY=NGINX_STATUS`. Let's try it:
+We can instruct `log2journal` to duplicate `NGINX_STATUS`, like this: `log2journal --inject 'PRIORITY=${NGINX_STATUS}'`. Let's try it:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=PRIORITY=NGINX_STATUS
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --inject 'PRIORITY=${NGINX_STATUS}'
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -161,10 +161,10 @@ NGINX_URL=/index.html
 
 ```
 
-Now that we have the `PRIORITY` field equal to the `NGINX_STATUS`, we can use instruct `log2journal` to change it to a valid priority, by appending: `--rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6`. These rewrite commands say to match everything that starts with `5` and replace it with priority `3` (error) and everything else with priority `6` (info). Let's see it:
+Now that we have the `PRIORITY` field equal to the `NGINX_STATUS`, we can use instruct `log2journal` to change it to a valid priority, by appending: `--rewrite 'PRIORITY=/^5/3' --rewrite 'PRIORITY=/.*/6'`. These rewrite commands say to match everything that starts with `5` and replace it with priority `3` (error) and everything else with priority `6` (info). Let's see it:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --inject 'PRIORITY=${NGINX_STATUS}' --rewrite 'PRIORITY=/^5/3' --rewrite 'PRIORITY=/.*/6'
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -182,12 +182,12 @@ NGINX_URL=/index.html
 
 ```
 
-Similarly, we could duplicate `NGINX_URL` to `NGINX_ENDPOINT` and then process it with sed to remove any query string, or replace IDs in the URL path with constant names, thus giving us uniform endpoints independently of the parameters.
+Similarly, we could duplicate `${NGINX_URL}` to `NGINX_ENDPOINT` and then process it to remove any query string, or replace IDs in the URL path with constant names, thus giving us uniform endpoints independently of the parameters.
 
-To complete the example, we can also inject a `SYSLOG_IDENTIFIER` with `log2journal`, using `--inject=SYSLOG_IDENTIFIER=nginx-log`, like this:
+To complete the example, we can also inject a `SYSLOG_IDENTIFIER` with `log2journal`, using `--inject SYSLOG_IDENTIFIER=nginx-log`, like this:
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx -rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --inject 'PRIORITY=${NGINX_STATUS}' --inject 'SYSLOG_IDENTIFIER=nginx' -rewrite 'PRIORITY=/^5/3' --rewrite 'PRIORITY=/.*/6'
 MESSAGE=GET /index.html HTTP/1.1
 NGINX_BODY_BYTES_SENT=4172
 NGINX_HTTP_REFERER=-
@@ -210,7 +210,7 @@ Now the message is ready to be sent to a systemd-journal. For this we use `syste
 
 
 ```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --duplicate=STATUS2PRIORITY=NGINX_STATUS --inject=SYSLOG_IDENTIFIER=nginx -rewrite=PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6 | systemd-cat-native
+# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 104 0.001 "-" "Go-http-client/1.1"' | log2journal '^(?<NGINX_REMOTE_ADDR>[^ ]+) - (?<NGINX_REMOTE_USER>[^ ]+) \[(?<NGINX_TIME_LOCAL>[^\]]+)\] "(?<MESSAGE>(?<NGINX_METHOD>[A-Z]+) (?<NGINX_URL>[^ ]+) HTTP/(?<NGINX_HTTP_VERSION>[^"]+))" (?<NGINX_STATUS>\d+) (?<NGINX_BODY_BYTES_SENT>\d+) (?<NGINX_REQUEST_LENGTH>\d+) (?<NGINX_REQUEST_TIME>[\d.]+) "(?<NGINX_HTTP_REFERER>[^"]*)" "(?<NGINX_HTTP_USER_AGENT>[^"]*)"' --inject 'PRIORITY=${NGINX_STATUS}' --inject 'SYSLOG_IDENTIFIER=nginx' -rewrite 'PRIORITY=/^5/3' --rewrite 'PRIORITY=/.*/6' | systemd-cat-native
 # no output
 
 # let's find the message
@@ -296,24 +296,24 @@ pattern='(?x)                          # Enable PCRE2 extended mode
 
 tail -n $last -F /var/log/nginx/*access.log \
 	| log2journal "${pattern}" \
-		--filename-key=NGINX_LOG_FILE \
-		--duplicate=PRIORITY=NGINX_STATUS \
-		--duplicate=NGINX_STATUS_FAMILY=NGINX_STATUS \
-		--inject=SYSLOG_IDENTIFIER=nginx-log \
-		--unmatched-key=MESSAGE \
-		--inject-unmatched=PRIORITY=1 \
-		--rewrite='PRIORITY=/^5/3 --rewrite=PRIORITY=/.*/6' \
-		--rewrite='NGINX_STATUS_FAMILY=/^(?<first_digit>[0-9]).*$/${first_digit}xx' \
-		--rewrite='NGINX_STATUS_FAMILY=/^.*$/UNKNOWN' \
+		--filename-key 'NGINX_LOG_FILE' \
+		--unmatched-key 'MESSAGE' \
+		--inject-unmatched 'PRIORITY=1' \
+		--inject 'PRIORITY=${NGINX_STATUS}' \
+		--rewrite 'PRIORITY=/^5/3' \
+		--rewrite 'PRIORITY=/.*/6' \
+		--inject 'NGINX_STATUS_FAMILY=${NGINX_STATUS}' \
+		--rewrite 'NGINX_STATUS_FAMILY=/^(?<first_digit>[0-9]).*$/${first_digit}xx' \
+		--rewrite 'NGINX_STATUS_FAMILY=/^.*$/UNKNOWN' \
+		--inject 'SYSLOG_IDENTIFIER=nginx-log' \
 		| $send_or_show
 ```
-
 
 ## `log2journal` options
 
 ```
 
-Netdata log2journal v1.43.0-306-g929866ad3
+Netdata log2journal v1.43.0-313-gd79fbac6a
 
 Convert logs to systemd Journal Export Format.
 
@@ -350,14 +350,6 @@ Options:
        Usually it should be set to --unmatched-key=MESSAGE so that the
        unmatched entry will appear as the log message in the journals.
        Use --inject-unmatched to inject additional fields to unmatched lines.
-
-  --duplicate TARGET=KEY1[,KEY2[,KEY3[,...]]
-       Create a new key called TARGET, duplicating the values of the keys
-       given. Useful for further processing. When multiple keys are given,
-       their values are separated by comma.
-
-       Up to 512 duplications can be given on the command line, and up to
-       20 keys per duplication command are allowed.
 
   --inject LINE
        Inject constant fields to the output (both matched and unmatched logs).
@@ -455,40 +447,40 @@ This is a simple diagram of the pipeline taking place:
           |                       INPUT                       |  
           |             read one log line at a time           |  
           +---------------------------------------------------+  
-                           v                          v          
-          +---------------------------------+         |          
-          |   EXTRACT FIELDS AND VALUES     |         |          
-          |  JSON, logfmt, or pattern based |         |          
-          |    (apply optional PREFIX)      |         |          
-          +---------------------------------+         |          
-                  v                 v                 |          
-          +---------------+  +--------------+         |          
-          |   DUPLICATE   |  |    FILTER    |         |          
-          |               |  | filter keys  |         |          
-          |  create new   |  +--------------+         |          
-          |  fields by    |         v                 |          
-          |  duplicating  |  +--------------+         |          
-          |  other fields |  |    RENAME    |         |          
-          |  and their    |  |    change    |         |          
-          |  values       |  | field names  |         |          
-          +---------------+  +--------------+         |          
-                  v                 v                 v          
-          +---------------------------------+  +--------------+  
-          |        REWRITE PIPELINES        |  |    INJECT    |  
-          |  altering the values of fields  |  |   constants  |  
-          +---------------------------------+  +--------------+  
-                          v                           v          
+                          v   v   v   v   v   v                  
+          +---------------------------------------------------+  
+          |             EXTRACT FIELDS AND VALUES             |  
+          |            JSON, logfmt, or pattern based         |  
+          |              (apply optional PREFIX)              |  
+          +---------------------------------------------------+  
+                          v   v   v   v   v   v                  
+          +---------------------------------------------------+  
+          |                   RENAME FIELDS                   |  
+          |           change the names of the fields          |  
+          +---------------------------------------------------+  
+                          v   v   v   v   v   v                  
+          +---------------------------------------------------+  
+          |                 INJECT NEW FIELDS                 |  
+          |   constants, or other field values as variables   |  
+          +---------------------------------------------------+  
+                          v   v   v   v   v   v                  
+          +---------------------------------------------------+  
+          |                REWRITE FIELD VALUES               |  
+          |     pipeline multiple rewriting rules to alter    |  
+          |               the values of the fields            |  
+          +---------------------------------------------------+  
+                          v   v   v   v   v   v                  
+          +---------------------------------------------------+  
+          |                   FILTER FIELDS                   |  
+          |  use include and exclude patterns on the field    |  
+          | names, to select which fields are sent to journal |  
+          +---------------------------------------------------+  
+                          v   v   v   v   v   v                  
           +---------------------------------------------------+  
           |                       OUTPUT                      |  
           |           generate Journal Export Format          |  
           +---------------------------------------------------+  
                                                                  
-IMPORTANT:
- - Extraction of keys includes formatting them according to journal rules.
- - Duplication rules use the original extracted field names, after they have
-   been prefixed (when a PREFIX is set) and before they are renamed.
- - Rewriting is always the last stage, so the final field names are matched.
-
 --------------------------------------------------------------------------------
 JOURNAL FIELDS RULES (enforced by systemd-journald)
 

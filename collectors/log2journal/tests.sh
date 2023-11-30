@@ -68,10 +68,10 @@ echo >&2 "Testing command line parsing..."
 test_log2journal_config /dev/null "${tests}/full.output" --show-config      \
   --prefix=NGINX_                                                           \
   --filename-key NGINX_LOG_FILENAME                                         \
-  --duplicate PRIORITY=NGINX_STATUS                                         \
-  --duplicate=NGINX_STATUS_FAMILY=NGINX_STATUS,NGINX_METHOD                 \
   --inject SYSLOG_IDENTIFIER=nginx-log                                      \
   --inject=SYSLOG_IDENTIFIER2=nginx-log2                                    \
+  --inject 'PRIORITY=${NGINX_STATUS}'                                       \
+  --inject='NGINX_STATUS_FAMILY=${NGINX_STATUS}${NGINX_METHOD}'             \
   --rewrite 'PRIORITY=//${NGINX_STATUS}/inject,dont-stop'                   \
   --rewrite "PRIORITY=/^[123]/6"                                            \
   --rewrite='PRIORITY=|^4|5'                                                \

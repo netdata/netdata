@@ -317,18 +317,6 @@ void injection_cleanup(INJECTION *inj);
 
 // ----------------------------------------------------------------------------
 
-typedef struct duplication {
-    HASHED_KEY target;
-    uint32_t used;
-    bool exposed;
-    HASHED_KEY keys[MAX_KEY_DUPS_KEYS];
-    TEXT values[MAX_KEY_DUPS_KEYS];
-} DUPLICATION;
-
-void duplication_cleanup(DUPLICATION *dp);
-
-// ----------------------------------------------------------------------------
-
 typedef struct key_rename {
     HASHED_KEY new_key;
     HASHED_KEY old_key;
@@ -400,11 +388,6 @@ typedef struct log_job {
 
     struct {
         uint32_t used;
-        DUPLICATION array[MAX_KEY_DUPS];
-    } dups;
-
-    struct {
-        uint32_t used;
         REWRITE array[MAX_REWRITES];
         TEXT tmp;
     } rewrites;
@@ -431,8 +414,6 @@ void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *
 // configuration related
 
 // management of configuration to set settings
-DUPLICATION *log_job_duplication_add(LOG_JOB *jb, const char *target, size_t target_len);
-bool log_job_duplication_key_add(DUPLICATION *kd, const char *key, size_t key_len);
 bool log_job_filename_key_set(LOG_JOB *jb, const char *key, size_t key_len);
 bool log_job_key_prefix_set(LOG_JOB *jb, const char *prefix, size_t prefix_len);
 bool log_job_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);

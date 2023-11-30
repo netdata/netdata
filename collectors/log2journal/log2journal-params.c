@@ -41,9 +41,6 @@ void log_job_cleanup(LOG_JOB *jb) {
     for(size_t i = 0; i < jb->renames.used ;i++)
         rename_cleanup(&jb->renames.array[i]);
 
-    for(size_t i = 0; i < jb->dups.used ;i++)
-        duplication_cleanup(&jb->dups.array[i]);
-
     for(size_t i = 0; i < jb->rewrites.used; i++)
         rewrite_cleanup(&jb->rewrites.array[i]);
 
@@ -292,41 +289,6 @@ static bool parse_inject(LOG_JOB *jb, const char *value, bool unmatched) {
     return true;
 }
 
-static bool parse_duplicate(LOG_JOB *jb, const char *value) {
-    const char *target = value;
-    const char *equal_sign = strchr(value, '=');
-    if (!equal_sign || equal_sign == target) {
-        log2stderr("Error: Invalid duplicate format, '=' not found or at the start in %s", value);
-        return false;
-    }
-
-    size_t target_len = equal_sign - target;
-    DUPLICATION *kd = log_job_duplication_add(jb, target, target_len);
-    if(!kd) return false;
-
-    const char *key = equal_sign + 1;
-    while (key) {
-        if (kd->used >= MAX_KEY_DUPS_KEYS) {
-            log2stderr("Error: too many keys in duplication of target '%s'.", kd->target.key);
-            return false;
-        }
-
-        const char *comma = strchr(key, ',');
-        size_t key_len;
-        if (comma) {
-            key_len = comma - key;
-            log_job_duplication_key_add(kd, key, key_len);
-            key = comma + 1;
-        }
-        else {
-            log_job_duplication_key_add(kd, key, strlen(key));
-            break;  // No more keys
-        }
-    }
-
-    return true;
-}
-
 bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
@@ -391,10 +353,6 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
 #endif
             else if (strcmp(param, "--unmatched-key") == 0)
                 hashed_key_set(&jb->unmatched.key, value);
-            else if (strcmp(param, "--duplicate") == 0) {
-                if (!parse_duplicate(jb, value))
-                    return false;
-            }
             else if (strcmp(param, "--inject") == 0) {
                 if (!parse_inject(jb, value, false))
                     return false;

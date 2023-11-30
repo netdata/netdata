@@ -2,8 +2,6 @@
 
 #include "log2journal.h"
 
-static inline void send_duplications_for_key(LOG_JOB *jb, HASHED_KEY *k, const char *value, size_t value_len);
-
 // ----------------------------------------------------------------------------
 
 const char journal_key_characters_map[256] = {
@@ -317,10 +315,6 @@ inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const
     ht_key->flags |= HK_VALUE_FROM_LOG;
 
 //    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
-
-    // process the duplications (using the original key)
-    // and send them to output
-    send_duplications_for_key(jb, ht_key, value, len);
 }
 
 static inline void log_job_process_rewrites(LOG_JOB *jb) {
@@ -412,101 +406,6 @@ static inline void jb_finalize_injections(LOG_JOB *jb, bool line_is_matched) {
         INJECTION *inj = &jb->injections.keys[j];
 
         replace_evaluate(jb, &inj->key, &inj->value);
-    }
-}
-
-static inline void log_job_duplications_reset(LOG_JOB *jb) {
-    for(size_t d = 0; d < jb->dups.used ; d++) {
-        DUPLICATION *kd = &jb->dups.array[d];
-        kd->exposed = false;
-
-        for(size_t g = 0; g < kd->used ; g++) {
-            if(kd->values[g].txt)
-                kd->values[g].txt[0] = '\0';
-        }
-    }
-}
-
-// ----------------------------------------------------------------------------
-// duplications
-
-static inline void send_duplications_for_key(LOG_JOB *jb, HASHED_KEY *k, const char *value, size_t value_len) {
-    // IMPORTANT:
-    // The 'value' may not be NULL terminated and have more data that the value we need
-
-    if(!(k->flags & HK_DUPS_CHECKED) || k->flags & HK_HAS_DUPS) {
-        k->flags |= HK_DUPS_CHECKED;
-
-        for(size_t d = 0; d < jb->dups.used; d++) {
-            DUPLICATION *kd = &jb->dups.array[d];
-
-            if(kd->exposed || kd->used == 0)
-                continue;
-
-            if(kd->used == 1) {
-                // just one key to be duplicated
-                if(hashed_keys_match(&kd->keys[0], k)) {
-                    k->flags |= HK_HAS_DUPS;
-
-                    send_key_value_and_rewrite(jb, &kd->target, value, value_len);
-                    kd->exposed = true;
-                }
-            }
-            else {
-                // multiple keys to be duplicated
-                for(size_t g = 0; g < kd->used; g++) {
-                    if(hashed_keys_match(&kd->keys[g], k)) {
-                        k->flags |= HK_HAS_DUPS;
-                        txt_replace(&kd->values[g], value, value_len);
-                    }
-                }
-            }
-        }
-    }
-}
-
-static inline void jb_send_remaining_duplications(LOG_JOB *jb) {
-    static __thread char buffer[JOURNAL_MAX_VALUE_LEN + 1];
-
-    // IMPORTANT:
-    // all duplications are exposed, even the ones we haven't found their keys in the source,
-    // so that the output always has the same fields for matched entries.
-
-    for(size_t d = 0; d < jb->dups.used ; d++) {
-        DUPLICATION *kd = &jb->dups.array[d];
-
-        if(kd->exposed || kd->used == 0)
-            continue;
-
-        buffer[0] = '\0';
-        size_t remaining = sizeof(buffer);
-        char *s = buffer;
-
-        for(size_t g = 0; g < kd->used ; g++) {
-            if(remaining < 2) {
-                log2stderr("Warning: duplicated key '%s' cannot fit the values.", kd->target.key);
-                break;
-            }
-
-            if(g > 0) {
-                *s++ = ',';
-                *s = '\0';
-                remaining--;
-            }
-
-            char *value = (kd->values[g].txt && kd->values[g].txt[0]) ? kd->values[g].txt : "[unavailable]";
-            size_t len = strlen(value);
-            size_t copied = copy_to_buffer(s, remaining, value, len);
-            remaining -= copied;
-            s += copied;
-
-            if(copied != len) {
-                log2stderr("Warning: duplicated key '%s' will have truncated value", jb->dups.array[d].target.key);
-                break;
-            }
-        }
-
-        send_key_value_and_rewrite(jb, &kd->target, buffer, s - buffer);
     }
 }
 
@@ -618,8 +517,6 @@ int log_job_run(LOG_JOB *jb) {
         if(jb_switched_filename(jb, line, len))
             continue;
 
-        log_job_duplications_reset(jb);
-
         bool line_is_matched;
 
         if(json)
@@ -640,10 +537,6 @@ int log_job_run(LOG_JOB *jb) {
             if(!jb_send_unmatched_line(jb, line))
                 // just logging to stderr, not sending unmatched lines
                 continue;
-        }
-        else {
-            // print all non-exposed duplications
-            jb_send_remaining_duplications(jb);
         }
 
         jb_inject_filename(jb);
