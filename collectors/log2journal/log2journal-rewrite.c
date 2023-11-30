@@ -15,6 +15,8 @@ bool log_job_rewrite_add(LOG_JOB *jb, const char *key, const char *search_patter
     }
 
     REWRITE *rw = &jb->rewrites.array[jb->rewrites.used++];
+    rw->flags = RW_SEARCH_REPLACE | RW_MATCHED_ENTRIES;
+
     hashed_key_set(&rw->key, key);
 
     if(!search_pattern_set(&rw->search, search_pattern, strlen(search_pattern)) ||
@@ -22,6 +24,13 @@ bool log_job_rewrite_add(LOG_JOB *jb, const char *key, const char *search_patter
         rewrite_cleanup(rw);
         jb->rewrites.used--;
         return false;
+    }
+
+    for(REPLACE_NODE *node = rw->replace.nodes; node; node = node->next) {
+        if(node->is_variable) {
+            rw->flags |= RW_HAS_VARIABLES;
+            break;
+        }
     }
 
     return true;
