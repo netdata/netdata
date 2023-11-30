@@ -225,7 +225,8 @@ class ModuleConfig:
         self.is_stock = False
 
     def load(self, abs_path):
-        self.is_stock = abs_path.startswith(DIRS.modules_stock_config)
+        if not IS_ATTY:
+            self.is_stock = abs_path.startswith(DIRS.modules_stock_config)
         self.config.update(load_config(abs_path) or dict())
 
     def defaults(self):
