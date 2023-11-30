@@ -23,10 +23,6 @@
 #include "logsmanagement/unit_test/unit_test.h"
 #endif
 
-#if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
-#include "query_test.h"
-#endif  // defined(LOGS_MANAGEMENT_STRESS_TEST)
-
 netdata_mutex_t stdout_mut = NETDATA_MUTEX_INITIALIZER;
 
 bool logsmanagement_should_exit = false;
@@ -209,12 +205,6 @@ int main(int argc, char **argv) {
     debug_log( "libuv version: %s", uv_version_string());
     debug_log( "LZ4 version: %s", LZ4_versionString());
     debug_log( "SQLITE version: " SQLITE_VERSION);
-
-#if defined(LOGS_MANAGEMENT_STRESS_TEST) && LOGS_MANAGEMENT_STRESS_TEST == 1
-    debug_log( "Running Netdata with logs_management stress test enabled!");
-    static uv_thread_t run_stress_test_queries_thread_id;
-    uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
-#endif  // LOGS_MANAGEMENT_STRESS_TEST
 
     for(int i = 0; i < (int) (sizeof(signals) / sizeof(signals[0])); i++){
         uv_signal_init(main_loop, &signals[i].sig);
