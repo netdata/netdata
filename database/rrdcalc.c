@@ -230,7 +230,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     rw_spinlock_write_unlock(&st->alerts.spinlock);
 
     if(rc->update_every < rc->rrdset->update_every) {
-        netdata_log_error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
+        netdata_log_info("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
         rc->update_every = rc->rrdset->update_every;
     }
 
