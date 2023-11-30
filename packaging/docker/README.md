@@ -133,6 +133,34 @@ volumes:
 > If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
 > Add Nodes" button in your Space's "Nodes" view.
 
+### With systemd units monitoring
+
+Monitoring systemd units requires mounting `/run/dbus`. This mount is not available on non-systemd systems, so we cannot
+use it in the Recommended Way.
+
+Mounting `/run/dbus` provides:
+
+- [go.d/systemdunits](https://github.com/netdata/go.d.plugin/tree/master/modules/systemdunits#readme).
+- Systemd-list-units function: information about all systemd units, including their active state, description, whether
+  they are enabled, and more.
+
+<Tabs>
+<TabItem value="docker_run" label="docker run">
+
+<h3> Using the <code>docker run</code> command </h3>
+
+Add `-v /run/dbus:/run/dbus:ro` to your `docker run`.
+
+</TabItem>
+<TabItem value="docker compose" label="docker-compose">
+
+<h3> Using the <code>docker-compose</code> command</h3>
+
+Add `- /run/dbus:/run/dbus:ro` to the netdata service `volumes`.
+
+</TabItem>
+</Tabs>
+
 ### With host-editable configuration
 
 Use a [bind mount](https://docs.docker.com/storage/bind-mounts/) for `/etc/netdata` rather than a volume.
