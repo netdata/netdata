@@ -1117,7 +1117,7 @@ void pluginsd_function_cancel(void *data) {
     dfe_done(t);
 
     if(sent <= 0)
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
 }
 
