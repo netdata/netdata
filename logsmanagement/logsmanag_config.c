@@ -563,8 +563,17 @@ static void config_section_init(uv_loop_t *main_loop,
      * Check if config_section->name is valid and if so, use it as chartname.
      * ------------------------------------------------------------------------- */
     if(config_section->name && *config_section->name){
-        p_file_info->chartname = strdupz(config_section->name);
-        netdata_fix_chart_id((char *) p_file_info->chartname);
+        char tmp[LOGS_MANAG_CHARTNAME_SIZE] = {0};
+
+        snprintfz(tmp, sizeof(tmp), "%s%s", LOGS_MANAG_CHARTNAME_PREFIX, config_section->name);
+
+        netdata_fix_chart_id(tmp);
+
+        for(char *ch = (char *) tmp; *ch; ch++) 
+            *ch = *ch == '.' ? '_' : *ch; // Convert dots to underscores
+
+        p_file_info->chartname = strdupz(tmp);
+
         collector_info("[%s]: Initializing config loading", p_file_info->chartname);
     } else {
         collector_error("Invalid logs management config section.");
@@ -650,21 +659,21 @@ static void config_section_init(uv_loop_t *main_loop,
             
         switch(p_file_info->log_type){
             case FLB_TAIL:
-                if(!strcasecmp(p_file_info->chartname, "Netdata_daemon.log")){
+                if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "netdata_daemon_log")){
                     char path[FILENAME_MAX + 1];
                     snprintfz(path, FILENAME_MAX, "%s/daemon.log", get_log_dir());
                     if(access(path, R_OK)) {
-                        collector_error("[%s]: 'Netdata_daemon.log' path (%s) invalid, unknown or needs permissions", 
+                        collector_error("[%s]: 'Netdata daemon.log' path (%s) invalid, unknown or needs permissions", 
                             p_file_info->chartname, path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(path);
-                } else if(!strcasecmp(p_file_info->chartname, "Netdata_fluentbit.log")){
+                } else if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "fluentbit_log")){
                     if(access(p_flb_srvc_config->log_path, R_OK)){
-                        collector_error("[%s]: Netdata_fluentbit.log path (%s) invalid, unknown or needs permissions", 
+                        collector_error("[%s]: Netdata fluentbit.log path (%s) invalid, unknown or needs permissions", 
                             p_file_info->chartname, p_flb_srvc_config->log_path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(p_flb_srvc_config->log_path);
-                } else if(!strcasecmp(p_file_info->chartname, "Auth.log_tail")){
+                } else if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "auth_log_tail")){
                     const char * const auth_path_default[] = {
                         "/var/log/auth.log",
                         NULL
@@ -690,7 +699,7 @@ static void config_section_init(uv_loop_t *main_loop,
                 }
                 break;
             case FLB_WEB_LOG:
-                if(!strcasecmp(p_file_info->chartname, "Apache_access.log")){
+                if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "apache_access_log")){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
                         "/var/log/apache2/access.log",
@@ -705,7 +714,7 @@ static void config_section_init(uv_loop_t *main_loop,
                         collector_error("[%s]: Apache access.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(apache_access_path_default[i]);
-                } else if(!strcasecmp(p_file_info->chartname, "Nginx_access.log")){
+                } else if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "nginx_access_log")){
                     const char * const nginx_access_path_default[] = {
                         "/var/log/nginx/access.log",
                         NULL
