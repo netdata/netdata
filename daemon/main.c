@@ -1349,7 +1349,7 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
                 }
                 else {
                     if(log)
-                        netdata_log_info("%s=%s", line, value);
+                        netdata_log_debug("%s=%s", line, value);
 
                     setenv(line, value, 1);
                 }
