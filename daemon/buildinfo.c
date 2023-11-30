@@ -1291,7 +1291,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 // ----------------------------------------------------------------------------
 // system info
 
-int get_system_info(struct rrdhost_system_info *system_info, bool log);
+int get_system_info(struct rrdhost_system_info *system_info);
 static void populate_system_info(void) {
     static bool populated = false;
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
@@ -1314,7 +1314,7 @@ static void populate_system_info(void) {
     }
     else {
         system_info = callocz(1, sizeof(struct rrdhost_system_info));
-        get_system_info(system_info, false);
+        get_system_info(system_info);
         free_system_info = true;
     }
 
