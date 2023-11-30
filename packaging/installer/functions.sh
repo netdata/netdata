@@ -905,8 +905,13 @@ create_netdata_conf() {
   fi
 
   if [ -z "$url" ]; then
-    echo "# netdata can generate its own config which is available at 'http://<netdata_ip>/netdata.conf'" > "${path}"
-    echo "# You can download it with command like: 'wget -O ${path} http://localhost:19999/netdata.conf'" >> "${path}"
+    cat << EOF > "${path}"
+# netdata can generate its own config which is available at 'http://<IP>:19999/netdata.conf'
+# You can download it using:
+#    curl -o ${path} http://localhost:19999/netdata.conf
+# or
+#    wget -O ${path} http://localhost:19999/netdata.conf
+EOF
   fi
 
 }
