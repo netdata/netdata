@@ -66,7 +66,7 @@ const char journal_key_characters_map[256] = {
 static inline void validate_key(LOG_JOB *jb __maybe_unused, HASHED_KEY *k) {
     if(k->len > JOURNAL_MAX_KEY_LEN)
         log2stderr("WARNING: key '%s' has length %zu, which is more than %zu, the max systemd-journal allows",
-                k->key, k->len, (size_t)JOURNAL_MAX_KEY_LEN);
+                k->key, (size_t)k->len, (size_t)JOURNAL_MAX_KEY_LEN);
 
     for(size_t i = 0; i < k->len ;i++) {
         char c = k->key[i];
