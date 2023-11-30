@@ -301,8 +301,9 @@ void rename_cleanup(RENAME *rn);
 
 typedef enum __attribute__((__packed__)) {
 //    RW_NONE                 = 0,
-    RW_SEARCH_REPLACE       = (1 << 0), // a rewrite rule
-    RW_MATCHED_ENTRIES      = (1 << 1), // an injection on matched log entry
+    RW_MATCHED_ENTRIES      = (1 << 0), // an injection on matched log entry
+    RW_MATCH_PCRE2          = (1 << 1), // a rewrite rule
+//    RW_MATCH_NON_EMPTY      = (1 << 2), // a rewrite rule
 //    RW_UNMATCHED_ENTRIES    = (1 << 2), // an injection on unmatched log entry
 //    RW_INJECT_ALWAYS        = (1 << 3), // an injection: inject always
 //    RW_INJECT_IF_SATISFIED  = (1 << 4), // a duplication: inject only if the variables are resolved
@@ -312,8 +313,11 @@ typedef enum __attribute__((__packed__)) {
 typedef struct key_rewrite {
     RW_FLAGS flags;
     HASHED_KEY key;
-    SEARCH_PATTERN search;
-    REPLACE_PATTERN replace;
+    union {
+        SEARCH_PATTERN match_pcre2;
+//        REPLACE_PATTERN match_non_empty;
+    };
+    REPLACE_PATTERN value;
 } REWRITE;
 
 void rewrite_cleanup(REWRITE *rw);
@@ -391,7 +395,7 @@ bool log_job_filename_key_set(LOG_JOB *jb, const char *key, size_t key_len);
 bool log_job_key_prefix_set(LOG_JOB *jb, const char *prefix, size_t prefix_len);
 bool log_job_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);
 bool log_job_injection_add(LOG_JOB *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched);
-bool log_job_rewrite_add(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern);
+bool log_job_rewrite_add_match_pcre2(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern);
 bool log_job_rename_add(LOG_JOB *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len);
 bool log_job_include_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);
 bool log_job_exclude_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);

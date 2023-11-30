@@ -154,17 +154,17 @@ static char *rewrite_value(LOG_JOB *jb, HASHED_KEY *k, const char *value, size_t
             if(!hashed_keys_match(&rw->key, k))
                 continue;
 
-            if(rw->flags & RW_SEARCH_REPLACE) {
-                if(!search_pattern_matches(&rw->search, value, value_len))
+            if(rw->flags & RW_MATCH_PCRE2) {
+                if(!search_pattern_matches(&rw->match_pcre2, value, value_len))
                     continue; // No match found, skip to next rewrite rule
 
-                PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(rw->search.match_data);
+                PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(rw->match_pcre2.match_data);
 
                 // Iterate through the linked list of replacement nodes
-                for(REPLACE_NODE *node = rw->replace.nodes; node != NULL; node = node->next) {
+                for(REPLACE_NODE *node = rw->value.nodes; node != NULL; node = node->next) {
                     if(node->is_variable) {
                         int group_number = pcre2_substring_number_from_name(
-                                rw->search.re, (PCRE2_SPTR) node->name.key);
+                                rw->match_pcre2.re, (PCRE2_SPTR) node->name.key);
 
                         if(group_number >= 0) {
                             PCRE2_SIZE start_offset = ovector[2 * group_number];
@@ -194,7 +194,7 @@ static char *rewrite_value(LOG_JOB *jb, HASHED_KEY *k, const char *value, size_t
                 }
             }
             else {
-                for(REPLACE_NODE *node = rw->replace.nodes; node != NULL; node = node->next) {
+                for(REPLACE_NODE *node = rw->value.nodes; node != NULL; node = node->next) {
                     if(node->is_variable) {
                         // TODO: lookup in key names to get their values
                         ;

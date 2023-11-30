@@ -4,29 +4,29 @@
 
 void rewrite_cleanup(REWRITE *rw) {
     hashed_key_cleanup(&rw->key);
-    search_pattern_cleanup(&rw->search);
-    replace_pattern_cleanup(&rw->replace);
+    search_pattern_cleanup(&rw->match_pcre2);
+    replace_pattern_cleanup(&rw->value);
 }
 
-bool log_job_rewrite_add(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern) {
+bool log_job_rewrite_add_match_pcre2(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern) {
     if(jb->rewrites.used >= MAX_REWRITES) {
         log2stderr("Error: too many rewrites. You can add up to %d rewrite rules.", MAX_REWRITES);
         return false;
     }
 
     REWRITE *rw = &jb->rewrites.array[jb->rewrites.used++];
-    rw->flags = RW_SEARCH_REPLACE | RW_MATCHED_ENTRIES;
+    rw->flags = RW_MATCH_PCRE2 | RW_MATCHED_ENTRIES;
 
     hashed_key_set(&rw->key, key);
 
-    if(!search_pattern_set(&rw->search, search_pattern, strlen(search_pattern)) ||
-        !replace_pattern_set(&rw->replace, replace_pattern)) {
+    if(!search_pattern_set(&rw->match_pcre2, search_pattern, strlen(search_pattern)) ||
+       !replace_pattern_set(&rw->value, replace_pattern)) {
         rewrite_cleanup(rw);
         jb->rewrites.used--;
         return false;
     }
 
-    for(REPLACE_NODE *node = rw->replace.nodes; node; node = node->next) {
+    for(REPLACE_NODE *node = rw->value.nodes; node; node = node->next) {
         if(node->is_variable) {
             rw->flags |= RW_HAS_VARIABLES;
             break;

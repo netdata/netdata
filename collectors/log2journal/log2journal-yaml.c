@@ -593,7 +593,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite search pattern");
                                     errors++;
                                 } else {
-                                    rw.search.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    rw.match_pcre2.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else if (yaml_scalar_matches(&sub_event, "replace", strlen("replace"))) {
@@ -601,7 +601,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite replace pattern");
                                     errors++;
                                 } else {
-                                    rw.replace.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    rw.value.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
                             } else {
@@ -611,8 +611,10 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                             break;
 
                         case YAML_MAPPING_END_EVENT:
-                            if(rw.key.key && rw.search.pattern && rw.replace.pattern) {
-                                if (!log_job_rewrite_add(jb, rw.key.key, rw.search.pattern, rw.replace.pattern))
+                            if(rw.key.key && rw.match_pcre2.pattern && rw.value.pattern) {
+                                if (!log_job_rewrite_add_match_pcre2(jb, rw.key.key, rw.match_pcre2.pattern
+                                                                     , rw.value.pattern
+                                                                    ))
                                     errors++;
                             }
                             rewrite_cleanup(&rw);
@@ -998,8 +1000,8 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
 
         for(size_t i = 0; i < jb->rewrites.used ;i++) {
             yaml_print_node("key", jb->rewrites.array[i].key.key, 1, true);
-            yaml_print_node("search", jb->rewrites.array[i].search.pattern, 2, false);
-            yaml_print_node("replace", jb->rewrites.array[i].replace.pattern, 2, false);
+            yaml_print_node("search", jb->rewrites.array[i].match_pcre2.pattern, 2, false);
+            yaml_print_node("replace", jb->rewrites.array[i].value.pattern, 2, false);
         }
     }
 

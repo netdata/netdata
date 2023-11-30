@@ -191,7 +191,7 @@ static bool parse_rewrite(LOG_JOB *jb, const char *param) {
     char *search_pattern = strndupz(equal_sign + 2, second_separator - (equal_sign + 2));
     char *replace_pattern = strdupz(second_separator + 1);
 
-    bool ret = log_job_rewrite_add(jb, key, search_pattern, replace_pattern);
+    bool ret = log_job_rewrite_add_match_pcre2(jb, key, search_pattern, replace_pattern);
 
     freez(key);
     freez(search_pattern);
