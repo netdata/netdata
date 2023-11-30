@@ -32,4 +32,3 @@ rewrite:
   - key: SIMPLE_INJECTION
     match: "KEY2 is 'value32'"
     value: "" # empty, so SIMPLE_INJECTION should not be available on row 3
-
