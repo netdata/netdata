@@ -222,8 +222,10 @@ class ModuleConfig:
     def __init__(self, name, config=None):
         self.name = name
         self.config = config or OrderedDict()
+        self.is_stock = False
 
     def load(self, abs_path):
+        self.is_stock = abs_path.startswith(DIRS.modules_stock_config)
         self.config.update(load_config(abs_path) or dict())
 
     def defaults(self):
@@ -242,6 +244,7 @@ class ModuleConfig:
         config = OrderedDict()
         config.update(job_config)
         config['job_name'] = job_name
+        config['__is_stock'] = self.is_stock
         for k, v in self.defaults().items():
             config.setdefault(k, v)
 
@@ -309,7 +312,8 @@ class JobsConfigsBuilder:
             return None
 
         configs = config.create_jobs()
-        self.log.info("[{0}] built {1} job(s) configs".format(module_name, len(configs)))
+        if not config.is_stock:
+            self.log.info("[{0}] built {1} job(s) configs".format(module_name, len(configs)))
 
         self.apply_defaults(configs, self.module_defaults)
         self.apply_defaults(configs, self.job_defaults)
@@ -338,6 +342,7 @@ class Job(threading.Thread):
         self.autodetection_retry = config['autodetection_retry']
         self.checks = self.inf
         self.job = None
+        self.is_stock = config.get('__is_stock', False)
         self.status = JOB_STATUS_INIT
 
     def is_inited(self):
@@ -350,8 +355,14 @@ class Job(threading.Thread):
         return self.job.name
 
     def check(self):
+        if self.is_stock:
+            self.job.logger.mute()
+
         ok = self.job.check()
+
+        self.job.logger.unmute()
         self.checks -= self.checks != self.inf and not ok
+
         return ok
 
     def create(self):
@@ -502,7 +513,6 @@ class FileLockRegistry:
         if name.startswith("dockerd"):
             name = "docker" + name[7:]
         return name
-
 
     def register(self, name):
         name = self.rename(name)
@@ -685,12 +695,14 @@ class Plugin:
             try:
                 ok = job.check()
             except Exception as error:
-                self.log.warning("{0}[{1}] : unhandled exception on check : {2}, skipping the job".format(
-                    job.module_name, job.real_name, repr(error)))
+                if not job.is_stock:
+                    self.log.warning("{0}[{1}] : unhandled exception on check : {2}, skipping the job".format(
+                        job.module_name, job.real_name, repr(error)))
                 job.status = JOB_STATUS_DROPPED
                 continue
             if not ok:
-                self.log.info('{0}[{1}] : check failed'.format(job.module_name, job.real_name))
+                if not job.is_stock:
+                    self.log.info('{0}[{1}] : check failed'.format(job.module_name, job.real_name))
                 job.status = JOB_STATUS_RECOVERING if job.need_to_recheck() else JOB_STATUS_DROPPED
                 continue
             self.log.info('{0}[{1}] : check success'.format(job.module_name, job.real_name))

@@ -15,7 +15,6 @@ except ImportError:
 
 from bases.collection import on_try_except_finally, unicode_str
 
-
 LOGGING_LEVELS = {'CRITICAL': 50,
                   'ERROR': 40,
                   'WARNING': 30,
@@ -47,6 +46,7 @@ def limiter(log_max_count=30, allowed_in_seconds=60):
             func(*args)
 
         return on_call
+
     return on_decorator
 
 
@@ -87,6 +87,7 @@ class BaseLogger(object):
         :param handler: <logging handler>
         """
         self.logger = logging.getLogger(logger_name)
+        self._muted = False
         if not self.has_handlers():
             self.severity = 'INFO'
             self.logger.addHandler(handler())
@@ -121,23 +122,34 @@ class BaseLogger(object):
             self.logger.setLevel(LOGGING_LEVELS[level])
 
     def debug(self, *msg, **kwargs):
-        self.logger.debug(' '.join(map(unicode_str, msg)), **kwargs)
+        if not self._muted:
+            self.logger.debug(' '.join(map(unicode_str, msg)), **kwargs)
 
     def info(self, *msg, **kwargs):
-        self.logger.info(' '.join(map(unicode_str, msg)), **kwargs)
+        if not self._muted:
+            self.logger.info(' '.join(map(unicode_str, msg)), **kwargs)
 
     def warning(self, *msg, **kwargs):
-        self.logger.warning(' '.join(map(unicode_str, msg)), **kwargs)
+        if not self._muted:
+            self.logger.warning(' '.join(map(unicode_str, msg)), **kwargs)
 
     def error(self, *msg, **kwargs):
-        self.logger.error(' '.join(map(unicode_str, msg)), **kwargs)
+        if not self._muted:
+            self.logger.error(' '.join(map(unicode_str, msg)), **kwargs)
 
-    def alert(self, *msg,  **kwargs):
-        self.logger.critical(' '.join(map(unicode_str, msg)), **kwargs)
+    def alert(self, *msg, **kwargs):
+        if not self._muted:
+            self.logger.critical(' '.join(map(unicode_str, msg)), **kwargs)
 
     @on_try_except_finally(on_finally=(exit, 1))
     def fatal(self, *msg, **kwargs):
         self.logger.critical(' '.join(map(unicode_str, msg)), **kwargs)
+
+    def mute(self):
+        self._muted = True
+
+    def unmute(self):
+        self._muted = False
 
 
 class PythonDLogger(object):
