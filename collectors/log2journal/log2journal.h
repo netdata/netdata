@@ -14,6 +14,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <assert.h>
 
 // ----------------------------------------------------------------------------
 // logging
@@ -130,7 +131,7 @@ static inline size_t copy_to_buffer(char *dst, size_t dst_size, const char *src,
 
 typedef struct txt {
     char *txt;
-    size_t size;
+    uint32_t size;
 } TEXT;
 
 static inline void txt_cleanup(TEXT *t) {
@@ -170,17 +171,18 @@ static inline void txt_replace(TEXT *t, const char *s, size_t len) {
 // ----------------------------------------------------------------------------
 
 typedef enum __attribute__((__packed__)) {
-    HK_NONE              = 0,
-    HK_ALLOCATED         = (1 << 0),
-    HK_FILTERED          = (1 << 1),
-    HK_FILTERED_INCLUDED = (1 << 2),
-    HK_COLLISION_CHECKED = (1 << 3),
-    HK_RENAMES_CHECKED   = (1 << 4),
-    HK_HAS_RENAMES       = (1 << 5),
-    HK_DUPS_CHECKED      = (1 << 6),
-    HK_HAS_DUPS          = (1 << 7),
-    HK_REWRITES_CHECKED  = (1 << 8),
-    HK_HAS_REWRITES      = (1 << 9),
+    HK_NONE                 = 0,
+    HK_HASHTABLE_ALLOCATED  = (1 << 0),
+    HK_FILTERED             = (1 << 1),
+    HK_FILTERED_INCLUDED    = (1 << 2),
+    HK_COLLISION_CHECKED    = (1 << 3),
+    HK_RENAMES_CHECKED      = (1 << 4),
+    HK_HAS_RENAMES          = (1 << 5),
+    HK_DUPS_CHECKED         = (1 << 6),
+    HK_HAS_DUPS             = (1 << 7),
+    HK_REWRITES_CHECKED     = (1 << 8),
+    HK_HAS_REWRITES         = (1 << 9),
+    HK_KEY_CHECKED          = (1 << 10),
 } HASHED_KEY_FLAGS;
 
 typedef struct hashed_key {
@@ -188,6 +190,10 @@ typedef struct hashed_key {
     uint32_t len;
     HASHED_KEY_FLAGS flags;
     XXH64_hash_t hash;
+    union {
+        struct hashed_key *hashtable_ptr; // HK_HASHTABLE_ALLOCATED is not set
+        TEXT value;                       // HK_HASHTABLE_ALLOCATED is set
+    };
 } HASHED_KEY;
 
 static inline void hashed_key_cleanup(HASHED_KEY *k) {
@@ -195,6 +201,11 @@ static inline void hashed_key_cleanup(HASHED_KEY *k) {
         freez((void *)k->key);
         k->key = NULL;
     }
+
+    if(k->flags & HK_HASHTABLE_ALLOCATED)
+        txt_cleanup(&k->value);
+    else
+        k->hashtable_ptr = NULL;
 }
 
 static inline void hashed_key_set(HASHED_KEY *k, const char *name) {
@@ -213,6 +224,10 @@ static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t le
     k->len = len;
     k->hash = XXH3_64bits(k->key, k->len);
     k->flags = HK_NONE;
+}
+
+static inline bool hashed_keys_match(HASHED_KEY *k1, HASHED_KEY *k2) {
+    return ((k1 == k2) || (k1->hash == k2->hash && strcmp(k1->key, k2->key) == 0));
 }
 
 // ----------------------------------------------------------------------------
@@ -284,7 +299,18 @@ void rename_cleanup(RENAME *rn);
 
 // ----------------------------------------------------------------------------
 
+typedef enum __attribute__((__packed__)) {
+//    RW_NONE                 = 0,
+    RW_SEARCH_REPLACE       = (1 << 0), // a rewrite rule
+    RW_MATCHED_ENTRIES      = (1 << 1), // an injection on matched log entry
+//    RW_UNMATCHED_ENTRIES    = (1 << 2), // an injection on unmatched log entry
+//    RW_INJECT_ALWAYS        = (1 << 3), // an injection: inject always
+//    RW_INJECT_IF_SATISFIED  = (1 << 4), // a duplication: inject only if the variables are resolved
+    RW_HAS_VARIABLES        = (1 << 5), // the replacement has variables in it
+} RW_FLAGS;
+
 typedef struct key_rewrite {
+    RW_FLAGS flags;
     HASHED_KEY key;
     SEARCH_PATTERN search;
     REPLACE_PATTERN replace;
@@ -310,7 +336,7 @@ typedef struct log_job {
 
     struct {
         bool last_line_was_empty;
-        const char *key;
+        HASHED_KEY key;
         char current[FILENAME_MAX + 1];
     } filename;
 
@@ -320,7 +346,7 @@ typedef struct log_job {
     } injections;
 
     struct {
-        const char *key;
+        HASHED_KEY key;
         struct {
             uint32_t used;
             INJECTION keys[MAX_INJECTIONS];
@@ -343,8 +369,11 @@ typedef struct log_job {
     } renames;
 } LOG_JOB;
 
+// initialize a log job
+void log_job_init(LOG_JOB *jb);
+
 // free all resources consumed by the log job
-void nd_log_cleanup(LOG_JOB *jb);
+void log_job_cleanup(LOG_JOB *jb);
 
 // ----------------------------------------------------------------------------
 

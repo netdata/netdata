@@ -4,7 +4,24 @@
 
 // ----------------------------------------------------------------------------
 
-void nd_log_cleanup(LOG_JOB *jb) {
+void log_job_init(LOG_JOB *jb) {
+    memset(jb, 0, sizeof(*jb));
+    simple_hashtable_init(&jb->hashtable, 32);
+}
+
+static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
+    for(size_t i = 0; i < ht->used ;i++) {
+        HASHED_KEY *k = ht->hashtable[i].data;
+        if(k && k->flags & HK_HASHTABLE_ALLOCATED) {
+            hashed_key_cleanup(k);
+            freez(k);
+            ht->hashtable[i].data = NULL;
+            ht->hashtable[i].hash = 0;
+        }
+    }
+}
+
+void log_job_cleanup(LOG_JOB *jb) {
     if(jb->prefix) {
         freez((void *) jb->prefix);
         jb->prefix = NULL;
@@ -30,6 +47,9 @@ void nd_log_cleanup(LOG_JOB *jb) {
     for(size_t i = 0; i < jb->rewrites.used; i++)
         rewrite_cleanup(&jb->rewrites.array[i]);
 
+    simple_hashtable_cleanup_allocated(&jb->hashtable);
+    simple_hashtable_free(&jb->hashtable);
+
     // remove references to everything else, to reveal them in valgrind
     memset(jb, 0, sizeof(*jb));
 }
@@ -42,10 +62,7 @@ bool log_job_filename_key_set(LOG_JOB *jb, const char *key, size_t key_len) {
         return false;
     }
 
-    if(jb->filename.key)
-        freez((char*)jb->filename.key);
-
-    jb->filename.key = strndupz(key, key_len);
+    hashed_key_len_set(&jb->filename.key, key, key_len);
 
     return true;
 }
@@ -295,7 +312,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
             }
 #endif
             else if (strcmp(param, "--unmatched-key") == 0)
-                jb->unmatched.key = value;
+                hashed_key_set(&jb->unmatched.key, value);
             else if (strcmp(param, "--duplicate") == 0) {
                 if (!parse_duplicate(jb, value))
                     return false;

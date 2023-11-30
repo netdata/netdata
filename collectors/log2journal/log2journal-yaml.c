@@ -520,7 +520,7 @@ static size_t yaml_parse_unmatched(yaml_parser_t *parser, LOG_JOB *jb) {
                         errors++;
                     } else {
                         if (sub_event.type == YAML_SCALAR_EVENT) {
-                            jb->unmatched.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                            hashed_key_len_set(&jb->unmatched.key, (char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                         } else {
                             yaml_error(parser, &sub_event, "expected a scalar value for 'key'");
                             errors++;
@@ -952,10 +952,10 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         yaml_print_node("prefix", jb->prefix, 0, false);
     }
 
-    if(jb->filename.key) {
+    if(jb->filename.key.key) {
         fprintf(stderr, "\n");
         yaml_print_node("filename", NULL, 0, false);
-        yaml_print_node("key", jb->filename.key, 1, false);
+        yaml_print_node("key", jb->filename.key.key, 1, false);
     }
 
     if(jb->filter.include.pattern || jb->filter.exclude.pattern) {
@@ -1013,12 +1013,12 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         }
     }
 
-    if(jb->unmatched.key || jb->unmatched.injections.used) {
+    if(jb->unmatched.key.key || jb->unmatched.injections.used) {
         fprintf(stderr, "\n");
         yaml_print_node("unmatched", NULL, 0, false);
 
-        if(jb->unmatched.key)
-            yaml_print_node("key", jb->unmatched.key, 1, false);
+        if(jb->unmatched.key.key)
+            yaml_print_node("key", jb->unmatched.key.key, 1, false);
 
         if(jb->unmatched.injections.used) {
             fprintf(stderr, "\n");
