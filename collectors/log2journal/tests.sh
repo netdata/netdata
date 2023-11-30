@@ -72,6 +72,7 @@ test_log2journal_config /dev/null "${tests}/full.output" --show-config      \
   --duplicate=NGINX_STATUS_FAMILY=NGINX_STATUS,NGINX_METHOD                 \
   --inject SYSLOG_IDENTIFIER=nginx-log                                      \
   --inject=SYSLOG_IDENTIFIER2=nginx-log2                                    \
+  --rewrite 'PRIORITY=//${NGINX_STATUS}/inject,dont-stop'                   \
   --rewrite "PRIORITY=/^[123]/6"                                            \
   --rewrite='PRIORITY=|^4|5'                                                \
   '--rewrite=PRIORITY=-^5-3'                                                \
@@ -115,7 +116,8 @@ test_log2journal() {
   printf >&2 "running: "
   printf >&2 "%q " "${log2journal_bin}" "${@}"
   printf >&2 "\n"
-  echo >&2 "using as input: ${in}"
+  echo >&2 "using as input  : ${in}"
+  echo >&2 "expecting output: ${out}"
 
   [ -f output ] && rm output
 
@@ -125,7 +127,7 @@ test_log2journal() {
   [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && exit 1
 
   diff "${out}" output
-  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match!" && cat output && exit 1
+  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match! - here is what we got:" && cat output && exit 1
 
   echo >&2 "OK"
   echo >&2

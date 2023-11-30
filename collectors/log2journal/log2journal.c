@@ -63,6 +63,79 @@ const char journal_key_characters_map[256] = {
 
 // ----------------------------------------------------------------------------
 
+// Function to insert a key into the sorted.keys array while keeping it sorted
+void log_job_add_key_sorted(LOG_JOB *jb, HASHED_KEY *newKey) {
+    size_t i, j;
+
+    // Find the position to insert the new key based on lexicographic order
+    for (i = 0; i < jb->sorted.used; i++) {
+        if (strcmp(newKey->key, jb->sorted.keys[i]->key) < 0) {
+            break;
+        }
+    }
+
+    // Shift elements to the right to make space for the new key
+    for (j = jb->sorted.used; j > i; j--) {
+        jb->sorted.keys[j] = jb->sorted.keys[j - 1];
+    }
+
+    // Insert the new key at the correct position
+    jb->sorted.keys[i] = newKey;
+    jb->sorted.used++;
+}
+
+static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
+    if(k->flags & HK_HASHTABLE_ALLOCATED)
+        return k;
+
+    if(!k->hashtable_ptr) {
+        HASHED_KEY *ht_key;
+        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&jb->hashtable, k->hash, true);
+        if(slot->data) {
+            ht_key = slot->data;
+
+            if(!(ht_key->flags & HK_COLLISION_CHECKED)) {
+                ht_key->flags |= HK_COLLISION_CHECKED;
+
+                if(strcmp(ht_key->key, k->key) != 0)
+                    log2stderr("Hashtable collision detected on key '%s' (hash %lx) and '%s' (hash %lx). "
+                               "Please file a bug report.", ht_key->key, (unsigned long) ht_key->hash, k->key
+                               , (unsigned long) k->hash
+                              );
+            }
+        }
+        else {
+            ht_key = callocz(1, sizeof(HASHED_KEY));
+            ht_key->key = strdupz(k->key);
+            ht_key->len = k->len;
+            ht_key->hash = k->hash;
+            ht_key->flags = HK_HASHTABLE_ALLOCATED;
+
+            slot->hash = ht_key->hash;
+            slot->data = ht_key;
+            jb->hashtable.used++;
+
+            log_job_add_key_sorted(jb, ht_key);
+        }
+
+        k->hashtable_ptr = ht_key;
+    }
+
+    return k->hashtable_ptr;
+}
+
+static inline HASHED_KEY *get_key_from_hashtable_with_char_ptr(LOG_JOB *jb, const char *key) {
+    HASHED_KEY find = {
+            .key = key,
+            .len = strlen(key),
+    };
+    find.hash = XXH3_64bits(key, find.len);
+
+    return get_key_from_hashtable(jb, &find);
+}
+
+// ----------------------------------------------------------------------------
+
 static inline void validate_key(LOG_JOB *jb __maybe_unused, HASHED_KEY *k) {
     if(k->len > JOURNAL_MAX_KEY_LEN)
         log2stderr("WARNING: key '%s' has length %zu, which is more than %zu, the max systemd-journal allows",
@@ -87,133 +160,105 @@ static inline void validate_key(LOG_JOB *jb __maybe_unused, HASHED_KEY *k) {
 
 // ----------------------------------------------------------------------------
 
-static inline HASHED_KEY *get_key_from_hashtable_for_key(LOG_JOB *jb, HASHED_KEY *find) {
-    HASHED_KEY *k;
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&jb->hashtable, find->hash, true);
-    if(slot->data) {
-        k = slot->data;
+static inline size_t replace_evaluate_to_buffer(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN *rp, char *dst, size_t dst_size) {
+    size_t remaining = dst_size;
+    char *copy_to = dst;
 
-        if(!(k->flags & HK_COLLISION_CHECKED)) {
-            k->flags |= HK_COLLISION_CHECKED;
-
-            if(strcmp(k->key, find->key) != 0)
-                log2stderr("Hashtable collision detected on key '%s' (hash %lx) and '%s' (hash %lx). "
-                           "Please file a bug report.",
-                        k->key, (unsigned long)k->hash, find->key, (unsigned long)find->hash);
+    for(REPLACE_NODE *node = rp->nodes; node != NULL && remaining > 1; node = node->next) {
+        if(node->is_variable) {
+            HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+            if(ktmp->value.len) {
+                size_t copied = copy_to_buffer(copy_to, remaining, ktmp->value.txt, ktmp->value.len);
+                copy_to += copied;
+                remaining -= copied;
+            }
+        }
+        else {
+            size_t copied = copy_to_buffer(copy_to, remaining, node->name.key, node->name.len);
+            copy_to += copied;
+            remaining -= copied;
         }
     }
-    else {
-        k = mallocz(sizeof(HASHED_KEY));
-        k->key = strdupz(find->key);
-        k->len = find->len;
-        k->hash = find->hash;
-        k->flags = HK_HASHTABLE_ALLOCATED;
 
-        slot->hash = k->hash;
-        slot->data = k;
-        jb->hashtable.used++;
+    return copy_to - dst;
+}
+
+static inline void replace_evaluate(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN *rp) {
+    HASHED_KEY *ht_key = get_key_from_hashtable(jb, k);
+
+    // set it to empty value
+    k->value.len = 0;
+
+    for(REPLACE_NODE *node = rp->nodes; node != NULL; node = node->next) {
+        if(node->is_variable) {
+            HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+            if(ktmp->value.len)
+                txt_expand_and_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
+        }
+        else
+            txt_expand_and_append(&ht_key->value, node->name.key, node->name.len);
+    }
+}
+
+static inline void replace_evaluate_from_pcre2(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN *rp, SEARCH_PATTERN *sp) {
+    assert(k->flags & HK_HASHTABLE_ALLOCATED);
+
+    // set the temporary TEXT to zero length
+    jb->rewrites.tmp.len = 0;
+
+    PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(sp->match_data);
+
+    // Iterate through the linked list of replacement nodes
+    for(REPLACE_NODE *node = rp->nodes; node != NULL; node = node->next) {
+        if(node->is_variable) {
+            int group_number = pcre2_substring_number_from_name(
+                    sp->re, (PCRE2_SPTR) node->name.key);
+
+            if(group_number >= 0) {
+                PCRE2_SIZE start_offset = ovector[2 * group_number];
+                PCRE2_SIZE end_offset = ovector[2 * group_number + 1];
+                PCRE2_SIZE length = end_offset - start_offset;
+
+                txt_expand_and_append(&jb->rewrites.tmp, k->value.txt + start_offset, length);
+            }
+            else {
+                HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+                if(ktmp->value.len)
+                    txt_expand_and_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
+            }
+        }
+        else {
+            txt_expand_and_append(&jb->rewrites.tmp, node->name.key, node->name.len);
+        }
     }
 
-    return k;
+    // swap the values of the temporary TEXT and the key value
+    TEXT tmp = k->value;
+    k->value = jb->rewrites.tmp;
+    jb->rewrites.tmp = tmp;
 }
 
-static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, const char *key) {
-    HASHED_KEY find = {
-            .key = key,
-            .len = strlen(key),
-    };
-    find.hash = XXH3_64bits(key, find.len);
+static inline bool rewrite_conditions_satisfied(LOG_JOB *jb, HASHED_KEY *k, REWRITE *rw) {
+    assert(k->flags & HK_HASHTABLE_ALLOCATED);
 
-    return get_key_from_hashtable_for_key(jb, &find);
-}
-
-static inline HASHED_KEY *hashed_key_in_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
-    if(k->flags & HK_HASHTABLE_ALLOCATED)
-        return k;
-
-    if(!k->hashtable_ptr)
-        k->hashtable_ptr = get_key_from_hashtable_for_key(jb, k);
-
-    return k->hashtable_ptr;
+    if(rw->flags & RW_MATCH_PCRE2) {
+        return search_pattern_matches(&rw->match_pcre2, k->value.txt, k->value.len);
+    }
+    else if(rw->flags & RW_MATCH_NON_EMPTY) {
+        char buffer[2]; // we don't need a big buffer - we just check if anything is written
+        if(replace_evaluate_to_buffer(jb, k, &rw->match_non_empty, buffer, sizeof(buffer)))
+            // it copied something
+            return true;
+        else
+            // it copied nothing
+            return false;
+    }
+    else
+        // no conditions
+        return true;
 }
 
 // ----------------------------------------------------------------------------
-
-static char *rewrite_value(LOG_JOB *jb, HASHED_KEY *k, const char *value, size_t value_len) {
-    static __thread char rewritten_value[JOURNAL_MAX_VALUE_LEN + 1];
-
-    if(!(k->flags & HK_REWRITES_CHECKED) || k->flags & HK_HAS_REWRITES) {
-        k->flags |= HK_REWRITES_CHECKED;
-
-        char *copy_to = rewritten_value;
-        size_t remaining = sizeof(rewritten_value);
-
-        for(size_t i = 0; i < jb->rewrites.used; i++) {
-            REWRITE *rw = &jb->rewrites.array[i];
-
-            if(!hashed_keys_match(&rw->key, k))
-                continue;
-
-            if(rw->flags & RW_MATCH_PCRE2) {
-                if(!search_pattern_matches(&rw->match_pcre2, value, value_len))
-                    continue; // No match found, skip to next rewrite rule
-
-                PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(rw->match_pcre2.match_data);
-
-                // Iterate through the linked list of replacement nodes
-                for(REPLACE_NODE *node = rw->value.nodes; node != NULL; node = node->next) {
-                    if(node->is_variable) {
-                        int group_number = pcre2_substring_number_from_name(
-                                rw->match_pcre2.re, (PCRE2_SPTR) node->name.key);
-
-                        if(group_number >= 0) {
-                            PCRE2_SIZE start_offset = ovector[2 * group_number];
-                            PCRE2_SIZE end_offset = ovector[2 * group_number + 1];
-                            PCRE2_SIZE length = end_offset - start_offset;
-
-                            size_t copied = copy_to_buffer(copy_to, remaining, value + start_offset, length);
-                            copy_to += copied;
-                            remaining -= copied;
-                        }
-                        else {
-                            // TODO: lookup in key names to get their values
-
-                            if(!node->logged_error) {
-                                log2stderr("WARNING: variable '${%s}' in rewrite rule of key '%s' cannot be resolved.",
-                                           node->name.key, k->key);
-
-                                node->logged_error = true;
-                            }
-                        }
-                    }
-                    else {
-                        size_t copied = copy_to_buffer(copy_to, remaining, node->name.key, node->name.len);
-                        copy_to += copied;
-                        remaining -= copied;
-                    }
-                }
-            }
-            else {
-                for(REPLACE_NODE *node = rw->value.nodes; node != NULL; node = node->next) {
-                    if(node->is_variable) {
-                        // TODO: lookup in key names to get their values
-                        ;
-                    }
-                    else {
-                        size_t copied = copy_to_buffer(copy_to, remaining, node->name.key, node->name.len);
-                        copy_to += copied;
-                        remaining -= copied;
-                    }
-                }
-            }
-
-            k->flags |= HK_HAS_REWRITES;
-            return rewritten_value;
-        }
-    }
-
-    return NULL;
-}
 
 static inline HASHED_KEY *rename_key(LOG_JOB *jb, HASHED_KEY *k) {
     if(!(k->flags & HK_RENAMES_CHECKED) || k->flags & HK_HAS_RENAMES) {
@@ -225,7 +270,7 @@ static inline HASHED_KEY *rename_key(LOG_JOB *jb, HASHED_KEY *k) {
             if(hashed_keys_match(&rn->old_key, k)) {
                 k->flags |= HK_HAS_RENAMES;
 
-                return hashed_key_in_hashtable(jb, &rn->new_key);
+                return get_key_from_hashtable(jb, &rn->new_key);
             }
         }
     }
@@ -235,15 +280,18 @@ static inline HASHED_KEY *rename_key(LOG_JOB *jb, HASHED_KEY *k) {
 
 // ----------------------------------------------------------------------------
 
-static inline void send_key_value_constant(LOG_JOB *jb __maybe_unused, HASHED_KEY *key, const char *value) {
-    HASHED_KEY *ht_key = hashed_key_in_hashtable(jb, key);
+static inline void send_key_value_constant(LOG_JOB *jb __maybe_unused, HASHED_KEY *key, const char *value, size_t len) {
+    HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
 
-    printf("%s=%s\n", ht_key->key, value);
+    txt_replace(&ht_key->value, value, len);
+    ht_key->flags |= HK_VALUE_FROM_LOG;
+
+    //    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
 }
 
 static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char *format, ...) __attribute__ ((format(__printf__, 3, 4)));
 static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char *format, ...) {
-    HASHED_KEY *ht_key = hashed_key_in_hashtable(jb, key);
+    HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
 
     printf("%s=", ht_key->key);
     va_list args;
@@ -254,47 +302,82 @@ static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char
 }
 
 static inline void send_key_value_and_rewrite(LOG_JOB *jb, HASHED_KEY *key, const char *value, size_t len) {
-    HASHED_KEY *ht_key = hashed_key_in_hashtable(jb, key);
+    HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
 
-    if(!(ht_key->flags & HK_KEY_CHECKED)) {
-        ht_key->flags |= HK_KEY_CHECKED;
-        validate_key(jb, ht_key);
-    }
+    txt_replace(&ht_key->value, value, len);
+    ht_key->flags |= HK_VALUE_FROM_LOG;
 
-    char *rewritten = rewrite_value(jb, ht_key, value, len);
-    if(!rewritten)
-        printf("%s=%.*s\n", ht_key->key, (int)len, value);
-    else
-        printf("%s=%s\n", ht_key->key, rewritten);
+//    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
 }
 
 inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *value, size_t len) {
-    HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
+    HASHED_KEY *ht_key = get_key_from_hashtable_with_char_ptr(jb, key);
+    HASHED_KEY *nk = rename_key(jb, ht_key);
+    txt_replace(&nk->value, value, len);
+    ht_key->flags |= HK_VALUE_FROM_LOG;
 
-    if(!(ht_key->flags & HK_FILTERED)) {
-        ht_key->flags |= HK_FILTERED;
-
-        bool included = jb->filter.include.re ? search_pattern_matches(&jb->filter.include, ht_key->key, ht_key->len) : true;
-        bool excluded = jb->filter.exclude.re ? search_pattern_matches(&jb->filter.exclude, ht_key->key, ht_key->len) : false;
-
-        if(included && !excluded)
-            ht_key->flags |= HK_FILTERED_INCLUDED;
-        else
-            ht_key->flags &= ~HK_FILTERED_INCLUDED;
-    }
-
-    if(ht_key->flags & HK_FILTERED_INCLUDED) {
-        // process renames (changing the key)
-        HASHED_KEY *nk = rename_key(jb, ht_key);
-
-        // process rewrites (changing the value)
-        // and send it to output
-        send_key_value_and_rewrite(jb, nk, value, len);
-    }
+//    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
 
     // process the duplications (using the original key)
     // and send them to output
     send_duplications_for_key(jb, ht_key, value, len);
+}
+
+static inline void log_job_process_rewrites(LOG_JOB *jb) {
+    for(size_t i = 0; i < jb->rewrites.used ;i++) {
+        REWRITE *rw = &jb->rewrites.array[i];
+
+        HASHED_KEY *k = get_key_from_hashtable(jb, &rw->key);
+
+        if(!(rw->flags & RW_INJECT) && !(k->flags & HK_VALUE_FROM_LOG) && !k->value.len)
+            continue;
+
+        if(!(k->flags & HK_VALUE_REWRITTEN) && rewrite_conditions_satisfied(jb, k, rw)) {
+            if(rw->flags & RW_MATCH_PCRE2)
+                replace_evaluate_from_pcre2(jb, k, &rw->value, &rw->match_pcre2);
+            else
+                replace_evaluate(jb, k, &rw->value);
+
+            if(!(rw->flags & RW_DONT_STOP))
+                k->flags |= HK_VALUE_REWRITTEN;
+
+//            fprintf(stderr, "REWRITE %s=%.*s\n", k->key, (int)k->value.len, k->value.txt);
+        }
+    }
+}
+
+static inline void send_all_fields(LOG_JOB *jb) {
+    for(size_t i = 0; i < jb->sorted.used ;i++) {
+        HASHED_KEY *k = jb->sorted.keys[i];
+
+        if(k->value.len) {
+            // the key exists and has some value
+
+            if(!(k->flags & HK_FILTERED)) {
+                k->flags |= HK_FILTERED;
+
+                bool included = jb->filter.include.re ? search_pattern_matches(&jb->filter.include, k->key, k->len) : true;
+                bool excluded = jb->filter.exclude.re ? search_pattern_matches(&jb->filter.exclude, k->key, k->len) : false;
+
+                if(included && !excluded)
+                    k->flags |= HK_FILTERED_INCLUDED;
+                else
+                    k->flags &= ~HK_FILTERED_INCLUDED;
+
+                // log some error if the key does not comply to journal standards
+                validate_key(jb, k);
+            }
+
+            if(k->flags & HK_FILTERED_INCLUDED)
+                printf("%s=%.*s\n", k->key, (int)k->value.len, k->value.txt);
+
+            // reset it for the next round
+            k->value.txt[0] = '\0';
+            k->value.len = 0;
+        }
+
+        k->flags &= ~(HK_VALUE_REWRITTEN | HK_VALUE_FROM_LOG);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -328,7 +411,7 @@ static inline void jb_finalize_injections(LOG_JOB *jb, bool line_is_matched) {
 
         INJECTION *inj = &jb->injections.keys[j];
 
-        send_key_value_constant(jb, &inj->key, inj->value.txt);
+        replace_evaluate(jb, &inj->key, &inj->value);
     }
 }
 
@@ -431,8 +514,8 @@ static inline void jb_send_remaining_duplications(LOG_JOB *jb) {
 // filename injection
 
 static inline void jb_inject_filename(LOG_JOB *jb) {
-    if (jb->filename.key.key && jb->filename.current[0])
-        send_key_value_constant(jb, &jb->filename.key, jb->filename.current);
+    if (jb->filename.key.key && jb->filename.current.len)
+        send_key_value_constant(jb, &jb->filename.key, jb->filename.current.txt, jb->filename.current.len);
 }
 
 static inline bool jb_switched_filename(LOG_JOB *jb, const char *line, size_t len) {
@@ -454,8 +537,7 @@ static inline bool jb_switched_filename(LOG_JOB *jb, const char *line, size_t le
         const char *end = strstr(line, " <==");
         while (*start == ' ') start++;
         if (*start != '\n' && *start != '\0' && end) {
-            copy_to_buffer(jb->filename.current, sizeof(jb->filename.current),
-                           start, end - start);
+            txt_replace(&jb->filename.current, start, end - start);
             return true;
         }
     }
@@ -474,7 +556,7 @@ static inline bool jb_send_unmatched_line(LOG_JOB *jb, const char *line) {
     for (size_t j = 0; j < jb->unmatched.injections.used; j++) {
         INJECTION *inj = &jb->unmatched.injections.keys[j];
 
-        send_key_value_constant(jb, &inj->key, inj->value.txt);
+        replace_evaluate(jb, &inj->key, &inj->value);
     }
 
     return true;
@@ -567,6 +649,8 @@ int log_job_run(LOG_JOB *jb) {
         jb_inject_filename(jb);
         jb_finalize_injections(jb, line_is_matched);
 
+        log_job_process_rewrites(jb);
+        send_all_fields(jb);
         printf("\n");
         fflush(stdout);
     }

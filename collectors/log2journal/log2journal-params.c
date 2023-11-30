@@ -10,7 +10,7 @@ void log_job_init(LOG_JOB *jb) {
 }
 
 static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
-    for(size_t i = 0; i < ht->used ;i++) {
+    for(size_t i = 0; i < ht->size ;i++) {
         HASHED_KEY *k = ht->hashtable[i].data;
         if(k && k->flags & HK_HASHTABLE_ALLOCATED) {
             hashed_key_cleanup(k);
@@ -46,6 +46,9 @@ void log_job_cleanup(LOG_JOB *jb) {
 
     for(size_t i = 0; i < jb->rewrites.used; i++)
         rewrite_cleanup(&jb->rewrites.array[i]);
+
+    txt_cleanup(&jb->rewrites.tmp);
+    txt_cleanup(&jb->filename.current);
 
     simple_hashtable_cleanup_allocated(&jb->hashtable);
     simple_hashtable_free(&jb->hashtable);
@@ -146,6 +149,79 @@ static bool is_symbol(char c) {
     return !isalpha(c) && !isdigit(c) && !iscntrl(c);
 }
 
+struct {
+    const char *keyword;
+    int action;
+    RW_FLAGS flag;
+} rewrite_flags[] = {
+        {"match",       1, RW_MATCH_PCRE2},
+        {"match",       0, RW_MATCH_NON_EMPTY},
+
+        {"regex",       1, RW_MATCH_PCRE2},
+        {"regex",       0, RW_MATCH_NON_EMPTY},
+
+        {"pcre2",       1, RW_MATCH_PCRE2},
+        {"pcre2",       0, RW_MATCH_NON_EMPTY},
+
+        {"non_empty",   1, RW_MATCH_NON_EMPTY},
+        {"non_empty",   0, RW_MATCH_PCRE2},
+
+        {"non-empty",   1, RW_MATCH_NON_EMPTY},
+        {"non-empty",   0, RW_MATCH_PCRE2},
+
+        {"not_empty",   1, RW_MATCH_NON_EMPTY},
+        {"not_empty",   0, RW_MATCH_PCRE2},
+
+        {"not-empty",   1, RW_MATCH_NON_EMPTY},
+        {"not-empty",   0, RW_MATCH_PCRE2},
+
+        {"stop",        0, RW_DONT_STOP},
+        {"no-stop",     1, RW_DONT_STOP},
+        {"no_stop",     1, RW_DONT_STOP},
+        {"dont-stop",   1, RW_DONT_STOP},
+        {"dont_stop",   1, RW_DONT_STOP},
+        {"continue",    1, RW_DONT_STOP},
+        {"inject",      1, RW_INJECT},
+        {"existing",    0, RW_INJECT},
+};
+
+RW_FLAGS parse_rewrite_flags(const char *options) {
+    RW_FLAGS flags = RW_MATCH_PCRE2; // Default option
+
+    // Tokenize the input options using ","
+    char *token;
+    char *optionsCopy = strdup(options); // Make a copy to avoid modifying the original
+    token = strtok(optionsCopy, ",");
+
+    while (token != NULL) {
+        // Find the keyword-action mapping
+        bool found = false;
+
+        for (size_t i = 0; i < sizeof(rewrite_flags) / sizeof(rewrite_flags[0]); i++) {
+            if (strcmp(token, rewrite_flags[i].keyword) == 0) {
+                if (rewrite_flags[i].action == 1) {
+                    flags |= rewrite_flags[i].flag; // Set the flag
+                } else {
+                    flags &= ~rewrite_flags[i].flag; // Unset the flag
+                }
+
+                found = true;
+            }
+        }
+
+        if(!found)
+            log2stderr("Warning: rewrite options '%s' is not understood.", token);
+
+        // Get the next token
+        token = strtok(NULL, ",");
+    }
+
+    free(optionsCopy); // Free the copied string
+
+    return flags;
+}
+
+
 static bool parse_rewrite(LOG_JOB *jb, const char *param) {
     // Search for '=' in param
     const char *equal_sign = strchr(param, '=');
@@ -180,18 +256,20 @@ static bool parse_rewrite(LOG_JOB *jb, const char *param) {
         return false;
     }
 
-    // Reserve a slot in rewrites
-    if (jb->rewrites.used >= MAX_REWRITES) {
-        log2stderr("Error: Exceeded maximum number of rewrite rules, while processing: %s", param);
-        return false;
-    }
+    RW_FLAGS flags = RW_MATCH_PCRE2;
+    const char *third_separator = strchr(second_separator + 1, separator);
+    if(third_separator)
+        flags = parse_rewrite_flags(third_separator + 1);
 
     // Extract key, search pattern, and replacement pattern
     char *key = strndupz(param, equal_sign - param);
     char *search_pattern = strndupz(equal_sign + 2, second_separator - (equal_sign + 2));
-    char *replace_pattern = strdupz(second_separator + 1);
+    char *replace_pattern = third_separator ? strndup(second_separator + 1, third_separator - (second_separator + 1)) : strdupz(second_separator + 1);
 
-    bool ret = log_job_rewrite_add_match_pcre2(jb, key, search_pattern, replace_pattern);
+    if(!*search_pattern)
+        flags &= ~RW_MATCH_PCRE2;
+
+    bool ret = log_job_rewrite_add(jb, key, flags, search_pattern, replace_pattern);
 
     freez(key);
     freez(search_pattern);
