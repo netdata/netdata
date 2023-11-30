@@ -563,16 +563,14 @@ static void config_section_init(uv_loop_t *main_loop,
      * Check if config_section->name is valid and if so, use it as chartname.
      * ------------------------------------------------------------------------- */
     if(config_section->name && *config_section->name){
-        char tmp[50] = {0};
-
-#define LOGS_MANAG_CHARTNAME_PREFIX "logs_manag_"
+        char tmp[LOGS_MANAG_CHARTNAME_SIZE] = {0};
 
         snprintfz(tmp, sizeof(tmp), "%s%s", LOGS_MANAG_CHARTNAME_PREFIX, config_section->name);
 
         netdata_fix_chart_id(tmp);
 
         for(char *ch = (char *) tmp; *ch; ch++) 
-            *ch = *ch == '.' ? '_' : *ch;
+            *ch = *ch == '.' ? '_' : *ch; // Convert dots to underscores
 
         p_file_info->chartname = strdupz(tmp);
 
