@@ -215,7 +215,7 @@ int create_spawn_server(uv_loop_t *loop, uv_pipe_t *spawn_channel, uv_process_t 
     stdio[1].flags = UV_INHERIT_FD;
     stdio[1].data.fd = 1 /* UV_STDOUT_FD */;
     stdio[2].flags = UV_INHERIT_FD;
-    stdio[2].data.fd = 2 /* UV_STDERR_FD */;
+    stdio[2].data.fd = nd_log_health_fd() /* UV_STDERR_FD */;
 
     ret = uv_spawn(loop, process, &options); /* execute the netdata binary again as the netdata user */
     if (0 != ret) {
