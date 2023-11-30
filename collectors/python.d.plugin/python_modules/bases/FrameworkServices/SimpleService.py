@@ -8,7 +8,7 @@ import os
 
 from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import safe_print
-from bases.loggers import PythonDLimitedLogger
+from bases.loggers import PythonDLogger
 from third_party.monotonic import monotonic
 from time import sleep, time
 
@@ -62,7 +62,7 @@ def clean_module_name(name):
     return name
 
 
-class SimpleService(PythonDLimitedLogger, object):
+class SimpleService(PythonDLogger, object):
     """
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
@@ -73,7 +73,7 @@ class SimpleService(PythonDLimitedLogger, object):
         :param configuration: <dict>
         :param name: <str>
         """
-        PythonDLimitedLogger.__init__(self)
+        PythonDLogger.__init__(self)
         self.configuration = configuration
         self.order = list()
         self.definitions = dict()
