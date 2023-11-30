@@ -130,61 +130,6 @@ static bool yaml_scalar_matches_with_trace(yaml_event_t *event, const char *s, s
 
 // ----------------------------------------------------------------------------
 
-static DUPLICATION *yaml_parse_duplicate_key(LOG_JOB *jb, yaml_parser_t *parser) {
-    yaml_event_t event;
-
-    if (!yaml_parse(parser, &event))
-        return false;
-
-    DUPLICATION *kd = NULL;
-    if(event.type == YAML_SCALAR_EVENT) {
-        kd = log_job_duplication_add(jb, (char *) event.data.scalar.value, event.data.scalar.length);
-    }
-    else
-        yaml_error(parser, &event, "duplicate key must be a scalar.");
-
-    yaml_event_delete(&event);
-    return kd;
-}
-
-static size_t yaml_parse_duplicate_from(LOG_JOB *jb __maybe_unused, yaml_parser_t *parser, DUPLICATION *kd) {
-    size_t errors = 0;
-    yaml_event_t event;
-
-    if (!yaml_parse(parser, &event))
-        return 1;
-
-    if(event.type == YAML_SCALAR_EVENT) {
-        if(!log_job_duplication_key_add(kd, (char *) event.data.scalar.value, event.data.scalar.length))
-            errors++;
-    }
-    else if(event.type == YAML_SEQUENCE_START_EVENT) {
-        bool finished = false;
-        while(!errors && !finished) {
-            yaml_event_t sub_event;
-            if (!yaml_parse(parser, &sub_event))
-                return ++errors;
-            else {
-                if (sub_event.type == YAML_SCALAR_EVENT) {
-                    if(!log_job_duplication_key_add(kd, (char *) sub_event.data.scalar.value
-                                                    , sub_event.data.scalar.length
-                                                   ))
-                        errors++;
-                }
-                else if (sub_event.type == YAML_SEQUENCE_END_EVENT)
-                    finished = true;
-
-                yaml_event_delete(&sub_event);
-            }
-        }
-    }
-    else
-        yaml_error(parser, &event, "not expected event type");
-
-    yaml_event_delete(&event);
-    return errors;
-}
-
 static size_t yaml_parse_filename_injection(yaml_parser_t *parser, LOG_JOB *jb) {
     yaml_event_t event;
     size_t errors = 0;
@@ -308,75 +253,6 @@ static size_t yaml_parse_prefix(yaml_parser_t *parser, LOG_JOB *jb) {
     }
 
     yaml_event_delete(&event);
-    return errors;
-}
-
-static size_t yaml_parse_duplicates_injection(yaml_parser_t *parser, LOG_JOB *jb) {
-    if (!yaml_parse_expect_event(parser, YAML_SEQUENCE_START_EVENT))
-        return 1;
-
-    DUPLICATION *kd = NULL;
-
-    // Expecting a key-value pair for each duplicate
-    bool finished;
-    size_t errors = 0;
-    while (!errors && !finished) {
-        yaml_event_t event;
-        if (!yaml_parse(parser, &event)) {
-            errors++;
-            break;
-        }
-
-        if(event.type == YAML_MAPPING_START_EVENT) {
-            ;
-        }
-        if (event.type == YAML_SEQUENCE_END_EVENT) {
-            finished = true;
-        }
-        else if(event.type == YAML_SCALAR_EVENT) {
-            if (yaml_scalar_matches(&event, "key", strlen("key"))) {
-                kd = yaml_parse_duplicate_key(jb, parser);
-                if (!kd)
-                    errors++;
-                else {
-                    while (!errors && kd) {
-                        yaml_event_t sub_event;
-                        if (!yaml_parse(parser, &sub_event)) {
-                            errors++;
-                            break;
-                        }
-
-                        if (sub_event.type == YAML_MAPPING_END_EVENT) {
-                            kd = NULL;
-                        } else if (sub_event.type == YAML_SCALAR_EVENT) {
-                            if (yaml_scalar_matches(&sub_event, "values_of", strlen("values_of"))) {
-                                if (!kd) {
-                                    yaml_error(parser, &sub_event, "Found 'values_of' but the 'key' is not set.");
-                                    errors++;
-                                } else
-                                    errors += yaml_parse_duplicate_from(jb, parser, kd);
-                            } else {
-                                yaml_error(parser, &sub_event, "unknown scalar");
-                                errors++;
-                            }
-                        } else {
-                            yaml_error(parser, &sub_event, "unexpected event type");
-                            errors++;
-                        }
-
-                        // Delete the event after processing
-                        yaml_event_delete(&event);
-                    }
-                }
-            } else {
-                yaml_error(parser, &event, "unknown scalar");
-                errors++;
-            }
-        }
-
-        yaml_event_delete(&event);
-    }
-
     return errors;
 }
 
@@ -568,7 +444,10 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
         switch (event.type) {
             case YAML_MAPPING_START_EVENT:
             {
-                REWRITE rw = { 0 };
+                RW_FLAGS flags = RW_NONE;
+                char *key = NULL;
+                char *search_pattern = NULL;
+                char *replace_pattern = NULL;
 
                 bool mapping_finished = false;
                 while (!errors && !mapping_finished) {
@@ -585,23 +464,67 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite key");
                                     errors++;
                                 } else {
-                                    rw.key.key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
-                            } else if (yaml_scalar_matches(&sub_event, "search", strlen("search"))) {
+                            } else if (yaml_scalar_matches(&sub_event, "match", strlen("match"))) {
                                 if (!yaml_parse(parser, &sub_event) || sub_event.type != YAML_SCALAR_EVENT) {
-                                    yaml_error(parser, &sub_event, "Expected scalar for rewrite search pattern");
+                                    yaml_error(parser, &sub_event, "Expected scalar for rewrite match PCRE2 pattern");
                                     errors++;
-                                } else {
-                                    rw.search.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                }
+                                else {
+                                    if(search_pattern)
+                                        freez(search_pattern);
+                                    flags |= RW_MATCH_PCRE2;
+                                    flags &= ~RW_MATCH_NON_EMPTY;
+                                    search_pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
-                            } else if (yaml_scalar_matches(&sub_event, "replace", strlen("replace"))) {
+                            } else if (yaml_scalar_matches(&sub_event, "not_empty", strlen("not_empty"))) {
                                 if (!yaml_parse(parser, &sub_event) || sub_event.type != YAML_SCALAR_EVENT) {
-                                    yaml_error(parser, &sub_event, "Expected scalar for rewrite replace pattern");
+                                    yaml_error(parser, &sub_event, "Expected scalar for rewrite not empty condition");
+                                    errors++;
+                                }
+                                else {
+                                    if(search_pattern)
+                                        freez(search_pattern);
+                                    flags |= RW_MATCH_NON_EMPTY;
+                                    flags &= ~RW_MATCH_PCRE2;
+                                    search_pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    yaml_event_delete(&sub_event);
+                                }
+                            } else if (yaml_scalar_matches(&sub_event, "value", strlen("value"))) {
+                                if (!yaml_parse(parser, &sub_event) || sub_event.type != YAML_SCALAR_EVENT) {
+                                    yaml_error(parser, &sub_event, "Expected scalar for rewrite value");
                                     errors++;
                                 } else {
-                                    rw.replace.pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    replace_pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                                    yaml_event_delete(&sub_event);
+                                }
+                            } else if (yaml_scalar_matches(&sub_event, "stop", strlen("stop"))) {
+                                if (!yaml_parse(parser, &sub_event) || sub_event.type != YAML_SCALAR_EVENT) {
+                                    yaml_error(parser, &sub_event, "Expected scalar for rewrite stop boolean");
+                                    errors++;
+                                } else {
+                                    if(strncmp((char*)sub_event.data.scalar.value, "no", 2) == 0 ||
+                                        strncmp((char*)sub_event.data.scalar.value, "false", 5) == 0)
+                                        flags |= RW_DONT_STOP;
+                                    else
+                                        flags &= ~RW_DONT_STOP;
+
+                                    yaml_event_delete(&sub_event);
+                                }
+                            } else if (yaml_scalar_matches(&sub_event, "inject", strlen("inject"))) {
+                                if (!yaml_parse(parser, &sub_event) || sub_event.type != YAML_SCALAR_EVENT) {
+                                    yaml_error(parser, &sub_event, "Expected scalar for rewrite inject boolean");
+                                    errors++;
+                                } else {
+                                    if(strncmp((char*)sub_event.data.scalar.value, "yes", 3) == 0 ||
+                                       strncmp((char*)sub_event.data.scalar.value, "true", 4) == 0)
+                                        flags |= RW_INJECT;
+                                    else
+                                        flags &= ~RW_INJECT;
+
                                     yaml_event_delete(&sub_event);
                                 }
                             } else {
@@ -611,11 +534,21 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                             break;
 
                         case YAML_MAPPING_END_EVENT:
-                            if(rw.key.key && rw.search.pattern && rw.replace.pattern) {
-                                if (!log_job_rewrite_add(jb, rw.key.key, rw.search.pattern, rw.replace.pattern))
+                            if(key) {
+                                if (!log_job_rewrite_add(jb, key, flags, search_pattern, replace_pattern))
                                     errors++;
                             }
-                            rewrite_cleanup(&rw);
+
+                            freez(key);
+                            key = NULL;
+
+                            freez(search_pattern);
+                            search_pattern = NULL;
+
+                            freez(replace_pattern);
+                            replace_pattern = NULL;
+
+                            flags = RW_NONE;
 
                             mapping_finished = true;
                             break;
@@ -803,9 +736,6 @@ static size_t yaml_parse_initialized(yaml_parser_t *parser, LOG_JOB *jb) {
                 else if (yaml_scalar_matches(&event, "filter", strlen("filter")))
                     errors += yaml_parse_filters(parser, jb);
 
-                else if (yaml_scalar_matches(&event, "duplicate", strlen("duplicate")))
-                    errors += yaml_parse_duplicates_injection(parser, jb);
-
                 else if (yaml_scalar_matches(&event, "inject", strlen("inject")))
                     errors += yaml_parse_injections(parser, jb, false);
 
@@ -979,16 +909,13 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         }
     }
 
-    if(jb->dups.used) {
+    if(jb->injections.used) {
         fprintf(stderr, "\n");
-        yaml_print_node("duplicate", NULL, 0, false);
-        for(size_t i = 0; i < jb->dups.used ;i++) {
-            DUPLICATION *kd = &jb->dups.array[i];
-            yaml_print_node("key", kd->target.key, 1, true);
-            yaml_print_node("values_of", NULL, 2, false);
+        yaml_print_node("inject", NULL, 0, false);
 
-            for(size_t k = 0; k < kd->used ;k++)
-                yaml_print_node(NULL, kd->keys[k].key, 3, true);
+        for (size_t i = 0; i < jb->injections.used; i++) {
+            yaml_print_node("key", jb->injections.keys[i].key.key, 1, true);
+            yaml_print_node("value", jb->injections.keys[i].value.pattern, 2, false);
         }
     }
 
@@ -997,19 +924,23 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
         yaml_print_node("rewrite", NULL, 0, false);
 
         for(size_t i = 0; i < jb->rewrites.used ;i++) {
-            yaml_print_node("key", jb->rewrites.array[i].key.key, 1, true);
-            yaml_print_node("search", jb->rewrites.array[i].search.pattern, 2, false);
-            yaml_print_node("replace", jb->rewrites.array[i].replace.pattern, 2, false);
-        }
-    }
+            REWRITE *rw = &jb->rewrites.array[i];
 
-    if(jb->injections.used) {
-        fprintf(stderr, "\n");
-        yaml_print_node("inject", NULL, 0, false);
+            yaml_print_node("key", rw->key.key, 1, true);
 
-        for (size_t i = 0; i < jb->injections.used; i++) {
-            yaml_print_node("key", jb->injections.keys[i].key.key, 1, true);
-            yaml_print_node("value", jb->injections.keys[i].value.txt, 2, false);
+            if(rw->flags & RW_MATCH_PCRE2)
+                yaml_print_node("match", rw->match_pcre2.pattern, 2, false);
+
+            else if(rw->flags & RW_MATCH_NON_EMPTY)
+                yaml_print_node("not_empty", rw->match_non_empty.pattern, 2, false);
+
+            yaml_print_node("value", rw->value.pattern, 2, false);
+
+            if(rw->flags & RW_INJECT)
+                yaml_print_node("inject", "yes", 2, false);
+
+            if(rw->flags & RW_DONT_STOP)
+                yaml_print_node("stop", "no", 2, false);
         }
     }
 
@@ -1026,7 +957,7 @@ void log_job_configuration_to_yaml(LOG_JOB *jb) {
 
             for (size_t i = 0; i < jb->unmatched.injections.used; i++) {
                 yaml_print_node("key", jb->unmatched.injections.keys[i].key.key, 2, true);
-                yaml_print_node("value", jb->unmatched.injections.keys[i].value.txt, 3, false);
+                yaml_print_node("value", jb->unmatched.injections.keys[i].value.pattern, 3, false);
             }
         }
     }

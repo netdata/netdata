@@ -1,0 +1,34 @@
+pattern: logfmt
+
+inject:
+  - key: SIMPLE_INJECTION
+    value: "An unset variable looks like '${this}', while the value of KEY2 is '${KEY2}'"
+
+rewrite:
+  - key: INJECTED
+    value: "${KEY1} - ${KEY2}"
+    inject: yes
+    stop: no
+
+  - key: INJECTED
+    match: '^value01'
+    value: "Key INJECTED had value '${INJECTED}' and now has this, but only on the first row of the log."
+
+  - key: INJECTED
+    not_empty: "${KEY4}"
+    value: "KEY4 has the value '${KEY4}'; it is not empty, so INJECTED has been rewritten."
+
+  - key: INJECTED
+    match: '^KEY4 has the value'
+    value: "This value should not appear in the logs, because the previous one matched and stopped the pipeline."
+
+  - key: ANOTHER_INJECTION
+    value: "${KEY1} - ${KEY2} - ${INJECTED} - should not work because inject is not true amd ANOTHER_INJECTION is not in the log file."
+
+  - key: YET_ANOTHER_INJECTION
+    value: "${KEY1} - ${KEY2} - ${INJECTED} - this should work because inject is yes"
+    inject: yes
+
+  - key: SIMPLE_INJECTION
+    match: "KEY2 is 'value32'"
+    value: "" # empty, so SIMPLE_INJECTION should not be available on row 3

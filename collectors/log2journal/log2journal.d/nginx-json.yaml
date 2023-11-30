@@ -12,7 +12,7 @@ filename:
   key: NGINX_LOG_FILENAME
 
 filter:
-  exclude: "^NGINX_BINARY_REMOTE_ADDR$"
+  exclude: "NGINX_BINARY_REMOTE_ADDR"
 
 rename:
   - new_key: MESSAGE
@@ -66,19 +66,19 @@ rename:
   - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL_KEY_ALG
     old_key: NGINX_PROXY_PROTOCOL_TLV_SSL_0X25
 
-# Duplicate fields under a different name. You can duplicate multiple fields
-# to a new one and then use rewrite rules to change its value.
-duplicate:
+# Inject constant fields into the journal logs.
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: "nginx-log"
 
-  # we insert the field PRIORITY as a copy of NGINX_STATUS.
-  - key: PRIORITY
-    values_of:
-      - NGINX_STATUS
+  # inject PRIORITY is a duplicate of NGINX_STATUS
+  - key: "PRIORITY"
+    value: "${NGINX_STATUS}"
 
-  # we inject the field NGINX_STATUS_FAMILY as a copy of NGINX_STATUS.
-  - key: NGINX_STATUS_FAMILY
-    values_of:
-      - NGINX_STATUS
+  # Inject NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
+  - key: "NGINX_STATUS_FAMILY"
+    value: "${NGINX_STATUS}"
+
 
 # Rewrite the value of fields (including the duplicated ones).
 # The search pattern can have named groups, and the replace pattern can use
@@ -86,75 +86,70 @@ duplicate:
 rewrite:
   # a ? means it has query string, everything else means it does not
   - key: NGINX_HAS_QUERY_STRING
-    search: '^\?$'
-    replace: "yes"
+    match: '^\?$'
+    value: "yes"
   - key: NGINX_HAS_QUERY_STRING
-    search: ".*"
-    replace: "no"
+    match: ".*"
+    value: "no"
 
   # 'on' means it was HTTPS, everything else means it was not
   - key: NGINX_HTTPS
-    search: "^on$"
-    replace: "yes"
+    match: "^on$"
+    value: "yes"
   - key: NGINX_HTTPS
-    search: ".*"
-    replace: "no"
+    match: ".*"
+    value: "no"
 
   # 'p' means it was pipelined, everything else means it was not
   - key: NGINX_PIPELINED
-    search: "^p$"
-    replace: "yes"
+    match: "^p$"
+    value: "yes"
   - key: NGINX_PIPELINED
-    search: ".*"
-    replace: "no"
+    match: ".*"
+    value: "no"
 
   # zero means client sent a certificate and it was verified, non-zero means otherwise
   - key: NGINX_PROXY_PROTOCOL_TLV_SSL_VERIFY
-    search: "^0$"
-    replace: "yes"
+    match: "^0$"
+    value: "yes"
   - key: NGINX_PROXY_PROTOCOL_TLV_SSL_VERIFY
-    search: ".*"
-    replace: "no"
+    match: ".*"
+    value: "no"
 
   # 'OK' means request completed, everything else means it didn't
   - key: NGINX_REQUEST_COMPLETION
-    search: "^OK$"
-    replace: "completed"
+    match: "^OK$"
+    value: "completed"
   - key: NGINX_REQUEST_COMPLETION
-    search: ".*"
-    replace: "not completed"
+    match: ".*"
+    value: "not completed"
 
   # PRIORTY is a duplicate of NGINX_STATUS
   # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
   - key: "PRIORITY"
-    search: "^[123]"
-    replace: 6
+    match: "^[123]"
+    value: 6
 
   - key: "PRIORITY"
-    search: "^4"
-    replace: 5
+    match: "^4"
+    value: 5
 
   - key: "PRIORITY"
-    search: "^5"
-    replace: 3
+    match: "^5"
+    value: 3
 
   - key: "PRIORITY"
-    search: ".*"
-    replace: 4
+    match: ".*"
+    value: 4
 
   # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
   - key: "NGINX_STATUS_FAMILY"
-    search: "^(?<first_digit>[1-5])"
-    replace: "${first_digit}xx"
+    match: "^(?<first_digit>[1-5])"
+    value: "${first_digit}xx"
 
   - key: "NGINX_STATUS_FAMILY"
-    search: ".*"
-    replace: "UNKNOWN"
-
-# Inject constant fields into the journal logs.
-inject:
-  - key: SYSLOG_IDENTIFIER
-    value: "nginx-log"
+    match: ".*"
+    value: "UNKNOWN"
 
 # Control what to do when input logs do not match the main PCRE2 pattern.
 unmatched:
