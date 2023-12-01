@@ -62,7 +62,7 @@
       }
 
       window.addEventListener('message', function(event) {
-        var isNetdataMessage = Array.isArray(event.data) ? event.data.length === 3 ? event.data[0] === "netdata-registry" : isValidHttpUrl(event.data[0]) : true
+        var isNetdataMessage = Array.isArray(event.data) ? event.data.length === 3 ? event.data[0] === "netdata-registry" : isValidHttpUrl(event.data[0]) : false
 
         if (!isNetdataMessage) return
 
