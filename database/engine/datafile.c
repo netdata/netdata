@@ -422,6 +422,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
 
+    netdata_log_info("DBENGINE: loading %d data/journal of tier %d...", matched_files, ctx->config.tier);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
 
