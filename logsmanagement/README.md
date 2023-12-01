@@ -118,8 +118,9 @@ There are some fundamental configuration options that are common to all log coll
 | `disk space limit` | Equivalent value in `logsmanagement.d.conf` (`500 MiB` by default). | Maximum disk space that all compressed logs in database can occupy (per log source). Once exceeded, oldest BLOB of logs will be truncated for new logs to be written over. Each log source database can contain a maximum of 10 BLOBs at any point, so each truncation equates to a deletion of about 10% of the oldest logs. The number of BLOBS will be configurable in a future release.
 | `collected logs total chart enable` | Equivalent value in `logsmanagement.d.conf` (`no` by default). | Chart that shows the number of log records collected for this log source, since the last Netdata agent restart. Useful for debugging purposes.
 | `collected logs rate chart enable` | Equivalent value in `logsmanagement.d.conf` (`yes` by default). | Chart that shows the rate that log records are collected at for this log source.
+| `submit logs to system journal = no` | Equivalent value in `logsmanagement.d.conf` (`no` by default). Available only for `flb_tail`, `flb_web_log`, `flb_serial`, `flb_docker_events` and `flb_mqtt`. | If enabled, it will submit the collected logs to the system journal.
 
-There are also one setting that cannot be set per log source, but can only be defined in `logsmanagement.d.conf`:
+There is also one setting that cannot be set per log source, but can only be defined in `logsmanagement.d.conf`:
 
 |  Configuration Option | Default 		| Description  |
 |      :------------:  	| :------------:  | ------------ |
@@ -152,6 +153,7 @@ This collector will collect logs from the kernel message log buffer. See also do
 
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
+| `prio level` | Drop kernel logs with priority higher than `prio level`. Default value is 8, so no logs will be dropped.
 | `severity chart` | Enable chart showing Syslog Severity values of collected logs. Severity values are in the range of 0 to 7 inclusive.|
 | `subsystem chart` | Enable chart showing which subsystems generated the logs.|
 | `device chart` | Enable chart showing which devices generated the logs.|

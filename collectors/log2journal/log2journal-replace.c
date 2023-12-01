@@ -100,5 +100,12 @@ bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern) {
         }
     }
 
+    for(REPLACE_NODE *node = rp->nodes; node; node = node->next) {
+        if(node->is_variable) {
+            rp->has_variables = true;
+            break;
+        }
+    }
+
     return true;
 }

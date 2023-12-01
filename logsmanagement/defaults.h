@@ -30,6 +30,13 @@
 #endif
 #define ENABLE_COLLECTED_LOGS_RATE_DEFAULT CONFIG_BOOLEAN_YES   /**< Default value to enable (or not) metrics of rate of collected log records **/
 
+#define SD_JOURNAL_FIELD_PREFIX "LOGS_MANAG_"                   /**< Default systemd journal field prefix for sources that log to the system journal */
+
+#define SD_JOURNAL_SEND_DEFAULT CONFIG_BOOLEAN_NO               /**< Default value to enable (or not) submission of logs to the system journal (where applicable) **/
+
+#define LOGS_MANAG_CHARTNAME_SIZE 50                            /**< Maximum size of log source chart names, including terminating '\0'. **/
+#define LOGS_MANAG_CHARTNAME_PREFIX "logs_manag_"               /**< Prefix of top-level chart names, used also in function sources. **/
+
 /* -------------------------------------------------------------------------- */
 
 

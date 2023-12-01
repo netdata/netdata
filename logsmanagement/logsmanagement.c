@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
     if(logs_manag_config_load(&flb_srvc_config, &p_forward_in_config, g_update_every)) 
         exit(1);    
 
-    if(flb_init(flb_srvc_config, get_stock_config_dir())){
+    if(flb_init(flb_srvc_config, get_stock_config_dir(), g_logs_manag_config.sd_journal_field_prefix)){
         collector_error("flb_init() failed - logs management will be disabled");
         exit(1);
     }

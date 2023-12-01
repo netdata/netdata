@@ -3860,7 +3860,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     if (debug_enabled) {
         for (w = root; w; w = w->next) {
-            if (unlikely(w->debug_enabled && !w->target && w->processes)) {
+            if (unlikely(!w->target && w->processes)) {
                 struct pid_on_target *pid_on_target;
                 fprintf(stderr, "apps.plugin: target '%s' has aggregated %u process(es):", w->name, w->processes);
                 for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {

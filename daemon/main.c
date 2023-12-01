@@ -1314,7 +1314,7 @@ static inline void coverity_remove_taint(char *s)
     (void)s;
 }
 
-int get_system_info(struct rrdhost_system_info *system_info, bool log) {
+int get_system_info(struct rrdhost_system_info *system_info) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
@@ -1346,11 +1346,7 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
 
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
                     netdata_log_error("Unexpected environment variable %s=%s", line, value);
-                }
-                else {
-                    if(log)
-                        netdata_log_info("%s=%s", line, value);
-
+                } else {
                     setenv(line, value, 1);
                 }
             }
@@ -2107,7 +2103,7 @@ int main(int argc, char **argv) {
     netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
-    get_system_info(system_info, true);
+    get_system_info(system_info);
     (void) registry_get_this_machine_guid();
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);

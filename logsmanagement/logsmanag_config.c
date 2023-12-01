@@ -21,7 +21,9 @@ g_logs_manag_config_t g_logs_manag_config = {
     .disk_space_limit_in_mib = DISK_SPACE_LIMIT_DEFAULT,  
     .buff_flush_to_db_interval = SAVE_BLOB_TO_DB_DEFAULT,
     .enable_collected_logs_total = ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT,
-    .enable_collected_logs_rate = ENABLE_COLLECTED_LOGS_RATE_DEFAULT
+    .enable_collected_logs_rate = ENABLE_COLLECTED_LOGS_RATE_DEFAULT,
+    .sd_journal_field_prefix = SD_JOURNAL_FIELD_PREFIX,
+    .do_sd_journal_send = SD_JOURNAL_SEND_DEFAULT
 };
 
 static logs_manag_db_mode_t db_mode_str_to_db_mode(const char *const db_mode_str){
@@ -311,7 +313,6 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         section, 
         "circular buffer drop logs if full", 
         g_logs_manag_config.circ_buff_drop_logs);
-    
 
     g_logs_manag_config.compression_acceleration = appconfig_get_number(    
         &logsmanagement_d_conf,
@@ -330,6 +331,18 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         section, 
         "collected logs rate chart enable", 
         g_logs_manag_config.enable_collected_logs_rate);
+
+    g_logs_manag_config.do_sd_journal_send = appconfig_get_boolean(    
+        &logsmanagement_d_conf,
+        section, 
+        "submit logs to system journal", 
+        g_logs_manag_config.do_sd_journal_send);
+
+    g_logs_manag_config.sd_journal_field_prefix = appconfig_get(
+        &logsmanagement_d_conf,
+        section,
+        "systemd journal fields prefix",
+        g_logs_manag_config.sd_journal_field_prefix);
     
     if(!rc){
         collector_info("CONFIG: [%s] update every: %d",                       section,  g_logs_manag_config.update_every);
@@ -340,6 +353,8 @@ int logs_manag_config_load( flb_srvc_config_t *p_flb_srvc_config,
         collector_info("CONFIG: [%s] compression acceleration: %d",           section,  g_logs_manag_config.compression_acceleration);
         collector_info("CONFIG: [%s] collected logs total chart enable: %d",  section,  g_logs_manag_config.enable_collected_logs_total);
         collector_info("CONFIG: [%s] collected logs rate chart enable: %d",   section,  g_logs_manag_config.enable_collected_logs_rate);
+        collector_info("CONFIG: [%s] submit logs to system journal: %d",      section,  g_logs_manag_config.do_sd_journal_send);
+        collector_info("CONFIG: [%s] systemd journal fields prefix: %s",      section,  g_logs_manag_config.sd_journal_field_prefix);
     }
 
 
@@ -548,8 +563,17 @@ static void config_section_init(uv_loop_t *main_loop,
      * Check if config_section->name is valid and if so, use it as chartname.
      * ------------------------------------------------------------------------- */
     if(config_section->name && *config_section->name){
-        p_file_info->chartname = strdupz(config_section->name);
-        netdata_fix_chart_id((char *) p_file_info->chartname);
+        char tmp[LOGS_MANAG_CHARTNAME_SIZE] = {0};
+
+        snprintfz(tmp, sizeof(tmp), "%s%s", LOGS_MANAG_CHARTNAME_PREFIX, config_section->name);
+
+        netdata_fix_chart_id(tmp);
+
+        for(char *ch = (char *) tmp; *ch; ch++) 
+            *ch = *ch == '.' ? '_' : *ch; // Convert dots to underscores
+
+        p_file_info->chartname = strdupz(tmp);
+
         collector_info("[%s]: Initializing config loading", p_file_info->chartname);
     } else {
         collector_error("Invalid logs management config section.");
@@ -635,21 +659,21 @@ static void config_section_init(uv_loop_t *main_loop,
             
         switch(p_file_info->log_type){
             case FLB_TAIL:
-                if(!strcasecmp(p_file_info->chartname, "Netdata_daemon.log")){
+                if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "netdata_daemon_log")){
                     char path[FILENAME_MAX + 1];
                     snprintfz(path, FILENAME_MAX, "%s/daemon.log", get_log_dir());
                     if(access(path, R_OK)) {
-                        collector_error("[%s]: 'Netdata_daemon.log' path (%s) invalid, unknown or needs permissions", 
+                        collector_error("[%s]: 'Netdata daemon.log' path (%s) invalid, unknown or needs permissions", 
                             p_file_info->chartname, path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(path);
-                } else if(!strcasecmp(p_file_info->chartname, "Netdata_fluentbit.log")){
+                } else if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "fluentbit_log")){
                     if(access(p_flb_srvc_config->log_path, R_OK)){
-                        collector_error("[%s]: Netdata_fluentbit.log path (%s) invalid, unknown or needs permissions", 
+                        collector_error("[%s]: Netdata fluentbit.log path (%s) invalid, unknown or needs permissions", 
                             p_file_info->chartname, p_flb_srvc_config->log_path);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(p_flb_srvc_config->log_path);
-                } else if(!strcasecmp(p_file_info->chartname, "Auth.log_tail")){
+                } else if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "auth_log_tail")){
                     const char * const auth_path_default[] = {
                         "/var/log/auth.log",
                         NULL
@@ -675,7 +699,7 @@ static void config_section_init(uv_loop_t *main_loop,
                 }
                 break;
             case FLB_WEB_LOG:
-                if(!strcasecmp(p_file_info->chartname, "Apache_access.log")){
+                if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "apache_access_log")){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
                         "/var/log/apache2/access.log",
@@ -690,7 +714,7 @@ static void config_section_init(uv_loop_t *main_loop,
                         collector_error("[%s]: Apache access.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(apache_access_path_default[i]);
-                } else if(!strcasecmp(p_file_info->chartname, "Nginx_access.log")){
+                } else if(!strcasecmp(p_file_info->chartname, LOGS_MANAG_CHARTNAME_PREFIX "nginx_access_log")){
                     const char * const nginx_access_path_default[] = {
                         "/var/log/nginx/access.log",
                         NULL
@@ -799,6 +823,13 @@ static void config_section_init(uv_loop_t *main_loop,
                                                         g_logs_manag_config.disk_space_limit_in_mib) MiB / BLOB_MAX_FILES;
     collector_info("[%s]: BLOB max size = %lld", p_file_info->chartname, (long long)p_file_info->blob_max_size);
 
+
+    /* -------------------------------------------------------------------------
+     * Read configuration about sending logs to system journal.
+     * ------------------------------------------------------------------------- */
+    p_file_info->do_sd_journal_send = appconfig_get_boolean(&log_management_config, config_section->name,
+                                                            "submit logs to system journal",
+                                                            g_logs_manag_config.do_sd_journal_send);
 
     /* -------------------------------------------------------------------------
      * Read collected logs chart configuration.
@@ -936,6 +967,12 @@ static void config_section_init(uv_loop_t *main_loop,
         }
     }
     else if(p_file_info->log_type == FLB_KMSG){
+        Flb_kmsg_config_t *kmsg_config = callocz(1, sizeof(Flb_kmsg_config_t));
+
+        kmsg_config->prio_level = appconfig_get(&log_management_config, config_section->name, "prio level", "8");
+
+        p_file_info->flb_config = kmsg_config;
+
         if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_SEVER;
         }

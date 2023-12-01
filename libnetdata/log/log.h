@@ -149,6 +149,7 @@ int nd_log_priority2id(const char *priority);
 const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
 
+int nd_log_health_fd(void);
 typedef bool (*log_formatter_callback_t)(BUFFER *wb, void *data);
 
 struct log_stack_entry {

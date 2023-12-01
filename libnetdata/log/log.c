@@ -245,7 +245,7 @@ const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority) {
 // ----------------------------------------------------------------------------
 // log sources
 
-const char *log_sources_str[] = {
+const char *nd_log_sources[] = {
         [NDLS_UNSET] = "UNSET",
         [NDLS_ACCESS] = "access",
         [NDLS_ACLK] = "aclk",
@@ -255,12 +255,23 @@ const char *log_sources_str[] = {
         [NDLS_DEBUG] = "debug",
 };
 
-static const char *nd_log_source2str(ND_LOG_SOURCES source) {
-    size_t entries = sizeof(log_sources_str) / sizeof(log_sources_str[0]);
-    if(source < entries)
-        return log_sources_str[source];
+size_t nd_log_source2id(const char *source, ND_LOG_SOURCES def) {
+    size_t entries = sizeof(nd_log_sources) / sizeof(nd_log_sources[0]);
+    for(size_t i = 0; i < entries ;i++) {
+        if(strcmp(nd_log_sources[i], source) == 0)
+            return i;
+    }
 
-    return "UNKNOWN";
+    return def;
+}
+
+
+static const char *nd_log_id2source(ND_LOG_SOURCES source) {
+    size_t entries = sizeof(nd_log_sources) / sizeof(nd_log_sources[0]);
+    if(source < entries)
+        return nd_log_sources[source];
+
+    return nd_log_sources[NDLS_COLLECTORS];
 }
 
 // ----------------------------------------------------------------------------
@@ -503,6 +514,13 @@ __attribute__((constructor)) void initialize_invocation_id(void) {
     setenv("NETDATA_INVOCATION_ID", uuid, 1);
 }
 
+int nd_log_health_fd(void) {
+    if(nd_log.sources[NDLS_HEALTH].method == NDLM_FILE && nd_log.sources[NDLS_HEALTH].fd != -1)
+        return nd_log.sources[NDLS_HEALTH].fd;
+
+    return STDERR_FILENO;
+}
+
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
     char buf[FILENAME_MAX + 100];
     if(setting && *setting)
@@ -563,7 +581,7 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
             else
                 nd_log(NDLS_DAEMON, NDLP_ERR, "Error while parsing configuration of log source '%s'. "
                                               "In config '%s', '%s' is not understood.",
-                                              nd_log_source2str(source), setting, name);
+                       nd_log_id2source(source), setting, name);
         }
     }
 
@@ -2079,7 +2097,22 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields[NDF_INVOCATION_ID].entry = ND_LOG_FIELD_UUID(NDF_INVOCATION_ID, &nd_log.invocation_id);
 
     if(likely(!thread_log_fields[NDF_LOG_SOURCE].entry.set))
-        thread_log_fields[NDF_LOG_SOURCE].entry = ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, nd_log_source2str(source));
+        thread_log_fields[NDF_LOG_SOURCE].entry = ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, nd_log_id2source(source));
+    else {
+        ND_LOG_SOURCES src = source;
+
+        if(thread_log_fields[NDF_LOG_SOURCE].entry.type == NDFT_TXT)
+            src = nd_log_source2id(thread_log_fields[NDF_LOG_SOURCE].entry.txt, source);
+        else if(thread_log_fields[NDF_LOG_SOURCE].entry.type == NDFT_U64)
+            src = thread_log_fields[NDF_LOG_SOURCE].entry.u64;
+
+        if(src != source && src >= 0 && src < _NDLS_MAX) {
+            source = src;
+            output = nd_logger_select_output(source, &fp, &spinlock);
+            if(output != NDLM_FILE && output != NDLM_JOURNAL && output != NDLM_SYSLOG)
+                return;
+        }
+    }
 
     if(likely(!thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry.set))
         thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry = ND_LOG_FIELD_TXT(NDF_SYSLOG_IDENTIFIER, program_name);
@@ -2145,7 +2178,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields[NDF_LOG_SOURCE].entry = (struct log_stack_entry){
                 .set = true,
                 .type = NDFT_TXT,
-                .txt = nd_log_source2str(source),
+                .txt = nd_log_id2source(source),
         };
 
         thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry = (struct log_stack_entry){

@@ -1,0 +1,37 @@
+INJECTED=Key INJECTED had value 'value01 - value02' and now has this, but only on the first row of the log.
+KEY1=value01
+KEY2=value02
+KEY3=value03
+KEY4=value04
+SIMPLE_INJECTION=An unset variable looks like '', while the value of KEY2 is 'value02'
+YET_ANOTHER_INJECTION=value01 - value02 - Key INJECTED had value 'value01 - value02' and now has this, but only on the first row of the log. - this should work because inject is yes
+
+INJECTED=value11 - value12
+KEY1=value11
+KEY2=value12
+KEY3=value13
+SIMPLE_INJECTION=An unset variable looks like '', while the value of KEY2 is 'value12'
+YET_ANOTHER_INJECTION=value11 - value12 - value11 - value12 - this should work because inject is yes
+
+INJECTED=KEY4 has the value 'value24'; it is not empty, so INJECTED has been rewritten.
+KEY1=value21
+KEY2=value22
+KEY3=value23
+KEY4=value24
+SIMPLE_INJECTION=An unset variable looks like '', while the value of KEY2 is 'value22'
+YET_ANOTHER_INJECTION=value21 - value22 - KEY4 has the value 'value24'; it is not empty, so INJECTED has been rewritten. - this should work because inject is yes
+
+INJECTED=value31 - value32
+KEY1=value31
+KEY2=value32
+KEY3=value33
+YET_ANOTHER_INJECTION=value31 - value32 - value31 - value32 - this should work because inject is yes
+
+INJECTED=KEY4 has the value 'value44'; it is not empty, so INJECTED has been rewritten.
+KEY1=value41
+KEY2=value42
+KEY3=value43
+KEY4=value44
+SIMPLE_INJECTION=An unset variable looks like '', while the value of KEY2 is 'value42'
+YET_ANOTHER_INJECTION=value41 - value42 - KEY4 has the value 'value44'; it is not empty, so INJECTED has been rewritten. - this should work because inject is yes
+

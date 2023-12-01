@@ -68,10 +68,11 @@ echo >&2 "Testing command line parsing..."
 test_log2journal_config /dev/null "${tests}/full.output" --show-config      \
   --prefix=NGINX_                                                           \
   --filename-key NGINX_LOG_FILENAME                                         \
-  --duplicate PRIORITY=NGINX_STATUS                                         \
-  --duplicate=NGINX_STATUS_FAMILY=NGINX_STATUS,NGINX_METHOD                 \
   --inject SYSLOG_IDENTIFIER=nginx-log                                      \
   --inject=SYSLOG_IDENTIFIER2=nginx-log2                                    \
+  --inject 'PRIORITY=${NGINX_STATUS}'                                       \
+  --inject='NGINX_STATUS_FAMILY=${NGINX_STATUS}${NGINX_METHOD}'             \
+  --rewrite 'PRIORITY=//${NGINX_STATUS}/inject,dont-stop'                   \
   --rewrite "PRIORITY=/^[123]/6"                                            \
   --rewrite='PRIORITY=|^4|5'                                                \
   '--rewrite=PRIORITY=-^5-3'                                                \
@@ -115,7 +116,8 @@ test_log2journal() {
   printf >&2 "running: "
   printf >&2 "%q " "${log2journal_bin}" "${@}"
   printf >&2 "\n"
-  echo >&2 "using as input: ${in}"
+  echo >&2 "using as input  : ${in}"
+  echo >&2 "expecting output: ${out}"
 
   [ -f output ] && rm output
 
@@ -125,7 +127,7 @@ test_log2journal() {
   [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && exit 1
 
   diff "${out}" output
-  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match!" && cat output && exit 1
+  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match! - here is what we got:" && cat output && exit 1
 
   echo >&2 "OK"
   echo >&2
@@ -136,7 +138,9 @@ test_log2journal() {
 echo >&2
 echo >&2 "Testing parsing and output..."
 
-test_log2journal ${tests}/json.log ${tests}/json.output json
-test_log2journal ${tests}/json.log ${tests}/json-include.output json --include "OBJECT"
-test_log2journal ${tests}/json.log ${tests}/json-exclude.output json --exclude "ARRAY[^2]"
-test_log2journal ${tests}/nginx-json.log ${tests}/nginx-json.output -f "${script_dir}/log2journal.d/nginx-json.yaml"
+test_log2journal "${tests}/json.log" "${tests}/json.output" json
+test_log2journal "${tests}/json.log" "${tests}/json-include.output" json --include "OBJECT"
+test_log2journal "${tests}/json.log" "${tests}/json-exclude.output" json --exclude "ARRAY[^2]"
+test_log2journal "${tests}/nginx-json.log" "${tests}/nginx-json.output" -f "${script_dir}/log2journal.d/nginx-json.yaml"
+test_log2journal "${tests}/nginx-combined.log" "${tests}/nginx-combined.output" -f "${script_dir}/log2journal.d/nginx-combined.yaml"
+test_log2journal "${tests}/logfmt.log" "${tests}/logfmt.output" -f "${tests}/logfmt.yaml"

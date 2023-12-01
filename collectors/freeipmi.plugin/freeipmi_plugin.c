@@ -1903,7 +1903,7 @@ int main (int argc, char **argv) {
     errno = 0;
 
     if(freq_s && freq_s < update_every)
-        collector_error("%s(): update frequency %d seconds is too small for IPMI. Using %d.",
+        collector_info("%s(): update frequency %d seconds is too small for IPMI. Using %d.",
                         __FUNCTION__, freq_s, update_every);
 
     update_every = freq_s = MAX(freq_s, update_every);

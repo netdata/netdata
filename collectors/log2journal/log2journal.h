@@ -14,6 +14,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <assert.h>
 
 // ----------------------------------------------------------------------------
 // logging
@@ -130,7 +131,8 @@ static inline size_t copy_to_buffer(char *dst, size_t dst_size, const char *src,
 
 typedef struct txt {
     char *txt;
-    size_t size;
+    uint32_t size;
+    uint32_t len;
 } TEXT;
 
 static inline void txt_cleanup(TEXT *t) {
@@ -142,6 +144,7 @@ static inline void txt_cleanup(TEXT *t) {
 
     t->txt = NULL;
     t->size = 0;
+    t->len = 0;
 }
 
 static inline void txt_replace(TEXT *t, const char *s, size_t len) {
@@ -155,6 +158,7 @@ static inline void txt_replace(TEXT *t, const char *s, size_t len) {
 
         memcpy(t->txt, s, len);
         t->txt[len] = '\0';
+        t->len = len;
     }
     else {
         // no existing value allocation, or too small for our value
@@ -164,23 +168,59 @@ static inline void txt_replace(TEXT *t, const char *s, size_t len) {
 
         t->txt = strndupz(s, len);
         t->size = len + 1;
+        t->len = len;
     }
+}
+
+static inline void txt_expand_and_append(TEXT *t, const char *s, size_t len) {
+    if(len + 1 > (t->size - t->len)) {
+        size_t new_size = t->len + len + 1;
+        if(new_size < t->size * 2)
+            new_size = t->size * 2;
+
+        char *b = mallocz(new_size);
+        if(t->txt) {
+            memcpy(b, t->txt, t->len);
+            freez(t->txt);
+        }
+
+        t->txt = b;
+        t->size = new_size;
+    }
+
+    char *copy_to = &t->txt[t->len];
+    memcpy(copy_to, s, len);
+    copy_to[len] = '\0';
+    t->len += len;
 }
 
 // ----------------------------------------------------------------------------
 
 typedef enum __attribute__((__packed__)) {
-    HK_NONE              = 0,
-    HK_ALLOCATED         = (1 << 0),
-    HK_FILTERED          = (1 << 1),
-    HK_FILTERED_INCLUDED = (1 << 2),
-    HK_COLLISION_CHECKED = (1 << 3),
-    HK_RENAMES_CHECKED   = (1 << 4),
-    HK_HAS_RENAMES       = (1 << 5),
-    HK_DUPS_CHECKED      = (1 << 6),
-    HK_HAS_DUPS          = (1 << 7),
-    HK_REWRITES_CHECKED  = (1 << 8),
-    HK_HAS_REWRITES      = (1 << 9),
+    HK_NONE                 = 0,
+
+    // permanent flags - they are set once to optimize various decisions and lookups
+
+    HK_HASHTABLE_ALLOCATED  = (1 << 0), // this is key object allocated in the hashtable
+                                        // objects that do not have this, have a pointer to a key in the hashtable
+                                        // objects that have this, value a value allocated
+
+    HK_FILTERED             = (1 << 1), // we checked once if this key in filtered
+    HK_FILTERED_INCLUDED    = (1 << 2), // the result of the filtering was to include it in the output
+
+    HK_COLLISION_CHECKED    = (1 << 3), // we checked once for collision check of this key
+
+    HK_RENAMES_CHECKED      = (1 << 4), // we checked once if there are renames on this key
+    HK_HAS_RENAMES          = (1 << 5), // and we found there is a rename rule related to it
+
+    HK_DUPS_CHECKED         = (1 << 6), // we checked once if there are duplications for this key
+    HK_HAS_DUPS             = (1 << 7), // and we found there are duplication related to it
+
+    // ephemeral flags - they are unset at the end of each log line
+
+    HK_VALUE_FROM_LOG       = (1 << 14), // the value of this key has been read from the log (or from injection, duplication)
+    HK_VALUE_REWRITTEN      = (1 << 15), // the value of this key has been rewritten due to one of our rewrite rules
+
 } HASHED_KEY_FLAGS;
 
 typedef struct hashed_key {
@@ -188,6 +228,10 @@ typedef struct hashed_key {
     uint32_t len;
     HASHED_KEY_FLAGS flags;
     XXH64_hash_t hash;
+    union {
+        struct hashed_key *hashtable_ptr; // HK_HASHTABLE_ALLOCATED is not set
+        TEXT value;                       // HK_HASHTABLE_ALLOCATED is set
+    };
 } HASHED_KEY;
 
 static inline void hashed_key_cleanup(HASHED_KEY *k) {
@@ -195,6 +239,11 @@ static inline void hashed_key_cleanup(HASHED_KEY *k) {
         freez((void *)k->key);
         k->key = NULL;
     }
+
+    if(k->flags & HK_HASHTABLE_ALLOCATED)
+        txt_cleanup(&k->value);
+    else
+        k->hashtable_ptr = NULL;
 }
 
 static inline void hashed_key_set(HASHED_KEY *k, const char *name) {
@@ -213,6 +262,10 @@ static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t le
     k->len = len;
     k->hash = XXH3_64bits(k->key, k->len);
     k->flags = HK_NONE;
+}
+
+static inline bool hashed_keys_match(HASHED_KEY *k1, HASHED_KEY *k2) {
+    return ((k1 == k2) || (k1->hash == k2->hash && strcmp(k1->key, k2->key) == 0));
 }
 
 // ----------------------------------------------------------------------------
@@ -246,6 +299,7 @@ void replace_node_free(REPLACE_NODE *rpn);
 typedef struct replace_pattern {
     const char *pattern;
     REPLACE_NODE *nodes;
+    bool has_variables;
 } REPLACE_PATTERN;
 
 void replace_pattern_cleanup(REPLACE_PATTERN *rp);
@@ -255,23 +309,11 @@ bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern);
 
 typedef struct injection {
     bool on_unmatched;
-    TEXT value;
     HASHED_KEY key;
+    REPLACE_PATTERN value;
 } INJECTION;
 
 void injection_cleanup(INJECTION *inj);
-
-// ----------------------------------------------------------------------------
-
-typedef struct duplication {
-    HASHED_KEY target;
-    uint32_t used;
-    bool exposed;
-    HASHED_KEY keys[MAX_KEY_DUPS_KEYS];
-    TEXT values[MAX_KEY_DUPS_KEYS];
-} DUPLICATION;
-
-void duplication_cleanup(DUPLICATION *dp);
 
 // ----------------------------------------------------------------------------
 
@@ -284,10 +326,22 @@ void rename_cleanup(RENAME *rn);
 
 // ----------------------------------------------------------------------------
 
+typedef enum __attribute__((__packed__)) {
+    RW_NONE                 = 0,
+    RW_MATCH_PCRE2          = (1 << 1), // a rewrite rule
+    RW_MATCH_NON_EMPTY      = (1 << 2), // a rewrite rule
+    RW_DONT_STOP            = (1 << 3),
+    RW_INJECT               = (1 << 4),
+} RW_FLAGS;
+
 typedef struct key_rewrite {
+    RW_FLAGS flags;
     HASHED_KEY key;
-    SEARCH_PATTERN search;
-    REPLACE_PATTERN replace;
+    union {
+        SEARCH_PATTERN match_pcre2;
+        REPLACE_PATTERN match_non_empty;
+    };
+    REPLACE_PATTERN value;
 } REWRITE;
 
 void rewrite_cleanup(REWRITE *rw);
@@ -304,14 +358,19 @@ typedef struct log_job {
     SIMPLE_HASHTABLE hashtable;
 
     struct {
+        HASHED_KEY *keys[MAX_OUTPUT_KEYS];
+        size_t used;
+    } sorted;
+
+    struct {
         SEARCH_PATTERN include;
         SEARCH_PATTERN exclude;
     } filter;
 
     struct {
         bool last_line_was_empty;
-        const char *key;
-        char current[FILENAME_MAX + 1];
+        HASHED_KEY key;
+        TEXT current;
     } filename;
 
     struct {
@@ -320,7 +379,7 @@ typedef struct log_job {
     } injections;
 
     struct {
-        const char *key;
+        HASHED_KEY key;
         struct {
             uint32_t used;
             INJECTION keys[MAX_INJECTIONS];
@@ -329,12 +388,8 @@ typedef struct log_job {
 
     struct {
         uint32_t used;
-        DUPLICATION array[MAX_KEY_DUPS];
-    } dups;
-
-    struct {
-        uint32_t used;
         REWRITE array[MAX_REWRITES];
+        TEXT tmp;
     } rewrites;
 
     struct {
@@ -343,8 +398,11 @@ typedef struct log_job {
     } renames;
 } LOG_JOB;
 
+// initialize a log job
+void log_job_init(LOG_JOB *jb);
+
 // free all resources consumed by the log job
-void nd_log_cleanup(LOG_JOB *jb);
+void log_job_cleanup(LOG_JOB *jb);
 
 // ----------------------------------------------------------------------------
 
@@ -356,13 +414,11 @@ void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *
 // configuration related
 
 // management of configuration to set settings
-DUPLICATION *log_job_duplication_add(LOG_JOB *jb, const char *target, size_t target_len);
-bool log_job_duplication_key_add(DUPLICATION *kd, const char *key, size_t key_len);
 bool log_job_filename_key_set(LOG_JOB *jb, const char *key, size_t key_len);
 bool log_job_key_prefix_set(LOG_JOB *jb, const char *prefix, size_t prefix_len);
 bool log_job_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);
 bool log_job_injection_add(LOG_JOB *jb, const char *key, size_t key_len, const char *value, size_t value_len, bool unmatched);
-bool log_job_rewrite_add(LOG_JOB *jb, const char *key, const char *search_pattern, const char *replace_pattern);
+bool log_job_rewrite_add(LOG_JOB *jb, const char *key, RW_FLAGS flags, const char *search_pattern, const char *replace_pattern);
 bool log_job_rename_add(LOG_JOB *jb, const char *new_key, size_t new_key_len, const char *old_key, size_t old_key_len);
 bool log_job_include_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);
 bool log_job_exclude_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len);

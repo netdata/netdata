@@ -1477,8 +1477,8 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                 continue;
 
             uuid_t host_uuid;
-            uuid_parse(machine_guid, host_uuid);
-            delete_host_chart_labels(&host_uuid);
+            if (!uuid_parse(machine_guid, host_uuid))
+                delete_host_chart_labels(&host_uuid);
 
             freez(machine_guid);
         }
