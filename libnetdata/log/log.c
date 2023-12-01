@@ -891,7 +891,9 @@ static void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
             e->fd = STDOUT_FILENO;
             break;
 
-        default:
+        case NDLM_DISABLED:
+            break;
+
         case NDLM_DEFAULT:
         case NDLM_STDERR:
             e->method = NDLM_STDERR;
