@@ -338,7 +338,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
         ctx_fs_error(ctx);
         return fd;
     }
-    netdata_log_debug("DBENGINE: initializing data file \"%s\".", path);
+    
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
@@ -354,7 +355,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
-    netdata_log_debug("DBENGINE: data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: data file \"%s\" initialized (size:%" PRIu64 ").", path, file_size);
+
     return 0;
 
     error:
