@@ -108,9 +108,6 @@ int become_user(const char *username, int pid_fd) {
     uid_t uid = pw->pw_uid;
     gid_t gid = pw->pw_gid;
 
-    if (am_i_root)
-        netdata_log_info("I am root, so checking permissions");
-
     prepare_required_directories(uid, gid);
 
     if(pidfile[0]) {

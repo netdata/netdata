@@ -338,7 +338,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
         ctx_fs_error(ctx);
         return fd;
     }
-    netdata_log_info("DBENGINE: initializing data file \"%s\".", path);
+    
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
@@ -354,7 +355,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
-    netdata_log_info("DBENGINE: data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: data file \"%s\" initialized (size:%" PRIu64 ").", path, file_size);
+
     return 0;
 
     error:
@@ -422,6 +424,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
 
+    netdata_log_info("DBENGINE: loading %d data/journal of tier %d...", matched_files, ctx->config.tier);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
 
