@@ -7,6 +7,7 @@
 void log_job_init(LOG_JOB *jb) {
     memset(jb, 0, sizeof(*jb));
     simple_hashtable_init(&jb->hashtable, 32);
+    hashed_key_set(&jb->line.key, "LINE");
 }
 
 static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
@@ -22,6 +23,8 @@ static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
 }
 
 void log_job_cleanup(LOG_JOB *jb) {
+    hashed_key_cleanup(&jb->line.key);
+
     if(jb->prefix) {
         freez((void *) jb->prefix);
         jb->prefix = NULL;
@@ -346,7 +349,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                 if (!yaml_parse_file(value, jb))
                     return false;
             }
-            else if (strcmp(param, "--config") == 0) {
+            else if (strcmp(param, "-c") == 0 || strcmp(param, "--config") == 0) {
                 if (!yaml_parse_config(value, jb))
                     return false;
             }
@@ -392,7 +395,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
 
     // Check if a pattern is set and exactly one pattern is specified
     if (!jb->pattern) {
-        log2stderr("Error: Pattern not specified.");
+        log2stderr("Warning: pattern not specified. Try the default config with: -c default");
         log_job_command_line_help(argv[0]);
         return false;
     }

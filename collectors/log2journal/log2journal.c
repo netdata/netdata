@@ -164,11 +164,18 @@ static inline size_t replace_evaluate_to_buffer(LOG_JOB *jb, HASHED_KEY *k, REPL
 
     for(REPLACE_NODE *node = rp->nodes; node != NULL && remaining > 1; node = node->next) {
         if(node->is_variable) {
-            HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
-            if(ktmp->value.len) {
-                size_t copied = copy_to_buffer(copy_to, remaining, ktmp->value.txt, ktmp->value.len);
+            if(hashed_keys_match(&node->name, &jb->line.key)) {
+                size_t copied = copy_to_buffer(copy_to, remaining, jb->line.trimmed, jb->line.trimmed_len);
                 copy_to += copied;
                 remaining -= copied;
+            }
+            else {
+                HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+                if(ktmp->value.len) {
+                    size_t copied = copy_to_buffer(copy_to, remaining, ktmp->value.txt, ktmp->value.len);
+                    copy_to += copied;
+                    remaining -= copied;
+                }
             }
         }
         else {
@@ -189,9 +196,14 @@ static inline void replace_evaluate(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN 
 
     for(REPLACE_NODE *node = rp->nodes; node != NULL; node = node->next) {
         if(node->is_variable) {
-            HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
-            if(ktmp->value.len)
-                txt_expand_and_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
+            if(hashed_keys_match(&node->name, &jb->line.key))
+                txt_expand_and_append(&ht_key->value, jb->line.trimmed, jb->line.trimmed_len);
+
+            else {
+                HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+                if(ktmp->value.len)
+                    txt_expand_and_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
+            }
         }
         else
             txt_expand_and_append(&ht_key->value, node->name.key, node->name.len);
@@ -220,9 +232,14 @@ static inline void replace_evaluate_from_pcre2(LOG_JOB *jb, HASHED_KEY *k, REPLA
                 txt_expand_and_append(&jb->rewrites.tmp, k->value.txt + start_offset, length);
             }
             else {
-                HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
-                if(ktmp->value.len)
-                    txt_expand_and_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
+                if(hashed_keys_match(&node->name, &jb->line.key))
+                    txt_expand_and_append(&jb->rewrites.tmp, jb->line.trimmed, jb->line.trimmed_len);
+
+                else {
+                    HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+                    if(ktmp->value.len)
+                        txt_expand_and_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
+                }
             }
         }
         else {
@@ -496,11 +513,13 @@ int log_job_run(LOG_JOB *jb) {
 
     if(strcmp(jb->pattern, "json") == 0) {
         json = json_parser_create(jb);
+        // never fails
     }
     else if(strcmp(jb->pattern, "logfmt") == 0) {
         logfmt = logfmt_parser_create(jb);
+        // never fails
     }
-    else {
+    else if(strcmp(jb->pattern, "none") != 0) {
         pcre2 = pcre2_parser_create(jb);
         if(pcre2_has_error(pcre2)) {
             log2stderr("%s", pcre2_parser_error(pcre2));
@@ -509,21 +528,25 @@ int log_job_run(LOG_JOB *jb) {
         }
     }
 
-    char buffer[MAX_LINE_LENGTH];
-    char *line;
-    size_t len;
+    jb->line.buffer = mallocz(MAX_LINE_LENGTH + 1);
+    jb->line.size = MAX_LINE_LENGTH + 1;
+    jb->line.trimmed_len = 0;
+    jb->line.trimmed = jb->line.buffer;
 
-    while ((line = get_next_line(jb, buffer, sizeof(buffer), &len))) {
+    while ((jb->line.trimmed = get_next_line(jb, (char *)jb->line.buffer, jb->line.size, &jb->line.trimmed_len))) {
+        const char *line = jb->line.trimmed;
+        size_t len = jb->line.trimmed_len;
+
         if(jb_switched_filename(jb, line, len))
             continue;
 
-        bool line_is_matched;
+        bool line_is_matched = true;
 
         if(json)
             line_is_matched = json_parse_document(json, line);
         else if(logfmt)
             line_is_matched = logfmt_parse_document(logfmt, line);
-        else
+        else if(pcre2)
             line_is_matched = pcre2_parse_document(pcre2, line, len);
 
         if(!line_is_matched) {
@@ -531,7 +554,7 @@ int log_job_run(LOG_JOB *jb) {
                 log2stderr("%s", json_parser_error(json));
             else if(logfmt)
                 log2stderr("%s", logfmt_parser_error(logfmt));
-            else
+            else if(pcre2)
                 log2stderr("%s", pcre2_parser_error(pcre2));
 
             if(!jb_send_unmatched_line(jb, line))
@@ -556,6 +579,8 @@ int log_job_run(LOG_JOB *jb) {
 
     else if(pcre2)
         pcre2_parser_destroy(pcre2);
+
+    freez((void *)jb->line.buffer);
 
     return 0;
 }

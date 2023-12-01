@@ -358,6 +358,14 @@ typedef struct log_job {
     SIMPLE_HASHTABLE hashtable;
 
     struct {
+        const char *buffer;
+        const char *trimmed;
+        size_t trimmed_len;
+        size_t size;
+        HASHED_KEY key;
+    } line;
+
+    struct {
         HASHED_KEY *keys[MAX_OUTPUT_KEYS];
         size_t used;
     } sorted;
