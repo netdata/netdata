@@ -363,7 +363,7 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
     k->values.used = 0;
     k->values.enabled = false;
 
-    simple_hashtable_free(&k->values.ht);
+    simple_hashtable_destroy(&k->values.ht);
 }
 
 static inline const char *facets_key_get_value(FACET_KEY *k) {
@@ -601,7 +601,7 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
 
-    simple_hashtable_free(&facets->keys.ht);
+    simple_hashtable_destroy(&facets->keys.ht);
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {

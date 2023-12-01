@@ -11,9 +11,13 @@
 typedef uint64_t SIMPLE_HASHTABLE_HASH;
 #define SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS 32
 
+#ifndef SIMPLE_HASHTABLE_VALUE_TYPE
+#define SIMPLE_HASHTABLE_VALUE_TYPE void
+#endif
+
 typedef struct simple_hashtable_slot {
     SIMPLE_HASHTABLE_HASH hash;
-    void *data;
+    SIMPLE_HASHTABLE_VALUE_TYPE *data;
 } SIMPLE_HASHTABLE_SLOT;
 
 typedef struct simple_hashtable {
@@ -25,28 +29,159 @@ typedef struct simple_hashtable {
     size_t used;
     size_t size;
     SIMPLE_HASHTABLE_SLOT *hashtable;
+
+#ifdef SIMPLE_HASHTABLE_SORT_FUNCTION
+    struct {
+        size_t used;
+        size_t size;
+        SIMPLE_HASHTABLE_VALUE_TYPE **array;
+    } sorted;
+#endif
 } SIMPLE_HASHTABLE;
 
+#ifdef SIMPLE_HASHTABLE_SORT_FUNCTION
+static inline size_t simple_hashtable_sorted_binary_search(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+    size_t left = 0, right = ht->sorted.used;
+
+    while (left < right) {
+        size_t mid = left + (right - left) / 2;
+        if (SIMPLE_HASHTABLE_SORT_FUNCTION(ht->sorted.array[mid], value) < 0)
+            left = mid + 1;
+        else
+            right = mid;
+    }
+
+    return left;
+}
+
+static inline void simple_hashtable_add_value_sorted(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+    size_t index = simple_hashtable_sorted_binary_search(ht, value);
+
+    // Ensure there's enough space in the sorted array
+    if (ht->sorted.used >= ht->sorted.size) {
+        size_t size = ht->sorted.size ? ht->sorted.size * 2 : 64;
+        SIMPLE_HASHTABLE_VALUE_TYPE **array = mallocz(size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+        if(ht->sorted.array) {
+            memcpy(array, ht->sorted.array, ht->sorted.size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+            freez(ht->sorted.array);
+        }
+        ht->sorted.array = array;
+        ht->sorted.size = size;
+    }
+
+    // Use memmove to shift elements and create space for the new element
+    memmove(&ht->sorted.array[index + 1], &ht->sorted.array[index], (ht->sorted.used - index) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+
+    ht->sorted.array[index] = value;
+    ht->sorted.used++;
+}
+
+static inline void simple_hashtable_del_value_sorted(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+    size_t index = simple_hashtable_sorted_binary_search(ht, value);
+
+    // Check if the value exists at the found index
+    assert(index < ht->sorted.used && ht->sorted.array[index] == value);
+
+    // Use memmove to shift elements and close the gap
+    memmove(&ht->sorted.array[index], &ht->sorted.array[index + 1], (ht->sorted.used - index - 1) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+    ht->sorted.used--;
+}
+
+static inline void simple_hashtable_replace_value_sorted(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_VALUE_TYPE *old_value, SIMPLE_HASHTABLE_VALUE_TYPE *new_value) {
+    if(new_value == old_value)
+        return;
+
+    size_t old_value_index = simple_hashtable_sorted_binary_search(ht, old_value);
+    assert(old_value_index < ht->sorted.used && ht->sorted.array[old_value_index] == old_value);
+
+    int r = SIMPLE_HASHTABLE_SORT_FUNCTION(old_value, new_value);
+    if(r == 0) {
+        // Same value, so use the same index
+        ht->sorted.array[old_value_index] = new_value;
+        return;
+    }
+
+    size_t new_value_index = simple_hashtable_sorted_binary_search(ht, new_value);
+    if(old_value_index == new_value_index) {
+        // Not the same value, but still at the same index
+        ht->sorted.array[old_value_index] = new_value;
+        return;
+    }
+    else if (old_value_index < new_value_index) {
+        // The old value is before the new value
+        size_t shift_start = old_value_index + 1;
+        size_t shift_end = new_value_index - 1;
+        size_t shift_size = shift_end - old_value_index;
+
+        memmove(&ht->sorted.array[old_value_index], &ht->sorted.array[shift_start], shift_size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+        ht->sorted.array[shift_end] = new_value;
+    }
+    else {
+        // The old value is after the new value
+        size_t shift_start = new_value_index;
+        size_t shift_end = old_value_index;
+        size_t shift_size = shift_end - new_value_index;
+
+        memmove(&ht->sorted.array[new_value_index + 1], &ht->sorted.array[shift_start], shift_size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+        ht->sorted.array[new_value_index] = new_value;
+    }
+}
+
+static inline SIMPLE_HASHTABLE_VALUE_TYPE **simple_hashtable_sorted_array_first_read_only(SIMPLE_HASHTABLE *ht) {
+    if (ht->sorted.used > 0) {
+        return &ht->sorted.array[0];
+    }
+    return NULL;
+}
+
+static inline SIMPLE_HASHTABLE_VALUE_TYPE **simple_hashtable_sorted_array_next_read_only(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_VALUE_TYPE **last) {
+    if (!last) return NULL;
+
+    // Calculate the current position in the sorted array
+    size_t currentIndex = last - ht->sorted.array;
+
+    // Proceed to the next element if it exists
+    if (currentIndex + 1 < ht->sorted.used) {
+        return &ht->sorted.array[currentIndex + 1];
+    }
+
+    // If no more elements, return NULL
+    return NULL;
+}
+
+#define SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY(ht, name) \
+    for (SIMPLE_HASHTABLE_VALUE_TYPE **(name) = simple_hashtable_sorted_array_first_read_only(ht); \
+         name; \
+         (name) = simple_hashtable_sorted_array_next_read_only(ht, name))
+
+#define SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(name) (*(name))
+
+#else
+#define simple_hashtable_add_value_sorted(ht, value) do { ; } while(0)
+#define simple_hashtable_del_value_sorted(ht, value) do { ; } while(0)
+#define simple_hashtable_replace_value_sorted(ht, old_value, new_value) do { ; } while(0)
+#endif
+
 static void simple_hashtable_init(SIMPLE_HASHTABLE *ht, size_t size) {
-    ht->resizes = 0;
-    ht->used = 0;
+    memset(ht, 0, sizeof(*ht));
     ht->size = size;
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
 }
 
-static void simple_hashtable_free(SIMPLE_HASHTABLE *ht) {
+static void simple_hashtable_destroy(SIMPLE_HASHTABLE *ht) {
+#ifdef SIMPLE_HASHTABLE_SORT_FUNCTION
+    freez(ht->sorted.array);
+#endif
+
     freez(ht->hashtable);
-    ht->hashtable = NULL;
-    ht->size = 0;
-    ht->used = 0;
-    ht->resizes = 0;
+    memset(ht, 0, sizeof(*ht));
 }
 
 static inline void simple_hashtable_resize(SIMPLE_HASHTABLE *ht);
 
-#define SHTS_DATA_UNSET ((void *)NULL)
-#define SHTS_DATA_DELETED ((void *)0x01)
-#define SHTS_DATA_USERNULL ((void *)0x02)
+#define SHTS_DATA_UNSET ((SIMPLE_HASHTABLE_VALUE_TYPE *)NULL)
+#define SHTS_DATA_DELETED ((SIMPLE_HASHTABLE_VALUE_TYPE *)0x01)
+#define SHTS_DATA_USERNULL ((SIMPLE_HASHTABLE_VALUE_TYPE *)0x02)
 #define SHTS_IS_UNSET(sl) ((sl)->data == SHTS_DATA_UNSET)
 #define SHTS_IS_DELETED(sl) ((sl)->data == SHTS_DATA_DELETED)
 #define SHTS_IS_USERNULL(sl) ((sl)->data == SHTS_DATA_USERNULL)
@@ -71,7 +206,7 @@ static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE 
 
     ht->collisions++;
 
-    if(unlikely(resize && ht->size <= (ht->used << 4))) {
+    if(unlikely(resize && ht->size <= (ht->used << 1))) {
         simple_hashtable_resize(ht);
 
         slot = hash % ht->size;
@@ -105,11 +240,13 @@ static inline bool simple_hashtable_del_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTA
     ht->deletions++;
     ht->deleted++;
 
+    simple_hashtable_del_value_sorted(ht, SIMPLE_HASHTABLE_SLOT_DATA(sl));
+
     sl->data = SHTS_DATA_DELETED;
     return true;
 }
 
-static inline void simple_hashtable_set_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_SLOT *sl, SIMPLE_HASHTABLE_HASH hash, void *data) {
+static inline void simple_hashtable_set_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_SLOT *sl, SIMPLE_HASHTABLE_HASH hash, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
     if(data == NULL)
         data = SHTS_DATA_USERNULL;
 
@@ -118,11 +255,17 @@ static inline void simple_hashtable_set_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTA
         return;
     }
 
-    if(likely(SHTS_IS_UNSET(sl)))
+    if(likely(SHTS_IS_UNSET(sl))) {
+        simple_hashtable_add_value_sorted(ht, data);
         ht->used++;
+    }
 
-    else if(unlikely(SHTS_IS_DELETED(sl)))
+    else if(unlikely(SHTS_IS_DELETED(sl))) {
         ht->deleted--;
+    }
+
+    else
+        simple_hashtable_replace_value_sorted(ht, SIMPLE_HASHTABLE_SLOT_DATA(sl), data);
 
     sl->hash = hash;
     sl->data = data;
@@ -135,7 +278,7 @@ static inline void simple_hashtable_resize(SIMPLE_HASHTABLE *ht) {
     size_t old_size = ht->size;
 
     ht->resizes++;
-    ht->size = (ht->size << 3) - 1;
+    ht->size = (ht->size << 1) - 1;
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
     ht->used = ht->deleted = 0;
     for(size_t i = 0 ; i < old_size ; i++) {
@@ -151,25 +294,67 @@ static inline void simple_hashtable_resize(SIMPLE_HASHTABLE *ht) {
 }
 
 // ----------------------------------------------------------------------------
+// hashtable traversal, in read-only mode
+// the hashtable should not be modified while the traversal is taking place
+
+static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_first_read_only(SIMPLE_HASHTABLE *ht) {
+    for(size_t i = 0; i < ht->used ;i++) {
+        SIMPLE_HASHTABLE_SLOT *sl = &ht->hashtable[i];
+        if(!SIMPLE_HASHTABLE_SLOT_UNSET_OR_DELETED(sl))
+            return sl;
+    }
+
+    return NULL;
+}
+
+static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_next_read_only(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_SLOT *last) {
+    if (!last) return NULL;
+
+    // Calculate the current position in the array
+    size_t currentIndex = last - ht->hashtable;
+
+    // Iterate over the hashtable starting from the next element
+    for (size_t i = currentIndex + 1; i < ht->size; i++) {
+        SIMPLE_HASHTABLE_SLOT *sl = &ht->hashtable[i];
+        if (!SIMPLE_HASHTABLE_SLOT_UNSET_OR_DELETED(sl)) {
+            return sl;
+        }
+    }
+
+    // If no more data slots are found, return NULL
+    return NULL;
+}
+
+#define SIMPLE_HASHTABLE_FOREACH_READ_ONLY(ht, name) for(SIMPLE_HASHTABLE_SLOT *(name) = simple_hashtable_first_read_only(ht); \
+    name;                                                                                                             \
+    (name) = simple_hashtable_next_read_only(ht, name))
+
+#define SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(name) SIMPLE_HASHTABLE_SLOT_DATA(name)
+
+// ----------------------------------------------------------------------------
 // high level implementation
 
-static inline void *simple_hashtable_set(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, void *data) {
+#ifdef SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION
+
+static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_set(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
     XXH64_hash_t hash = XXH3_64bits(key, key_len);
     SIMPLE_HASHTABLE_SLOT *sl = simple_hashtable_get_slot(ht, hash, true);
     simple_hashtable_set_slot(ht, sl, hash, data);
     return SIMPLE_HASHTABLE_SLOT_DATA(sl);
 }
 
-static inline void *simple_hashtable_get(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, void *data) {
+static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_get(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
     XXH64_hash_t hash = XXH3_64bits(key, key_len);
     SIMPLE_HASHTABLE_SLOT *sl = simple_hashtable_get_slot(ht, hash, true);
     return SIMPLE_HASHTABLE_SLOT_DATA(sl);
 }
 
-static inline bool simple_hashtable_del(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, void *data) {
+static inline bool simple_hashtable_del(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
     XXH64_hash_t hash = XXH3_64bits(key, key_len);
     SIMPLE_HASHTABLE_SLOT *sl = simple_hashtable_get_slot(ht, hash, true);
     return simple_hashtable_del_slot(ht, sl);
 }
+
+#endif // SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION
 
 #endif //NETDATA_SIMPLE_HASHTABLE_H

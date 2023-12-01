@@ -72,6 +72,11 @@ static inline void freez(void *ptr) {
 
 // ----------------------------------------------------------------------------
 
+struct hashed_key;
+static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
+#define SIMPLE_HASHTABLE_SORT_FUNCTION compare_keys
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct hashed_key
+
 #define XXH_INLINE_ALL
 #include "../../libnetdata/xxhash.h"
 #include "../../libnetdata/simple_hashtable.h"
@@ -85,11 +90,9 @@ static inline void freez(void *ptr) {
 
 #define MAX_OUTPUT_KEYS 1024
 #define MAX_LINE_LENGTH (1024 * 1024)
-#define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 2)
 #define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
 #define MAX_REWRITES (MAX_OUTPUT_KEYS / 2)
 #define MAX_RENAMES (MAX_OUTPUT_KEYS / 2)
-#define MAX_KEY_DUPS_KEYS 20
 
 #define JOURNAL_MAX_KEY_LEN 64              // according to systemd-journald
 #define JOURNAL_MAX_VALUE_LEN (48 * 1024)   // according to systemd-journald
@@ -213,9 +216,6 @@ typedef enum __attribute__((__packed__)) {
     HK_RENAMES_CHECKED      = (1 << 4), // we checked once if there are renames on this key
     HK_HAS_RENAMES          = (1 << 5), // and we found there is a rename rule related to it
 
-    HK_DUPS_CHECKED         = (1 << 6), // we checked once if there are duplications for this key
-    HK_HAS_DUPS             = (1 << 7), // and we found there are duplication related to it
-
     // ephemeral flags - they are unset at the end of each log line
 
     HK_VALUE_FROM_LOG       = (1 << 14), // the value of this key has been read from the log (or from injection, duplication)
@@ -266,6 +266,10 @@ static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t le
 
 static inline bool hashed_keys_match(HASHED_KEY *k1, HASHED_KEY *k2) {
     return ((k1 == k2) || (k1->hash == k2->hash && strcmp(k1->key, k2->key) == 0));
+}
+
+static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2) {
+    return strcmp(k1->key, k2->key);
 }
 
 // ----------------------------------------------------------------------------
@@ -364,11 +368,6 @@ typedef struct log_job {
         size_t size;
         HASHED_KEY key;
     } line;
-
-    struct {
-        HASHED_KEY *keys[MAX_OUTPUT_KEYS];
-        size_t used;
-    } sorted;
 
     struct {
         SEARCH_PATTERN include;

@@ -10,13 +10,13 @@ void log_job_init(LOG_JOB *jb) {
     hashed_key_set(&jb->line.key, "LINE");
 }
 
-static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
-    for(size_t i = 0; i < ht->size ;i++) {
-        HASHED_KEY *k = SIMPLE_HASHTABLE_SLOT_DATA(&ht->hashtable[i]);
+static void simple_hashtable_cleanup_allocated_keys(SIMPLE_HASHTABLE *ht) {
+    SIMPLE_HASHTABLE_FOREACH_READ_ONLY(ht, sl) {
+        HASHED_KEY *k = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
         if(k && k->flags & HK_HASHTABLE_ALLOCATED) {
+            simple_hashtable_del_slot(ht, sl);
             hashed_key_cleanup(k);
             freez(k);
-            simple_hashtable_del_slot(ht, &ht->hashtable[i]);
         }
     }
 }
@@ -49,8 +49,8 @@ void log_job_cleanup(LOG_JOB *jb) {
     txt_cleanup(&jb->rewrites.tmp);
     txt_cleanup(&jb->filename.current);
 
-    simple_hashtable_cleanup_allocated(&jb->hashtable);
-    simple_hashtable_free(&jb->hashtable);
+    simple_hashtable_cleanup_allocated_keys(&jb->hashtable);
+    simple_hashtable_destroy(&jb->hashtable);
 
     // remove references to everything else, to reveal them in valgrind
     memset(jb, 0, sizeof(*jb));

@@ -61,27 +61,6 @@ const char journal_key_characters_map[256] = {
 
 // ----------------------------------------------------------------------------
 
-// Function to insert a key into the sorted.keys array while keeping it sorted
-void log_job_add_key_sorted(LOG_JOB *jb, HASHED_KEY *newKey) {
-    size_t i, j;
-
-    // Find the position to insert the new key based on lexicographic order
-    for (i = 0; i < jb->sorted.used; i++) {
-        if (strcmp(newKey->key, jb->sorted.keys[i]->key) < 0) {
-            break;
-        }
-    }
-
-    // Shift elements to the right to make space for the new key
-    for (j = jb->sorted.used; j > i; j--) {
-        jb->sorted.keys[j] = jb->sorted.keys[j - 1];
-    }
-
-    // Insert the new key at the correct position
-    jb->sorted.keys[i] = newKey;
-    jb->sorted.used++;
-}
-
 static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
     if(k->flags & HK_HASHTABLE_ALLOCATED)
         return k;
@@ -108,8 +87,6 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
             ht_key->flags = HK_HASHTABLE_ALLOCATED;
 
             simple_hashtable_set_slot(&jb->hashtable, slot, ht_key->hash, ht_key);
-
-            log_job_add_key_sorted(jb, ht_key);
         }
 
         k->hashtable_ptr = ht_key;
@@ -154,7 +131,7 @@ static inline void validate_key(LOG_JOB *jb __maybe_unused, HASHED_KEY *k) {
 
 // ----------------------------------------------------------------------------
 
-static inline size_t replace_evaluate_to_buffer(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN *rp, char *dst, size_t dst_size) {
+static inline size_t replace_evaluate_to_buffer(LOG_JOB *jb, HASHED_KEY *k __maybe_unused, REPLACE_PATTERN *rp, char *dst, size_t dst_size) {
     size_t remaining = dst_size;
     char *copy_to = dst;
 
@@ -312,15 +289,6 @@ static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char
     printf("\n");
 }
 
-static inline void send_key_value_and_rewrite(LOG_JOB *jb, HASHED_KEY *key, const char *value, size_t len) {
-    HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
-
-    txt_replace(&ht_key->value, value, len);
-    ht_key->flags |= HK_VALUE_FROM_LOG;
-
-//    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
-}
-
 inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *value, size_t len) {
     HASHED_KEY *ht_key = get_key_from_hashtable_with_char_ptr(jb, key);
     HASHED_KEY *nk = rename_key(jb, ht_key);
@@ -354,8 +322,8 @@ static inline void log_job_process_rewrites(LOG_JOB *jb) {
 }
 
 static inline void send_all_fields(LOG_JOB *jb) {
-    for(size_t i = 0; i < jb->sorted.used ;i++) {
-        HASHED_KEY *k = jb->sorted.keys[i];
+    SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY(&jb->hashtable, kptr) {
+        HASHED_KEY *k = SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(kptr);
 
         if(k->value.len) {
             // the key exists and has some value
