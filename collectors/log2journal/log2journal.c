@@ -89,9 +89,7 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
     if(!k->hashtable_ptr) {
         HASHED_KEY *ht_key;
         SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&jb->hashtable, k->hash, true);
-        if(slot->data) {
-            ht_key = slot->data;
-
+        if((ht_key = SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
             if(!(ht_key->flags & HK_COLLISION_CHECKED)) {
                 ht_key->flags |= HK_COLLISION_CHECKED;
 
@@ -109,9 +107,7 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
             ht_key->hash = k->hash;
             ht_key->flags = HK_HASHTABLE_ALLOCATED;
 
-            slot->hash = ht_key->hash;
-            slot->data = ht_key;
-            jb->hashtable.used++;
+            simple_hashtable_set_slot(&jb->hashtable, slot, ht_key->hash, ht_key);
 
             log_job_add_key_sorted(jb, ht_key);
         }

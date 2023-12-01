@@ -12,12 +12,11 @@ void log_job_init(LOG_JOB *jb) {
 
 static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
     for(size_t i = 0; i < ht->size ;i++) {
-        HASHED_KEY *k = ht->hashtable[i].data;
+        HASHED_KEY *k = SIMPLE_HASHTABLE_SLOT_DATA(&ht->hashtable[i]);
         if(k && k->flags & HK_HASHTABLE_ALLOCATED) {
             hashed_key_cleanup(k);
             freez(k);
-            ht->hashtable[i].data = NULL;
-            ht->hashtable[i].hash = 0;
+            simple_hashtable_delete_slot(ht, &ht->hashtable[i]);
         }
     }
 }

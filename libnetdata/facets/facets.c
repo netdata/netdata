@@ -411,16 +411,16 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const 
 
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
     SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, hash, true);
-    return slot->data;
+    return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VALUE * const tv) {
     SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, tv->hash, true);
 
-    if(slot->data) {
+    if(SIMPLE_HASHTABLE_SLOT_DATA(slot)) {
         // already exists
 
-        FACET_VALUE *v = slot->data;
+        FACET_VALUE *v = SIMPLE_HASHTABLE_SLOT_DATA(slot);
         FACET_VALUE_ADD_CONFLICT(k, v, tv);
         return v;
     }
@@ -428,9 +428,7 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     // we have to add it
 
     FACET_VALUE *v = mallocz(sizeof(*v));
-    slot->hash = tv->hash;
-    slot->data = v;
-    k->values.ht.used++;
+    simple_hashtable_set_slot(&k->values.ht, slot, tv->hash, v);
 
     memcpy(v, tv, sizeof(*v));
 
@@ -608,7 +606,7 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
     SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
-    return slot->data;
+    return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
 bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length) {
@@ -689,20 +687,18 @@ static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH has
 
     SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
 
-    if(unlikely(!slot->data)) {
+    if(unlikely(!SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
         // we have to add it
         FACET_KEY *k = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
 
-        slot->hash = hash;
-        slot->data = k;
-        facets->keys.ht.used++;
+        simple_hashtable_set_slot(&facets->keys.ht, slot, hash, k);
 
         return k;
     }
 
     // already in the index
 
-    FACET_KEY *k = slot->data;
+    FACET_KEY *k = SIMPLE_HASHTABLE_SLOT_DATA(slot);
 
     facet_key_set_name(k, name, name_length);
 
