@@ -344,6 +344,7 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/log/log.h
                      libnetdata/os.c
                      libnetdata/os.h
+                     libnetdata/simple_hashtable.h
                      libnetdata/endian.h
                      libnetdata/onewayalloc/onewayalloc.c
                      libnetdata/onewayalloc/onewayalloc.h
@@ -1546,7 +1547,19 @@ install(TARGETS systemd-cat-native
 pkg_check_modules(PCRE2 libpcre2-8)
 
 if(PCRE2_FOUND)
-        set(LOG2JOURNAL_FILES libnetdata/log/log2journal.c)
+        set(LOG2JOURNAL_FILES collectors/log2journal/log2journal.h
+                              collectors/log2journal/log2journal.c
+                              collectors/log2journal/log2journal-help.c
+                              collectors/log2journal/log2journal-yaml.c
+                              collectors/log2journal/log2journal-json.c
+                              collectors/log2journal/log2journal-logfmt.c
+                              collectors/log2journal/log2journal-pcre2.c
+                              collectors/log2journal/log2journal-params.c
+                              collectors/log2journal/log2journal-inject.c
+                              collectors/log2journal/log2journal-pattern.c
+                              collectors/log2journal/log2journal-replace.c
+                              collectors/log2journal/log2journal-rename.c
+                              collectors/log2journal/log2journal-rewrite.c)
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
         target_include_directories(log2journal BEFORE PUBLIC ${PCRE2_INCLUDE_DIRS})
@@ -1556,6 +1569,10 @@ if(PCRE2_FOUND)
         install(TARGETS log2journal
                 COMPONENT log2journal
                 DESTINATION usr/sbin)
+
+        install(DIRECTORY collectors/log2journal/log2journal.d
+                COMPONENT log2journal
+                DESTINATION usr/lib/netdata/conf.d)
 endif()
 
 #
