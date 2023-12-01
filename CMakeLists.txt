@@ -92,6 +92,7 @@ option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" True)
 option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" True)
 option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
 option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" True)
+option(ENABLE_PLUGIN_LOGS_MANAGEMENT "enable logs-management.plugin" True)
 
 option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "enable prometheus remote write exporter" True)
 option(ENABLE_EXPORTER_MONGODB "enable mongodb exporter" True)
@@ -840,6 +841,42 @@ set(PROC_PLUGIN_FILES collectors/proc.plugin/ipc.c
 
 set(TC_PLUGIN_FILES collectors/tc.plugin/plugin_tc.c)
 
+set(LOGS_MANAGEMENT_PLUGIN_FILES logsmanagement/circular_buffer.c
+                                 logsmanagement/circular_buffer.h
+                                 logsmanagement/db_api.c
+                                 logsmanagement/db_api.h
+                                 logsmanagement/defaults.h
+                                 logsmanagement/file_info.h
+                                 logsmanagement/flb_plugin.c
+                                 logsmanagement/flb_plugin.h
+                                 logsmanagement/functions.c
+                                 logsmanagement/functions.h
+                                 logsmanagement/helper.h
+                                 logsmanagement/logsmanag_config.c
+                                 logsmanagement/logsmanag_config.h
+                                 logsmanagement/logsmanagement.c
+                                 logsmanagement/parser.c
+                                 logsmanagement/parser.h
+                                 logsmanagement/query.c
+                                 logsmanagement/query.h
+                                 logsmanagement/rrd_api/rrd_api_docker_ev.c
+                                 logsmanagement/rrd_api/rrd_api_docker_ev.h
+                                 logsmanagement/rrd_api/rrd_api_generic.c
+                                 logsmanagement/rrd_api/rrd_api_generic.h
+                                 logsmanagement/rrd_api/rrd_api_kernel.c
+                                 logsmanagement/rrd_api/rrd_api_kernel.h
+                                 logsmanagement/rrd_api/rrd_api_mqtt.c
+                                 logsmanagement/rrd_api/rrd_api_mqtt.h
+                                 logsmanagement/rrd_api/rrd_api_stats.c
+                                 logsmanagement/rrd_api/rrd_api_stats.h
+                                 logsmanagement/rrd_api/rrd_api_systemd.c
+                                 logsmanagement/rrd_api/rrd_api_systemd.h
+                                 logsmanagement/rrd_api/rrd_api_web_log.c
+                                 logsmanagement/rrd_api/rrd_api_web_log.h
+                                 logsmanagement/rrd_api/rrd_api.h
+                                 database/sqlite/sqlite3.c
+                                 database/sqlite/sqlite3.h)
+
 set(NETDATA_FILES collectors/all.h
                   ${DAEMON_FILES}
                   ${API_PLUGIN_FILES}
@@ -1342,6 +1379,25 @@ if(ENABLE_PLUGIN_SLABINFO)
     install(TARGETS slabinfo.plugin
             COMPONENT slabinfo_plugin
             DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
+    add_executable(logs-management.plugin ${LOGS_MANAGEMENT_PLUGIN_FILES})
+    target_link_libraries(logs-management.plugin libnetdata)
+
+    install(TARGETS logs-management.plugin
+            COMPONENT logs_management_plugin
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    install(DIRECTORY logsmanagement/stock_conf/logsmanagement.d
+            COMPONENT logs_management_plugin
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(FILES logsmanagement/stock_conf/logsmanagement.d.conf
+            COMPONENT logs_management_plugin
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(DIRECTORY DESTINATION etc/netdata/logsmanagement.d)
 endif()
 
 if(ENABLE_PLUGIN_CUPS)
