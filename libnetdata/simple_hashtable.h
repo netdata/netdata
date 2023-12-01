@@ -3,6 +3,11 @@
 #ifndef NETDATA_SIMPLE_HASHTABLE_H
 #define NETDATA_SIMPLE_HASHTABLE_H
 
+#ifndef XXH_INLINE_ALL
+#define XXH_INLINE_ALL
+#endif
+#include "xxhash.h"
+
 typedef uint64_t SIMPLE_HASHTABLE_HASH;
 #define SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS 32
 
@@ -39,10 +44,18 @@ static void simple_hashtable_free(SIMPLE_HASHTABLE *ht) {
 
 static inline void simple_hashtable_resize(SIMPLE_HASHTABLE *ht);
 
-#define SHTS_IS_UNSET(sl) ((sl)->data == NULL)
-#define SHTS_IS_DELETED(sl) ((sl)->data == (void *)0x01)
-#define SIMPLE_HASHTABLE_SLOT_DATA(sl) ((SHTS_IS_UNSET(sl) || SHTS_IS_DELETED(sl)) ? NULL : (sl)->data)
+#define SHTS_DATA_UNSET ((void *)NULL)
+#define SHTS_DATA_DELETED ((void *)0x01)
+#define SHTS_DATA_USERNULL ((void *)0x02)
+#define SHTS_IS_UNSET(sl) ((sl)->data == SHTS_DATA_UNSET)
+#define SHTS_IS_DELETED(sl) ((sl)->data == SHTS_DATA_DELETED)
+#define SHTS_IS_USERNULL(sl) ((sl)->data == SHTS_DATA_USERNULL)
+#define SIMPLE_HASHTABLE_SLOT_DATA(sl) ((SHTS_IS_UNSET(sl) || SHTS_IS_DELETED(sl) || SHTS_IS_USERNULL(sl)) ? NULL : (sl)->data)
+#define SIMPLE_HASHTABLE_SLOT_UNSET_OR_DELETED(sl) ((SHTS_IS_UNSET(sl) || SHTS_IS_DELETED(sl)) ? NULL : (sl)->data)
 
+// IMPORTANT
+// The pointer returned by this call is valid up to the next call of this function (or the resize one)
+// If you need to cache something, cache the hash, not the slot pointer.
 static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_HASH hash, bool resize) {
     ht->searches++;
 
@@ -53,7 +66,7 @@ static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE 
     slot = hash % ht->size;
     sl = &ht->hashtable[slot];
     deleted = SHTS_IS_DELETED(sl) ? sl : NULL;
-    if(likely(!SIMPLE_HASHTABLE_SLOT_DATA(sl) || sl->hash == hash))
+    if(likely(!SIMPLE_HASHTABLE_SLOT_UNSET_OR_DELETED(sl) || sl->hash == hash))
         return (SHTS_IS_UNSET(sl) && deleted) ? deleted : sl;
 
     ht->collisions++;
@@ -64,7 +77,7 @@ static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE 
         slot = hash % ht->size;
         sl = &ht->hashtable[slot];
         deleted = (!deleted && SHTS_IS_DELETED(sl)) ? sl : deleted;
-        if(likely(!SIMPLE_HASHTABLE_SLOT_DATA(sl) || sl->hash == hash))
+        if(likely(!SIMPLE_HASHTABLE_SLOT_UNSET_OR_DELETED(sl) || sl->hash == hash))
             return (SHTS_IS_UNSET(sl) && deleted) ? deleted : sl;
 
         ht->collisions++;
@@ -75,7 +88,7 @@ static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE 
     deleted = (!deleted && SHTS_IS_DELETED(sl)) ? sl : deleted;
 
     // Linear probing until we find it
-    while (SIMPLE_HASHTABLE_SLOT_DATA(sl) && sl->hash != hash) {
+    while (SIMPLE_HASHTABLE_SLOT_UNSET_OR_DELETED(sl) && sl->hash != hash) {
         slot = (slot + 1) % ht->size;  // Wrap around if necessary
         sl = &ht->hashtable[slot];
         deleted = (!deleted && SHTS_IS_DELETED(sl)) ? sl : deleted;
@@ -85,19 +98,23 @@ static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE 
     return (SHTS_IS_UNSET(sl) && deleted) ? deleted : sl;
 }
 
-static inline void simple_hashtable_delete_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_SLOT *sl) {
+static inline bool simple_hashtable_del_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_SLOT *sl) {
     if(SHTS_IS_UNSET(sl) || SHTS_IS_DELETED(sl))
-        return;
+        return false;
 
     ht->deletions++;
     ht->deleted++;
 
-    sl->data = (void *)0x01;
+    sl->data = SHTS_DATA_DELETED;
+    return true;
 }
 
 static inline void simple_hashtable_set_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_SLOT *sl, SIMPLE_HASHTABLE_HASH hash, void *data) {
-    if(unlikely(data == NULL || data == (void *)0x01)) {
-        simple_hashtable_delete_slot(ht, data);
+    if(data == NULL)
+        data = SHTS_DATA_USERNULL;
+
+    if(unlikely(data == SHTS_DATA_UNSET || data == SHTS_DATA_DELETED)) {
+        simple_hashtable_del_slot(ht, sl);
         return;
     }
 
@@ -111,6 +128,8 @@ static inline void simple_hashtable_set_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTA
     sl->data = data;
 }
 
+// IMPORTANT
+// this call invalidates all SIMPLE_HASHTABLE_SLOT pointers
 static inline void simple_hashtable_resize(SIMPLE_HASHTABLE *ht) {
     SIMPLE_HASHTABLE_SLOT *old = ht->hashtable;
     size_t old_size = ht->size;
@@ -120,7 +139,7 @@ static inline void simple_hashtable_resize(SIMPLE_HASHTABLE *ht) {
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
     ht->used = ht->deleted = 0;
     for(size_t i = 0 ; i < old_size ; i++) {
-        if(!SIMPLE_HASHTABLE_SLOT_DATA(&old[i]))
+        if(!SIMPLE_HASHTABLE_SLOT_UNSET_OR_DELETED(&old[i]))
             continue;
 
         SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(ht, old[i].hash, false);
@@ -129,6 +148,28 @@ static inline void simple_hashtable_resize(SIMPLE_HASHTABLE *ht) {
     }
 
     freez(old);
+}
+
+// ----------------------------------------------------------------------------
+// high level implementation
+
+static inline void *simple_hashtable_set(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, void *data) {
+    XXH64_hash_t hash = XXH3_64bits(key, key_len);
+    SIMPLE_HASHTABLE_SLOT *sl = simple_hashtable_get_slot(ht, hash, true);
+    simple_hashtable_set_slot(ht, sl, hash, data);
+    return SIMPLE_HASHTABLE_SLOT_DATA(sl);
+}
+
+static inline void *simple_hashtable_get(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, void *data) {
+    XXH64_hash_t hash = XXH3_64bits(key, key_len);
+    SIMPLE_HASHTABLE_SLOT *sl = simple_hashtable_get_slot(ht, hash, true);
+    return SIMPLE_HASHTABLE_SLOT_DATA(sl);
+}
+
+static inline bool simple_hashtable_del(SIMPLE_HASHTABLE *ht, void *key, size_t key_len, void *data) {
+    XXH64_hash_t hash = XXH3_64bits(key, key_len);
+    SIMPLE_HASHTABLE_SLOT *sl = simple_hashtable_get_slot(ht, hash, true);
+    return simple_hashtable_del_slot(ht, sl);
 }
 
 #endif //NETDATA_SIMPLE_HASHTABLE_H

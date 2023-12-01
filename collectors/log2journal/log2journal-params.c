@@ -16,7 +16,7 @@ static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
         if(k && k->flags & HK_HASHTABLE_ALLOCATED) {
             hashed_key_cleanup(k);
             freez(k);
-            simple_hashtable_delete_slot(ht, &ht->hashtable[i]);
+            simple_hashtable_del_slot(ht, &ht->hashtable[i]);
         }
     }
 }
