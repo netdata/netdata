@@ -832,7 +832,7 @@ int mrg_unittest(void) {
     pthread_t th[threads];
     for(size_t i = 0; i < threads ; i++) {
         char buf[15 + 1];
-        snprintfz(buf, 15, "TH[%zu]", i);
+        snprintfz(buf, sizeof(buf) - 1, "TH[%zu]", i);
         netdata_thread_create(&th[i], buf,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                               mrg_stress, &t);

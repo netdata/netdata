@@ -15,9 +15,8 @@ struct proto_alert_status {
     uint64_t last_submitted_sequence_id;
 };
 
-void aclk_push_alert_event(struct aclk_sync_cfg_t *wc);
 void aclk_send_alarm_configuration (char *config_hash);
-int aclk_push_alert_config_event(char *node_id, char *config_hash);
+void aclk_push_alert_config_event(char *node_id, char *config_hash);
 void aclk_start_alert_streaming(char *node_id, bool resets);
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host);
 void sql_process_queue_removed_alerts_to_aclk(char *node_id);

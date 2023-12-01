@@ -384,7 +384,7 @@ static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n) {
     }
 
     char b[100+1], *s;
-    snprintfz(b, 100, NETDATA_DOUBLE_FORMAT, n);
+    snprintfz(b, sizeof(b) - 1, NETDATA_DOUBLE_FORMAT, n);
 
     s = &b[strlen(b) - 1];
     while(s > b && *s == '0') {

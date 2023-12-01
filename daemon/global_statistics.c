@@ -842,7 +842,7 @@ static void global_statistics_charts(void) {
 
             for(size_t tier = 0; tier < storage_tiers ;tier++) {
                 char buf[30 + 1];
-                snprintfz(buf, 30, "tier%zu", tier);
+                snprintfz(buf, sizeof(buf) - 1, "tier%zu", tier);
                 rds[tier] = rrddim_add(st_points_stored, buf, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
         }

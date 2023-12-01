@@ -14,70 +14,76 @@ const char *database_config[] = {
     "memory_mode INT DEFAULT 0, abbrev_timezone TEXT DEFAULT '', utc_offset INT NOT NULL DEFAULT 0,"
     "program_name TEXT NOT NULL DEFAULT 'unknown', program_version TEXT NOT NULL DEFAULT 'unknown', "
     "entries INT NOT NULL DEFAULT 0,"
-    "health_enabled INT NOT NULL DEFAULT 0, last_connected INT NOT NULL DEFAULT 0);",
+    "health_enabled INT NOT NULL DEFAULT 0, last_connected INT NOT NULL DEFAULT 0)",
 
     "CREATE TABLE IF NOT EXISTS chart(chart_id blob PRIMARY KEY, host_id blob, type text, id text, name text, "
     "family text, context text, title text, unit text, plugin text, module text, priority int, update_every int, "
-    "chart_type int, memory_mode int, history_entries);",
-    "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
-    "multiplier int, divisor int , algorithm int, options text);",
+    "chart_type int, memory_mode int, history_entries)",
 
-    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int);",
-    "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id);",
-    "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id);",
+    "CREATE TABLE IF NOT EXISTS dimension(dim_id blob PRIMARY KEY, chart_id blob, id text, name text, "
+    "multiplier int, divisor int , algorithm int, options text)",
+
+    "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int)",
+
+    "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id)",
+
+    "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",
+
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
-    "label_value text, date_created int, PRIMARY KEY (chart_id, label_key));",
-    "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created);",
+    "label_value text, date_created int, PRIMARY KEY (chart_id, label_key))",
+
+    "CREATE TABLE IF NOT EXISTS node_instance (host_id blob PRIMARY KEY, claim_id, node_id, date_created)",
+
     "CREATE TABLE IF NOT EXISTS alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "
     "on_key text, class text, component text, type text, os text, hosts text, lookup text, "
     "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
-    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, summary text);",
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, summary text)",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
-    "date_created INT, PRIMARY KEY(host_id, system_key));",
+    "date_created INT, PRIMARY KEY(host_id, system_key))",
 
     "CREATE TABLE IF NOT EXISTS host_label(host_id blob, source_type int, label_key text NOT NULL, "
-    "label_value text NOT NULL, date_created INT, PRIMARY KEY (host_id, label_key));",
+    "label_value text NOT NULL, date_created INT, PRIMARY KEY (host_id, label_key))",
 
     "CREATE TRIGGER IF NOT EXISTS ins_host AFTER INSERT ON host BEGIN INSERT INTO node_instance (host_id, date_created)"
-      " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END;",
+      " SELECT new.host_id, unixepoch() WHERE new.host_id NOT IN (SELECT host_id FROM node_instance); END",
 
     "CREATE TABLE IF NOT EXISTS health_log (health_log_id INTEGER PRIMARY KEY, host_id blob, alarm_id int, "
     "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
-    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id)) ;",
+    "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id))",
 
-    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)",
 
     "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
     "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
     "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
     "info text, exec_code int, new_status real, old_status real, delay int, "
-    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text);",
+    "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)",
 
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id);",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id);",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_5 ON health_log_detail (health_log_id, unique_id DESC);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_5 ON health_log_detail (health_log_id, unique_id DESC)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id);",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id);",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
     NULL
 };
 
 const char *database_cleanup[] = {
-    "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart);",
-    "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);",
-    "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host);",
-    "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host);",
-    "DROP TRIGGER IF EXISTS tr_dim_del;",
-    "DROP INDEX IF EXISTS ind_d1;",
-    "DROP INDEX IF EXISTS ind_c1;",
-    "DROP INDEX IF EXISTS ind_c2;",
-    "DROP INDEX IF EXISTS alert_hash_index;",
-    "DROP INDEX IF EXISTS health_log_d_ind_4;",
-    "DROP INDEX IF EXISTS health_log_d_ind_1;",
+    "DELETE FROM host WHERE host_id NOT IN (SELECT host_id FROM chart)",
+    "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host)",
+    "DELETE FROM host_info WHERE host_id NOT IN (SELECT host_id FROM host)",
+    "DELETE FROM host_label WHERE host_id NOT IN (SELECT host_id FROM host)",
+    "DROP TRIGGER IF EXISTS tr_dim_del",
+    "DROP INDEX IF EXISTS ind_d1",
+    "DROP INDEX IF EXISTS ind_c1",
+    "DROP INDEX IF EXISTS ind_c2",
+    "DROP INDEX IF EXISTS alert_hash_index",
+    "DROP INDEX IF EXISTS health_log_d_ind_4",
+    "DROP INDEX IF EXISTS health_log_d_ind_1",
     NULL
 };
 
@@ -202,42 +208,42 @@ int configure_sqlite_database(sqlite3 *database, int target_version)
 
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
-    snprintfz(buf, 1024, "PRAGMA auto_vacuum=%s;", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA auto_vacuum=%s", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
-    snprintfz(buf, 1024, "PRAGMA synchronous=%s;", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA synchronous=%s", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
-    snprintfz(buf, 1024, "PRAGMA journal_mode=%s;", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_mode=%s", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
-    snprintfz(buf, 1024, "PRAGMA temp_store=%s;", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA temp_store=%s", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
-    snprintfz(buf, 1024, "PRAGMA journal_size_limit=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
     if (init_database_batch(database, list))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
-    snprintfz(buf, 1024, "PRAGMA cache_size=%lld;", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA cache_size=%lld", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
     if (init_database_batch(database, list))
         return 1;
 
-    snprintfz(buf, 1024, "PRAGMA user_version=%d;", target_version);
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA user_version=%d", target_version);
     if (init_database_batch(database, list))
         return 1;
 
@@ -384,13 +390,13 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     int rc;
 
     if (likely(!memory)) {
-        snprintfz(sqlite_database, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
         rc = unlink(sqlite_database);
         snprintfz(sqlite_database, FILENAME_MAX, "%s/netdata-meta.db", netdata_configured_cache_dir);
 
         if (rc == 0 || (rebuild & DB_CHECK_RECOVER)) {
             char new_sqlite_database[FILENAME_MAX + 1];
-            snprintfz(new_sqlite_database, FILENAME_MAX, "%s/netdata-meta-recover.db", netdata_configured_cache_dir);
+            snprintfz(new_sqlite_database, sizeof(new_sqlite_database) - 1, "%s/netdata-meta-recover.db", netdata_configured_cache_dir);
             recover_database(sqlite_database, new_sqlite_database);
             if (rebuild & DB_CHECK_RECOVER)
                 return 0;
@@ -410,7 +416,7 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
 
     if (rebuild & DB_CHECK_RECLAIM_SPACE) {
         netdata_log_info("Reclaiming space of %s", sqlite_database);
-        rc = sqlite3_exec_monitored(db_meta, "VACUUM;", 0, 0, &err_msg);
+        rc = sqlite3_exec_monitored(db_meta, "VACUUM", 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             error_report("Failed to execute VACUUM rc = %d (%s)", rc, err_msg);
             sqlite3_free(err_msg);
@@ -565,7 +571,7 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         uuid_unparse_lower(*node_id, wc->node_id);
 }
 
-#define SQL_UPDATE_NODE_ID  "update node_instance set node_id = @node_id where host_id = @host_id;"
+#define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
 int update_node_id(uuid_t *host_id, uuid_t *node_id)
 {
@@ -617,7 +623,7 @@ failed:
     return rc - 1;
 }
 
-#define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL;"
+#define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL"
 
 int get_node_id(uuid_t *host_id, uuid_t *node_id)
 {
@@ -653,8 +659,9 @@ failed:
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
 
-#define SQL_INVALIDATE_NODE_INSTANCES "UPDATE node_instance SET node_id = NULL WHERE EXISTS " \
-    "(SELECT host_id FROM node_instance WHERE host_id = @host_id AND (@claim_id IS NULL OR claim_id <> @claim_id));"
+#define SQL_INVALIDATE_NODE_INSTANCES                                                                                  \
+    "UPDATE node_instance SET node_id = NULL WHERE EXISTS "                                                            \
+    "(SELECT host_id FROM node_instance WHERE host_id = @host_id AND (@claim_id IS NULL OR claim_id <> @claim_id))"
 
 void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
 {
@@ -698,8 +705,9 @@ failed:
         error_report("Failed to finalize the prepared statement when invalidating node instance information");
 }
 
-#define SQL_GET_NODE_INSTANCE_LIST "SELECT ni.node_id, ni.host_id, h.hostname " \
-    "FROM node_instance ni, host h WHERE ni.host_id = h.host_id AND h.hops >=0;"
+#define SQL_GET_NODE_INSTANCE_LIST                                                                                     \
+    "SELECT ni.node_id, ni.host_id, h.hostname "                                                                       \
+    "FROM node_instance ni, host h WHERE ni.host_id = h.host_id AND h.hops >=0"
 
 struct node_instance_list *get_node_list(void)
 {
@@ -768,7 +776,7 @@ failed:
     return node_list;
 };
 
-#define SQL_GET_HOST_NODE_ID "select node_id from node_instance where host_id = @host_id;"
+#define SQL_GET_HOST_NODE_ID "SELECT node_id FROM node_instance WHERE host_id = @host_id"
 
 void sql_load_node_id(RRDHOST *host)
 {
@@ -807,7 +815,7 @@ failed:
 };
 
 
-#define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id;"
+#define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id"
 
 void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info)
 {
@@ -838,7 +846,7 @@ skip:
 }
 
 #define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \
-    "AND label_key IS NOT NULL AND label_value IS NOT NULL;"
+    "AND label_key IS NOT NULL AND label_value IS NOT NULL"
 
 RRDLABELS *sql_load_host_labels(uuid_t *host_id)
 {
@@ -894,7 +902,7 @@ int sql_metadata_cache_stats(int op)
     return count;
 }
 
-#define SQL_DROP_TABLE "DROP table %s;"
+#define SQL_DROP_TABLE "DROP table %s"
 
 void sql_drop_table(const char *table)
 {
@@ -902,7 +910,7 @@ void sql_drop_table(const char *table)
         return;
 
     char wstr[255];
-    snprintfz(wstr, 254, SQL_DROP_TABLE, table);
+    snprintfz(wstr, sizeof(wstr) - 1, SQL_DROP_TABLE, table);
 
     int rc = sqlite3_exec_monitored(db_meta, wstr, 0, 0, NULL);
     if (rc != SQLITE_OK) {

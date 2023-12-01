@@ -930,10 +930,10 @@ void dbengine_init(char *hostname) {
         RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
         if(tier > 0) {
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
+            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu multihost disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu update every iterations", tier);
+            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
             grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
             if(grouping_iterations < 2) {
                 grouping_iterations = 2;
@@ -943,7 +943,7 @@ void dbengine_init(char *hostname) {
                        hostname, tier);
             }
 
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu backfill", tier);
+            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu backfill", tier);
             const char *bf = config_get(CONFIG_SECTION_DB, dbengineconfig, backfill == RRD_BACKFILL_NEW ? "new" : backfill == RRD_BACKFILL_FULL ? "full" : "none");
             if(strcmp(bf, "new") == 0) backfill = RRD_BACKFILL_NEW;
             else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;

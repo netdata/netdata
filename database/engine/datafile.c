@@ -160,7 +160,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
 
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintfz(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+    (void) snprintfz(str, maxlen - 1, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
                     datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 

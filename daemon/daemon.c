@@ -213,7 +213,7 @@ static void oom_score_adj(void) {
     // check the environment
     char *s = getenv("OOMScoreAdjust");
     if(!s || !*s) {
-        snprintfz(buf, 30, "%d", (int)wanted_score);
+        snprintfz(buf, sizeof(buf) - 1, "%d", (int)wanted_score);
         s = buf;
     }
 
@@ -248,7 +248,7 @@ static void oom_score_adj(void) {
     int written = 0;
     int fd = open("/proc/self/oom_score_adj", O_WRONLY);
     if(fd != -1) {
-        snprintfz(buf, 30, "%d", (int)wanted_score);
+        snprintfz(buf, sizeof(buf) - 1, "%d", (int)wanted_score);
         ssize_t len = strlen(buf);
         if(len > 0 && write(fd, buf, (size_t)len) == len) written = 1;
         close(fd);

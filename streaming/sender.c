@@ -31,7 +31,7 @@
 #define WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION    24
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 25
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 21
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
 
 extern struct config stream_config;

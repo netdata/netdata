@@ -1913,7 +1913,7 @@ int main(int argc, char **argv) {
 
         {
             char buf[20 + 1];
-            snprintfz(buf, 20, "%d", libuv_worker_threads);
+            snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
             setenv("UV_THREADPOOL_SIZE", buf, 1);
         }
 

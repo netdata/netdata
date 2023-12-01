@@ -42,7 +42,7 @@ void aral_judy_init(void) {
     for(size_t Words = 0; Words <= MAX_JUDY_SIZE_TO_ARAL; Words++)
         if(judy_sizes_config[Words]) {
             char buf[30+1];
-            snprintfz(buf, 30, "judy-%zu", Words * sizeof(Word_t));
+            snprintfz(buf, sizeof(buf) - 1, "judy-%zu", Words * sizeof(Word_t));
             judy_sizes_aral[Words] = aral_create(
                     buf,
                     Words * sizeof(Word_t),
