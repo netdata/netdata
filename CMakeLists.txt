@@ -1387,6 +1387,8 @@ if(ENABLE_PLUGIN_SLABINFO)
 endif()
 
 if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
+    set(ENABLE_LOGSMANAGEMENT True)
+
     if(ENABLE_LOGS_MANAGEMENT_TESTS)
         list(APPEND LOGS_MANAGEMENT_PLUGIN_FILES logsmanagement/unit_test/unit_test.c
                                                  logsmanagement/unit_test/unit_test.h)

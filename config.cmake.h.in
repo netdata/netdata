@@ -58,6 +58,7 @@
 #cmakedefine ENABLE_BROTLI
 #cmakedefine STORAGE_WITH_MATH
 
+#cmakedefine ENABLE_LOGSMANAGEMENT
 #cmakedefine ENABLE_LOGSMANAGEMENT_TESTS
 
 // enabled plugins
