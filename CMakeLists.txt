@@ -1318,6 +1318,10 @@ if(ENABLE_PLUGIN_APPS)
             DESTINATION usr/lib/netdata/conf.d)
 endif()
 
+if(CAP_FOUND)
+    set(HAVE_CAPABILITY True)
+endif()
+
 if(ENABLE_PLUGIN_FREEIPMI)
     pkg_check_modules(IPMI REQUIRED libipmimonitoring)
 

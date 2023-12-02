@@ -1133,7 +1133,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
 #endif
-#ifdef HAVE_SYS_CAPABILITY_H
+#ifdef HAVE_CAPABILITY
     build_info_set_status(BIB_LIB_LIBCAP, true);
 #endif
 #ifdef HAVE_CRYPTO

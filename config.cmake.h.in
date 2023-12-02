@@ -27,6 +27,8 @@
 #cmakedefine HAVE_STDINT_H
 #cmakedefine HAVE_SYS_CAPABILITY_H
 
+#cmakedefine HAVE_CAPABILITY
+
 // checked symbols
 
 #cmakedefine MAJOR_IN_SYSMACROS
