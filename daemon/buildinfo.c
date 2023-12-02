@@ -69,6 +69,7 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LZ4,
     BIB_LIB_ZSTD,
     BIB_LIB_ZLIB,
+    BIB_LIB_PROTOBUF,
     BIB_LIB_OPENSSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
@@ -649,6 +650,14 @@ static struct {
                 .json = "zlib",
                 .value = NULL,
         },
+        [BIB_LIB_PROTOBUF] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "protobuf",
+                .print = "protobuf (platform-neutral data serialization protocol)",
+                .json = "protobuf",
+                .value = NULL,
+        },
         [BIB_LIB_OPENSSL] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
@@ -1123,7 +1132,16 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_LIB_DLIB, true);
     build_info_set_value(BIB_LIB_DLIB, "bundled");
 #endif
-        
+
+#ifdef HAVE_PROTOBUF
+    build_info_set_status(BIB_LIB_PROTOBUF, true);
+#ifdef BUNDLED_PROTOBUF
+    build_info_set_value(BIB_LIB_PROTOBUF, "bundled");
+#else
+    build_info_set_value(BIB_LIB_PROTOBUF, "system");
+#endif
+#endif
+
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif

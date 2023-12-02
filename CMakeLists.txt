@@ -257,6 +257,10 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         endif()
 
         set(ENABLE_PROTOBUF True)
+        set(HAVE_PROTOBUF True)
+        if (ENABLE_BUNDLED_PROTOBUF)
+                set(BUNDLED_PROTOBUF True)
+        endif()
 endif()
 
 #

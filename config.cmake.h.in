@@ -28,6 +28,8 @@
 #cmakedefine HAVE_SYS_CAPABILITY_H
 
 #cmakedefine HAVE_CAPABILITY
+#cmakedefine HAVE_PROTOBUF
+#cmakedefine BUNDLED_PROTOBUF
 
 // checked symbols
 
