@@ -288,6 +288,7 @@ ENABLE_EBPF=1
 ENABLE_H2O=1
 ENABLE_CLOUD=1
 ENABLE_LOGS_MANAGEMENT=1
+ENABLE_LOGS_MANAGEMENT_TESTS=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -340,6 +341,7 @@ while [ -n "${1}" ]; do
       ;;
     "--enable-logs-management") ENABLE_LOGS_MANAGEMENT=1 ;;
     "--disable-logsmanagement") ENABLE_LOGS_MANAGEMENT=0 ;;
+    "--enable-logsmanagement-tests") ENABLE_LOGS_MANAGEMENT_TESTS=1 ;;
     "--disable-lto")
       # TODO: Needs CMake support
       ;;
@@ -1189,6 +1191,7 @@ enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
 enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
 enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
 enable_feature PLUGIN_LOGS_MANAGEMENT "${ENABLE_LOGS_MANAGEMENT}"
+enable_feature LOGS_MANAGEMENT_TESTS "${ENABLE_LOGS_MANAGEMENT_TESTS}"
 
 enable_feature ACLK "${ENABLE_CLOUD}"
 enable_feature CLOUD "${ENABLE_CLOUD}"

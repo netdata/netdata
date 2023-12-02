@@ -101,6 +101,8 @@ option(ENABLE_BUNDLED_JSONC "enable bundled json-c" False)
 option(ENABLE_BUNDLED_YAML "enable bundled yaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 
+option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
+
 #
 # detect OS
 #
@@ -1382,6 +1384,12 @@ if(ENABLE_PLUGIN_SLABINFO)
 endif()
 
 if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
+    if(ENABLE_LOGS_MANAGEMENT_TESTS)
+        list(APPEND LOGS_MANAGEMENT_PLUGIN_FILES logsmanagement/unit_test/unit_test.c
+                                                 logsmanagement/unit_test/unit_test.h)
+        set(ENABLE_LOGSMANAGEMENT_TESTS True)
+    endif()
+
     add_executable(logs-management.plugin ${LOGS_MANAGEMENT_PLUGIN_FILES})
     target_link_libraries(logs-management.plugin libnetdata)
 
