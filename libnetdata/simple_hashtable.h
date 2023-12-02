@@ -237,7 +237,7 @@ static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_get_slot_named(SIMPL
 
     ht->collisions++;
 
-    if(unlikely(resize && ht->size <= (ht->used << 1))) {
+    if(unlikely(resize && (ht->size <= (ht->used << 1) || ht->used >= ht->size))) {
         simple_hashtable_resize_named(ht);
 
         slot = hash % ht->size;
@@ -309,7 +309,7 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
     size_t old_size = ht->size;
 
     ht->resizes++;
-    ht->size = (ht->size << 1) - 1;
+    ht->size = (ht->size << 1) - ((ht->size > 16) ? 1 : 0);
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
     ht->used = ht->deleted = 0;
     for(size_t i = 0 ; i < old_size ; i++) {

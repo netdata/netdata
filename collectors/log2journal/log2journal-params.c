@@ -14,9 +14,10 @@ static void simple_hashtable_cleanup_allocated_keys(SIMPLE_HASHTABLE_KEY *ht) {
     SIMPLE_HASHTABLE_FOREACH_READ_ONLY(ht, sl, _KEY) {
         HASHED_KEY *k = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
         if(k && k->flags & HK_HASHTABLE_ALLOCATED) {
-            simple_hashtable_del_slot_KEY(ht, sl);
-            hashed_key_cleanup(k);
-            freez(k);
+            // the order of these statements is important!
+            simple_hashtable_del_slot_KEY(ht, sl); // remove any references to n
+            hashed_key_cleanup(k); // cleanup the internals of n
+            freez(k); // free n
         }
     }
 }

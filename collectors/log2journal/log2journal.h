@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 #include <stdarg.h>
 #include <assert.h>
 
@@ -42,9 +43,21 @@ static inline void *mallocz(size_t size) {
 }
 
 static inline void *callocz(size_t elements, size_t size) {
-    void *ptr = mallocz(elements * size);
-    memset(ptr, 0, elements * size);
+    void *ptr = calloc(elements, size);
+    if (!ptr) {
+        log2stderr("Fatal Error: Memory allocation failed. Requested size: %zu bytes.", elements * size);
+        exit(EXIT_FAILURE);
+    }
     return ptr;
+}
+
+static inline void *reallocz(void *ptr, size_t size) {
+    void *new_ptr = realloc(ptr, size);
+    if (!new_ptr) {
+        log2stderr("Fatal Error: Memory reallocation failed. Requested size: %zu bytes.", size);
+        exit(EXIT_FAILURE);
+    }
+    return new_ptr;
 }
 
 static inline char *strdupz(const char *s) {
@@ -193,13 +206,7 @@ static inline void txt_expand_and_append(TEXT *t, const char *s, size_t len) {
         if(new_size < t->size * 2)
             new_size = t->size * 2;
 
-        char *b = mallocz(new_size);
-        if(t->txt) {
-            memcpy(b, t->txt, t->len);
-            freez(t->txt);
-        }
-
-        t->txt = b;
+        t->txt = reallocz(t->txt, new_size);
         t->size = new_size;
     }
 

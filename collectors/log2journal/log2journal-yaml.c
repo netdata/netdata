@@ -2,6 +2,756 @@
 
 #include "log2journal.h"
 
+#define YAML_MAX_LINE (1024 * 64)
+#define YAML_MAX_NESTING 1024
+
+// ----------------------------------------------------------------------------
+// hashtable for CFG_KEY
+
+// cleanup hashtable defines
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H
+
+struct cfg_node;
+static inline int compare_cfg_nodes(struct cfg_node *n1, struct cfg_node *n2);
+#define SIMPLE_HASHTABLE_SORT_FUNCTION compare_cfg_nodes
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct cfg_node
+#define SIMPLE_HASHTABLE_NAME _CFG_NODE
+#define SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION 1
+#include "../../libnetdata/simple_hashtable.h"
+
+// ----------------------------------------------------------------------------
+
+typedef struct cfg_node CFG_NODE;
+typedef struct cfg_value CFG_VALUE;
+
+static inline void cfg_value_cleanup(CFG_VALUE *v);
+static inline XXH64_hash_t cfg_node_hash(CFG_NODE *n);
+
+// ----------------------------------------------------------------------------
+
+typedef struct cfg_key {
+    char *name;
+    XXH64_hash_t hash;
+    size_t len;
+} CFG_KEY;
+
+static inline void cfg_key_cleanup(CFG_KEY *k) {
+    assert(k);
+    freez(k->name);
+
+    memset(k, 0, sizeof(*k));
+}
+
+static inline void cfg_key_init(CFG_KEY *k, const char *key, size_t key_len) {
+    assert(key);
+
+    cfg_key_cleanup(k);
+
+    if(key && *key && key_len) {
+        k->name = strndupz(key, key_len);
+        k->len = key_len;
+        k->hash = XXH3_64bits(k->name, k->len);
+    }
+}
+
+static inline XXH64_hash_t cfg_key_hash(CFG_KEY *k) {
+    return k->hash;
+}
+
+// ----------------------------------------------------------------------------
+
+typedef enum {
+    CFG_NODE_ID_TYPE_NONE = 0,
+    CFG_NODE_ID_TYPE_NAMED,
+    CFG_NODE_ID_TYPE_NUMBERED,
+} CFG_NODE_ID_TYPE;
+
+typedef struct cfg_node_id {
+    CFG_NODE_ID_TYPE type;
+    union {
+        CFG_KEY key;
+        uint32_t number;
+    };
+} CFG_NODE_ID;
+
+static inline void cfg_node_id_cleanup(CFG_NODE_ID *id) {
+    assert(id);
+
+    if(id->type == CFG_NODE_ID_TYPE_NAMED)
+        cfg_key_cleanup(&id->key);
+
+    memset(id, 0, sizeof(*id));
+}
+
+static inline bool cfg_node_id_set_named(CFG_NODE_ID *id, const char *key, size_t key_len) {
+    assert(id);
+
+    if(id->type != CFG_NODE_ID_TYPE_NONE)
+        return false;
+
+    cfg_node_id_cleanup(id);
+
+    id->type = CFG_NODE_ID_TYPE_NAMED;
+    cfg_key_init(&id->key, key, key_len);
+    return true;
+}
+
+static inline bool cfg_node_id_set_numbered(CFG_NODE_ID *id, size_t number) {
+    assert(id);
+
+    if(id->type != CFG_NODE_ID_TYPE_NONE)
+        return false;
+
+    cfg_node_id_cleanup(id);
+
+    id->type = CFG_NODE_ID_TYPE_NUMBERED;
+    id->number = number;
+    return true;
+}
+
+static inline XXH64_hash_t cfg_node_id_hash(CFG_NODE_ID *id) {
+    return cfg_key_hash(&id->key);
+}
+
+// ----------------------------------------------------------------------------
+
+typedef struct cfg_value_map {
+    SIMPLE_HASHTABLE_CFG_NODE hashtable;
+} CFG_VALUE_MAP;
+
+static inline void cfg_value_map_cleanup(CFG_VALUE_MAP *map);
+static inline void cfg_value_map_init(CFG_VALUE_MAP *map) {
+    assert(map);
+    cfg_value_map_cleanup(map);
+    simple_hashtable_init_CFG_NODE(&map->hashtable, 1);
+}
+
+static inline void cfg_value_map_add_child(CFG_VALUE_MAP *map, CFG_NODE *child) {
+    SIMPLE_HASHTABLE_SLOT_CFG_NODE *sl = simple_hashtable_get_slot_CFG_NODE(&map->hashtable, cfg_node_hash(child), true);
+    simple_hashtable_set_slot_CFG_NODE(&map->hashtable, sl, cfg_node_hash(child), child);
+}
+
+// ----------------------------------------------------------------------------
+
+typedef struct cfg_value_array {
+    uint32_t size;
+    uint32_t used;
+    CFG_NODE **array;
+} CFG_VALUE_ARRAY;
+
+static inline void cfg_value_array_cleanup(CFG_VALUE_ARRAY *arr);
+static inline void cfg_value_array_init(CFG_VALUE_ARRAY *arr) {
+    assert(arr);
+    cfg_value_array_cleanup(arr);
+    // no need to initialize anything
+}
+
+static inline void cfg_value_array_add_child(CFG_VALUE_ARRAY *arr, CFG_NODE *child);
+
+// ----------------------------------------------------------------------------
+
+typedef enum {
+    CFG_NON = 0,
+    CFG_TXT,
+    CFG_U64,
+    CFG_I64,
+    CFG_DBL,
+    CFG_BLN,
+    CFG_MAP,
+    CFG_ARR,
+    CFG_LNK,
+} CFG_VALUE_TYPE;
+
+struct cfg_value {
+    CFG_VALUE_TYPE type;
+    union {
+        char           *txt;  // for strings
+        uint64_t        u64;
+        int64_t         i64;
+        double          dbl;  // for doubles
+        bool            bln;  // for booleans
+        CFG_VALUE_MAP   map;
+        CFG_VALUE_ARRAY arr;
+    } value;
+};
+
+static inline const char *cfg_value_type(CFG_VALUE_TYPE type) {
+    switch(type) {
+        default:
+        case CFG_NON:
+            return "empty";
+
+        case CFG_TXT:
+            return "text";
+
+        case CFG_U64:
+            return "unsigned integer";
+
+        case CFG_I64:
+            return "signed integer";
+
+        case CFG_DBL:
+            return "double";
+
+        case CFG_BLN:
+            return "boolean";
+
+        case CFG_MAP:
+            return "map";
+
+        case CFG_ARR:
+            return "array";
+
+        case CFG_LNK:
+            return "link";
+    }
+}
+
+static inline void cfg_value_cleanup(CFG_VALUE *v) {
+    assert(v);
+
+    switch(v->type) {
+        case CFG_TXT:
+            freez(v->value.txt);
+            v->value.txt = NULL;
+            break;
+
+        case CFG_NON:
+        case CFG_U64:
+        case CFG_I64:
+        case CFG_DBL:
+        case CFG_BLN:
+            break;
+
+        case CFG_MAP:
+            cfg_value_map_cleanup(&v->value.map);
+            break;
+
+        case CFG_ARR:
+            cfg_value_array_cleanup(&v->value.arr);
+            break;
+
+        case CFG_LNK:
+            // FIXME implement link cleanup
+            break;
+    }
+
+    memset(v, 0, sizeof(*v));
+}
+
+static inline bool cfg_value_make_array(CFG_VALUE *v) {
+    if(v->type != CFG_NON && v->type != CFG_ARR)
+        return false;
+
+    if(v->type == CFG_ARR)
+        return true;
+
+    v->type = CFG_ARR;
+    cfg_value_array_init(&v->value.arr);
+    return true;
+}
+
+static inline bool cfg_value_make_map(CFG_VALUE *v) {
+    if(v->type != CFG_NON && v->type != CFG_MAP)
+        return false;
+
+    if(v->type == CFG_MAP)
+        return true;
+
+    v->type = CFG_MAP;
+    cfg_value_map_init(&v->value.map);
+    return true;
+}
+
+static inline bool cfg_value_done(CFG_VALUE *v) {
+    return v->type != CFG_NON;
+}
+
+static inline bool cfg_value_add_child(CFG_VALUE *v, CFG_NODE *child);
+
+static inline bool cfg_value_set_literal(CFG_VALUE *v, const char *s, size_t len) {
+    assert(v || s || len);
+
+    if(v->type != CFG_NON)
+        return false;
+
+    cfg_value_cleanup(v);
+
+    v->type = CFG_TXT;
+    v->value.txt = strndupz(s, len);
+
+    // FIXME the text at this point includes everything including Block Scalars
+    // so, this needs to be parsed and the text needs to be extracted to support
+    // the full feature set of YAML.
+    // Also, we should automatically convert the literal to the right type,
+    // based on the value we find.
+
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+
+struct cfg_node {
+    CFG_NODE_ID id;
+    CFG_VALUE value;       // Node value
+};
+
+static inline void cfg_node_cleanup(CFG_NODE *n) {
+    assert(n);
+
+    cfg_node_id_cleanup(&n->id);
+    cfg_value_cleanup(&n->value);
+    memset(n, 0, sizeof(*n));
+}
+
+static inline void cfg_node_init(CFG_NODE *n) {
+    assert(n);
+    cfg_node_cleanup(n);
+}
+
+static inline CFG_NODE *cfg_node_create(void) {
+    return callocz(1, sizeof(CFG_NODE));
+}
+
+static inline void cfg_node_free(CFG_NODE *n) {
+    if(!n) return;
+
+    cfg_node_cleanup(n);
+    freez(n);
+}
+
+static inline bool cfg_node_make_array(CFG_NODE *n) {
+    return cfg_value_make_array(&n->value);
+}
+
+static inline bool cfg_node_make_map(CFG_NODE *n) {
+    return cfg_value_make_map(&n->value);
+}
+
+static inline bool cfg_node_done(CFG_NODE *n) {
+    return cfg_value_done(&n->value);
+}
+
+static inline bool cfg_node_add_child(CFG_NODE *n, CFG_NODE *child) {
+    return cfg_value_add_child(&n->value, child);
+}
+
+static inline XXH64_hash_t cfg_node_hash(CFG_NODE *n) {
+    return cfg_node_id_hash(&n->id);
+}
+
+static inline bool cfg_node_set_name(CFG_NODE *n, const char *key, size_t key_len) {
+    return cfg_node_id_set_named(&n->id, key, key_len);
+}
+
+static inline bool cfg_node_set_literal(CFG_NODE *n, const char *s, size_t len) {
+    return cfg_value_set_literal(&n->value, s, len);
+}
+
+static inline int compare_cfg_nodes(struct cfg_node *n1, struct cfg_node *n2) {
+    assert(n1->id.type == n2->id.type);
+    assert(n1->id.type == CFG_NODE_ID_TYPE_NAMED || n1->id.type == CFG_NODE_ID_TYPE_NUMBERED);
+
+    if(n1->id.type == CFG_NODE_ID_TYPE_NAMED)
+        return strcmp(n1->id.key.name, n2->id.key.name);
+
+    int a = (int)n1->id.number;
+    int b = (int)n2->id.number;
+
+    return a - b;
+}
+
+// ----------------------------------------------------------------------------
+// functions that need to have visibility on all structure definitions
+
+static inline void cfg_value_array_cleanup(CFG_VALUE_ARRAY *arr) {
+    assert(arr);
+    for(size_t i = 0; i < arr->used ;i++) {
+        cfg_node_cleanup(arr->array[i]);
+        freez(arr->array[i]);
+    }
+
+    freez(arr->array);
+    memset(arr, 0, sizeof(*arr));
+}
+
+static inline void cfg_value_map_cleanup(CFG_VALUE_MAP *map) {
+    assert(map);
+
+    SIMPLE_HASHTABLE_FOREACH_READ_ONLY(&map->hashtable, sl, _CFG_NODE) {
+        CFG_NODE *n = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
+        // the order of these statements is important!
+        simple_hashtable_del_slot_CFG_NODE(&map->hashtable, sl); // remove any references to n
+        cfg_node_cleanup(n); // cleanup all the internals of n
+        freez(n); // free n
+    }
+
+    simple_hashtable_destroy_CFG_NODE(&map->hashtable);
+    memset(map, 0, sizeof(*map));
+}
+
+static inline void cfg_value_array_add_child(CFG_VALUE_ARRAY *arr, CFG_NODE *child) {
+    if(arr->size <= arr->used) {
+        size_t new_size = arr->size ? arr->size * 2 : 1;
+        arr->array = reallocz(arr->array, new_size * sizeof(CFG_NODE *));
+        arr->size = new_size;
+    }
+
+    arr->array[arr->used++] = child;
+}
+
+static inline bool cfg_value_add_child(CFG_VALUE *v, CFG_NODE *child) {
+    switch(v->type) {
+        case CFG_ARR:
+            if(child->id.type != CFG_NODE_ID_TYPE_NUMBERED) return false;
+            cfg_value_array_add_child(&v->value.arr, child);
+            return true;
+
+        case CFG_MAP:
+            if(child->id.type != CFG_NODE_ID_TYPE_NAMED) return false;
+            cfg_value_map_add_child(&v->value.map, child);
+            return true;
+
+        default:
+            return false;
+    }
+
+    return false;
+}
+
+// ----------------------------------------------------------------------------
+
+typedef struct cfg {
+    SIMPLE_HASHTABLE_CFG_NODE hashtable;
+} CFG;
+
+static inline void cfg_cleanup(CFG *cfg) {
+    assert(cfg);
+
+    SIMPLE_HASHTABLE_FOREACH_READ_ONLY(&cfg->hashtable, sl, _CFG_NODE) {
+        CFG_NODE *n = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
+        // the order of these statements is important!
+        simple_hashtable_del_slot_CFG_NODE(&cfg->hashtable, sl); // remove any references to n
+        cfg_node_cleanup(n); // cleanup all the internals of n
+        freez(n); // free n
+    }
+
+    simple_hashtable_destroy_CFG_NODE(&cfg->hashtable);
+
+    memset(cfg, 0, sizeof(*cfg));
+}
+
+static inline void cfg_init(CFG *cfg) {
+    assert(cfg);
+
+    cfg_cleanup(cfg);
+    simple_hashtable_init_CFG_NODE(&cfg->hashtable, 1);
+}
+
+// ----------------------------------------------------------------------------
+
+// returning true means "append another line to the buffer and run me again"
+// remaining data are returned in endptr
+static inline bool parse_literal_after_keyword(const char *s, size_t len, const char **endptr) {
+    const char *e = &s[len - 1];
+
+    // trim trailing spaces and newlines
+    while(e > s && (isspace(*e) || *e == '\n' || *e == '\r')) e--;
+
+    // trim leading spaces
+    while(isspace(*s)) s++;
+
+    switch(*s) {
+        case '\'':
+            // single quote, possibly multiline string without processing escapes
+            // FIXME find a matching quote, otherwise we need more input
+
+        case '"':
+            // FIXME find a matching quote on the line
+            // if found, ignore everything after that.
+            // if not found, the last character should be a backslash
+            // otherwise through an error
+            if(*e == '\\')
+                return true;
+
+        case '|':
+            // FIXME block scalar - we need to compare indentation of the lines to find where the scalar ends
+
+        case '>':
+            // FIXME block scalar - we need to compare indentation of the lines to find where the scalar ends
+
+        case '-':
+            // FIXME special single-item list
+
+        case '[':
+            // FIXME start of array
+
+        case '{':
+            // FIXME start of object
+
+        case '&':
+        case '*':
+
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+
+struct yaml_parser_stack_entry {
+    CFG_NODE *node;
+    size_t indent;
+};
+
+typedef struct yaml_parser_state {
+    const char *txt;
+
+    struct {
+        size_t line;
+        const char *line_start;
+
+        CFG_NODE *node;
+
+        size_t pos;
+        size_t indent;
+    } current;
+
+    struct {
+        struct yaml_parser_stack_entry *array;
+        size_t depth;
+        size_t size;
+    } stack;
+
+    CFG *cfg;
+
+    char error[1024];
+} YAML_PARSER;
+
+static inline void yaml_push(YAML_PARSER *yp) {
+    assert(yp->current.node);
+    assert(yp->stack.array[yp->stack.depth - 1].node != yp->current.node);
+
+    if(yp->stack.depth >= yp->stack.size) {
+        size_t size = yp->stack.size ? yp->stack.size * 2 : 2;
+        yp->stack.array = reallocz(yp->stack.array, size * sizeof(*yp->stack.array));
+        yp->stack.size = size;
+    }
+
+    yp->stack.array[yp->stack.depth++] = (struct yaml_parser_stack_entry) {
+        .node = yp->current.node,
+        .indent = yp->current.indent,
+    };
+
+    yp->current.node = NULL;
+}
+
+static inline void yaml_pop(YAML_PARSER *yp) {
+    assert(yp->current.node != NULL);
+    assert(yp->stack.depth);
+
+    yp->stack.depth--;
+    yp->current.node = yp->stack.array[yp->stack.depth].node;
+    yp->current.indent = yp->stack.array[yp->stack.depth].indent;
+}
+
+static inline CFG_NODE *yaml_parent_node(YAML_PARSER *yp) {
+    assert(yp->stack.depth);
+    return yp->stack.array[yp->stack.depth - 1].node;
+}
+
+const char *yaml_current_pos(YAML_PARSER *yp) {
+    return &yp->txt[yp->current.pos];
+}
+
+static inline bool yaml_is_line_done(YAML_PARSER *yp) {
+    const char *s = yaml_current_pos(yp);
+    return !*s || *s == '\n' || strncmp(s, "\r\n", 2) == 0;
+}
+
+static inline bool yaml_next_token_start(YAML_PARSER *yp) {
+    const char *s = yaml_current_pos(yp);
+    bool at_line_start = (s == yp->current.line_start);
+
+    while(*s) {
+        if(*s == '\n') {
+            // line changed
+            yp->current.line++;
+            yp->current.line_start = ++s;
+            yp->current.indent = 0;
+            at_line_start = true;
+        }
+
+        else if(*s == ' ') {
+            // a space
+            if(at_line_start)
+                yp->current.indent++;
+
+            s++;
+        }
+
+        else if(*s == '#') {
+            // skip the comment
+            while(*s && *s != '\n')
+                s++;
+        }
+
+        else
+            break;
+    }
+
+    yp->current.pos += s - yaml_current_pos(yp);
+    return *s != '\0';
+}
+
+static inline bool yaml_parse_string_literal(YAML_PARSER *yp, const char *stop_chars) {
+    return false;
+}
+
+static inline bool yaml_parse_value(YAML_PARSER  *yp) {
+    return yaml_parse_string_literal(yp, NULL);
+}
+
+static inline bool yaml_parse_keyword(YAML_PARSER *yp, const char *stop_chars) {
+    return yaml_parse_string_literal(yp, stop_chars);
+}
+
+static inline CFG *cfg_parse_yaml(const char *txt) {
+    YAML_PARSER yaml_parser = {
+            .cfg = callocz(1, sizeof(CFG *)),
+    };
+    YAML_PARSER *yp = &yaml_parser;
+
+    cfg_init(yp->cfg);
+
+    // push the parent node into the stack
+    yp->current.node = cfg_node_create();
+    yaml_push(yp);
+
+    yp->current.line_start = txt;
+    yp->current.line = 1;
+    while(yaml_next_token_start(yp)) {
+        // expect a keyword or -
+
+        const char *s = yaml_current_pos(yp);
+        if(*s == '-') {
+            // the parent node must be an array
+            CFG_NODE *parent = yaml_parent_node(yp);
+            if(!cfg_node_make_array(parent)) {
+                if(!yp->error[0])
+                    snprintf(yp->error, sizeof(yp->error), "parent object is a %s; cannot switch it to %s",
+                             cfg_value_type(parent->value.type), cfg_value_type(CFG_ARR));
+                goto cleanup;
+            }
+
+            yp->current.pos++;
+
+            if(!yaml_next_token_start(yp)) {
+                if(!yp->error[0])
+                    snprintf(yp->error, sizeof(yp->error), "a - is handing around");
+                goto cleanup;
+            }
+        }
+        else {
+            // the parent node must be a map
+            CFG_NODE *parent = yaml_parent_node(yp);
+            if(!cfg_node_make_map(parent)) {
+                if(!yp->error[0])
+                    snprintf(yp->error, sizeof(yp->error), "parent object is a %s; cannot switch it to %s",
+                            cfg_value_type(parent->value.type), cfg_value_type(CFG_MAP));
+                goto cleanup;
+            }
+        }
+
+        if(!yaml_parse_keyword(yp, ":\n")) {
+            if(!yp->error[0])
+                snprintf(yp->error, sizeof(yp->error), "no keyword");
+            goto cleanup;
+        }
+
+        if(!yaml_next_token_start(yp)) {
+            if(!yp->error[0])
+                snprintf(yp->error, sizeof(yp->error), "document ended without assigning value");
+            goto cleanup;
+        }
+
+        if(!yaml_parse_value(yp)) {
+            if(!yp->error[0])
+                snprintf(yp->error, sizeof(yp->error), "cannot parse value");
+            goto cleanup;
+        }
+
+        CFG_NODE *parent = yaml_parent_node(yp);
+        if(!cfg_node_add_child(parent, yp->current.node)) {
+            if(!yp->error[0])
+                snprintf(yp->error, sizeof(yp->error), "parent node is %s and cannot accept children nodes.",
+                         cfg_value_type(parent->value.type));
+
+            goto cleanup;
+        }
+
+        yp->current.node = NULL;
+    }
+
+    if(yp->current.node) {
+        if(!yp->error[0])
+            snprintf(yp->error, sizeof(yp->error), "last node was not completed");
+
+        goto cleanup;
+    }
+
+    return yp->cfg;
+
+cleanup:
+    log2stderr("YAML PARSER: at line %zu: %s", yp->current.line, yp->error);
+    cfg_node_free(yp->current.node);
+    cfg_cleanup(yp->cfg);
+    freez(yp->cfg);
+    return NULL;
+}
+
+static char *cfg_load_file(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    char *buffer;
+    long length;
+
+    if (file == NULL) {
+        log2stderr("YAML: cannot open file '%s'", filename);
+        return NULL;
+    }
+
+    // Seek to the end of the file to determine its size
+    fseek(file, 0, SEEK_END);
+    length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    // Allocate memory for the entire content
+    buffer = mallocz(length + 1);
+
+    // Read the file into the buffer
+    if (fread(buffer, 1, length, file) != (size_t)length) {
+        log2stderr("YAML: cannot read file '%s'", filename);
+        free(buffer);
+        fclose(file);
+        return NULL;
+    }
+
+    // Null-terminate the buffer
+    buffer[length] = '\0';
+
+    fclose(file);
+    return buffer;
+}
+
+static inline CFG *cfg_parse_yaml_file(const char *filename) {
+    const char *s = cfg_load_file(filename);
+    CFG *cfg = cfg_parse_yaml(s);
+    freez((void *)s);
+    return cfg;
+}
+
 // ----------------------------------------------------------------------------
 // yaml configuration file
 
@@ -773,6 +1523,8 @@ cleanup:
 }
 
 bool yaml_parse_file(const char *config_file_path, LOG_JOB *jb) {
+    // cfg_parse_yaml_file(config_file_path);
+
     if(!config_file_path || !*config_file_path) {
         log2stderr("yaml configuration filename cannot be empty.");
         return false;
