@@ -66,6 +66,9 @@ typedef enum __attribute__((packed)) {
     BIB_CONNECTIVITY_WEBRTC,
     BIB_CONNECTIVITY_NATIVE_HTTPS,
     BIB_CONNECTIVITY_TLS_HOST_VERIFY,
+    BIB_LIB_LZ4,
+    BIB_LIB_ZSTD,
+    BIB_LIB_ZLIB,
     BIB_LIB_OPENSSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
@@ -622,6 +625,30 @@ static struct {
                 .json = "tls-host-verify",
                 .value = NULL,
         },
+        [BIB_LIB_LZ4] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "LZ4 (extremely fast lossless compression algorithm)",
+                .json = "lz4",
+                .value = NULL,
+        },
+        [BIB_LIB_ZSTD] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "ZSTD (fast, lossless compression algorithm)",
+                .json = "zstd",
+                .value = NULL,
+        },
+        [BIB_LIB_ZLIB] = {
+                .category = BIC_LIBS,
+                .type = BIT_BOOLEAN,
+                .analytics = "zlib",
+                .print = "zlib (lossless data-compression library)",
+                .json = "zlib",
+                .value = NULL,
+        },
         [BIB_LIB_OPENSSL] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
@@ -1041,6 +1068,16 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_FEATURE_REPLICATION, true);
 
     build_info_set_status(BIB_FEATURE_STREAMING_COMPRESSION, true);
+
+#ifdef ENABLE_BROTLI
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "brotli");
+#endif
+#ifdef ENABLE_ZSTD
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "zstd");
+#endif
+#ifdef ENABLE_LZ4
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "lz4");
+#endif
     build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "gzip");
 
     build_info_set_status(BIB_FEATURE_CONTEXTS, true);
@@ -1073,6 +1110,19 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_CONNECTIVITY_TLS_HOST_VERIFY, true);
 #endif
 
+#ifdef ENABLE_LZ4
+    build_info_set_status(BIB_LIB_LZ4, true);
+#endif
+#ifdef ENABLE_ZSTD
+    build_info_set_status(BIB_LIB_ZSTD, true);
+#endif
+
+    build_info_set_status(BIB_LIB_ZLIB, true);
+
+#ifdef HAVE_DLIB
+    build_info_set_status(BIB_LIB_DLIB, true);
+    build_info_set_value(BIB_LIB_DLIB, "bundled");
+#endif
         
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
