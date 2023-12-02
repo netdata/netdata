@@ -113,13 +113,16 @@ set(MACOS   False)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         set(MACOS True)
+        set(COMPILED_FOR_MACOS True)
 
         find_library(IOKIT IOKit)
         find_library(FOUNDATION Foundation)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
         set(FREEBSD True)
+        set(COMPILED_FOR_FREEBSD True)
 else()
         set(LINUX True)
+        set(COMPILED_FOR_LINUX True)
         add_definitions(-D_GNU_SOURCE)
 endif()
 

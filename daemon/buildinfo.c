@@ -44,6 +44,7 @@ typedef enum __attribute__((packed)) {
     BIB_CONTAINER_OS_VERSION,
     BIB_CONTAINER_OS_VERSION_ID,
     BIB_CONTAINER_OS_DETECTION,
+    BIB_FEATURE_BUILT_FOR,
     BIB_FEATURE_CLOUD,
     BIB_FEATURE_HEALTH,
     BIB_FEATURE_STREAMING,
@@ -71,7 +72,10 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LIBCAP,
     BIB_LIB_LIBCRYPTO,
     BIB_PLUGIN_APPS,
+    BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
+    BIB_PLUGIN_LINUX_PROC,
+    BIB_PLUGIN_LINUX_TC,
     BIB_PLUGIN_LINUX_DISKSPACE,
     BIB_PLUGIN_FREEBSD,
     BIB_PLUGIN_MACOS,
@@ -442,6 +446,14 @@ static struct {
                 .json = "detection",
                 .value = "unknown",
         },
+        [BIB_FEATURE_BUILT_FOR] = {
+                .category = BIC_FEATURE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Built For",
+                .json = "built-for",
+                .value = "unknown",
+        },
         [BIB_FEATURE_CLOUD] = {
                 .category = BIC_FEATURE,
                 .type = BIT_BOOLEAN,
@@ -658,12 +670,36 @@ static struct {
                 .json = "apps",
                 .value = NULL,
         },
+        [BIB_PLUGIN_LINUX_CGROUPS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "cgroups (monitor containers and VMs)",
+                .json = "cgroups",
+                .value = NULL,
+        },
         [BIB_PLUGIN_LINUX_CGROUP_NETWORK] = {
                 .category = BIC_PLUGINS,
                 .type = BIT_BOOLEAN,
                 .analytics = "cgroup Network Tracking",
                 .print = "cgroup-network (associate interfaces to CGROUPS)",
                 .json = "cgroup-network",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_LINUX_PROC] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "proc (monitor Linux systems)",
+                .json = "proc",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_LINUX_TC] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = NULL,
+                .print = "tc (monitor Linux network QoS)",
+                .json = "tc",
                 .value = NULL,
         },
         [BIB_PLUGIN_LINUX_DISKSPACE] = {
@@ -967,6 +1003,25 @@ static void build_info_set_status(BUILD_INFO_SLOT slot, bool status) {
 __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, program_version);
     build_info_set_value(BIB_PACKAGING_CONFIGURE_OPTIONS, CONFIGURE_COMMAND);
+
+#ifdef COMPILED_FOR_LINUX
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Linux");
+    build_info_set_status(BIB_PLUGIN_LINUX_CGROUPS, true);
+    build_info_set_status(BIB_PLUGIN_LINUX_PROC, true);
+    build_info_set_status(BIB_PLUGIN_LINUX_DISKSPACE, true);
+    build_info_set_status(BIB_PLUGIN_LINUX_TC, true);
+#endif
+#ifdef COMPILED_FOR_FREEBSD
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "FreeBSD");
+    build_info_set_status(BIB_PLUGIN_FREEBSD, true);
+#endif
+#ifdef COMPILED_FOR_MACOS
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
+    build_info_set_status(BIB_PLUGIN_MACOS, true);
+#endif
 
 #ifdef ENABLE_ACLK
     build_info_set_status(BIB_FEATURE_CLOUD, true);

@@ -6,6 +6,11 @@
 #define __always_unused __attribute__((unused))
 #define __maybe_unused __attribute__((unused))
 
+// platform
+#cmakedefine COMPILED_FOR_FREEBSD
+#cmakedefine COMPILED_FOR_LINUX
+#cmakedefine COMPILED_FOR_MACOS
+
 // checked headers
 
 #cmakedefine HAVE_NETINET_IN_H
