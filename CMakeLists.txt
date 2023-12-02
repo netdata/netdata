@@ -202,6 +202,7 @@ int main() {
 " STRERROR_R_CHAR_P)
 
 # openssl/crypto
+set(ENABLE_OPENSSL True)
 if(NOT MACOS)
         pkg_check_modules(CRYPTO libcrypto)
         pkg_check_modules(OPENSSL REQUIRED openssl)
@@ -1667,7 +1668,6 @@ install(TARGETS netdatacli
 add_definitions(-DHAVE_CONFIG_H)
 
 set(STORAGE_WITH_MATH On)
-set(ENABLE_HTTPS On)
 
 set(CACHE_DIR "${CMAKE_INSTALL_PREFIX}/var/cache/netdata")
 set(CONFIG_DIR "${CMAKE_INSTALL_PREFIX}/etc/netdata")
