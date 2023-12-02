@@ -66,7 +66,7 @@ void analytics_exporting_connectors(BUFFER *b)
 #endif
                 break;
             case EXPORTING_CONNECTOR_TYPE_MONGODB:
-#if HAVE_MONGOC
+#ifdef HAVE_MONGOC
                 buffer_strcat(b, "MongoDB");
 #endif
                 break;

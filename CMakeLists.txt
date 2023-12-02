@@ -1540,6 +1540,7 @@ endif()
 
 if(ENABLE_EXPORTER_MONGODB)
         pkg_check_modules(MONGOC REQUIRED libmongoc-1.0)
+        set(HAVE_MONGOC True)
 endif()
 
 if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
@@ -1575,14 +1576,14 @@ add_executable(netdata
         ${NETDATA_FILES}
         "$<$<BOOL:${ENABLE_ACLK}>:${ACLK_FILES}>"
         "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
-        "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
 )
 
 target_compile_definitions(netdata PRIVATE
         "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
-        "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_CFLAGS_OTHER}>"
 )
 
@@ -1592,7 +1593,7 @@ target_include_directories(netdata PRIVATE
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include>"
         "$<$<BOOL:${ENABLE_ML}>:${CMAKE_SOURCE_DIR}/ml/dlib>"
-        "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )
 
@@ -1602,7 +1603,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${LINUX}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
         "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_LIBRARIES}>"
-        "$<$<BOOL:${ENABLE_EXPORTING_MONGODB}>:${MONGOC_LIBRARIES}>"
+        "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
 )

@@ -30,6 +30,7 @@
 #cmakedefine HAVE_CAPABILITY
 #cmakedefine HAVE_PROTOBUF
 #cmakedefine BUNDLED_PROTOBUF
+#cmakedefine HAVE_MONGOC
 
 // checked symbols
 

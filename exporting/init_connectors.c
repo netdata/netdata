@@ -17,7 +17,7 @@
 #include "pubsub/pubsub.h"
 #endif
 
-#if HAVE_MONGOC
+#ifdef HAVE_MONGOC
 #include "mongodb/mongodb.h"
 #endif
 
@@ -79,7 +79,7 @@ int init_connectors(struct engine *engine)
 #endif
                 break;
             case EXPORTING_CONNECTOR_TYPE_MONGODB:
-#if HAVE_MONGOC
+#ifdef HAVE_MONGOC
                 if (init_mongodb_instance(instance) != 0)
                     return 1;
 #endif
