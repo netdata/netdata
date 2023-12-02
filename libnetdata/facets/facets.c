@@ -99,7 +99,9 @@ static inline bool is_valid_string_hash(const char *s) {
 }
 
 // ----------------------------------------------------------------------------
+// hashtable for FACET_VALUE
 
+// cleanup hashtable defines
 #undef SIMPLE_HASHTABLE_SORT_FUNCTION
 #undef SIMPLE_HASHTABLE_VALUE_TYPE
 #undef SIMPLE_HASHTABLE_NAME
@@ -111,6 +113,10 @@ struct facet_value;
 #define SIMPLE_HASHTABLE_NAME _VALUE
 #include "../simple_hashtable.h"
 
+// ----------------------------------------------------------------------------
+// hashtable for FACET_KEY
+
+// cleanup hashtable defines
 #undef SIMPLE_HASHTABLE_SORT_FUNCTION
 #undef SIMPLE_HASHTABLE_VALUE_TYPE
 #undef SIMPLE_HASHTABLE_NAME
@@ -121,6 +127,8 @@ struct facet_key;
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_key
 #define SIMPLE_HASHTABLE_NAME _KEY
 #include "../simple_hashtable.h"
+
+// ----------------------------------------------------------------------------
 
 typedef struct facet_value {
     FACETS_HASH hash;

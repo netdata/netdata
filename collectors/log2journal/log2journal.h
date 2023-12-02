@@ -72,6 +72,20 @@ static inline void freez(void *ptr) {
 
 // ----------------------------------------------------------------------------
 
+#define XXH_INLINE_ALL
+#include "../../libnetdata/xxhash.h"
+
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
+
+#ifdef HAVE_LIBYAML
+#include <yaml.h>
+#endif
+
+// ----------------------------------------------------------------------------
+// hashtable for HASHED_KEY
+
+// cleanup hashtable defines
 #undef SIMPLE_HASHTABLE_SORT_FUNCTION
 #undef SIMPLE_HASHTABLE_VALUE_TYPE
 #undef SIMPLE_HASHTABLE_NAME
@@ -82,17 +96,9 @@ static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
 #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_keys
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct hashed_key
 #define SIMPLE_HASHTABLE_NAME _KEY
-
-#define XXH_INLINE_ALL
-#include "../../libnetdata/xxhash.h"
 #include "../../libnetdata/simple_hashtable.h"
 
-#define PCRE2_CODE_UNIT_WIDTH 8
-#include <pcre2.h>
-
-#ifdef HAVE_LIBYAML
-#include <yaml.h>
-#endif
+// ----------------------------------------------------------------------------
 
 #define MAX_OUTPUT_KEYS 1024
 #define MAX_LINE_LENGTH (1024 * 1024)
