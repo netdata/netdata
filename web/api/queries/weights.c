@@ -112,7 +112,7 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
 
     // we can use the pointer address or RMA as a unique key for each metric
     char buf[20 + 1];
-    ssize_t len = snprintfz(buf, 20, "%p", rma);
+    ssize_t len = snprintfz(buf, sizeof(buf) - 1, "%p", rma);
     dictionary_set_advanced(results, buf, len + 1, &t, sizeof(struct register_result), NULL);
 }
 
@@ -717,7 +717,7 @@ static inline struct dict_unique_name_units *dict_unique_name_units_add(DICTIONA
 
 static inline struct dict_unique_id_name *dict_unique_id_name_add(DICTIONARY *dict, const char *id, const char *name, ssize_t *max_id) {
     char key[1024 + 1];
-    snprintfz(key, 1024, "%s:%s", id, name);
+    snprintfz(key, sizeof(key) - 1, "%s:%s", id, name);
     struct dict_unique_id_name *dun = dictionary_set(dict, key, NULL, sizeof(struct dict_unique_id_name));
     if(!dun->existing) {
         dun->existing = true;
@@ -2047,7 +2047,7 @@ print("\nprob", prob)
 
 static int double_expect(double v, const char *str, const char *descr) {
     char buf[100 + 1];
-    snprintfz(buf, 100, "%0.6f", v);
+    snprintfz(buf, sizeof(buf) - 1, "%0.6f", v);
     int ret = strcmp(buf, str) ? 1 : 0;
 
     fprintf(stderr, "%s %s, expected %s, got %s\n", ret?"FAILED":"OK", descr, str, buf);

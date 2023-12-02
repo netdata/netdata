@@ -1039,7 +1039,7 @@ static bool epdl_populate_pages_from_extent_data(
 
         if(!page_length || !start_time_s) {
             char log[200 + 1];
-            snprintfz(log, 200, "page %u (out of %u) is EMPTY", i, count);
+            snprintfz(log, sizeof(log) - 1, "page %u (out of %u) is EMPTY", i, count);
             epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
             continue;
         }
@@ -1048,7 +1048,7 @@ static bool epdl_populate_pages_from_extent_data(
         Word_t metric_id = (Word_t)metric;
         if(!metric) {
             char log[200 + 1];
-            snprintfz(log, 200, "page %u (out of %u) has unknown UUID", i, count);
+            snprintfz(log, sizeof(log) - 1, "page %u (out of %u) has unknown UUID", i, count);
             epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
             continue;
         }
@@ -1082,7 +1082,7 @@ static bool epdl_populate_pages_from_extent_data(
             else {
                 if (unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
                     char log[200 + 1];
-                    snprintfz(log, 200, "page %u (out of %u) offset %u + page length %zu, "
+                    snprintfz(log, sizeof(log) - 1, "page %u (out of %u) offset %u + page length %zu, "
                                         "exceeds the uncompressed buffer size %u",
                                         i, count, page_offset, vd.page_length, uncompressed_payload_length);
                     epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);

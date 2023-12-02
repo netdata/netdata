@@ -1803,7 +1803,7 @@ PGC *pgc_create(const char *name,
     cache->aral = callocz(cache->config.partitions, sizeof(ARAL *));
     for(size_t part = 0; part < cache->config.partitions ; part++) {
         char buf[100 +1];
-        snprintfz(buf, 100, "%s[%zu]", name, part);
+        snprintfz(buf, sizeof(buf) - 1, "%s[%zu]", name, part);
         cache->aral[part] = aral_create(
                 buf,
                 sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
@@ -1862,9 +1862,6 @@ void pgc_destroy(PGC *cache) {
 
         freez(cache->aral);
 #endif
-
-        // TODO: @stelfrag/@ktsaou is this correct? address sanitizer says
-        // we miss memory without this on shutdown.
         freez(cache->index);
         freez(cache);
     }
@@ -2522,7 +2519,7 @@ void unittest_stress_test(void) {
     for(size_t i = 0; i < pgc_uts.collect_threads ;i++) {
         collect_thread_ids[i] = i;
         char buffer[100 + 1];
-        snprintfz(buffer, 100, "COLLECT_%zu", i);
+        snprintfz(buffer, sizeof(buffer) - 1, "COLLECT_%zu", i);
         netdata_thread_create(&collect_threads[i], buffer,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                               unittest_stress_test_collector, &collect_thread_ids[i]);
@@ -2534,7 +2531,7 @@ void unittest_stress_test(void) {
     for(size_t i = 0; i < pgc_uts.query_threads ;i++) {
         query_thread_ids[i] = i;
         char buffer[100 + 1];
-        snprintfz(buffer, 100, "QUERY_%zu", i);
+        snprintfz(buffer, sizeof(buffer) - 1, "QUERY_%zu", i);
         initstate_r(1, pgc_uts.rand_statebufs, 1024, &pgc_uts.random_data[i]);
         netdata_thread_create(&queries_threads[i], buffer,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,

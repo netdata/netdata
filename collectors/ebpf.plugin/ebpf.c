@@ -3803,7 +3803,7 @@ static void ebpf_create_statistic_charts(int update_every)
             continue;
 
         em->functions.order_thread_chart = j;
-        snprintfz(name, 255,"%s_%s", NETDATA_EBPF_THREADS, em->info.thread_name);
+        snprintfz(name, sizeof(name) - 1, "%s_%s", NETDATA_EBPF_THREADS, em->info.thread_name);
         em->functions.fcnt_thread_chart_name = strdupz(name);
         ebpf_create_thread_chart(name,
                                  "Threads running.",
@@ -3816,7 +3816,7 @@ static void ebpf_create_statistic_charts(int update_every)
 #endif
 
         em->functions.order_thread_lifetime = j;
-        snprintfz(name, 255,"%s_%s", NETDATA_EBPF_LIFE_TIME, em->info.thread_name);
+        snprintfz(name, sizeof(name) - 1, "%s_%s", NETDATA_EBPF_LIFE_TIME, em->info.thread_name);
         em->functions.fcnt_thread_lifetime_name = strdupz(name);
         ebpf_create_thread_chart(name,
                                  "Time remaining for thread.",

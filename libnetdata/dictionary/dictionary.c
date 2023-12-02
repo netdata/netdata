@@ -2627,7 +2627,7 @@ static char **dictionary_unittest_generate_names(size_t entries) {
     char **names = mallocz(sizeof(char *) * entries);
     for(size_t i = 0; i < entries ;i++) {
         char buf[25 + 1] = "";
-        snprintfz(buf, 25, "name.%zu.0123456789.%zu!@#$%%^&*(),./[]{}\\|~`", i, entries / 2 + i);
+        snprintfz(buf, sizeof(buf) - 1, "name.%zu.0123456789.%zu!@#$%%^&*(),./[]{}\\|~`", i, entries / 2 + i);
         names[i] = strdupz(buf);
     }
     return names;
@@ -2637,7 +2637,7 @@ static char **dictionary_unittest_generate_values(size_t entries) {
     char **values = mallocz(sizeof(char *) * entries);
     for(size_t i = 0; i < entries ;i++) {
         char buf[25 + 1] = "";
-        snprintfz(buf, 25, "value-%zu-0987654321.%zu%%^&*(),. \t !@#$/[]{}\\|~`", i, entries / 2 + i);
+        snprintfz(buf, sizeof(buf) - 1, "value-%zu-0987654321.%zu%%^&*(),. \t !@#$/[]{}\\|~`", i, entries / 2 + i);
         values[i] = strdupz(buf);
     }
     return values;
@@ -3253,13 +3253,13 @@ static void *unittest_dict_thread(void *arg) {
                 char buf [256 + 1];
 
                 for (int i = 0; i < 1000; i++) {
-                    snprintfz(buf, 256, "del/flush test %d", i);
+                    snprintfz(buf, sizeof(buf) - 1, "del/flush test %d", i);
                     dictionary_set(tu->dict, buf, NULL, 0);
                     tu->stats.ops.inserts++;
                 }
 
                 for (int i = 0; i < 1000; i++) {
-                    snprintfz(buf, 256, "del/flush test %d", i);
+                    snprintfz(buf, sizeof(buf) - 1, "del/flush test %d", i);
                     dictionary_del(tu->dict, buf);
                     tu->stats.ops.deletes++;
                 }

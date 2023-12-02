@@ -1239,7 +1239,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             spinlock_unlock(&spinlock);
 
             char msg[100 + 1];
-            snprintfz(msg, 100,
+            snprintfz(msg, sizeof(msg) - 1,
                       "rate limit, will accept new connection in %ld secs",
                       (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
 
@@ -1305,7 +1305,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             // try again later
 
             char msg[200 + 1];
-            snprintfz(msg, 200,
+            snprintfz(msg, sizeof(msg) - 1,
                       "multiple connections for same host, "
                       "old connection was last used %ld secs ago%s",
                       age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");

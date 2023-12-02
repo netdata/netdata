@@ -197,10 +197,10 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 if (unlikely(core_sum == 0)) continue; // try next core
 
                 char id[50 + 1];
-                snprintfz(id, 50, "cpu%d_softirqs", c);
+                snprintfz(id, sizeof(id) - 1, "cpu%d_softirqs", c);
 
                 char title[100 + 1];
-                snprintfz(title, 100, "CPU softirqs");
+                snprintfz(title, sizeof(title) - 1, "CPU softirqs");
 
                 core_st[c] = rrdset_create_localhost(
                         "cpu"
@@ -218,7 +218,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 );
 
                 char core[50+1];
-                snprintfz(core, 50, "cpu%d", c);
+                snprintfz(core, sizeof(core) - 1, "cpu%d", c);
                 rrdlabels_add(core_st[c]->rrdlabels, "cpu", core, RRDLABEL_SRC_AUTO);
             }
 

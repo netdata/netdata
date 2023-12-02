@@ -225,7 +225,7 @@ static void calculate_values_and_show_charts(
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
             if(unlikely(!m->st_space || m->st_space->update_every != update_every)) {
                 char title[4096 + 1];
-                snprintfz(title, 4096, "Disk Space Usage");
+                snprintfz(title, sizeof(title) - 1, "Disk Space Usage");
                 m->st_space = rrdset_create_localhost(
                         "disk_space"
                         , disk
@@ -265,7 +265,7 @@ static void calculate_values_and_show_charts(
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
             if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
                 char title[4096 + 1];
-                snprintfz(title, 4096, "Disk Files (inodes) Usage");
+                snprintfz(title, sizeof(title) - 1, "Disk Files (inodes) Usage");
                 m->st_inodes = rrdset_create_localhost(
                         "disk_inodes"
                         , disk

@@ -367,7 +367,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
     DIR *dir = opendir(path);
     if (!dir) {
         if (errno == ENOENT)
-            collector_info("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
+            nd_log_collector(NDLP_DEBUG, "DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s': no such file or directory.", disk, major, minor, path);
         else
             collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
         goto failed;
@@ -500,7 +500,7 @@ static inline bool ends_with(const char *str, const char *suffix) {
 
 static inline char *get_disk_by_id(char *device) {
     char pathname[256 + 1];
-    snprintfz(pathname, 256, "%s/by-id", path_to_dev_disk);
+    snprintfz(pathname, sizeof(pathname) - 1, "%s/by-id", path_to_dev_disk);
 
     struct dirent *entry;
     DIR *dp = opendir(pathname);
@@ -546,9 +546,9 @@ static inline char *get_disk_model(char *device) {
     char path[256 + 1];
     char buffer[256 + 1];
 
-    snprintfz(path, 256, "%s/%s/device/model", path_to_sys_block, device);
+    snprintfz(path, sizeof(path) - 1, "%s/%s/device/model", path_to_sys_block, device);
     if(read_file(path, buffer, 256) != 0) {
-        snprintfz(path, 256, "%s/%s/device/name", path_to_sys_block, device);
+        snprintfz(path, sizeof(path) - 1, "%s/%s/device/name", path_to_sys_block, device);
         if(read_file(path, buffer, 256) != 0)
             return NULL;
     }
@@ -564,7 +564,7 @@ static inline char *get_disk_serial(char *device) {
     char path[256 + 1];
     char buffer[256 + 1];
 
-    snprintfz(path, 256, "%s/%s/device/serial", path_to_sys_block, device);
+    snprintfz(path, sizeof(path) - 1, "%s/%s/device/serial", path_to_sys_block, device);
     if(read_file(path, buffer, 256) != 0)
         return NULL;
 

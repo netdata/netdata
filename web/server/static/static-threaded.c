@@ -544,7 +544,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
         static_workers_private_data[i].max_sockets = max_sockets / static_threaded_workers_count;
 
         char tag[50 + 1];
-        snprintfz(tag, 50, "WEB[%d]", i+1);
+        snprintfz(tag, sizeof(tag) - 1, "WEB[%d]", i+1);
 
         netdata_log_info("starting worker %d", i+1);
         netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT,

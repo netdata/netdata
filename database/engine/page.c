@@ -72,7 +72,7 @@ void pgd_init_arals(void)
     // pgd aral
     {
         char buf[20 + 1];
-        snprintfz(buf, 20, "pgd");
+        snprintfz(buf, sizeof(buf) - 1, "pgd");
 
         // FIXME: add stats
         pgd_alloc_globals.aral_pgd = aral_create(
@@ -91,7 +91,7 @@ void pgd_init_arals(void)
             size_t tier = storage_tiers - i;
 
             char buf[20 + 1];
-            snprintfz(buf, 20, "tier%zu-pages", tier);
+            snprintfz(buf, sizeof(buf) - 1, "tier%zu-pages", tier);
 
             pgd_alloc_globals.aral_data[tier] = aral_create(
                     buf,
@@ -106,7 +106,7 @@ void pgd_init_arals(void)
     // gorilla buffers aral
     for (size_t i = 0; i != 4; i++) {
         char buf[20 + 1];
-        snprintfz(buf, 20, "gbuffer-%zu", i);
+        snprintfz(buf, sizeof(buf) - 1, "gbuffer-%zu", i);
 
         // FIXME: add stats
         pgd_alloc_globals.aral_gorilla_buffer[i] = aral_create(
@@ -121,7 +121,7 @@ void pgd_init_arals(void)
     // gorilla writers aral
     for (size_t i = 0; i != 4; i++) {
         char buf[20 + 1];
-        snprintfz(buf, 20, "gwriter-%zu", i);
+        snprintfz(buf, sizeof(buf) - 1, "gwriter-%zu", i);
 
         // FIXME: add stats
         pgd_alloc_globals.aral_gorilla_writer[i] = aral_create(
@@ -449,6 +449,7 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
                            "pgd_copy_to_extent() gorilla writer does not have any buffers");
 
             bool ok = gorilla_writer_serialize(pg->gorilla.writer, dst, dst_size);
+            UNUSED(ok);
             internal_fatal(!ok,
                            "pgd_copy_to_extent() tried to serialize pg=%p, gw=%p (with dst_size=%u bytes, num_buffers=%zu)",
                            pg, pg->gorilla.writer, dst_size, pg->gorilla.num_buffers);

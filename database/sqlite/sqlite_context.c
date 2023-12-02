@@ -7,16 +7,16 @@
 #define DB_CONTEXT_METADATA_VERSION 1
 
 const char *database_context_config[] = {
-    "CREATE TABLE IF NOT EXISTS context (host_id BLOB, id TEXT NOT NULL, version INT NOT NULL, title TEXT NOT NULL, " \
+    "CREATE TABLE IF NOT EXISTS context (host_id BLOB, id TEXT NOT NULL, version INT NOT NULL, title TEXT NOT NULL, "
     "chart_type TEXT NOT NULL, unit TEXT NOT NULL, priority INT NOT NULL, first_time_t INT NOT NULL, "
     "last_time_t INT NOT NULL, deleted INT NOT NULL, "
-    "family TEXT, PRIMARY KEY (host_id, id));",
+    "family TEXT, PRIMARY KEY (host_id, id))",
 
     NULL
 };
 
 const char *database_context_cleanup[] = {
-    "VACUUM;",
+    "VACUUM",
     NULL
 };
 
@@ -31,7 +31,7 @@ int sql_init_context_database(int memory)
     int rc;
 
     if (likely(!memory))
-        snprintfz(sqlite_database, FILENAME_MAX, "%s/context-meta.db", netdata_configured_cache_dir);
+        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
     else
         strcpy(sqlite_database, ":memory:");
 
@@ -56,9 +56,9 @@ int sql_init_context_database(int memory)
         return 1;
 
     if (likely(!memory))
-        snprintfz(buf, 1024, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta;", netdata_configured_cache_dir);
+        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta", netdata_configured_cache_dir);
     else
-        snprintfz(buf, 1024, "ATTACH DATABASE ':memory:' as meta;");
+        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE ':memory:' as meta");
 
     if(init_database_batch(db_context_meta, list)) return 1;
 
@@ -92,7 +92,7 @@ void sql_close_context_database(void)
 // Fetching data
 //
 #define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, " \
-        "c.update_every, c.chart_type, c.family FROM chart c WHERE c.host_id = @host_id and c.chart_id is not null; "
+        "c.update_every, c.chart_type, c.family FROM chart c WHERE c.host_id = @host_id AND c.chart_id IS NOT NULL"
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
@@ -141,7 +141,7 @@ skip_load:
 
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END " \
-        "FROM dimension d WHERE d.chart_id = @id and d.dim_id is not null ORDER BY d.rowid ASC;"
+        "FROM dimension d WHERE d.chart_id = @id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
@@ -178,7 +178,8 @@ failed:
 }
 
 // LABEL LIST
-#define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l WHERE l.chart_id = @id;"
+#define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l WHERE l.chart_id = @id"
+
 void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data)
 {
     int rc;
@@ -215,7 +216,8 @@ failed:
 
 // CONTEXT LIST
 #define CTX_GET_CONTEXT_LIST  "SELECT id, version, title, chart_type, unit, priority, first_time_t, " \
-            "last_time_t, deleted, family FROM context c WHERE c.host_id = @host_id;"
+            "last_time_t, deleted, family FROM context c WHERE c.host_id = @host_id"
+
 void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
 
@@ -266,9 +268,10 @@ failed:
 //
 // Storing Data
 //
-#define CTX_STORE_CONTEXT "INSERT OR REPLACE INTO context " \
-    "(host_id, id, version, title, chart_type, unit, priority, first_time_t, last_time_t, deleted, family) " \
-    "VALUES (@host_id, @context, @version, @title, @chart_type, @unit, @priority, @first_time_t, @last_time_t, @deleted, @family);"
+#define CTX_STORE_CONTEXT                                                                                              \
+    "INSERT OR REPLACE INTO context "                                                                                  \
+    "(host_id, id, version, title, chart_type, unit, priority, first_time_t, last_time_t, deleted, family) "           \
+    "VALUES (@host_id, @context, @version, @title, @chart_type, @unit, @priority, @first_t, @last_t, @delete, @family)"
 
 int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
@@ -292,7 +295,7 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 
     rc = bind_text_null(res, 2, context_data->id, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store details");
+        error_report("Failed to bind context to store context details");
         goto skip_store;
     }
 
@@ -304,19 +307,19 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 
     rc = bind_text_null(res, 4, context_data->title, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store details");
+        error_report("Failed to bind context to store context details");
         goto skip_store;
     }
 
     rc = bind_text_null(res, 5, context_data->chart_type, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store details");
+        error_report("Failed to bind context to store context details");
         goto skip_store;
     }
 
     rc = bind_text_null(res, 6, context_data->units, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store details");
+        error_report("Failed to bind context to store context details");
         goto skip_store;
     }
 
@@ -365,7 +368,7 @@ skip_store:
 
 // Delete a context
 
-#define CTX_DELETE_CONTEXT "DELETE FROM context WHERE host_id = @host_id AND id = @context;"
+#define CTX_DELETE_CONTEXT "DELETE FROM context WHERE host_id = @host_id AND id = @context"
 int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc, rc_stored = 1;
@@ -382,13 +385,13 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 
 	rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id to delete context data");
+        error_report("Failed to bind host_id for context data deletion");
         goto skip_delete;
     }
 
     rc = sqlite3_bind_text(res, 2, context_data->id, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context id for data deletion");
+        error_report("Failed to bind context id for context data deletion");
         goto skip_delete;
     }
 
@@ -396,13 +399,6 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 
     if (rc_stored != SQLITE_DONE)
         error_report("Failed to delete context %s, rc = %d", context_data->id, rc_stored);
-#ifdef NETDATA_INTERNAL_CHECKS
-    else {
-        char host_uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(*host_uuid, host_uuid_str);
-        netdata_log_info("%s: Deleted context %s under host %s", __FUNCTION__, context_data->id, host_uuid_str);
-    }
-#endif
 
 skip_delete:
     rc = sqlite3_finalize(res);

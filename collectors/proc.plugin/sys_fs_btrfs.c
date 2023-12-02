@@ -795,7 +795,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "disk_%s", node->id);
                 snprintfz(name, RRD_ID_LENGTH_MAX, "disk_%s", node->label);
-                snprintfz(title, 200, "BTRFS Physical Disk Allocation");
+                snprintfz(title, sizeof(title) - 1, "BTRFS Physical Disk Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -854,7 +854,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "data_%s", node->id);
                 snprintfz(name, RRD_ID_LENGTH_MAX, "data_%s", node->label);
-                snprintfz(title, 200, "BTRFS Data Allocation");
+                snprintfz(title, sizeof(title) - 1, "BTRFS Data Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -898,7 +898,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "metadata_%s", node->id);
                 snprintfz(name, RRD_ID_LENGTH_MAX, "metadata_%s", node->label);
-                snprintfz(title, 200, "BTRFS Metadata Allocation");
+                snprintfz(title, sizeof(title) - 1, "BTRFS Metadata Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -944,7 +944,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "system_%s", node->id);
                 snprintfz(name, RRD_ID_LENGTH_MAX, "system_%s", node->label);
-                snprintfz(title, 200, "BTRFS System Allocation");
+                snprintfz(title, sizeof(title) - 1, "BTRFS System Allocation");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -988,7 +988,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "commits_%s", node->id);
                 snprintfz(name, RRD_ID_LENGTH_MAX, "commits_%s", node->label);
-                snprintfz(title, 200, "BTRFS Commits");
+                snprintfz(title, sizeof(title) - 1, "BTRFS Commits");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -1021,7 +1021,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->id);
                 snprintfz(name, RRD_ID_LENGTH_MAX, "commits_perc_time_%s", node->label);
-                snprintfz(title, 200, "BTRFS Commits Time Share");
+                snprintfz(title, sizeof(title) - 1, "BTRFS Commits Time Share");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -1055,7 +1055,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "commit_timings_%s", node->id);
                 snprintfz(name, RRD_ID_LENGTH_MAX, "commit_timings_%s", node->label);
-                snprintfz(title, 200, "BTRFS Commit Timings");
+                snprintfz(title, sizeof(title) - 1, "BTRFS Commit Timings");
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -1101,7 +1101,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                     snprintfz(id, RRD_ID_LENGTH_MAX, "device_errors_dev%d_%s", d->id, node->id);
                     snprintfz(name, RRD_ID_LENGTH_MAX, "device_errors_dev%d_%s", d->id, node->label);
-                    snprintfz(title, 200, "BTRFS Device Errors");
+                    snprintfz(title, sizeof(title) - 1, "BTRFS Device Errors");
 
                     netdata_fix_chart_id(id);
                     netdata_fix_chart_name(name);

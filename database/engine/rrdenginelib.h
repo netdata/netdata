@@ -58,7 +58,7 @@ static inline void modify_bit(unsigned *x, unsigned pos, uint8_t val)
     }
 }
 
-#define RRDENG_PATH_MAX (4096)
+#define RRDENG_PATH_MAX (FILENAME_MAX + 1)
 
 /* returns old *ptr value */
 static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,

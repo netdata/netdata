@@ -4,11 +4,12 @@
 
 // SQL statements
 
-#define SQL_STORE_CLAIM_ID  "INSERT INTO node_instance " \
-    "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, unixepoch()) " \
-    "ON CONFLICT(host_id) DO UPDATE SET claim_id = excluded.claim_id;"
+#define SQL_STORE_CLAIM_ID                                                                                             \
+    "INSERT INTO node_instance "                                                                                       \
+    "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, UNIXEPOCH()) "                                     \
+    "ON CONFLICT(host_id) DO UPDATE SET claim_id = excluded.claim_id"
 
-#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
+#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid"
 
 #define STORE_HOST_LABEL                                                                                               \
     "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
@@ -18,13 +19,13 @@
 
 #define STORE_HOST_OR_CHART_LABEL_VALUE "(u2h('%s'), %d,'%s','%s', unixepoch())"
 
-#define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
+#define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid"
 
 #define SQL_STORE_HOST_INFO                                                                                              \
     "INSERT OR REPLACE INTO host (host_id, hostname, registry_hostname, update_every, os, timezone, tags, hops, "        \
     "memory_mode, abbrev_timezone, utc_offset, program_name, program_version, entries, health_enabled, last_connected) " \
     "VALUES (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, "                     \
-    "@memory_mode, @abbrev_tz, @utc_offset, @prog_name, @prog_version, @entries, @health_enabled, @last_connected);"
+    "@memory_mode, @abbrev_tz, @utc_offset, @prog_name, @prog_version, @entries, @health_enabled, @last_connected)"
 
 #define SQL_STORE_CHART                                                                                                \
     "INSERT INTO chart (chart_id, host_id, type, id, name, family, context, title, unit, plugin, module, priority, "   \
@@ -51,9 +52,9 @@
     "(@uuid, @name, @value, UNIXEPOCH())"
 
 #define MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID                                                                          \
-    "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0);"
-#define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id;"
-#define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
+    "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0)"
+#define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id"
+#define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host)"
 
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
@@ -190,8 +191,8 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
     return 1;
 }
 
-#define SQL_DELETE_CHART_LABEL "DELETE FROM chart_label WHERE chart_id = @chart_id;"
-#define SQL_DELETE_CHART_LABEL_HISTORY "DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id;"
+#define SQL_DELETE_CHART_LABEL "DELETE FROM chart_label WHERE chart_id = @chart_id"
+#define SQL_DELETE_CHART_LABEL_HISTORY "DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id"
 
 static void clean_old_chart_labels(RRDSET *st)
 {
@@ -199,9 +200,9 @@ static void clean_old_chart_labels(RRDSET *st)
     time_t first_time_s = rrdset_first_entry_s(st);
 
     if (unlikely(!first_time_s))
-        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL);
+        snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_CHART_LABEL);
     else
-        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
+        snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
 
     int rc = exec_statement_with_uuid(sql, &st->chart_uuid);
     if (unlikely(rc))
@@ -1152,9 +1153,7 @@ static void timer_cb(uv_timer_t* handle)
    struct metadata_cmd cmd;
    memset(&cmd, 0, sizeof(cmd));
 
-   time_t now = now_realtime_sec();
-
-   if (wc->metadata_check_after && wc->metadata_check_after < now) {
+   if (wc->metadata_check_after <  now_realtime_sec()) {
        cmd.opcode = METADATA_SCAN_HOSTS;
        metadata_enq_cmd(wc, &cmd);
    }
@@ -1177,7 +1176,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
        nd_log(NDLS_DAEMON, NDLP_DEBUG, "%s: Freeing %d database pages", db_alias, do_free_pages);
 
        char sql[128];
-       snprintfz(sql, 127, "PRAGMA incremental_vacuum(%d)", do_free_pages);
+       snprintfz(sql, sizeof(sql) - 1, "PRAGMA incremental_vacuum(%d)", do_free_pages);
        (void) db_execute(database, sql);
    }
 }
@@ -1490,7 +1489,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
     if (!data->max_count)
-        transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION;");
+        transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION");
 
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
@@ -1560,7 +1559,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     dfe_done(host);
 
     if (!data->max_count && transaction_started)
-        transaction_started = db_execute(db_meta, "COMMIT TRANSACTION;");
+        transaction_started = db_execute(db_meta, "COMMIT TRANSACTION");
 
     usec_t all_ended_ut = now_monotonic_usec(); (void)all_ended_ut;
     internal_error(true, "METADATA: checking all hosts completed in %0.2f ms",
@@ -1958,7 +1957,7 @@ static void *metadata_unittest_threads(void)
     tu.join = 0;
     for (int i = 0; i < threads_to_create; i++) {
         char buf[100 + 1];
-        snprintf(buf, 100, "META[%d]", i);
+        snprintf(buf, sizeof(buf) - 1, "META[%d]", i);
         netdata_thread_create(
             &threads[i],
             buf,

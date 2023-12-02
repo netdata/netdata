@@ -435,7 +435,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 if (likely(do_space)) {
                     st = rrdset_find_active_bytype_localhost("disk_space", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
-                        snprintfz(title, 4096, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
+                        snprintfz(title, sizeof(title) - 1, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
                                 "disk_space"
                                 , mntbuf[i].f_mntonname
@@ -467,7 +467,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                 if (likely(do_inodes)) {
                     st = rrdset_find_active_bytype_localhost("disk_inodes", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
-                        snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
+                        snprintfz(title, sizeof(title) - 1, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         st = rrdset_create_localhost(
                                 "disk_inodes"
                                 , mntbuf[i].f_mntonname

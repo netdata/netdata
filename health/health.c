@@ -912,10 +912,9 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
     }
 }
 
-static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host, SILENCERS *silencers) {
+static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host)
+{
     SILENCER *s;
-    netdata_log_debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s",
-          rrdcalc_name(rc), (rc->rrdset)?rrdset_context(rc->rrdset):"", rrdcalc_chart_name(rc), host);
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
@@ -960,20 +959,20 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         if (silencers->stype == STYPE_DISABLE_ALARMS) rc->run_flags |= RRDCALC_FLAG_DISABLED;
         else if (silencers->stype == STYPE_SILENCE_NOTIFICATIONS) rc->run_flags |= RRDCALC_FLAG_SILENCED;
     } else {
-        SILENCE_TYPE st = check_silenced(rc, rrdhost_hostname(host), silencers);
+        SILENCE_TYPE st = check_silenced(rc, rrdhost_hostname(host));
         if (st == STYPE_DISABLE_ALARMS) rc->run_flags |= RRDCALC_FLAG_DISABLED;
         else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->run_flags |= RRDCALC_FLAG_SILENCED;
     }
 
     if (rrdcalc_flags_old != rc->run_flags) {
-        netdata_log_info("Alarm silencing changed for host '%s' alarm '%s': Disabled %s->%s Silenced %s->%s",
-             rrdhost_hostname(host),
-             rrdcalc_name(rc),
-             (rrdcalc_flags_old & RRDCALC_FLAG_DISABLED)?"true":"false",
-             (rc->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false",
-             (rrdcalc_flags_old & RRDCALC_FLAG_SILENCED)?"true":"false",
-             (rc->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
-        );
+        netdata_log_info(
+            "Alarm silencing changed for host '%s' alarm '%s': Disabled %s->%s Silenced %s->%s",
+            rrdhost_hostname(host),
+            rrdcalc_name(rc),
+            (rrdcalc_flags_old & RRDCALC_FLAG_DISABLED) ? "true" : "false",
+            (rc->run_flags & RRDCALC_FLAG_DISABLED) ? "true" : "false",
+            (rrdcalc_flags_old & RRDCALC_FLAG_SILENCED) ? "true" : "false",
+            (rc->run_flags & RRDCALC_FLAG_SILENCED) ? "true" : "false");
     }
     if (rc->run_flags & RRDCALC_FLAG_DISABLED)
         return 1;
