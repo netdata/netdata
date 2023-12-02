@@ -72,10 +72,16 @@ static inline void freez(void *ptr) {
 
 // ----------------------------------------------------------------------------
 
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H
+
 struct hashed_key;
 static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
 #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_keys
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct hashed_key
+#define SIMPLE_HASHTABLE_NAME _KEY
 
 #define XXH_INLINE_ALL
 #include "../../libnetdata/xxhash.h"
@@ -359,7 +365,7 @@ typedef struct log_job {
     const char *pattern;
     const char *prefix;
 
-    SIMPLE_HASHTABLE hashtable;
+    SIMPLE_HASHTABLE_KEY hashtable;
 
     struct {
         const char *buffer;

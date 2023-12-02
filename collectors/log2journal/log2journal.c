@@ -67,7 +67,7 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
 
     if(!k->hashtable_ptr) {
         HASHED_KEY *ht_key;
-        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&jb->hashtable, k->hash, true);
+        SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&jb->hashtable, k->hash, true);
         if((ht_key = SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
             if(!(ht_key->flags & HK_COLLISION_CHECKED)) {
                 ht_key->flags |= HK_COLLISION_CHECKED;
@@ -86,7 +86,7 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
             ht_key->hash = k->hash;
             ht_key->flags = HK_HASHTABLE_ALLOCATED;
 
-            simple_hashtable_set_slot(&jb->hashtable, slot, ht_key->hash, ht_key);
+            simple_hashtable_set_slot_KEY(&jb->hashtable, slot, ht_key->hash, ht_key);
         }
 
         k->hashtable_ptr = ht_key;
@@ -322,7 +322,7 @@ static inline void log_job_process_rewrites(LOG_JOB *jb) {
 }
 
 static inline void send_all_fields(LOG_JOB *jb) {
-    SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY(&jb->hashtable, kptr) {
+    SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY(&jb->hashtable, kptr, HASHED_KEY, _KEY) {
         HASHED_KEY *k = SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(kptr);
 
         if(k->value.len) {
