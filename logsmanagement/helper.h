@@ -16,11 +16,11 @@
 #define LOGS_MANAG_STR(x) LOGS_MANAG_STR_HELPER(x)
 
 #ifndef m_assert
-#if defined(LOGS_MANAGEMENT_STRESS_TEST) 
+#if defined(LOGS_MANAGEMENT_DEV_MODE) 
 #define m_assert(expr, msg) assert(((void)(msg), (expr)))
 #else
 #define m_assert(expr, msg) do{} while(0)
-#endif  // LOGS_MANAGEMENT_STRESS_TEST
+#endif  // LOGS_MANAGEMENT_DEV_MODE
 #endif  // m_assert
 
 /* Test if a timestamp is within a valid range 
@@ -45,7 +45,7 @@
 #define COMPILE_TIME_ASSERT(X)    COMPILE_TIME_ASSERT2(X,__LINE__)
 #endif  // COMPILE_TIME_ASSERT
 
-#if defined(NETDATA_INTERNAL_CHECKS) && defined(LOGS_MANAGEMENT_STRESS_TEST)
+#if defined(NETDATA_INTERNAL_CHECKS) && defined(LOGS_MANAGEMENT_DEV_MODE)
 #define debug_log(args...) netdata_logger(NDLS_COLLECTORS, NDLP_DEBUG,   __FILE__, __FUNCTION__, __LINE__, ##args)
 #else
 #define debug_log(fmt, args...) do {} while(0)

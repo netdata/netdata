@@ -240,7 +240,7 @@ void *pluginsd_main(void *ptr)
     // disable some plugins by default
     config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
     config_get_boolean(CONFIG_SECTION_PLUGINS, "logs-management", 
-#if defined(LOGS_MANAGEMENT_STRESS_TEST)
+#if defined(LOGS_MANAGEMENT_DEV_MODE)
         CONFIG_BOOLEAN_YES
 #else 
         CONFIG_BOOLEAN_NO

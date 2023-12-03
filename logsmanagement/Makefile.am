@@ -25,8 +25,4 @@ dist_logsmanagconfig_DATA = \
 
 dist_noinst_DATA = \
     README.md \
-    stress_test/logrotate.conf \
-    stress_test/logs_query.html \
-    stress_test/run_stress_test.sh \
-    stress_test/stress_test.c \
     $(NULL)
