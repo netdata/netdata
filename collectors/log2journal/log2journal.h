@@ -473,6 +473,8 @@ const char *json_parser_error(LOG_JSON_STATE *js);
 bool json_parse_document(LOG_JSON_STATE *js, const char *txt);
 void json_test(void);
 
+size_t parse_surrogate(const char *s, char *d, size_t *remaining);
+
 // ----------------------------------------------------------------------------
 // logfmt parser
 
