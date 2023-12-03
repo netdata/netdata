@@ -60,7 +60,7 @@ void log_job_command_line_help(const char *name) {
     printf("  --file /path/to/file.yaml or -f /path/to/file.yaml\n");
     printf("       Read yaml configuration file for instructions.\n");
     printf("\n");
-    printf("  --config CONFIG_NAME\n");
+    printf("  --config CONFIG_NAME or -c CONFIG_NAME\n");
     printf("       Run with the internal configuration named CONFIG_NAME.\n");
     printf("       Available internal configs:\n");
     printf("\n");

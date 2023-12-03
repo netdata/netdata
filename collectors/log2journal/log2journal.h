@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 #include <stdarg.h>
 #include <assert.h>
 
@@ -42,9 +43,21 @@ static inline void *mallocz(size_t size) {
 }
 
 static inline void *callocz(size_t elements, size_t size) {
-    void *ptr = mallocz(elements * size);
-    memset(ptr, 0, elements * size);
+    void *ptr = calloc(elements, size);
+    if (!ptr) {
+        log2stderr("Fatal Error: Memory allocation failed. Requested size: %zu bytes.", elements * size);
+        exit(EXIT_FAILURE);
+    }
     return ptr;
+}
+
+static inline void *reallocz(void *ptr, size_t size) {
+    void *new_ptr = realloc(ptr, size);
+    if (!new_ptr) {
+        log2stderr("Fatal Error: Memory reallocation failed. Requested size: %zu bytes.", size);
+        exit(EXIT_FAILURE);
+    }
+    return new_ptr;
 }
 
 static inline char *strdupz(const char *s) {
@@ -74,7 +87,6 @@ static inline void freez(void *ptr) {
 
 #define XXH_INLINE_ALL
 #include "../../libnetdata/xxhash.h"
-#include "../../libnetdata/simple_hashtable.h"
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
@@ -83,13 +95,29 @@ static inline void freez(void *ptr) {
 #include <yaml.h>
 #endif
 
+// ----------------------------------------------------------------------------
+// hashtable for HASHED_KEY
+
+// cleanup hashtable defines
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H
+
+struct hashed_key;
+static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
+#define SIMPLE_HASHTABLE_SORT_FUNCTION compare_keys
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct hashed_key
+#define SIMPLE_HASHTABLE_NAME _KEY
+#include "../../libnetdata/simple_hashtable.h"
+
+// ----------------------------------------------------------------------------
+
 #define MAX_OUTPUT_KEYS 1024
 #define MAX_LINE_LENGTH (1024 * 1024)
-#define MAX_KEY_DUPS (MAX_OUTPUT_KEYS / 2)
 #define MAX_INJECTIONS (MAX_OUTPUT_KEYS / 2)
 #define MAX_REWRITES (MAX_OUTPUT_KEYS / 2)
 #define MAX_RENAMES (MAX_OUTPUT_KEYS / 2)
-#define MAX_KEY_DUPS_KEYS 20
 
 #define JOURNAL_MAX_KEY_LEN 64              // according to systemd-journald
 #define JOURNAL_MAX_VALUE_LEN (48 * 1024)   // according to systemd-journald
@@ -178,13 +206,7 @@ static inline void txt_expand_and_append(TEXT *t, const char *s, size_t len) {
         if(new_size < t->size * 2)
             new_size = t->size * 2;
 
-        char *b = mallocz(new_size);
-        if(t->txt) {
-            memcpy(b, t->txt, t->len);
-            freez(t->txt);
-        }
-
-        t->txt = b;
+        t->txt = reallocz(t->txt, new_size);
         t->size = new_size;
     }
 
@@ -212,9 +234,6 @@ typedef enum __attribute__((__packed__)) {
 
     HK_RENAMES_CHECKED      = (1 << 4), // we checked once if there are renames on this key
     HK_HAS_RENAMES          = (1 << 5), // and we found there is a rename rule related to it
-
-    HK_DUPS_CHECKED         = (1 << 6), // we checked once if there are duplications for this key
-    HK_HAS_DUPS             = (1 << 7), // and we found there are duplication related to it
 
     // ephemeral flags - they are unset at the end of each log line
 
@@ -266,6 +285,10 @@ static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t le
 
 static inline bool hashed_keys_match(HASHED_KEY *k1, HASHED_KEY *k2) {
     return ((k1 == k2) || (k1->hash == k2->hash && strcmp(k1->key, k2->key) == 0));
+}
+
+static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2) {
+    return strcmp(k1->key, k2->key);
 }
 
 // ----------------------------------------------------------------------------
@@ -355,12 +378,15 @@ typedef struct log_job {
     const char *pattern;
     const char *prefix;
 
-    SIMPLE_HASHTABLE hashtable;
+    SIMPLE_HASHTABLE_KEY hashtable;
 
     struct {
-        HASHED_KEY *keys[MAX_OUTPUT_KEYS];
-        size_t used;
-    } sorted;
+        const char *buffer;
+        const char *trimmed;
+        size_t trimmed_len;
+        size_t size;
+        HASHED_KEY key;
+    } line;
 
     struct {
         SEARCH_PATTERN include;
@@ -446,6 +472,8 @@ void json_parser_destroy(LOG_JSON_STATE *js);
 const char *json_parser_error(LOG_JSON_STATE *js);
 bool json_parse_document(LOG_JSON_STATE *js, const char *txt);
 void json_test(void);
+
+size_t parse_surrogate(const char *s, char *d, size_t *remaining);
 
 // ----------------------------------------------------------------------------
 // logfmt parser

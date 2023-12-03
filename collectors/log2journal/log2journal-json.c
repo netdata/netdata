@@ -167,7 +167,7 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
     }
 }
 
-static bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
+static inline bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
     if (codepoint <= 0x7F) {
         // 1-byte sequence
         if (*remaining < 2) return false; // +1 for the null
@@ -203,6 +203,56 @@ static bool encode_utf8(unsigned codepoint, char **d, size_t *remaining) {
         return false;
 
     return true;
+}
+
+size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
+    if (s[0] != '\\' || (s[1] != 'u' && s[1] != 'U')) {
+        return 0; // Not a valid Unicode escape sequence
+    }
+
+    char hex[9] = {0}; // Buffer for the hexadecimal value
+    unsigned codepoint;
+
+    if (s[1] == 'u') {
+        // Handle \uXXXX
+        if (!isxdigit(s[2]) || !isxdigit(s[3]) || !isxdigit(s[4]) || !isxdigit(s[5])) {
+            return 0; // Not a valid \uXXXX sequence
+        }
+
+        hex[0] = s[2];
+        hex[1] = s[3];
+        hex[2] = s[4];
+        hex[3] = s[5];
+        codepoint = (unsigned)strtoul(hex, NULL, 16);
+
+        if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+            // Possible start of surrogate pair
+            if (s[6] == '\\' && s[7] == 'u' && isxdigit(s[8]) && isxdigit(s[9]) &&
+                isxdigit(s[10]) && isxdigit(s[11])) {
+                // Valid low surrogate
+                unsigned low_surrogate = strtoul(&s[8], NULL, 16);
+                if (low_surrogate < 0xDC00 || low_surrogate > 0xDFFF) {
+                    return 0; // Invalid low surrogate
+                }
+                codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low_surrogate - 0xDC00);
+                return encode_utf8(codepoint, &d, remaining) ? 12 : 0; // \uXXXX\uXXXX
+            }
+        }
+
+        // Single \uXXXX
+        return encode_utf8(codepoint, &d, remaining) ? 6 : 0;
+    }
+    else {
+        // Handle \UXXXXXXXX
+        for (int i = 2; i < 10; i++) {
+            if (!isxdigit(s[i])) {
+                return 0; // Not a valid \UXXXXXXXX sequence
+            }
+            hex[i - 2] = s[i];
+        }
+        codepoint = (unsigned)strtoul(hex, NULL, 16);
+        return encode_utf8(codepoint, &d, remaining) ? 10 : 0; // \UXXXXXXXX
+    }
 }
 
 static inline void copy_newline(LOG_JSON_STATE *js __maybe_unused, char **d, size_t *remaining) {
@@ -258,18 +308,12 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
                     s++;
                     break;
 
-                case 'u':
-                    if(isxdigit(s[1]) && isxdigit(s[2]) && isxdigit(s[3]) && isxdigit(s[4])) {
-                        char b[5] = {
-                                [0] = s[1],
-                                [1] = s[2],
-                                [2] = s[3],
-                                [3] = s[4],
-                                [4] = '\0',
-                        };
-                        unsigned codepoint = strtoul(b, NULL, 16);
-                        if(encode_utf8(codepoint, &d, &remaining)) {
-                            s += 5;
+                case 'u': {
+                        size_t old_remaining = remaining;
+                        size_t consumed = parse_surrogate(s - 1, d, &remaining);
+                        if (consumed > 0) {
+                            s += consumed - 1; // -1 because we already incremented s after '\\'
+                            d += old_remaining - remaining;
                             continue;
                         }
                         else {
@@ -277,11 +321,6 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
                             remaining--;
                             c = *s++;
                         }
-                    }
-                    else {
-                        *d++ = '\\';
-                        remaining--;
-                        c = *s++;
                     }
                     break;
 

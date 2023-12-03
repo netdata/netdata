@@ -6,22 +6,25 @@
 
 void log_job_init(LOG_JOB *jb) {
     memset(jb, 0, sizeof(*jb));
-    simple_hashtable_init(&jb->hashtable, 32);
+    simple_hashtable_init_KEY(&jb->hashtable, 32);
+    hashed_key_set(&jb->line.key, "LINE");
 }
 
-static void simple_hashtable_cleanup_allocated(SIMPLE_HASHTABLE *ht) {
-    for(size_t i = 0; i < ht->size ;i++) {
-        HASHED_KEY *k = ht->hashtable[i].data;
+static void simple_hashtable_cleanup_allocated_keys(SIMPLE_HASHTABLE_KEY *ht) {
+    SIMPLE_HASHTABLE_FOREACH_READ_ONLY(ht, sl, _KEY) {
+        HASHED_KEY *k = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
         if(k && k->flags & HK_HASHTABLE_ALLOCATED) {
-            hashed_key_cleanup(k);
-            freez(k);
-            ht->hashtable[i].data = NULL;
-            ht->hashtable[i].hash = 0;
+            // the order of these statements is important!
+            simple_hashtable_del_slot_KEY(ht, sl); // remove any references to n
+            hashed_key_cleanup(k); // cleanup the internals of n
+            freez(k); // free n
         }
     }
 }
 
 void log_job_cleanup(LOG_JOB *jb) {
+    hashed_key_cleanup(&jb->line.key);
+
     if(jb->prefix) {
         freez((void *) jb->prefix);
         jb->prefix = NULL;
@@ -47,8 +50,8 @@ void log_job_cleanup(LOG_JOB *jb) {
     txt_cleanup(&jb->rewrites.tmp);
     txt_cleanup(&jb->filename.current);
 
-    simple_hashtable_cleanup_allocated(&jb->hashtable);
-    simple_hashtable_free(&jb->hashtable);
+    simple_hashtable_cleanup_allocated_keys(&jb->hashtable);
+    simple_hashtable_destroy_KEY(&jb->hashtable);
 
     // remove references to everything else, to reveal them in valgrind
     memset(jb, 0, sizeof(*jb));
@@ -346,7 +349,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                 if (!yaml_parse_file(value, jb))
                     return false;
             }
-            else if (strcmp(param, "--config") == 0) {
+            else if (strcmp(param, "-c") == 0 || strcmp(param, "--config") == 0) {
                 if (!yaml_parse_config(value, jb))
                     return false;
             }
@@ -392,7 +395,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
 
     // Check if a pattern is set and exactly one pattern is specified
     if (!jb->pattern) {
-        log2stderr("Error: Pattern not specified.");
+        log2stderr("Warning: pattern not specified. Try the default config with: -c default");
         log_job_command_line_help(argv[0]);
         return false;
     }

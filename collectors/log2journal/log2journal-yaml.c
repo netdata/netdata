@@ -852,7 +852,7 @@ static bool needs_quotes_in_yaml(const char *str) {
 
 static void yaml_print_node(const char *key, const char *value, size_t depth, bool dash) {
     if(depth > 10) depth = 10;
-    const char *quote = "\"";
+    const char *quote = "'";
 
     const char *second_line = NULL;
     if(value && strchr(value, '\n')) {

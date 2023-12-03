@@ -23,7 +23,7 @@
 
 #define UPDATE_TIMEOUT_DEFAULT 10                               /**< Default timeout to use to update charts if they haven't been updated in the meantime. **/
 
-#if !defined(LOGS_MANAGEMENT_STRESS_TEST)
+#if !defined(LOGS_MANAGEMENT_DEV_MODE)
 #define ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT CONFIG_BOOLEAN_NO   /**< Default value to enable (or not) metrics of total collected log records **/
 #else 
 #define ENABLE_COLLECTED_LOGS_TOTAL_DEFAULT CONFIG_BOOLEAN_YES  /**< Default value to enable (or not) metrics of total collected log records, if stress tests are enabled **/
@@ -57,7 +57,7 @@ typedef enum {
 
 #define DISK_SPACE_LIMIT_DEFAULT 500                    /**< Global default configuration maximum database disk space limit per log source **/
 
-#if !defined(LOGS_MANAGEMENT_STRESS_TEST)
+#if !defined(LOGS_MANAGEMENT_DEV_MODE)
 #define GLOBAL_DB_MODE_DEFAULT_STR "none"               /**< db mode string to be used as global default in configuration **/
 #define GLOBAL_DB_MODE_DEFAULT LOGS_MANAG_DB_MODE_NONE  /**< db mode to be used as global default, matching GLOBAL_DB_MODE_DEFAULT_STR **/
 #else 
