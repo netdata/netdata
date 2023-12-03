@@ -61,37 +61,14 @@ const char journal_key_characters_map[256] = {
 
 // ----------------------------------------------------------------------------
 
-// Function to insert a key into the sorted.keys array while keeping it sorted
-void log_job_add_key_sorted(LOG_JOB *jb, HASHED_KEY *newKey) {
-    size_t i, j;
-
-    // Find the position to insert the new key based on lexicographic order
-    for (i = 0; i < jb->sorted.used; i++) {
-        if (strcmp(newKey->key, jb->sorted.keys[i]->key) < 0) {
-            break;
-        }
-    }
-
-    // Shift elements to the right to make space for the new key
-    for (j = jb->sorted.used; j > i; j--) {
-        jb->sorted.keys[j] = jb->sorted.keys[j - 1];
-    }
-
-    // Insert the new key at the correct position
-    jb->sorted.keys[i] = newKey;
-    jb->sorted.used++;
-}
-
 static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
     if(k->flags & HK_HASHTABLE_ALLOCATED)
         return k;
 
     if(!k->hashtable_ptr) {
         HASHED_KEY *ht_key;
-        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&jb->hashtable, k->hash, true);
-        if(slot->data) {
-            ht_key = slot->data;
-
+        SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&jb->hashtable, k->hash, true);
+        if((ht_key = SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
             if(!(ht_key->flags & HK_COLLISION_CHECKED)) {
                 ht_key->flags |= HK_COLLISION_CHECKED;
 
@@ -109,11 +86,7 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
             ht_key->hash = k->hash;
             ht_key->flags = HK_HASHTABLE_ALLOCATED;
 
-            slot->hash = ht_key->hash;
-            slot->data = ht_key;
-            jb->hashtable.used++;
-
-            log_job_add_key_sorted(jb, ht_key);
+            simple_hashtable_set_slot_KEY(&jb->hashtable, slot, ht_key->hash, ht_key);
         }
 
         k->hashtable_ptr = ht_key;
@@ -158,17 +131,24 @@ static inline void validate_key(LOG_JOB *jb __maybe_unused, HASHED_KEY *k) {
 
 // ----------------------------------------------------------------------------
 
-static inline size_t replace_evaluate_to_buffer(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN *rp, char *dst, size_t dst_size) {
+static inline size_t replace_evaluate_to_buffer(LOG_JOB *jb, HASHED_KEY *k __maybe_unused, REPLACE_PATTERN *rp, char *dst, size_t dst_size) {
     size_t remaining = dst_size;
     char *copy_to = dst;
 
     for(REPLACE_NODE *node = rp->nodes; node != NULL && remaining > 1; node = node->next) {
         if(node->is_variable) {
-            HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
-            if(ktmp->value.len) {
-                size_t copied = copy_to_buffer(copy_to, remaining, ktmp->value.txt, ktmp->value.len);
+            if(hashed_keys_match(&node->name, &jb->line.key)) {
+                size_t copied = copy_to_buffer(copy_to, remaining, jb->line.trimmed, jb->line.trimmed_len);
                 copy_to += copied;
                 remaining -= copied;
+            }
+            else {
+                HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+                if(ktmp->value.len) {
+                    size_t copied = copy_to_buffer(copy_to, remaining, ktmp->value.txt, ktmp->value.len);
+                    copy_to += copied;
+                    remaining -= copied;
+                }
             }
         }
         else {
@@ -189,9 +169,14 @@ static inline void replace_evaluate(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN 
 
     for(REPLACE_NODE *node = rp->nodes; node != NULL; node = node->next) {
         if(node->is_variable) {
-            HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
-            if(ktmp->value.len)
-                txt_expand_and_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
+            if(hashed_keys_match(&node->name, &jb->line.key))
+                txt_expand_and_append(&ht_key->value, jb->line.trimmed, jb->line.trimmed_len);
+
+            else {
+                HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+                if(ktmp->value.len)
+                    txt_expand_and_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
+            }
         }
         else
             txt_expand_and_append(&ht_key->value, node->name.key, node->name.len);
@@ -220,9 +205,14 @@ static inline void replace_evaluate_from_pcre2(LOG_JOB *jb, HASHED_KEY *k, REPLA
                 txt_expand_and_append(&jb->rewrites.tmp, k->value.txt + start_offset, length);
             }
             else {
-                HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
-                if(ktmp->value.len)
-                    txt_expand_and_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
+                if(hashed_keys_match(&node->name, &jb->line.key))
+                    txt_expand_and_append(&jb->rewrites.tmp, jb->line.trimmed, jb->line.trimmed_len);
+
+                else {
+                    HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
+                    if(ktmp->value.len)
+                        txt_expand_and_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
+                }
             }
         }
         else {
@@ -299,15 +289,6 @@ static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char
     printf("\n");
 }
 
-static inline void send_key_value_and_rewrite(LOG_JOB *jb, HASHED_KEY *key, const char *value, size_t len) {
-    HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
-
-    txt_replace(&ht_key->value, value, len);
-    ht_key->flags |= HK_VALUE_FROM_LOG;
-
-//    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
-}
-
 inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *value, size_t len) {
     HASHED_KEY *ht_key = get_key_from_hashtable_with_char_ptr(jb, key);
     HASHED_KEY *nk = rename_key(jb, ht_key);
@@ -341,8 +322,8 @@ static inline void log_job_process_rewrites(LOG_JOB *jb) {
 }
 
 static inline void send_all_fields(LOG_JOB *jb) {
-    for(size_t i = 0; i < jb->sorted.used ;i++) {
-        HASHED_KEY *k = jb->sorted.keys[i];
+    SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY(&jb->hashtable, kptr, HASHED_KEY, _KEY) {
+        HASHED_KEY *k = SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(kptr);
 
         if(k->value.len) {
             // the key exists and has some value
@@ -496,11 +477,13 @@ int log_job_run(LOG_JOB *jb) {
 
     if(strcmp(jb->pattern, "json") == 0) {
         json = json_parser_create(jb);
+        // never fails
     }
     else if(strcmp(jb->pattern, "logfmt") == 0) {
         logfmt = logfmt_parser_create(jb);
+        // never fails
     }
-    else {
+    else if(strcmp(jb->pattern, "none") != 0) {
         pcre2 = pcre2_parser_create(jb);
         if(pcre2_has_error(pcre2)) {
             log2stderr("%s", pcre2_parser_error(pcre2));
@@ -509,21 +492,25 @@ int log_job_run(LOG_JOB *jb) {
         }
     }
 
-    char buffer[MAX_LINE_LENGTH];
-    char *line;
-    size_t len;
+    jb->line.buffer = mallocz(MAX_LINE_LENGTH + 1);
+    jb->line.size = MAX_LINE_LENGTH + 1;
+    jb->line.trimmed_len = 0;
+    jb->line.trimmed = jb->line.buffer;
 
-    while ((line = get_next_line(jb, buffer, sizeof(buffer), &len))) {
+    while ((jb->line.trimmed = get_next_line(jb, (char *)jb->line.buffer, jb->line.size, &jb->line.trimmed_len))) {
+        const char *line = jb->line.trimmed;
+        size_t len = jb->line.trimmed_len;
+
         if(jb_switched_filename(jb, line, len))
             continue;
 
-        bool line_is_matched;
+        bool line_is_matched = true;
 
         if(json)
             line_is_matched = json_parse_document(json, line);
         else if(logfmt)
             line_is_matched = logfmt_parse_document(logfmt, line);
-        else
+        else if(pcre2)
             line_is_matched = pcre2_parse_document(pcre2, line, len);
 
         if(!line_is_matched) {
@@ -531,7 +518,7 @@ int log_job_run(LOG_JOB *jb) {
                 log2stderr("%s", json_parser_error(json));
             else if(logfmt)
                 log2stderr("%s", logfmt_parser_error(logfmt));
-            else
+            else if(pcre2)
                 log2stderr("%s", pcre2_parser_error(pcre2));
 
             if(!jb_send_unmatched_line(jb, line))
@@ -556,6 +543,8 @@ int log_job_run(LOG_JOB *jb) {
 
     else if(pcre2)
         pcre2_parser_destroy(pcre2);
+
+    freez((void *)jb->line.buffer);
 
     return 0;
 }

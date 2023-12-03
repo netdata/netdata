@@ -109,11 +109,12 @@ test_log2journal_config /dev/null "${tests}/full.output" --show-config      \
 # -----------------------------------------------------------------------------
 
 test_log2journal() {
-  local in="${1}"
-  local out="${2}"
-  shift 2
+  local n="${1}"
+  local in="${2}"
+  local out="${3}"
+  shift 3
 
-  printf >&2 "running: "
+  printf >&2 "running test No ${n}: "
   printf >&2 "%q " "${log2journal_bin}" "${@}"
   printf >&2 "\n"
   echo >&2 "using as input  : ${in}"
@@ -138,9 +139,10 @@ test_log2journal() {
 echo >&2
 echo >&2 "Testing parsing and output..."
 
-test_log2journal "${tests}/json.log" "${tests}/json.output" json
-test_log2journal "${tests}/json.log" "${tests}/json-include.output" json --include "OBJECT"
-test_log2journal "${tests}/json.log" "${tests}/json-exclude.output" json --exclude "ARRAY[^2]"
-test_log2journal "${tests}/nginx-json.log" "${tests}/nginx-json.output" -f "${script_dir}/log2journal.d/nginx-json.yaml"
-test_log2journal "${tests}/nginx-combined.log" "${tests}/nginx-combined.output" -f "${script_dir}/log2journal.d/nginx-combined.yaml"
-test_log2journal "${tests}/logfmt.log" "${tests}/logfmt.output" -f "${tests}/logfmt.yaml"
+test_log2journal 1 "${tests}/json.log" "${tests}/json.output" json
+test_log2journal 2 "${tests}/json.log" "${tests}/json-include.output" json --include "OBJECT"
+test_log2journal 3 "${tests}/json.log" "${tests}/json-exclude.output" json --exclude "ARRAY[^2]"
+test_log2journal 4 "${tests}/nginx-json.log" "${tests}/nginx-json.output" -f "${script_dir}/log2journal.d/nginx-json.yaml"
+test_log2journal 5 "${tests}/nginx-combined.log" "${tests}/nginx-combined.output" -f "${script_dir}/log2journal.d/nginx-combined.yaml"
+test_log2journal 6 "${tests}/logfmt.log" "${tests}/logfmt.output" -f "${tests}/logfmt.yaml"
+test_log2journal 7 "${tests}/logfmt.log" "${tests}/default.output" -f "${script_dir}/log2journal.d/default.yaml"

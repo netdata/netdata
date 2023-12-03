@@ -37,15 +37,15 @@ rename:
 # Inject constant fields into the journal logs.
 inject:
   - key: SYSLOG_IDENTIFIER
-    value: "nginx-log"
+    value: nginx-log
 
   # inject PRIORITY is a duplicate of NGINX_STATUS
-  - key: "PRIORITY"
-    value: "${NGINX_STATUS}"
+  - key: PRIORITY
+    value: '${NGINX_STATUS}'
 
   # Inject NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
-  - key: "NGINX_STATUS_FAMILY"
-    value: "${NGINX_STATUS}"
+  - key: NGINX_STATUS_FAMILY
+    value: '${NGINX_STATUS}'
 
 # Rewrite the value of fields (including the duplicated ones).
 # The search pattern can have named groups, and the replace pattern can use
@@ -53,30 +53,30 @@ inject:
 rewrite:
   # PRIORITY is a duplicate of NGINX_STATUS
   # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
-  - key: "PRIORITY"
-    match: "^[123]"
+  - key: PRIORITY
+    match: '^[123]'
     value: 6
 
-  - key: "PRIORITY"
-    match: "^4"
+  - key: PRIORITY
+    match: '^4'
     value: 5
 
-  - key: "PRIORITY"
-    match: "^5"
+  - key: PRIORITY
+    match: '^5'
     value: 3
 
-  - key: "PRIORITY"
-    match: ".*"
+  - key: PRIORITY
+    match: '.*'
     value: 4
 
   # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
-  - key: "NGINX_STATUS_FAMILY"
-    match: "^(?<first_digit>[1-5])"
-    value: "${first_digit}xx"
+  - key: NGINX_STATUS_FAMILY
+    match: '^(?<first_digit>[1-5])'
+    value: '${first_digit}xx'
 
-  - key: "NGINX_STATUS_FAMILY"
-    match: ".*"
-    value: "UNKNOWN"
+  - key: NGINX_STATUS_FAMILY
+    match: '.*'
+    value: 'UNKNOWN'
 
 # Control what to do when input logs do not match the main PCRE2 pattern.
 unmatched:

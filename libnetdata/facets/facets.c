@@ -99,7 +99,36 @@ static inline bool is_valid_string_hash(const char *s) {
 }
 
 // ----------------------------------------------------------------------------
+// hashtable for FACET_VALUE
+
+// cleanup hashtable defines
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H
+
+struct facet_value;
+// #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_value
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_value
+#define SIMPLE_HASHTABLE_NAME _VALUE
 #include "../simple_hashtable.h"
+
+// ----------------------------------------------------------------------------
+// hashtable for FACET_KEY
+
+// cleanup hashtable defines
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H
+
+struct facet_key;
+// #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_key
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_key
+#define SIMPLE_HASHTABLE_NAME _KEY
+#include "../simple_hashtable.h"
+
+// ----------------------------------------------------------------------------
 
 typedef struct facet_value {
     FACETS_HASH hash;
@@ -157,7 +186,7 @@ struct facet_key {
         bool enabled;
         uint32_t used;
         FACET_VALUE *ll;
-        SIMPLE_HASHTABLE ht;
+        SIMPLE_HASHTABLE_VALUE ht;
     } values;
 
     struct {
@@ -216,7 +245,7 @@ struct facets {
     struct {
         size_t count;
         FACET_KEY *ll;
-        SIMPLE_HASHTABLE ht;
+        SIMPLE_HASHTABLE_KEY ht;
     } keys;
 
     struct {
@@ -347,7 +376,7 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k);
 static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
     k->values.ll = NULL;
     k->values.used = 0;
-    simple_hashtable_init(&k->values.ht, FACETS_VALUES_HASHTABLE_ENTRIES);
+    simple_hashtable_init_VALUE(&k->values.ht, FACETS_VALUES_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
@@ -363,7 +392,7 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
     k->values.used = 0;
     k->values.enabled = false;
 
-    simple_hashtable_free(&k->values.ht);
+    simple_hashtable_destroy_VALUE(&k->values.ht);
 }
 
 static inline const char *facets_key_get_value(FACET_KEY *k) {
@@ -410,17 +439,17 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const 
 }
 
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, hash, true);
-    return slot->data;
+    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, hash, true);
+    return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VALUE * const tv) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, tv->hash, true);
+    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, tv->hash, true);
 
-    if(slot->data) {
+    if(SIMPLE_HASHTABLE_SLOT_DATA(slot)) {
         // already exists
 
-        FACET_VALUE *v = slot->data;
+        FACET_VALUE *v = SIMPLE_HASHTABLE_SLOT_DATA(slot);
         FACET_VALUE_ADD_CONFLICT(k, v, tv);
         return v;
     }
@@ -428,9 +457,7 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     // we have to add it
 
     FACET_VALUE *v = mallocz(sizeof(*v));
-    slot->hash = tv->hash;
-    slot->data = v;
-    k->values.ht.used++;
+    simple_hashtable_set_slot_VALUE(&k->values.ht, slot, tv->hash, v);
 
     memcpy(v, tv, sizeof(*v));
 
@@ -584,7 +611,7 @@ static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
 
-    simple_hashtable_init(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
+    simple_hashtable_init_KEY(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
@@ -603,12 +630,12 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
 
-    simple_hashtable_free(&facets->keys.ht);
+    simple_hashtable_destroy_KEY(&facets->keys.ht);
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
-    return slot->data;
+    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, true);
+    return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
 bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length) {
@@ -687,22 +714,20 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
 static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH hash, const char *name, size_t name_length, FACET_KEY_OPTIONS options) {
     facets->operations.keys.registered++;
 
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
+    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, true);
 
-    if(unlikely(!slot->data)) {
+    if(unlikely(!SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
         // we have to add it
         FACET_KEY *k = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
 
-        slot->hash = hash;
-        slot->data = k;
-        facets->keys.ht.used++;
+        simple_hashtable_set_slot_KEY(&facets->keys.ht, slot, hash, k);
 
         return k;
     }
 
     // already in the index
 
-    FACET_KEY *k = slot->data;
+    FACET_KEY *k = SIMPLE_HASHTABLE_SLOT_DATA(slot);
 
     facet_key_set_name(k, name, name_length);
 
