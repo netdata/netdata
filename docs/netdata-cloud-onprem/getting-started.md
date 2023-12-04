@@ -195,6 +195,6 @@ Exposes API endpoints to authenticate agents connecting to the cloud.
 
 ## Infrastructure Diagram
 
-![infrastructure.jpeg](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud-onprem/infrastructure.jpeg)
+![infrastructure.jpeg](https://raw.githubusercontent.com/netdata/netdata/master/docs/netdata-cloud-onprem/infrastructure.jpeg)
 
 ### If you have any questions or suggestions please contact the Netdata team.
