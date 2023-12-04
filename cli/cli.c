@@ -17,7 +17,7 @@ uint64_t debug_flags;
 void netdata_logger_fatal( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt __maybe_unused, ... )
 {
     abort();
-};
+}
 #endif
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
@@ -129,7 +129,7 @@ static void parse_command_reply(BUFFER *buf)
          pos < response_string + response_string_size  && !syntax_error ;
          ++pos) {
         /* Skip white-space characters */
-        for ( ; isspace(*pos) && ('\0' != *pos); ++pos) {;}
+        for ( ; isspace(*pos) && ('\0' != *pos); ++pos) ;
 
         if ('\0' == *pos)
             continue;

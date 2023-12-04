@@ -25,7 +25,6 @@ struct option_def {
 void cancel_main_threads(void);
 int killpid(pid_t pid);
 void netdata_cleanup_and_exit(int ret) NORETURN;
-void send_statistics(const char *action, const char *action_result, const char *action_data);
 
 typedef enum {
     ABILITY_DATA_QUERIES          = (1 << 0),

@@ -4306,25 +4306,25 @@ void *global_statistics_workers_main(void *ptr)
 {
     global_statistics_register_workers();
 
-    netdata_thread_cleanup_push(global_statistics_workers_cleanup, ptr);
+    netdata_thread_cleanup_push(global_statistics_workers_cleanup, ptr)
+    {
+        int update_every =
+                (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+        if (update_every < localhost->rrd_update_every)
+            update_every = localhost->rrd_update_every;
 
-            int update_every =
-                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-            if (update_every < localhost->rrd_update_every)
-                update_every = localhost->rrd_update_every;
+        usec_t step = update_every * USEC_PER_SEC;
+        heartbeat_t hb;
+        heartbeat_init(&hb);
 
-            usec_t step = update_every * USEC_PER_SEC;
-            heartbeat_t hb;
-            heartbeat_init(&hb);
+        while (service_running(SERVICE_COLLECTORS)) {
+            worker_is_idle();
+            heartbeat_next(&hb, step);
 
-            while (service_running(SERVICE_COLLECTORS)) {
-                worker_is_idle();
-                heartbeat_next(&hb, step);
-
-                worker_is_busy(WORKER_JOB_WORKERS);
-                worker_utilization_charts();
-            }
-
+            worker_is_busy(WORKER_JOB_WORKERS);
+            worker_utilization_charts();
+        }
+    }
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
@@ -4348,25 +4348,26 @@ void *global_statistics_sqlite3_main(void *ptr)
 {
     global_statistics_register_workers();
 
-    netdata_thread_cleanup_push(global_statistics_sqlite3_cleanup, ptr);
+    netdata_thread_cleanup_push(global_statistics_sqlite3_cleanup, ptr)
+    {
 
-            int update_every =
-                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-            if (update_every < localhost->rrd_update_every)
-                update_every = localhost->rrd_update_every;
+        int update_every =
+                (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+        if (update_every < localhost->rrd_update_every)
+            update_every = localhost->rrd_update_every;
 
-            usec_t step = update_every * USEC_PER_SEC;
-            heartbeat_t hb;
-            heartbeat_init(&hb);
+        usec_t step = update_every * USEC_PER_SEC;
+        heartbeat_t hb;
+        heartbeat_init(&hb);
 
-            while (service_running(SERVICE_COLLECTORS)) {
-                worker_is_idle();
-                heartbeat_next(&hb, step);
+        while (service_running(SERVICE_COLLECTORS)) {
+            worker_is_idle();
+            heartbeat_next(&hb, step);
 
-                worker_is_busy(WORKER_JOB_SQLITE3);
-                sqlite3_statistics_charts();
-            }
-
+            worker_is_busy(WORKER_JOB_SQLITE3);
+            sqlite3_statistics_charts();
+        }
+    }
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

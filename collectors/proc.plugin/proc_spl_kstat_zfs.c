@@ -357,7 +357,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                 if (unlikely(!pool)) {
                     struct zfs_pool new_zfs_pool = {};
                     pool = dictionary_set(zfs_pools, de->d_name, &new_zfs_pool, sizeof(struct zfs_pool));
-                };
+                }
 
                 pool->updated = 1;
 

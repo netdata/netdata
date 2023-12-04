@@ -499,15 +499,15 @@ static void parse_commands(struct command_context *cmd_ctx)
     status = CMD_STATUS_FAILURE;
 
     /* Skip white-space characters */
-    for (pos = cmd_ctx->command_string ; isspace(*pos) && ('\0' != *pos) ; ++pos) {;}
+    for (pos = cmd_ctx->command_string ; isspace(*pos) && ('\0' != *pos) ; ++pos) ;
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         if (!strncmp(pos, command_info_array[i].cmd_str, strlen(command_info_array[i].cmd_str))) {
             if (CMD_EXIT == i) {
                 /* musl C does not like libuv workqueues calling exit() */
                 execute_command(CMD_EXIT, NULL, NULL);
             }
-            for (lstrip=pos + strlen(command_info_array[i].cmd_str); isspace(*lstrip) && ('\0' != *lstrip); ++lstrip) {;}
-            for (rstrip=lstrip+strlen(lstrip)-1; rstrip>lstrip && isspace(*rstrip); *(rstrip--) = 0 );
+            for (lstrip=pos + strlen(command_info_array[i].cmd_str); isspace(*lstrip) && ('\0' != *lstrip); ++lstrip) ;
+            for (rstrip=lstrip+strlen(lstrip)-1; rstrip>lstrip && isspace(*rstrip); *(rstrip--) = 0 ) ;
 
             cmd_ctx->work.data = cmd_ctx;
             cmd_ctx->idx = i;

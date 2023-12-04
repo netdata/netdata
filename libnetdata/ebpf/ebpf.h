@@ -141,7 +141,7 @@ enum netdata_kernel_idx {
 #define EBPF_KERNEL_REJECT_LIST_FILE "ebpf_kernel_reject_list.txt"
 
 #define ND_EBPF_DEFAULT_MIN_PID 1U
-#define ND_EBPF_MAP_FD_NOT_INITIALIZED (int)-1
+#define ND_EBPF_MAP_FD_NOT_INITIALIZED ((int)-1)
 
 typedef struct ebpf_addresses {
     char *function;

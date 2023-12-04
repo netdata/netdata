@@ -679,7 +679,7 @@ static void config_section_init(uv_loop_t *main_loop,
                         NULL
                     };
                     int i = 0;
-                    while(auth_path_default[i] && access(auth_path_default[i], R_OK)){i++;};
+                    while(auth_path_default[i] && access(auth_path_default[i], R_OK)) i++;
                     if(!auth_path_default[i]){
                         collector_error("[%s]: auth.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
@@ -691,7 +691,7 @@ static void config_section_init(uv_loop_t *main_loop,
                         NULL
                     };
                     int i = 0;
-                    while(syslog_path_default[i] && access(syslog_path_default[i], R_OK)){i++;};
+                    while(syslog_path_default[i] && access(syslog_path_default[i], R_OK)) i++;
                     if(!syslog_path_default[i]){
                         collector_error("[%s]: syslog path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
@@ -709,7 +709,7 @@ static void config_section_init(uv_loop_t *main_loop,
                         NULL
                     };
                     int i = 0;
-                    while(apache_access_path_default[i] && access(apache_access_path_default[i], R_OK)){i++;};
+                    while(apache_access_path_default[i] && access(apache_access_path_default[i], R_OK)) i++;
                     if(!apache_access_path_default[i]){
                         collector_error("[%s]: Apache access.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);
@@ -720,7 +720,7 @@ static void config_section_init(uv_loop_t *main_loop,
                         NULL
                     };
                     int i = 0;
-                    while(nginx_access_path_default[i] && access(nginx_access_path_default[i], R_OK)){i++;};
+                    while(nginx_access_path_default[i] && access(nginx_access_path_default[i], R_OK)) i++;
                     if(!nginx_access_path_default[i]){
                         collector_error("[%s]: Nginx access.log path invalid, unknown or needs permissions", p_file_info->chartname);
                         return p_file_info_destroy(p_file_info);

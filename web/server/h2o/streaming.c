@@ -138,9 +138,10 @@ static void stream_on_recv(h2o_socket_t *sock, const char *err)
 #define STREAM_METHOD "STREAM "
 #define USER_AGENT "User-Agent: "
 
-#define NEED_MIN_BYTES(buf, bytes)       \
-if (rbuf_bytes_available(buf) < bytes)   \
-    return GIMME_MORE_OF_DEM_SWEET_BYTEZ;
+#define NEED_MIN_BYTES(buf, bytes) do {      \
+    if(rbuf_bytes_available(buf) < bytes)    \
+        return GIMME_MORE_OF_DEM_SWEET_BYTEZ;\
+} while(0)
 
 // TODO check in streaming code this is probably defined somewhere already
 #define MAX_LEN_STREAM_HELLO (1024*2)

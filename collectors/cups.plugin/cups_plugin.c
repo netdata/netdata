@@ -175,7 +175,7 @@ struct job_metrics *get_job_metrics(char *dest) {
         struct job_metrics new_job_metrics = { .id = ++job_id };
         jm = dictionary_set(dict_dest_job_metrics, dest, &new_job_metrics, sizeof(struct job_metrics));
         send_job_charts_definitions_to_netdata(dest, jm->id, false);
-    };
+    }
 
     return jm;
 }

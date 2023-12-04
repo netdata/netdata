@@ -485,20 +485,11 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
 }
 
-// TODO enable this macro before release
-#define bail_if_no_cap(cap) \
-    if(unlikely(!stream_has_capability(host->sender, cap))) { \
-        return; \
-    }
-
-#define dyncfg_check_can_push(host) \
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host))) \
-        return; \
-    bail_if_no_cap(STREAM_CAP_DYNCFG)
+#define dyncfg_can_push(host) (rrdhost_can_send_definitions_to_parent(host) && stream_has_capability((host)->sender, STREAM_CAP_DYNCFG))
 
 // assumes job is locked and acquired!!!
 void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, const char *module_name, struct job *job) {
-    dyncfg_check_can_push(host);
+    if(!dyncfg_can_push(host)) return;
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -517,7 +508,7 @@ void rrdpush_send_job_status_update(RRDHOST *host, const char *plugin_name, cons
 }
 
 void rrdpush_send_job_deleted(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name) {
-    dyncfg_check_can_push(host);
+    if(!dyncfg_can_push(host)) return;
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -622,7 +613,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
 }
 
 void rrdpush_send_dyncfg(RRDHOST *host) {
-    dyncfg_check_can_push(host);
+    if(!dyncfg_can_push(host)) return;
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -654,9 +645,8 @@ void rrdpush_send_dyncfg(RRDHOST *host) {
     sender_thread_buffer_free();
 }
 
-void rrdpush_send_dyncfg_enable(RRDHOST *host, const char *plugin_name)
-{
-    dyncfg_check_can_push(host);
+void rrdpush_send_dyncfg_enable(RRDHOST *host, const char *plugin_name) {
+    if(!dyncfg_can_push(host)) return;
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -667,9 +657,8 @@ void rrdpush_send_dyncfg_enable(RRDHOST *host, const char *plugin_name)
     sender_thread_buffer_free();
 }
 
-void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, const char *module_name, enum module_type type)
-{
-    dyncfg_check_can_push(host);
+void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, const char *module_name, enum module_type type) {
+    if(!dyncfg_can_push(host)) return;
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -680,9 +669,8 @@ void rrdpush_send_dyncfg_reg_module(RRDHOST *host, const char *plugin_name, cons
     sender_thread_buffer_free();
 }
 
-void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name, enum job_type type, uint32_t flags)
-{
-    dyncfg_check_can_push(host);
+void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const char *module_name, const char *job_name, enum job_type type, uint32_t flags) {
+    if(!dyncfg_can_push(host)) return;
 
     BUFFER *wb = sender_start(host->sender);
 
@@ -693,9 +681,8 @@ void rrdpush_send_dyncfg_reg_job(RRDHOST *host, const char *plugin_name, const c
     sender_thread_buffer_free();
 }
 
-void rrdpush_send_dyncfg_reset(RRDHOST *host, const char *plugin_name)
-{
-    dyncfg_check_can_push(host);
+void rrdpush_send_dyncfg_reset(RRDHOST *host, const char *plugin_name) {
+    if(!dyncfg_can_push(host)) return;
 
     BUFFER *wb = sender_start(host->sender);
 

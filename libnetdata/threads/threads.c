@@ -276,8 +276,9 @@ static void *netdata_thread_init(void *ptr) {
     netdata_thread_set_tag(netdata_thread->tag);
 
     void *ret = NULL;
-    pthread_cleanup_push(thread_cleanup, ptr);
-            ret = netdata_thread->start_routine(netdata_thread->arg);
+    pthread_cleanup_push(thread_cleanup, ptr) {
+        ret = netdata_thread->start_routine(netdata_thread->arg);
+    }
     pthread_cleanup_pop(1);
 
     return ret;

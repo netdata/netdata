@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// do not REMOVE this, it is used by systemd-journal includes to prevent saving the file, function, line of the
+// source code that makes the calls, allowing our loggers to log the lines of source code that actually log
 #define SD_JOURNAL_SUPPRESS_LOCATION
 
 #include "../libnetdata.h"
@@ -1433,13 +1435,13 @@ static int64_t log_field_to_int64(struct log_field *lf) {
             break;
 
         case NDFT_U64:
-            return lf->entry.u64;
+            return (int64_t)lf->entry.u64;
 
         case NDFT_I64:
-            return lf->entry.i64;
+            return (int64_t)lf->entry.i64;
 
         case NDFT_DBL:
-            return lf->entry.dbl;
+            return (int64_t)lf->entry.dbl;
     }
 
     if(s && *s)
@@ -1536,7 +1538,7 @@ static void errno_annotator(BUFFER *wb, const char *key, struct log_field *lf) {
         return;
 
     char buf[1024];
-    const char *s = errno2str(errnum, buf, sizeof(buf));
+    const char *s = errno2str((int)errnum, buf, sizeof(buf));
 
     if(buffer_strlen(wb))
         buffer_fast_strcat(wb, " ", 1);

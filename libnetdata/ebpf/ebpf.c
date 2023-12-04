@@ -768,7 +768,7 @@ static void ebpf_update_maps(ebpf_module_t *em, struct bpf_object *obj)
         int fd = bpf_map__fd(map);
         if (maps) {
             const char *map_name = bpf_map__name(map);
-            int j = 0; ;
+            int j = 0;
             while (maps[j].name) {
                 ebpf_local_maps_t *w = &maps[j];
                 if (w->map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED && !strcmp(map_name, w->name))
@@ -908,7 +908,7 @@ char *ebpf_find_symbol(char *search)
     unsigned long i, lines = procfile_lines(ff);
     size_t length = strlen(search);
     for(i = 0; i < lines ; i++) {
-        char *cmp = procfile_lineword(ff, i,2);;
+        char *cmp = procfile_lineword(ff, i,2);
         if (!strncmp(search, cmp, length)) {
             ret = strdupz(cmp);
             break;
