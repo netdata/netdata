@@ -3750,7 +3750,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     struct target *w;
 
     for (w = root; w ; w = w->next) {
-        if (unlikely(!w->exposed && !w->is_other))
+        if (unlikely(!w->exposed))
             continue;
 
         send_BEGIN(type, w->clean_name, "processes", dt);
