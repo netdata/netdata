@@ -1201,7 +1201,13 @@ enable_feature DBENGINE "${ENABLE_DBENGINE}"
 enable_feature H2O "${ENABLE_H2O}"
 enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
 
-enable_feature PLUGIN_APPS "${IS_LINUX}"
+ENABLE_APPS=0
+
+if [ "${IS_LINUX}" = 1 ] || [ "$(uname -s)" = "FreeBSD" ]; then
+    ENABLE_APPS=1
+fi
+
+enable_feature PLUGIN_APPS "${ENABLE_APPS}"
 
 check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
 check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
