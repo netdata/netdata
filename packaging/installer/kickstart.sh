@@ -125,6 +125,7 @@ main() {
       ;;
   esac
 
+  handle_existing_install
   set_tmpdir
 
   if [ -n "${INSTALL_VERSION}" ]; then
@@ -2324,9 +2325,5 @@ parse_args $@
 confirm_root_support
 get_system_info
 confirm_install_prefix
-
-if [ -z "${ACTION}" ]; then
-  handle_existing_install
-fi
 
 main
