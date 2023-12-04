@@ -24,8 +24,8 @@ filename:
   key: NGINX_LOG_FILENAME
 
 filter:
-  include: ".*"
-  exclude: ".*HELLO.*WORLD.*"
+  include: '.*'
+  exclude: '.*HELLO.*WORLD.*'
 
 rename:
   - new_key: TEST1
@@ -39,32 +39,32 @@ inject:
   - key: SYSLOG_IDENTIFIER2
     value: nginx-log2
   - key: PRIORITY
-    value: "${NGINX_STATUS}"
+    value: '${NGINX_STATUS}'
   - key: NGINX_STATUS_FAMILY
-    value: "${NGINX_STATUS}${NGINX_METHOD}"
+    value: '${NGINX_STATUS}${NGINX_METHOD}'
 
 rewrite:
   - key: PRIORITY
-    value: "${NGINX_STATUS}"
+    value: '${NGINX_STATUS}'
     inject: yes
     stop: no
   - key: PRIORITY
-    match: "^[123]"
+    match: '^[123]'
     value: 6
   - key: PRIORITY
-    match: "^4"
+    match: '^4'
     value: 5
   - key: PRIORITY
-    match: "^5"
+    match: '^5'
     value: 3
   - key: PRIORITY
-    match: ".*"
+    match: '.*'
     value: 4
   - key: NGINX_STATUS_FAMILY
-    match: "^(?<first_digit>[1-5])"
-    value: "${first_digit}xx"
+    match: '^(?<first_digit>[1-5])'
+    value: '${first_digit}xx'
   - key: NGINX_STATUS_FAMILY
-    match: ".*"
+    match: '.*'
     value: UNKNOWN
 
 unmatched:

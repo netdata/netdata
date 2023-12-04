@@ -11,7 +11,7 @@ Requirements:
 
 To install the whole environment, log in to the designated host and run:
 ```shell
-curl https://netdata-cloud-netdata-static-content.s3.amazonaws.com/provision.sh
+curl https://netdata-cloud-netdata-static-content.s3.amazonaws.com/provision.sh -o provision.sh
 chmod +x provision.sh
 sudo ./provision.sh --install
 ```
@@ -24,10 +24,10 @@ What does the script do during installation?
    - Path for certificate file (PEM format)
    - Path for private key file (PEM format)
 2. After getting all of the information installation is starting. The script will install:
-   1. Helm
-   2. Kubectl
-   3. AWS CLI
-   4. K3s cluster (single node)
+   - Helm
+   - Kubectl
+   - AWS CLI
+   - K3s cluster (single node)
 3. When all the required software is installed script starts to provision the K3s cluster with gathered data.
 
 After cluster provisioning netdata is ready to be used.

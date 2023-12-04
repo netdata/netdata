@@ -12,7 +12,7 @@ filename:
   key: NGINX_LOG_FILENAME
 
 filter:
-  exclude: "NGINX_BINARY_REMOTE_ADDR"
+  exclude: '^(NGINX_BINARY_REMOTE_ADDR)$'
 
 rename:
   - new_key: MESSAGE
@@ -69,15 +69,15 @@ rename:
 # Inject constant fields into the journal logs.
 inject:
   - key: SYSLOG_IDENTIFIER
-    value: "nginx-log"
+    value: nginx-log
 
   # inject PRIORITY is a duplicate of NGINX_STATUS
-  - key: "PRIORITY"
-    value: "${NGINX_STATUS}"
+  - key: PRIORITY
+    value: '${NGINX_STATUS}'
 
   # Inject NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
-  - key: "NGINX_STATUS_FAMILY"
-    value: "${NGINX_STATUS}"
+  - key: NGINX_STATUS_FAMILY
+    value: '${NGINX_STATUS}'
 
 
 # Rewrite the value of fields (including the duplicated ones).
@@ -87,69 +87,69 @@ rewrite:
   # a ? means it has query string, everything else means it does not
   - key: NGINX_HAS_QUERY_STRING
     match: '^\?$'
-    value: "yes"
+    value: yes
   - key: NGINX_HAS_QUERY_STRING
-    match: ".*"
-    value: "no"
+    match: '.*'
+    value: no
 
   # 'on' means it was HTTPS, everything else means it was not
   - key: NGINX_HTTPS
-    match: "^on$"
-    value: "yes"
+    match: '^on$'
+    value: yes
   - key: NGINX_HTTPS
-    match: ".*"
-    value: "no"
+    match: '.*'
+    value: no
 
   # 'p' means it was pipelined, everything else means it was not
   - key: NGINX_PIPELINED
-    match: "^p$"
-    value: "yes"
+    match: '^p$'
+    value: yes
   - key: NGINX_PIPELINED
-    match: ".*"
-    value: "no"
+    match: '.*'
+    value: no
 
   # zero means client sent a certificate and it was verified, non-zero means otherwise
   - key: NGINX_PROXY_PROTOCOL_TLV_SSL_VERIFY
-    match: "^0$"
-    value: "yes"
+    match: '^0$'
+    value: yes
   - key: NGINX_PROXY_PROTOCOL_TLV_SSL_VERIFY
-    match: ".*"
-    value: "no"
+    match: '.*'
+    value: no
 
   # 'OK' means request completed, everything else means it didn't
   - key: NGINX_REQUEST_COMPLETION
-    match: "^OK$"
-    value: "completed"
+    match: '^OK$'
+    value: 'completed'
   - key: NGINX_REQUEST_COMPLETION
-    match: ".*"
-    value: "not completed"
+    match: '.*'
+    value: 'not completed'
 
   # PRIORTY is a duplicate of NGINX_STATUS
   # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
-  - key: "PRIORITY"
-    match: "^[123]"
+  - key: PRIORITY
+    match: '^[123]'
     value: 6
 
-  - key: "PRIORITY"
-    match: "^4"
+  - key: PRIORITY
+    match: '^4'
     value: 5
 
-  - key: "PRIORITY"
-    match: "^5"
+  - key: PRIORITY
+    match: '^5'
     value: 3
 
-  - key: "PRIORITY"
-    match: ".*"
+  - key: PRIORITY
+    match: '.*'
     value: 4
 
   # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
-  - key: "NGINX_STATUS_FAMILY"
-    match: "^(?<first_digit>[1-5])"
-    value: "${first_digit}xx"
+  - key: NGINX_STATUS_FAMILY
+    match: '^(?<first_digit>[1-5])'
+    value: '${first_digit}xx'
 
-  - key: "NGINX_STATUS_FAMILY"
-    match: ".*"
-    value: "UNKNOWN"
+  - key: NGINX_STATUS_FAMILY
+    match: '.*'
+    value: 'UNKNOWN'
 
 # Control what to do when input logs do not match the main PCRE2 pattern.
 unmatched:
