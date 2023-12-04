@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- logs-management: Disable logs management monitoring section [\#16525](https://github.com/netdata/netdata/pull/16525) ([Dim-P](https://github.com/Dim-P))
 - log method = none is not respected [\#16523](https://github.com/netdata/netdata/pull/16523) ([ktsaou](https://github.com/ktsaou))
 - include more cases for megacli degraded state [\#16522](https://github.com/netdata/netdata/pull/16522) ([ClaraCrazy](https://github.com/ClaraCrazy))
+- log2journal improvements 5 [\#16519](https://github.com/netdata/netdata/pull/16519) ([ktsaou](https://github.com/ktsaou))
 - change log level to debug for dbengine routine operations on start [\#16518](https://github.com/netdata/netdata/pull/16518) ([ilyam8](https://github.com/ilyam8))
 - remove system info logging [\#16517](https://github.com/netdata/netdata/pull/16517) ([ilyam8](https://github.com/ilyam8))
 - python.d: logger: remove timestamp when logging to journald. [\#16516](https://github.com/netdata/netdata/pull/16516) ([ilyam8](https://github.com/ilyam8))
@@ -433,8 +435,6 @@
 - facets optimizations [\#15940](https://github.com/netdata/netdata/pull/15940) ([ktsaou](https://github.com/ktsaou))
 - improved facets info [\#15936](https://github.com/netdata/netdata/pull/15936) ([ktsaou](https://github.com/ktsaou))
 - feat: Adds access control configuration for ntfy [\#15932](https://github.com/netdata/netdata/pull/15932) ([miversen33](https://github.com/miversen33))
-- fix memory leak on prometheus exporter and code cleanup [\#15929](https://github.com/netdata/netdata/pull/15929) ([ktsaou](https://github.com/ktsaou))
-- systemd-journal and facets: info and sources [\#15928](https://github.com/netdata/netdata/pull/15928) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
