@@ -204,25 +204,19 @@ static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
     time_t now = now_realtime_sec();
     time_t last_entry_t;
     RRDSET *st;
+
+    time_t child_connect_time = host->child_connect_time;
+
     rrdset_foreach_read(st, host) {
         if(rrdset_is_replicating(st))
             continue;
 
         last_entry_t = rrdset_last_entry_s(st);
 
-//        if(last_entry_t + st->update_every * 2 + 30 < now)
-//            netdata_log_error("Possibly obsolete chart 'host:%s/chart:%s', last entry is %zu secs old "
-//                              "(replicating: %s, obsolete: %s, obsolete dims: %s)",
-//                              rrdhost_hostname(host), rrdset_id(st), now - last_entry_t,
-//                              rrdset_is_replicating(st) ? "true" : "false",
-//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) ? "true" : "false",
-//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) ? "true" : "false"
-//                              );
-
-
-        if(last_entry_t && last_entry_t < host->child_connect_time &&
-           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
-                   (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) < now)
+        if (last_entry_t && last_entry_t < child_connect_time &&
+            child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
+                    (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) <
+                now)
 
             rrdset_is_obsolete___safe_from_collector_thread(st);
     }
@@ -241,19 +235,22 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
-        if(host != localhost
-            && host->trigger_chart_obsoletion_check
-            && (
-                   (
-                    host->child_last_chart_command
-                 && host->child_last_chart_command + host->health.health_delay_up_to < now_realtime_sec()
-                   )
-                || (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
-                )
-            ) {
+        if (host == localhost)
+            continue;
+
+        netdata_mutex_lock(&host->receiver_lock);
+
+        time_t now = now_realtime_sec();
+
+        if (host->trigger_chart_obsoletion_check &&
+            ((host->child_last_chart_command &&
+              host->child_last_chart_command + host->health.health_delay_up_to < now) ||
+             (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now))) {
             svc_rrdhost_detect_obsolete_charts(host);
             host->trigger_chart_obsoletion_check = 0;
         }
+
+        netdata_mutex_unlock(&host->receiver_lock);
     }
 
     rrd_unlock();
