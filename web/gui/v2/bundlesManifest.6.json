@@ -1,5 +1,6 @@
 {
   "app.css": "/app.cb2e9f9a81cf9533384e.css",
+<<<<<<< HEAD
   "app.js": "/app.bdc9e6fd928f5f2b7fa6.js",
   "runtime.js": "/runtime.f3ce1f7a9b08e6795a50.js",
   "npm.react.dom.js": "/npm.react.dom.c01d5fdd49b632d78389.js",
@@ -12,4 +13,18 @@
   "3423.js": "/3423.16eab3abf78049f577a4.js",
   "5158.js": "/5158.908f93a8135a2de2e398.js",
   "6187.js": "/6187.6646e857be54520bc799.js"
+=======
+  "app.js": "/app.0aa0867576aa56309774.js",
+  "runtime.js": "/runtime.5c3678d837d0a72bddc1.js",
+  "npm.react.dom.js": "/npm.react.dom.f05fa7d26cc191f9fa8b.js",
+  "2406.js": "/2406.24e694a1545dcd8796d7.js",
+  "2533.js": "/2533.0888eb5c25893e13de89.js",
+  "6152.js": "/6152.3d6f965a5e6abd36d6d4.js",
+  "8099.js": "/8099.549b3186da50ca0a262c.js",
+  "4586.js": "/4586.eb0017e74411313a36c8.js",
+  "1282.js": "/1282.c501a99713395ad6a935.js",
+  "9513.js": "/9513.a435398d5e9c7da0b6d6.js",
+  "5158.js": "/5158.e126ec74acf01cd1f94f.js",
+  "6187.js": "/6187.fdf0e68b17ddfa9020ee.js"
+>>>>>>> origin/master
 }
