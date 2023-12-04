@@ -8,5 +8,6 @@ SUBDIRS = \
 
 dist_noinst_DATA = \
     gperf-config.txt \
+    functions-table.md \
     README.md \
     $(NULL)

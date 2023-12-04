@@ -133,10 +133,19 @@ Netdata parses lines starting with:
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
+-    `FUNCTION` - define functions
+-    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
+-    `FUNCTION_RESULT_END` - to end the transmission of function results
 
 a single program can produce any number of charts with any number of dimensions each.
 
 Charts can be added any time (not just the beginning).
+
+Netdata may send the following commands to the plugin's `stdin`:
+
+-    `FUNCTION` - to call a specific function, with all parameters inline
+-    `FUNCTION_PAYLOAD` - to call a specific function, with a payload of parameters
+-    `FUNCTION_PAYLOAD_END` - to end the payload of parameters
 
 ### Command line parameters
 
@@ -154,18 +163,26 @@ every 5 seconds.
 There are a few environment variables that are set by `netdata` and are
 available for the plugin to use.
 
-|          variable           | description                                                                                                                                                                                                                                            |
-|:---------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|  `NETDATA_USER_CONFIG_DIR`  | The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).                                                |
-| `NETDATA_STOCK_CONFIG_DIR`  | The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).                                      |
-|    `NETDATA_PLUGINS_DIR`    | The directory where all Netdata plugins are stored.                                                                                                                                                                                                    |
-| `NETDATA_USER_PLUGINS_DIRS` | The list of directories where custom plugins are stored.                                                                                                                                                                                               |
-|      `NETDATA_WEB_DIR`      | The directory where the web files of Netdata are saved.                                                                                                                                                                                                |
-|     `NETDATA_CACHE_DIR`     | The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.                                  |
-|      `NETDATA_LOG_DIR`      | The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.                                                                                                           |
-|    `NETDATA_HOST_PREFIX`    | This is used in environments where system directories like `/sys` and `/proc` have to be accessed at a different path.                                                                                                                                 |
-|    `NETDATA_DEBUG_FLAGS`    | This is a number (probably in hex starting with `0x`), that enables certain Netdata debugging features. Check **\[[Tracing Options]]** for more information.                                                                                           |
-|   `NETDATA_UPDATE_EVERY`    | The minimum number of seconds between chart refreshes. This is like the **internal clock** of Netdata (it is user configurable, defaulting to `1`). There is no meaning for a plugin to update its values more frequently than this number of seconds. |
+|             variable             | description                                                                                                                                                                                                                                            |
+|:--------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|    `NETDATA_USER_CONFIG_DIR`     | The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).                                                |
+|    `NETDATA_STOCK_CONFIG_DIR`    | The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).                                      |
+|      `NETDATA_PLUGINS_DIR`       | The directory where all Netdata plugins are stored.                                                                                                                                                                                                    |
+|   `NETDATA_USER_PLUGINS_DIRS`    | The list of directories where custom plugins are stored.                                                                                                                                                                                               |
+|        `NETDATA_WEB_DIR`         | The directory where the web files of Netdata are saved.                                                                                                                                                                                                |
+|       `NETDATA_CACHE_DIR`        | The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.                                  |
+|        `NETDATA_LOG_DIR`         | The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.                                                                                                           |
+|      `NETDATA_HOST_PREFIX`       | This is used in environments where system directories like `/sys` and `/proc` have to be accessed at a different path.                                                                                                                                 |
+|      `NETDATA_DEBUG_FLAGS`       | This is a number (probably in hex starting with `0x`), that enables certain Netdata debugging features. Check **\[[Tracing Options]]** for more information.                                                                                           |
+|      `NETDATA_UPDATE_EVERY`      | The minimum number of seconds between chart refreshes. This is like the **internal clock** of Netdata (it is user configurable, defaulting to `1`). There is no meaning for a plugin to update its values more frequently than this number of seconds. |
+|     `NETDATA_INVOCATION_ID`      | A random UUID in compact form, representing the unique invocation identifier of Netdata. When running under systemd, Netdata uses the `INVOCATION_ID` set by systemd.                                                                                  |
+|       `NETDATA_LOG_METHOD`       | One of `syslog`, `journal`, `stderr` or `none`, indicating the preferred log method of external plugins.                                                                                                                                               |
+|       `NETDATA_LOG_FORMAT`       | One of `journal`, `logfmt` or `json`, indicating the format of the logs. Plugins can use the Netdata `systemd-cat-native` command to log always in `journal` format, and have it automatically converted to the format expected by netdata.            |
+|       `NETDATA_LOG_LEVEL`        | One of `emergency`, `alert`, `critical`, `error`, `warning`, `notice`, `info`, `debug`. Plugins are expected to log events with the given priority and the more important ones.                                                                        |
+|    `NETDATA_SYSLOG_FACILITY`     | Set only when the `NETDATA_LOG_METHOD` is `syslog`. Possible values are `auth`, `authpriv`, `cron`, `daemon`, `ftp`, `kern`, `lpr`, `mail`, `news`, `syslog`, `user`, `uucp` and `local0` to `local7`                                                  |  
+| `NETDATA_ERRORS_THROTTLE_PERIOD` | The log throttling period in seconds.                                                                                                                                                                                                                  |
+|   `NETDATA_ERRORS_PER_PERIOD`    | The allowed number of log events per period.                                                                                                                                                                                                           | 
+| `NETDATA_SYSTEMD_JOURNAL_PATH`   | When `NETDATA_LOG_METHOD` is set to `journal`, this is the systemd-journald socket path to use.                                                                                                                                                        |
 
 ### The output of the plugin
 
@@ -446,6 +463,8 @@ The `source` is an integer field that can have the following values:
 `CLABEL_COMMIT` indicates that all labels were defined and the chart can be updated.
 
 #### FUNCTION
+
+The plugin can register functions to Netdata, like this:
 
 > FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users"
 
