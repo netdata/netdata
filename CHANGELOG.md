@@ -6,9 +6,16 @@
 
 **Merged pull requests:**
 
+- update go.d plugin to v0.57.2 [\#16533](https://github.com/netdata/netdata/pull/16533) ([ilyam8](https://github.com/ilyam8))
+- Update getting-started-light-poc.md [\#16532](https://github.com/netdata/netdata/pull/16532) ([M4itee](https://github.com/M4itee))
+- Acquire receiver\_lock to to avoid race condition [\#16531](https://github.com/netdata/netdata/pull/16531) ([stelfrag](https://github.com/stelfrag))
+- link aclk.log to stdout in docker [\#16529](https://github.com/netdata/netdata/pull/16529) ([ilyam8](https://github.com/ilyam8))
+- Update getting-started.md [\#16528](https://github.com/netdata/netdata/pull/16528) ([Ancairon](https://github.com/Ancairon))
+- Make image available to Learn + add a category overview page for new … [\#16527](https://github.com/netdata/netdata/pull/16527) ([Ancairon](https://github.com/Ancairon))
 - logs-management: Disable logs management monitoring section [\#16525](https://github.com/netdata/netdata/pull/16525) ([Dim-P](https://github.com/Dim-P))
 - log method = none is not respected [\#16523](https://github.com/netdata/netdata/pull/16523) ([ktsaou](https://github.com/ktsaou))
 - include more cases for megacli degraded state [\#16522](https://github.com/netdata/netdata/pull/16522) ([ClaraCrazy](https://github.com/ClaraCrazy))
+- update bundled UI to v6.65.0 [\#16520](https://github.com/netdata/netdata/pull/16520) ([ilyam8](https://github.com/ilyam8))
 - log2journal improvements 5 [\#16519](https://github.com/netdata/netdata/pull/16519) ([ktsaou](https://github.com/ktsaou))
 - change log level to debug for dbengine routine operations on start [\#16518](https://github.com/netdata/netdata/pull/16518) ([ilyam8](https://github.com/ilyam8))
 - remove system info logging [\#16517](https://github.com/netdata/netdata/pull/16517) ([ilyam8](https://github.com/ilyam8))
@@ -430,11 +437,6 @@
 - Regenerate integrations.js [\#15946](https://github.com/netdata/netdata/pull/15946) ([netdatabot](https://github.com/netdatabot))
 - Integrations: Add a note to enable the collectors [\#15945](https://github.com/netdata/netdata/pull/15945) ([MrZammler](https://github.com/MrZammler))
 - Change the build image of EL packages from alma to rocky [\#15944](https://github.com/netdata/netdata/pull/15944) ([tkatsoulas](https://github.com/tkatsoulas))
-- Integrations: Add a note to install charts.d plugin [\#15943](https://github.com/netdata/netdata/pull/15943) ([MrZammler](https://github.com/MrZammler))
-- Add description about packages [\#15941](https://github.com/netdata/netdata/pull/15941) ([thiagoftsm](https://github.com/thiagoftsm))
-- facets optimizations [\#15940](https://github.com/netdata/netdata/pull/15940) ([ktsaou](https://github.com/ktsaou))
-- improved facets info [\#15936](https://github.com/netdata/netdata/pull/15936) ([ktsaou](https://github.com/ktsaou))
-- feat: Adds access control configuration for ntfy [\#15932](https://github.com/netdata/netdata/pull/15932) ([miversen33](https://github.com/miversen33))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
