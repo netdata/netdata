@@ -304,9 +304,9 @@ and searching of any dataset, independently of its source.
 On busy logs servers, or when querying long timeframes that match millions of log entries, the plugin has a sampling
 algorithm to allow it respond promptly. It works like this:
 
-1. The latest 500k log entries are queried in full, meaning that the log entries are queried in full, evaluating all the
-   fields of every single log entry. This evaluation allows counting the unique values per field, updating the counters
-   next to each value at the filters section of the dashboard.
+1. The latest 500k log entries are queried in full, evaluating all the fields of every single log entry. This evaluation
+   allows counting the unique values per field, updating the counters next to each value at the filters section of the
+   dashboard.
 2. When the latest 500k log entries have been processed and there are more data to read, the plugin divides evenly 500k
    more log entries to the number of journal files matched by the query. So, it will continue to evaluate all the fields
    of all log entries, up to the budget per file, aiming to fully query 1 million log entries in total.
@@ -348,20 +348,28 @@ To work around this problem, the plugin uses `inotify` to receive file updates i
 the newest to the oldest file, allowing the user interface to work immediately after startup, for the most recent
 timeframes.
 
-systemd-journal has been designed first to be reliable and then to be fast. It includes several mechanisms to ensure
+### Best practices for better performance
+
+systemd-journal has been designed **first to be reliable** and then to be fast. It includes several mechanisms to ensure
 minimal data loss under all conditions (e.g. disk corruption, tampering, forward secure sealing) and despite the fact
 that it utilizes several techniques to require minimal disk footprint (like deduplication of log entries, linking of
 values and fields, compression) the disk footprint of journal files remains significantly higher compared to other log
-management solutions. The higher disk footprint results in higher disk I/O during querying, since a lot more data have
-to read from disk to evaluate a query. Query performance at scale can greatly be improved by utilizing a compressed
-filesystem (ext4, btrfs, zfs) to store systemd-journal files.
+management solutions.
+
+The higher disk footprint results in higher disk I/O during querying, since a lot more data have to read from disk to
+evaluate a query. Query performance at scale can greatly benefit by utilizing a compressed filesystem (ext4, btrfs, zfs)
+to store systemd-journal files.
 
 systemd-journal files are cached by the operating system. There is no database server to serve queries. Each file is
-opened and the query runs by directly accessing the data in it. Therefore systemd-journal relies on the caching
-layer of the operating system to optimize query performance. The more RAM the system has, although it will not be
-reported as `used` (it will be reported as `cache`), the faster the queries will get. The first time a timeframe is
-accessed the query performance will be slower, but further queries on the same timeframe will be significantly faster
-since journal data are now cached in memory.
+opened and the query runs by directly accessing the data in it.
+
+Therefore systemd-journal relies on the caching layer of the operating system to optimize query performance. The more
+RAM the system has, although it will not be reported as `used` (it will be reported as `cache`), the faster the queries
+will get. The first time a timeframe is accessed the query performance will be slower, but further queries on the same
+timeframe will be significantly faster since journal data are now cached in memory.
+
+So, on busy logs centralization systems, queries performance can be improved significantly by using a compressed
+filesystem for storing the journal files, and higher amounts of RAM.
 
 ## Configuration and maintenance
 
