@@ -40,31 +40,34 @@ For more information check [this discussion](https://github.com/netdata/netdata/
 
 The following are limitations related to the availability of the plugin:
 
-- This plugin is not available when Netdata is installed in a container. The problem is that `libsystemd` is not
-  available in Alpine Linux (there is a `libsystemd`, but it is a dummy that returns failure on all calls). We plan to
-  change this, by shipping Netdata containers based on Debian.
+- Netdata versions prior to 1.44 shipped in a docker container do not include this plugin. 
+  The problem is that `libsystemd` is not available in Alpine Linux (there is a `libsystemd`, but it is a dummy that 
+  returns failure on all calls). Starting with Netdata version 1.44, Netdata containers use a Debian base image
+  making this plugin available when Netdata is running in a container.
 - For the same reason (lack of `systemd` support for Alpine Linux), the plugin is not available on `static` builds of
-  Netdata (which are based on `muslc`, not `glibc`).
+  Netdata (which are based on `muslc`, not `glibc`). If your Netdata is installed in `/opt/netdata` you most likely have
+  a static build of Netdata.
 - On old systemd systems (like Centos 7), the plugin runs always in "full data query" mode, which makes it slower. The
   reason, is that systemd API is missing some important calls we need to use the field indexes of `systemd` journal.
   However, when running in this mode, the plugin offers also negative matches on the data (like filtering for all logs
   that do not have set some field), and this is the reason "full data query" mode is also offered as an option even on
   newer versions of `systemd`.
 
-To use the plugin, install one of our native distribution packages, or install it from source.
-
 #### `systemd` journal features
 
 The following are limitations related to the features of `systemd` journal:
 
-- This plugin does not support binary field values. `systemd` journal has the ability to assign fields with binary data.
-  This plugin assumes all fields contain text values (text in this context includes numbers).
+- This plugin assumes that binary field values are text fields with newlines in them. `systemd-journal` has the ability
+  to support binary fields, without specifying the nature of the binary data. However, binary fields are commonly used
+  to store log entries that include multiple lines of text. The plugin treats all binary fields are multi-line text.
 - This plugin does not support multiple values per field for any given log entry. `systemd` journal has the ability to
   accept the same field key, multiple times, with multiple values on a single log entry. This plugin will present the
   last value and ignore the others for this log entry.
 - This plugin will only read journal files located in `/var/log/journal` or `/run/log/journal`. `systemd-journal-remote` has the
   ability to store journal files anywhere (user configured). If journal files are not located in `/var/log/journal`
-  or `/run/log/journal` (and any of their subdirectories), the plugin will not find them.
+  or `/run/log/journal` (and any of their subdirectories), the plugin will not find them. A simple solution is to link
+  the other directories somewhere inside `/var/log/journal`. The plugin will pick them up, even if a sub-directory of
+  `/var/log/journal` is a link to a directory outside `/var/log/journal`.
 
 Other than the above, this plugin supports all features of `systemd` journals.
 
@@ -153,6 +156,7 @@ The plugin automatically enriches certain fields to make them more user-friendly
 - `_GID`, `OBJECT_GID`: the local group database is consulted to annotate them with group names.
 - `_CAP_EFFECTIVE`: the encoded value is annotated with a human-readable list of the linux capabilities.
 - `_SOURCE_REALTIME_TIMESTAMP`: the numeric value is annotated with human-readable datetime in UTC.
+- `MESSAGE_ID`: for the known `MESSAGE_ID`s, the value is replaced with the well known name of the event.
 
 The values of all other fields are presented as found in the journals.
 
@@ -294,6 +298,70 @@ The problem lies in the way `libsystemd` handles multi-journal file queries. To 
 the Netdata plugin queries each file individually and it then it merges the results to be returned.
 This is transparent, thanks to the `facets` library in `libnetdata` that handles on-the-fly indexing, filtering,
 and searching of any dataset, independently of its source.
+
+## Performance at scale
+
+On busy logs servers, or when querying long timeframes that match millions of log entries, the plugin has a sampling
+algorithm to allow it respond promptly. It works like this:
+
+1. The latest 500k log entries are queried in full, meaning that the log entries are queried in full, evaluating all the
+   fields of every single log entry. This evaluation allows counting the unique values per field, updating the counters
+   next to each value at the filters section of the dashboard.
+2. When the latest 500k log entries have been processed and there are more data to read, the plugin divides evenly 500k
+   more log entries to the number of journal files matched by the query. So, it will continue to evaluate all the fields
+   of all log entries, up to the budget per file, aiming to fully query 1 million log entries in total.
+3. When the budget is hit for a given file, the plugin continues to scan log entries, but this time it does not evaluate
+   the fields and their values, so the counters per field and value are not updated. These unsampled log entries are
+   shown in the histogram with the label `[unsampled]`.
+4. The plugin continues to count `[unsampled]` entries until as many as sampled entries have been evaluated and at least
+   1% of the journal file has been processed.
+5. When the `[unsampled]` budget is exhausted, the plugin stops processing the journal file and based on the processing
+   completed so far and the number of entries in the journal file, it estimates the remaining number of log entries in
+   that file. This is shown as `[estimated]` at the histogram.
+6. In systemd versions 254 or later, the plugin fetches the unique sequence number of each log entry and calculates the
+   the percentage of the file matched by the query, versus the total number of the log entries in the journal file.
+7. In systemd versions prior to 254, the plugin estimates the number of entries the journal file contributes to the
+   query, using the amount of log entries matched it vs. the total duration the log file has entries for. 
+
+The above allow the plugin to respond promptly even when the number of log entries in the journal files is several
+dozens millions, while providing accurate estimations of the log entries over time at the histogram and enough counters
+at the fields filtering section to help users get an overview of the whole timeframe.
+
+The fact that the latest 500k log entries and 1% of all journal files (which are spread over time) have been fully
+evaluated, including counting the number of appearances for each field value, the plugin usually provides an accurate
+representation of the whole timeframe.
+
+Keep in mind that although the plugin is quite effective and responds promptly when there are hundreds of journal files
+matching a query, response times may be longer when there are several thousands of smaller files. systemd versions 254+
+attempt to solve this problem by allowing `systemd-journal-remote` to create larger files. However, for systemd
+versions prior to 254, `systemd-journal-remote` creates files of up to 32MB each, which when running very busy
+journals centralization servers aggregating several thousands of log entries per second, the number of files can grow
+to several dozens of thousands quickly. In such setups, the plugin should ideally skip processing journal files
+entirely, relying solely on the estimations of the sequence of files each file is part of. However, this has not been
+implemented yet. To improve the query performance in such setups, the user has to query smaller timeframes.
+
+Another optimization taking place in huge journal centralization points, is the initial scan of the database. The plugin
+needs to know the list of all journal files available, including the details of the first and the last message in each
+of them. When there are several thousands of files in a directory (like it usually happens in `/var/log/journal/remote`),
+directory listing and examination of each file can take a considerable amount of time (even `ls -l` takes minutes).
+To work around this problem, the plugin uses `inotify` to receive file updates immediately and scans the library from
+the newest to the oldest file, allowing the user interface to work immediately after startup, for the most recent
+timeframes.
+
+systemd-journal has been designed first to be reliable and then to be fast. It includes several mechanisms to ensure
+minimal data loss under all conditions (e.g. disk corruption, tampering, forward secure sealing) and despite the fact
+that it utilizes several techniques to require minimal disk footprint (like deduplication of log entries, linking of
+values and fields, compression) the disk footprint of journal files remains significantly higher compared to other log
+management solutions. The higher disk footprint results in higher disk I/O during querying, since a lot more data have
+to read from disk to evaluate a query. Query performance at scale can greatly be improved by utilizing a compressed
+filesystem (ext4, btrfs, zfs) to store systemd-journal files.
+
+systemd-journal files are cached by the operating system. There is no database server to serve queries. Each file is
+opened and the query runs by directly accessing the data in it. Therefore systemd-journal relies on the caching
+layer of the operating system to optimize query performance. The more RAM the system has, although it will not be
+reported as `used` (it will be reported as `cache`), the faster the queries will get. The first time a timeframe is
+accessed the query performance will be slower, but further queries on the same timeframe will be significantly faster
+since journal data are now cached in memory.
 
 ## Configuration and maintenance
 
