@@ -6,6 +6,11 @@ By combining these tools you can create advanced log processing pipelines sendin
 
 The process involves the usual piping of shell commands, to get and process the log files in realtime.
 
+The result is like this: nginx logs into systemd-journal:
+
+![image](https://github.com/netdata/netdata/assets/2662304/16b471ff-c5a1-4fcc-bcd5-83551e089f6c)
+
+
 The overall process looks like this:
 
 ```bash
@@ -14,7 +19,7 @@ tail -F /var/log/nginx/*.log       |\  # outputs log lines
   systemd-cat-native                   # send to local/remote journald
 ```
 
-Let's see the steps:
+These are the steps:
 
 1. `tail -F /var/log/nginx/*.log`<br/>this command will tail all `*.log` files in `/var/log/nginx/`. We use `-F` instead of `-f` to ensure that files will still be tailed after log rotation.
 2. `log2joural` is a Netdata program. It reads log entries and extracts fields, according to the PCRE2 pattern it accepts. It can also apply some basic operations on the fields, like injecting new fields or duplicating existing ones or rewriting their values. The output of `log2journal` is in Systemd Journal Export Format, and it looks like this:
@@ -28,9 +33,38 @@ Let's see the steps:
 3. `systemd-cat-native` is a Netdata program. I can send the logs to a local `systemd-journald` (journal namespaces supported), or to a remote `systemd-journal-remote`.
 
 
-## YAML configuration
+## Processing pipeline
 
+The sequence of processing in Netdata's `log2journal` is designed to methodically transform and prepare log data for export in the systemd Journal Export Format. This transformation occurs through a pipeline of stages, each with a specific role in processing the log entries. Here's a description of each stage in the sequence:
 
+1. **Input**<br/>
+  The tool reads one log line at a time from the input source. It supports different input formats such as JSON, logfmt, and free-form logs defined by PCRE2 patterns.
+
+2. **Extract Fields and Values**<br/>
+  Based on the input format (JSON, logfmt, or custom pattern), it extracts fields and their values from each log line. In the case of JSON and logfmt, it automatically extracts all fields. For custom patterns, it uses PCRE2 regular expressions, and fields are extracted based on sub-expressions defined in the pattern.
+
+3. **Transliteration**<br/> 
+  Extracted fields are transliterated to the limited character set accepted by systemd-journal: capitals A-Z, digits 0-9, underscores.
+
+4. **Apply Optional Prefix**<br/>
+  If a prefix is specified, it is added to all keys. This happens before any other processing so that all subsequent matches and manipulations take the prefix into account.
+
+5. **Rename Fields**<br/> 
+  Renames fields as specified in the configuration. This is used to change the names of the fields to match desired or required naming conventions.
+
+6. **Inject New Fields**<br/>
+  New fields are injected into the log data. This can include constants or values derived from other fields, using variable substitution.
+
+7. **Rewrite Field Values**<br/> 
+  Applies rewriting rules to alter the values of the fields. This can involve complex transformations, including regular expressions and variable substitutions. The rewrite rules can also inject new fields into the data.
+
+8. **Filter Fields**<br/>
+  Fields are filtered based on include and exclude patterns. This stage selects which fields are to be sent to the journal, allowing for selective logging.
+
+9. **Output**<br/>
+  Finally, the processed log data is output in the Journal Export Format. This format is compatible with systemd's journaling system and can be sent to local or remote systemd journal systems, by piping the output of `log2journal` to `systemd-cat-native`.
+
+This pipeline ensures a flexible and comprehensive approach to log processing, allowing for a wide range of modifications and customizations to fit various logging requirements. Each stage builds upon the previous one, enabling complex log transformations and enrichments before the data is exported to the systemd journal.
 
 ## Real-life example
 
@@ -318,7 +352,7 @@ tail -n $last -F /var/log/nginx/*access.log \
 
 ```
 
-Netdata log2journal v1.43.0-313-gd79fbac6a
+Netdata log2journal v1.43.0-341-gdac4df856
 
 Convert logs to systemd Journal Export Format.
 
@@ -333,21 +367,171 @@ Options:
   --file /path/to/file.yaml or -f /path/to/file.yaml
        Read yaml configuration file for instructions.
 
-  --config CONFIG_NAME
-       Run with the internal configuration named CONFIG_NAME.
-       Available internal configs:
+  --config CONFIG_NAME or -c CONFIG_NAME
+       Run with the internal YAML configuration named CONFIG_NAME.
+       Available internal YAML configs:
 
-       nginx-combined nginx-json 
+       nginx-combined nginx-json default 
 
-  --show-config
-       Show the configuration in YAML format before starting the job.
-       This is also an easy way to convert command line parameters to yaml.
+--------------------------------------------------------------------------------
+  INPUT PROCESSING
+
+  PATTERN
+       PATTERN should be a valid PCRE2 regular expression.
+       RE2 regular expressions (like the ones usually used in Go applications),
+       are usually valid PCRE2 patterns too.
+       Sub-expressions without named groups are evaluated, but their matches are
+       not added to the output.
+
+     - JSON mode
+       JSON mode is enabled when the pattern is set to: json
+       Field names are extracted from the JSON logs and are converted to the
+       format expected by Journal Export Format (all caps, only _ is allowed).
+
+     - logfmt mode
+       logfmt mode is enabled when the pattern is set to: logfmt
+       Field names are extracted from the logfmt logs and are converted to the
+       format expected by Journal Export Format (all caps, only _ is allowed).
+
+       All keys extracted from the input, are transliterated to match Journal
+       semantics (capital A-Z, digits 0-9, underscore).
+
+       In a YAML file:
+       ```yaml
+       pattern: 'PCRE2 pattern | json | logfmt'
+       ```
+
+--------------------------------------------------------------------------------
+  GLOBALS
+
+  --prefix PREFIX
+       Prefix all fields with PREFIX. The PREFIX is added before any other
+       processing, so that the extracted keys have to be matched with the PREFIX in
+       them. PREFIX is NOT transliterated and it is assumed to be systemd-journal
+       friendly.
+
+       In a YAML file:
+       ```yaml
+       prefix: 'PREFIX_' # prepend all keys with this prefix.
+       ```
 
   --filename-key KEY
        Add a field with KEY as the key and the current filename as value.
        Automatically detects filenames when piped after 'tail -F',
        and tail matches multiple filenames.
        To inject the filename when tailing a single file, use --inject.
+
+       In a YAML file:
+       ```yaml
+       filename:
+         key: KEY
+       ```
+
+--------------------------------------------------------------------------------
+  RENAMING OF KEYS
+
+  --rename NEW=OLD
+       Rename fields. OLD has been transliterated and PREFIX has been added.
+       NEW is assumed to be systemd journal friendly.
+
+       Up to 512 renaming rules are allowed.
+
+       In a YAML file:
+       ```yaml
+       rename:
+         - new_key: KEY1
+           old_key: KEY2 # transliterated with PREFIX added
+         - new_key: KEY3
+           old_key: KEY4 # transliterated with PREFIX added
+         # add as many as required
+       ```
+
+--------------------------------------------------------------------------------
+  INJECTING NEW KEYS
+
+  --inject KEY=VALUE
+       Inject constant fields to the output (both matched and unmatched logs).
+       --inject entries are added to unmatched lines too, when their key is
+       not used in --inject-unmatched (--inject-unmatched override --inject).
+       VALUE can use variable like ${OTHER_KEY} to be replaced with the values
+       of other keys available.
+
+       Up to 512 fields can be injected.
+
+       In a YAML file:
+       ```yaml
+       inject:
+         - key: KEY1
+           value: 'VALUE1'
+         - key: KEY2
+           value: '${KEY3}${KEY4}' # gets the values of KEY3 and KEY4
+         # add as many as required
+       ```
+
+--------------------------------------------------------------------------------
+  REWRITING KEY VALUES
+
+  --rewrite KEY=/MATCH/REPLACE[/OPTIONS]
+       Apply a rewrite rule to the values of a specific key.
+       The first character after KEY= is the separator, which should also
+       be used between the MATCH, REPLACE and OPTIONS.
+
+       OPTIONS can be a comma separated list of `non-empty`, `dont-stop` and
+       `inject`.
+
+       When `non-empty` is given, MATCH is expected to be a variable
+       substitution using `${KEY1}${KEY2}`. Once the substitution is completed
+       the rule is matching the KEY only if the result is not empty.
+       When `non-empty` is not set, the MATCH string is expected to be a PCRE2
+       regular expression to be checked against the KEY value. This PCRE2
+       pattern may include named groups to extract parts of the KEY's value.
+
+       REPLACE supports variable substitution like `${variable}` against MATCH
+       named groups (when MATCH is a PCRE2 pattern) and `${KEY}` against the
+       keys defined so far.
+
+       Example:
+              --rewrite DATE=/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/
+                             ${day}/${month}/${year}
+       The above will rewrite dates in the format YYYY-MM-DD to DD/MM/YYYY.
+
+       Only one rewrite rule is applied per key; the sequence of rewrites for a
+       given key, stops once a rule matches it. This allows providing a sequence
+       of independent rewriting rules for the same key, matching the different
+       values the key may get, and also provide a catch-all rewrite rule at the
+       end, for setting the key value if no other rule matched it. The rewrite
+       rule can allow processing more rewrite rules when OPTIONS includes
+       the keyword 'dont-stop'.
+
+       Up to 512 rewriting rules are allowed.
+
+       In a YAML file:
+       ```yaml
+       rewrite:
+         # the order if these rules in important - processed top to bottom
+         - key: KEY1
+           match: 'PCRE2 PATTERN WITH NAMED GROUPS'
+           value: 'all match fields and input keys as ${VARIABLE}'
+           inject: BOOLEAN # yes = inject the field, don't just rewrite it
+           stop: BOOLEAN # no = continue processing, don't stop if matched
+         - key: KEY2
+           non_empty: '${KEY3}${KEY4}' # match only if this evaluates to non empty
+           value: 'all input keys as ${VARIABLE}'
+           inject: BOOLEAN # yes = inject the field, don't just rewrite it
+           stop: BOOLEAN # no = continue processing, don't stop if matched
+         # add as many rewrites as required
+       ```
+
+       By default rewrite rules are applied only on fields already defined.
+       This allows shipping YAML files that include more rewrites than are
+       required for a specific input file.
+       Rewrite rules however allow injecting new fields when OPTIONS include
+       the keyword `inject` or in YAML `inject: yes` is given.
+
+       MATCH on the command line can be empty to define an unconditional rule.
+       Similarly, `match` and `non_empty` can be omitted in the YAML file.
+--------------------------------------------------------------------------------
+  UNMATCHED LINES
 
   --unmatched-key KEY
        Include unmatched log entries in the output with KEY as the field name.
@@ -356,12 +540,11 @@ Options:
        unmatched entry will appear as the log message in the journals.
        Use --inject-unmatched to inject additional fields to unmatched lines.
 
-  --inject LINE
-       Inject constant fields to the output (both matched and unmatched logs).
-       --inject entries are added to unmatched lines too, when their key is
-       not used in --inject-unmatched (--inject-unmatched override --inject).
-
-       Up to 512 fields can be injected.
+       In a YAML file:
+       ```yaml
+       unmatched:
+         key: MESSAGE  # inject the error log as MESSAGE
+       ```
 
   --inject-unmatched LINE
        Inject lines into the output for each unmatched log entry.
@@ -370,29 +553,18 @@ Options:
 
        Up to 512 such lines can be injected.
 
-  --rewrite KEY=/SearchPattern/ReplacePattern
-       Apply a rewrite rule to the values of a specific key.
-       The first character after KEY= is the separator, which should also
-       be used between the search pattern and the replacement pattern.
-       The search pattern is a PCRE2 regular expression, and the replacement
-       pattern supports literals and named capture groups from the search pattern.
+       In a YAML file:
+       ```yaml
+       unmatched:
+         key: MESSAGE  # inject the error log as MESSAGE
+         inject::
+           - key: KEY1
+             value: 'VALUE1'
+           # add as many constants as required
+       ```
 
-       Example:
-              --rewrite DATE=/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/
-                             ${day}/${month}/${year}
-       This will rewrite dates in the format YYYY-MM-DD to DD/MM/YYYY.
-
-       Only one rewrite rule is applied per key; the sequence of rewrites stops
-       for the key once a rule matches it. This allows providing a sequence of
-       independent rewriting rules for the same key, matching the different
-       values the key may get, and also provide a catch-all rewrite rule at the
-       end, for setting the key value if no other rule matched it.
-
-       Duplication of keys with the values of multiple other keys, combined with
-       multiple value rewriting rules, allows creating complex rules for adding
-       new keys, based on the values of existing keys.
-
-       Up to 512 rewriting rules are allowed.
+--------------------------------------------------------------------------------
+  FILTERING
 
   --include PATTERN
        Include only keys matching the PCRE2 PATTERN.
@@ -408,37 +580,22 @@ Options:
        exclude wins and the key will not be added, like a pipeline, we first
        include it and then exclude it.
 
-  --prefix PREFIX
-       Prefix all fields with PREFIX. The PREFIX is added before processing
-       duplications, renames and rewrites, so that the extracted keys have to
-       be matched with the PREFIX in them.
-       PREFIX is assumed to be systemd-journal friendly.
+       In a YAML file:
+       ```yaml
+       filter:
+         include: 'PCRE2 PATTERN MATCHING KEY NAMES TO INCLUDE'
+         exclude: 'PCRE2 PATTERN MATCHING KEY NAMES TO EXCLUDE'
+       ```
 
-  --rename NEW=OLD
-       Rename fields, before rewriting their values.
-
-       Up to 512 renaming rules are allowed.
+--------------------------------------------------------------------------------
+  OTHER
 
   -h, or --help
        Display this help and exit.
 
-  PATTERN
-       PATTERN should be a valid PCRE2 regular expression.
-       RE2 regular expressions (like the ones usually used in Go applications),
-       are usually valid PCRE2 patterns too.
-       Sub-expressions without named groups are evaluated, but their matches are
-       not added to the output.
-
-  JSON mode
-       JSON mode is enabled when the pattern is set to: json
-       Field names are extracted from the JSON logs and are converted to the
-       format expected by Journal Export Format (all caps, only _ is allowed).
-
-  logfmt mode
-       logfmt mode is enabled when the pattern is set to: logfmt
-       Field names are extracted from the logfmt logs and are converted to the
-       format expected by Journal Export Format (all caps, only _ is allowed).
-
+  --show-config
+       Show the configuration in YAML format before starting the job.
+       This is also an easy way to convert command line parameters to yaml.
 
 The program accepts all parameters as both --option=value and --option value.
 
@@ -456,7 +613,7 @@ This is a simple diagram of the pipeline taking place:
           +---------------------------------------------------+  
           |             EXTRACT FIELDS AND VALUES             |  
           |            JSON, logfmt, or pattern based         |  
-          |              (apply optional PREFIX)              |  
+          |  (apply optional PREFIX - all keys use capitals)  |  
           +---------------------------------------------------+  
                           v   v   v   v   v   v                  
           +---------------------------------------------------+  
@@ -524,110 +681,4 @@ You can find the most common fields at 'man systemd.journal-fields'.
 
 ## `systemd-cat-native` options
 
-```
-
-Netdata systemd-cat-native v1.40.0-1214-gae733dd49
-
-This program reads from its standard input, lines in the format:
-
-KEY1=VALUE1\n
-KEY2=VALUE2\n
-KEYN=VALUEN\n
-\n
-
-and sends them to systemd-journal.
-
-   - Binary journal fields are not accepted at its input
-   - Binary journal fields can be generated after newline processing
-   - Messages have to be separated by an empty line
-   - Keys starting with underscore are not accepted (by journald)
-   - Other rules imposed by systemd-journald are imposed (by journald)
-
-Usage:
-
-   systemd-cat-native
-          [--newline=STRING]
-          [--log-as-netdata|-N]
-          [--namespace=NAMESPACE] [--socket=PATH]
-          [--url=URL [--key=FILENAME] [--cert=FILENAME] [--trust=FILENAME|all]]
-
-The program has the following modes of logging:
-
-  * Log to a local systemd-journald or stderr
-
-    This is the default mode. If systemd-journald is available, logs will be
-    sent to systemd, otherwise logs will be printed on stderr, using logfmt
-    formatting. Options --socket and --namespace are available to configure
-    the journal destination:
-
-      --socket=PATH
-        The path of a systemd-journald UNIX socket.
-        The program will use the default systemd-journald socket when this
-        option is not used.
-
-      --namespace=NAMESPACE
-        The name of a configured and running systemd-journald namespace.
-        The program will produce the socket path based on its internal
-        defaults, to send the messages to the systemd journal namespace.
-
-  * Log as Netdata, enabled with --log-as-netdata or -N
-
-    In this mode the program uses environment variables set by Netdata for
-    the log destination. Only log fields defined by Netdata are accepted.
-    If the environment variables expected by Netdata are not found, it
-    falls back to stderr logging in logfmt format.
-
-  * Log to a systemd-journal-remote TCP socket, enabled with --url=URL
-
-    In this mode, the program will directly sent logs to a remote systemd
-    journal (systemd-journal-remote expected at the destination)
-    This mode is available even when the local system does not support
-    systemd, or even it is not Linux, allowing a remote Linux systemd
-    journald to become the logs database of the local system.
-
-    Unfortunately systemd-journal-remote does not accept compressed
-    data over the network, so the stream will be uncompressed.
-
-      --url=URL
-        The destination systemd-journal-remote address and port, similarly
-        to what /etc/systemd/journal-upload.conf accepts.
-        Usually it is in the form: https://ip.address:19532
-        Both http and https URLs are accepted. When using https, the
-        following additional options are accepted:
-
-      --key=FILENAME
-        The filename of the private key of the server.
-        The default is: /etc/ssl/private/journal-upload.pem
-
-      --cert=FILENAME
-        The filename of the public key of the server.
-        The default is: /etc/ssl/certs/journal-upload.pem
-
-      --trust=FILENAME | all
-        The filename of the trusted CA public key.
-        The default is: /etc/ssl/ca/trusted.pem
-        The keyword 'all' can be used to trust all CAs.
-
-      --keep-trying
-        Keep trying to send the message, if the remote journal is not there.
-
-    NEWLINES PROCESSING
-    systemd-journal logs entries may have newlines in them. However the
-    Journal Export Format uses binary formatted data to achieve this,
-    making it hard for text processing.
-
-    To overcome this limitation, this program allows single-line text
-    formatted values at its input, to be binary formatted multi-line Journal
-    Export Format at its output.
-
-    To achieve that it allows replacing a given string to a newline.
-    The parameter --newline=STRING allows setting the string to be replaced
-    with newlines.
-
-    For example by setting --newline='{NEWLINE}', the program will replace
-    all occurrences of {NEWLINE} with the newline character, within each
-    VALUE of the KEY=VALUE lines. Once this this done, the program will
-    switch the field to the binary Journal Export Format before sending the
-    log event to systemd-journal.
-
-```
+Read [the manual of systemd-cat-native](../../libnetdata/log/systemd-cat-native.md).
