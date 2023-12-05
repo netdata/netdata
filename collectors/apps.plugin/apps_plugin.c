@@ -3750,7 +3750,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     struct target *w;
 
     for (w = root; w ; w = w->next) {
-        if (unlikely(!w->exposed && !w->is_other))
+        if (unlikely(!w->exposed))
             continue;
 
         send_BEGIN(type, w->clean_name, "processes", dt);
@@ -3806,16 +3806,30 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #endif
 
 #ifndef __FreeBSD__
-        send_BEGIN(type, w->clean_name, "uptime", dt);
-        send_SET("uptime", (global_uptime > w->starttime) ? (global_uptime - w->starttime) : 0);
-        send_END();
-
-        if (enable_detailed_uptime_charts) {
-            send_BEGIN(type, w->clean_name, "uptime_summary", dt);
-            send_SET("min", w->uptime_min);
-            send_SET("avg", w->processes > 0 ? w->uptime_sum / w->processes : 0);
-            send_SET("max", w->uptime_max);
+        if (w->processes == 0) {
+            send_BEGIN(type, w->clean_name, "uptime", dt);
+            send_SET("uptime", 0);
             send_END();
+
+            if (enable_detailed_uptime_charts) {
+                send_BEGIN(type, w->clean_name, "uptime_summary", dt);
+                send_SET("min", 0);
+                send_SET("avg", 0);
+                send_SET("max", 0);
+                send_END();
+            }
+        } else {
+            send_BEGIN(type, w->clean_name, "uptime", dt);
+            send_SET("uptime", (global_uptime > w->starttime) ? (global_uptime - w->starttime) : 0);
+            send_END();
+
+            if (enable_detailed_uptime_charts) {
+                send_BEGIN(type, w->clean_name, "uptime_summary", dt);
+                send_SET("min", w->uptime_min);
+                send_SET("avg", w->processes > 0 ? w->uptime_sum / w->processes : 0);
+                send_SET("max", w->uptime_max);
+                send_END();
+            }
         }
 #endif
 
