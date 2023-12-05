@@ -1179,6 +1179,16 @@ static void get_netdata_configured_variables() {
 
 #ifdef ENABLE_DBENGINE
     // ------------------------------------------------------------------------
+    // get default Database Engine page type
+
+    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "raw");
+    if (strcmp(page_type, "gorilla") == 0) {
+        tier_page_type[0] = PAGE_GORILLA_METRICS;
+    } else if (strcmp(page_type, "raw") != 0) {
+        netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
+    }
+
+    // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
