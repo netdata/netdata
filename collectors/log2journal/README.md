@@ -677,8 +677,8 @@ You can find the most common fields at 'man systemd.journal-fields'.
 
 ```
 
-`log2journal` supports YAML configuration files, like the ones found [in this directory](log2journal.d/).
+`log2journal` supports YAML configuration files, like the ones found [in this directory](https://github.com/netdata/netdata/tree/master/collectors/log2journal/log2journal.d).
 
 ## `systemd-cat-native` options
 
-Read [the manual of systemd-cat-native](../../libnetdata/log/systemd-cat-native.md).
+Read [the manual of systemd-cat-native](https://github.com/netdata/netdata/blob/master/libnetdata/log/systemd-cat-native.md).
