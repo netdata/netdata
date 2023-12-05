@@ -6,6 +6,11 @@ By combining these tools you can create advanced log processing pipelines sendin
 
 The process involves the usual piping of shell commands, to get and process the log files in realtime.
 
+The result is like this: nginx logs into systemd-journal:
+
+![image](https://github.com/netdata/netdata/assets/2662304/16b471ff-c5a1-4fcc-bcd5-83551e089f6c)
+
+
 The overall process looks like this:
 
 ```bash
