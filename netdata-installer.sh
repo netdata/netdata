@@ -560,9 +560,9 @@ cmake_install() {
     # The above command should be used to replace the logic below once we no longer support
     # versions of CMake less than 3.15.
     if [ -n "${ninja}" ]; then
-        run ${ninja} install -C "${1}"
+        run ${ninja} -C "${1}" install
     else
-        run ${make} install -C "${1}"
+        run ${make} -C "${1}" install
     fi
 }
 
