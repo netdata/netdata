@@ -579,6 +579,57 @@ Netdata will automatically pick the new namespace and present it at the list of 
 You can also instruct `systemd-cat-native` to log to a remote system, sending the logs to a `systemd-journal-remote` instance running on another server. Check [the manual of systemd-cat-native](https://github.com/netdata/netdata/blob/master/libnetdata/log/systemd-cat-native.md).
 
 
+## Performance
+
+`log2journal` and `systemd-cat-native` have been designed to process hundreds of thousands of log lines per second. They both utilize high performance indexing hashtables to speed up lookups, and queues that dynamically adapt to the number of log lines offered, offering a smooth and fast experience under all conditions.
+
+In our tests, the combined CPU utilization of `log2journal` and `systemd-cat-native` versus `promtail` with similar configuration is 1 to 5. So, `log2journal` and `systemd-cat-native` combined, are 5 times faster than `promtail`.
+
+### PCRE2 patterns
+
+The key characteristic that can influence the performance of a logs processing pipeline using these tools, is the quality of the PCRE2 patterns used. Poorly created PCRE2 patterns can make processing significantly slower, or CPU consuming.
+
+Especially the pattern `.*` seems to have the biggest impact on CPU consumption, especially when multiple `.*` are on the same pattern.
+
+Usually we use `.*` to indicate that we need to match everything up to a character, e.g. `.* ` to match up to a space. By replacing it with `[^ ]+` (meaning: match at least a character up to a space), the regular expression engine can be a lot more efficient, reducing the overall CPU utilization significantly.
+
+### Performance of systemd journals
+
+The ingestion pipeline of logs, from `tail` to `systemd-journald` or `systemd-journal-remote` is very efficient in all aspects. CPU utilization is better than any other system we tested and RAM usage is independent of the number of fields indexed, making systemd-journal one of the most efficient log management engines for ingesting high volumes of structured logs.
+
+High fields cardinality does not have a noticable impact on systemd-journal. The amount of fields indexed and the amount of unique values per field, have a linear and predictable result in the resource utilization of `systemd-journald` and `systemd-journal-remote`. This is unlike other logs management solutions, like Loki, that their RAM requirements grow exponentially as the cardinality increases, making it impractical for them to index the amount of information systemd journals can index.
+
+However, the number of fields added to journals influences the overall disk footprint. Less fields means more log entries per journal file, smaller overall disk footprint and faster queries. 
+
+systemd-journal files are primarily designed for security and reliability. This comes at the cost of disk footprint. The internal structure of journal files is such that in case of corruption, minimum data loss will incur. To achieve such a unique characteristic, certain data within the files need to be aligned at predefined boundaries, so that in case there is a corruption, non-corrupted parts of the journal file can be recovered.
+
+Despite the fact that systemd-journald employees several techniques to optimize disk footprint, like deduplication of log entries, shared indexes for fields and their values, compression of long log entries, etc. the disk footprint of journal files is generally 10x more compared to other monitoring solutions, like Loki.
+
+This can be improved by storing journal files in a compressed filesystem. In our tests, a compressed filesystem can save up to 75% of the space required by journal files. The journal files will still be bigger than the overall disk footprint of other solutions, but the flexibility (index any number of fields), reliability (minimal potential data loss) and security (tampering protection and sealing) features of systemd-journal justify the difference.
+
+When using versions of systemd prior to 254 and you are centralizing logs to a remote system, `systemd-journal-remote` creates very small files (32MB). This results in increased duplication of information across the files, increasing the overall disk footprint. systemd versions 254+, added options to `systemd-journal-remote` to control the max size per file. This can significantly reduce the duplication of information.
+
+Another limitation of the `systemd-journald` ecosystem is the uncompressed transmission of logs across systems. `systemd-journal-remote` up to version 254 that we tested, accepts encrypted, but uncompressed data. This means that when centralizing logs to a logs server, the bandwidth required will be increased compared to other log management solution.
+
+## Security Considerations
+
+`log2journal` and `systemd-cat-native` are used to convert log files to structured logs in the systemd-journald ecosystem.
+
+Systemd-journal is a logs management solution designed primarily for security and reliability. When configured properly, it can reliably and securely store your logs, ensuring they will available and unchanged for as long as you need them.
+
+When sending logs to a remote system, `systemd-cat-native` can be configured the same way `systemd-journal-upload` is configured, using HTTPS and private keys to encrypt and secure their transmission over the network.
+
+When dealing with sensitive logs, organizations usually follow 2 strategies:
+
+1. Anonymize the logs before storing them, so that the stored logs do not have any sensitive information.
+2. Store the logs in full, including sensitive information, and carefully control who and how has access to them.
+
+Netdata can help in both cases.
+
+If you want to anonymize the logs before storing them, use rewriting rules at the `log2journal` phase to remove sensitive information from them. This process usually means matching the sensitive part and replacing with `XXX` or `CUSTOMER_ID`, or `CREDIT_CARD_NUMBER`, so that the resulting log entries stored in journal files will not include any such sensitive information.
+
+If on other hand your organization prefers to maintain the full logs and control who and how has access on them, use Netdata Cloud to assign roles to your team members and control which roles can access the journal logs in your environment.
+
 ## `log2journal` options
 
 ```
