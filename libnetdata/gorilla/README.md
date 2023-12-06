@@ -24,9 +24,9 @@ A Gorilla page can have multiple Gorilla buffers. If the values of a metric
 are highly compressible, just one Gorilla buffer is able to store all the values
 that otherwise would require a regular 4096 byte page, ie. we can use just 512
 bytes instead. In the worst case scenario (for metrics whose values are not
-compressible at all), a Gorilla page might end having `9` Gorilla buffers,
+compressible at all), a Gorilla page might end up having `9` Gorilla buffers,
 consuming 4608 bytes. In practice, this is pretty rare and does not negate
-the effect of compression for the of the metrics.
+the effect of compression for the metrics.
 
 When a gorilla page is full, ie. it contains 1024 slots/values, we serialize
 the linked-list of gorilla buffers directly to disk. During deserialization,
