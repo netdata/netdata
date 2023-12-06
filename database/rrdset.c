@@ -1676,7 +1676,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > MAX(st->db.entries, 60) * update_every_ut)) {
-        netdata_log_info("host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
+        nd_log_daemon(NDLP_DEBUG, "host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
             " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done,
             (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
