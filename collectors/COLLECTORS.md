@@ -377,7 +377,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [FreeBSD NFS](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/freebsd_nfs.md)
 
-- [FreeBSD RCTL/RACCT](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/freebsd_rctl-racct.md)
+- [FreeBSD RCTL-RACCT](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/freebsd_rctl-racct.md)
 
 - [dev.cpu.0.freq](https://github.com/netdata/netdata/blob/master/collectors/freebsd.plugin/integrations/dev.cpu.0.freq.md)
 
