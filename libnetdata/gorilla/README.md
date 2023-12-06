@@ -36,4 +36,4 @@ serving the query results.
 
 Overall, on a real-agent the Gorilla compression scheme reduces memory
 consumption approximately by ~30%, which can be several GiB of RAM for parents
-having hundrends, or even thousands, children streaming to them.
+having hundreds, or even thousands of children streaming to them.
