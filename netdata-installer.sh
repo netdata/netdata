@@ -528,14 +528,18 @@ if ! command -v "ninja" >/dev/null 2>&1; then
 else
     ninja="$(command -v ninja)"
     progress "Found Ninja at ${ninja}. Ninja version: $(${ninja} --version)"
-    progress "Will use Ninja for this build instead of Make."
+    progress "Will use Ninja for this build instead of Make when possible."
 fi
 
 make="$(command -v make 2>/dev/null)"
 
 if [ -z "${make}" ] && [ -z "${ninja}" ]; then
-    fatal "Could not find a usable copy of Make, which is required to build Netdata." I0014
+    fatal "Could not find a usable underlying build system (we support make and ninja)." I0014
 fi
+
+CMAKE_OPTS="${ninja:+-G Ninja}"
+BUILD_OPTS="VERBOSE=1"
+[ -n "${ninja}" ] && BUILD_OPTS="-v"
 
 if [ ${DONOTWAIT} -eq 0 ]; then
   if [ -n "${NETDATA_PREFIX}" ]; then
@@ -550,6 +554,17 @@ if [ ${DONOTWAIT} -eq 0 ]; then
   fi
 
 fi
+
+cmake_install() {
+    # run cmake --install ${1}
+    # The above command should be used to replace the logic below once we no longer support
+    # versions of CMake less than 3.15.
+    if [ -n "${ninja}" ]; then
+        run ${ninja} install "${1}"
+    else
+        run ${make} install "${1}"
+    fi
+}
 
 build_error() {
   netdata_banner
@@ -662,8 +677,8 @@ build_jsonc() {
   fi
 
   cd "${1}" > /dev/null || exit 1
-  run eval "${env_cmd} ${cmake} -DBUILD_SHARED_LIBS=OFF ."
-  run eval "${env_cmd} ${make} ${MAKEOPTS}"
+  run eval "${env_cmd} ${cmake} ${CMAKE_OPTS} -DBUILD_SHARED_LIBS=OFF ."
+  run eval "${env_cmd} ${cmake} --build . --parallel ${JOBS} -- ${BUILD_OPTS}"
   cd - > /dev/null || return 1
 }
 
@@ -682,10 +697,6 @@ bundle_jsonc() {
   if [ -z "${NETDATA_BUILD_JSON_C}" ] && pkg-config json-c; then
     NETDATA_BUILD_JSON_C=0
     return 0
-  fi
-
-  if [ -z "${make}" ]; then
-    fatal "No usable copy of Make found, which is required to bundle JSON-C. Either install development files for JSON-C, or install a working copy of Make." I0015
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling JSON-C."
@@ -1148,7 +1159,7 @@ NETDATA_GROUP="$(id -g -n "${NETDATA_USER}" 2> /dev/null)"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
-NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${ninja:+-G Ninja} -DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} "
+NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${CMAKE_OPTS} -DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} "
 
 # Feature autodetection code starts here
 
@@ -1245,8 +1256,6 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-BUILD_OPTS="VERBOSE=1"
-[ -n "${ninja}" ] && BUILD_OPTS="-v"
 # shellcheck disable=SC2086
 if ! run ${cmake} --build "${NETDATA_BUILD_DIR}" --parallel ${JOBS} -- ${BUILD_OPTS}; then
   fatal "Failed to build Netdata." I000B
@@ -1260,7 +1269,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
-if ! run ${cmake} --install "${NETDATA_BUILD_DIR}"; then
+if ! cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
 
