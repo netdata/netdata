@@ -23,7 +23,7 @@ else()
 endif()
 
 string(STRIP ${GIT_DESCRIBE_OUTPUT} GIT_DESCRIBE_OUTPUT)
-string(REGEX MATCH "v?([0-9]+)\\.([0-9]+)\\.([0-9]+)-([0-9]+)?-?([0-9a-zA-Z]+)?" MATCHES "${GIT_DESCRIBE_OUTPUT}")
+string(REGEX MATCH "v?([0-9]+)\\.([0-9]+)\\.([0-9]+)-?([0-9]+)?-?([0-9a-zA-Z]+)?" MATCHES "${GIT_DESCRIBE_OUTPUT}")
 
 if(CMAKE_MATCH_COUNT EQUAL 3)
         set(FIELD_MAJOR ${CMAKE_MATCH_1})
