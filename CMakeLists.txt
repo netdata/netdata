@@ -2131,8 +2131,8 @@ install(FILES web/gui/.well-known/dnt/cookies
         DESTINATION usr/share/netdata/web/.well-known/dnt)
 
 # v0 dashboard
-install(DIRECTORY web/gui/v0
-        DESTINATION usr/share/netdata/web)
+install(FILES web/gui/v0/index.html
+        DESTINATION usr/share/netdata/web/v0)
 
 #
 # packaging
