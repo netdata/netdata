@@ -17,8 +17,8 @@ value), we store just a single bit set to `1`.
   - We store a `0` bit to indicate the change.
   - We compute the leading-zero count (LZC) of the XOR result, and compare it
     with the previous LZC. If the two LZCs are equal we store a `1` bit.
-  - If the LZCs are different we use 5-bits to store the new LZC, and we store
-    the rest of the value (ie. without its LZC) to the buffer.
+  - If the LZCs are different we use 5 bits to store the new LZC, and we store
+    the rest of the value (ie. without its LZC) in the buffer.
 
 A Gorilla page can have multiple Gorilla buffers. If the values of a metric
 are highly compressible, just one Gorilla buffer is able to store all the values
