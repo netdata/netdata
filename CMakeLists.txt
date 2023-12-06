@@ -192,6 +192,7 @@ check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
 #
 
 include(CheckCSourceCompiles)
+include(CheckCXXSourceCompiles)
 
 check_c_source_compiles("
 #define _GNU_SOURCE
@@ -210,6 +211,14 @@ int main() {
         setns(0, 0); return 0;
 }
 " HAVE_SETNS)
+
+check_cxx_source_compiles("
+int main() {
+        __atomic_load_8(nullptr, 0);
+        return 0;
+}
+" HAVE_BUILTIN_ATOMICS)
+
 
 # openssl/crypto
 set(ENABLE_OPENSSL True)
@@ -1094,6 +1103,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 # target_link_libraries(test Threads::Threads)
 
 target_link_libraries(libnetdata PUBLIC
+        "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${LINUX}>,$<BOOL:${FREEBSD}>>:pthread;rt>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
