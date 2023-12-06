@@ -41,4 +41,5 @@ SUBDIRS = \
 
 dist_noinst_DATA = \
     README.md \
+    gorilla/README.md \
     $(NULL)
