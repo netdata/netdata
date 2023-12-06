@@ -1,17 +1,20 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.44.0](https://github.com/netdata/netdata/tree/v1.44.0) (2023-12-06)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.43.2...v1.44.0)
 
 **Merged pull requests:**
 
+- update bundled UI to v6.66.1 [\#16554](https://github.com/netdata/netdata/pull/16554) ([ilyam8](https://github.com/ilyam8))
+- Improve page validity check during database extent load [\#16552](https://github.com/netdata/netdata/pull/16552) ([stelfrag](https://github.com/stelfrag))
 - Proper Learn-friendly links [\#16547](https://github.com/netdata/netdata/pull/16547) ([Ancairon](https://github.com/Ancairon))
 - docs required for release [\#16546](https://github.com/netdata/netdata/pull/16546) ([ktsaou](https://github.com/ktsaou))
 - Add option to change page type for tier 0 to gorilla [\#16545](https://github.com/netdata/netdata/pull/16545) ([vkalintiris](https://github.com/vkalintiris))
 - fix alpine deps [\#16543](https://github.com/netdata/netdata/pull/16543) ([tkatsoulas](https://github.com/tkatsoulas))
 - change level to debug "took too long to be updated" [\#16540](https://github.com/netdata/netdata/pull/16540) ([ilyam8](https://github.com/ilyam8))
 - apps: fix uptime for groups with 0 processes [\#16538](https://github.com/netdata/netdata/pull/16538) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#16536](https://github.com/netdata/netdata/pull/16536) ([netdatabot](https://github.com/netdatabot))
 - Reorg kickstart guide's steps [\#16534](https://github.com/netdata/netdata/pull/16534) ([tkatsoulas](https://github.com/tkatsoulas))
 - update go.d plugin to v0.57.2 [\#16533](https://github.com/netdata/netdata/pull/16533) ([ilyam8](https://github.com/ilyam8))
 - Update getting-started-light-poc.md [\#16532](https://github.com/netdata/netdata/pull/16532) ([M4itee](https://github.com/M4itee))
@@ -257,7 +260,6 @@
 - shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
 - Add support for gorilla pages for tier 0. [\#15969](https://github.com/netdata/netdata/pull/15969) ([vkalintiris](https://github.com/vkalintiris))
 - Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
-- Docs: getting started with netdata cloud onprem [\#15954](https://github.com/netdata/netdata/pull/15954) ([M4itee](https://github.com/M4itee))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -434,9 +436,6 @@
 - Clarify shipping repos cases [\#15960](https://github.com/netdata/netdata/pull/15960) ([tkatsoulas](https://github.com/tkatsoulas))
 - Clarifying the possible installation types [\#15958](https://github.com/netdata/netdata/pull/15958) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix journal direction parsing [\#15957](https://github.com/netdata/netdata/pull/15957) ([ktsaou](https://github.com/ktsaou))
-- facets and journal improvements [\#15956](https://github.com/netdata/netdata/pull/15956) ([ktsaou](https://github.com/ktsaou))
-- Preserve README info inside metadata.yaml for freeipmi.plugin [\#15955](https://github.com/netdata/netdata/pull/15955) ([Ancairon](https://github.com/Ancairon))
-- Fix CID 400366 [\#15953](https://github.com/netdata/netdata/pull/15953) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
