@@ -1,7 +1,7 @@
 # Gorilla compression and decompression
 
 This provides an alternative way of representing values stored in database
-pages. Instead of allocating and using a page of fixed-size, ie. 4096 bytes,
+pages. Instead of allocating and using a page of fixed size, ie. 4096 bytes,
 the Gorilla implementation adds support for dynamically sized pages that
 contain a variable number of Gorilla buffers.
 
