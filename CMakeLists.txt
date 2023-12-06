@@ -2121,6 +2121,10 @@ install(FILES web/gui/css/morris-0.5.1.css
 install(FILES web/gui/.well-known/dnt/cookies
         DESTINATION usr/share/netdata/web/.well-known/dnt)
 
+# v0 dashboard
+install(DIRECTORY web/gui/v0
+        DESTINATION usr/share/netdata/web)
+
 #
 # packaging
 #
