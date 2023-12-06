@@ -2069,8 +2069,8 @@ int main(int argc, char **argv) {
         fatal("Cannot daemonize myself.");
 
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
-    struct passwd *pw = getpwnam(user);
-    if (config_exists(CONFIG_SECTION_DIRECTORIES, "home") || !pw) {
+    struct passwd *pw = getpwuid(getuid());
+    if (config_exists(CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
         netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
     } else {
         netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
