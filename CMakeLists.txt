@@ -201,6 +201,16 @@ int main() {
 }
 " STRERROR_R_CHAR_P)
 
+check_c_source_compiles("
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <sched.h>
+int main() {
+        setns(0, 0); return 0;
+}
+" HAVE_SETNS)
+
 # openssl/crypto
 set(ENABLE_OPENSSL True)
 if(NOT MACOS)
