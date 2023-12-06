@@ -30,8 +30,8 @@ the effect of compression for the of the metrics.
 
 When a gorilla page is full, ie. it contains 1024 slots/values, we serialize
 the linked-list of gorilla buffers directly to disk. During deserialization,
-eg. when performing a DBEngine query, the Gorilla page is loaded from disk and
-it's linked-list entries are patched to point to the new memory allocated for
+eg. when performing a DBEngine query, the Gorilla page is loaded from the disk and
+its linked-list entries are patched to point to the new memory allocated for
 serving the query results.
 
 Overall, on a real-agent the Gorilla compression scheme reduces memory
