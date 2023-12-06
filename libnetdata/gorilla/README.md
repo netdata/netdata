@@ -5,7 +5,7 @@ pages. Instead of allocating and using a page of fixed-size, ie. 4096 bytes,
 the Gorilla implementation adds support for dynamically sized pages that
 contain a variable number of Gorilla buffers.
 
-Each buffer takes 512 bytes and compresses incoming data using the the Gorilla
+Each buffer takes 512 bytes and compresses incoming data using the Gorilla
 compression:
 
 - The very first value is stored as it is.
