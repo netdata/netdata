@@ -998,7 +998,9 @@ static bool epdl_populate_pages_from_extent_data(
         uncompressed_payload_length = 0;
         for (i = 0; i < count; ++i) {
             size_t page_length = header->descr[i].page_length;
-            if(page_length > RRDENG_BLOCK_SIZE) {
+            if (page_length > RRDENG_BLOCK_SIZE && (header->descr[i].type != PAGE_GORILLA_METRICS ||
+                                                    (header->descr[i].type == PAGE_GORILLA_METRICS &&
+                                                     (page_length - RRDENG_BLOCK_SIZE) % GORILLA_BUFFER_SIZE))) {
                 have_read_error = true;
                 break;
             }
