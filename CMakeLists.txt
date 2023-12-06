@@ -1429,26 +1429,30 @@ if(ENABLE_PLUGIN_CUPS)
         if(NOT CUPS_LIBRARIES)
                 find_program(CUPS_CONFIG cups-config)
                 if(CUPS_CONFIG)
-                        execute_process(COMMAND ${CUPS_CONFIG} --cflags OUTPUT_VARIABLE CUPS_CFLAGS_OTHER OUTPUT_STRIP_TRAILING_WHITESPACE)
-                        execute_process(COMMAND ${CUPS_CONFIG} --libs OUTPUT_VARIABLE CUPS_LIBRARIES OUTPUT_STRIP_TRAILING_WHITESPACE)
-                        set(CUPS_FOUND True)
+                        execute_process(COMMAND ${CUPS_CONFIG} --api-vesion OUTPUT_VARIABLE CUPS_API_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+                        if(CUPS_API_VERSION VERSION_LESS "1.7")
+                                set(CUPS_FOUND False)
+                        else()
+                                execute_process(COMMAND ${CUPS_CONFIG} --cflags OUTPUT_VARIABLE CUPS_CFLAGS_OTHER OUTPUT_STRIP_TRAILING_WHITESPACE)
+                                execute_process(COMMAND ${CUPS_CONFIG} --libs OUTPUT_VARIABLE CUPS_LIBRARIES OUTPUT_STRIP_TRAILING_WHITESPACE)
+                                set(CUPS_FOUND True)
+                        endif()
                 endif()
         endif()
     endif()
 
     if(NOT CUPS_FOUND)
-        message(FATAL_ERROR "Could not find cups cflags and libs.")
+        message(WARNING "Could not find cups cflags and libs.")
+    else()
+        set(CUPS_PLUGIN_FILES collectors/cups.plugin/cups_plugin.c)
+        add_executable(cups.plugin ${CUPS_PLUGIN_FILES})
+        target_link_libraries (cups.plugin libnetdata ${CUPS_LIBRARIES})
+        target_compile_options(cups.plugin PRIVATE ${CUPS_CFLAGS_OTHER})
+
+        install(TARGETS cups.plugin
+                COMPONENT cups_plugin
+                DESTINATION usr/libexec/netdata/plugins.d)
     endif()
-
-    set(CUPS_PLUGIN_FILES collectors/cups.plugin/cups_plugin.c)
-
-    add_executable(cups.plugin ${CUPS_PLUGIN_FILES})
-    target_link_libraries (cups.plugin libnetdata ${CUPS_LIBRARIES})
-    target_compile_options(cups.plugin PRIVATE ${CUPS_CFLAGS_OTHER})
-
-    install(TARGETS cups.plugin
-            COMPONENT cups_plugin
-            DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
@@ -1539,8 +1543,13 @@ endif()
 #
 
 if(ENABLE_EXPORTER_MONGODB)
-        pkg_check_modules(MONGOC REQUIRED libmongoc-1.0)
-        set(HAVE_MONGOC True)
+        pkg_check_modules(MONGOC libmongoc-1.0>=1.7)
+
+        if(MONGOC_FOUND)
+                SET(HAVE_MONGOC True)
+        else()
+                SET(ENABLE_EXPORTER_MONGODB False)
+        endif()
 endif()
 
 if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
