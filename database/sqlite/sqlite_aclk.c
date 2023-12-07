@@ -80,7 +80,12 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     UNUSED(argc);
     UNUSED(column);
 
-    time_t last_connected =  (time_t) (argv[IDX_LAST_CONNECTED] ? str2uint64_t(argv[IDX_LAST_CONNECTED], NULL) : 0);
+    time_t last_connected =
+        (time_t)(argv[IDX_LAST_CONNECTED] ? str2uint64_t(argv[IDX_LAST_CONNECTED], NULL) : 0);
+
+    if (!last_connected)
+        last_connected = now_realtime_sec();
+
     time_t age = now_realtime_sec() - last_connected;
     int is_ephemeral = 0;
 

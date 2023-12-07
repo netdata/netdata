@@ -1288,6 +1288,8 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     RRDHOST *host;
 
     size_t max_threads = MIN(get_netdata_cpus() / 2, 6);
+    if (max_threads < 1)
+        max_threads = 1;
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Using %zu threads for context loading", max_threads);
     struct host_context_load_thread *hclt = callocz(max_threads, sizeof(*hclt));
 
