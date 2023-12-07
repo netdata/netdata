@@ -65,7 +65,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
-set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE "Release")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
@@ -218,6 +218,10 @@ int main() {
         return 0;
 }
 " HAVE_BUILTIN_ATOMICS)
+
+if(FREEBSD)
+        set(HAVE_BUILTIN_ATOMICS True)
+endif()
 
 
 # openssl/crypto
