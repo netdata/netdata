@@ -201,14 +201,6 @@ include:
         - aarch64
     test:
       ebpf-core: true
-  - <<: *opensuse
-    version: "15.4"
-    support_type: Core
-    notes: ''
-    base_image: opensuse/leap:15.4
-    packages:
-      <<: *opensuse_packages
-      repo_distro: opensuse/15.4
 
   - &oracle
     distro: oraclelinux
