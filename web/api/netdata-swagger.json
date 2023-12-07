@@ -3,7 +3,7 @@
   "info": {
     "title": "Netdata API",
     "description": "Real-time performance and health monitoring.",
-    "version": "1.38",
+    "version": "v1-rolling",
     "contact": {
       "name": "Netdata Agent API",
       "email": "info@netdata.cloud",
