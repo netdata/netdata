@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "metric.h"
 
 typedef int32_t REFCOUNT;
@@ -591,27 +592,30 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         time_t update_every_s, time_t now_s)
 {
     if(unlikely(last_time_s > now_s)) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
-                          "fixing last time to now",
-                          first_time_s, last_time_s, now_s);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
+                     "fixing last time to now",
+                     first_time_s, last_time_s, now_s);
         last_time_s = now_s;
     }
 
     if (unlikely(first_time_s > last_time_s)) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
-                          "fixing first time to last time",
-                          first_time_s, last_time_s, now_s);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
+                     "fixing first time to last time",
+                     first_time_s, last_time_s, now_s);
 
         first_time_s = last_time_s;
     }
 
     if (unlikely(first_time_s == 0 || last_time_s == 0)) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
-                          "using them as-is",
-                          first_time_s, last_time_s, now_s);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
+                     "using them as-is",
+                     first_time_s, last_time_s, now_s);
     }
 
     bool added = false;
@@ -828,7 +832,7 @@ int mrg_unittest(void) {
     pthread_t th[threads];
     for(size_t i = 0; i < threads ; i++) {
         char buf[15 + 1];
-        snprintfz(buf, 15, "TH[%zu]", i);
+        snprintfz(buf, sizeof(buf) - 1, "TH[%zu]", i);
         netdata_thread_create(&th[i], buf,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                               mrg_stress, &t);

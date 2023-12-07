@@ -225,7 +225,7 @@ static void calculate_values_and_show_charts(
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
             if(unlikely(!m->st_space || m->st_space->update_every != update_every)) {
                 char title[4096 + 1];
-                snprintfz(title, 4096, "Disk Space Usage");
+                snprintfz(title, sizeof(title) - 1, "Disk Space Usage");
                 m->st_space = rrdset_create_localhost(
                         "disk_space"
                         , disk
@@ -265,7 +265,7 @@ static void calculate_values_and_show_charts(
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
             if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
                 char title[4096 + 1];
-                snprintfz(title, 4096, "Disk Files (inodes) Usage");
+                snprintfz(title, sizeof(title) - 1, "Disk Files (inodes) Usage");
                 m->st_inodes = rrdset_create_localhost(
                         "disk_inodes"
                         , disk
@@ -346,8 +346,6 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
     if(unlikely(!m)) {
         int slow = 0;
-        char var_name[4096 + 1];
-        snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
 
         int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
         int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
@@ -398,8 +396,16 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 slow = 1;
         }
 
-        do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
-        do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
+        char var_name[4096 + 1];
+        snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
+
+        do_space = def_space;
+        do_inodes = def_inodes;
+
+        if (config_exists(var_name, "space usage"))
+            do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
+        if (config_exists(var_name, "inodes usage"))
+            do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
 
         struct mount_point_metadata mp = {
                 .do_space = do_space,

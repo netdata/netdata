@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "facets.h"
 
-#define HISTOGRAM_COLUMNS 150               // the target number of points in a histogram
+#define FACETS_HISTOGRAM_COLUMNS 150        // the target number of points in a histogram
 #define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
 #define FACETS_KEYS_HASHTABLE_ENTRIES 15
 #define FACETS_VALUES_HASHTABLE_ENTRIES 15
+
+static inline void facets_reset_key(FACET_KEY *k);
 
 // ----------------------------------------------------------------------------
 
@@ -34,6 +36,8 @@ static const uint8_t id_encoding_characters_reverse[256] = {
 #define FACETS_HASH XXH64_hash_t
 #define FACETS_HASH_FUNCTION(src, len) XXH3_64bits(src, len)
 #define FACETS_HASH_ZERO (FACETS_HASH)0
+#define FACETS_HASH_UNSAMPLED (FACETS_HASH)(UINT64_MAX - 1)
+#define FACETS_HASH_ESTIMATED (FACETS_HASH)UINT64_MAX
 
 static inline void facets_hash_to_str(FACETS_HASH num, char *out) {
     out[11] = '\0';
@@ -95,103 +99,47 @@ static inline bool is_valid_string_hash(const char *s) {
 }
 
 // ----------------------------------------------------------------------------
+// hashtable for FACET_VALUE
 
-typedef uint64_t SIMPLE_HASHTABLE_HASH;
-#define SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS 32
+// cleanup hashtable defines
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H
 
-typedef struct simple_hashtable_slot {
-    SIMPLE_HASHTABLE_HASH hash;
-    void *data;
-} SIMPLE_HASHTABLE_SLOT;
+struct facet_value;
+// #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_value
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_value
+#define SIMPLE_HASHTABLE_NAME _VALUE
+#include "../simple_hashtable.h"
 
-typedef struct simple_hashtable {
-    size_t resizes;
-    size_t searches;
-    size_t collisions;
-    size_t used;
-    size_t size;
-    SIMPLE_HASHTABLE_SLOT *hashtable;
-} SIMPLE_HASHTABLE;
+// ----------------------------------------------------------------------------
+// hashtable for FACET_KEY
 
-static void simple_hashtable_init(SIMPLE_HASHTABLE *ht, size_t size) {
-    ht->resizes = 0;
-    ht->used = 0;
-    ht->size = size;
-    ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
-}
+// cleanup hashtable defines
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H
 
-static void simple_hashtable_free(SIMPLE_HASHTABLE *ht) {
-    freez(ht->hashtable);
-    ht->hashtable = NULL;
-    ht->size = 0;
-    ht->used = 0;
-    ht->resizes = 0;
-}
-
-static void simple_hashtable_resize_double(SIMPLE_HASHTABLE *ht);
-
-static inline SIMPLE_HASHTABLE_SLOT *simple_hashtable_get_slot(SIMPLE_HASHTABLE *ht, SIMPLE_HASHTABLE_HASH hash, bool resize) {
-    // IMPORTANT:
-    // If the hashtable supported deletions, we would need to have a special slot.data value
-    // to mark deleted values and assume they are occupied during lookup, but empty during insert.
-    // But for our case, we don't need it, since we never delete items from the hashtable.
-
-    ht->searches++;
-
-    size_t slot = hash % ht->size;
-    if(likely(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash))
-        return &ht->hashtable[slot];
-
-    ht->collisions++;
-
-    if(unlikely(resize && ht->size <= (ht->used << 4))) {
-        simple_hashtable_resize_double(ht);
-
-        slot = hash % ht->size;
-        if(likely(!ht->hashtable[slot].data || ht->hashtable[slot].hash == hash))
-            return &ht->hashtable[slot];
-
-        ht->collisions++;
-    }
-
-    slot = ((hash >> SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS) + 1) % ht->size;
-    // Linear probing until we find it
-    while (ht->hashtable[slot].data && ht->hashtable[slot].hash != hash) {
-        slot = (slot + 1) % ht->size;  // Wrap around if necessary
-        ht->collisions++;
-    }
-
-    return &ht->hashtable[slot];
-}
-
-static void simple_hashtable_resize_double(SIMPLE_HASHTABLE *ht) {
-    SIMPLE_HASHTABLE_SLOT *old = ht->hashtable;
-    size_t old_size = ht->size;
-
-    ht->resizes++;
-    ht->size = (ht->size << 3) - 1;
-    ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
-    for(size_t i = 0 ; i < old_size ; i++) {
-        if(!old[i].data)
-            continue;
-
-        SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(ht, old[i].hash, false);
-        *slot = old[i];
-    }
-
-    freez(old);
-}
-
+struct facet_key;
+// #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_key
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_key
+#define SIMPLE_HASHTABLE_NAME _KEY
+#include "../simple_hashtable.h"
 
 // ----------------------------------------------------------------------------
 
 typedef struct facet_value {
     FACETS_HASH hash;
     const char *name;
+    const char *color;
     uint32_t name_len;
 
     bool selected;
     bool empty;
+    bool unsampled;
+    bool estimated;
 
     uint32_t rows_matching_facet_value;
     uint32_t final_facet_value_counter;
@@ -204,14 +152,19 @@ typedef struct facet_value {
 } FACET_VALUE;
 
 typedef enum {
-    FACET_KEY_VALUE_NONE    = 0,
-    FACET_KEY_VALUE_UPDATED = (1 << 0),
-    FACET_KEY_VALUE_EMPTY   = (1 << 1),
-    FACET_KEY_VALUE_COPIED  = (1 << 2),
+    FACET_KEY_VALUE_NONE        = 0,
+    FACET_KEY_VALUE_UPDATED     = (1 << 0),
+    FACET_KEY_VALUE_EMPTY       = (1 << 1),
+    FACET_KEY_VALUE_UNSAMPLED   = (1 << 2),
+    FACET_KEY_VALUE_ESTIMATED   = (1 << 3),
+    FACET_KEY_VALUE_COPIED      = (1 << 4),
 } FACET_KEY_VALUE_FLAGS;
 
 #define facet_key_value_updated(k) ((k)->current_value.flags & FACET_KEY_VALUE_UPDATED)
 #define facet_key_value_empty(k) ((k)->current_value.flags & FACET_KEY_VALUE_EMPTY)
+#define facet_key_value_unsampled(k) ((k)->current_value.flags & FACET_KEY_VALUE_UNSAMPLED)
+#define facet_key_value_estimated(k) ((k)->current_value.flags & FACET_KEY_VALUE_ESTIMATED)
+#define facet_key_value_empty_or_unsampled_or_estimated(k) ((k)->current_value.flags & (FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED|FACET_KEY_VALUE_ESTIMATED))
 #define facet_key_value_copied(k) ((k)->current_value.flags & FACET_KEY_VALUE_COPIED)
 
 struct facet_key {
@@ -233,7 +186,7 @@ struct facet_key {
         bool enabled;
         uint32_t used;
         FACET_VALUE *ll;
-        SIMPLE_HASHTABLE ht;
+        SIMPLE_HASHTABLE_VALUE ht;
     } values;
 
     struct {
@@ -248,6 +201,14 @@ struct facet_key {
     struct {
         FACET_VALUE *v;
     } empty_value;
+
+    struct {
+        FACET_VALUE *v;
+    } unsampled_value;
+
+    struct {
+        FACET_VALUE *v;
+    } estimated_value;
 
     struct {
         facet_dynamic_row_t cb;
@@ -284,7 +245,7 @@ struct facets {
     struct {
         size_t count;
         FACET_KEY *ll;
-        SIMPLE_HASHTABLE ht;
+        SIMPLE_HASHTABLE_KEY ht;
     } keys;
 
     struct {
@@ -347,6 +308,8 @@ struct facets {
         struct {
             size_t evaluated;
             size_t matched;
+            size_t unsampled;
+            size_t estimated;
             size_t created;
             size_t reused;
         } rows;
@@ -361,6 +324,8 @@ struct facets {
             size_t transformed;
             size_t dynamic;
             size_t empty;
+            size_t unsampled;
+            size_t estimated;
             size_t indexed;
             size_t inserts;
             size_t conflicts;
@@ -370,6 +335,10 @@ struct facets {
             size_t searches;
         } fts;
     } operations;
+
+    struct {
+        DICTIONARY *used_hashes_registry;
+    } report;
 };
 
 usec_t facets_row_oldest_ut(FACETS *facets) {
@@ -407,7 +376,7 @@ static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k);
 static inline void FACETS_VALUES_INDEX_CREATE(FACET_KEY *k) {
     k->values.ll = NULL;
     k->values.used = 0;
-    simple_hashtable_init(&k->values.ht, FACETS_VALUES_HASHTABLE_ENTRIES);
+    simple_hashtable_init_VALUE(&k->values.ht, FACETS_VALUES_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
@@ -423,7 +392,7 @@ static inline void FACETS_VALUES_INDEX_DESTROY(FACET_KEY *k) {
     k->values.used = 0;
     k->values.enabled = false;
 
-    simple_hashtable_free(&k->values.ht);
+    simple_hashtable_destroy_VALUE(&k->values.ht);
 }
 
 static inline const char *facets_key_get_value(FACET_KEY *k) {
@@ -470,17 +439,17 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const 
 }
 
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, hash, true);
-    return slot->data;
+    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, hash, true);
+    return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VALUE * const tv) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&k->values.ht, tv->hash, true);
+    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, tv->hash, true);
 
-    if(slot->data) {
+    if(SIMPLE_HASHTABLE_SLOT_DATA(slot)) {
         // already exists
 
-        FACET_VALUE *v = slot->data;
+        FACET_VALUE *v = SIMPLE_HASHTABLE_SLOT_DATA(slot);
         FACET_VALUE_ADD_CONFLICT(k, v, tv);
         return v;
     }
@@ -488,13 +457,21 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     // we have to add it
 
     FACET_VALUE *v = mallocz(sizeof(*v));
-    slot->hash = tv->hash;
-    slot->data = v;
-    k->values.ht.used++;
+    simple_hashtable_set_slot_VALUE(&k->values.ht, slot, tv->hash, v);
 
     memcpy(v, tv, sizeof(*v));
 
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(k->values.ll, v, prev, next);
+    if(v->estimated || v->unsampled) {
+        if(k->values.ll && k->values.ll->estimated) {
+            FACET_VALUE *estimated = k->values.ll;
+            DOUBLE_LINKED_LIST_INSERT_ITEM_AFTER_UNSAFE(k->values.ll, estimated, v, prev, next);
+        }
+        else
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(k->values.ll, v, prev, next);
+    }
+    else
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(k->values.ll, v, prev, next);
+
     k->values.used++;
 
     if(!v->selected)
@@ -515,11 +492,58 @@ static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VA
     return v;
 }
 
+static inline void FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(FACET_KEY *k) {
+    static const FACET_VALUE tv = {
+            .hash = FACETS_HASH_UNSAMPLED,
+            .name = FACET_VALUE_UNSAMPLED,
+            .name_len = sizeof(FACET_VALUE_UNSAMPLED) - 1,
+            .unsampled = true,
+            .color = "offline",
+    };
+
+    k->current_value.hash = FACETS_HASH_UNSAMPLED;
+
+    if(k->unsampled_value.v) {
+        FACET_VALUE_ADD_CONFLICT(k, k->unsampled_value.v, &tv);
+        k->current_value.v = k->unsampled_value.v;
+    }
+    else {
+        FACET_VALUE *v = FACET_VALUE_ADD_TO_INDEX(k, &tv);
+        v->unsampled = true;
+        k->unsampled_value.v = v;
+        k->current_value.v = v;
+    }
+}
+
+static inline void FACET_VALUE_ADD_ESTIMATED_VALUE_TO_INDEX(FACET_KEY *k) {
+    static const FACET_VALUE tv = {
+            .hash = FACETS_HASH_ESTIMATED,
+            .name = FACET_VALUE_ESTIMATED,
+            .name_len = sizeof(FACET_VALUE_ESTIMATED) - 1,
+            .estimated = true,
+            .color = "generic",
+    };
+
+    k->current_value.hash = FACETS_HASH_ESTIMATED;
+
+    if(k->estimated_value.v) {
+        FACET_VALUE_ADD_CONFLICT(k, k->estimated_value.v, &tv);
+        k->current_value.v = k->estimated_value.v;
+    }
+    else {
+        FACET_VALUE *v = FACET_VALUE_ADD_TO_INDEX(k, &tv);
+        v->estimated = true;
+        k->estimated_value.v = v;
+        k->current_value.v = v;
+    }
+}
+
 static inline void FACET_VALUE_ADD_EMPTY_VALUE_TO_INDEX(FACET_KEY *k) {
     static const FACET_VALUE tv = {
             .hash = FACETS_HASH_ZERO,
             .name = FACET_VALUE_UNSET,
             .name_len = sizeof(FACET_VALUE_UNSET) - 1,
+            .empty = true,
     };
 
     k->current_value.hash = FACETS_HASH_ZERO;
@@ -544,6 +568,9 @@ static inline void FACET_VALUE_ADD_CURRENT_VALUE_TO_INDEX(FACET_KEY *k) {
     tv.name = facets_key_get_value(k);
     tv.name_len = facets_key_get_value_length(k);
     tv.hash = FACETS_HASH_FUNCTION(tv.name, tv.name_len);
+    tv.empty = false;
+    tv.estimated = false;
+    tv.unsampled = false;
 
     k->current_value.v = FACET_VALUE_ADD_TO_INDEX(k, &tv);
     k->facets->operations.values.indexed++;
@@ -584,7 +611,7 @@ static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
 
-    simple_hashtable_init(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
+    simple_hashtable_init_KEY(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
 }
 
 static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
@@ -603,12 +630,12 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
 
-    simple_hashtable_free(&facets->keys.ht);
+    simple_hashtable_destroy_KEY(&facets->keys.ht);
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
-    return slot->data;
+    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, true);
+    return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
 bool facets_key_name_value_length_is_selected(FACETS *facets, const char *key, size_t key_length, const char *value, size_t value_length) {
@@ -687,22 +714,20 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
 static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH hash, const char *name, size_t name_length, FACET_KEY_OPTIONS options) {
     facets->operations.keys.registered++;
 
-    SIMPLE_HASHTABLE_SLOT *slot = simple_hashtable_get_slot(&facets->keys.ht, hash, true);
+    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, true);
 
-    if(unlikely(!slot->data)) {
+    if(unlikely(!SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
         // we have to add it
         FACET_KEY *k = FACETS_KEY_CREATE(facets, hash, name, name_length, options);
 
-        slot->hash = hash;
-        slot->data = k;
-        facets->keys.ht.used++;
+        simple_hashtable_set_slot_KEY(&facets->keys.ht, slot, hash, k);
 
         return k;
     }
 
     // already in the index
 
-    FACET_KEY *k = slot->data;
+    FACET_KEY *k = SIMPLE_HASHTABLE_SLOT_DATA(slot);
 
     facet_key_set_name(k, name, name_length);
 
@@ -729,6 +754,10 @@ bool facets_key_name_is_facet(FACETS *facets, const char *key) {
 
 // ----------------------------------------------------------------------------
 
+size_t facets_histogram_slots(FACETS *facets) {
+    return facets->histogram.slots;
+}
+
 static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
     // Array of valid durations in seconds
     static time_t valid_durations_s[] = {
@@ -744,7 +773,7 @@ static usec_t calculate_histogram_bar_width(usec_t after_ut, usec_t before_ut) {
     usec_t bar_width_ut = 1 * USEC_PER_SEC;
 
     for (int i = array_size - 1; i >= 0; --i) {
-        if (duration_ut / (valid_durations_s[i] * USEC_PER_SEC) >= HISTOGRAM_COLUMNS) {
+        if (duration_ut / (valid_durations_s[i] * USEC_PER_SEC) >= FACETS_HISTOGRAM_COLUMNS) {
             bar_width_ut = valid_durations_s[i] * USEC_PER_SEC;
             break;
         }
@@ -801,17 +830,7 @@ void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_
     facets_set_timeframe_and_histogram_by_id(facets, hash_str, after_ut, before_ut);
 }
 
-static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
-    if(!facets->histogram.enabled ||
-            !facets->histogram.key ||
-            !facets->histogram.key->values.enabled ||
-            !facet_key_value_updated(facets->histogram.key) ||
-            usec < facets->histogram.after_ut ||
-            usec > facets->histogram.before_ut)
-        return;
-
-    FACET_VALUE *v = facets->histogram.key->current_value.v;
-
+static inline uint32_t facets_histogram_slot_at_time_ut(FACETS *facets, usec_t usec, FACET_VALUE *v) {
     if(unlikely(!v->histogram))
         v->histogram = callocz(facets->histogram.slots, sizeof(*v->histogram));
 
@@ -828,11 +847,177 @@ static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
     if(unlikely(slot >= facets->histogram.slots))
         slot = facets->histogram.slots - 1;
 
+    return slot;
+}
+
+static inline void facets_histogram_update_value_slot(FACETS *facets, usec_t usec, FACET_VALUE *v) {
+    uint32_t slot = facets_histogram_slot_at_time_ut(facets, usec, v);
     v->histogram[slot]++;
 }
 
+static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
+    if(!facets->histogram.enabled ||
+            !facets->histogram.key ||
+            !facets->histogram.key->values.enabled ||
+            !facet_key_value_updated(facets->histogram.key) ||
+            usec < facets->histogram.after_ut ||
+            usec > facets->histogram.before_ut)
+        return;
+
+    FACET_VALUE *v = facets->histogram.key->current_value.v;
+    facets_histogram_update_value_slot(facets, usec, v);
+}
+
+static usec_t overlap_duration_ut(usec_t start1, usec_t end1, usec_t start2, usec_t end2) {
+    usec_t overlap_start = MAX(start1, start2);
+    usec_t overlap_end = MIN(end1, end2);
+
+    if (overlap_start < overlap_end)
+        return overlap_end - overlap_start;
+    else
+        return 0; // No overlap
+}
+
+void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, size_t entries) {
+    if(unlikely(!facets->histogram.enabled))
+        return;
+
+    if(unlikely(!overlap_duration_ut(facets->histogram.after_ut, facets->histogram.before_ut, from_ut, to_ut)))
+        return;
+
+    facets->operations.rows.evaluated += entries;
+    facets->operations.rows.matched += entries;
+    facets->operations.rows.estimated += entries;
+
+    if (!facets->histogram.enabled ||
+        !facets->histogram.key ||
+        !facets->histogram.key->values.enabled)
+        return;
+
+    if (from_ut < facets->histogram.after_ut)
+        from_ut = facets->histogram.after_ut;
+
+    if (to_ut > facets->histogram.before_ut)
+        to_ut = facets->histogram.before_ut;
+
+    if (!facets->histogram.key->estimated_value.v)
+        FACET_VALUE_ADD_ESTIMATED_VALUE_TO_INDEX(facets->histogram.key);
+
+    FACET_VALUE *v = facets->histogram.key->estimated_value.v;
+
+    size_t slots = 0;
+    size_t total_ut = to_ut - from_ut;
+    ssize_t remaining_entries = (ssize_t)entries;
+    size_t slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
+    for(; slot < facets->histogram.slots ;slot++) {
+        usec_t slot_start_ut = facets->histogram.after_ut + slot * facets->histogram.slot_width_ut;
+        usec_t slot_end_ut = slot_start_ut + facets->histogram.slot_width_ut;
+
+        if(slot_start_ut > to_ut)
+            break;
+
+        usec_t overlap_ut = overlap_duration_ut(from_ut, to_ut, slot_start_ut, slot_end_ut);
+
+        size_t slot_entries = (overlap_ut * entries) / total_ut;
+        v->histogram[slot] += slot_entries;
+        remaining_entries -= (ssize_t)slot_entries;
+        slots++;
+    }
+
+    // Check if all entries are assigned
+    // This should always be true if the distribution is correct
+    internal_fatal(remaining_entries < 0 || remaining_entries >= (ssize_t)(slots),
+                   "distribution of estimations is not accurate - there are %zd remaining entries",
+                   remaining_entries);
+}
+
+void facets_row_finished_unsampled(FACETS *facets, usec_t usec) {
+    facets->operations.rows.evaluated++;
+    facets->operations.rows.matched++;
+    facets->operations.rows.unsampled++;
+
+    if(!facets->histogram.enabled ||
+       !facets->histogram.key ||
+       !facets->histogram.key->values.enabled ||
+       usec < facets->histogram.after_ut ||
+       usec > facets->histogram.before_ut)
+        return;
+
+    if(!facets->histogram.key->unsampled_value.v)
+        FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(facets->histogram.key);
+
+    FACET_VALUE *v = facets->histogram.key->unsampled_value.v;
+    facets_histogram_update_value_slot(facets, usec, v);
+
+    facets_reset_key(facets->histogram.key);
+}
+
+static const char *facets_key_name_cached(FACET_KEY *k, DICTIONARY *used_hashes_registry) {
+    if(k->name) {
+        if(used_hashes_registry && !k->default_selected_for_values) {
+            char hash_str[FACET_STRING_HASH_SIZE];
+            facets_hash_to_str(k->hash, hash_str);
+            dictionary_set(used_hashes_registry, hash_str, (void *)k->name, strlen(k->name) + 1);
+        }
+
+        return k->name;
+    }
+
+    // key has no name
+    const char *name = "[UNAVAILABLE_FIELD]";
+
+    if(used_hashes_registry) {
+        char hash_str[FACET_STRING_HASH_SIZE];
+        facets_hash_to_str(k->hash, hash_str);
+        const char *s = dictionary_get(used_hashes_registry, hash_str);
+        if(s) name = s;
+    }
+
+    return name;
+}
+
+static const char *facets_key_value_cached(FACET_KEY *k, FACET_VALUE *v, DICTIONARY *used_hashes_registry) {
+    if(v->empty || v->estimated || v->unsampled)
+        return v->name;
+
+    if(v->name && v->name_len) {
+        if(used_hashes_registry && !k->default_selected_for_values && v->selected) {
+            char hash_str[FACET_STRING_HASH_SIZE];
+            facets_hash_to_str(v->hash, hash_str);
+            dictionary_set(used_hashes_registry, hash_str, (void *)v->name, v->name_len + 1);
+        }
+
+        return v->name;
+    }
+
+    // key has no name
+    const char *name = "[unavailable field]";
+
+    if(used_hashes_registry) {
+        char hash_str[FACET_STRING_HASH_SIZE];
+        facets_hash_to_str(v->hash, hash_str);
+        const char *s = dictionary_get(used_hashes_registry, hash_str);
+        if(s) name = s;
+    }
+
+    return name;
+}
+
+static inline void facets_key_value_transformed(FACETS *facets, FACET_KEY *k, FACET_VALUE *v, BUFFER *dst, FACETS_TRANSFORMATION_SCOPE scope) {
+    buffer_flush(dst);
+
+    if(v->empty || v->unsampled || v->estimated)
+        buffer_strcat(dst, v->name);
+    else if(k->transform.cb && k->transform.view_only) {
+        buffer_contents_replace(dst, v->name, v->name_len);
+        k->transform.cb(facets, dst, scope, k->transform.data);
+    }
+    else
+        buffer_strcat(dst, facets_key_value_cached(k, v, facets->report.used_hashes_registry));
+}
+
 static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
-    BUFFER *tb = NULL;
+    CLEAN_BUFFER *tb = buffer_create(0, NULL);
 
     buffer_json_member_add_array(wb, key);
     {
@@ -845,23 +1030,30 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
                 if (unlikely(!v->histogram))
                     continue;
 
-                if(!v->empty && k->transform.cb && k->transform.view_only) {
-                    if(!tb)
-                        tb = buffer_create(0, NULL);
-
-                    buffer_contents_replace(tb, v->name, v->name_len);
-                    k->transform.cb(facets, tb, FACETS_TRANSFORM_HISTOGRAM, k->transform.data);
-                    buffer_json_add_array_item_string(wb, buffer_tostring(tb));
-                }
-                else
-                    buffer_json_add_array_item_string(wb, v->name);
+                facets_key_value_transformed(facets, k, v, tb, FACETS_TRANSFORM_HISTOGRAM);
+                buffer_json_add_array_item_string(wb, buffer_tostring(tb));
             }
             foreach_value_in_key_done(v);
         }
     }
     buffer_json_array_close(wb); // key
+}
 
-    buffer_free(tb);
+static inline void facets_histogram_value_colors(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+    buffer_json_member_add_array(wb, key);
+    {
+        if(k && k->values.enabled) {
+            FACET_VALUE *v;
+            foreach_value_in_key(k, v) {
+                if (unlikely(!v->histogram))
+                    continue;
+
+                buffer_json_add_array_item_string(wb, v->color);
+            }
+            foreach_value_in_key_done(v);
+        }
+    }
+    buffer_json_array_close(wb); // key
 }
 
 static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
@@ -967,6 +1159,8 @@ static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe
 }
 
 static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) {
+    CLEAN_BUFFER *tmp = buffer_create(0, NULL);
+
     size_t dimensions = 0;
     uint32_t min = UINT32_MAX, max = 0, sum = 0, count = 0;
 
@@ -1008,6 +1202,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
     buffer_json_member_add_object(wb, "summary");
     {
+        // summary.nodes
         buffer_json_member_add_array(wb, "nodes");
         {
             buffer_json_add_array_item_object(wb); // node
@@ -1054,6 +1249,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         }
         buffer_json_array_close(wb); // nodes
 
+        // summary.contexts
         buffer_json_member_add_array(wb, "contexts");
         {
             buffer_json_add_array_item_object(wb); // context
@@ -1091,6 +1287,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         }
         buffer_json_array_close(wb); // contexts
 
+        // summary.instances
         buffer_json_member_add_array(wb, "instances");
         {
             buffer_json_add_array_item_object(wb); // instance
@@ -1122,17 +1319,20 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         }
         buffer_json_array_close(wb); // instances
 
+        // summary.dimensions
         buffer_json_member_add_array(wb, "dimensions");
         if(dimensions && k && k->values.enabled) {
             size_t pri = 0;
             FACET_VALUE *v;
+
             foreach_value_in_key(k, v) {
                 if(unlikely(!v->histogram))
                     continue;
 
                 buffer_json_add_array_item_object(wb); // dimension
                 {
-                    buffer_json_member_add_string(wb, "id", v->name);
+                    facets_key_value_transformed(facets, k, v, tmp, FACETS_TRANSFORM_HISTOGRAM);
+                    buffer_json_member_add_string(wb, "id", buffer_tostring(tmp));
                     buffer_json_member_add_object(wb, "ds");
                     {
                         buffer_json_member_add_uint64(wb, "sl", 1);
@@ -1288,7 +1488,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
         char title[1024 + 1] = "Events Distribution";
         FACET_KEY *kt = FACETS_KEY_GET_FROM_INDEX(facets, facets->histogram.hash);
         if(kt && kt->name)
-            snprintfz(title, 1024, "Events Distribution by %s", kt->name);
+            snprintfz(title, sizeof(title) - 1, "Events Distribution by %s", kt->name);
 
         buffer_json_member_add_string(wb, "title", title);
         buffer_json_member_add_time_t(wb, "update_every", facets->histogram.slot_width_ut / USEC_PER_SEC);
@@ -1306,6 +1506,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
             facets_histogram_value_names(wb, facets, k, "ids", NULL);
             facets_histogram_value_names(wb, facets, k, "names", NULL);
+            facets_histogram_value_colors(wb, facets, k, "colors");
             facets_histogram_value_units(wb, facets, k, "units");
 
             buffer_json_member_add_object(wb, "sts");
@@ -1538,6 +1739,30 @@ void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
 
 // ----------------------------------------------------------------------------
 
+static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) {
+    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+
+    k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_UNSAMPLED;
+
+    facets->operations.values.registered++;
+    facets->operations.values.unsampled++;
+
+    // no need to copy the UNSET value
+    // empty values are exported as empty
+    k->current_value.raw = NULL;
+    k->current_value.raw_len = 0;
+    k->current_value.b->len = 0;
+    k->current_value.flags &= ~FACET_KEY_VALUE_COPIED;
+
+    if(unlikely(k->values.enabled))
+        FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(k);
+    else {
+        k->key_found_in_row++;
+        k->key_values_selected_in_row++;
+    }
+}
+
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
     if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
@@ -1567,7 +1792,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED;
-    k->current_value.flags &= ~FACET_KEY_VALUE_EMPTY;
+    k->current_value.flags &= ~(FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED|FACET_KEY_VALUE_ESTIMATED);
 
     facets->operations.values.registered++;
 
@@ -1581,7 +1806,7 @@ static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
 //    if(strstr(buffer_tostring(k->current_value), "fprintd") != NULL)
 //        found = true;
 
-    if(facets->query && !facet_key_value_empty(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
+    if(facets->query && !facet_key_value_empty_or_unsampled_or_estimated(k) && ((k->options & FACET_KEY_OPTION_FTS) || facets->options & FACETS_OPTION_ALL_KEYS_FTS)) {
         facets->operations.fts.searches++;
         facets_key_value_copy_to_buffer(k);
         switch(simple_pattern_matches_extract(facets->query, buffer_tostring(k->current_value.b), NULL, 0)) {
@@ -1692,7 +1917,7 @@ static FACET_ROW *facets_row_create(FACETS *facets, usec_t usec, FACET_ROW *into
                 .empty = true,
         };
 
-        if(facet_key_value_updated(k) && !facet_key_value_empty(k)) {
+        if(facet_key_value_updated(k) && !facet_key_value_empty_or_unsampled_or_estimated(k)) {
             t.tmp = facets_key_get_value(k);
             t.tmp_len = facets_key_get_value_length(k);
             t.empty = false;
@@ -1769,6 +1994,12 @@ static inline bool facets_is_entry_within_anchor(FACETS *facets, usec_t usec) {
     }
 
     return true;
+}
+
+bool facets_row_candidate_to_keep(FACETS *facets, usec_t usec) {
+    return !facets->base ||
+            (usec >= facets->base->prev->usec && usec <= facets->base->usec && facets_is_entry_within_anchor(facets, usec)) ||
+            facets->items_to_return < facets->max_items_to_return;
 }
 
 static void facets_row_keep(FACETS *facets, usec_t usec) {
@@ -1898,9 +2129,10 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
     for(size_t p = 0; p < entries ;p++) {
         FACET_KEY *k = facets->keys_with_values.array[p];
 
-        if(!facet_key_value_updated(k))
+        if(!facet_key_value_updated(k)) {
             // put the FACET_VALUE_UNSET value into it
             facets_key_set_empty_value(facets, k);
+        }
 
         total_keys++;
 
@@ -2117,7 +2349,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
     if(!k->values.enabled || !k->values.ll || !k->values.used)
         return 0;
 
-    if(!k->transform.cb || !(k->facets->options & FACETS_OPTION_SORT_FACETS_ALPHABETICALLY))
+    if(!k->transform.cb || !k->transform.view_only || !(k->facets->options & FACETS_OPTION_SORT_FACETS_ALPHABETICALLY))
         return facets_sort_and_reorder_values_internal(k);
 
     // we have a transformation and has to be sorted alphabetically
@@ -2141,8 +2373,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
         values[used].name_len = v->name_len;
         used++;
 
-        buffer_contents_replace(tb, v->name, v->name_len);
-        k->transform.cb(k->facets, tb, FACETS_TRANSFORM_FACET_SORT, k->transform.data);
+        facets_key_value_transformed(k->facets, k, v, tb, FACETS_TRANSFORM_FACET_SORT);
         v->name = strdupz(buffer_tostring(tb));
         v->name_len = buffer_strlen(tb);
     }
@@ -2180,55 +2411,9 @@ void facets_table_config(BUFFER *wb) {
     buffer_json_object_close(wb); // pagination
 }
 
-static const char *facets_json_key_name_string(FACET_KEY *k, DICTIONARY *used_hashes_registry) {
-    if(k->name) {
-        if(used_hashes_registry && !k->default_selected_for_values) {
-            char hash_str[FACET_STRING_HASH_SIZE];
-            facets_hash_to_str(k->hash, hash_str);
-            dictionary_set(used_hashes_registry, hash_str, (void *)k->name, strlen(k->name) + 1);
-        }
-
-        return k->name;
-    }
-
-    // key has no name
-    const char *name = "[UNAVAILABLE_FIELD]";
-
-    if(used_hashes_registry) {
-        char hash_str[FACET_STRING_HASH_SIZE];
-        facets_hash_to_str(k->hash, hash_str);
-        const char *s = dictionary_get(used_hashes_registry, hash_str);
-        if(s) name = s;
-    }
-
-    return name;
-}
-
-static const char *facets_json_key_value_string(FACET_KEY *k, FACET_VALUE *v, DICTIONARY *used_hashes_registry) {
-    if(v->name && v->name_len) {
-        if(used_hashes_registry && !k->default_selected_for_values && v->selected) {
-            char hash_str[FACET_STRING_HASH_SIZE];
-            facets_hash_to_str(v->hash, hash_str);
-            dictionary_set(used_hashes_registry, hash_str, (void *)v->name, v->name_len + 1);
-        }
-
-        return v->name;
-    }
-
-    // key has no name
-    const char *name = "[unavailable field]";
-
-    if(used_hashes_registry) {
-        char hash_str[FACET_STRING_HASH_SIZE];
-        facets_hash_to_str(v->hash, hash_str);
-        const char *s = dictionary_get(used_hashes_registry, hash_str);
-        if(s) name = s;
-    }
-
-    return name;
-}
-
 void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry) {
+    facets->report.used_hashes_registry = used_hashes_registry;
+
     if(!(facets->options & FACETS_OPTION_DATA_ONLY)) {
         facets_table_config(wb);
         facets_accepted_parameters_to_json_array(facets, wb, true);
@@ -2252,7 +2437,7 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
         }
 
         if(show_facets) {
-            BUFFER *tb = NULL;
+            CLEAN_BUFFER *tb = buffer_create(0, NULL);
             FACET_KEY *k;
             foreach_key_in_facets(facets, k) {
                 if(!k->values.enabled)
@@ -2265,7 +2450,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 buffer_json_add_array_item_object(wb); // key
                 {
                     buffer_json_member_add_string(wb, "id", hash_to_static_string(k->hash));
-                    buffer_json_member_add_string(wb, "name", facets_json_key_name_string(k, used_hashes_registry));
+                    buffer_json_member_add_string(wb, "name", facets_key_name_cached(k
+                                                                                     , facets->report.used_hashes_registry
+                                                                                    ));
 
                     if(!k->order) k->order = facets->order++;
                     buffer_json_member_add_uint64(wb, "order", k->order);
@@ -2277,21 +2464,15 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                             if((facets->options & FACETS_OPTION_DONT_SEND_EMPTY_VALUE_FACETS) && v->empty)
                                 continue;
 
+                            if(v->unsampled || v->estimated)
+                                continue;
+
                             buffer_json_add_array_item_object(wb);
                             {
                                 buffer_json_member_add_string(wb, "id", hash_to_static_string(v->hash));
 
-                                if(!v->empty && k->transform.cb && k->transform.view_only) {
-                                    if(!tb)
-                                        tb = buffer_create(0, NULL);
-
-                                    buffer_contents_replace(tb, v->name, v->name_len);
-                                    k->transform.cb(facets, tb, FACETS_TRANSFORM_FACET, k->transform.data);
-                                    buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
-                                }
-                                else
-                                    buffer_json_member_add_string(wb, "name", facets_json_key_value_string(k, v, used_hashes_registry));
-
+                                facets_key_value_transformed(facets, k, v, tb, FACETS_TRANSFORM_FACET);
+                                buffer_json_member_add_string(wb, "name", buffer_tostring(tb));
                                 buffer_json_member_add_uint64(wb, "count", v->final_facet_value_counter);
                                 buffer_json_member_add_uint64(wb, "order", v->order);
                             }
@@ -2304,7 +2485,6 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 buffer_json_object_close(wb); // key
             }
             foreach_key_in_facets_done(k);
-            buffer_free(tb);
             buffer_json_array_close(wb); // facets
         }
     }
@@ -2518,6 +2698,8 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
     if(show_items) {
         buffer_json_member_add_uint64(wb, "evaluated", facets->operations.rows.evaluated);
         buffer_json_member_add_uint64(wb, "matched", facets->operations.rows.matched);
+        buffer_json_member_add_uint64(wb, "unsampled", facets->operations.rows.unsampled);
+        buffer_json_member_add_uint64(wb, "estimated", facets->operations.rows.estimated);
         buffer_json_member_add_uint64(wb, "returned", facets->items_to_return);
         buffer_json_member_add_uint64(wb, "max_to_return", facets->max_items_to_return);
         buffer_json_member_add_uint64(wb, "before", facets->operations.skips_before);
@@ -2582,6 +2764,8 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
             buffer_json_member_add_uint64(wb, "transformed", facets->operations.values.transformed);
             buffer_json_member_add_uint64(wb, "dynamic", facets->operations.values.dynamic);
             buffer_json_member_add_uint64(wb, "empty", facets->operations.values.empty);
+            buffer_json_member_add_uint64(wb, "unsampled", facets->operations.values.unsampled);
+            buffer_json_member_add_uint64(wb, "estimated", facets->operations.values.estimated);
             buffer_json_member_add_uint64(wb, "indexed", facets->operations.values.indexed);
             buffer_json_member_add_uint64(wb, "inserts", facets->operations.values.inserts);
             buffer_json_member_add_uint64(wb, "conflicts", facets->operations.values.conflicts);

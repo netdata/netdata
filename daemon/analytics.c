@@ -149,7 +149,7 @@ void analytics_log_prometheus(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.prometheus_hits < ANALYTICS_MAX_PROMETHEUS_HITS)) {
         analytics_data.prometheus_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.prometheus_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.prometheus_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, b);
     }
 }
@@ -162,7 +162,7 @@ void analytics_log_shell(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.shell_hits < ANALYTICS_MAX_SHELL_HITS)) {
         analytics_data.shell_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.shell_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.shell_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_shell_used, b);
     }
 }
@@ -175,7 +175,7 @@ void analytics_log_json(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.json_hits < ANALYTICS_MAX_JSON_HITS)) {
         analytics_data.json_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.json_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.json_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_json_used, b);
     }
 }
@@ -188,7 +188,7 @@ void analytics_log_dashboard(void)
     if (netdata_anonymous_statistics_enabled == 1 && likely(analytics_data.dashboard_hits < ANALYTICS_MAX_DASHBOARD_HITS)) {
         analytics_data.dashboard_hits++;
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.dashboard_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
     }
 }
@@ -198,7 +198,7 @@ void analytics_log_dashboard(void)
  */
 void analytics_report_oom_score(long long int score){
     char b[21];
-    snprintfz(b, 20, "%lld", score);
+    snprintfz(b, sizeof(b) - 1, "%lld", score);
     analytics_set_data(&analytics_data.netdata_config_oom_score, b);
 }
 
@@ -222,11 +222,11 @@ void analytics_mirrored_hosts(void)
     }
     rrd_unlock();
 
-    snprintfz(b, 20, "%zu", count);
+    snprintfz(b, sizeof(b) - 1, "%zu", count);
     analytics_set_data(&analytics_data.netdata_mirrored_host_count, b);
-    snprintfz(b, 20, "%zu", reachable);
+    snprintfz(b, sizeof(b) - 1, "%zu", reachable);
     analytics_set_data(&analytics_data.netdata_mirrored_hosts_reachable, b);
-    snprintfz(b, 20, "%zu", unreachable);
+    snprintfz(b, sizeof(b) - 1, "%zu", unreachable);
     analytics_set_data(&analytics_data.netdata_mirrored_hosts_unreachable, b);
 }
 
@@ -281,7 +281,7 @@ void analytics_collectors(void)
             .plugin = rrdset_plugin_name(st),
             .module = rrdset_module_name(st)
         };
-        snprintfz(name, 499, "%s:%s", col.plugin, col.module);
+        snprintfz(name, sizeof(name) - 1, "%s:%s", col.plugin, col.module);
         dictionary_set(dict, name, &col, sizeof(struct collector));
     }
     rrdset_foreach_done(st);
@@ -297,7 +297,7 @@ void analytics_collectors(void)
 
     {
         char b[21];
-        snprintfz(b, 20, "%d", ap.c);
+        snprintfz(b, sizeof(b) - 1, "%d", ap.c);
         analytics_set_data(&analytics_data.netdata_collectors_count, b);
     }
 
@@ -402,7 +402,7 @@ void analytics_charts(void)
     analytics_data.charts_count = c;
     {
         char b[21];
-        snprintfz(b, 20, "%zu", c);
+        snprintfz(b, sizeof(b) - 1, "%zu", c);
         analytics_set_data(&analytics_data.netdata_charts_count, b);
     }
 }
@@ -427,7 +427,7 @@ void analytics_metrics(void)
     analytics_data.metrics_count = dimensions;
     {
         char b[21];
-        snprintfz(b, 20, "%zu", dimensions);
+        snprintfz(b, sizeof(b) - 1, "%zu", dimensions);
         analytics_set_data(&analytics_data.netdata_metrics_count, b);
     }
 }
@@ -454,11 +454,11 @@ void analytics_alarms(void)
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
-    snprintfz(b, 20, "%zu", alarm_normal);
+    snprintfz(b, sizeof(b) - 1, "%zu", alarm_normal);
     analytics_set_data(&analytics_data.netdata_alarms_normal, b);
-    snprintfz(b, 20, "%zu", alarm_warn);
+    snprintfz(b, sizeof(b) - 1, "%zu", alarm_warn);
     analytics_set_data(&analytics_data.netdata_alarms_warning, b);
-    snprintfz(b, 20, "%zu", alarm_crit);
+    snprintfz(b, sizeof(b) - 1, "%zu", alarm_crit);
     analytics_set_data(&analytics_data.netdata_alarms_critical, b);
 }
 
@@ -540,19 +540,19 @@ void analytics_gather_mutable_meta_data(void)
 
     {
         char b[21];
-        snprintfz(b, 20, "%zu", analytics_data.prometheus_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.prometheus_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_prometheus_used, b);
 
-        snprintfz(b, 20, "%zu", analytics_data.shell_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.shell_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_shell_used, b);
 
-        snprintfz(b, 20, "%zu", analytics_data.json_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.json_hits);
         analytics_set_data(&analytics_data.netdata_allmetrics_json_used, b);
 
-        snprintfz(b, 20, "%zu", analytics_data.dashboard_hits);
+        snprintfz(b, sizeof(b) - 1, "%zu", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
 
-        snprintfz(b, 20, "%zu", rrdhost_hosts_available());
+        snprintfz(b, sizeof(b) - 1, "%zu", rrdhost_hosts_available());
         analytics_set_data(&analytics_data.netdata_config_hosts_available, b);
     }
 }
@@ -664,10 +664,10 @@ void set_late_global_environment(struct rrdhost_system_info *system_info)
 #ifdef ENABLE_DBENGINE
     {
         char b[16];
-        snprintfz(b, 15, "%d", default_rrdeng_page_cache_mb);
+        snprintfz(b, sizeof(b) - 1, "%d", default_rrdeng_page_cache_mb);
         analytics_set_data(&analytics_data.netdata_config_page_cache_size, b);
 
-        snprintfz(b, 15, "%d", default_multidb_disk_quota_mb);
+        snprintfz(b, sizeof(b) - 1, "%d", default_multidb_disk_quota_mb);
         analytics_set_data(&analytics_data.netdata_config_multidb_disk_quota, b);
     }
 #endif
@@ -824,11 +824,10 @@ void get_system_timezone(void)
     }
 }
 
-void set_global_environment()
-{
+void set_global_environment() {
     {
         char b[16];
-        snprintfz(b, 15, "%d", default_rrd_update_every);
+        snprintfz(b, sizeof(b) - 1, "%d", default_rrd_update_every);
         setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 
@@ -843,7 +842,6 @@ void set_global_environment()
     setenv("NETDATA_LIB_DIR", verify_or_create_required_directory(netdata_configured_varlib_dir), 1);
     setenv("NETDATA_LOCK_DIR", verify_or_create_required_directory(netdata_configured_lock_dir), 1);
     setenv("NETDATA_LOG_DIR", verify_or_create_required_directory(netdata_configured_log_dir), 1);
-    setenv("HOME", verify_or_create_required_directory(netdata_configured_home_dir), 1);
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
     {
@@ -922,16 +920,14 @@ void set_global_environment()
         freez(default_port);
 
     // set the path we need
-    char path[1024 + 1], *p = getenv("PATH");
-    if (!p)
-        p = "/bin:/usr/bin";
-    snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
+    char path[4096], *p = getenv("PATH");
+    if (!p) p = "/bin:/usr/bin";
+    snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
     setenv("PATH", config_get(CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
 
     // python options
     p = getenv("PYTHONPATH");
-    if (!p)
-        p = "";
+    if (!p) p = "";
     setenv("PYTHONPATH", config_get(CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
 
     // disable buffering for python plugins
@@ -941,37 +937,46 @@ void set_global_environment()
     setenv("LC_ALL", "C", 1);
 }
 
-void send_statistics(const char *action, const char *action_result, const char *action_data)
-{
+void send_statistics(const char *action, const char *action_result, const char *action_data) {
     static char *as_script;
 
     if (netdata_anonymous_statistics_enabled == -1) {
         char *optout_file = mallocz(
             sizeof(char) *
             (strlen(netdata_configured_user_config_dir) + strlen(".opt-out-from-anonymous-statistics") + 2));
+
         sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
+
         if (likely(access(optout_file, R_OK) != 0)) {
             as_script = mallocz(
                 sizeof(char) *
                 (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
+
             sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
+
             if (unlikely(access(as_script, R_OK) != 0)) {
                 netdata_anonymous_statistics_enabled = 0;
-                netdata_log_info("Anonymous statistics script %s not found.", as_script);
+
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "Statistics script '%s' not found.",
+                       as_script);
+
                 freez(as_script);
-            } else {
-                netdata_anonymous_statistics_enabled = 1;
             }
-        } else {
+            else
+                netdata_anonymous_statistics_enabled = 1;
+        }
+        else {
             netdata_anonymous_statistics_enabled = 0;
             as_script = NULL;
         }
+
         freez(optout_file);
     }
-    if (!netdata_anonymous_statistics_enabled)
+
+    if (!netdata_anonymous_statistics_enabled || !action)
         return;
-    if (!action)
-        return;
+
     if (!action_result)
         action_result = "";
     if (!action_data)
@@ -1030,7 +1035,9 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_prebuilt_distro,
         analytics_data.netdata_fail_reason);
 
-    netdata_log_info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "%s '%s' '%s' '%s'",
+           as_script, action, action_result, action_data);
 
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(command_to_run, &command_pid, &fp_child_input);
@@ -1039,11 +1046,21 @@ void send_statistics(const char *action, const char *action_result, const char *
         char *s = fgets(buffer, 4, fp_child_output);
         int exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
         if (exit_code)
-            netdata_log_error("Execution of anonymous statistics script returned %d.", exit_code);
-        if (s && strncmp(buffer, "200", 3))
-            netdata_log_error("Execution of anonymous statistics script returned http code %s.", buffer);
-    } else {
-        netdata_log_error("Failed to run anonymous statistics script %s.", as_script);
+
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "Statistics script returned error: %d",
+                   exit_code);
+
+        if (s && strncmp(buffer, "200", 3) != 0)
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "Statistics script returned http code: %s",
+                   buffer);
+
     }
+    else
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Failed to run statistics script: %s.",
+               as_script);
+
     freez(command_to_run);
 }

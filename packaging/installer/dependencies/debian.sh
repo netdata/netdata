@@ -12,8 +12,10 @@ package_tree="
   autoconf-archive
   autogen
   automake
+  bison
   cmake
   curl
+  flex
   g++
   gcc
   git

@@ -1,0 +1,15 @@
+pattern: none
+
+filename:
+  key: LOG_FILENAME
+
+inject:
+  - key: MESSAGE
+    value: '${LINE}' # a special variable that resolves to the whole line read from the log
+
+  - key: PRIORITY
+    value: 6           # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
+
+  - key: SYSLOG_IDENTIFIER
+    value: log2journal # the name of the application sending the logs
+

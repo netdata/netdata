@@ -31,6 +31,8 @@ package_tree="
   virtual/libelf
   dev-lang/python
   dev-libs/libuv
+  sys-devel/bison
+  sys-devel/flex
   "
 usage() {
   cat << EOF

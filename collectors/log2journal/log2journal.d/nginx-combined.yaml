@@ -1,0 +1,91 @@
+# Netdata log2journal Configuration
+# The following parses nginx log files using the combined format.
+
+# The PCRE2 pattern to match log entries and give names to the fields.
+# The journal will have these names, so follow their rules. You can
+# initiate an extended PCRE2 pattern by starting the pattern with (?x)
+pattern: |
+  (?x)                                   # Enable PCRE2 extended mode
+  ^
+  (?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR
+  (?<NGINX_REMOTE_USER>[^ ]+) \s         # NGINX_REMOTE_USER
+  \[
+    (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
+  \]
+  \s+ "
+  (?<NGINX_REQUEST>
+    (?<NGINX_REQUEST_METHOD>[A-Z]+) \s+  # NGINX_METHOD
+    (?<NGINX_REQUEST_URI>[^ ]+) \s+
+    (?<NGINX_SERVER_PROTOCOL>[^"]+)
+  )
+  " \s+
+  (?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
+  (?<NGINX_BODY_BYTES_SENT>\d+) \s+      # NGINX_BODY_BYTES_SENT
+  "(?<NGINX_HTTP_REFERER>[^"]*)" \s+     # NGINX_HTTP_REFERER
+  "(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT
+
+# When log2journal can detect the filename of each log entry (tail gives it
+# only when it tails multiple files), this key will be used to send the
+# filename to the journals.
+filename:
+  key: NGINX_LOG_FILENAME
+
+rename:
+  - new_key: MESSAGE
+    old_key: NGINX_REQUEST
+
+# Inject constant fields into the journal logs.
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: nginx-log
+
+  # inject PRIORITY is a duplicate of NGINX_STATUS
+  - key: PRIORITY
+    value: '${NGINX_STATUS}'
+
+  # Inject NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
+  - key: NGINX_STATUS_FAMILY
+    value: '${NGINX_STATUS}'
+
+# Rewrite the value of fields (including the duplicated ones).
+# The search pattern can have named groups, and the replace pattern can use
+# them as ${name}.
+rewrite:
+  # PRIORITY is a duplicate of NGINX_STATUS
+  # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
+  - key: PRIORITY
+    match: '^[123]'
+    value: 6
+
+  - key: PRIORITY
+    match: '^4'
+    value: 5
+
+  - key: PRIORITY
+    match: '^5'
+    value: 3
+
+  - key: PRIORITY
+    match: '.*'
+    value: 4
+
+  # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
+  - key: NGINX_STATUS_FAMILY
+    match: '^(?<first_digit>[1-5])'
+    value: '${first_digit}xx'
+
+  - key: NGINX_STATUS_FAMILY
+    match: '.*'
+    value: 'UNKNOWN'
+
+# Control what to do when input logs do not match the main PCRE2 pattern.
+unmatched:
+  # The journal key to log the PCRE2 error message to.
+  # Set this to MESSAGE, so you to see the error in the log.
+  key: MESSAGE
+
+  # Inject static fields to the unmatched entries.
+  # Set PRIORITY=1 (alert) to help you spot unmatched entries in the logs.
+  inject:
+    - key: PRIORITY
+      value: 1

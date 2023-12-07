@@ -5,4 +5,5 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 dist_noinst_DATA = \
     README.md \
+    systemd-cat-native.md \
     $(NULL)

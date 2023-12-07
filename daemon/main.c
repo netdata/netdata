@@ -4,6 +4,8 @@
 #include "buildinfo.h"
 #include "static_threads.h"
 
+#include "database/engine/page_test.h"
+
 #if defined(ENV32BIT)
 #warning COMPILING 32BIT NETDATA
 #endif
@@ -313,7 +315,7 @@ void netdata_cleanup_and_exit(int ret) {
     const char *prev_msg = NULL;
     bool timeout = false;
 
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
     netdata_log_info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
@@ -422,6 +424,13 @@ void netdata_cleanup_and_exit(int ret) {
             delta_shutdown_time("flush dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
+
+            for (size_t tier = 0; tier < storage_tiers; tier++) {
+                if (!multidb_ctx[tier])
+                    continue;
+                completion_wait_for(&multidb_ctx[tier]->quiesce.completion);
+                completion_destroy(&multidb_ctx[tier]->quiesce.completion);
+            }
         }
 #endif
 
@@ -447,8 +456,9 @@ void netdata_cleanup_and_exit(int ret) {
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
                 if(running) {
-                    error_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
-                    error_limit(&erl, "waiting for %zu collectors to finish", running);
+                    nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
+                                 "waiting for %zu collectors to finish", running);
                     // sleep_usec(100 * USEC_PER_MS);
                     cleanup_destroyed_dictionaries();
                 }
@@ -616,8 +626,14 @@ int killpid(pid_t pid) {
     int ret;
     netdata_log_debug(D_EXIT, "Request to kill pid %d", pid);
 
+    int signal = SIGTERM;
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    if(service_running(SERVICE_COLLECTORS))
+//        signal = SIGABRT;
+//#endif
+
     errno = 0;
-    ret = kill(pid, SIGTERM);
+    ret = kill(pid, signal);
     if (ret == -1) {
         switch(errno) {
             case ESRCH:
@@ -664,7 +680,7 @@ static void set_nofile_limit(struct rlimit *rl) {
 }
 
 void cancel_main_threads() {
-    error_log_limit_unlimited();
+    nd_log_limits_unlimited();
 
     int i, found = 0;
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
@@ -754,7 +770,7 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>\n"
+            " Copyright (C) 2016-2023, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
@@ -843,44 +859,49 @@ static void security_init(){
 #endif
 
 static void log_init(void) {
+    nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
+
+    time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
+    size_t logs = ND_LOG_DEFAULT_THROTTLE_LOGS;
+    period = config_get_number(CONFIG_SECTION_LOGS, "logs flood protection period", period);
+    logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
+    nd_log_set_flood_protection(logs, period);
+
+    nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", NDLP_INFO_STR));
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    stdout_filename    = config_get(CONFIG_SECTION_LOGS, "debug",  filename);
+    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
 
-    snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
-    stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
+    bool with_journal = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */;
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", filename));
 
-    snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    stdcollector_filename = config_get(CONFIG_SECTION_LOGS, "collector", filename);
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
+    nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
 
-    snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    stdhealth_filename = config_get(CONFIG_SECTION_LOGS, "health", filename);
+    if(with_journal)
+        snprintfz(filename, FILENAME_MAX, "journal");
+    else
+        snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-        aclklog_filename = config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename);
+        nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 #endif
-
-    char deffacility[8];
-    snprintfz(deffacility,7,"%s","daemon");
-    facility_log = config_get(CONFIG_SECTION_LOGS, "facility",  deffacility);
-
-    error_log_throttle_period = config_get_number(CONFIG_SECTION_LOGS, "errors flood protection period", error_log_throttle_period);
-    error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
-    error_log_errors_per_period_backup = error_log_errors_per_period;
-
-    setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get(CONFIG_SECTION_LOGS, "errors flood protection period"    , ""), 1);
-    setenv("NETDATA_ERRORS_PER_PERIOD",      config_get(CONFIG_SECTION_LOGS, "errors to trigger flood protection", ""), 1);
-
-    char *selected_level = config_get(CONFIG_SECTION_LOGS, "severity level", NETDATA_LOG_LEVEL_INFO_STR);
-    global_log_severity_level = log_severity_string_to_severity_level(selected_level);
-    setenv("NETDATA_LOG_SEVERITY_LEVEL", selected_level , 1);
 }
 
 char *initialize_lock_directory_path(char *prefix)
@@ -1052,6 +1073,36 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
+    config_move(CONFIG_SECTION_LOGS,   "error",
+                CONFIG_SECTION_LOGS,   "daemon");
+
+    config_move(CONFIG_SECTION_LOGS,   "severity level",
+                CONFIG_SECTION_LOGS,   "level");
+
+    config_move(CONFIG_SECTION_LOGS,   "errors to trigger flood protection",
+                CONFIG_SECTION_LOGS,   "logs to trigger flood protection");
+
+    config_move(CONFIG_SECTION_LOGS,   "errors flood protection period",
+                CONFIG_SECTION_LOGS,   "logs flood protection period");
+    config_move(CONFIG_SECTION_HEALTH, "is ephemeral",
+                CONFIG_SECTION_GLOBAL, "is ephemeral node");
+
+    config_move(CONFIG_SECTION_HEALTH, "has unstable connection",
+                CONFIG_SECTION_GLOBAL, "has unstable connection");
+}
+
+static int get_hostname(char *buf, size_t buf_size) {
+    if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", netdata_configured_host_prefix);
+
+        if (!read_file(filename, buf, buf_size)) {
+            trim(buf);
+            return 0;
+        }
+    }
+
+    return gethostname(buf, buf_size);
 }
 
 static void get_netdata_configured_variables() {
@@ -1060,10 +1111,12 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get the hostname
 
+    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
+    verify_netdata_host_prefix();
+
     char buf[HOSTNAME_MAX + 1];
-    if(gethostname(buf, HOSTNAME_MAX) == -1){
+    if (get_hostname(buf, HOSTNAME_MAX))
         netdata_log_error("Cannot get machine hostname.");
-    }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
@@ -1114,8 +1167,6 @@ static void get_netdata_configured_variables() {
     netdata_configured_web_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "web",          netdata_configured_web_dir);
     netdata_configured_cache_dir        = config_get(CONFIG_SECTION_DIRECTORIES, "cache",        netdata_configured_cache_dir);
     netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_DIRECTORIES, "lib",          netdata_configured_varlib_dir);
-    char *env_home=getenv("HOME");
-    netdata_configured_home_dir         = config_get(CONFIG_SECTION_DIRECTORIES, "home",         env_home?env_home:netdata_configured_home_dir);
 
     netdata_configured_lock_dir = initialize_lock_directory_path(netdata_configured_varlib_dir);
 
@@ -1125,6 +1176,16 @@ static void get_netdata_configured_variables() {
     }
 
 #ifdef ENABLE_DBENGINE
+    // ------------------------------------------------------------------------
+    // get default Database Engine page type
+
+    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "raw");
+    if (strcmp(page_type, "gorilla") == 0) {
+        tier_page_type[0] = PAGE_GORILLA_METRICS;
+    } else if (strcmp(page_type, "raw") != 0) {
+        netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
+    }
+
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
@@ -1163,10 +1224,6 @@ static void get_netdata_configured_variables() {
        default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
     }
 #endif
-    // ------------------------------------------------------------------------
-
-    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
-    verify_netdata_host_prefix();
 
     // --------------------------------------------------------------------
     // get KSM settings
@@ -1186,6 +1243,7 @@ static void get_netdata_configured_variables() {
     // --------------------------------------------------------------------
 
     rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
+    rrdhost_free_ephemeral_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup ephemeral hosts after secs", rrdhost_free_ephemeral_time_s);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
@@ -1264,7 +1322,7 @@ static inline void coverity_remove_taint(char *s)
     (void)s;
 }
 
-int get_system_info(struct rrdhost_system_info *system_info, bool log) {
+int get_system_info(struct rrdhost_system_info *system_info) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
@@ -1296,11 +1354,7 @@ int get_system_info(struct rrdhost_system_info *system_info, bool log) {
 
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
                     netdata_log_error("Unexpected environment variable %s=%s", line, value);
-                }
-                else {
-                    if(log)
-                        netdata_log_info("%s=%s", line, value);
-
+                } else {
                     setenv(line, value, 1);
                 }
             }
@@ -1340,6 +1394,7 @@ int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_rrdpush_compressions(void);
+int uuid_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1349,8 +1404,6 @@ int main(int argc, char **argv) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
-    // Initialize stderror avoiding coredump when netdata_log_info() or netdata_log_error() is called
-    stderror = stderr;
 
     int i;
     int config_loaded = 0;
@@ -1444,6 +1497,10 @@ int main(int argc, char **argv) {
                         char* stresstest_string = "stresstest=";
 #endif
 
+                        if(strcmp(optarg, "pgd-tests") == 0) {
+                            return pgd_test(argc, argv);
+                        }
+
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
                             sql_init_database(DB_CHECK_RECOVER, 0);
                             return 0;
@@ -1498,6 +1555,8 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (ctx_unittest())
                                 return 1;
+                            if (uuid_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
@@ -1523,6 +1582,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
                             return buffer_unittest();
+                        }
+                        else if(strcmp(optarg, "uuidtest") == 0) {
+                            unittest_running = true;
+                            return uuid_unittest();
                         }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
@@ -1858,7 +1921,7 @@ int main(int argc, char **argv) {
 
         {
             char buf[20 + 1];
-            snprintfz(buf, 20, "%d", libuv_worker_threads);
+            snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
             setenv("UV_THREADPOOL_SIZE", buf, 1);
         }
 
@@ -1901,10 +1964,10 @@ int main(int argc, char **argv) {
         // get log filenames and settings
 
         log_init();
-        error_log_limit_unlimited();
+        nd_log_limits_unlimited();
 
         // initialize the log files
-        open_all_log_files();
+        nd_log_initialize();
         netdata_log_info("Netdata agent version \""VERSION"\" is starting");
 
         ieee754_doubles = is_system_ieee754_double();
@@ -2015,6 +2078,16 @@ int main(int argc, char **argv) {
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
+    // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
+    struct passwd *pw = getpwuid(getuid());
+    if (config_exists(CONFIG_SECTION_DIRECTORIES, "home") || !pw || !pw->pw_dir) {
+        netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", netdata_configured_home_dir);
+    } else {
+        netdata_configured_home_dir = config_get(CONFIG_SECTION_DIRECTORIES, "home", pw->pw_dir);
+    }
+
+    setenv("HOME", netdata_configured_home_dir, 1);
+
     dyn_conf_init();
 
     netdata_log_info("netdata started on pid %d.", getpid());
@@ -2048,7 +2121,7 @@ int main(int argc, char **argv) {
     netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
-    get_system_info(system_info, true);
+    get_system_info(system_info);
     (void) registry_get_this_machine_guid();
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
@@ -2085,7 +2158,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // enable log flood protection
 
-    error_log_limit_reset();
+    nd_log_limits_reset();
 
     // Load host labels
     delta_startup_time("collect host labels");

@@ -216,7 +216,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                           (mntbuf[i].f_blocks > 2 ||
                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                     if (unlikely(!m->st_space)) {
-                        snprintfz(title, 4096, "Disk Space Usage for %s [%s]",
+                        snprintfz(title, sizeof(title) - 1, "Disk Space Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         m->st_space = rrdset_create_localhost("disk_space",
                                                               mntbuf[i].f_mntonname,
@@ -254,7 +254,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                            (mntbuf[i].f_files > 1 ||
                                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                     if (unlikely(!m->st_inodes)) {
-                        snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]",
+                        snprintfz(title, sizeof(title) - 1, "Disk Files (inodes) Usage for %s [%s]",
                                   mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
                         m->st_inodes = rrdset_create_localhost("disk_inodes",
                                                                mntbuf[i].f_mntonname,

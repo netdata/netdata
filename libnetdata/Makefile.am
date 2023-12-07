@@ -8,9 +8,11 @@ SUBDIRS = \
     aral \
     avl \
     buffer \
+    buffered_reader \
     clocks \
     completion \
     config \
+    datetime \
     dictionary \
     ebpf \
     eval \
@@ -19,6 +21,7 @@ SUBDIRS = \
     json \
     july \
     health \
+    line_splitter \
     locks \
     log \
     onewayalloc \
@@ -31,10 +34,12 @@ SUBDIRS = \
     string \
     threads \
     url \
+    uuid \
     worker_utilization \
     tests \
     $(NULL)
 
 dist_noinst_DATA = \
     README.md \
+    gorilla/README.md \
     $(NULL)

@@ -1,0 +1,76 @@
+pattern: |
+  (?x)                                   # Enable PCRE2 extended mode
+  ^
+  (?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR
+  (?<NGINX_REMOTE_USER>[^ ]+) \s         # NGINX_REMOTE_USER
+  \[
+    (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
+  \]
+  \s+ "
+  (?<MESSAGE>
+    (?<NGINX_METHOD>[A-Z]+) \s+          # NGINX_METHOD
+    (?<NGINX_URL>[^ ]+) \s+
+    HTTP/(?<NGINX_HTTP_VERSION>[^"]+)
+  )
+  " \s+
+  (?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
+  (?<NGINX_BODY_BYTES_SENT>\d+) \s+      # NGINX_BODY_BYTES_SENT
+  "(?<NGINX_HTTP_REFERER>[^"]*)" \s+     # NGINX_HTTP_REFERER
+  "(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT
+
+prefix: NGINX_
+
+filename:
+  key: NGINX_LOG_FILENAME
+
+filter:
+  include: '.*'
+  exclude: '.*HELLO.*WORLD.*'
+
+rename:
+  - new_key: TEST1
+    old_key: TEST2
+  - new_key: TEST3
+    old_key: TEST4
+
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: 'nginx-log'
+  - key: SYSLOG_IDENTIFIER2
+    value: 'nginx-log2'
+  - key: PRIORITY
+    value: '${NGINX_STATUS}'
+  - key: NGINX_STATUS_FAMILY
+    value: '${NGINX_STATUS}${NGINX_METHOD}'
+
+rewrite:
+  - key: "PRIORITY"
+    value: "${NGINX_STATUS}"
+    inject: yes
+    stop: no
+  - key: "PRIORITY"
+    match: "^[123]"
+    value: 6
+  - key: "PRIORITY"
+    match: "^4"
+    value: 5
+  - key: "PRIORITY"
+    match: "^5"
+    value: 3
+  - key: "PRIORITY"
+    match: ".*"
+    value: 4
+  - key: "NGINX_STATUS_FAMILY"
+    match: "^(?<first_digit>[1-5])"
+    value: "${first_digit}xx"
+  - key: "NGINX_STATUS_FAMILY"
+    match: ".*"
+    value: "UNKNOWN"
+
+unmatched:
+  key: MESSAGE
+  inject:
+    - key: PRIORITY
+      value: 1
+    - key: PRIORITY2
+      value: 2

@@ -4,11 +4,12 @@
 
 // SQL statements
 
-#define SQL_STORE_CLAIM_ID  "INSERT INTO node_instance " \
-    "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, unixepoch()) " \
-    "ON CONFLICT(host_id) DO UPDATE SET claim_id = excluded.claim_id;"
+#define SQL_STORE_CLAIM_ID                                                                                             \
+    "INSERT INTO node_instance "                                                                                       \
+    "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, UNIXEPOCH()) "                                     \
+    "ON CONFLICT(host_id) DO UPDATE SET claim_id = excluded.claim_id"
 
-#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
+#define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid"
 
 #define STORE_HOST_LABEL                                                                                               \
     "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
@@ -18,13 +19,13 @@
 
 #define STORE_HOST_OR_CHART_LABEL_VALUE "(u2h('%s'), %d,'%s','%s', unixepoch())"
 
-#define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid;"
+#define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid"
 
 #define SQL_STORE_HOST_INFO                                                                                              \
     "INSERT OR REPLACE INTO host (host_id, hostname, registry_hostname, update_every, os, timezone, tags, hops, "        \
     "memory_mode, abbrev_timezone, utc_offset, program_name, program_version, entries, health_enabled, last_connected) " \
     "VALUES (@host_id, @hostname, @registry_hostname, @update_every, @os, @timezone, @tags, @hops, "                     \
-    "@memory_mode, @abbrev_tz, @utc_offset, @prog_name, @prog_version, @entries, @health_enabled, @last_connected);"
+    "@memory_mode, @abbrev_tz, @utc_offset, @prog_name, @prog_version, @entries, @health_enabled, @last_connected)"
 
 #define SQL_STORE_CHART                                                                                                \
     "INSERT INTO chart (chart_id, host_id, type, id, name, family, context, title, unit, plugin, module, priority, "   \
@@ -51,9 +52,9 @@
     "(@uuid, @name, @value, UNIXEPOCH())"
 
 #define MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID                                                                          \
-    "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0);"
-#define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id;"
-#define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host);"
+    "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0)"
+#define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id"
+#define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host)"
 
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
 #define METADATA_MAINTENANCE_REPEAT (60)            // Repeat if last run for dimensions, charts, labels needs more work
@@ -80,6 +81,7 @@ enum metadata_opcode {
     METADATA_ADD_HOST_INFO,
     METADATA_SCAN_HOSTS,
     METADATA_LOAD_HOST_CONTEXT,
+    METADATA_DELETE_HOST_CHART_LABELS,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
@@ -119,6 +121,8 @@ struct metadata_wc {
 #define metadata_flag_set(target_flags, flag)   __atomic_or_fetch(&((target_flags)->flags), (flag), __ATOMIC_SEQ_CST)
 #define metadata_flag_clear(target_flags, flag) __atomic_and_fetch(&((target_flags)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
+struct metadata_wc metasync_worker = {.loop = NULL};
+
 //
 // For unittest
 //
@@ -137,6 +141,33 @@ struct query_build {
     int count;
     char uuid_str[UUID_STR_LEN];
 };
+
+#define SQL_DELETE_CHART_LABELS_BY_HOST                                                                                \
+    "DELETE FROM chart_label WHERE chart_id in (SELECT chart_id FROM chart WHERE host_id = @host_id)"
+
+static void delete_host_chart_labels(uuid_t *host_uuid)
+{
+    sqlite3_stmt *res = NULL;
+
+    int rc = sqlite3_prepare_v2(db_meta, SQL_DELETE_CHART_LABELS_BY_HOST, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to delete chart labels by host");
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to host chart labels");
+        goto failed;
+    }
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to execute command to remove host chart labels");
+
+failed:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize statement to remove host chart labels");
+}
 
 static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     struct query_build *lb = data;
@@ -160,8 +191,8 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
     return 1;
 }
 
-#define SQL_DELETE_CHART_LABEL "DELETE FROM chart_label WHERE chart_id = @chart_id;"
-#define SQL_DELETE_CHART_LABEL_HISTORY "DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id;"
+#define SQL_DELETE_CHART_LABEL "DELETE FROM chart_label WHERE chart_id = @chart_id"
+#define SQL_DELETE_CHART_LABEL_HISTORY "DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id"
 
 static void clean_old_chart_labels(RRDSET *st)
 {
@@ -169,9 +200,9 @@ static void clean_old_chart_labels(RRDSET *st)
     time_t first_time_s = rrdset_first_entry_s(st);
 
     if (unlikely(!first_time_s))
-        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL);
+        snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_CHART_LABEL);
     else
-        snprintfz(sql, 511,SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
+        snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_CHART_LABEL_HISTORY, first_time_s);
 
     int rc = exec_statement_with_uuid(sql, &st->chart_uuid);
     if (unlikely(rc))
@@ -1122,9 +1153,7 @@ static void timer_cb(uv_timer_t* handle)
    struct metadata_cmd cmd;
    memset(&cmd, 0, sizeof(cmd));
 
-   time_t now = now_realtime_sec();
-
-   if (wc->metadata_check_after && wc->metadata_check_after < now) {
+   if (wc->metadata_check_after <  now_realtime_sec()) {
        cmd.opcode = METADATA_SCAN_HOSTS;
        metadata_enq_cmd(wc, &cmd);
    }
@@ -1144,10 +1173,10 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
    if (free_pages > (total_pages * threshold / 100)) {
 
        int do_free_pages = (int) (free_pages * vacuum_pc / 100);
-       netdata_log_info("%s: Freeing %d database pages", db_alias, do_free_pages);
+       nd_log(NDLS_DAEMON, NDLP_DEBUG, "%s: Freeing %d database pages", db_alias, do_free_pages);
 
        char sql[128];
-       snprintfz(sql, 127, "PRAGMA incremental_vacuum(%d)", do_free_pages);
+       snprintfz(sql, sizeof(sql) - 1, "PRAGMA incremental_vacuum(%d)", do_free_pages);
        (void) db_execute(database, sql);
    }
 }
@@ -1173,6 +1202,7 @@ void run_metadata_cleanup(struct metadata_wc *wc)
 struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
+    void *data;
     BUFFER *work_buffer;
     uint32_t max_count;
 };
@@ -1258,7 +1288,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     RRDHOST *host;
 
     size_t max_threads = MIN(get_netdata_cpus() / 2, 6);
-    netdata_log_info("METADATA: Using %zu threads for context loading", max_threads);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Using %zu threads for context loading", max_threads);
     struct host_context_load_thread *hclt = callocz(max_threads, sizeof(*hclt));
 
     size_t thread_index;
@@ -1291,7 +1321,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     cleanup_finished_threads(hclt, max_threads, true);
     freez(hclt);
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
-    netdata_log_info("METADATA: host contexts loaded in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: host contexts loaded in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
 
     worker_is_idle();
 }
@@ -1411,6 +1441,11 @@ static void store_host_and_system_info(RRDHOST *host, size_t *query_counter)
     }
 }
 
+struct host_chart_label_cleanup {
+    Pvoid_t JudyL;
+    Word_t count;
+};
+
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 {
@@ -1427,11 +1462,34 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     internal_error(true, "METADATA: checking all hosts...");
     usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
+    struct host_chart_label_cleanup *cl_cleanup_data = data->data;
+
+    if (cl_cleanup_data) {
+        Word_t Index = 0;
+        bool first = true;
+        Pvoid_t *PValue;
+        while ((PValue = JudyLFirstThenNext(cl_cleanup_data->JudyL, &Index, &first))) {
+            char *machine_guid = *PValue;
+
+            host = rrdhost_find_by_guid(machine_guid);
+            if (unlikely(host))
+                continue;
+
+            uuid_t host_uuid;
+            if (!uuid_parse(machine_guid, host_uuid))
+                delete_host_chart_labels(&host_uuid);
+
+            freez(machine_guid);
+        }
+        JudyLFreeArray(&cl_cleanup_data->JudyL, PJE0);
+        freez(cl_cleanup_data);
+    }
+
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
     if (!data->max_count)
-        transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION;");
+        transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION");
 
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
@@ -1501,7 +1559,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     dfe_done(host);
 
     if (!data->max_count && transaction_started)
-        transaction_started = db_execute(db_meta, "COMMIT TRANSACTION;");
+        transaction_started = db_execute(db_meta, "COMMIT TRANSACTION");
 
     usec_t all_ended_ut = now_monotonic_usec(); (void)all_ended_ut;
     internal_error(true, "METADATA: checking all hosts completed in %0.2f ms",
@@ -1556,7 +1614,7 @@ static void metadata_event_loop(void *arg)
     wc->timer_req.data = wc;
     fatal_assert(0 == uv_timer_start(&wc->timer_req, timer_cb, TIMER_INITIAL_PERIOD_MS, TIMER_REPEAT_PERIOD_MS));
 
-    netdata_log_info("Starting metadata sync thread");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Starting metadata sync thread");
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
@@ -1568,6 +1626,7 @@ static void metadata_event_loop(void *arg)
     completion_mark_complete(&wc->start_stop_complete);
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
+    struct host_chart_label_cleanup *cl_cleanup_data = NULL;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         uuid_t  *uuid;
@@ -1624,7 +1683,9 @@ static void metadata_event_loop(void *arg)
                     data = mallocz(sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
+                    data->data = cl_cleanup_data;
                     data->work_buffer = work_buffer;
+                    cl_cleanup_data = NULL;
 
                     if (unlikely(cmd.completion)) {
                         data->max_count = 0;            // 0 will process all pending updates
@@ -1640,6 +1701,7 @@ static void metadata_event_loop(void *arg)
                                           after_metadata_hosts))) {
                         // Failed to launch worker -- let the event loop handle completion
                         cmd.completion = wc->scan_complete;
+                        cl_cleanup_data = data->data;
                         freez(data);
                         metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
                     }
@@ -1656,6 +1718,15 @@ static void metadata_event_loop(void *arg)
                                           after_start_host_load_context))) {
                         freez(data);
                     }
+                    break;
+                case METADATA_DELETE_HOST_CHART_LABELS:;
+                    if (!cl_cleanup_data)
+                        cl_cleanup_data = callocz(1,sizeof(*cl_cleanup_data));
+
+                    Pvoid_t *PValue = JudyLIns(&cl_cleanup_data->JudyL, (Word_t) ++cl_cleanup_data->count, PJE0);
+                    if (PValue)
+                        *PValue = (void *) cmd.param[0];
+
                     break;
                 case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
@@ -1684,7 +1755,7 @@ static void metadata_event_loop(void *arg)
     freez(loop);
     worker_unregister();
 
-    netdata_log_info("Shutting down event loop");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down event loop");
     completion_mark_complete(&wc->start_stop_complete);
     if (wc->scan_complete) {
         completion_destroy(wc->scan_complete);
@@ -1702,23 +1773,21 @@ error_after_loop_init:
     worker_unregister();
 }
 
-struct metadata_wc metasync_worker = {.loop = NULL};
-
 void metadata_sync_shutdown(void)
 {
     completion_init(&metasync_worker.start_stop_complete);
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    netdata_log_info("METADATA: Sending a shutdown command");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
     /* wait for metadata thread to shut down */
-    netdata_log_info("METADATA: Waiting for shutdown ACK");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
     completion_wait_for(&metasync_worker.start_stop_complete);
     completion_destroy(&metasync_worker.start_stop_complete);
-    netdata_log_info("METADATA: Shutdown complete");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Shutdown complete");
 }
 
 void metadata_sync_shutdown_prepare(void)
@@ -1735,20 +1804,20 @@ void metadata_sync_shutdown_prepare(void)
     completion_init(compl);
     __atomic_store_n(&wc->scan_complete, compl, __ATOMIC_RELAXED);
 
-    netdata_log_info("METADATA: Sending a scan host command");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
     while (unlikely(metadata_flag_check(&metasync_worker, METADATA_FLAG_PROCESSING)) && max_wait_iterations--) {
         if (max_wait_iterations == 1999)
-            netdata_log_info("METADATA: Current worker is running; waiting to finish");
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Current worker is running; waiting to finish");
         sleep_usec(1000);
     }
 
     cmd.opcode = METADATA_SCAN_HOSTS;
     metadata_enq_cmd(&metasync_worker, &cmd);
 
-    netdata_log_info("METADATA: Waiting for host scan completion");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Waiting for host scan completion");
     completion_wait_for(wc->scan_complete);
-    netdata_log_info("METADATA: Host scan complete; can continue with shutdown");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Host scan complete; can continue with shutdown");
 }
 
 // -------------------------------------------------------------
@@ -1766,7 +1835,7 @@ void metadata_sync_init(void)
     completion_wait_for(&wc->start_stop_complete);
     completion_destroy(&wc->start_stop_complete);
 
-    netdata_log_info("SQLite metadata sync initialization complete");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "SQLite metadata sync initialization complete");
 }
 
 
@@ -1825,8 +1894,21 @@ void metadata_queue_load_host_context(RRDHOST *host)
     if (unlikely(!metasync_worker.loop))
         return;
     queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
-    netdata_log_info("Queued command to load host contexts");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command to load host contexts");
 }
+
+void metadata_delete_host_chart_labels(char *machine_guid)
+{
+    if (unlikely(!metasync_worker.loop)) {
+        freez(machine_guid);
+        return;
+    }
+
+    // Node machine guid is already strdup-ed
+    queue_metadata_cmd(METADATA_DELETE_HOST_CHART_LABELS, machine_guid, NULL);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command delete chart labels for host %s", machine_guid);
+}
+
 
 //
 // unitests
@@ -1875,7 +1957,7 @@ static void *metadata_unittest_threads(void)
     tu.join = 0;
     for (int i = 0; i < threads_to_create; i++) {
         char buf[100 + 1];
-        snprintf(buf, 100, "META[%d]", i);
+        snprintf(buf, sizeof(buf) - 1, "META[%d]", i);
         netdata_thread_create(
             &threads[i],
             buf,

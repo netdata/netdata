@@ -42,7 +42,7 @@ void aral_judy_init(void) {
     for(size_t Words = 0; Words <= MAX_JUDY_SIZE_TO_ARAL; Words++)
         if(judy_sizes_config[Words]) {
             char buf[30+1];
-            snprintfz(buf, 30, "judy-%zu", Words * sizeof(Word_t));
+            snprintfz(buf, sizeof(buf) - 1, "judy-%zu", Words * sizeof(Word_t));
             judy_sizes_aral[Words] = aral_create(
                     buf,
                     Words * sizeof(Word_t),
@@ -1269,17 +1269,19 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     return s;
 }
 
+// vsnprintfz() returns the number of bytes actually written - after possible truncation
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
     if(unlikely(!n)) return 0;
 
     int size = vsnprintf(dst, n, fmt, args);
     dst[n - 1] = '\0';
 
-    if (unlikely((size_t) size > n)) size = (int)n;
+    if (unlikely((size_t) size >= n)) size = (int)(n - 1);
 
     return size;
 }
 
+// snprintfz() returns the number of bytes actually written - after possible truncation
 int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     va_list args;
 
@@ -1694,51 +1696,28 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
     return value;
 }
 
-inline int pluginsd_isspace(char c) {
-    switch(c) {
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-        case '=':
-            return 1;
 
-        default:
-            return 0;
+BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_length) {
+    BUFFER *wb = buffer_create(0, NULL);
+
+    pid_t pid;
+    FILE *fp = netdata_popen(command, &pid, NULL);
+
+    if(fp) {
+        char buffer[max_line_length + 1];
+        while (fgets(buffer, max_line_length, fp)) {
+            buffer[max_line_length] = '\0';
+            buffer_strcat(wb, buffer);
+        }
     }
-}
-
-inline int config_isspace(char c) {
-    switch (c) {
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-        case ',':
-            return 1;
-
-        default:
-            return 0;
+    else {
+        buffer_free(wb);
+        netdata_log_error("Failed to execute command '%s'.", command);
+        return NULL;
     }
-}
 
-inline int group_by_label_isspace(char c) {
-    if(c == ',' || c == '|')
-        return 1;
-
-    return 0;
-}
-
-bool isspace_map_pluginsd[256] = {};
-bool isspace_map_config[256] = {};
-bool isspace_map_group_by_label[256] = {};
-
-__attribute__((constructor)) void initialize_is_space_arrays(void) {
-    for(int c = 0; c < 256 ; c++) {
-        isspace_map_pluginsd[c] = pluginsd_isspace((char) c);
-        isspace_map_config[c] = config_isspace((char) c);
-        isspace_map_group_by_label[c] = group_by_label_isspace((char) c);
-    }
+    netdata_pclose(NULL, fp, pid);
+    return wb;
 }
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {

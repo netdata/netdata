@@ -160,7 +160,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
 
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintfz(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+    (void) snprintfz(str, maxlen - 1, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
                     datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
@@ -338,7 +338,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
         ctx_fs_error(ctx);
         return fd;
     }
-    netdata_log_info("DBENGINE: initializing data file \"%s\".", path);
+    
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
@@ -354,7 +355,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
-    netdata_log_info("DBENGINE: data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: data file \"%s\" initialized (size:%" PRIu64 ").", path, file_size);
+
     return 0;
 
     error:
@@ -422,6 +424,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
 
+    netdata_log_info("DBENGINE: loading %d data/journal of tier %d...", matched_files, ctx->config.tier);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
 
@@ -479,14 +482,18 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
     int ret;
     char path[RRDENG_PATH_MAX];
 
-    netdata_log_info("DBENGINE: creating new data and journal files in path %s", ctx->config.dbfiles_path);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "DBENGINE: creating new data and journal files in path %s",
+           ctx->config.dbfiles_path);
+
     datafile = datafile_alloc_and_init(ctx, 1, fileno);
     ret = create_data_file(datafile);
     if(ret)
         goto error_after_datafile;
 
     generate_datafilepath(datafile, path, sizeof(path));
-    netdata_log_info("DBENGINE: created data file \"%s\".", path);
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "DBENGINE: created data file \"%s\".", path);
 
     journalfile = journalfile_alloc_and_init(datafile);
     ret = journalfile_create(journalfile, datafile);
@@ -494,7 +501,8 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
         goto error_after_journalfile;
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    netdata_log_info("DBENGINE: created journal file \"%s\".", path);
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "DBENGINE: created journal file \"%s\".", path);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile, having_lock);

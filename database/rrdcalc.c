@@ -230,7 +230,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     rw_spinlock_write_unlock(&st->alerts.spinlock);
 
     if(rc->update_every < rc->rrdset->update_every) {
-        netdata_log_error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
+        netdata_log_info("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
         rc->update_every = rc->rrdset->update_every;
     }
 
@@ -809,10 +809,10 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
             continue;
 
         if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=', NULL)) {
-            netdata_log_health("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
-                 rrdcalc_name(rc),
-                 rrdhost_hostname(host),
-                 rrdcalc_host_labels(rc));
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "Health configuration for alarm '%s' cannot be applied, "
+                   "because the host %s does not have the label(s) '%s'",
+                   rrdcalc_name(rc), rrdhost_hostname(host), rrdcalc_host_labels(rc));
 
             rrdcalc_unlink_and_delete(host, rc, false);
         }

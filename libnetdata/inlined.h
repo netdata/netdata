@@ -426,13 +426,24 @@ static inline void sanitize_json_string(char *dst, const char *src, size_t dst_s
 }
 
 static inline bool sanitize_command_argument_string(char *dst, const char *src, size_t dst_size) {
+    if(dst_size)
+        *dst = '\0';
+
     // skip leading dashes
-    while (src[0] == '-')
+    while (*src == '-')
         src++;
 
-    // escape single quotes
-    while (src[0] != '\0') {
-        if (src[0] == '\'') {
+    while (*src != '\0') {
+        if (dst_size < 1)
+            return false;
+
+        if (iscntrl(*src) || *src == '$') {
+            // remove control characters and characters that are expanded by bash
+            *dst++ = '_';
+            dst_size--;
+        }
+        else if (*src == '\'' || *src == '`') {
+            // escape single quotes
             if (dst_size < 4)
                 return false;
 
@@ -440,14 +451,10 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
 
             dst += 4;
             dst_size -= 4;
-        } else {
-            if (dst_size < 1)
-                return false;
-
-            dst[0] = src[0];
-
-            dst += 1;
-            dst_size -= 1;
+        }
+        else {
+            *dst++ = *src;
+            dst_size--;
         }
 
         src++;
@@ -456,6 +463,7 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
     // make sure we have space to terminate the string
     if (dst_size == 0)
         return false;
+
     *dst = '\0';
 
     return true;
@@ -529,10 +537,6 @@ static inline int read_single_base64_or_hex_number_file(const char *filename, un
         *result = 0;
         return -1;
     }
-}
-
-static inline int uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {
-    return memcmp(uu1, uu2, sizeof(uuid_t));
 }
 
 static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {

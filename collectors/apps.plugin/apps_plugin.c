@@ -3750,7 +3750,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     struct target *w;
 
     for (w = root; w ; w = w->next) {
-        if (unlikely(!w->exposed && !w->is_other))
+        if (unlikely(!w->exposed))
             continue;
 
         send_BEGIN(type, w->clean_name, "processes", dt);
@@ -3806,16 +3806,30 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #endif
 
 #ifndef __FreeBSD__
-        send_BEGIN(type, w->clean_name, "uptime", dt);
-        send_SET("uptime", (global_uptime > w->starttime) ? (global_uptime - w->starttime) : 0);
-        send_END();
-
-        if (enable_detailed_uptime_charts) {
-            send_BEGIN(type, w->clean_name, "uptime_summary", dt);
-            send_SET("min", w->uptime_min);
-            send_SET("avg", w->processes > 0 ? w->uptime_sum / w->processes : 0);
-            send_SET("max", w->uptime_max);
+        if (w->processes == 0) {
+            send_BEGIN(type, w->clean_name, "uptime", dt);
+            send_SET("uptime", 0);
             send_END();
+
+            if (enable_detailed_uptime_charts) {
+                send_BEGIN(type, w->clean_name, "uptime_summary", dt);
+                send_SET("min", 0);
+                send_SET("avg", 0);
+                send_SET("max", 0);
+                send_END();
+            }
+        } else {
+            send_BEGIN(type, w->clean_name, "uptime", dt);
+            send_SET("uptime", (global_uptime > w->starttime) ? (global_uptime - w->starttime) : 0);
+            send_END();
+
+            if (enable_detailed_uptime_charts) {
+                send_BEGIN(type, w->clean_name, "uptime_summary", dt);
+                send_SET("min", w->uptime_min);
+                send_SET("avg", w->processes > 0 ? w->uptime_sum / w->processes : 0);
+                send_SET("max", w->uptime_max);
+                send_END();
+            }
         }
 #endif
 
@@ -3860,7 +3874,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     if (debug_enabled) {
         for (w = root; w; w = w->next) {
-            if (unlikely(w->debug_enabled && !w->target && w->processes)) {
+            if (unlikely(!w->target && w->processes)) {
                 struct pid_on_target *pid_on_target;
                 fprintf(stderr, "apps.plugin: target '%s' has aggregated %u process(es):", w->name, w->processes);
                 for (pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
@@ -5234,24 +5248,10 @@ static void function_processes(const char *transaction, char *function __maybe_u
 static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
-    // debug_flags = D_PROCFILE;
-    stderror = stderr;
-
     clocks_init();
+    nd_log_initialize_for_external_plugins("apps.plugin");
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
-
-    // set the name for logging
-    program_name = "apps.plugin";
-
-    // disable syslog for apps.plugin
-    error_log_syslog = 0;
-
-    // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
-
-    log_set_global_severity_for_external_plugins();
 
     bool send_resource_usage = true;
     {

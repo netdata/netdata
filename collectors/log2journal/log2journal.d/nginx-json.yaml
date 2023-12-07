@@ -1,0 +1,164 @@
+# For all nginx variables, check this:
+# https://nginx.org/en/docs/http/ngx_http_core_module.html#var_connection_requests
+
+pattern: json
+
+prefix: NGINX_
+
+# When log2journal can detect the filename of each log entry (tail gives it
+# only when it tails multiple files), this key will be used to send the
+# filename to the journals.
+filename:
+  key: NGINX_LOG_FILENAME
+
+filter:
+  exclude: '^(NGINX_BINARY_REMOTE_ADDR)$'
+
+rename:
+  - new_key: MESSAGE
+    old_key: NGINX_REQUEST
+
+  # args is an alias for query_string
+  - new_key: NGINX_QUERY_STRING
+    old_key: NGINX_ARGS
+
+  # document_uri is an alias for uri
+  - new_key: NGINX_URI
+    old_key: NGINX_DOCUMENT_URI
+
+  # is_args states if the request had a query string or not
+  - new_key: NGINX_HAS_QUERY_STRING
+    old_key: NGINX_IS_ARGS
+
+  # msec is the timestamp in seconds, with fractional digits for milliseconds
+  - new_key: NGINX_TIMESTAMP_SEC
+    old_key: NGINX_MSEC
+
+  # nginx_version is already prefixed with nginx, let's remove one of them
+  - new_key: NGINX_VERSION
+    old_key: NGINX_NGINX_VERSION
+
+  # pipe states if the request was pipelined or not
+  - new_key: NGINX_PIPELINED
+    old_key: NGINX_PIPE
+
+  # rename numeric TLVs to their names
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_ALPN
+    old_key: NGINX_PROXY_PROTOCOL_TLV_0X01
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_AUTHORITY
+    old_key: NGINX_PROXY_PROTOCOL_TLV_0X02
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_UNIQUE_ID
+    old_key: NGINX_PROXY_PROTOCOL_TLV_0X05
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL
+    old_key: NGINX_PROXY_PROTOCOL_TLV_0X20
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_NETNS
+    old_key: NGINX_PROXY_PROTOCOL_TLV_0X30
+
+  # rename numeric SSL TLVs to their names
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL_VERSION
+    old_key: NGINX_PROXY_PROTOCOL_TLV_SSL_0X21
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL_CN
+    old_key: NGINX_PROXY_PROTOCOL_TLV_SSL_0X22
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL_CIPHER
+    old_key: NGINX_PROXY_PROTOCOL_TLV_SSL_0X23
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL_SIG_ALG
+    old_key: NGINX_PROXY_PROTOCOL_TLV_SSL_0X24
+  - new_key: NGINX_PROXY_PROTOCOL_TLV_SSL_KEY_ALG
+    old_key: NGINX_PROXY_PROTOCOL_TLV_SSL_0X25
+
+# Inject constant fields into the journal logs.
+inject:
+  - key: SYSLOG_IDENTIFIER
+    value: nginx-log
+
+  # inject PRIORITY is a duplicate of NGINX_STATUS
+  - key: PRIORITY
+    value: '${NGINX_STATUS}'
+
+  # Inject NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
+  - key: NGINX_STATUS_FAMILY
+    value: '${NGINX_STATUS}'
+
+
+# Rewrite the value of fields (including the duplicated ones).
+# The search pattern can have named groups, and the replace pattern can use
+# them as ${name}.
+rewrite:
+  # a ? means it has query string, everything else means it does not
+  - key: NGINX_HAS_QUERY_STRING
+    match: '^\?$'
+    value: yes
+  - key: NGINX_HAS_QUERY_STRING
+    match: '.*'
+    value: no
+
+  # 'on' means it was HTTPS, everything else means it was not
+  - key: NGINX_HTTPS
+    match: '^on$'
+    value: yes
+  - key: NGINX_HTTPS
+    match: '.*'
+    value: no
+
+  # 'p' means it was pipelined, everything else means it was not
+  - key: NGINX_PIPELINED
+    match: '^p$'
+    value: yes
+  - key: NGINX_PIPELINED
+    match: '.*'
+    value: no
+
+  # zero means client sent a certificate and it was verified, non-zero means otherwise
+  - key: NGINX_PROXY_PROTOCOL_TLV_SSL_VERIFY
+    match: '^0$'
+    value: yes
+  - key: NGINX_PROXY_PROTOCOL_TLV_SSL_VERIFY
+    match: '.*'
+    value: no
+
+  # 'OK' means request completed, everything else means it didn't
+  - key: NGINX_REQUEST_COMPLETION
+    match: '^OK$'
+    value: 'completed'
+  - key: NGINX_REQUEST_COMPLETION
+    match: '.*'
+    value: 'not completed'
+
+  # PRIORTY is a duplicate of NGINX_STATUS
+  # Valid PRIORITIES: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
+  - key: PRIORITY
+    match: '^[123]'
+    value: 6
+
+  - key: PRIORITY
+    match: '^4'
+    value: 5
+
+  - key: PRIORITY
+    match: '^5'
+    value: 3
+
+  - key: PRIORITY
+    match: '.*'
+    value: 4
+
+  # NGINX_STATUS_FAMILY is a duplicate of NGINX_STATUS
+  - key: NGINX_STATUS_FAMILY
+    match: '^(?<first_digit>[1-5])'
+    value: '${first_digit}xx'
+
+  - key: NGINX_STATUS_FAMILY
+    match: '.*'
+    value: 'UNKNOWN'
+
+# Control what to do when input logs do not match the main PCRE2 pattern.
+unmatched:
+  # The journal key to log the PCRE2 error message to.
+  # Set this to MESSAGE, so you to see the error in the log.
+  key: MESSAGE
+
+  # Inject static fields to the unmatched entries.
+  # Set PRIORITY=1 (alert) to help you spot unmatched entries in the logs.
+  inject:
+    - key: PRIORITY
+      value: 1

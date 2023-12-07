@@ -24,6 +24,20 @@ This script works on all Linux distributions and macOS environments, by detectin
 If you are installing on macOS, make sure to check the [install documentation for macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md) before continuing.
 
 
+## Verify script integrity
+
+To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
+run the following:
+
+```bash
+[ "<checksum-will-be-added-in-documentation-processing>" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+```
+
+If the script is valid, this command will return `OK, VALID`.
+
+
+## Installation
+
 > :bulb: Tip
 >
 > If you are unsure whether you want nightly or stable releases, read the [installation guide](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases).  
@@ -48,16 +62,6 @@ To install Netdata, run the following as your normal user:
 > If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
 > and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
 
-## Verify script integrity
-
-To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
-run the following:
-
-```bash
-[ "<checksum-will-be-added-in-documentation-processing>" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
-```
-
-If the script is valid, this command will return `OK, VALID`.
 
 ## What does `kickstart.sh` do?
 

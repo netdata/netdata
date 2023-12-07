@@ -3,6 +3,7 @@
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
+    install-service.sh \
     cron/netdata-updater-daily \
     freebsd/rc.d/netdata \
     initd/init.d/netdata \

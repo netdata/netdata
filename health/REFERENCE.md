@@ -701,14 +701,14 @@ If you have an e.g. external disk mounted on `/mnt/disk1` and you don't wish any
 it (but you do for all other mount points), you can add the following to the alert's configuration:
 
 ```yaml
-chart labels: mount_point=!/mnt/disk1 *`
+chart labels: mount_point=!/mnt/disk1 *
 ```
 
 The `chart labels` is a space-separated list that accepts simple patterns. If you use multiple different chart labels,
 then the result is an OR between them. i.e. the following:
 
 ```yaml
-chart labels: mount_point=/mnt/disk1 device=sda`
+chart labels: mount_point=/mnt/disk1 device=sda
 ```
 
 Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`. Furthermore, if a chart label name
@@ -733,7 +733,7 @@ alert information. Current variables supported are:
 | ${family}           | Will be replaced by the family instance for the alert (e.g. eth0) |
 | ${label:LABEL_NAME} | The variable will be replaced with the value of the chart label   |
 
-For example, a summry field like the following:
+For example, a summary field like the following:
 
 ```yaml
 summary: 1 minute received traffic overflow for ${label:device}
@@ -742,7 +742,7 @@ summary: 1 minute received traffic overflow for ${label:device}
 Will be rendered on the alert acting on interface `eth0` as:
 
 ```yaml
-info: 1 minute received traffic overflow for ${label:device}
+summary: 1 minute received traffic overflow for eth0
 ```
 
 > Please note that variable names are case-sensitive.

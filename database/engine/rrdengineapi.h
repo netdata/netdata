@@ -20,6 +20,7 @@ extern int default_multidb_disk_quota_mb;
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
+extern uint8_t tier_page_type[];
 
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
 

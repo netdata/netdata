@@ -86,14 +86,14 @@ If you've configured and entered your token correctly, you should see the plain 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
 
 ```sh
-curl "http://NODE:19999/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken"
+curl "http://NODE:19999/api/v1/manage/health?cmd=DISABLE%20ALL" -H "X-Auth-Token: Mytoken"
 ```
 
 The effect of disabling health checks is that the alert criteria are not evaluated at all and nothing is written in the alert log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
 ```sh
-curl "http://NODE:19999/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: Mytoken"
+curl "http://NODE:19999/api/v1/manage/health?cmd=SILENCE%20ALL" -H "X-Auth-Token: Mytoken"
 ```
 
 Alerts may then still be raised and logged in Netdata, so you'll be able to see them via the UI.  

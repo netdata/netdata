@@ -29,9 +29,13 @@ void health_silencers_add(SILENCER *silencer) {
     // Add the created instance to the linked list in silencers
     silencer->next = silencers->silencers;
     silencers->silencers = silencer;
-    netdata_log_debug(D_HEALTH, "HEALTH command API: Added silencer %s:%s:%s:%s", silencer->alarms,
-          silencer->charts, silencer->contexts, silencer->hosts
-    );
+    netdata_log_debug(
+        D_HEALTH,
+        "HEALTH command API: Added silencer %s:%s:%s:%s",
+        silencer->alarms,
+        silencer->charts,
+        silencer->contexts,
+        silencer->hosts);
 }
 
 /**
@@ -71,10 +75,6 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
                 (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY))
                 ) {
             silencer = create_silencer();
-            if(!silencer) {
-                netdata_log_error("Cannot add a new silencer to Netdata");
-                return NULL;
-            }
         }
     }
 
@@ -160,10 +160,10 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
  * @return It returns 0 on success and -1 otherwise
  */
 int health_initialize_global_silencers() {
-    silencers =  mallocz(sizeof(SILENCERS));
-    silencers->all_alarms=0;
-    silencers->stype=STYPE_NONE;
-    silencers->silencers=NULL;
+    silencers = mallocz(sizeof(SILENCERS));
+    silencers->all_alarms = 0;
+    silencers->stype = STYPE_NONE;
+    silencers->silencers = NULL;
 
     return 0;
 }

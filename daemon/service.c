@@ -204,25 +204,19 @@ static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
     time_t now = now_realtime_sec();
     time_t last_entry_t;
     RRDSET *st;
+
+    time_t child_connect_time = host->child_connect_time;
+
     rrdset_foreach_read(st, host) {
         if(rrdset_is_replicating(st))
             continue;
 
         last_entry_t = rrdset_last_entry_s(st);
 
-//        if(last_entry_t + st->update_every * 2 + 30 < now)
-//            netdata_log_error("Possibly obsolete chart 'host:%s/chart:%s', last entry is %zu secs old "
-//                              "(replicating: %s, obsolete: %s, obsolete dims: %s)",
-//                              rrdhost_hostname(host), rrdset_id(st), now - last_entry_t,
-//                              rrdset_is_replicating(st) ? "true" : "false",
-//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) ? "true" : "false",
-//                              rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) ? "true" : "false"
-//                              );
-
-
-        if(last_entry_t && last_entry_t < host->child_connect_time &&
-           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
-                   (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) < now)
+        if (last_entry_t && last_entry_t < child_connect_time &&
+            child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT +
+                    (ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every) <
+                now)
 
             rrdset_is_obsolete___safe_from_collector_thread(st);
     }
@@ -241,19 +235,22 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
-        if(host != localhost
-            && host->trigger_chart_obsoletion_check
-            && (
-                   (
-                    host->child_last_chart_command
-                 && host->child_last_chart_command + host->health.health_delay_up_to < now_realtime_sec()
-                   )
-                || (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
-                )
-            ) {
+        if (host == localhost)
+            continue;
+
+        netdata_mutex_lock(&host->receiver_lock);
+
+        time_t now = now_realtime_sec();
+
+        if (host->trigger_chart_obsoletion_check &&
+            ((host->child_last_chart_command &&
+              host->child_last_chart_command + host->health.health_delay_up_to < now) ||
+             (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now))) {
             svc_rrdhost_detect_obsolete_charts(host);
             host->trigger_chart_obsoletion_check = 0;
         }
+
+        netdata_mutex_unlock(&host->receiver_lock);
     }
 
     rrd_unlock();
@@ -272,22 +269,45 @@ restart_after_removal:
         if(!rrdhost_should_be_removed(host, protected_host, now))
             continue;
 
-        netdata_log_info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
+        bool is_archived = rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED);
+        if (!is_archived) {
+            netdata_log_info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
-        if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
-            /* don't delete multi-host DB host files */
-            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
-        ) {
-            worker_is_busy(WORKER_JOB_DELETE_HOST_CHARTS);
-            rrdhost_delete_charts(host);
+            if (rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST)
+                /* don't delete multi-host DB host files */
+                && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].instance))
+            ) {
+                worker_is_busy(WORKER_JOB_DELETE_HOST_CHARTS);
+                rrdhost_delete_charts(host);
+            }
+            else {
+                worker_is_busy(WORKER_JOB_SAVE_HOST_CHARTS);
+                rrdhost_save_charts(host);
+            }
         }
-        else {
-            worker_is_busy(WORKER_JOB_SAVE_HOST_CHARTS);
-            rrdhost_save_charts(host);
+
+        bool force = false;
+
+        if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) && now - host->last_connected > rrdhost_free_ephemeral_time_s)
+            force = true;
+
+        if (!force && is_archived)
+            continue;
+
+       if (force) {
+            netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
         }
 
         worker_is_busy(WORKER_JOB_FREE_HOST);
-        rrdhost_free___while_having_rrd_wrlock(host, false);
+#ifdef ENABLE_ACLK
+        // in case we have cloud connection we inform cloud
+        // a child disconnected
+        if (netdata_cloud_enabled && force) {
+            aclk_host_state_update(host, 0, 0);
+            unregister_node(host->machine_guid);
+        }
+#endif
+        rrdhost_free___while_having_rrd_wrlock(host, force);
         goto restart_after_removal;
     }
 

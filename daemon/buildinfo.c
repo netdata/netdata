@@ -101,6 +101,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_SLABINFO,
     BIB_PLUGIN_XEN,
     BIB_PLUGIN_XEN_VBD_ERROR,
+    BIB_PLUGIN_LOGS_MANAGEMENT,
     BIB_EXPORT_AWS_KINESIS,
     BIB_EXPORT_GCP_PUBSUB,
     BIB_EXPORT_MONGOC,
@@ -911,6 +912,14 @@ static struct {
                 .json = "xen-vbd-error",
                 .value = NULL,
         },
+        [BIB_PLUGIN_LOGS_MANAGEMENT] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "Logs Management",
+                .print = "Logs Management",
+                .json = "logs-management",
+                .value = NULL,
+        },
         [BIB_EXPORT_MONGOC] = {
                 .category = BIC_EXPORTERS,
                 .type = BIT_BOOLEAN,
@@ -1243,6 +1252,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_XENSTAT_VBD_ERROR
     build_info_set_status(BIB_PLUGIN_XEN_VBD_ERROR, true);
 #endif
+#ifdef ENABLE_LOGSMANAGEMENT
+    build_info_set_status(BIB_PLUGIN_LOGS_MANAGEMENT, true);
+#endif
 
     build_info_set_status(BIB_EXPORT_PROMETHEUS_EXPORTER, true);
     build_info_set_status(BIB_EXPORT_GRAPHITE, true);
@@ -1279,7 +1291,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 // ----------------------------------------------------------------------------
 // system info
 
-int get_system_info(struct rrdhost_system_info *system_info, bool log);
+int get_system_info(struct rrdhost_system_info *system_info);
 static void populate_system_info(void) {
     static bool populated = false;
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
@@ -1302,7 +1314,7 @@ static void populate_system_info(void) {
     }
     else {
         system_info = callocz(1, sizeof(struct rrdhost_system_info));
-        get_system_info(system_info, false);
+        get_system_info(system_info);
         free_system_info = true;
     }
 

@@ -11,60 +11,46 @@ struct aclk_sync_config_s {
     uv_timer_t timer_req;
     time_t cleanup_after;          // Start a cleanup after this timestamp
     uv_async_t async;
-    /* FIFO command queue */
-    uv_mutex_t cmd_mutex;
-    uv_cond_t cmd_cond;
     bool initialized;
-    volatile unsigned queue_size;
-    struct aclk_database_cmdqueue cmd_queue;
+    SPINLOCK cmd_queue_lock;
+    struct aclk_database_cmd *cmd_base;
 } aclk_sync_config = { 0 };
-
 
 void sanity_check(void) {
     // make sure the compiler will stop on misconfigurations
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < ACLK_MAX_ENUMERATIONS_DEFINED);
 }
 
-
-int aclk_database_enq_cmd_noblock(struct aclk_database_cmd *cmd)
+static struct aclk_database_cmd aclk_database_deq_cmd(void)
 {
-    unsigned queue_size;
+    struct aclk_database_cmd ret;
 
-    /* wait for free space in queue */
-    uv_mutex_lock(&aclk_sync_config.cmd_mutex);
-    if ((queue_size = aclk_sync_config.queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE) {
-        uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
-        return 1;
+    spinlock_lock(&aclk_sync_config.cmd_queue_lock);
+    if(aclk_sync_config.cmd_base) {
+        struct aclk_database_cmd *t = aclk_sync_config.cmd_base;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(aclk_sync_config.cmd_base, t, prev, next);
+        ret = *t;
+        freez(t);
     }
+    else {
+        ret.opcode = ACLK_DATABASE_NOOP;
+        ret.completion = NULL;
+    }
+    spinlock_unlock(&aclk_sync_config.cmd_queue_lock);
 
-    fatal_assert(queue_size < ACLK_DATABASE_CMD_Q_MAX_SIZE);
-    /* enqueue command */
-    aclk_sync_config.cmd_queue.cmd_array[aclk_sync_config.cmd_queue.tail] = *cmd;
-    aclk_sync_config.cmd_queue.tail = aclk_sync_config.cmd_queue.tail != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
-                                          aclk_sync_config.cmd_queue.tail + 1 : 0;
-    aclk_sync_config.queue_size = queue_size + 1;
-    uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
-    return 0;
+    return ret;
 }
 
 static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 {
-    unsigned queue_size;
+    struct aclk_database_cmd *t = mallocz(sizeof(*t));
+    *t = *cmd;
+    t->prev = t->next = NULL;
 
-    /* wait for free space in queue */
-    uv_mutex_lock(&aclk_sync_config.cmd_mutex);
-    while ((queue_size = aclk_sync_config.queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE) {
-        uv_cond_wait(&aclk_sync_config.cmd_cond, &aclk_sync_config.cmd_mutex);
-    }
-    fatal_assert(queue_size < ACLK_DATABASE_CMD_Q_MAX_SIZE);
-    /* enqueue command */
-    aclk_sync_config.cmd_queue.cmd_array[aclk_sync_config.cmd_queue.tail] = *cmd;
-    aclk_sync_config.cmd_queue.tail = aclk_sync_config.cmd_queue.tail != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
-                                          aclk_sync_config.cmd_queue.tail + 1 : 0;
-    aclk_sync_config.queue_size = queue_size + 1;
-    uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
+    spinlock_lock(&aclk_sync_config.cmd_queue_lock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(aclk_sync_config.cmd_base, t, prev, next);
+    spinlock_unlock(&aclk_sync_config.cmd_queue_lock);
 
-    /* wake up event loop */
     (void) uv_async_send(&aclk_sync_config.async);
 }
 
@@ -85,6 +71,7 @@ enum {
     IDX_ENTRIES,
     IDX_HEALTH_ENABLED,
     IDX_LAST_CONNECTED,
+    IDX_IS_EPHEMERAL,
 };
 
 static int create_host_callback(void *data, int argc, char **argv, char **column)
@@ -93,8 +80,25 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     UNUSED(argc);
     UNUSED(column);
 
+    time_t last_connected =  (time_t) (argv[IDX_LAST_CONNECTED] ? str2uint64_t(argv[IDX_LAST_CONNECTED], NULL) : 0);
+    time_t age = now_realtime_sec() - last_connected;
+    int is_ephemeral = 0;
+
+    if (argv[IDX_IS_EPHEMERAL])
+        is_ephemeral = str2i(argv[IDX_IS_EPHEMERAL]);
+
     char guid[UUID_STR_LEN];
     uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
+
+    if (is_ephemeral && age > rrdhost_free_ephemeral_time_s) {
+        netdata_log_info(
+            "Skipping ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
+            (const char *)argv[IDX_HOSTNAME],
+            guid,
+            age,
+            rrdhost_free_ephemeral_time_s);
+        return 0;
+    }
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
@@ -104,33 +108,47 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
 
     RRDHOST *host = rrdhost_find_or_create(
-          (const char *) argv[IDX_HOSTNAME]
-        , (const char *) argv[IDX_REGISTRY]
-        , guid
-        , (const char *) argv[IDX_OS]
-        , (const char *) argv[IDX_TIMEZONE]
-        , (const char *) argv[IDX_ABBREV_TIMEZONE]
-        , (int32_t) (argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET], NULL) : 0)
-        , (const char *) argv[IDX_TAGS]
-        , (const char *) (argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown")
-        , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
-        , argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1
-        , argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0
-        , default_rrd_memory_mode
-        , 0 // health
-        , 0 // rrdpush enabled
-        , NULL  //destination
-        , NULL  // api key
-        , NULL  // send charts matching
-        , false // rrdpush_enable_replication
-        , 0     // rrdpush_seconds_to_replicate
-        , 0     // rrdpush_replication_step
-        , system_info
-        , 1
-    );
+        (const char *)argv[IDX_HOSTNAME],
+        (const char *)argv[IDX_REGISTRY],
+        guid,
+        (const char *)argv[IDX_OS],
+        (const char *)argv[IDX_TIMEZONE],
+        (const char *)argv[IDX_ABBREV_TIMEZONE],
+        (int32_t)(argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET], NULL) : 0),
+        (const char *)argv[IDX_TAGS],
+        (const char *)(argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown"),
+        (const char *)(argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown"),
+        argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1,
+        argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0,
+        default_rrd_memory_mode,
+        0 // health
+        ,
+        0 // rrdpush enabled
+        ,
+        NULL //destination
+        ,
+        NULL // api key
+        ,
+        NULL // send charts matching
+        ,
+        false // rrdpush_enable_replication
+        ,
+        0 // rrdpush_seconds_to_replicate
+        ,
+        0 // rrdpush_replication_step
+        ,
+        system_info,
+        1);
+
     if (likely(host)) {
+        if (is_ephemeral)
+            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+
+        if (is_ephemeral)
+            host->child_disconnected_time = now_realtime_sec();
+
         host->rrdlabels = sql_load_host_labels((uuid_t *)argv[IDX_HOST_ID]);
-        host->last_connected = (time_t) (argv[IDX_LAST_CONNECTED] ? str2uint64_t(argv[IDX_LAST_CONNECTED], NULL) : 0);
+        host->last_connected = last_connected;
     }
 
     (*number_of_chidren)++;
@@ -139,43 +157,14 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     char node_str[UUID_STR_LEN] = "<none>";
     if (likely(host->node_id))
         uuid_unparse_lower(*host->node_id, node_str);
-    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"", rrdhost_hostname(host), host->machine_guid, node_str);
+    internal_error(true, "Adding archived host \"%s\" with GUID \"%s\" node id = \"%s\"  ephemeral=%d", rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
     return 0;
 }
 
 #ifdef ENABLE_ACLK
-static struct aclk_database_cmd aclk_database_deq_cmd(void)
-{
-    struct aclk_database_cmd ret;
-    unsigned queue_size;
 
-    uv_mutex_lock(&aclk_sync_config.cmd_mutex);
-    queue_size = aclk_sync_config.queue_size;
-    if (queue_size == 0) {
-        memset(&ret, 0, sizeof(ret));
-        ret.opcode = ACLK_DATABASE_NOOP;
-        ret.completion = NULL;
-
-    } else {
-        /* dequeue command */
-        ret = aclk_sync_config.cmd_queue.cmd_array[aclk_sync_config.cmd_queue.head];
-        if (queue_size == 1) {
-            aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.tail = 0;
-        } else {
-            aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.head != ACLK_DATABASE_CMD_Q_MAX_SIZE - 1 ?
-                                                  aclk_sync_config.cmd_queue.head + 1 : 0;
-        }
-        aclk_sync_config.queue_size = queue_size - 1;
-        /* wake up producers */
-        uv_cond_signal(&aclk_sync_config.cmd_cond);
-    }
-    uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
-
-    return ret;
-}
-
-#define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id;"
+#define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id"
 static int is_host_available(uuid_t *host_id)
 {
     sqlite3_stmt *res = NULL;
@@ -234,7 +223,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql,"SELECT 'drop '||type||' IF EXISTS '||name||';' FROM sqlite_schema " \
-                        "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index');", uuid_str);
+                        "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index')", uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -258,18 +247,63 @@ fail:
     buffer_free(sql);
 }
 
+// OPCODE: ACLK_DATABASE_NODE_UNREGISTER
+static void sql_unregister_node(char *machine_guid)
+{
+    int rc;
+    uuid_t host_uuid;
+
+    if (unlikely(!machine_guid))
+        return;
+
+    rc = uuid_parse(machine_guid, host_uuid);
+    if (rc) {
+        freez(machine_guid);
+        return;
+    }
+
+    sqlite3_stmt *res = NULL;
+
+    rc = sqlite3_prepare_v2(db_meta, "UPDATE node_instance SET node_id = NULL WHERE host_id = @host_id", -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to prepare statement to remove the host node id");
+        freez(machine_guid);
+        return;
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter to remove host node id");
+        goto skip;
+    }
+    rc = sqlite3_step_monitored(res);
+    if (unlikely(rc != SQLITE_DONE)) {
+        error_report("Failed to execute command to remove host node id");
+    } else {
+       // node: machine guid will be freed after processing
+       metadata_delete_host_chart_labels(machine_guid);
+       machine_guid = NULL;
+    }
+
+skip:
+    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
+        error_report("Failed to finalize statement to remove host node id");
+    freez(machine_guid);
+}
+
+
 static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
 {
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = ACLK_DATABASE_DELETE_HOST;
     cmd.param[0] = strdupz((char *) argv[0]);
-    aclk_database_enq_cmd_noblock(&cmd);
+    aclk_database_enq_cmd(&cmd);
     return 0;
 }
 
 #define SQL_SELECT_ACLK_ACTIVE_LIST "SELECT REPLACE(SUBSTR(name,19),'_','-') FROM sqlite_schema " \
-        "WHERE name LIKE 'aclk_chart_latest_%' AND type IN ('table');"
+        "WHERE name LIKE 'aclk_chart_latest_%' AND type IN ('table')"
 
 static void sql_check_aclk_table_list(void)
 {
@@ -281,19 +315,18 @@ static void sql_check_aclk_table_list(void)
     }
 }
 
-#define SQL_ALERT_CLEANUP "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND CAST(date_cloud_ack AS INT) < unixepoch()-%d;"
+#define SQL_ALERT_CLEANUP "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND CAST(date_cloud_ack AS INT) < unixepoch()-%d"
 
 static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
-    char sql[512];
-    snprintfz(sql,511, SQL_ALERT_CLEANUP, (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
+    char sql[ACLK_SYNC_QUERY_SIZE];
+    snprintfz(sql,sizeof(sql) - 1, SQL_ALERT_CLEANUP, (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
     if (unlikely(db_execute(db_meta, sql)))
         error_report("Failed to clean stale ACLK alert entries");
     return 0;
 }
 
-
-#define SQL_SELECT_ACLK_ALERT_LIST "SELECT SUBSTR(name,12) FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table');"
+#define SQL_SELECT_ACLK_ALERT_LIST "SELECT SUBSTR(name,12) FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table')"
 
 static void sql_maint_aclk_sync_database_all(void)
 {
@@ -307,7 +340,7 @@ static void sql_maint_aclk_sync_database_all(void)
 
 static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
-    char uuid_str[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
 
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
@@ -335,18 +368,15 @@ static void timer_cb(uv_timer_t *handle)
     struct aclk_database_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
 
-    time_t now =  now_realtime_sec();
-
-    if (config->cleanup_after && config->cleanup_after < now) {
+    if (config->cleanup_after < now_realtime_sec()) {
         cmd.opcode = ACLK_DATABASE_CLEANUP;
-        if (!aclk_database_enq_cmd_noblock(&cmd))
-            config->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
+        aclk_database_enq_cmd(&cmd);
+        config->cleanup_after += ACLK_DATABASE_CLEANUP_INTERVAL;
     }
 
     if (aclk_connected) {
         cmd.opcode = ACLK_DATABASE_PUSH_ALERT;
-        aclk_database_enq_cmd_noblock(&cmd);
-
+        aclk_database_enq_cmd(&cmd);
         aclk_check_node_info_and_collectors();
     }
 }
@@ -417,12 +447,16 @@ static void aclk_synchronization(void *arg __maybe_unused)
                 case ACLK_DATABASE_NODE_STATE:;
                     RRDHOST *host = cmd.param[0];
                     int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-                    struct aclk_sync_host_config *ahc = host->aclk_sync_host_config;
+                    struct aclk_sync_cfg_t *ahc = host->aclk_config;
                     if (unlikely(!ahc))
                         sql_create_aclk_table(host, &host->host_uuid, host->node_id);
-                    aclk_host_state_update(host, live);
+                    aclk_host_state_update(host, live, 1);
                     break;
-// ALERTS
+                case ACLK_DATABASE_NODE_UNREGISTER:
+                    sql_unregister_node(cmd.param[0]);
+
+                    break;
+                    // ALERTS
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
                     aclk_push_alert_config_event(cmd.param[0], cmd.param[1]);
                     break;
@@ -447,8 +481,6 @@ static void aclk_synchronization(void *arg __maybe_unused)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
-//    uv_close((uv_handle_t *)&config->async_exit, NULL);
-    uv_cond_destroy(&config->cmd_cond);
     (void) uv_loop_close(loop);
 
     worker_unregister();
@@ -458,11 +490,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
 
 static void aclk_synchronization_init(void)
 {
-    aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.tail = 0;
-    aclk_sync_config.queue_size = 0;
-    fatal_assert(0 == uv_cond_init(&aclk_sync_config.cmd_cond));
-    fatal_assert(0 == uv_mutex_init(&aclk_sync_config.cmd_mutex));
-
+    memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
 }
 #endif
@@ -472,8 +500,8 @@ static void aclk_synchronization_init(void)
 void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __maybe_unused, uuid_t *node_id __maybe_unused)
 {
 #ifdef ENABLE_ACLK
-    char uuid_str[GUID_LEN + 1];
-    char host_guid[GUID_LEN + 1];
+    char uuid_str[UUID_STR_LEN];
+    char host_guid[UUID_STR_LEN];
     int rc;
 
     uuid_unparse_lower_fix(host_uuid, uuid_str);
@@ -481,32 +509,34 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 
     char sql[ACLK_SYNC_QUERY_SIZE];
 
-    snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, TABLE_ACLK_ALERT, uuid_str);
+    snprintfz(sql, sizeof(sql) - 1, TABLE_ACLK_ALERT, uuid_str);
     rc = db_execute(db_meta, sql);
     if (unlikely(rc))
         error_report("Failed to create ACLK alert table for host %s", host ? rrdhost_hostname(host) : host_guid);
     else {
-        snprintfz(sql, ACLK_SYNC_QUERY_SIZE -1, INDEX_ACLK_ALERT1, uuid_str, uuid_str);
+        snprintfz(sql, sizeof(sql) - 1, INDEX_ACLK_ALERT1, uuid_str, uuid_str);
         rc = db_execute(db_meta, sql);
         if (unlikely(rc))
-            error_report("Failed to create ACLK alert table index 1 for host %s", host ? string2str(host->hostname) : host_guid);
+            error_report(
+                "Failed to create ACLK alert table index 1 for host %s", host ? string2str(host->hostname) : host_guid);
 
-        snprintfz(sql, ACLK_SYNC_QUERY_SIZE -1, INDEX_ACLK_ALERT2, uuid_str, uuid_str);
+        snprintfz(sql, sizeof(sql) - 1, INDEX_ACLK_ALERT2, uuid_str, uuid_str);
         rc = db_execute(db_meta, sql);
         if (unlikely(rc))
-            error_report("Failed to create ACLK alert table index 2 for host %s", host ? string2str(host->hostname) : host_guid);
+            error_report(
+                "Failed to create ACLK alert table index 2 for host %s", host ? string2str(host->hostname) : host_guid);
     }
-    if (likely(host) && unlikely(host->aclk_sync_host_config))
+    if (likely(host) && unlikely(host->aclk_config))
         return;
 
     if (unlikely(!host))
         return;
 
-    struct aclk_sync_host_config *wc = callocz(1, sizeof(struct aclk_sync_host_config));
+    struct aclk_sync_cfg_t *wc = callocz(1, sizeof(struct aclk_sync_cfg_t));
     if (node_id && !uuid_is_null(*node_id))
         uuid_unparse_lower(*node_id, wc->node_id);
 
-    host->aclk_sync_host_config = (void *)wc;
+    host->aclk_config = wc;
     if (node_id && !host->node_id) {
         host->node_id = mallocz(sizeof(*host->node_id));
         uuid_copy(*host->node_id, *node_id);
@@ -520,12 +550,18 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 #endif
 }
 
-#define SQL_FETCH_ALL_HOSTS "SELECT host_id, hostname, registry_hostname, update_every, os, " \
-    "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, " \
-    "program_version, entries, health_enabled, last_connected FROM host WHERE hops >0;"
+#define SQL_FETCH_ALL_HOSTS                                                                                            \
+    "SELECT host_id, hostname, registry_hostname, update_every, os, "                                                  \
+    "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "                                   \
+    "program_version, entries, health_enabled, last_connected, "                                                       \
+    "(SELECT CASE WHEN hl.label_value = 'true' THEN 1 ELSE 0 END FROM "                                                \
+    "host_label hl WHERE hl.host_id = h.host_id AND hl.label_key = '_is_ephemeral')  "                                 \
+    "FROM host h WHERE hops > 0"
 
-#define SQL_FETCH_ALL_INSTANCES "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni " \
-                                "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL; "
+#define SQL_FETCH_ALL_INSTANCES                                                                                        \
+    "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni "                                                     \
+    "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL"
+
 void sql_aclk_sync_init(void)
 {
     char *err_msg = NULL;
@@ -620,3 +656,18 @@ void schedule_node_info_update(RRDHOST *host __maybe_unused)
     aclk_database_enq_cmd(&cmd);
 #endif
 }
+
+#ifdef ENABLE_ACLK
+void unregister_node(const char *machine_guid)
+{
+    if (unlikely(!machine_guid))
+        return;
+
+    struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = ACLK_DATABASE_NODE_UNREGISTER;
+    cmd.param[0] = strdupz(machine_guid);
+    cmd.completion = NULL;
+    aclk_database_enq_cmd(&cmd);
+}
+#endif

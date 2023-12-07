@@ -91,7 +91,7 @@ def battery_charts(bats):
 
 
 RE_ADAPTER = re.compile(
-    r'Adapter #([0-9]+) State(?:\s+)?: ([a-zA-Z]+)'
+    r'Adapter #([0-9]+) State(?:\s+)?: ([a-zA-Z ]+)'
 )
 
 RE_VD = re.compile(
@@ -124,13 +124,13 @@ def find_batteries(d):
 class Adapter:
     def __init__(self, n, state):
         self.id = n
-        self.state = int(state == 'Degraded')
+        # TODO: Rewrite all of this
+        self.state = int(state in ("Partially Degraded", "Degraded", "Failed"))
 
     def data(self):
         return {
             'adapter_{0}_degraded'.format(self.id): self.state,
         }
-
 
 class PD:
     def __init__(self, n, media_err, predict_fail):

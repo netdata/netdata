@@ -1323,6 +1323,14 @@ void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDAT
 #else // !NETDATA_LOG_COLLECTION_ERRORS
 void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
 #endif // !NETDATA_LOG_COLLECTION_ERRORS
+
+    static __thread struct log_stack_entry lgs[] = {
+            [0] = ND_LOG_FIELD_STR(NDF_NIDL_DIMENSION, NULL),
+            [1] = ND_LOG_FIELD_END(),
+    };
+    lgs[0].str = rd->id;
+    log_stack_push(lgs);
+
 #ifdef NETDATA_LOG_COLLECTION_ERRORS
     rd->rrddim_store_metric_count++;
 
@@ -1384,6 +1392,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     }
 
     rrdcontext_collected_rrddim(rd);
+    log_stack_pop(&lgs);
 }
 
 void store_metric_collection_completed() {
@@ -1667,7 +1676,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > MAX(st->db.entries, 60) * update_every_ut)) {
-        netdata_log_info("host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
+        nd_log_daemon(NDLP_DEBUG, "host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
             " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done,
             (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);

@@ -12,9 +12,11 @@ declare -a package_tree=(
   autoconf-archive
   autogen
   automake
+  bison
   cmake
   curl
   elfutils-libelf-devel
+  flex
   gcc
   gcc-c++
   git

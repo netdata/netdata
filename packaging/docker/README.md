@@ -21,7 +21,7 @@ The Netdata container requires different privileges and mounts to provide functi
 Netdata installed on the host. Below you can find a list of Netdata components that need these privileges and mounts,
 along with their descriptions.
 
-<details>
+<details open>
 <summary>Privileges</summary>
 
 |    Component    |          Privileges           | Description                                                                                                              | 
@@ -33,16 +33,18 @@ along with their descriptions.
 
 </details>
 
-<details>
+<details open>
 <summary>Mounts</summary>
 
-|   Component    |           Mounts           | Description                                                                                                                         | 
-|:--------------:|:--------------------------:|-------------------------------------------------------------------------------------------------------------------------------------|
-|    netdata     |      /etc/os-release       | Host info detection.                                                                                                                |
-| cgroups.plugin | /sys, /var/run/docker.sock | Docker containers monitoring and name resolution.                                                                                   |
-|  go.d.plugin   |    /var/run/docker.sock    | Docker Engine and containers monitoring. See [docker](https://github.com/netdata/go.d.plugin/tree/master/modules/docker) collector. |
-|  apps.plugin   |  /etc/passwd, /etc/group   | Monitoring of host system resource usage by each user and user group.                                                               |
-|  proc.plugin   |           /proc            | Host system monitoring (CPU, memory, network interfaces, disks, etc.).                                                              |
+|       Component        |           Mounts           | Description                                                                                                                                | 
+|:----------------------:|:--------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------|
+|        netdata         |      /etc/os-release       | Host info detection.                                                                                                                       |
+|     cgroups.plugin     | /sys, /var/run/docker.sock | Docker containers monitoring and name resolution.                                                                                          |
+|      go.d.plugin       |    /var/run/docker.sock    | Docker Engine and containers monitoring. See [docker](https://github.com/netdata/go.d.plugin/tree/master/modules/docker#readme) collector. |
+|      go.d.plugin       |          /var/log          | Web servers logs tailing. See [weblog](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog#readme) collector.                |
+|      apps.plugin       |  /etc/passwd, /etc/group   | Monitoring of host system resource usage by each user and user group.                                                                      |
+|      proc.plugin       |           /proc            | Host system monitoring (CPU, memory, network interfaces, disks, etc.).                                                                     |
+| systemd-journal.plugin |          /var/log          | Viewing, exploring and analyzing systemd journal logs.                                                                                     |
 
 </details>
 
@@ -73,6 +75,7 @@ docker run -d --name=netdata \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
+  -v /var/log:/host/var/log:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
@@ -113,6 +116,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
 volumes:
@@ -128,6 +132,34 @@ volumes:
 >
 > If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
 > Add Nodes" button in your Space's "Nodes" view.
+
+### With systemd units monitoring
+
+Monitoring systemd units requires mounting `/run/dbus`. This mount is not available on non-systemd systems, so we cannot
+use it in the Recommended Way.
+
+Mounting `/run/dbus` provides:
+
+- [go.d/systemdunits](https://github.com/netdata/go.d.plugin/tree/master/modules/systemdunits#readme).
+- Systemd-list-units function: information about all systemd units, including their active state, description, whether
+  they are enabled, and more.
+
+<Tabs>
+<TabItem value="docker_run" label="docker run">
+
+<h3> Using the <code>docker run</code> command </h3>
+
+Add `-v /run/dbus:/run/dbus:ro` to your `docker run`.
+
+</TabItem>
+<TabItem value="docker compose" label="docker-compose">
+
+<h3> Using the <code>docker-compose</code> command</h3>
+
+Add `- /run/dbus:/run/dbus:ro` to the netdata service `volumes`.
+
+</TabItem>
+</Tabs>
 
 ### With host-editable configuration
 
@@ -159,6 +191,7 @@ docker run -d --name=netdata \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /etc/os-release:/host/etc/os-release:ro \
+  -v /var/log:/host/var/log:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
@@ -199,6 +232,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
 volumes:
@@ -269,6 +303,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 volumes:
   caddy_data:
@@ -319,6 +354,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
     environment:
       - DOCKER_HOST=localhost:2375
   proxy:
@@ -365,6 +401,7 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
     environment:
       - DOCKER_HOST=localhost:2375
   cetusguard:
@@ -453,22 +490,20 @@ above section on [configuring Agent containers](#configure-agent-containers) to 
 how you created the container.
 
 Alternatively, you can directly use the hostname from the node running the container by mounting `/etc/hostname` from
-the host in the container. With `docker run`, this can be done by adding `--volume /etc/hostname:/etc/hostname:ro` to
+the host in the container. With `docker run`, this can be done by adding `--volume /etc/hostname:/host/etc/hostname:ro` to
 the options. If you are using Docker Compose, you can add an entry to the container's `volumes` section
-reading `- /etc/hostname:/etc/hostname:ro`.
+reading `- /etc/hostname:/host/etc/hostname:ro`.
 
 ## Adding extra packages at runtime
 
 By default, the official Netdata container images do not include a number of optional runtime dependencies. You
-can add these dependencies, or any other APK packages, at runtime by listing them in the environment variable
-`NETDATA_EXTRA_APK_PACKAGES`.
+can add these dependencies, or any other APT packages, at runtime by listing them in the environment variable
+`NETDATA_EXTRA_DEB_PACKAGES`.
 
 Commonly useful packages include:
 
 - `apcupsd`: For monitoring APC UPS devices.
-- `libvirt-daemon`: For resolving cgroup names for libvirt domains.
 - `lm-sensors`: For monitoring hardware sensors.
-- `msmtp`: For email alert support.
 - `netcat-openbsd`: For IRC alert support.
 
 ## Health Checks

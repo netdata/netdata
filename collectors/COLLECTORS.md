@@ -221,7 +221,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Virtual Machines](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/integrations/virtual_machines.md)
 
-- [Xen/XCP-ng](https://github.com/netdata/netdata/blob/master/collectors/xenstat.plugin/integrations/xen-xcp-ng.md)
+- [Xen XCP-ng](https://github.com/netdata/netdata/blob/master/collectors/xenstat.plugin/integrations/xen_xcp-ng.md)
 
 - [cAdvisor](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/cadvisor.md)
 
@@ -377,7 +377,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [FreeBSD NFS](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/freebsd_nfs.md)
 
-- [FreeBSD RCTL/RACCT](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/freebsd_rctl-racct.md)
+- [FreeBSD RCTL-RACCT](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/integrations/freebsd_rctl-racct.md)
 
 - [dev.cpu.0.freq](https://github.com/netdata/netdata/blob/master/collectors/freebsd.plugin/integrations/dev.cpu.0.freq.md)
 
