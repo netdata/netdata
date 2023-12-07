@@ -1274,11 +1274,6 @@ if ! cmake_install "${NETDATA_BUILD_DIR}"; then
 fi
 
 # -----------------------------------------------------------------------------
-progress "Fix generated files permissions"
-
-run chmod 755 ./system/*/init.d/netdata ./system/*/rc.d/netdata ./system/runit/run ./system/install-service.sh
-
-# -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
 
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"

@@ -1751,7 +1751,7 @@ install(DIRECTORY DESTINATION usr/lib/netdata/conf.d)
 install(DIRECTORY DESTINATION usr/libexec/netdata/plugins.d)
 install(DIRECTORY DESTINATION usr/share/netdata/web)
 
-set(libsysdir_POST "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata")
+set(libsysdir_POST "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/system")
 set(pkglibexecdir_POST "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata")
 set(localstatedir_POST "${CMAKE_INSTALL_PREFIX}/var")
 set(sbindir_POST "${CMAKE_INSTALL_PREFIX}/usr/sbin")
@@ -1833,25 +1833,25 @@ configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONL
 install(FILES ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist DESTINATION usr/lib/netdata/system/launchd)
 
 configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata DESTINATION usr/lib/netdata/system/freebsd/rc.d)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata DESTINATION usr/lib/netdata/system/freebsd/rc.d)
 
 configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata DESTINATION usr/lib/netdata/system/initd/init.d)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata DESTINATION usr/lib/netdata/system/initd/init.d)
 
 configure_file(system/logrotate/netdata.in system/logrotate/netdata @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/system/logrotate/netdata DESTINATION usr/lib/netdata/system/logrotate)
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata DESTINATION usr/lib/netdata/system/lsb/init.d)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata DESTINATION usr/lib/netdata/system/lsb/init.d)
 
 configure_file(system/openrc/conf.d/netdata.in system/openrc/conf.d/netdata @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/system/openrc/conf.d/netdata DESTINATION usr/lib/netdata/system/openrc/conf.d)
 
 configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata DESTINATION usr/lib/netdata/system/openrc/init.d)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata DESTINATION usr/lib/netdata/system/openrc/init.d)
 
 configure_file(system/runit/run.in system/runit/run @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/system/runit/run DESTINATION usr/lib/netdata/system/runit)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/system/runit/run DESTINATION usr/lib/netdata/system/runit)
 
 configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/system/systemd/netdata.service DESTINATION usr/lib/netdata/system/systemd)
