@@ -239,8 +239,8 @@ int main(int argc, char **argv)
         fprintf(stdout, "\n");
         fflush(stdout);
         if (ferror(stdout) && errno == EPIPE) {
-            netdata_log_info("error writing to stdout: EPIPE. Exiting...");
-            break;
+            netdata_log_error("error writing to stdout: EPIPE. Exiting...");
+            return 1;
         }
     }
 
