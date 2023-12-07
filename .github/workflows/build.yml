@@ -781,7 +781,7 @@ jobs:
           path: final-artifacts
       - name: Authenticate to GCS
         id: gcs-auth
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           project_id: ${{ secrets.GCP_NIGHTLY_STORAGE_PROJECT }}
           credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
