@@ -9,14 +9,10 @@ case "$1" in
 
     if capsh --supports=cap_perfmon 2>/dev/null; then
         setcap cap_perfmon+ep /usr/libexec/netdata/plugins.d/perf.plugin
-        ret="$?"
     else
-        setcap cap_sys_admin+ep /usr/libexec/netdata/plugins.d/perf.plugin
-        ret="$?"
-    fi
-
-    if [ "${ret}" -ne 0 ]; then
-        chmod -f 4750 /usr/libexec/netdata/plugins.d/perf.plugin
+        if ! setcap cap_sys_admin+ep /usr/libexec/netdata/plugins.d/perf.plugin; then
+            chmod -f 4750 /usr/libexec/netdata/plugins.d/perf.plugin
+        fi
     fi
     ;;
 esac
