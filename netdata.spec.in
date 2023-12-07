@@ -173,9 +173,7 @@ Suggests: %{name}-plugin-cups = %{version}
 Recommends: %{name}-plugin-systemd-journal = %{version}
 Recommends: %{name}-plugin-logs-management = %{version}
 %else
-Suggests: %{name}-plugin-cups = %{version}
 Requires: %{name}-plugin-systemd-journal = %{version}
-Recommends: %{name}-plugin-logs-management = %{version}
 %endif
 
 
