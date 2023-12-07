@@ -7,7 +7,7 @@ case "$1" in
     chown root:netdata /usr/libexec/netdata/plugins.d/perf.plugin
     chmod 0750 /usr/libexec/netdata/plugins.d/perf.plugin
 
-    if ! setcap cap_perfmon+ep /usr/libexec/netdata/plugins.d/perf.plugin; then
+    if setcap cap_perfmon+ep /usr/libexec/netdata/plugins.d/perf.plugin; then
         echo "Set cap_perfmon capabilties for perf.plugin"
     else
         if ! setcap cap_sys_admin+ep /usr/libexec/netdata/plugins.d/perf.plugin; then
