@@ -61,8 +61,8 @@ to work on these platforms with minimal user effort.
 | Alpine Linux             | 3.18           | No                                     | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images                                     |
 | Alma Linux               | 9.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
 | Alma Linux               | 8.x            | x86\_64, AArch64                       | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                                                    |
-| Amazon Linux             | 2023           | x86\_64, AArch64         |                                                                                                      |
-| Amazon Linux             | 2              | x86\_64, AArch64         |                                                                                                      |
+| Amazon Linux             | 2023           | x86\_64, AArch64                       |                                                                                                                                                    |
+| Amazon Linux             | 2              | x86\_64, AArch64                       |                                                                                                                                                    |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                                                    |
 | Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) for more info on using Netdata on Docker |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
@@ -72,6 +72,7 @@ to work on these platforms with minimal user effort.
 | Fedora                   | 38             | x86\_64, AArch64                       |                                                                                                                                                    |
 | Fedora                   | 37             | x86\_64, AArch64                       |                                                                                                                                                    |
 | openSUSE                 | Leap 15.5      | x86\_64, AArch64                       |                                                                                                                                                    |
+| openSUSE                 | Leap 15.4      | x86\_64, AArch64                       |                                                                                                                                                    |
 | Oracle Linux             | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Oracle Linux             | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64                       |                                                                                                                                                    |
@@ -158,6 +159,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Alpine Linux | 3.14      | EOL as of 2023-05-01 |
 | Alpine Linux | 3.13      | EOL as of 2022-11-01 |
 | Debian       | 9.x       | EOL as of 2022-06-30 |
+| Fedora       | 37        | EOL as of 2023-12-05 |
 | Fedora       | 36        | EOL as of 2023-05-18 |
 | Fedora       | 35        | EOL as of 2022-12-13 |
 | openSUSE     | Leap 15.4 | EOL as of 2023-12-07 |
