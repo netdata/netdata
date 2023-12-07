@@ -219,7 +219,7 @@ int main() {
 }
 " HAVE_BUILTIN_ATOMICS)
 
-if(FREEBSD)
+if(FREEBSD OR MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
 
