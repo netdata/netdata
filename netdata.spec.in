@@ -168,10 +168,12 @@ Requires: %{name}-plugin-nfacct = %{version}
 %if 0%{?_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: %{name}-plugin-freeipmi = %{version}
 %endif
-%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: %{name}-plugin-cups = %{version}
 Recommends: %{name}-plugin-systemd-journal = %{version}
 Recommends: %{name}-plugin-logs-management = %{version}
+%else
+Requires: %{name}-plugin-systemd-journal = %{version}
 %endif
 
 
