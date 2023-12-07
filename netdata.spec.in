@@ -118,6 +118,9 @@ AutoReqProv: yes
 %global _have_ml 1
 %endif
 
+# Filter known bogus deps that would be caught by AutoReqProv.
+%global __requires_exclude_from ^%{_libdir}/%{name}/system/.*$
+
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	%{version}
