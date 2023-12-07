@@ -77,6 +77,8 @@ We have an nginx server logging in this standard combined log format:
                     '"$http_referer" "$http_user_agent"';
 ```
 
+### Extracting fields with a pattern
+
 First, let's find the right pattern for `log2journal`. We ask ChatGPT:
 
 ```
@@ -170,6 +172,8 @@ TIME_LOCAL=19/Nov/2023:00:24:43 +0000
 
 As you can see, it extracted all the fields and made them capitals, as systemd-journal expects them.
 
+### Prefixing field names
+
 To make sure the fields are unique for nginx and do not interfere with other applications, we should prefix them with `NGINX_`:
 
 ```yaml
@@ -213,6 +217,8 @@ NGINX_STATUS=200
 NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
 
 ```
+
+### Renaming fields
 
 Now, all fields start with `NGINX_` but we want `NGINX_REQUEST` to be the `MESSAGE` of the log line, as we will see it by default in `journalctl` and the Netdata dashboard. Let's rename it:
 
@@ -262,7 +268,11 @@ NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
 
 ```
 
-Ideally, we would want the 5xx errors to be red in our `journalctl` output and the dashboard. To achieve that we need to add a PRIORITY field to set the log level. Log priorities are numeric and follow the `syslog` priorities. Checking `/usr/include/sys/syslog.h` we can see these:
+### Injecting new fields
+
+To have a complete message in journals we need 3 fields: `MESSAGE`, `PRIORITY` and `SYSLOG_IDENTIFIER`. We have already added `MESSAGE` by renaming `NGINX_REQUEST`. We can also inject a `SYSLOG_IDENTIFIER` and `PRIORITY`.
+
+Ideally, we would want the 5xx errors to be red in our `journalctl` output and the dashboard. To achieve that we need to set the `PRIORITY` field to the right log level. Log priorities are numeric and follow the `syslog` priorities. Checking `/usr/include/sys/syslog.h` we can see these:
 
 ```c
 #define LOG_EMERG       0       /* system is unusable */
@@ -279,7 +289,7 @@ Avoid setting priority to 0 (`LOG_EMERG`), because these will be on your termina
 
 To set the PRIORITY field in the output, we can use `NGINX_STATUS`. We will do this in 2 steps: a) inject the priority field as a copy is `NGINX_STATUS` and then b) use a pattern on its value to rewrite it to the priority level we want.
 
-First, let's inject it:
+First, let's inject `SYSLOG_IDENTIFIER` and `PRIORITY`:
 
 ```yaml
 pattern: |
@@ -311,6 +321,9 @@ rename:
 inject:                         # <<< we added this
   - key: PRIORITY               # <<< we added this
     value: '${NGINX_STATUS}'    # <<< we added this
+    
+  - key: SYSLOG_IDENTIFIER      # <<< we added this
+    value: 'nginx-log'          # <<< we added this
 ```
 
 Let's see what this does:
@@ -328,11 +341,14 @@ NGINX_REQUEST_URI=/index.html
 NGINX_SERVER_PROTOCOL=HTTP/1.1
 NGINX_STATUS=200
 NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
-PRIORITY=200                    # <<< PRIORITY added
+PRIORITY=200                         # <<< PRIORITY added
+SYSLOG_IDENTIFIER=nginx-log          # <<< SYSLOG_IDENTIFIER added
 
 ```
 
-Now we need to rewrite it to the right priority based on its value. We will assign the priority 6 (info) when the status is 1xx, 2xx, 3xx, priority 5 (notice) when status is 4xx, priority 3 (error) when status is 5xx and anything else will go to priority 4 (warning). Let's do it:
+### Rewriting field values
+
+Now we need to rewrite `PRIORITY` to the right syslog level based on its value (`NGINX_STATUS`). We will assign the priority 6 (info) when the status is 1xx, 2xx, 3xx, priority 5 (notice) when status is 4xx, priority 3 (error) when status is 5xx and anything else will go to priority 4 (warning). Let's do it:
 
 ```yaml
 pattern: |
@@ -400,84 +416,14 @@ NGINX_REQUEST_URI=/index.html
 NGINX_SERVER_PROTOCOL=HTTP/1.1
 NGINX_STATUS=200
 NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
-PRIORITY=6                      # <<< PRIORITY rewritten here
+PRIORITY=6                           # <<< PRIORITY rewritten here
+SYSLOG_IDENTIFIER=nginx-log
 
 ```
 
 Rewrite rules are powerful. You can have named groups in them, like in the main pattern, to extract sub-fields from them, which you can then use in variable substitution. You can use rewrite rules to anonymize the URLs, e.g to remove customer IDs or transaction details from them.
 
-To complete the example, we can also inject a `SYSLOG_IDENTIFIER`. Generally your journal logs should always have 3 fields: `MESSAGE`, `PRIORITY` and `SYSLOG_IDENTIFIER`. These 3 fields make it a complete entry. Then you can add as many fields as required for your use case.
-
-```yaml
-pattern: |
-  (?x) # Enable PCRE2 extended mode
-  ^
-  (?<remote_addr>[^ ]+) \s - \s
-  (?<remote_user>[^ ]+) \s
-  \[
-    (?<time_local>[^\]]+)
-  \]
-  \s+ "
-  (?<request>
-    (?<request_method>[A-Z]+) \s+
-    (?<request_uri>[^ ]+) \s+
-    (?<server_protocol>[^"]+)
-  )
-  " \s+
-  (?<status>\d+) \s+
-  (?<body_bytes_sent>\d+) \s+
-  "(?<http_referer>[^"]*)" \s+
-  "(?<http_user_agent>[^"]*)"
-
-prefix: 'NGINX_'
-
-rename:                         
-  - new_key: MESSAGE            
-    old_key: NGINX_REQUEST      
-
-inject:                         
-  - key: PRIORITY               
-    value: '${NGINX_STATUS}'
-  - key: SYSLOG_IDENTIFIER          # <<< we added this
-    value: 'nginx-log'              # <<< we added this
-
-rewrite:                        
-  - key: PRIORITY               
-    match: '^[123]'             
-    value: 6                    
-
-  - key: PRIORITY               
-    match: '^4'                 
-    value: 5                    
-
-  - key: PRIORITY               
-    match: '^5'                 
-    value: 3                    
-
-  - key: PRIORITY               
-    match: '.*'                 
-    value: 4                    
-```
-
-Let's see it:
-
-```bash
-# echo '1.2.3.4 - - [19/Nov/2023:00:24:43 +0000] "GET /index.html HTTP/1.1" 200 4172 "-" "Go-http-client/1.1"' | log2journal -f nginx.yaml
-MESSAGE=GET /index.html HTTP/1.1
-NGINX_BODY_BYTES_SENT=4172
-NGINX_HTTP_REFERER=-
-NGINX_HTTP_USER_AGENT=Go-http-client/1.1
-NGINX_REMOTE_ADDR=1.2.3.4
-NGINX_REMOTE_USER=-
-NGINX_REQUEST_METHOD=GET
-NGINX_REQUEST_URI=/index.html
-NGINX_SERVER_PROTOCOL=HTTP/1.1
-NGINX_STATUS=200
-NGINX_TIME_LOCAL=19/Nov/2023:00:24:43 +0000
-PRIORITY=6
-SYSLOG_IDENTIFIER=nginx-log          # <<< SYSLOG_IDENTIFIER added
-
-```
+### Sending logs to systemd-journal
 
 Now the message is ready to be sent to a systemd-journal. For this we use `systemd-cat-native`. This command can send such messages to a journal running on the localhost, a local journal namespace, or a `systemd-journal-remote` running on another server. By just appending `| systemd-cat-native` to the command, the message will be sent to the local journal.
 
