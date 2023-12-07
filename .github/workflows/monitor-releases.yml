@@ -19,7 +19,6 @@ concurrency: # This keeps multiple instances of the job from running concurrentl
 jobs:
   update-stable-agents-metadata:
     name: update-stable-agents-metadata
-    if: ${{ github.ref == 'refs/heads/master' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
