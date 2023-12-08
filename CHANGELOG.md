@@ -6,7 +6,16 @@
 
 **Merged pull requests:**
 
+- Resolve issue on startup in servers with 1 core [\#16565](https://github.com/netdata/netdata/pull/16565) ([stelfrag](https://github.com/stelfrag))
+- Fix release metadata workflow [\#16563](https://github.com/netdata/netdata/pull/16563) ([tkatsoulas](https://github.com/tkatsoulas))
+- Make  the systemd-journal mandatory package on Centos 7  and Amazon linux 2 [\#16562](https://github.com/netdata/netdata/pull/16562) ([tkatsoulas](https://github.com/tkatsoulas))
+- Fix for AMD GPU drm different format proc file [\#16561](https://github.com/netdata/netdata/pull/16561) ([MrZammler](https://github.com/MrZammler))
+- Revert "remove discourse badge from readme" [\#16560](https://github.com/netdata/netdata/pull/16560) ([ilyam8](https://github.com/ilyam8))
 - Add README for gorilla [\#16553](https://github.com/netdata/netdata/pull/16553) ([vkalintiris](https://github.com/vkalintiris))
+- Bump new version on the release changelog GHA [\#16551](https://github.com/netdata/netdata/pull/16551) ([tkatsoulas](https://github.com/tkatsoulas))
+- set "HOME" after switching to netdata user [\#16548](https://github.com/netdata/netdata/pull/16548) ([ilyam8](https://github.com/ilyam8))
+- Remove openSUSE 15.4 from CI [\#16449](https://github.com/netdata/netdata/pull/16449) ([tkatsoulas](https://github.com/tkatsoulas))
+- Remove fedora 37 from CI [\#16422](https://github.com/netdata/netdata/pull/16422) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.44.0](https://github.com/netdata/netdata/tree/v1.44.0) (2023-12-06)
 
@@ -266,8 +275,6 @@
 - Update info about custom dashboards [\#16121](https://github.com/netdata/netdata/pull/16121) ([elizabyte8](https://github.com/elizabyte8))
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 - shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
-- Add support for gorilla pages for tier 0. [\#15969](https://github.com/netdata/netdata/pull/15969) ([vkalintiris](https://github.com/vkalintiris))
-- Add integrations JSON file for website usage. [\#15959](https://github.com/netdata/netdata/pull/15959) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -432,17 +439,6 @@
 - Maintain node's last connected timestamp in the db [\#15979](https://github.com/netdata/netdata/pull/15979) ([stelfrag](https://github.com/stelfrag))
 - apps.plugin function is not thread safe [\#15978](https://github.com/netdata/netdata/pull/15978) ([ktsaou](https://github.com/ktsaou))
 - functions cancelling [\#15977](https://github.com/netdata/netdata/pull/15977) ([ktsaou](https://github.com/ktsaou))
-- Facets: fixes 5 [\#15976](https://github.com/netdata/netdata/pull/15976) ([ktsaou](https://github.com/ktsaou))
-- Split cgroup charts [\#15975](https://github.com/netdata/netdata/pull/15975) ([thiagoftsm](https://github.com/thiagoftsm))
-- facets histogram: do not send db retention for facets [\#15974](https://github.com/netdata/netdata/pull/15974) ([ktsaou](https://github.com/ktsaou))
-- extend ml default training from ~24 to ~48 hours [\#15971](https://github.com/netdata/netdata/pull/15971) ([andrewm4894](https://github.com/andrewm4894))
-- facets histogram when empty [\#15970](https://github.com/netdata/netdata/pull/15970) ([ktsaou](https://github.com/ktsaou))
-- facets: do not shadow local variable [\#15968](https://github.com/netdata/netdata/pull/15968) ([ktsaou](https://github.com/ktsaou))
-- Skip trying to preserve file owners when bundling external code. [\#15966](https://github.com/netdata/netdata/pull/15966) ([Ferroin](https://github.com/Ferroin))
-- fix using undefined var when loading job statuses in python.d [\#15965](https://github.com/netdata/netdata/pull/15965) ([ilyam8](https://github.com/ilyam8))
-- facets: data-only queries [\#15961](https://github.com/netdata/netdata/pull/15961) ([ktsaou](https://github.com/ktsaou))
-- Clarify shipping repos cases [\#15960](https://github.com/netdata/netdata/pull/15960) ([tkatsoulas](https://github.com/tkatsoulas))
-- Clarifying the possible installation types [\#15958](https://github.com/netdata/netdata/pull/15958) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
