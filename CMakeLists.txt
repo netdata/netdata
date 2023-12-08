@@ -2148,6 +2148,7 @@ install(FILES web/gui/dashboard_info_custom_example.js
               web/gui/registry-alert-redirect.html
               web/gui/registry-hello.html
               web/gui/switch.html
+              web/gui/ilove.html
         DESTINATION usr/share/netdata/web)
 
 install(FILES web/gui/old/index.html DESTINATION usr/share/netdata/web/old)

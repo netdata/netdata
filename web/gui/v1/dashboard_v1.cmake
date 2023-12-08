@@ -14,7 +14,6 @@ web/gui/v1/demosites2.html
 web/gui/v1/favicon.ico
 web/gui/v1/goto-host-from-alarm.html
 web/gui/v1/index-node-view.html
-web/gui/v1/index.html
 web/gui/v1/infographic.html
 web/gui/v1/manifest.json
 web/gui/v1/precache-manifest.e2d3811ef5e4b7e75e1f56d6ee92ef2c.js
