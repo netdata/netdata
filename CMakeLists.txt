@@ -1820,6 +1820,13 @@ install(FILES streaming/stream.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #
+# swagger
+#
+install(FILES web/api/netdata-swagger.json
+              web/api/netdata-swagger.yaml
+        DESTINATION usr/share/netdata/web)
+
+#
 # service files
 #
 
