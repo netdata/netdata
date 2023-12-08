@@ -235,6 +235,13 @@ int main(int argc, char **argv)
             netdata_log_info("all modules are disabled, exiting...");
             return 1;
         }
+
+        fprintf(stdout, "\n");
+        fflush(stdout);
+        if (ferror(stdout) && errno == EPIPE) {
+            netdata_log_error("error writing to stdout: EPIPE. Exiting...");
+            return 1;
+        }
     }
 
     fprintf(stdout, "EXIT\n");
