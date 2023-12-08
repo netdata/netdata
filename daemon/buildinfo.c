@@ -338,7 +338,7 @@ static struct {
                 .json = "cpu_frequency",
                 .value = "unknown",
         },
-        [BIB_HW_RAM_SIZE] = {
+        [BIB_HW_ARCHITECTURE] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
                 .analytics = NULL,
@@ -346,7 +346,7 @@ static struct {
                 .json = "cpu_architecture",
                 .value = "unknown",
         },
-        [BIB_HW_DISK_SPACE] = {
+        [BIB_HW_RAM_SIZE] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
                 .analytics = NULL,
@@ -354,7 +354,7 @@ static struct {
                 .json = "ram",
                 .value = "unknown",
         },
-        [BIB_HW_ARCHITECTURE] = {
+        [BIB_HW_DISK_SPACE] = {
                 .category = BIC_HARDWARE,
                 .type = BIT_STRING,
                 .analytics = NULL,
