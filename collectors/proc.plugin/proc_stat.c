@@ -487,7 +487,7 @@ int do_proc_stat(int update_every, usec_t dt) {
 
     if(unlikely(do_cpu == -1)) {
         do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
-        do_cpu_cores              = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", CONFIG_BOOLEAN_YES);
+        do_cpu_cores              = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", CONFIG_BOOLEAN_NO);
         do_interrupts             = config_get_boolean("plugin:proc:/proc/stat", "cpu interrupts", CONFIG_BOOLEAN_YES);
         do_context                = config_get_boolean("plugin:proc:/proc/stat", "context switches", CONFIG_BOOLEAN_YES);
         do_forks                  = config_get_boolean("plugin:proc:/proc/stat", "processes started", CONFIG_BOOLEAN_YES);
@@ -508,7 +508,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_core_throttle_count = CONFIG_BOOLEAN_AUTO;
             do_package_throttle_count = CONFIG_BOOLEAN_NO;
             do_cpu_freq = CONFIG_BOOLEAN_YES;
-            do_cpuidle = CONFIG_BOOLEAN_YES;
+            do_cpuidle = CONFIG_BOOLEAN_NO;
         }
         if(unlikely(get_system_cpus() > 24)) {
             // the system has too many processors
