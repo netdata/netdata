@@ -31,6 +31,8 @@ typedef struct query {
     usec_t started_ut;
     usec_t finished_ut;
 
+    WEB_CLIENT_ACL acl;
+
     size_t response_size;
     short response_code;
 
@@ -128,7 +130,7 @@ static inline void query_progress_cleanup_unsafe(QUERY_PROGRESS *qp) {
     qp->next = qp->prev = NULL;
 }
 
-void query_progress_start(uuid_t *transaction, usec_t started_ut, const char *query, const char *payload) {
+void query_progress_start(uuid_t *transaction, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload) {
     if(!transaction)
         return;
 
@@ -145,6 +147,7 @@ void query_progress_start(uuid_t *transaction, usec_t started_ut, const char *qu
 
             query_progress_cleanup_unsafe(qp);
             uuid_copy(qp->transaction, *transaction);
+            qp->acl = acl;
             qp->started_ut = started_ut;
             qp->finished_ut = 0;
             qp->done = qp->all = 0;
@@ -156,6 +159,7 @@ void query_progress_start(uuid_t *transaction, usec_t started_ut, const char *qu
         qp = callocz(1, sizeof(*qp));
         qp->query = buffer_create(0, NULL);
         qp->payload = buffer_create(0, NULL);
+        qp->acl = acl;
         uuid_copy(qp->transaction, *transaction);
         qp->started_ut = started_ut;
         qp->finished_ut = 0;
@@ -173,6 +177,8 @@ void query_progress_start(uuid_t *transaction, usec_t started_ut, const char *qu
 
     if(!qp->started_ut)
         qp->started_ut = now_realtime_usec();
+
+    qp->acl |= acl;
 
     query_progress_hash(qp);
 }
@@ -217,7 +223,7 @@ void query_progress_done_another(uuid_t *transaction, size_t done) {
     spinlock_unlock(&progress.spinlock);
 }
 
-void query_progress_done(uuid_t *transaction, usec_t finished_ut) {
+void query_progress_done(uuid_t *transaction, usec_t finished_ut, short int response_code, size_t response_size) {
     if(!transaction)
         return;
 
@@ -226,7 +232,7 @@ void query_progress_done(uuid_t *transaction, usec_t finished_ut) {
 
     QUERY_PROGRESS *qp = query_progress_find_unsafe(transaction);
     if(qp) {
-        qp->done = qp->all = MAX(qp->done, qp->all);
+        qp->response_code = response_code;
         qp->finished_ut = finished_ut ? finished_ut : now_realtime_usec();
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
         progress.cache.available++;
