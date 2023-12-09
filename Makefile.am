@@ -191,6 +191,8 @@ LIBNETDATA_FILES = \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
     libnetdata/procfile/procfile.h \
+    libnetdata/query_progress/progress.c \
+    libnetdata/query_progress/progress.h \
     libnetdata/os.c \
     libnetdata/os.h \
     libnetdata/endian.h \
@@ -226,6 +228,7 @@ LIBNETDATA_FILES = \
     libnetdata/dyn_conf/dyn_conf.c \
     libnetdata/dyn_conf/dyn_conf.h \
     libnetdata/simple_hashtable.h \
+    libnetdata/simple_hashtable_undef.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF

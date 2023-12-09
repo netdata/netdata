@@ -278,6 +278,8 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
             .interrupt_callback = web_client_interrupt_callback,
             .interrupt_callback_data = w,
+
+            .transaction = &w->transaction,
     };
 
     return web_api_v12_weights(wb, &qwr);

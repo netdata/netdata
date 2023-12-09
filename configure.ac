@@ -2212,6 +2212,7 @@ AC_CONFIG_FILES([
     libnetdata/onewayalloc/Makefile
     libnetdata/popen/Makefile
     libnetdata/procfile/Makefile
+    libnetdata/query_progress/Makefile
     libnetdata/simple_pattern/Makefile
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile

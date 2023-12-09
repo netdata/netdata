@@ -822,6 +822,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             .priority = STORAGE_PRIORITY_NORMAL,
             .interrupt_callback = web_client_interrupt_callback,
             .interrupt_callback_data = w,
+            .transaction = &w->transaction,
     };
     qt = query_target_create(&qtr);
 

@@ -580,6 +580,8 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
             .interrupt_callback = web_client_interrupt_callback,
             .interrupt_callback_data = w,
+
+            .transaction = &w->transaction,
     };
 
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
