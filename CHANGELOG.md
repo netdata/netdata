@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- make debugfs exit on sigpipe [\#16569](https://github.com/netdata/netdata/pull/16569) ([ilyam8](https://github.com/ilyam8))
+- Fix memory leak during host chart label cleanup [\#16568](https://github.com/netdata/netdata/pull/16568) ([stelfrag](https://github.com/stelfrag))
+- fix cpu arch/ram/disk values in buildinfo [\#16567](https://github.com/netdata/netdata/pull/16567) ([ilyam8](https://github.com/ilyam8))
 - Resolve issue on startup in servers with 1 core [\#16565](https://github.com/netdata/netdata/pull/16565) ([stelfrag](https://github.com/stelfrag))
 - Fix release metadata workflow [\#16563](https://github.com/netdata/netdata/pull/16563) ([tkatsoulas](https://github.com/tkatsoulas))
 - Make  the systemd-journal mandatory package on Centos 7  and Amazon linux 2 [\#16562](https://github.com/netdata/netdata/pull/16562) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -435,10 +438,6 @@
 - Functions: allow collectors to be restarted [\#15983](https://github.com/netdata/netdata/pull/15983) ([ktsaou](https://github.com/ktsaou))
 - Metadata fixes for some collectors [\#15982](https://github.com/netdata/netdata/pull/15982) ([Ancairon](https://github.com/Ancairon))
 - update go.d.plugin to v0.55.0 [\#15981](https://github.com/netdata/netdata/pull/15981) ([ilyam8](https://github.com/ilyam8))
-- bump UI to v6.37.1 [\#15980](https://github.com/netdata/netdata/pull/15980) ([ilyam8](https://github.com/ilyam8))
-- Maintain node's last connected timestamp in the db [\#15979](https://github.com/netdata/netdata/pull/15979) ([stelfrag](https://github.com/stelfrag))
-- apps.plugin function is not thread safe [\#15978](https://github.com/netdata/netdata/pull/15978) ([ktsaou](https://github.com/ktsaou))
-- functions cancelling [\#15977](https://github.com/netdata/netdata/pull/15977) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
