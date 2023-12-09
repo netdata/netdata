@@ -11,8 +11,6 @@
 #include "../simple_hashtable_undef.h"
 
 struct query;
-static inline uuid_t *query_transaction(struct query *qp);
-static inline bool query_compare_keys(uuid_t *t1, uuid_t *t2);
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct query
 #define SIMPLE_HASHTABLE_KEY_TYPE uuid_t
 #define SIMPLE_HASHTABLE_NAME _QUERY

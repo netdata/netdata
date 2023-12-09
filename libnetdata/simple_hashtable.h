@@ -60,6 +60,14 @@ typedef uint64_t SIMPLE_HASHTABLE_HASH;
 #undef SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION
 #endif
 
+#if defined(SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION)
+static inline SIMPLE_HASHTABLE_KEY_TYPE SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION(SIMPLE_HASHTABLE_VALUE_TYPE *);
+#endif
+
+#if defined(SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION)
+static inline bool SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION(SIMPLE_HASHTABLE_KEY_TYPE *, SIMPLE_HASHTABLE_KEY_TYPE *);
+#endif
+
 // First layer of macro for token concatenation
 #define CONCAT_INTERNAL(a, b) a ## b
 // Second layer of macro, which ensures proper expansion
