@@ -1718,7 +1718,9 @@ set(WEB_DIR "${CMAKE_INSTALL_PREFIX}/usr/share/netdata/web")
 set(VARLIB_DIR "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
 
 set(CONFIGURE_COMMAND "dummy-configure-command")
-set(NETDATA_USER "netdata")
+if (NOT NETDATA_USER)
+        set(NETDATA_USER "netdata")
+endif()
 set(VERSION "${GIT_DESCRIBE_OUTPUT}")
 
 configure_file(config.cmake.h.in config.h)
