@@ -1439,10 +1439,6 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
             COMPONENT logs_management_plugin
             DESTINATION usr/lib/netdata/conf.d)
 
-    install(FILES logsmanagement/stock_conf/logsmanagement.d.conf
-            COMPONENT logs_management_plugin
-            DESTINATION usr/lib/netdata/conf.d)
-
     install(DIRECTORY DESTINATION etc/netdata/logsmanagement.d)
 endif()
 
@@ -2115,6 +2111,16 @@ install(FILES collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
 # FIXME: don't install this unconditionally
 configure_file(collectors/ioping.plugin/ioping.plugin.in collectors/ioping.plugin/ioping.plugin @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/collectors/ioping.plugin/ioping.plugin DESTINATION usr/libexec/netdata/plugins.d)
+
+#
+# logs management
+#
+if (ENABLE_PLUGIN_LOGS_MANAGEMENT)
+        configure_file(logsmanagement/stock_conf/logsmanagement.d.conf.in logsmanagement/stock_conf/logsmanagement.d.conf @ONLY)
+        install(FILES ${CMAKE_BINARY_DIR}/logsmanagement/stock_conf/logsmanagement.d.conf
+                COMPONENT logs_management_plugin
+                DESTINATION usr/lib/netdata/conf.d)
+endif()
 
 #
 # dashboard

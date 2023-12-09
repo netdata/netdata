@@ -12,7 +12,7 @@
 
 [db]
     db mode = none
-    # db dir = change to use non-default path
+    db dir = @cachedir_POST@/logs_management_db
     circular buffer flush to db = 6
     disk space limit MiB = 500
 
@@ -28,6 +28,6 @@
     http listen = 0.0.0.0
     http port = 2020
     http server = false
-    # log file = change to use non-default path
+    log file = @localstatedir_POST@/log/netdata/fluentbit.log
     log level = info
     coro stack size = 24576

@@ -1878,10 +1878,6 @@ install_fluentbit() {
 
   run cp -a -v fluent-bit/build/lib/libfluent-bit.so "${NETDATA_PREFIX}"/usr/lib/netdata
 
-  # Fix paths in logsmanagement.d.conf
-  run sed -i -e "s|# db dir =.*|db dir = ${NETDATA_CACHE_DIR}\/logs_management_db|g" "${NETDATA_STOCK_CONFIG_DIR}"/logsmanagement.d.conf
-  run sed -i -e "s|# log file =.*|log file = ${NETDATA_LOG_DIR}\/fluentbit.log|g" "${NETDATA_STOCK_CONFIG_DIR}"/logsmanagement.d.conf
-
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
 
