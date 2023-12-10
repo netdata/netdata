@@ -451,6 +451,8 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
         used++;
     }
 
+    assert(used == ht->used - ht->deleted);
+
     ht->used = used;
     ht->deleted = 0;
     ht->needs_cleanup = false;

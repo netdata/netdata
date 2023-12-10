@@ -157,6 +157,7 @@ void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_
         if(qp->prev) {
             // reusing a finished transaction
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
+            progress.cache.available--;
             qp->finished_ut = qp->started_ut = 0;
             qp->all = qp->done = qp->updates = 0;
             qp->acl = 0;
@@ -346,8 +347,14 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
     usec_t now_ut = now_realtime_usec();
     usec_t max_duration_ut = 0;
     size_t max_size = 0;
+    size_t archived = 0, running = 0;
     SIMPLE_HASHTABLE_FOREACH_READ_ONLY(&progress.hashtable, sl, _QUERY) {
         QUERY_PROGRESS *qp = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
+
+        if(qp->prev)
+            archived++;
+        else
+            running++;
 
         bool finished = qp->finished_ut ? true : false;
         usec_t duration_ut = finished ? qp->finished_ut - qp->started_ut : now_ut - qp->started_ut;
@@ -390,6 +397,8 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         buffer_json_array_close(wb); // row
     }
+
+    assert(archived == progress.cache.available);
 
     spinlock_unlock(&progress.spinlock);
 
