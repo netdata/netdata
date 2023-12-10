@@ -34,6 +34,8 @@ typedef struct query {
     size_t response_size;
     short response_code;
 
+    bool indexed;
+
     size_t updates;
     size_t all;
     size_t done;
@@ -76,7 +78,7 @@ SIMPLE_HASHTABLE_HASH query_hash(uuid_t *transaction) {
     return parts->lo;
 }
 
-static inline void query_progress_init_unsafe(void) {
+static void query_progress_init_unsafe(void) {
     if(!progress.initialized) {
         memset(&progress, 0, sizeof(progress));
         simple_hashtable_init_QUERY(&progress.hashtable, PROGRESS_CACHE_SIZE * 4);
@@ -88,10 +90,15 @@ static inline QUERY_PROGRESS *query_progress_find_unsafe(uuid_t *transaction) {
     SIMPLE_HASHTABLE_HASH hash = query_hash(transaction);
     SIMPLE_HASHTABLE_SLOT_QUERY *slot = simple_hashtable_get_slot_QUERY(&progress.hashtable, hash, transaction, true);
     QUERY_PROGRESS *qp = SIMPLE_HASHTABLE_SLOT_DATA(slot);
+
+    assert(!qp || qp->indexed);
+
     return qp;
 }
 
 static inline void query_progress_hash(QUERY_PROGRESS *qp) {
+    assert(!qp->indexed);
+
     spinlock_lock(&progress.spinlock);
     SIMPLE_HASHTABLE_HASH hash = query_hash(&qp->transaction);
     SIMPLE_HASHTABLE_SLOT_QUERY *slot =
@@ -102,9 +109,13 @@ static inline void query_progress_hash(QUERY_PROGRESS *qp) {
 
     simple_hashtable_set_slot_QUERY(&progress.hashtable, slot, hash, qp);
     spinlock_unlock(&progress.spinlock);
+
+    qp->indexed = true;
 }
 
 static inline void query_progress_unhash_unsafe(QUERY_PROGRESS *qp) {
+    assert(qp->indexed);
+
     SIMPLE_HASHTABLE_HASH hash = query_hash(&qp->transaction);
     SIMPLE_HASHTABLE_SLOT_QUERY *slot =
             simple_hashtable_get_slot_QUERY(&progress.hashtable, hash, &qp->transaction, true);
@@ -114,18 +125,37 @@ static inline void query_progress_unhash_unsafe(QUERY_PROGRESS *qp) {
     else
         internal_fatal(SIMPLE_HASHTABLE_SLOT_DATA(slot) != NULL,
                        "Attempt to unhash a progress slot, with a different value");
+
+    qp->indexed = false;
 }
 
-static inline void query_progress_cleanup_unsafe(QUERY_PROGRESS *qp) {
-    query_progress_unhash_unsafe(qp);
+static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, bool keep_transaction) {
+    assert(qp && qp->prev == NULL && qp->next == NULL);
+    assert(keep_transaction || !qp->indexed);
 
     buffer_flush(qp->query);
     buffer_flush(qp->payload);
-
-    memset(qp->transaction, 0, sizeof(uuid_t));
     qp->started_ut = qp->finished_ut = 0;
-    qp->all = qp->done = 0;
+    qp->all = qp->done = qp->updates = 0;
+    qp->acl = 0;
     qp->next = qp->prev = NULL;
+    qp->response_size = 0;
+    qp->response_code = 0;
+
+    if(!keep_transaction)
+        memset(qp->transaction, 0, sizeof(uuid_t));
+}
+
+static inline void query_progress_link_to_cache(QUERY_PROGRESS *qp) {
+    assert(!qp->prev && !qp->next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
+    progress.cache.available++;
+}
+
+static inline void query_progress_unlink_from_cache(QUERY_PROGRESS *qp) {
+    assert(qp->prev);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
+    progress.cache.available--;
 }
 
 static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload) {
@@ -156,15 +186,8 @@ void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_
         // the transaction is already there
         if(qp->prev) {
             // reusing a finished transaction
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
-            progress.cache.available--;
-            qp->finished_ut = qp->started_ut = 0;
-            qp->all = qp->done = qp->updates = 0;
-            qp->acl = 0;
-            qp->response_size = 0;
-            qp->response_code = 0;
-            buffer_flush(qp->query);
-            buffer_flush(qp->payload);
+            query_progress_unlink_from_cache(qp);
+            query_progress_cleanup_to_reuse(qp, true);
         }
 
         query_progress_update(qp, started_ut, acl, query, payload);
@@ -175,10 +198,10 @@ void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_
         // transaction is not found - get the first available, if any.
         if (progress.cache.available >= PROGRESS_CACHE_SIZE && progress.cache.list) {
             qp = progress.cache.list;
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
-            progress.cache.available--;
+            query_progress_unlink_from_cache(qp);
 
-            query_progress_cleanup_unsafe(qp);
+            query_progress_unhash_unsafe(qp);
+            query_progress_cleanup_to_reuse(qp, false);
             uuid_copy(qp->transaction, *transaction);
             qp->acl = acl;
             qp->started_ut = started_ut;
@@ -257,8 +280,11 @@ void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int 
             qp->response_size = response_size;
             qp->response_code = response_code;
             qp->finished_ut = finished_ut ? finished_ut : now_realtime_usec();
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
-            progress.cache.available++;
+
+            if(qp->prev)
+                query_progress_unlink_from_cache(qp);
+
+            query_progress_link_to_cache(qp);
         }
     }
 
@@ -267,8 +293,7 @@ void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int 
         QUERY_PROGRESS *qp_to_free = NULL;
         if(progress.cache.available > PROGRESS_CACHE_SIZE && progress.cache.list) {
             qp_to_free = progress.cache.list;
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp_to_free, prev, next);
-            progress.cache.available--;
+            query_progress_unlink_from_cache(qp_to_free);
             query_progress_unhash_unsafe(qp_to_free);
         }
 
