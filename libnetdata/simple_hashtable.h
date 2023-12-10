@@ -105,6 +105,7 @@ typedef struct simple_hashtable_named {
     size_t resizes;
     size_t searches;
     size_t collisions;
+    size_t additions;
     size_t deletions;
     size_t deleted;
     size_t used;
@@ -415,6 +416,7 @@ static inline void simple_hashtable_set_slot_named(
 
     sl->hash = hash;
     sl->data = data;
+    ht->additions++;
 }
 
 // IMPORTANT
