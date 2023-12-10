@@ -247,7 +247,7 @@ void web_client_request_done(struct web_client *w) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    query_progress_done(&w->transaction, 0, w->response.code, buffer_strlen(w->response.data));
+    query_progress_finished(&w->transaction, 0, w->response.code, buffer_strlen(w->response.data));
 
     web_client_uncork_socket(w);
 
@@ -747,7 +747,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    query_progress_start(&w->transaction, 0, w->acl, buffer_tostring(w->url_as_received), w->post_payload);
+    query_progress_start_or_update(&w->transaction, 0, w->acl, buffer_tostring(w->url_as_received), w->post_payload);
 
     // get the api version
     char *tok = strsep_skip_consecutive_separators(&url_path_fragment, "/");
@@ -1820,7 +1820,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
     switch(http_request_validate(w)) {
         case HTTP_VALIDATION_OK:
-            query_progress_start(&w->transaction, 0, w->acl, buffer_tostring(w->url_as_received), w->post_payload);
+            query_progress_start_or_update(&w->transaction, 0, w->acl, buffer_tostring(w->url_as_received),
+                                           w->post_payload);
 
             switch(w->mode) {
                 case WEB_CLIENT_MODE_STREAM:

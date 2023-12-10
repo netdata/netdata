@@ -1717,7 +1717,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
         return -1;
     }
 
-    query_progress_done_another(qwr->transaction, 1);
+    query_progress_done_step(qwr->transaction, 1);
 
     return 1;
 }

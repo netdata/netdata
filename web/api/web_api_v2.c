@@ -664,6 +664,29 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
     return webrtc_new_connection(w->post_payload, w->response.data);
 }
 
+static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    char *transaction = NULL;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "transaction")) transaction = value;
+    }
+
+    uuid_t tr;
+    uuid_parse_flexi(transaction, tr);
+
+    return web_api_v2_report_progress(&tr, w->response.data);
+}
+
 #define CONFIG_API_V2_URL "/api/v2/config"
 static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query __maybe_unused) {
 
@@ -867,6 +890,7 @@ static struct web_api_command api_commands_v2[] = {
         {"job_statuses",  0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_job_statuses, 0},
 
         { "ilove.svg",       0, WEB_CLIENT_ACL_NOCHECK, web_client_api_request_v2_ilove, 0 },
+        { "progress",        0, WEB_CLIENT_ACL_NOCHECK, web_client_api_request_v2_progress, 0 },
 
         // terminator
         {NULL,                  0, WEB_CLIENT_ACL_NONE,                 NULL, 0},

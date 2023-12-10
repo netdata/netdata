@@ -128,7 +128,7 @@ static inline void query_progress_cleanup_unsafe(QUERY_PROGRESS *qp) {
     qp->next = qp->prev = NULL;
 }
 
-void query_progress_start(uuid_t *transaction, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload) {
+void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload) {
     if(!transaction)
         return;
 
@@ -181,7 +181,7 @@ void query_progress_start(uuid_t *transaction, usec_t started_ut, WEB_CLIENT_ACL
     query_progress_hash(qp);
 }
 
-void query_progress_set_all(uuid_t *transaction, size_t all) {
+void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
     if(!transaction)
         return;
 
@@ -202,7 +202,7 @@ void query_progress_set_all(uuid_t *transaction, size_t all) {
     spinlock_unlock(&progress.spinlock);
 }
 
-void query_progress_done_another(uuid_t *transaction, size_t done) {
+void query_progress_done_step(uuid_t *transaction, size_t done) {
     if(!transaction)
         return;
 
@@ -221,7 +221,7 @@ void query_progress_done_another(uuid_t *transaction, size_t done) {
     spinlock_unlock(&progress.spinlock);
 }
 
-void query_progress_done(uuid_t *transaction, usec_t finished_ut, short int response_code, size_t response_size) {
+void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, size_t response_size) {
     if(!transaction)
         return;
 
@@ -251,4 +251,50 @@ void query_progress_done(uuid_t *transaction, usec_t finished_ut, short int resp
         buffer_free(qp->payload);
         freez(qp);
     }
+}
+
+
+int web_api_v2_report_progress(uuid_t *transaction, BUFFER *wb) {
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    if(!transaction) {
+        buffer_json_member_add_uint64(wb, "status", 400);
+        buffer_json_member_add_string(wb, "message", "No transaction given");
+        buffer_json_finalize(wb);
+        return 400;
+    }
+
+    spinlock_lock(&progress.spinlock);
+    query_progress_init_unsafe();
+
+    QUERY_PROGRESS *qp = query_progress_find_unsafe(transaction);
+    if(!qp) {
+        spinlock_unlock(&progress.spinlock);
+        buffer_json_member_add_uint64(wb, "status", 404);
+        buffer_json_member_add_string(wb, "message", "Transaction not found");
+        buffer_json_finalize(wb);
+        return 404;
+    }
+
+    buffer_json_member_add_uint64(wb, "status", 200);
+
+    if(qp->finished_ut) {
+        buffer_json_member_add_double(wb, "progress", 100.0);
+        buffer_json_member_add_uint64(wb, "age_ut", qp->finished_ut - qp->started_ut);
+    }
+    else {
+        buffer_json_member_add_uint64(wb, "age_ut", now_realtime_usec() - qp->started_ut);
+
+        if (qp->all)
+            buffer_json_member_add_double(wb, "progress", (double) qp->done * 100.0 / (double) qp->all);
+        else
+            buffer_json_member_add_uint64(wb, "working", qp->done);
+    }
+
+    buffer_json_finalize(wb);
+
+    spinlock_unlock(&progress.spinlock);
+
+    return 200;
 }
