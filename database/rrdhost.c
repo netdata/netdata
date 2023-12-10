@@ -1112,9 +1112,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , 0
     );
 
-    if (unlikely(!localhost)) {
+    if (unlikely(!localhost))
         return 1;
-    }
 
     // we register this only on localhost
     // for the other nodes, the origin server should register it
@@ -1123,12 +1122,17 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                      RRDFUNCTIONS_STREAMING_HELP, true,
                      rrdhost_function_streaming, NULL);
 
+    rrd_function_add(localhost, NULL, "netdata-queries", 10,
+                     RRDFUNCTIONS_PROGRESS_HELP, true,
+                     rrdhost_function_progress, NULL);
+
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);
         sql_aclk_sync_init();
         web_client_api_v1_management_init();
     }
-    return localhost==NULL;
+
+    return 0;
 }
 
 // ----------------------------------------------------------------------------

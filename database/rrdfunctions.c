@@ -1183,6 +1183,26 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
 
 // ----------------------------------------------------------------------------
 
+int rrdhost_function_progress(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
+                              void *collector_data __maybe_unused,
+                              rrd_function_result_callback_t result_cb, void *result_cb_data,
+                              rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                              rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                              void *register_canceller_cb_data __maybe_unused) {
+
+    int response = progress_function_result(wb, rrdhost_hostname(localhost));
+
+    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data)) {
+        buffer_flush(wb);
+        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
+    }
+
+    if(result_cb)
+        result_cb(wb, response, result_cb_data);
+
+    return response;
+}
+
 int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
                                void *collector_data __maybe_unused,
                                rrd_function_result_callback_t result_cb, void *result_cb_data,

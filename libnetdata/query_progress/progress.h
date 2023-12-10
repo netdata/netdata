@@ -11,4 +11,8 @@ void query_progress_set_finish_line(uuid_t *transaction, size_t all);
 void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, size_t response_size);
 int web_api_v2_report_progress(uuid_t *transaction, BUFFER *wb);
 
+
+#define RRDFUNCTIONS_PROGRESS_HELP "View the progress on the running and latest Netdata API Requests"
+int progress_function_result(BUFFER *wb, const char *hostname);
+
 #endif // NETDATA_QUERY_PROGRESS_H

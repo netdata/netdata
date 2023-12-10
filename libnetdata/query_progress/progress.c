@@ -109,11 +109,11 @@ static inline void query_progress_unhash_unsafe(QUERY_PROGRESS *qp) {
     SIMPLE_HASHTABLE_SLOT_QUERY *slot =
             simple_hashtable_get_slot_QUERY(&progress.hashtable, hash, &qp->transaction, true);
 
-    internal_fatal(SIMPLE_HASHTABLE_SLOT_DATA(slot) != qp,
-                   "Attempt to unhash a progress slot, with a different value");
-
     if(SIMPLE_HASHTABLE_SLOT_DATA(slot) == qp)
         simple_hashtable_del_slot_QUERY(&progress.hashtable, slot);
+    else
+        internal_fatal(SIMPLE_HASHTABLE_SLOT_DATA(slot) != NULL,
+                       "Attempt to unhash a progress slot, with a different value");
 }
 
 static inline void query_progress_cleanup_unsafe(QUERY_PROGRESS *qp) {
@@ -128,18 +128,52 @@ static inline void query_progress_cleanup_unsafe(QUERY_PROGRESS *qp) {
     qp->next = qp->prev = NULL;
 }
 
+static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload) {
+    if(started_ut && started_ut < qp->started_ut)
+        qp->started_ut = started_ut;
+
+    if(query && *query && !buffer_strlen(qp->query))
+        buffer_strcat(qp->query, query);
+
+    if(payload && *payload && !buffer_strlen(qp->payload))
+        buffer_strcat(qp->payload, payload);
+
+    if(!qp->started_ut)
+        qp->started_ut = now_realtime_usec();
+
+    qp->acl |= acl;
+}
+
 void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload) {
-    if(!transaction)
+    if(!transaction || uuid_is_null(*transaction))
         return;
 
     spinlock_lock(&progress.spinlock);
     query_progress_init_unsafe();
 
     QUERY_PROGRESS *qp = query_progress_find_unsafe(transaction);
-    if(!qp) {
-        // transaction is not found - get the first available
-        qp = progress.cache.list;
-        if (qp) {
+    if(qp) {
+        // the transaction is already there
+        if(qp->prev) {
+            // reusing a finished transaction
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
+            qp->finished_ut = qp->started_ut = 0;
+            qp->all = qp->done = qp->updates = 0;
+            qp->acl = 0;
+            qp->response_size = 0;
+            qp->response_code = 0;
+            buffer_flush(qp->query);
+            buffer_flush(qp->payload);
+        }
+
+        query_progress_update(qp, started_ut, acl, query, payload);
+        spinlock_unlock(&progress.spinlock);
+        return;
+    }
+    else {
+        // transaction is not found - get the first available, if any.
+        if (progress.cache.available >= PROGRESS_CACHE_SIZE && progress.cache.list) {
+            qp = progress.cache.list;
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
             progress.cache.available--;
 
@@ -164,25 +198,12 @@ void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_
         qp->done = qp->all = 0;
     }
 
-    if(started_ut && started_ut < qp->started_ut)
-        qp->started_ut = started_ut;
-
-    if(query && *query && !buffer_strlen(qp->query))
-        buffer_strcat(qp->query, query);
-
-    if(payload && *payload && !buffer_strlen(qp->payload))
-        buffer_strcat(qp->payload, payload);
-
-    if(!qp->started_ut)
-        qp->started_ut = now_realtime_usec();
-
-    qp->acl |= acl;
-
+    query_progress_update(qp, started_ut, acl, query, payload);
     query_progress_hash(qp);
 }
 
 void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
-    if(!transaction)
+    if(!transaction || uuid_is_null(*transaction))
         return;
 
     spinlock_lock(&progress.spinlock);
@@ -203,7 +224,7 @@ void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
 }
 
 void query_progress_done_step(uuid_t *transaction, size_t done) {
-    if(!transaction)
+    if(!transaction || uuid_is_null(*transaction))
         return;
 
     spinlock_lock(&progress.spinlock);
@@ -222,37 +243,43 @@ void query_progress_done_step(uuid_t *transaction, size_t done) {
 }
 
 void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, size_t response_size) {
-    if(!transaction)
+    if(!transaction || uuid_is_null(*transaction))
         return;
 
     spinlock_lock(&progress.spinlock);
     query_progress_init_unsafe();
 
-    QUERY_PROGRESS *qp = query_progress_find_unsafe(transaction);
-    if(qp) {
-        qp->response_code = response_code;
-        qp->finished_ut = finished_ut ? finished_ut : now_realtime_usec();
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
-        progress.cache.available++;
-        qp = NULL;
+    // find this transaction to update it
+    {
+        QUERY_PROGRESS *qp = query_progress_find_unsafe(transaction);
+        if(qp) {
+            qp->response_size = response_size;
+            qp->response_code = response_code;
+            qp->finished_ut = finished_ut ? finished_ut : now_realtime_usec();
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
+            progress.cache.available++;
+        }
     }
 
-    if(progress.cache.available > PROGRESS_CACHE_SIZE) {
-        qp = progress.cache.list;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp, prev, next);
-        progress.cache.available--;
-        query_progress_unhash_unsafe(qp);
-    }
+    // find an item to free
+    {
+        QUERY_PROGRESS *qp_to_free = NULL;
+        if(progress.cache.available > PROGRESS_CACHE_SIZE && progress.cache.list) {
+            qp_to_free = progress.cache.list;
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(progress.cache.list, qp_to_free, prev, next);
+            progress.cache.available--;
+            query_progress_unhash_unsafe(qp_to_free);
+        }
 
-    spinlock_unlock(&progress.spinlock);
+        spinlock_unlock(&progress.spinlock);
 
-    if(qp) {
-        buffer_free(qp->query);
-        buffer_free(qp->payload);
-        freez(qp);
+        if(qp_to_free) {
+            buffer_free(qp_to_free->query);
+            buffer_free(qp_to_free->payload);
+            freez(qp_to_free);
+        }
     }
 }
-
 
 int web_api_v2_report_progress(uuid_t *transaction, BUFFER *wb) {
     buffer_flush(wb);
@@ -295,6 +322,145 @@ int web_api_v2_report_progress(uuid_t *transaction, BUFFER *wb) {
     buffer_json_finalize(wb);
 
     spinlock_unlock(&progress.spinlock);
+
+    return 200;
+}
+
+// ----------------------------------------------------------------------------
+
+int progress_function_result(BUFFER *wb, const char *hostname) {
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    buffer_json_member_add_string(wb, "hostname", hostname);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_PROGRESS_HELP);
+    buffer_json_member_add_array(wb, "data");
+
+    spinlock_lock(&progress.spinlock);
+    query_progress_init_unsafe();
+
+    usec_t now_ut = now_realtime_usec();
+    usec_t max_duration_ut = 0;
+    size_t max_size = 0;
+    SIMPLE_HASHTABLE_FOREACH_READ_ONLY(&progress.hashtable, sl, _QUERY) {
+        QUERY_PROGRESS *qp = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
+
+        bool finished = qp->finished_ut ? true : false;
+        usec_t duration_ut = finished ? qp->finished_ut - qp->started_ut : now_ut - qp->started_ut;
+        if(duration_ut > max_duration_ut)
+            max_duration_ut = duration_ut;
+
+        if(finished && qp->response_size > max_size)
+            max_size = qp->response_size;
+
+        buffer_json_add_array_item_array(wb); // row
+
+        buffer_json_add_array_item_uuid(wb, &qp->transaction);
+        buffer_json_add_array_item_uint64(wb, qp->started_ut);
+        buffer_json_add_array_item_string(wb, buffer_tostring(qp->query));
+
+        if(finished) {
+            buffer_json_add_array_item_string(wb, "finished");
+            buffer_json_add_array_item_double(wb, NAN);
+        }
+        else if(qp->all) {
+            double percent = (double)qp->done * 100.0 / (double)qp->all;
+            buffer_json_add_array_item_string(wb, "in-progress");
+            buffer_json_add_array_item_double(wb, percent);
+        }
+        else {
+            buffer_json_add_array_item_string(wb, "working");
+            buffer_json_add_array_item_uint64(wb, qp->done);
+        }
+
+        buffer_json_add_array_item_double(wb, (double)duration_ut / USEC_PER_MS);
+
+        if(finished) {
+            buffer_json_add_array_item_uint64(wb, qp->response_code);
+            buffer_json_add_array_item_uint64(wb, qp->response_size);
+        }
+        else {
+            buffer_json_add_array_item_string(wb, NULL);
+            buffer_json_add_array_item_string(wb, NULL);
+        }
+
+        buffer_json_array_close(wb); // row
+    }
+
+    spinlock_unlock(&progress.spinlock);
+
+    buffer_json_array_close(wb); // data
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+
+        // transaction
+        buffer_rrdf_table_add_field(wb, field_id++, "Transaction", "Transaction ID",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
+                                    NULL);
+
+        // timestamp
+        buffer_rrdf_table_add_field(wb, field_id++, "Started", "Query Start Timestamp",
+                                    RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_USEC,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        // query
+        buffer_rrdf_table_add_field(wb, field_id++, "Query", "Query",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH | RRDF_FIELD_OPTS_WRAP, NULL);
+
+        // status
+        buffer_rrdf_table_add_field(wb, field_id++, "Status", "Query Status",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        // progress
+        buffer_rrdf_table_add_field(wb, field_id++, "Progress", "Query Progress",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        // duration
+        buffer_rrdf_table_add_field(wb, field_id++, "Duration", "Query Duration",
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    2, "ms", (double)max_duration_ut / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        // response code
+        buffer_rrdf_table_add_field(wb, field_id++, "Response", "Query Response Code",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        // response size
+        buffer_rrdf_table_add_field(wb, field_id++, "Size", "Query Response Size",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, "bytes", max_size, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+    }
+
+    buffer_json_object_close(wb); // columns
+    buffer_json_member_add_string(wb, "default_sort_column", "Started");
+
+    buffer_json_member_add_time_t(wb, "expires", (time_t)((now_ut / USEC_PER_SEC) + 1));
+    buffer_json_finalize(wb);
 
     return 200;
 }

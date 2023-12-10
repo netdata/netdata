@@ -235,8 +235,12 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     else if(w->response.code >= 300)
         prio = NDLP_NOTICE;
 
+    // cleanup progress
+    query_progress_finished(&w->transaction, 0, w->response.code, buffer_strlen(w->response.data));
+
     // access log
-    nd_log(NDLS_ACCESS, prio, NULL);
+    if(likely(buffer_strlen(w->url_as_received)))
+        nd_log(NDLS_ACCESS, prio, NULL);
 }
 
 void web_client_request_done(struct web_client *w) {
@@ -247,14 +251,11 @@ void web_client_request_done(struct web_client *w) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    query_progress_finished(&w->transaction, 0, w->response.code, buffer_strlen(w->response.data));
-
     web_client_uncork_socket(w);
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
-    if(likely(buffer_strlen(w->url_as_received)))
-        web_client_log_completed_request(w, true);
+    web_client_log_completed_request(w, true);
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
         if(w->ifd != w->ofd) {

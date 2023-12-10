@@ -871,6 +871,16 @@ static inline void buffer_json_add_array_item_string(BUFFER *wb, const char *val
     wb->json.stack[wb->json.depth].count++;
 }
 
+static inline void buffer_json_add_array_item_uuid(BUFFER *wb, uuid_t *value) {
+    if(value && !uuid_is_null(*value)) {
+        char uuid[GUID_LEN + 1];
+        uuid_unparse_lower(*value, uuid);
+        buffer_json_add_array_item_string(wb, uuid);
+    }
+    else
+        buffer_json_add_array_item_string(wb, NULL);
+}
+
 static inline void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_print_json_comma_newline_spacing(wb);
 
