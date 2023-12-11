@@ -87,16 +87,16 @@ void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     parser_init_repertoire(parser, repertoire);
 
     if (repertoire & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING))
-        inflight_functions_init(parser);
+        pluginsd_inflight_functions_init(parser);
 }
 
 void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
 
-    parser_destroy_dyncfg(parser);
+    pluginsd_dyncfg_cleanup(parser);
+    pluginsd_inflight_functions_cleanup(parser);
 
-    dictionary_destroy(parser->inflight.functions);
     freez(parser);
 }
 

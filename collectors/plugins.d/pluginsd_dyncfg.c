@@ -84,7 +84,7 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
 
     // garbage collect stale inflight functions
     if(parser->inflight.smaller_timeout < now)
-        inflight_functions_garbage_collect(parser, now);
+        pluginsd_inflight_functions_garbage_collect(parser, now);
 
     dictionary_write_unlock(parser->inflight.functions);
 }
@@ -128,7 +128,7 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
 
     // garbage collect stale inflight functions
     if(parser->inflight.smaller_timeout < now)
-        inflight_functions_garbage_collect(parser, now);
+        pluginsd_inflight_functions_garbage_collect(parser, now);
 
     dictionary_write_unlock(parser->inflight.functions);
 
@@ -566,7 +566,7 @@ PARSER_RC pluginsd_delete_job(char **words, size_t num_words, PARSER *parser) {
     return PARSER_RC_OK;
 }
 
-void parser_destroy_dyncfg(PARSER *parser) {
+void pluginsd_dyncfg_cleanup(PARSER *parser) {
     if (parser->user.cd != NULL && parser->user.cd->configuration != NULL) {
         unregister_plugin(parser->user.host->configurable_plugins, parser->user.cd->cfg_dict_item);
         parser->user.cd->configuration = NULL;

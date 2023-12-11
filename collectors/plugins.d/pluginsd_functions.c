@@ -71,7 +71,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     return false;
 }
 
-void delete_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug, const char *fnc_sig, int code) {
+static void delete_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug, const char *fnc_sig, int code) {
     if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
@@ -97,7 +97,7 @@ void delete_job_finalize(struct parser *parser __maybe_unused, struct configurab
     freez(params_local);
 }
 
-void set_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug __maybe_unused, const char *fnc_sig, int code) {
+static void set_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug __maybe_unused, const char *fnc_sig, int code) {
     if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
         return;
 
@@ -150,14 +150,20 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     freez((void *)pf->payload);
 }
 
-void inflight_functions_init(PARSER *parser) {
+void pluginsd_inflight_functions_init(PARSER *parser) {
     parser->inflight.functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions, 0);
     dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
     dictionary_register_delete_callback(parser->inflight.functions, inflight_functions_delete_callback, parser);
     dictionary_register_conflict_callback(parser->inflight.functions, inflight_functions_conflict_callback, parser);
 }
 
-void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
+void pluginsd_inflight_functions_cleanup(PARSER *parser) {
+    dictionary_destroy(parser->inflight.functions);
+}
+
+// ----------------------------------------------------------------------------
+
+void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
     parser->inflight.smaller_timeout = 0;
     struct inflight_function *pf;
     dfe_start_write(parser->inflight.functions, pf) {
@@ -180,7 +186,9 @@ void inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
     dfe_done(pf);
 }
 
-void pluginsd_function_cancel(void *data) {
+// ----------------------------------------------------------------------------
+
+static void pluginsd_function_cancel(void *data) {
     struct inflight_function *look_for = data, *t;
 
     bool sent = false;
@@ -254,7 +262,7 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
 
     // garbage collect stale inflight functions
     if(parser->inflight.smaller_timeout < now)
-        inflight_functions_garbage_collect(parser, now);
+        pluginsd_inflight_functions_garbage_collect(parser, now);
 
     dictionary_write_unlock(parser->inflight.functions);
 

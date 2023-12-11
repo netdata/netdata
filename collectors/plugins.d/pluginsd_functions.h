@@ -23,6 +23,8 @@ struct inflight_function {
 PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER *parser);
 
-void inflight_functions_garbage_collect(PARSER  *parser, usec_t now);
+void pluginsd_inflight_functions_init(PARSER *parser);
+void pluginsd_inflight_functions_cleanup(PARSER *parser);
+void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now);
 
 #endif //NETDATA_PLUGINSD_FUNCTIONS_H

@@ -136,7 +136,6 @@ PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_ou
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
 void parser_destroy(PARSER *working_parser);
 void pluginsd_cleanup_v2(PARSER *parser);
-void inflight_functions_init(PARSER *parser);
 void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
 PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, size_t num_words);
 
