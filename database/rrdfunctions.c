@@ -282,6 +282,7 @@ struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
     RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
     STRING *help;
+    STRING *tags;
     int timeout;                    // the default timeout of the function
 
     rrd_function_execute_cb_t execute_cb;
@@ -451,6 +452,18 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     else
         string_freez(new_rdcf->help);
 
+    if(rdcf->tags != new_rdcf->tags) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed tags",
+                dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
+        STRING *old = rdcf->tags;
+        rdcf->tags = new_rdcf->tags;
+        string_freez(old);
+        changed = true;
+    }
+    else
+        string_freez(new_rdcf->tags);
+
     if(rdcf->timeout != new_rdcf->timeout) {
         netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed timeout",
                          dictionary_acquired_item_name(item), rrdhost_hostname(host));
@@ -497,11 +510,18 @@ void rrdfunctions_host_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
 }
 
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help,
+void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help, const char *tags,
                       bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function
     // to create a GLOBAL function
+
+    if(!tags || !*tags) {
+        if(strcmp(name, "systemd-journal") == 0)
+            tags = "logs";
+        else
+            tags = "top";
+    }
 
     if(st && !st->functions_view)
         st->functions_view = dictionary_create_view(host->functions);
@@ -516,6 +536,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
         .help = string_strdupz(help),
+        .tags = string_strdupz(tags),
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions, key, &tmp, sizeof(tmp));
 
@@ -534,10 +555,11 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     struct rrd_host_function *tmp;
     dfe_start_read(st->functions_view, tmp) {
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\"\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\"\n"
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
+                       , string2str(tmp->tags)
                        );
     }
     dfe_done(tmp);
@@ -552,10 +574,11 @@ void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
             continue;
 
         buffer_sprintf(wb
-                , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n"
+                , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\"\n"
                 , tmp_dfe.name
                 , tmp->timeout
                 , string2str(tmp->help)
+                , string2str(tmp->tags)
         );
     }
     dfe_done(tmp);
@@ -1106,18 +1129,21 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb)
             continue;
 
         buffer_json_member_add_object(wb, t_dfe.name);
-        buffer_json_member_add_string_or_empty(wb, "help", string2str(t->help));
-        buffer_json_member_add_int64(wb, "timeout", (int64_t)t->timeout);
+        {
+            buffer_json_member_add_string_or_empty(wb, "help", string2str(t->help));
+            buffer_json_member_add_int64(wb, "timeout", (int64_t) t->timeout);
 
-        char options[65];
-        snprintfz(
-            options,
-            64,
-            "%s%s",
-            (t->options & RRD_FUNCTION_LOCAL) ? "LOCAL " : "",
-            (t->options & RRD_FUNCTION_GLOBAL) ? "GLOBAL" : "");
+            char options[65];
+            snprintfz(
+                    options, 64
+                    , "%s%s"
+                    , (t->options & RRD_FUNCTION_LOCAL) ? "LOCAL " : ""
+                    , (t->options & RRD_FUNCTION_GLOBAL) ? "GLOBAL" : ""
+                    );
 
-        buffer_json_member_add_string_or_empty(wb, "options", options);
+            buffer_json_member_add_string_or_empty(wb, "options", options);
+            buffer_json_member_add_string_or_empty(wb, "tags", string2str(t->tags));
+        }
         buffer_json_object_close(wb);
     }
     dfe_done(t);
@@ -1139,14 +1165,19 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
         if(!rrd_collector_running(t->collector)) continue;
 
         buffer_json_member_add_object(wb, t_dfe.name);
-        buffer_json_member_add_string(wb, "help", string2str(t->help));
-        buffer_json_member_add_int64(wb, "timeout", t->timeout);
-        buffer_json_member_add_array(wb, "options");
-        if(t->options & RRD_FUNCTION_GLOBAL)
-            buffer_json_add_array_item_string(wb, "GLOBAL");
-        if(t->options & RRD_FUNCTION_LOCAL)
-            buffer_json_add_array_item_string(wb, "LOCAL");
-        buffer_json_array_close(wb);
+        {
+            buffer_json_member_add_string(wb, "help", string2str(t->help));
+            buffer_json_member_add_int64(wb, "timeout", t->timeout);
+            buffer_json_member_add_array(wb, "options");
+            {
+                if (t->options & RRD_FUNCTION_GLOBAL)
+                    buffer_json_add_array_item_string(wb, "GLOBAL");
+                if (t->options & RRD_FUNCTION_LOCAL)
+                    buffer_json_add_array_item_string(wb, "LOCAL");
+            }
+            buffer_json_array_close(wb);
+            buffer_json_member_add_string(wb, "tags", string2str(t->tags));
+        }
         buffer_json_object_close(wb);
     }
     dfe_done(t);
@@ -1166,7 +1197,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
     dfe_done(t);
 }
 
-void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help) {
+void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags) {
     if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
 
     struct rrd_host_function *t;
@@ -1175,6 +1206,9 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
 
         if(help)
             *help = t->help;
+
+        if(tags)
+            *tags = t->tags;
 
         dictionary_set(dst, t_dfe.name, value, value_size);
     }

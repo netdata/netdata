@@ -167,6 +167,7 @@ struct function_v2_entry {
     size_t used;
     size_t *node_ids;
     STRING *help;
+    STRING *tags;
 };
 
 struct context_v2_entry {
@@ -913,8 +914,9 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 .size = 1,
                 .node_ids = &ctl->nodes.ni,
                 .help = NULL,
+                .tags = NULL,
         };
-        host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help);
+        host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags);
     }
 
     if(ctl->mode & CONTEXTS_V2_NODES) {
@@ -2062,12 +2064,17 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 struct function_v2_entry *t;
                 dfe_start_read(ctl.functions.dict, t) {
                     buffer_json_add_array_item_object(wb);
-                    buffer_json_member_add_string(wb, "name", t_dfe.name);
-                    buffer_json_member_add_string(wb, "help", string2str(t->help));
-                    buffer_json_member_add_array(wb, "ni");
-                    for (size_t i = 0; i < t->used; i++)
-                        buffer_json_add_array_item_uint64(wb, t->node_ids[i]);
-                    buffer_json_array_close(wb);
+                    {
+                        buffer_json_member_add_string(wb, "name", t_dfe.name);
+                        buffer_json_member_add_string(wb, "help", string2str(t->help));
+                        buffer_json_member_add_array(wb, "ni");
+                        {
+                            for (size_t i = 0; i < t->used; i++)
+                                buffer_json_add_array_item_uint64(wb, t->node_ids[i]);
+                        }
+                        buffer_json_array_close(wb);
+                        buffer_json_member_add_string(wb, "tags", string2str(t->tags));
+                    }
                     buffer_json_object_close(wb);
                 }
                 dfe_done(t);

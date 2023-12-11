@@ -447,7 +447,9 @@ The `source` is an integer field that can have the following values:
 
 #### FUNCTION
 
-> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users"
+> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users" "tags"
+
+Tags currently recognized are either `top` or `logs` (or both, space separated).
 
 A function can be used by users to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
 

@@ -865,7 +865,7 @@ void *diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
     rrd_collector_started();
-    rrd_function_add(localhost, NULL, "mount-points", 10, RRDFUNCTIONS_DISKSPACE_HELP, true, diskspace_function_mount_points, NULL);
+    rrd_function_add(localhost, NULL, "mount-points", 10, RRDFUNCTIONS_DISKSPACE_HELP, "top", true, diskspace_function_mount_points, NULL);
 
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 

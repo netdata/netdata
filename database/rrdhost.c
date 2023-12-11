@@ -1119,11 +1119,11 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     // for the other nodes, the origin server should register it
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
     rrd_function_add(localhost, NULL, "streaming", 10,
-                     RRDFUNCTIONS_STREAMING_HELP, true,
+                     RRDFUNCTIONS_STREAMING_HELP, "top", true,
                      rrdhost_function_streaming, NULL);
 
-    rrd_function_add(localhost, NULL, "netdata-queries", 10,
-                     RRDFUNCTIONS_PROGRESS_HELP, true,
+    rrd_function_add(localhost, NULL, "netdata-api-calls", 10,
+                     RRDFUNCTIONS_PROGRESS_HELP, "top", true,
                      rrdhost_function_progress, NULL);
 
     if (likely(system_info)) {
