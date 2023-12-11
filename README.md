@@ -68,8 +68,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 Dec 11, 2023: [University of Amsterdam published a study](https://twitter.com/IMalavolta/status/1734208439096676680) related to the impact of monitoring tools for Docker based systems, aiming to answer 2 questions:
 
-1. **What is the impact of using different monitoring tools on the energy efficiency of Docker-based systems?**
-2. **What is the impact of using different monitoring tools on the performance of Docker-based systems?**
+1. **What is the impact of monitoring tools on the energy efficiency of Docker-based systems?**
+2. **What is the impact of monitoring tools on the performance of Docker-based systems?**
 
 They tested ELK, Prometheus, Netdata and Zipkin, under 9 different configurations (Low, Mid, High Frequency vs. Low, Mid, High Workload, 3x3).
 
