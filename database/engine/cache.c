@@ -1949,13 +1949,13 @@ time_t pgc_page_end_time_s(PGC_PAGE *page) {
     return page->end_time_s;
 }
 
-time_t pgc_page_update_every_s(PGC_PAGE *page) {
+uint32_t pgc_page_update_every_s(PGC_PAGE *page) {
     return page->update_every_s;
 }
 
-time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every_s) {
+uint32_t pgc_page_fix_update_every(PGC_PAGE *page, uint32_t update_every_s) {
     if(page->update_every_s == 0)
-        page->update_every_s = (uint32_t) update_every_s;
+        page->update_every_s = update_every_s;
 
     return page->update_every_s;
 }

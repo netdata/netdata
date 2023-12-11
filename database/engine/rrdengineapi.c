@@ -192,9 +192,9 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
 // collect ops
 
 static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *handle) {
-    if(unlikely((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
-        internal_error(true, "DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
-              (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
+    if(unlikely((uint32_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
+        internal_error(true, "DBENGINE: collection handle has update every %u, but the metric registry has %u. Fixing it.",
+              (uint32_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
             handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
@@ -213,7 +213,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
     time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
-    time_t update_every_s = pgc_page_update_every_s(handle->pgc_page);
+    uint32_t update_every_s = pgc_page_update_every_s(handle->pgc_page);
     size_t page_length = handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
     size_t entries = handle->page_position;
     time_t overwrite_zero_update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
@@ -288,8 +288,8 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     // data collection may be able to go back in time and during the addition of new pages
     // clean pages may be found matching ours!
 
-    time_t db_first_time_s, db_last_time_s, db_update_every_s;
-    mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, &db_update_every_s);
+    time_t db_first_time_s, db_last_time_s;
+    mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, NULL);
     handle->page_end_time_ut = (usec_t)db_last_time_s * USEC_PER_SEC;
 
     return (STORAGE_COLLECT_HANDLE *)handle;
@@ -336,7 +336,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
                                                 PGD *data,
                                                 size_t data_size) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
-    const time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
+    const uint32_t update_every_s = (uint32_t)(handle->update_every_ut / USEC_PER_SEC);
 
     PGC_ENTRY page_entry = {
             .section = (Word_t) ctx,
@@ -345,7 +345,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
             .end_time_s = point_in_time_s,
             .size = data_size,
             .data = data,
-            .update_every_s = (uint32_t) update_every_s,
+            .update_every_s = update_every_s,
             .hot = true
     };
 
@@ -364,11 +364,11 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
 #endif
-                    "DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
-                    "with existing %s%s page from %ld to %ld, update every %ld - "
+                    "DBENGINE: metric '%s' new page from %ld to %ld, update every %u, has a conflict in main cache "
+                    "with existing %s%s page from %ld to %ld, update every %u - "
                     "is it collected more than once?",
                     uuid,
-                    page_entry.start_time_s, page_entry.end_time_s, (time_t)page_entry.update_every_s,
+                    page_entry.start_time_s, page_entry.end_time_s, page_entry.update_every_s,
                     pgc_is_page_hot(pgc_page) ? "hot" : "not-hot",
                     pgc_page_data(pgc_page) == PGD_EMPTY ? " gap" : "",
                     pgc_page_start_time_s(pgc_page), pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
@@ -644,8 +644,8 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_clear_writer(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
 
-    time_t first_time_s, last_time_s, update_every_s;
-    mrg_metric_get_retention(main_mrg, handle->metric, &first_time_s, &last_time_s, &update_every_s);
+    time_t first_time_s, last_time_s;
+    mrg_metric_get_retention(main_mrg, handle->metric, &first_time_s, &last_time_s, NULL);
 
     mrg_metric_release(main_mrg, handle->metric);
     freez(handle);
@@ -736,7 +736,8 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
     // is inserted into the main cache, to avoid scanning the journals
     // again for pages matching the gap.
 
-    time_t db_first_time_s, db_last_time_s, db_update_every_s;
+    time_t db_first_time_s, db_last_time_s;
+    uint32_t db_update_every_s;
     mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, &db_update_every_s);
 
     if(is_page_in_time_range(start_time_s, end_time_s, db_first_time_s, db_last_time_s) == PAGE_IS_IN_RANGE) {
@@ -799,7 +800,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
 
     time_t page_start_time_s = pgc_page_start_time_s(handle->page);
     time_t page_end_time_s = pgc_page_end_time_s(handle->page);
-    time_t page_update_every_s = pgc_page_update_every_s(handle->page);
+    uint32_t page_update_every_s = pgc_page_update_every_s(handle->page);
 
     unsigned position;
     if(likely(handle->now_s >= page_start_time_s && handle->now_s <= page_end_time_s)) {
@@ -949,8 +950,7 @@ bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_
     if (unlikely(!metric))
         return false;
 
-    time_t update_every_s;
-    mrg_metric_get_retention(main_mrg, metric, first_entry_s, last_entry_s, &update_every_s);
+    mrg_metric_get_retention(main_mrg, metric, first_entry_s, last_entry_s, NULL);
 
     mrg_metric_release(main_mrg, metric);
 
