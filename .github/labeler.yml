@@ -11,271 +11,271 @@
 # Please keep the labels sorted and deduplicated.
 
 area/ACLK:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - aclk/**
-        - database/sqlite/sqlite_aclk*
-        - mqtt_websockets
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - aclk/**
+              - database/sqlite/sqlite_aclk*
+              - mqtt_websockets
 
 area/claim:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - claim/*
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - claim/*
 
 area/exporting:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - exporting/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - exporting/**
 
 area/build:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - build/**
-        - build_external/**
-        - CMakeLists.txt
-        - configure.ac
-        - Makefile.am
-        - "**/Makefile.am"
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - build/**
+              - build_external/**
+              - CMakeLists.txt
+              - configure.ac
+              - Makefile.am
+              - "**/Makefile.am"
 
 area/ci:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - .github/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - .github/**
 
 area/daemon:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - daemon/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - daemon/**
 
 area/database:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - database/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - database/**
 
 area/docs:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - "*.md"
-        - "**/*.md"
-        - "**/*.mdx"
-        - diagrams/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - "*.md"
+              - "**/*.md"
+              - "**/*.mdx"
+              - diagrams/**
 
 # -----------------collectors----------------------
 
 area/collectors:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/**
 
 collectors/plugins.d:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/plugins.d/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/plugins.d/**
 
 collectors/apps:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/apps.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/apps.plugin/**
 
 collectors/cgroups:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/cgroups.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/cgroups.plugin/**
 
 collectors/charts.d:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/charts.d.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/charts.d.plugin/**
 
 collectors/cups:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/cups.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/cups.plugin/**
 
 collectors/debugfs:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/debugfs.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/debugfs.plugin/**
 
 collectors/diskspace:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/diskspace.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/diskspace.plugin/**
 
 collectors/ebpf:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/ebpf.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/ebpf.plugin/**
 
 collectors/freebsd:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/freebsd.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/freebsd.plugin/**
 
 collectors/freeipmi:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/freeipmi.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/freeipmi.plugin/**
 
 collectors/idlejitter:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/idlejitter.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/idlejitter.plugin/**
 
 collectors/ioping:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/ioping.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/ioping.plugin/**
 
 collectors/macos:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/macos.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/macos.plugin/**
 
 collectors/nfacct:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/nfacct.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/nfacct.plugin/**
 
 collectors/perf:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/perf.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/perf.plugin/**
 
 collectors/proc:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/proc.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/proc.plugin/**
 
 collectors/python.d:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/python.d.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/python.d.plugin/**
 
 collectors/slabinfo:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/slabinfo.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/slabinfo.plugin/**
 
 collectors/statsd:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/statsd.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/statsd.plugin/**
 
 collectors/systemd-journal:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/systemd-journal.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/systemd-journal.plugin/**
 
 collectors/tc:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/tc.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/tc.plugin/**
 
 collectors/timex:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/timex.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/timex.plugin/**
 
 collectors/xenstat:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - collectors/xenstat.plugin/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - collectors/xenstat.plugin/**
 
 # ----------------/collectors----------------------
 
 area/health:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - health/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - health/**
 
 area/metadata:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - "**/*metadata.yaml"
-        - integrations/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - "**/*metadata.yaml"
+              - integrations/**
 
 area/ml:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - ml/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - ml/**
 
 area/packaging:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - contrib/**
-        - packaging/**
-        - system/**
-        - Dockerfile*
-        - netdata-installer.sh
-        - netdata.spec.in
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - contrib/**
+              - packaging/**
+              - system/**
+              - Dockerfile*
+              - netdata-installer.sh
+              - netdata.spec.in
 
 area/registry:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - registry/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - registry/**
 
 area/streaming:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - streaming/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - streaming/**
 
 area/tests:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - tests/**
-        - daemon/unit_test*
-        - coverity-scan.sh
-        - cppcheck.sh
-        - netdata.cppcheck
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - tests/**
+              - daemon/unit_test*
+              - coverity-scan.sh
+              - cppcheck.sh
+              - netdata.cppcheck
 
 area/web:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - web/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - web/**
 
 area/logs-management:
-  any:
-    changed-files:
-      any-glob-to-any-file:
-        - logsmanagement/**
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - logsmanagement/**
