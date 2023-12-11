@@ -549,8 +549,16 @@ MACOS_PLUGIN_FILES = \
 PLUGINSD_PLUGIN_FILES = \
     collectors/plugins.d/plugins_d.c \
     collectors/plugins.d/plugins_d.h \
+    collectors/plugins.d/pluginsd_dyncfg.c \
+    collectors/plugins.d/pluginsd_dyncfg.h \
+    collectors/plugins.d/pluginsd_functions.c \
+    collectors/plugins.d/pluginsd_functions.h \
+    collectors/plugins.d/pluginsd_internals.c \
+    collectors/plugins.d/pluginsd_internals.h \
     collectors/plugins.d/pluginsd_parser.c \
     collectors/plugins.d/pluginsd_parser.h \
+    collectors/plugins.d/pluginsd_replication.c \
+    collectors/plugins.d/pluginsd_replication.h \
     collectors/plugins.d/gperf-hashtable.h \
     $(NULL)
 
