@@ -46,7 +46,7 @@ jobs:
       - name: Generate Nightly Changleog
         id: nightly-changelog
         if: steps.target.outputs.run == 'true' && steps.target.outputs.type == 'nightly'
-        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        uses: heinrichreimer/github-changelog-generator-action@v2.4
         with:
           bugLabels: IGNOREBUGS
           excludeLabels: "stale,duplicate,question,invalid,wontfix,discussion,no changelog"
