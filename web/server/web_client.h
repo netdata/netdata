@@ -160,7 +160,8 @@ struct web_client {
     // THESE NEED TO BE FREED
     char *auth_bearer_token;            // the Bearer auth token (if sent)
     char *server_host;                  // the Host: header
-    char *forwarded_host;               // the X-Forwarded-For: header
+    char *forwarded_host;               // the X-Forwarded-Host: header
+    char *forwarded_for;                // the X-Forwarded-For: header
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
 

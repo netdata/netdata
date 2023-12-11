@@ -139,6 +139,8 @@ void web_server_log_connection(struct web_client *w, const char *msg) {
 #endif
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);

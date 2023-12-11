@@ -465,7 +465,7 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
 // the hashtable should not be modified while the traversal is taking place
 
 static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_first_read_only_named(SIMPLE_HASHTABLE_NAMED *ht) {
-    for(size_t i = 0; i < ht->used ;i++) {
+    for(size_t i = 0; i < ht->size ;i++) {
         SIMPLE_HASHTABLE_SLOT_NAMED *sl = &ht->hashtable[i];
         if(!simple_hashtable_is_slot_unset(sl) && !simple_hashtable_is_slot_deleted(sl))
             return sl;
@@ -478,10 +478,10 @@ static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_next_read_only_named
     if (!last) return NULL;
 
     // Calculate the current position in the array
-    size_t currentIndex = last - ht->hashtable;
+    size_t index = last - ht->hashtable;
 
     // Iterate over the hashtable starting from the next element
-    for (size_t i = currentIndex + 1; i < ht->size; i++) {
+    for (size_t i = index + 1; i < ht->size; i++) {
         SIMPLE_HASHTABLE_SLOT_NAMED *sl = &ht->hashtable[i];
         if (!simple_hashtable_is_slot_unset(sl) && !simple_hashtable_is_slot_deleted(sl)) {
             return sl;

@@ -10,8 +10,6 @@
 #include "h2o/memory.h"
 #endif
 
-#define WEB_DATA_LENGTH_INCREASE_STEP 1024
-
 #define BUFFER_JSON_MAX_DEPTH 32 // max is 255
 
 extern const char hex_digits[16];

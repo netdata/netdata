@@ -138,6 +138,9 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     freez(w->forwarded_host);
     w->forwarded_host = NULL;
 
+    freez(w->forwarded_for);
+    w->forwarded_for = NULL;
+
     freez(w->origin);
     w->origin = NULL;
 
@@ -196,8 +199,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     now_monotonic_high_precision_timeval(&tv);
 
     size_t size = (w->mode == WEB_CLIENT_MODE_FILECOPY)?w->response.rlen:w->response.data->len;
-    size_t sent = size;
-    if(likely(w->response.zoutput)) sent = (size_t)w->response.zstream.total_out;
+    size_t sent = w->response.zoutput ? (size_t)w->response.zstream.total_out : size;
 
     if(update_web_stats)
         global_statistics_web_request_completed(dt_usec(&tv, &w->timings.tv_in),
@@ -236,7 +238,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
         prio = NDLP_NOTICE;
 
     // cleanup progress
-    query_progress_finished(&w->transaction, 0, w->response.code, buffer_strlen(w->response.data));
+    query_progress_finished(&w->transaction, 0, w->response.code, size, sent);
 
     // access log
     if(likely(buffer_strlen(w->url_as_received)))
@@ -246,6 +248,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
 void web_client_request_done(struct web_client *w) {
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_END(),
     };
@@ -739,6 +742,8 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, get_request_method(w)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
@@ -748,7 +753,10 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    query_progress_start_or_update(&w->transaction, 0, w->acl, buffer_tostring(w->url_as_received), w->post_payload);
+    query_progress_start_or_update(&w->transaction, 0, w->acl,
+                                   buffer_tostring(w->url_as_received),
+                                   w->post_payload,
+                                   w->forwarded_for ? w->forwarded_for : w->client_ip);
 
     // get the api version
     char *tok = strsep_skip_consecutive_separators(&url_path_fragment, "/");
@@ -1015,7 +1023,8 @@ const char *web_response_code_to_string(int code) {
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
     static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
-                    hash_authorization = 0, hash_host = 0, hash_forwarded_host = 0, hash_transaction_id = 0;
+                    hash_authorization = 0, hash_host = 0, hash_forwarded_host = 0, hash_forwarded_for = 0,
+                    hash_transaction_id = 0;
     static uint32_t hash_accept_encoding = 0;
 
     if(unlikely(!hash_origin)) {
@@ -1027,6 +1036,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_authorization = simple_uhash("X-Auth-Token");
         hash_host = simple_uhash("Host");
         hash_forwarded_host = simple_uhash("X-Forwarded-Host");
+        hash_forwarded_for = simple_uhash("X-Forwarded-For");
         hash_transaction_id = simple_uhash("X-Transaction-ID");
     }
 
@@ -1094,6 +1104,11 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         char buffer[NI_MAXHOST];
         strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
         w->forwarded_host = strdupz(buffer);
+    }
+    else if(hash == hash_forwarded_for && !strcasecmp(s, "X-Forwarded-For")) {
+        char buffer[NI_MAXHOST];
+        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
+        w->forwarded_for = strdupz(buffer);
     }
     else if(hash == hash_transaction_id && !strcasecmp(s, "X-Transaction-ID")) {
         char buffer[UUID_STR_LEN * 2];
@@ -1804,6 +1819,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, web_server_log_transport, w),
             ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, get_request_method(w)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
@@ -1821,8 +1838,10 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
     switch(http_request_validate(w)) {
         case HTTP_VALIDATION_OK:
-            query_progress_start_or_update(&w->transaction, 0, w->acl, buffer_tostring(w->url_as_received),
-                                           w->post_payload);
+            query_progress_start_or_update(&w->transaction, 0, w->acl,
+                                           buffer_tostring(w->url_as_received),
+                                           w->post_payload,
+                                           w->forwarded_for ? w->forwarded_for : w->client_ip);
 
             switch(w->mode) {
                 case WEB_CLIENT_MODE_STREAM:

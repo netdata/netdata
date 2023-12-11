@@ -259,23 +259,23 @@ void buffer_free(BUFFER *b) {
 void buffer_increase(BUFFER *b, size_t free_size_required) {
     buffer_overflow_check(b);
 
-    size_t left = b->size - b->len;
-    if(left >= free_size_required) return;
+    size_t remaining = b->size - b->len;
+    if(remaining >= free_size_required) return;
 
-    size_t wanted = free_size_required - left;
-    size_t minimum = WEB_DATA_LENGTH_INCREASE_STEP;
-    if(minimum > wanted) wanted = minimum;
+    size_t increase = free_size_required - remaining;
+    size_t minimum = 128;
+    if(minimum > increase) increase = minimum;
 
     size_t optimal = (b->size > 5*1024*1024) ? b->size / 2 : b->size;
-    if(optimal > wanted) wanted = optimal;
+    if(optimal > increase) increase = optimal;
 
-    netdata_log_debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
+    netdata_log_debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + increase);
 
-    b->buffer = reallocz(b->buffer, b->size + wanted + sizeof(BUFFER_OVERFLOW_EOF) + 2);
-    b->size += wanted;
+    b->buffer = reallocz(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
+    b->size += increase;
 
     if(b->statistics)
-        __atomic_add_fetch(b->statistics, wanted, __ATOMIC_RELAXED);
+        __atomic_add_fetch(b->statistics, increase, __ATOMIC_RELAXED);
 
     buffer_overflow_init(b);
     buffer_overflow_check(b);
