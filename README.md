@@ -68,15 +68,15 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 Dec 11, 2023: [University of Amsterdam published a study](https://twitter.com/IMalavolta/status/1734208439096676680) related to the impact of monitoring tools for Docker based systems, aiming to answer 2 questions:
 
-- RQ1: **What is the impact of using different monitoring tools on the energy efficiency of Docker-based systems?**
-- RQ2: **What is the impact of using different monitoring tools on the performance of Docker-based systems?**
+1. **What is the impact of using different monitoring tools on the energy efficiency of Docker-based systems?**
+2. **What is the impact of using different monitoring tools on the performance of Docker-based systems?**
 
 They tested ELK, Prometheus, Netdata and Zipkin, under 9 different configurations (Low, Mid, High Frequency vs. Low, Mid, High Workload, 3x3).
 
 This is how Netdata stands:
 
-- RQ1: 🚀 Netdata excels in energy efficiency: **"... Netdata being the most energy-efficient tool ..."**, as the study says.
-- RQ2: 🚀 Netdata excels in CPU Usage, RAM Usage and Execution Time, and has a similar impact in Network Traffic as Prometheus.
+- 🚀 Netdata excels in energy efficiency: **"... Netdata being the most energy-efficient tool ..."**, as the study says.
+- 🚀 Netdata excels in CPU Usage, RAM Usage and Execution Time, and has a similar impact in Network Traffic as Prometheus.
 
 The study did not normalize the results based on the number of metrics collected. Given that Netdata usually collects singificantly more metrics than the other tools, Netdata managed to outperform the other tools, while ingesting a much higher number of metrics. [Read the full study here](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf).
 
