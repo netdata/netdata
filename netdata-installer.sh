@@ -339,12 +339,12 @@ while [ -n "${1}" ]; do
     "--enable-lto")
       # TODO: Needs CMake support
       ;;
-    "--enable-logs-management") ENABLE_LOGS_MANAGEMENT=1 ;;
-    "--disable-logsmanagement") ENABLE_LOGS_MANAGEMENT=0 ;;
-    "--enable-logsmanagement-tests") ENABLE_LOGS_MANAGEMENT_TESTS=1 ;;
     "--disable-lto")
       # TODO: Needs CMake support
       ;;
+    "--enable-logs-management") ENABLE_LOGS_MANAGEMENT=1 ;;
+    "--disable-logsmanagement") ENABLE_LOGS_MANAGEMENT=0 ;;
+    "--enable-logsmanagement-tests") ENABLE_LOGS_MANAGEMENT_TESTS=1 ;;
     "--disable-x86-sse")
       # XXX: No longer supported.
       ;;
@@ -426,7 +426,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   base=1024
   scale=256
 
-  target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
+  target_ram="$((base * mega + (scale * mega * (JOBS - 1))))"
   total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
   total_ram="$((total_ram * 1024))"
 
@@ -455,9 +455,9 @@ fi
 
 # set default make options
 if [ -z "${MAKEOPTS}" ]; then
-  MAKEOPTS="-j$(find_processors)"
+  MAKEOPTS="-j${JOBS}"
 elif echo "${MAKEOPTS}" | grep -vqF -e "-j"; then
-  MAKEOPTS="${MAKEOPTS} -j$(find_processors)"
+  MAKEOPTS="${MAKEOPTS} -j${JOBS}"
 fi
 
 if [ "$(id -u)" -ne 0 ] && [ -z "${NETDATA_PREPARE_ONLY}" ]; then
@@ -1008,13 +1008,13 @@ build_fluentbit() {
 
   rm CMakeCache.txt > /dev/null 2>&1
 
-  if ! run eval "${env_cmd} $1 -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
+  if ! run eval "${env_cmd} ${cmake} ${CMAKE_OPTS} -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
     cd - > /dev/null || return 1
     rm -rf fluent-bit/build > /dev/null 2>&1
     return 1
   fi
 
-  if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
+  if ! run eval "${env_cmd} ${cmake} --build . --parallel ${JOBS} -- ${BUILD_OPTS}"; then
     cd - > /dev/null || return 1
     rm -rf fluent-bit/build > /dev/null 2>&1
     return 1
