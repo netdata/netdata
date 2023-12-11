@@ -64,7 +64,7 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ---
 
-:star: **Netdata is the most energy-efficient monitoring tool** :star: <br/>
+:star: **Netdata is the most energy-efficient monitoring tool for Docker-based systems** :star: <br/>
 
 Dec 11, 2023: [University of Amsterdam published a study](https://twitter.com/IMalavolta/status/1734208439096676680) related to the impact of monitoring tools for Docker based systems, aiming to answer 2 questions:
 
