@@ -2,7 +2,7 @@
 
 #include "progress.h"
 
-#define PROGRESS_CACHE_SIZE 100
+#define PROGRESS_CACHE_SIZE 200
 
 // ----------------------------------------------------------------------------
 // hashtable for HASHED_KEY
@@ -30,6 +30,7 @@ typedef struct query {
     usec_t started_ut;
     usec_t finished_ut;
 
+    HTTP_REQUEST_MODE mode;
     WEB_CLIENT_ACL acl;
 
     uint32_t sent_size;
@@ -172,7 +173,8 @@ static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, uuid_t *transact
         uuid_copy(qp->transaction, *transaction);
 }
 
-static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
+static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, HTTP_REQUEST_MODE mode, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
+    qp->mode = mode;
     qp->acl = acl;
     qp->started_ut = started_ut ? started_ut : now_realtime_usec();
     qp->finished_ut = 0;
@@ -208,7 +210,7 @@ static inline void query_progress_unlink_from_cache_unsafe(QUERY_PROGRESS *qp) {
 // ----------------------------------------------------------------------------
 // Progress API
 
-void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
+void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
     if(!transaction)
         return;
 
@@ -236,7 +238,7 @@ void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_
         qp = query_progress_alloc(transaction);
     }
 
-    query_progress_update(qp, started_ut, acl, query, payload, client);
+    query_progress_update(qp, started_ut, mode, acl, query, payload, client);
 
     if(!qp->indexed)
         query_progress_add_to_hashtable_unsafe(qp);
@@ -419,6 +421,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         buffer_json_add_array_item_uuid_compact(wb, &qp->transaction);
         buffer_json_add_array_item_uint64(wb, qp->started_ut);
+        buffer_json_add_array_item_string(wb, http_request_method2string(qp->mode));
         buffer_json_add_array_item_string(wb, buffer_tostring(qp->query));
 
         if(!buffer_strlen(qp->client)) {
@@ -463,7 +466,9 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
         {
             char *severity = "notice";
             if(finished) {
-                if(qp->response_code == HTTP_RESP_CLIENT_CLOSED_REQUEST)
+                if(qp->response_code == HTTP_RESP_NOT_MODIFIED ||
+                    qp->response_code == HTTP_RESP_CLIENT_CLOSED_REQUEST ||
+                    qp->response_code == HTTP_RESP_CONFLICT)
                     severity = "debug";
                 else if(qp->response_code >= 500 && qp->response_code <= 599)
                     severity = "error";
@@ -503,6 +508,13 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_USEC,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        // request method
+        buffer_rrdf_table_add_field(wb, field_id++, "Method", "Request Method",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // query
@@ -552,14 +564,14 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, "bytes", (double)max_size, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // sent size
         buffer_rrdf_table_add_field(wb, field_id++, "Sent", "Query Response Final Size",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, "bytes", (double)max_sent, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
-                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+                                    RRDF_FIELD_OPTS_NONE, NULL);
 
         // row options
         buffer_rrdf_table_add_field(wb, field_id++, "rowOptions", "rowOptions",

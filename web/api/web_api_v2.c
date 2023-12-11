@@ -728,17 +728,11 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     int http_method;
     switch (w->mode)
     {
-        case WEB_CLIENT_MODE_GET:
-            http_method = HTTP_METHOD_GET;
-            break;
-        case WEB_CLIENT_MODE_POST:
-            http_method = HTTP_METHOD_POST;
-            break;
-        case WEB_CLIENT_MODE_PUT:
-            http_method = HTTP_METHOD_PUT;
-            break;
-        case WEB_CLIENT_MODE_DELETE:
-            http_method = HTTP_METHOD_DELETE;
+        case HTTP_REQUEST_MODE_GET:
+        case HTTP_REQUEST_MODE_POST:
+        case HTTP_REQUEST_MODE_PUT:
+        case HTTP_REQUEST_MODE_DELETE:
+            http_method = w->mode;
             break;
         default:
             buffer_sprintf(w->response.data, "Invalid HTTP method");

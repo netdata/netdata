@@ -12,16 +12,6 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
-typedef enum web_client_mode {
-    WEB_CLIENT_MODE_GET = 0,
-    WEB_CLIENT_MODE_POST = 1,
-    WEB_CLIENT_MODE_FILECOPY = 2,
-    WEB_CLIENT_MODE_OPTIONS = 3,
-    WEB_CLIENT_MODE_STREAM = 4,
-    WEB_CLIENT_MODE_PUT = 5,
-    WEB_CLIENT_MODE_DELETE = 6,
-} WEB_CLIENT_MODE;
-
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
@@ -140,7 +130,7 @@ struct web_client {
     uuid_t transaction;
 
     WEB_CLIENT_FLAGS flags;             // status flags for the client
-    WEB_CLIENT_MODE mode;               // the operational mode of the client
+    HTTP_REQUEST_MODE mode;               // the operational mode of the client
     WEB_CLIENT_ACL acl;                 // the access list of the client
     int port_acl;                       // the operations permitted on the port the client connected to
     size_t header_parse_tries;

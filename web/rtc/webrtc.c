@@ -297,11 +297,11 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
 
     char *path = (char *)request;
     if(strncmp(request, "POST ", 5) == 0) {
-        w->mode = WEB_CLIENT_MODE_POST;
+        w->mode = HTTP_REQUEST_MODE_POST;
         path += 10;
     }
     else if(strncmp(request, "GET ", 4) == 0) {
-        w->mode = WEB_CLIENT_MODE_GET;
+        w->mode = HTTP_REQUEST_MODE_GET;
         path += 4;
     }
 

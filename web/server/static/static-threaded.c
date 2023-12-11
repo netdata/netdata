@@ -142,7 +142,7 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
         goto cleanup;
     }
 
-    if(unlikely(w->mode != WEB_CLIENT_MODE_FILECOPY || w->ifd == w->ofd)) {
+    if(unlikely(w->mode != HTTP_REQUEST_MODE_FILECOPY || w->ifd == w->ofd)) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
         retval = -1;
         goto cleanup;
@@ -296,11 +296,11 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
         worker_is_busy(WORKER_JOB_PROCESS);
         web_client_process_request_from_web_server(w);
 
-        if (unlikely(w->mode == WEB_CLIENT_MODE_STREAM)) {
+        if (unlikely(w->mode == HTTP_REQUEST_MODE_STREAM)) {
             web_client_send(w);
         }
 
-        else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
+        else if(unlikely(w->mode == HTTP_REQUEST_MODE_FILECOPY)) {
             if(w->pollinfo_filecopy_slot == 0) {
                 netdata_log_debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 

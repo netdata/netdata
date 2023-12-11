@@ -620,7 +620,7 @@ void freez_dyncfg(void *ptr) {
 #ifdef NETDATA_TEST_DYNCFG
 static void handle_dyncfg_root(DICTIONARY *plugins_dict, struct uni_http_response *resp, int method)
 {
-    if (method != HTTP_METHOD_GET) {
+    if (method != HTTP_REQUEST_MODE_GET) {
         resp->content = "method not allowed";
         resp->content_length = strlen(resp->content);
         resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
@@ -640,7 +640,7 @@ static void handle_dyncfg_root(DICTIONARY *plugins_dict, struct uni_http_respons
 static void handle_plugin_root(struct uni_http_response *resp, int method, struct configurable_plugin *plugin, void *post_payload, size_t post_payload_size)
 {
     switch(method) {
-        case HTTP_METHOD_GET:
+        case HTTP_REQUEST_MODE_GET:
         {
             dyncfg_config_t cfg = plugin->get_config_cb(plugin->cb_usr_ctx, plugin->name);
             resp->content = mallocz(cfg.data_size);
@@ -650,7 +650,7 @@ static void handle_plugin_root(struct uni_http_response *resp, int method, struc
             resp->content_length = cfg.data_size;
             return;
         }
-        case HTTP_METHOD_PUT:
+        case HTTP_REQUEST_MODE_PUT:
         {
             char *response;
             if (post_payload == NULL) {
@@ -696,7 +696,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         return;
     }
     if (strncmp(module, DYN_CONF_MODULE_LIST, sizeof(DYN_CONF_MODULE_LIST)) == 0) {
-        if (method != HTTP_METHOD_GET) {
+        if (method != HTTP_REQUEST_MODE_GET) {
             resp->content = "method not allowed (only GET)";
             resp->content_length = strlen(resp->content);
             resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
@@ -720,7 +720,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->status = HTTP_RESP_NOT_FOUND;
         return;
     }
-    if (method == HTTP_METHOD_GET) {
+    if (method == HTTP_REQUEST_MODE_GET) {
         dyncfg_config_t cfg = mod->get_config_cb(mod->config_cb_usr_ctx, plugin->name, mod->name);
         resp->content = mallocz(cfg.data_size);
         memcpy(resp->content, cfg.data, cfg.data_size);
@@ -728,7 +728,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
         resp->content_free = freez_dyncfg;
         resp->content_length = cfg.data_size;
         return;
-    } else if (method == HTTP_METHOD_PUT) {
+    } else if (method == HTTP_REQUEST_MODE_PUT) {
         char *response;
         if (post_payload == NULL) {
             resp->content = "no payload";
@@ -759,7 +759,7 @@ void handle_module_root(struct uni_http_response *resp, int method, struct confi
 
 static inline void _handle_job_root(struct uni_http_response *resp, int method, struct module *mod, const char *job_id, void *post_payload, size_t post_payload_size, struct job *job)
 {
-    if (method == HTTP_METHOD_POST) {
+    if (method == HTTP_REQUEST_MODE_POST) {
         if (job != NULL) {
             resp->content = "can't POST, job already exists (use PUT to update?)";
             resp->content_length = strlen(resp->content);
@@ -794,7 +794,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
         return;
     }
     switch (method) {
-        case HTTP_METHOD_GET:
+        case HTTP_REQUEST_MODE_GET:
         {
             dyncfg_config_t cfg = mod->get_job_config_cb(mod->job_config_cb_usr_ctx, mod->plugin->name, mod->name, job->name);
             resp->content = mallocz(cfg.data_size);
@@ -804,7 +804,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
             resp->content_length = cfg.data_size;
             return;
         }
-        case HTTP_METHOD_PUT:
+        case HTTP_REQUEST_MODE_PUT:
         {
             if (post_payload == NULL) {
                 resp->content = "missing payload";
@@ -828,7 +828,7 @@ static inline void _handle_job_root(struct uni_http_response *resp, int method, 
             resp->content_length = strlen(resp->content);
             return;
         }
-        case HTTP_METHOD_DELETE:
+        case HTTP_REQUEST_MODE_DELETE:
         {
             if (!remove_job(mod, job)) {
                 resp->content = "failed to remove job";
@@ -876,7 +876,7 @@ void handle_job_root(struct uni_http_response *resp, int method, struct module *
             resp->status = HTTP_RESP_NOT_FOUND;
             return;
         }
-        if (method != HTTP_METHOD_GET) {
+        if (method != HTTP_REQUEST_MODE_GET) {
             resp->content = "method not allowed (only GET)";
             resp->content_length = strlen(resp->content);
             resp->status = HTTP_RESP_METHOD_NOT_ALLOWED;
@@ -913,7 +913,7 @@ struct uni_http_response dyn_conf_process_http_request(
     struct uni_http_response resp = {
         .status = HTTP_RESP_INTERNAL_SERVER_ERROR,
         .content_type = CT_TEXT_PLAIN,
-        .content = HTTP_RESP_INTERNAL_SERVER_ERROR_STR,
+        .content = (char *) http_response_code2string(HTTP_RESP_INTERNAL_SERVER_ERROR),
         .content_free = NULL,
         .content_length = 0
     };

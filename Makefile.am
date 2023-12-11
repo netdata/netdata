@@ -225,6 +225,7 @@ LIBNETDATA_FILES = \
     libnetdata/worker_utilization/worker_utilization.h \
     libnetdata/xxhash.h \
     libnetdata/http/http_defs.h \
+    libnetdata/http/http_defs.c \
     libnetdata/dyn_conf/dyn_conf.c \
     libnetdata/dyn_conf/dyn_conf.h \
     libnetdata/simple_hashtable.h \
