@@ -939,9 +939,11 @@ install_netdata_updater() {
     cat "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
   fi
 
-  if issystemd && [ -n "$(get_systemd_service_dir)" ]; then
-    cat "${NETDATA_SOURCE_DIR}/system/systemd/netdata-updater.timer" > "$(get_systemd_service_dir)/netdata-updater.timer"
-    cat "${NETDATA_BUILD_DIR}/system/systemd/netdata-updater.service" > "$(get_systemd_service_dir)/netdata-updater.service"
+  # these files are installed by cmake
+  libsysdir="${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/"
+  if [ -d "${libsysdir}" ] && issystemd && [ -n "$(get_systemd_service_dir)" ]; then
+    cat "${libsysdir}/netdata-updater.timer" > "$(get_systemd_service_dir)/netdata-updater.timer"
+    cat "${libsysdir}/netdata-updater.service" > "$(get_systemd_service_dir)/netdata-updater.service"
   fi
 
   sed -i -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
