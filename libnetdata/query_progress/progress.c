@@ -206,9 +206,10 @@ static inline void query_progress_unlink_from_cache_unsafe(QUERY_PROGRESS *qp) {
 }
 
 // ----------------------------------------------------------------------------
+// Progress API
 
 void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
-    if(!transaction || uuid_is_null(*transaction))
+    if(!transaction)
         return;
 
     spinlock_lock(&progress.spinlock);
@@ -244,7 +245,7 @@ void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, WEB_
 }
 
 void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
-    if(!transaction || uuid_is_null(*transaction))
+    if(!transaction)
         return;
 
     spinlock_lock(&progress.spinlock);
@@ -265,7 +266,7 @@ void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
 }
 
 void query_progress_done_step(uuid_t *transaction, size_t done) {
-    if(!transaction || uuid_is_null(*transaction))
+    if(!transaction)
         return;
 
     spinlock_lock(&progress.spinlock);
@@ -284,7 +285,7 @@ void query_progress_done_step(uuid_t *transaction, size_t done) {
 }
 
 void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, usec_t duration_ut, size_t response_size, size_t sent_size) {
-    if(!transaction || uuid_is_null(*transaction))
+    if(!transaction)
         return;
 
     spinlock_lock(&progress.spinlock);
@@ -458,6 +459,25 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
             buffer_json_add_array_item_string(wb, NULL);
         }
 
+        buffer_json_add_array_item_object(wb); // row options
+        {
+            char *severity = "notice";
+            if(finished) {
+                if(qp->response_code == HTTP_RESP_CLIENT_CLOSED_REQUEST)
+                    severity = "debug";
+                else if(qp->response_code >= 500 && qp->response_code <= 599)
+                    severity = "error";
+                else if(qp->response_code >= 400 && qp->response_code <= 499)
+                    severity = "warning";
+                else if(qp->response_code >= 300 && qp->response_code <= 399)
+                    severity = "notice";
+                else
+                    severity = "normal";
+            }
+            buffer_json_member_add_string(wb, "severity", severity);
+        }
+        buffer_json_object_close(wb); // row options
+
         buffer_json_array_close(wb); // row
     }
 
@@ -482,7 +502,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
         buffer_rrdf_table_add_field(wb, field_id++, "Started", "Query Start Timestamp",
                                     RRDF_FIELD_TYPE_TIMESTAMP, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DATETIME_USEC,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // query
@@ -540,6 +560,13 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
                                     0, "bytes", (double)max_sent, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        // row options
+        buffer_rrdf_table_add_field(wb, field_id++, "rowOptions", "rowOptions",
+                                    RRDF_FIELD_TYPE_NONE, RRDR_FIELD_VISUAL_ROW_OPTIONS, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_FIXED, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_DUMMY, NULL);
     }
 
     buffer_json_object_close(wb); // columns

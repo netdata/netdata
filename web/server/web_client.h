@@ -52,6 +52,7 @@ typedef enum web_client_flags {
     WEB_CLIENT_FLAG_PATH_IS_V2              = (1 << 15), // v2 dashboard found on the path
     WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 16), // the path has a trailing hash
     WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 17), // the path ends with a filename extension
+    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 18), // when set we track the progress of this transaction
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2)

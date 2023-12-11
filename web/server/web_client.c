@@ -238,7 +238,10 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
         prio = NDLP_NOTICE;
 
     // cleanup progress
-    query_progress_finished(&w->transaction, 0, w->response.code, total_ut, size, sent);
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING)) {
+        web_client_flag_clear(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
+        query_progress_finished(&w->transaction, 0, w->response.code, total_ut, size, sent);
+    }
 
     // access log
     if(likely(buffer_strlen(w->url_as_received)))
@@ -753,10 +756,13 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    query_progress_start_or_update(&w->transaction, 0, w->acl,
-                                   buffer_tostring(w->url_as_received),
-                                   w->post_payload,
-                                   w->forwarded_for ? w->forwarded_for : w->client_ip);
+    if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING)) {
+        web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
+        query_progress_start_or_update(&w->transaction, 0, w->acl,
+                                       buffer_tostring(w->url_as_received),
+                                       w->post_payload,
+                                       w->forwarded_for ? w->forwarded_for : w->client_ip);
+    }
 
     // get the api version
     char *tok = strsep_skip_consecutive_separators(&url_path_fragment, "/");
@@ -1838,10 +1844,13 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
     switch(http_request_validate(w)) {
         case HTTP_VALIDATION_OK:
-            query_progress_start_or_update(&w->transaction, 0, w->acl,
-                                           buffer_tostring(w->url_as_received),
-                                           w->post_payload,
-                                           w->forwarded_for ? w->forwarded_for : w->client_ip);
+            if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING)) {
+                web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
+                query_progress_start_or_update(&w->transaction, 0, w->acl,
+                                               buffer_tostring(w->url_as_received),
+                                               w->post_payload,
+                                               w->forwarded_for ? w->forwarded_for : w->client_ip);
+            }
 
             switch(w->mode) {
                 case WEB_CLIENT_MODE_STREAM:
