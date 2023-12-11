@@ -19,7 +19,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
     char buffer[2048 + 1];
     snprintfz(buffer, sizeof(buffer) - 1, "%s %s %d \"%s\"\n",
-              pf->payload ? "FUNCTION_PAYLOAD" : "FUNCTION",
+              pf->payload ? PLUGINSD_KEYWORD_FUNCTION_PAYLOAD : PLUGINSD_KEYWORD_FUNCTION,
               transaction,
               pf->timeout,
               string2str(pf->function));
