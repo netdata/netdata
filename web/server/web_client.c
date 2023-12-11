@@ -238,7 +238,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
         prio = NDLP_NOTICE;
 
     // cleanup progress
-    query_progress_finished(&w->transaction, 0, w->response.code, size, sent);
+    query_progress_finished(&w->transaction, 0, w->response.code, total_ut, size, sent);
 
     // access log
     if(likely(buffer_strlen(w->url_as_received)))

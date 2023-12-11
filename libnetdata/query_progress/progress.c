@@ -32,13 +32,15 @@ typedef struct query {
 
     WEB_CLIENT_ACL acl;
 
-    size_t sent_size;
-    size_t response_size;
+    uint32_t sent_size;
+    uint32_t response_size;
     short response_code;
 
     bool indexed;
 
-    size_t updates;
+    uint32_t updates;
+
+    usec_t duration_ut;
     size_t all;
     size_t done;
 
@@ -126,7 +128,7 @@ static inline void query_progress_remove_from_hashtable_unsafe(QUERY_PROGRESS *q
         simple_hashtable_del_slot_QUERY(&progress.hashtable, slot);
     else
         internal_fatal(SIMPLE_HASHTABLE_SLOT_DATA(slot) != NULL,
-                       "Attempt to unhash a progress slot, with a different value");
+                       "Attempt to remove from the hashtable a progress slot with a different value");
 
     qp->indexed = false;
 }
@@ -159,7 +161,7 @@ static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, uuid_t *transact
     buffer_flush(qp->query);
     buffer_flush(qp->payload);
     buffer_flush(qp->client);
-    qp->started_ut = qp->finished_ut = 0;
+    qp->started_ut = qp->finished_ut = qp->duration_ut = 0;
     qp->all = qp->done = qp->updates = 0;
     qp->acl = 0;
     qp->next = qp->prev = NULL;
@@ -171,8 +173,13 @@ static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, uuid_t *transact
 }
 
 static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
-    if(started_ut && started_ut < qp->started_ut)
-        qp->started_ut = started_ut;
+    qp->acl = acl;
+    qp->started_ut = started_ut ? started_ut : now_realtime_usec();
+    qp->finished_ut = 0;
+    qp->duration_ut = 0;
+    qp->response_size = 0;
+    qp->sent_size = 0;
+    qp->response_code = 0;
 
     if(query && *query && !buffer_strlen(qp->query))
         buffer_strcat(qp->query, query);
@@ -182,11 +189,6 @@ static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, 
 
     if(client && *client && !buffer_strlen(qp->client))
         buffer_strcat(qp->client, client);
-
-    if(!qp->started_ut)
-        qp->started_ut = now_realtime_usec();
-
-    qp->acl |= acl;
 }
 
 // ----------------------------------------------------------------------------
@@ -281,7 +283,7 @@ void query_progress_done_step(uuid_t *transaction, size_t done) {
     spinlock_unlock(&progress.spinlock);
 }
 
-void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, size_t response_size, size_t sent_size) {
+void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, usec_t duration_ut, size_t response_size, size_t sent_size) {
     if(!transaction || uuid_is_null(*transaction))
         return;
 
@@ -295,6 +297,7 @@ void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int 
             qp->sent_size = sent_size;
             qp->response_size = response_size;
             qp->response_code = response_code;
+            qp->duration_ut = duration_ut;
             qp->finished_ut = finished_ut ? finished_ut : now_realtime_usec();
 
             if(qp->prev)
@@ -399,7 +402,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
             running++;
 
         bool finished = qp->finished_ut ? true : false;
-        usec_t duration_ut = finished ? qp->finished_ut - qp->started_ut : now_ut - qp->started_ut;
+        usec_t duration_ut = finished ? qp->duration_ut : now_ut - qp->started_ut;
         if(duration_ut > max_duration_ut)
             max_duration_ut = duration_ut;
 
@@ -413,7 +416,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         buffer_json_add_array_item_array(wb); // row
 
-        buffer_json_add_array_item_uuid(wb, &qp->transaction);
+        buffer_json_add_array_item_uuid_compact(wb, &qp->transaction);
         buffer_json_add_array_item_uint64(wb, qp->started_ut);
         buffer_json_add_array_item_string(wb, buffer_tostring(qp->query));
 
@@ -512,7 +515,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         // duration
         buffer_rrdf_table_add_field(wb, field_id++, "Duration", "Query Duration",
-                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "ms", (double)max_duration_ut / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
@@ -527,14 +530,14 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
         // response size
         buffer_rrdf_table_add_field(wb, field_id++, "Size", "Query Response Size",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                    0, "bytes", max_size, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, "bytes", (double)max_size, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // sent size
         buffer_rrdf_table_add_field(wb, field_id++, "Sent", "Query Response Final Size",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                    0, "bytes", max_sent, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, "bytes", (double)max_sent, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
     }
