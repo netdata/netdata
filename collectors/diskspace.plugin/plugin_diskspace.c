@@ -866,7 +866,7 @@ void *diskspace_main(void *ptr) {
 
     rrd_collector_started();
     rrd_function_add(localhost, NULL, "mount-points", 10, RRDFUNCTIONS_DISKSPACE_HELP,
-                     "top", HTTP_ACCESS_ALL,
+                     "top", HTTP_ACCESS_ANY,
                      true, diskspace_function_mount_points, NULL);
 
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);

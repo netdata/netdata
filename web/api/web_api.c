@@ -19,13 +19,13 @@ static short int web_client_check_acl_and_bearer(struct web_client *w, HTTP_ACL 
 
     if(!netdata_is_protected_by_bearer && !(endpoint_acl & HTTP_ACL_BEARER_REQUIRED)) {
         // bearer protection is not enabled and is not required by the endpoint
-        w->access = HTTP_ACCESS_ALL;
+        w->access = HTTP_ACCESS_ANY;
         return HTTP_RESP_OK;
     }
 
     if(!(endpoint_acl & (HTTP_ACL_BEARER_REQUIRED | HTTP_ACL_BEARER_OPTIONAL))) {
         // endpoint does not require a bearer
-        w->access = HTTP_ACCESS_ALL;
+        w->access = HTTP_ACCESS_ANY;
         return HTTP_RESP_OK;
     }
 

@@ -9,7 +9,7 @@ static struct {
         { .access = HTTP_ACCESS_NONE, .name = "none" },
         { .access = HTTP_ACCESS_MEMBERS, .name = "members" },
         { .access = HTTP_ACCESS_ADMINS, .name = "admins" },
-        { .access = HTTP_ACCESS_ALL, .name = "all" },
+        { .access = HTTP_ACCESS_ANY, .name = "any" },
 };
 
 HTTP_ACCESS http_access2id(const char *access) {
