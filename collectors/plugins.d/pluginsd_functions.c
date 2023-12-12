@@ -279,11 +279,12 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
         global = true;
     }
 
-    char *name      = get_word(words, num_words, i++);
-    char *timeout_s = get_word(words, num_words, i++);
-    char *help      = get_word(words, num_words, i++);
-    char *tags      = get_word(words, num_words, i++);
-    char *access    = get_word(words, num_words, i++);
+    char *name          = get_word(words, num_words, i++);
+    char *timeout_str   = get_word(words, num_words, i++);
+    char *help          = get_word(words, num_words, i++);
+    char *tags          = get_word(words, num_words, i++);
+    char *access_str    = get_word(words, num_words, i++);
+    char *priority_str  = get_word(words, num_words, i++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_FUNCTION);
     if(!host) return PARSER_RC_ERROR;
@@ -291,27 +292,34 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     RRDSET *st = (global)? NULL: pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_FUNCTION, PLUGINSD_KEYWORD_CHART);
     if(!st) global = true;
 
-    if (unlikely(!timeout_s || !name || !help || (!global && !st))) {
+    if (unlikely(!timeout_str || !name || !help || (!global && !st))) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', help = '%s'). Ignoring it.",
                           rrdhost_hostname(host),
                           st?rrdset_id(st):"(unset)",
                           global?"yes":"no",
                           name?name:"(unset)",
-                          timeout_s?timeout_s:"(unset)",
+                timeout_str ? timeout_str : "(unset)",
                           help?help:"(unset)"
         );
         return PARSER_RC_ERROR;
     }
 
-    int timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
-    if (timeout_s && *timeout_s) {
-        timeout = str2i(timeout_s);
-        if (unlikely(timeout <= 0))
-            timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
+    int timeout_s = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
+    if (timeout_str && *timeout_str) {
+        timeout_s = str2i(timeout_str);
+        if (unlikely(timeout_s <= 0))
+            timeout_s = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
     }
 
-    rrd_function_add(host, st, name, timeout, help, tags,
-                     http_access2id(access), false,
+    int priority = RRDFUNCTIONS_PRIORITY_DEFAULT;
+    if(priority_str && *priority_str) {
+        priority = str2i(priority_str);
+        if(priority <= 0)
+            priority = RRDFUNCTIONS_PRIORITY_DEFAULT;
+    }
+
+    rrd_function_add(host, st, name, timeout_s, priority, help, tags,
+                     http_access2id(access_str), false,
                      pluginsd_function_execute_cb, parser);
 
     parser->user.data_collections_count++;

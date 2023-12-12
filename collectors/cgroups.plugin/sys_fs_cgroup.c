@@ -1672,12 +1672,12 @@ void *cgroups_main(void *ptr) {
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
     cgroup_netdev_link_init();
 
-    rrd_function_add(localhost, NULL, "containers-vms", 10, RRDFUNCTIONS_CGTOP_HELP,
-                     "top", HTTP_ACCESS_ANY,
+    rrd_function_add(localhost, NULL, "containers-vms", 10, RRDFUNCTIONS_PRIORITY_DEFAULT / 2,
+                     RRDFUNCTIONS_CGTOP_HELP, "top", HTTP_ACCESS_ANY,
                      true, cgroup_function_cgroup_top, NULL);
 
-    rrd_function_add(localhost, NULL, "systemd-services", 10, RRDFUNCTIONS_SYSTEMD_SERVICES_HELP,
-                     "top", HTTP_ACCESS_ANY,
+    rrd_function_add(localhost, NULL, "systemd-services", 10, RRDFUNCTIONS_PRIORITY_DEFAULT / 3,
+                     RRDFUNCTIONS_SYSTEMD_SERVICES_HELP, "top", HTTP_ACCESS_ANY,
                      true, cgroup_function_systemd_top, NULL);
 
     heartbeat_t hb;

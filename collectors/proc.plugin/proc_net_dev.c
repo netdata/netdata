@@ -1927,7 +1927,7 @@ void *netdev_main(void *ptr)
     netdata_thread_cleanup_push(netdev_main_cleanup, ptr);
 
     rrd_collector_started();
-    rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_NETDEV_HELP,
+    rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_NETDEV_HELP,
                      "top", HTTP_ACCESS_ANY,
                      true, netdev_function_net_interfaces, NULL);
 

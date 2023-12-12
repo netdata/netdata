@@ -736,10 +736,11 @@ struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsman
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     netdata_mutex_lock(&stdout_mut);
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\"\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\" %d\n",
                     LOGS_MANAG_FUNC_NAME, 
                     LOGS_MANAG_QUERY_TIMEOUT_DEFAULT, 
-                    FUNCTION_LOGSMANAGEMENT_HELP_SHORT);
+                    FUNCTION_LOGSMANAGEMENT_HELP_SHORT,
+                    RRDFUNCTIONS_PRIORITY_DEFAULT + 1);
     netdata_mutex_unlock(&stdout_mut);
 
     struct functions_evloop_globals *wg = functions_evloop_init(1, "LGSMNGM", 

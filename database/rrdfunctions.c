@@ -89,6 +89,7 @@ struct rrd_host_function {
     STRING *help;
     STRING *tags;
     int timeout;                    // the default timeout of the function
+    int priority;
 
     rrd_function_execute_cb_t execute_cb;
     void *execute_cb_data;
@@ -149,6 +150,9 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
 
     rrd_collector_started();
     rdcf->collector = rrd_collector_acquire_current_thread();
+
+    if(!rdcf->priority)
+        rdcf->priority = RRDFUNCTIONS_PRIORITY_DEFAULT;
 
 //    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
@@ -222,6 +226,14 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
+    if(rdcf->priority != new_rdcf->priority) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed priority",
+                dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
+        rdcf->priority = new_rdcf->priority;
+        changed = true;
+    }
+
     if(rdcf->sync != new_rdcf->sync) {
         netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed sync/async mode",
                          dictionary_acquired_item_name(item), rrdhost_hostname(host));
@@ -262,7 +274,7 @@ void rrdfunctions_host_destroy(RRDHOST *host) {
 
 // ----------------------------------------------------------------------------
 
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help, const char *tags,
+void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, const char *help, const char *tags,
                       HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
                       void *execute_cb_data) {
 
@@ -291,6 +303,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .execute_cb_data = execute_cb_data,
         .help = string_strdupz(help),
         .tags = string_strdupz(tags),
+        .priority = priority,
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions, key, &tmp, sizeof(tmp));
 
@@ -309,12 +322,13 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     struct rrd_host_function *tmp;
     dfe_start_read(st->functions_view, tmp) {
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" \"%s\"\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" \"%s\" %d\n"
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
                        , string2str(tmp->tags)
                        , http_id2access(tmp->access)
+                       , tmp->priority
                        );
     }
     dfe_done(tmp);
@@ -329,12 +343,13 @@ void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
             continue;
 
         buffer_sprintf(wb
-                , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" \"%s\"\n"
+                , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" \"%s\" %d\n"
                 , tmp_dfe.name
                 , tmp->timeout
                 , string2str(tmp->help)
                 , string2str(tmp->tags)
                 , http_id2access(tmp->access)
+               , tmp->priority
         );
     }
     dfe_done(tmp);
@@ -855,6 +870,7 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb)
             buffer_json_member_add_string_or_empty(wb, "options", options);
             buffer_json_member_add_string_or_empty(wb, "tags", string2str(t->tags));
             buffer_json_member_add_string(wb, "access", http_id2access(t->access));
+            buffer_json_member_add_uint64(wb, "priority", t->priority);
         }
         buffer_json_object_close(wb);
     }
@@ -890,6 +906,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
             buffer_json_array_close(wb);
             buffer_json_member_add_string(wb, "tags", string2str(t->tags));
             buffer_json_member_add_string(wb, "access", http_id2access(t->access));
+            buffer_json_member_add_uint64(wb, "priority", t->priority);
         }
         buffer_json_object_close(wb);
     }
@@ -910,7 +927,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
     dfe_done(t);
 }
 
-void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags, HTTP_ACCESS *access) {
+void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags, HTTP_ACCESS *access, int *priority) {
     if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
 
     struct rrd_host_function *t;
@@ -925,6 +942,9 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
 
         if(access)
             *access = t->access;
+
+        if(priority)
+            *priority = t->priority;
 
         dictionary_set(dst, t_dfe.name, value, value_size);
     }

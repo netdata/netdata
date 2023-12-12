@@ -144,6 +144,7 @@ Charts can be added any time (not just the beginning).
 Netdata may send the following commands to the plugin's `stdin`:
 
 -    `FUNCTION` - to call a specific function, with all parameters inline
+-    `FUNCTION_CANCEL` - cancel a running function transaction
 -    `FUNCTION_PAYLOAD` - to call a specific function, with a payload of parameters
 -    `FUNCTION_PAYLOAD_END` - to end the payload of parameters
 

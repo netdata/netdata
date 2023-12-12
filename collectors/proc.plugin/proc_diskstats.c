@@ -1490,7 +1490,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     static bool add_func = true;
     if (add_func) {
-        rrd_function_add(localhost, NULL, "block-devices", 10, RRDFUNCTIONS_DISKSTATS_HELP,
+        rrd_function_add(localhost, NULL, "block-devices", 10, RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSTATS_HELP,
                          "top", HTTP_ACCESS_ANY, true,
                          diskstats_function_block_devices, NULL);
         add_func = false;
