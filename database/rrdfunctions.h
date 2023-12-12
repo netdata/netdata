@@ -21,9 +21,6 @@ void rrd_functions_inflight_init(void);
 void rrdfunctions_host_init(RRDHOST *host);
 void rrdfunctions_host_destroy(RRDHOST *host);
 
-void rrd_collector_started(void);
-void rrd_collector_finished(void);
-
 // add a function, to be run from the collector
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help, const char *tags,
                       bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data);

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define NETDATA_RRD_INTERNALS
+#define NETDATA_RRDCOLLECTOR_INTERNALS
+
 #include "rrd.h"
 
 #define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
@@ -78,6 +80,8 @@ typedef enum __attribute__((packed)) {
     // this is 8-bit
 } RRD_FUNCTION_OPTIONS;
 
+// ----------------------------------------------------------------------------
+
 struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
     RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
@@ -91,115 +95,59 @@ struct rrd_host_function {
     struct rrd_collector *collector;
 };
 
-// Each function points to this collector structure
-// so that when the collector exits, all of them will
-// be invalidated (running == false)
-// The last function that is using this collector
-// frees the structure too (or when the collector calls
-// rrdset_collector_finished()).
+struct rrd_function_inflight {
+    bool used;
 
-struct rrd_collector {
-    int32_t refcount;
-    int32_t refcount_canceller;
-    pid_t tid;
-    bool running;
+    RRDHOST *host;
+    const char *transaction;
+    const char *cmd;
+    const char *sanitized_cmd;
+    size_t sanitized_cmd_length;
+    int timeout;
+    bool cancelled;
+
+    const DICTIONARY_ITEM *host_function_acquired;
+
+    // the collector
+    // we acquire this structure at the beginning,
+    // and we release it at the end
+    struct rrd_host_function *rdcf;
+
+    struct {
+        BUFFER *wb;
+
+        // in async mode,
+        // the function to call to send the result back
+        rrd_function_result_callback_t cb;
+        void *data;
+    } result;
+
+    struct {
+        // to be called in sync mode
+        // while the function is running
+        // to check if the function has been canceled
+        rrd_function_is_cancelled_cb_t cb;
+        void *data;
+    } is_cancelled;
+
+    struct {
+        // to be registered by the function itself
+        // used to signal the function to cancel
+        rrd_function_canceller_cb_t cb;
+        void *data;
+    } canceller;
 };
 
-// Each thread that adds RRDSET functions, has to call
-// rrdset_collector_started() and rrdset_collector_finished()
-// to create the collector structure.
+static DICTIONARY *rrd_functions_inflight_requests = NULL;
 
-static __thread struct rrd_collector *thread_rrd_collector = NULL;
-
-static void rrd_collector_free(struct rrd_collector *rdc) {
-    if(rdc->running)
-        return;
-
-    int32_t expected = 0;
-    if(!__atomic_compare_exchange_n(&rdc->refcount, &expected, -1, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
-        // the collector is still referenced by charts.
-        // leave it hanging there, the last chart will actually free it.
-        return;
-    }
-
-    // we can free it now
-    freez(rdc);
-}
-
-// called once per collector
-void rrd_collector_started(void) {
-    if(!thread_rrd_collector)
-        thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
-
-    thread_rrd_collector->tid = gettid();
-    __atomic_store_n(&thread_rrd_collector->running, true, __ATOMIC_RELAXED);
-}
-
-// called once per collector
-void rrd_collector_finished(void) {
-    if(!thread_rrd_collector)
-        return;
-
-    __atomic_store_n(&thread_rrd_collector->running, false, __ATOMIC_RELAXED);
-
-    int32_t expected = 0;
-    while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount_canceller, &expected, -1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
-        expected = 0;
-        sleep_usec(1 * USEC_PER_MS);
-    }
-
-    rrd_collector_free(thread_rrd_collector);
-    thread_rrd_collector = NULL;
-}
-
-#define rrd_collector_running(c) __atomic_load_n(&(c)->running, __ATOMIC_RELAXED)
-
-static struct rrd_collector *rrd_collector_acquire(void) {
-    rrd_collector_started();
-
-    int32_t expected = __atomic_load_n(&thread_rrd_collector->refcount, __ATOMIC_RELAXED), wanted = 0;
-    do {
-        if(expected < 0 || !rrd_collector_running(thread_rrd_collector)) {
-            internal_fatal(true, "FUNCTIONS: Trying to acquire a collector that is exiting.");
-            return thread_rrd_collector;
-        }
-
-        wanted = expected + 1;
-
-    } while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount, &expected, wanted, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
-
-    return thread_rrd_collector;
-}
-
-static void rrd_collector_release(struct rrd_collector *rdc) {
-    if(unlikely(!rdc)) return;
-
-    int32_t expected = __atomic_load_n(&rdc->refcount, __ATOMIC_RELAXED), wanted = 0;
-    do {
-        if(expected < 0) {
-            internal_fatal(true, "FUNCTIONS: Trying to release a collector that is exiting.");
-            return;
-        }
-
-        if(expected == 0) {
-            internal_fatal(true, "FUNCTIONS: Trying to release a collector that is not acquired.");
-            return;
-        }
-
-        wanted = expected - 1;
-
-    } while(!__atomic_compare_exchange_n(&rdc->refcount, &expected, wanted, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    if(wanted == 0)
-        rrd_collector_free(rdc);
-}
+// ----------------------------------------------------------------------------
 
 static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *rrdhost) {
     RRDHOST *host = rrdhost; (void)host;
     struct rrd_host_function *rdcf = func;
 
     rrd_collector_started();
-    rdcf->collector = rrd_collector_acquire();
+    rdcf->collector = rrd_collector_acquire_current_thread();
 
 //    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
@@ -224,10 +172,11 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 
     if(rdcf->collector != thread_rrd_collector) {
         netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed collector from %d to %d",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host), rdcf->collector->tid, thread_rrd_collector->tid);
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host),
+                         rrd_collector_tid(rdcf->collector), rrd_collector_tid(thread_rrd_collector));
 
         struct rrd_collector *old_rdc = rdcf->collector;
-        rdcf->collector = rrd_collector_acquire();
+        rdcf->collector = rrd_collector_acquire_current_thread();
         rrd_collector_release(old_rdc);
         changed = true;
     }
@@ -309,6 +258,8 @@ void rrdfunctions_host_init(RRDHOST *host) {
 void rrdfunctions_host_destroy(RRDHOST *host) {
     dictionary_destroy(host->functions);
 }
+
+// ----------------------------------------------------------------------------
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help, const char *tags,
                       bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
@@ -455,7 +406,7 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
                 }
             }
 
-            // if s == NULL, set it to the end of the buffer
+            // if s == NULL, set it to the end of the buffer;
             // this should happen only the first time
             if (unlikely(!s))
                 s = &buffer[key_length - 1];
@@ -485,51 +436,6 @@ static int rrd_call_function_find(RRDHOST *host, BUFFER *wb, const char *name, s
 }
 
 // ----------------------------------------------------------------------------
-
-struct rrd_function_inflight {
-    bool used;
-
-    RRDHOST *host;
-    const char *transaction;
-    const char *cmd;
-    const char *sanitized_cmd;
-    size_t sanitized_cmd_length;
-    int timeout;
-    bool cancelled;
-
-    const DICTIONARY_ITEM *host_function_acquired;
-
-    // the collector
-    // we acquire this structure at the beginning,
-    // and we release it at the end
-    struct rrd_host_function *rdcf;
-
-    struct {
-        BUFFER *wb;
-
-        // in async mode,
-        // the function to call to send the result back
-        rrd_function_result_callback_t cb;
-        void *data;
-    } result;
-
-    struct {
-        // to be called in sync mode
-        // while the function is running
-        // to check if the function has been cancelled
-        rrd_function_is_cancelled_cb_t cb;
-        void *data;
-    } is_cancelled;
-
-    struct {
-        // to be registered by the function itself
-        // used to signal the function to cancel
-        rrd_function_canceller_cb_t cb;
-        void *data;
-    } canceller;
-};
-
-static DICTIONARY *rrd_functions_inflight_requests = NULL;
 
 static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rrd_function_inflight *r = value;
@@ -667,8 +573,8 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     netdata_mutex_init(&tmp->mutex);
     pthread_cond_init(&tmp->cond, NULL);
 
-    // we need a temporary BUFFER, because we may time out and the caller supplied one may vanish
-    // so, we create a new one we guarantee will survive until the collector finishes...
+    // we need a temporary BUFFER, because we may time out and the caller supplied one may vanish,
+    // so we create a new one we guarantee will survive until the collector finishes...
 
     bool we_should_free = true;
     BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
@@ -897,22 +803,16 @@ void rrd_function_cancel(const char *transaction) {
 
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
-    int32_t expected = __atomic_load_n(&r->rdcf->collector->refcount_canceller, __ATOMIC_RELAXED);
-    int32_t wanted;
-    do {
-        if(expected < 0) {
-            netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the collector is not running.",
-                             transaction);
-            goto cleanup;
-        }
-
-        wanted = expected + 1;
-    } while(!__atomic_compare_exchange_n(&r->rdcf->collector->refcount_canceller, &expected, wanted, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    if(!rrd_collector_canceller_acquire(r->rdcf->collector)) {
+        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the collector is not running.",
+                         transaction);
+        goto cleanup;
+    }
 
     if(r->canceller.cb)
         r->canceller.cb(r->canceller.data);
 
-    __atomic_sub_fetch(&r->rdcf->collector->refcount_canceller, 1, __ATOMIC_RELAXED);
+    rrd_collector_canceller_release(r->rdcf->collector);
 
 cleanup:
     dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
@@ -1243,19 +1143,19 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbMetrics", "Time-series Metrics in the DB",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, NULL, max_db_metrics, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, NULL, (double)max_db_metrics, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbInstances", "Instances in the DB",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, NULL, max_db_instances, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, NULL, (double)max_db_instances, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         buffer_rrdf_table_add_field(wb, field_id++, "dbContexts", "Contexts in the DB",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, NULL, max_db_contexts, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    0, NULL, (double)max_db_contexts, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
@@ -1314,7 +1214,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
         buffer_rrdf_table_add_field(wb, field_id++, "InReplInstances", "Inbound Replicating Instances",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, "instances", max_collection_replication_instances, RRDF_FIELD_SORT_DESCENDING,
+                                    0, "instances", (double)max_collection_replication_instances, RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1389,7 +1289,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutReplInstances", "Outbound Replicating Instances",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, "instances", max_streaming_replication_instances, RRDF_FIELD_SORT_DESCENDING,
+                                    0, "instances", (double)max_streaming_replication_instances, RRDF_FIELD_SORT_DESCENDING,
                                     NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1438,7 +1338,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
 
         buffer_rrdf_table_add_field(wb, field_id++, "OutTrafficData", "Outbound Metric Data Traffic",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                                    0, "bytes", max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA],
+                                    0, "bytes", (double)max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA],
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1446,7 +1346,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "OutTrafficMetadata", "Outbound Metric Metadata Traffic",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "bytes",
-                                    max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA],
+                                    (double)max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA],
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1454,7 +1354,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "OutTrafficReplication", "Outbound Metric Replication Traffic",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "bytes",
-                                    max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION],
+                                    (double)max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION],
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1462,7 +1362,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "OutTrafficFunctions", "Outbound Metric Functions Traffic",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "bytes",
-                                    max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS],
+                                    (double)max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS],
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1493,7 +1393,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "MlAnomalous", "Number of Anomalous Metrics",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "metrics",
-                                    max_ml_anomalous,
+                                    (double)max_ml_anomalous,
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1501,7 +1401,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "MlNormal", "Number of Not Anomalous Metrics",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "metrics",
-                                    max_ml_normal,
+                                    (double)max_ml_normal,
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1509,7 +1409,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "MlTrained", "Number of Trained Metrics",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "metrics",
-                                    max_ml_trained,
+                                    (double)max_ml_trained,
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1517,7 +1417,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "MlPending", "Number of Pending Metrics",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "metrics",
-                                    max_ml_pending,
+                                    (double)max_ml_pending,
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
@@ -1525,7 +1425,7 @@ int rrdhost_function_streaming(BUFFER *wb, int timeout __maybe_unused, const cha
         buffer_rrdf_table_add_field(wb, field_id++, "MlSilenced", "Number of Silenced Metrics",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
                                     0, "metrics",
-                                    max_ml_silenced,
+                                    (double)max_ml_silenced,
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);

@@ -588,6 +588,8 @@ RRD_PLUGIN_FILES = \
     database/rrd.c \
     database/rrd.h \
     database/rrdset.c \
+    database/rrdcollector.c \
+    database/rrdcollector.h \
     database/rrdfunctions.c \
     database/rrdfunctions.h \
     database/rrdsetvar.c \
