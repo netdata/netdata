@@ -64,7 +64,7 @@ UNIT_STATIC int count_fields(const char *line, const char delimiter){
         }
         if(*ptr == delimiter){
             cnt++;
-            while(*(ptr+1) == delimiter){ ptr++;};
+            while(*(ptr+1) == delimiter) ptr++;
             continue;
         }
     }
@@ -228,7 +228,7 @@ int search_keyword( char *src, size_t src_sz __maybe_unused,
             regerror(rc, &regex_compiled, regcomp_err_str, regcomp_err_str_size);
             freez(regcomp_err_str);
             fatal("Could not compile regular expression:%.*s, error: %s", (int) MAX_REGEX_SIZE, regexString, regcomp_err_str);
-        };
+        }
     }
 
     regmatch_t groupArray[1];
@@ -477,8 +477,8 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
                 goto next_item;
             }
 
-            while(*port != ':' && vhost_size < field_size) { port++; vhost_size++; };
-            if(likely(vhost_size < field_size)){ 
+            while(*port != ':' && vhost_size < field_size) { port++; vhost_size++; }
+            if(likely(vhost_size < field_size)) {
                 /* ':' detected in string */
                 port++; 
                 port_size = field_size - vhost_size - 1;
@@ -1122,7 +1122,7 @@ void parse_web_log_line(const Web_log_parser_config_t *wblp_config,
         if(fields_format[i] == TIME){
 
             if(wblp_config->skip_timestamp_parsing){
-                while(*offset != ']') {offset++;};
+                while(*offset != ']') offset++;
                 i++;
                 offset++;
                 goto next_item;

@@ -8,8 +8,6 @@
 
 #include "daemon/global_statistics.h"
 
-#define DEFAULT_CHUNKED_RESPONSE_BUFFER_SIZE (4096)
-
 static const char *http_req_type_to_str(http_req_type_t req) {
     switch (req) {
         case HTTP_REQ_GET:
@@ -25,7 +23,6 @@ static const char *http_req_type_to_str(http_req_type_t req) {
 
 #define TRANSFER_ENCODING_CHUNKED (-2)
 
-#define HTTP_PARSE_CTX_INITIALIZER { .state = HTTP_PARSE_INITIAL, .content_length = -1, .http_code = 0 }
 void http_parse_ctx_create(http_parse_ctx *ctx)
 {
     ctx->state = HTTP_PARSE_INITIAL;
@@ -315,8 +312,6 @@ typedef struct https_req_ctx {
     SSL *ssl;
 
     size_t written;
-
-    int self_signed_allowed;
 
     http_parse_ctx parse_ctx;
 
@@ -762,12 +757,6 @@ void https_req_response_free(https_req_response_t *res) {
     freez(res->payload);
 }
 
-void https_req_response_init(https_req_response_t *res) {
-    res->http_code = 0;
-    res->payload = NULL;
-    res->payload_size = 0;
-}
-
 static inline char *UNUSED_FUNCTION(min_non_null)(char *a, char *b) {
     if (!a)
         return b;
@@ -816,12 +805,11 @@ static inline void port_by_proto(url_t *url) {
     }
 }
 
-#define STRDUPZ_2PTR(dest, start, end)                                                                                 \
-    {                                                                                                                  \
+#define STRDUPZ_2PTR(dest, start, end) do {                                                                            \
         dest = mallocz(1 + end - start);                                                                               \
         memcpy(dest, start, end - start);                                                                              \
         dest[end - start] = 0;                                                                                         \
-    }
+    } while(0)
 
 int url_parse(const char *url, url_t *parsed) {
     const char *start = url;
@@ -833,7 +821,7 @@ int url_parse(const char *url, url_t *parsed) {
             return 1;
         }
 
-        STRDUPZ_2PTR(parsed->proto, start, end)
+        STRDUPZ_2PTR(parsed->proto, start, end);
         start = end + strlen(URI_PROTO_SEPARATOR);
     }
 

@@ -7,7 +7,6 @@
 
 /* Forward declarations */
 struct rrdengine_instance;
-struct rrdengine_worker_config;
 struct rrdengine_datafile;
 struct rrdengine_journalfile;
 

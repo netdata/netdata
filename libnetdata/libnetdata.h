@@ -43,10 +43,6 @@ extern "C" {
 //#define NETDATA_TRACE_ALLOCATIONS 1
 //#endif
 
-#define OS_LINUX   1
-#define OS_FREEBSD 2
-#define OS_MACOS   3
-
 #define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
 #define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
 #define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
@@ -202,10 +198,6 @@ extern "C" {
 // netdata common definitions
 
 #define _cleanup_(x) __attribute__((__cleanup__(x)))
-
-#ifdef __GNUC__
-#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
-#endif // __GNUC__
 
 #ifdef HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
 #define NEVERNULL __attribute__((returns_nonnull))
@@ -703,7 +695,6 @@ typedef enum {
 void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 
 void netdata_cleanup_and_exit(int ret) NORETURN;
-void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
 
 #define XXH_INLINE_ALL

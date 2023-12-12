@@ -14,8 +14,6 @@ extern struct pgc *extent_cache;
 struct rrdengine_instance;
 
 #define INVALID_TIME (0)
-#define MAX_PAGE_CACHE_FETCH_RETRIES (3)
-#define PAGE_CACHE_FETCH_WAIT_TIMEOUT (3)
 
 extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
 

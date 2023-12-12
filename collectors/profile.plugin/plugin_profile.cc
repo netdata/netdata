@@ -14,8 +14,6 @@ extern "C" {
 #include <thread>
 #include <vector>
 
-#define PLUGIN_PROFILE_NAME "profile.plugin"
-
 #define CONFIG_SECTION_PROFILE "plugin:profile"
 
 class Generator {

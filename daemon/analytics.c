@@ -7,7 +7,6 @@ struct analytics_data analytics_data;
 extern void analytics_exporting_connectors (BUFFER *b);
 extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
-extern int aclk_connected;
 
 struct collector {
     const char *plugin;
@@ -483,7 +482,7 @@ void analytics_misc(void)
 
     if (strcmp(
         config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io"),
-        "https://registry.my-netdata.io"))
+        "https://registry.my-netdata.io") != 0)
         analytics_set_data(&analytics_data.netdata_config_use_private_registry, "true");
 
     //do we need both registry to announce and enabled to indicate that this is a private registry ?

@@ -44,8 +44,6 @@ char *get_agent_claimid()
 #define CLAIMING_COMMAND_LENGTH 16384
 #define CLAIMING_PROXY_LENGTH (CLAIMING_COMMAND_LENGTH/4)
 
-extern struct registry registry;
-
 /* rrd_init() and post_conf_load() must have been called before this function */
 CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, const char **msg __maybe_unused)
 {
@@ -102,7 +100,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
 
     netdata_log_info("Waiting for claiming command '%s' to finish.", command_exec_buffer);
     char read_buffer[100 + 1];
-    while (fgets(read_buffer, 100, fp_child_output) != NULL) {;}
+    while (fgets(read_buffer, 100, fp_child_output) != NULL) ;
 
     exit_code = netdata_pclose(fp_child_input, fp_child_output, command_pid);
 
@@ -137,10 +135,6 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
 
     return CLAIM_AGENT_FAILED_WITH_MESSAGE;
 }
-
-#ifdef ENABLE_ACLK
-extern int aclk_connected, aclk_kill_link, aclk_disable_runtime;
-#endif
 
 /* Change the claimed state of the agent.
  *

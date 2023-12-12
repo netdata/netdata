@@ -401,4 +401,4 @@ void circ_buff_destroy(Circ_buff_t *buff){
     freez(buff->in->data);
     freez(buff->in);
     freez(buff);
-};
+}

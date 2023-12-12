@@ -35,8 +35,8 @@
 #define RRD_FAMILY_SW "software"
 #define RRD_FAMILY_CACHE "cache"
 
-#define NO_FD -1
-#define ALL_PIDS -1
+#define NO_FD (-1)
+#define ALL_PIDS (-1)
 #define RUNNING_THRESHOLD 100
 
 static int debug = 0;

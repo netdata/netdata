@@ -637,9 +637,12 @@ static int journalfile_check_superblock(uv_file file)
     fatal_assert(req.result >= 0);
     uv_fs_req_cleanup(&req);
 
-    if (strncmp(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ) ||
-        strncmp(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ)) {
-        netdata_log_error("DBENGINE: File has invalid superblock.");
+
+    char jf_magic[RRDENG_MAGIC_SZ] = RRDENG_JF_MAGIC;
+    char jf_ver[RRDENG_VER_SZ] = RRDENG_JF_VER;
+    if (strncmp(superblock->magic_number, jf_magic, RRDENG_MAGIC_SZ) != 0 ||
+        strncmp(superblock->version, jf_ver, RRDENG_VER_SZ) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;

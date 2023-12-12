@@ -704,7 +704,7 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
         else {
             if(unlikely(avl_insert(&ids->index, (avl_t *) user_or_group_id) != (void *) user_or_group_id)) {
                 netdata_log_error("INTERNAL ERROR: duplicate indexing of id during realloc");
-            };
+            }
 
             user_or_group_id->next = ids->root;
             ids->root = user_or_group_id;
@@ -1239,11 +1239,11 @@ cleanup:
 // each parameter is accessed only ONCE - so it is safe to pass function calls
 // or other macros as parameters
 
-#define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec) { \
+#define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec) do { \
         kernel_uint_t _new_tmp = new_kernel_value; \
         (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * RATES_DETAIL) / ((collected_usec) - (last_collected_usec)); \
         (last_kernel_variable) = _new_tmp; \
-    }
+    } while(0)
 
 // the same macro for struct pid members
 #define pid_incremental_rate(type, var, value) \
