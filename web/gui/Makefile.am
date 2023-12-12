@@ -10,8 +10,13 @@ CLEANFILES = \
 
 SUBDIRS = \
     v1 \
-    v2 \
     $(NULL)
+
+if ENABLE_CLOUD_UI
+    SUBDIRS += \
+        v2 \
+        $(NULL)
+endif
 
 DASHBOARD_JS_FILES = \
     $(srcdir)/src/dashboard.js/prologue.js.inc \
@@ -55,7 +60,6 @@ dist_web_DATA = \
     dashboard.js \
     $(srcdir)/dashboard_info_custom_example.js \
     $(srcdir)/dashboard_info.js \
-    $(srcdir)/index.html \
     $(srcdir)/main.css \
     $(srcdir)/main.js \
     $(srcdir)/registry-access.html \
@@ -65,6 +69,14 @@ dist_web_DATA = \
     $(srcdir)/ilove.html \
     version.txt \
     $(NULL)
+
+# Note: when this is false, v1's index.html get installed instead, which
+# works outside of v1/ path too.
+if ENABLE_CLOUD_UI
+    dist_web_DATA += \
+        $(srcdir)/index.html \
+        $(NULL)
+endif
 
 webolddir=$(webdir)/old
 dist_webold_DATA = \
