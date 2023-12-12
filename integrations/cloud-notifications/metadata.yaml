@@ -403,9 +403,9 @@
       4. On the **Splunk** card click on **+ Add**
       5. A modal will be presented to you to enter the required details to enable the configuration:
         - **Notification settings** are Netdata specific settings
-            - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
-            - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-            - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
+            - Configuration name - provide a descriptive name for your configuration to easily identify it.
+            - Rooms - select the nodes or areas of your infrastructure you want to receive notifications about.
+            - Notification - choose the type of notifications you want to receive: All Alerts and unreachable, All Alerts, Critical only.
         - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk:
             - HTTP Event Collector URI - The URI of your HTTP event collector in Splunk
             - HTTP Event Collector Token - the token that Splunk provided to you when you created the HTTP Event Collector
