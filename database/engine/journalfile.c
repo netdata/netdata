@@ -934,6 +934,8 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     netdata_log_info("DBENGINE: checking %u metrics that exist in the journal", j2_header->metric_count);
     for (entries = 0; entries < j2_header->metric_count; entries++) {
 
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(metric->uuid, uuid_str);
         struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
         struct journal_page_header local_metric_list_header = *metric_list_header;
 
