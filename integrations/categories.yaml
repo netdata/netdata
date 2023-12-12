@@ -413,7 +413,7 @@
   description: "Monitoring logs on your infrastructure"
   most_popular: true
   priority: 3
-  children:
+  children: []
 - id: export
   name: exporters
   description: "Exporter Integrations"
