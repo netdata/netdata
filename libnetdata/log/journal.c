@@ -3,9 +3,6 @@
 #include "journal.h"
 
 bool is_path_unix_socket(const char *path) {
-    if(!path || !*path)
-        return false;
-
     struct stat statbuf;
 
     // Check if the path is valid
