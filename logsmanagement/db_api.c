@@ -146,7 +146,7 @@ static void db_writer_db_mode_none(void *arg){
     }
 }
 
-#define return_db_writer_db_mode_none(p_file_info, do_mut_unlock){              \
+#define return_db_writer_db_mode_none(p_file_info, do_mut_unlock) do {          \
     p_file_info->db_mode = LOGS_MANAG_DB_MODE_NONE;                             \
     freez((void *) p_file_info->db_dir);                                        \
     p_file_info->db_dir = strdupz("");                                          \
@@ -165,7 +165,7 @@ static void db_writer_db_mode_none(void *arg){
         return fatal_assert(!uv_thread_create(  p_file_info->db_writer_thread,  \
                                                 db_writer_db_mode_none,         \
                                                 p_file_info));                  \
-}
+} while(0)
 
 static void db_writer_db_mode_full(void *arg){
     int rc = 0;

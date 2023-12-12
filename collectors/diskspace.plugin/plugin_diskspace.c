@@ -148,7 +148,7 @@ static void add_basic_mountinfo(struct basic_mountinfo **root, struct mountinfo 
 
     bmi->next = *root;
     *root = bmi;
-};
+}
 
 static void free_basic_mountinfo(struct basic_mountinfo *bmi)
 {
@@ -160,7 +160,7 @@ static void free_basic_mountinfo(struct basic_mountinfo *bmi)
 
         freez(bmi);
     }
-};
+}
 
 static void free_basic_mountinfo_list(struct basic_mountinfo *root)
 {

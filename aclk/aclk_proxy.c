@@ -15,20 +15,6 @@ struct {
     { .type = PROXY_TYPE_UNKNOWN,  .url_str = NULL                                      },
 };
 
-const char *aclk_proxy_type_to_s(ACLK_PROXY_TYPE *type)
-{
-    switch (*type) {
-        case PROXY_DISABLED:
-            return "disabled";
-        case PROXY_TYPE_HTTP:
-            return "HTTP";
-        case PROXY_TYPE_SOCKS5:
-            return "SOCKS";
-        default:
-            return "Unknown";
-    }
-}
-
 static inline ACLK_PROXY_TYPE aclk_find_proxy(const char *string)
 {
     int i = 0;

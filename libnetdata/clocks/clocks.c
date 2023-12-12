@@ -230,7 +230,7 @@ void sleep_to_absolute_time(usec_t usec) {
             sleep_usec(usec);
         }
     }
-};
+}
 #endif
 
 #define HEARTBEAT_ALIGNMENT_STATISTICS_SIZE 10

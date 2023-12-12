@@ -56,7 +56,6 @@ int url_parse(const char *url, url_t *parsed);
 void url_t_destroy(url_t *url);
 
 void https_req_response_free(https_req_response_t *res);
-void https_req_response_init(https_req_response_t *res);
 
 #define HTTPS_REQ_RESPONSE_T_INITIALIZER            \
     {                                               \

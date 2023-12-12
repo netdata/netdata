@@ -549,7 +549,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     char buffer2[10 + 1];
     snprintfz(buffer2, 10, "%d", default_port);
 
-    char *ip = buffer, *port = buffer2, *interface = "", *portconfig;;
+    char *ip = buffer, *port = buffer2, *interface = "", *portconfig;
 
     int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
     const char *protocol_str = "tcp";

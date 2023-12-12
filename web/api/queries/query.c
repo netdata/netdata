@@ -1723,7 +1723,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                             case TIER_QUERY_FETCH_SUM:
                                 new_point.value = sp.sum;
                                 break;
-                        };
+                        }
                     }
                 }
                 else

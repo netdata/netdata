@@ -93,7 +93,7 @@ static void journal_file_get_header_from_journalctl(const char *filename, struct
             jf->messages_in_file = jf->last_seqnum - jf->first_seqnum;
     }
 
-    if(!jf->logged_journalctl_failure && (!read_head || !read_head || !read_tail)) {
+    if(!jf->logged_journalctl_failure && (!read_head || !read_tail)) {
 
         nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
                "Failed to read %s%s%s from journalctl's output on filename '%s', using the command: %s",

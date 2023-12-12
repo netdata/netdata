@@ -580,8 +580,8 @@ static void ebpf_fd_exit(void *ptr)
         ebpf_obsolete_fd_global(em);
 
 #ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_fd_pid)
-        ebpf_statistic_obsolete_aral_chart(em, fd_disable_priority);
+        if (ebpf_aral_fd_pid)
+            ebpf_statistic_obsolete_aral_chart(em, fd_disable_priority);
 #endif
 
 

@@ -68,9 +68,7 @@ void *cpuidlejitter_main(void *ptr) {
             usec_t error = dt - sleep_ut;
             error_total += error;
 
-            if(unlikely(!iterations))
-                error_min = error;
-            else if(error < error_min)
+            if(unlikely(!iterations || error < error_min))
                 error_min = error;
 
             if(error > error_max)

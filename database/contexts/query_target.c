@@ -4,7 +4,7 @@
 
 #define QUERY_TARGET_MAX_REALLOC_INCREASE 500
 #define query_target_realloc_size(size, start) \
-            (size) ? ((size) < QUERY_TARGET_MAX_REALLOC_INCREASE ? (size) * 2 : (size) + QUERY_TARGET_MAX_REALLOC_INCREASE) : (start);
+            (size) ? ((size) < QUERY_TARGET_MAX_REALLOC_INCREASE ? (size) * 2 : (size) + QUERY_TARGET_MAX_REALLOC_INCREASE) : (start)
 
 static void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm);
 static void query_dimension_release(QUERY_DIMENSION *qd);

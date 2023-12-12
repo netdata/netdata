@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define EXPORTINGS_INTERNALS
 #include "prometheus.h"
 
 // ----------------------------------------------------------------------------

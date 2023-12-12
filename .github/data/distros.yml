@@ -30,6 +30,11 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
+    version: "3.19"
+    support_type: Core
+    notes: ''
+    eol_check: true
+  - <<: *alpine
     version: "3.18"
     support_type: Core
     notes: ''

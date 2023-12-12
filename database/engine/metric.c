@@ -162,8 +162,8 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
 
-    time_t first, last, ue;
-    mrg_metric_get_retention(mrg, metric, &first, &last, &ue);
+    time_t first, last;
+    mrg_metric_get_retention(mrg, metric, &first, &last, NULL);
     return (!first || !last || first > last);
 }
 
@@ -394,8 +394,8 @@ inline bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric,
     return true;
 }
 
-inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s) {
-    internal_fatal(first_time_s < 0 || last_time_s < 0 || update_every_s < 0,
+inline void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, uint32_t update_every_s) {
+    internal_fatal(first_time_s < 0 || last_time_s < 0,
                    "DBENGINE METRIC: timestamp is negative");
     internal_fatal(first_time_s > max_acceptable_collected_time(),
                    "DBENGINE METRIC: metric first time is in the future");
@@ -425,13 +425,14 @@ inline time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metri
     return mrg_metric_get_first_time_s_smart(mrg, metric);
 }
 
-inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, time_t *update_every_s) {
+inline void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
     time_t hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
 
     *last_time_s = MAX(clean, hot);
     *first_time_s = mrg_metric_get_first_time_s_smart(mrg, metric);
-    *update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
+    if (update_every_s)
+        *update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
 }
 
 inline bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
@@ -498,8 +499,8 @@ inline bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metr
         }
     } while(do_again);
 
-    time_t first, last, ue;
-    mrg_metric_get_retention(mrg, metric, &first, &last, &ue);
+    time_t first, last;
+    mrg_metric_get_retention(mrg, metric, &first, &last, NULL);
     return (first && last && first < last);
 }
 
@@ -524,25 +525,21 @@ inline time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metr
     return MAX(clean, hot);
 }
 
-inline bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every_s) {
-    internal_fatal(update_every_s < 0, "DBENGINE METRIC: timestamp is negative");
-
+inline bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
     if(update_every_s > 0)
         return set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, true);
 
     return false;
 }
 
-inline bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every_s) {
-    internal_fatal(update_every_s < 0, "DBENGINE METRIC: timestamp is negative");
-
+inline bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, uint32_t update_every_s) {
     if(update_every_s > 0)
         return set_metric_field_with_condition(metric->latest_update_every_s, update_every_s, _current <= 0);
 
     return false;
 }
 
-inline time_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *metric) {
+inline uint32_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *metric) {
     return __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
 }
 

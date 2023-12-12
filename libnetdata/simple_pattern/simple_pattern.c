@@ -147,7 +147,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
         if(default_mode == SIMPLE_PATTERN_SUBSTRING) {
             m->mode = SIMPLE_PATTERN_SUBSTRING;
 
-            struct simple_pattern *tm = m;
+            struct simple_pattern *tm;
             for(tm = m; tm->child ; tm = tm->child) ;
             tm->mode = SIMPLE_PATTERN_SUBSTRING;
         }

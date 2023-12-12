@@ -70,12 +70,12 @@ bool mrg_metric_set_clean_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_
 bool mrg_metric_set_hot_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_time_s);
 time_t mrg_metric_get_latest_time_s(MRG *mrg, METRIC *metric);
 
-bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every_s);
-bool mrg_metric_set_update_every_s_if_zero(MRG *mrg, METRIC *metric, time_t update_every_s);
-time_t mrg_metric_get_update_every_s(MRG *mrg, METRIC *metric);
+bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, uint32_t update_every_s);
+bool mrg_metric_set_update_every_s_if_zero(MRG *mrg, METRIC *metric, uint32_t update_every_s);
+uint32_t mrg_metric_get_update_every_s(MRG *mrg, METRIC *metric);
 
-void mrg_metric_expand_retention(MRG *mrg, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s);
-void mrg_metric_get_retention(MRG *mrg, METRIC *metric, time_t *first_time_s, time_t *last_time_s, time_t *update_every_s);
+void mrg_metric_expand_retention(MRG *mrg, METRIC *metric, time_t first_time_s, time_t last_time_s, uint32_t update_every_s);
+void mrg_metric_get_retention(MRG *mrg, METRIC *metric, time_t *first_time_s, time_t *last_time_s, uint32_t *update_every_s);
 bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric);
 
 bool mrg_metric_set_writer(MRG *mrg, METRIC *metric);

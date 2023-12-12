@@ -786,8 +786,8 @@ static void ebpf_process_exit(void *ptr)
         ebpf_obsolete_process_global(em);
 
 #ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_process_stat)
-        ebpf_statistic_obsolete_aral_chart(em, process_disable_priority);
+        if (ebpf_aral_process_stat)
+            ebpf_statistic_obsolete_aral_chart(em, process_disable_priority);
 #endif
 
         fflush(stdout);

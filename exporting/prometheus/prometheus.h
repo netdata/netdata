@@ -9,8 +9,6 @@
 #define PROMETHEUS_LABELS_MAX   1024
 #define PROMETHEUS_VARIABLE_MAX 256
 
-#define PROMETHEUS_LABELS_MAX_NUMBER 128
-
 typedef enum prometheus_output_flags {
     PROMETHEUS_OUTPUT_NONE       = 0,
     PROMETHEUS_OUTPUT_HELP       = (1 << 0),

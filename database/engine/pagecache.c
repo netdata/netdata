@@ -246,7 +246,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
 
         time_t page_start_time_s = pgc_page_start_time_s(page);
         time_t page_end_time_s = pgc_page_end_time_s(page);
-        time_t page_update_every_s = pgc_page_update_every_s(page);
+        uint32_t page_update_every_s = pgc_page_update_every_s(page);
 
         if(!page_update_every_s)
             page_update_every_s = dt_s;
@@ -282,7 +282,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->metric_id = metric_id;
             pd->first_time_s = page_start_time_s;
             pd->last_time_s = page_end_time_s;
-            pd->update_every_s = (uint32_t) page_update_every_s;
+            pd->update_every_s = page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
             pd->status |= tags;
 
@@ -332,8 +332,8 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
 
 static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_t start_time_s, time_t end_time_s) {
 
-    time_t db_first_time_s, db_last_time_s, db_update_every_s;
-    mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, &db_update_every_s);
+    time_t db_first_time_s, db_last_time_s;
+    mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, NULL);
 
     if(is_page_in_time_range(start_time_s, end_time_s, db_first_time_s, db_last_time_s) != PAGE_IS_IN_RANGE)
         return;
@@ -845,7 +845,7 @@ struct pgc_page *pg_cache_lookup_next(
         struct rrdengine_instance *ctx,
         PDC *pdc,
         time_t now_s,
-        time_t last_update_every_s,
+        uint32_t last_update_every_s,
         size_t *entries
 ) {
     if (unlikely(!pdc))
@@ -905,7 +905,7 @@ struct pgc_page *pg_cache_lookup_next(
 
         time_t page_start_time_s = pgc_page_start_time_s(page);
         time_t page_end_time_s = pgc_page_end_time_s(page);
-        time_t page_update_every_s = pgc_page_update_every_s(page);
+        uint32_t page_update_every_s = pgc_page_update_every_s(page);
 
         if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);
@@ -918,7 +918,7 @@ struct pgc_page *pg_cache_lookup_next(
             if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
                 page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
-                pd->update_every_s = (uint32_t) page_update_every_s;
+                pd->update_every_s = page_update_every_s;
             }
 
             size_t entries_by_size = pgd_slots_used(pgc_page_data(page));
@@ -983,7 +983,7 @@ struct pgc_page *pg_cache_lookup_next(
     return page;
 }
 
-void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s,
+void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, uint32_t update_every_s,
            struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size, uint32_t page_length) {
 
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) // for open cache item
@@ -1003,7 +1003,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
             .metric_id = metric_id,
             .start_time_s = start_time_s,
             .end_time_s =  end_time_s,
-            .update_every_s = (uint32_t) update_every_s,
+            .update_every_s = update_every_s,
             .size = 0,
             .data = datafile,
             .custom_data = (uint8_t *) &ext_io_data,

@@ -321,7 +321,7 @@ static inline int ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesys
         ret = ebpf_fs_attach_kprobe(obj, functions);
 
     if (!ret)
-        map->map_fd = bpf_map__fd(obj->maps.tbl_fs);;
+        map->map_fd = bpf_map__fd(obj->maps.tbl_fs);
 
     return ret;
 }

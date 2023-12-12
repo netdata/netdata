@@ -628,7 +628,7 @@ void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
         buffer_strcat(wb, "STEP_UNALIGNED");
 }
 
-inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
+inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
     time_t start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
 
     time_t end_time_s;
@@ -666,12 +666,12 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         uuid_t *uuid,
         time_t start_time_s,
         time_t end_time_s,
-        time_t update_every_s,                  // can be zero, if unknown
+        uint32_t update_every_s,                // can be zero, if unknown
         size_t page_length,
         uint8_t page_type,
         size_t entries,                         // can be zero, if unknown
         time_t now_s,                           // can be zero, to disable future timestamp check
-        time_t overwrite_zero_update_every_s,   // can be zero, if unknown
+        uint32_t overwrite_zero_update_every_s,   // can be zero, if unknown
         bool have_read_error,
         const char *msg,
         RRDENG_COLLECT_PAGE_FLAGS flags) {
@@ -732,7 +732,6 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         (now_s && vd.end_time_s > now_s)                        ||
         vd.start_time_s <= 0                                    ||
         vd.end_time_s <= 0                                      ||
-        vd.update_every_s < 0                                   ||
         (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
         (vd.update_every_s == 0 && vd.entries > 1))
     {
@@ -797,7 +796,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             );
         }
         else {
-            const char *err_valid = (vd.is_valid) ? "" : "found invalid, ";
+            const char *err_valid = "";
             const char *err_start = (vd.start_time_s == start_time_s) ? "" : "start time updated, ";
             const char *err_end = (vd.end_time_s == end_time_s) ? "" : "end time updated, ";
             const char *err_update = (vd.update_every_s == update_every_s) ? "" : "update every updated, ";
