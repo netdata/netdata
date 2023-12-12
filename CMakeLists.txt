@@ -1709,6 +1709,10 @@ add_definitions(-DHAVE_CONFIG_H)
 
 set(STORAGE_WITH_MATH On)
 
+if(NOT CMAKE_INSTALL_PREFIX STREQUAL "")
+  string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+endif()
+
 set(CACHE_DIR "${CMAKE_INSTALL_PREFIX}/var/cache/netdata")
 set(CONFIG_DIR "${CMAKE_INSTALL_PREFIX}/etc/netdata")
 set(LIBCONFIG_DIR "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d")
