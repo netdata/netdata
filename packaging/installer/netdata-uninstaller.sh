@@ -739,9 +739,11 @@ if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ] && [ "netdata" = "$(
 else
   rm_file "${NETDATA_PREFIX}/usr/sbin/netdata"
   rm_file "${NETDATA_PREFIX}/usr/sbin/netdatacli"
+  rm_file "${NETDATA_PREFIX}/usr/sbin/netdata-claim.sh"
+  rm_file "${NETDATA_PREFIX}/usr/sbin/log2journal"
+  rm_file "${NETDATA_PREFIX}/usr/sbin/systemd-cat-native"
   rm_file "/tmp/netdata-ipc"
   rm_file "/tmp/netdata-service-cmds"
-  rm_file "${NETDATA_PREFIX}/usr/sbin/netdata-claim.sh"
   rm_dir "${NETDATA_PREFIX}/usr/share/netdata"
   rm_dir "${NETDATA_PREFIX}/usr/libexec/netdata"
   rm_dir "${NETDATA_PREFIX}/var/lib/netdata"
