@@ -23,7 +23,8 @@ void rrdfunctions_host_destroy(RRDHOST *host);
 
 // add a function, to be run from the collector
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help, const char *tags,
-                      bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data);
+                      HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
+                      void *execute_cb_data);
 
 // call a function, to be run from anywhere
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *cmd,
@@ -39,7 +40,7 @@ void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);
 
 void chart_functions2json(RRDSET *st, BUFFER *wb);
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size);
-void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags);
+void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags, HTTP_ACCESS *access);
 void host_functions2json(RRDHOST *host, BUFFER *wb);
 
 uint8_t functions_format_to_content_type(const char *format);

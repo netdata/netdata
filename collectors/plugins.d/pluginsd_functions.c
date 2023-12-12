@@ -283,6 +283,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     char *timeout_s = get_word(words, num_words, i++);
     char *help      = get_word(words, num_words, i++);
     char *tags      = get_word(words, num_words, i++);
+    char *access    = get_word(words, num_words, i++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_FUNCTION);
     if(!host) return PARSER_RC_ERROR;
@@ -309,7 +310,9 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
             timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
     }
 
-    rrd_function_add(host, st, name, timeout, help, tags, false, pluginsd_function_execute_cb, parser);
+    rrd_function_add(host, st, name, timeout, help, tags,
+                     http_access2id(access), false,
+                     pluginsd_function_execute_cb, parser);
 
     parser->user.data_collections_count++;
 

@@ -130,8 +130,9 @@ struct web_client {
     uuid_t transaction;
 
     WEB_CLIENT_FLAGS flags;             // status flags for the client
-    HTTP_REQUEST_MODE mode;               // the operational mode of the client
-    WEB_CLIENT_ACL acl;                 // the access list of the client
+    HTTP_REQUEST_MODE mode;             // the operational mode of the client
+    HTTP_ACL acl;                       // the access list of the client
+    HTTP_ACCESS access;                 // the access level of the client
     int port_acl;                       // the operations permitted on the port the client connected to
     size_t header_parse_tries;
     size_t header_parse_last_size;

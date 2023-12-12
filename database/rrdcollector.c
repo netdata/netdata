@@ -12,7 +12,7 @@
 
 struct rrd_collector {
     int32_t refcount;
-    int32_t refcount_canceller;
+    int32_t refcount_dispatcher;
     pid_t tid;
     bool running;
 };
@@ -31,21 +31,21 @@ inline pid_t rrd_collector_tid(struct rrd_collector *rdc) {
     return rdc->tid;
 }
 
-bool rrd_collector_canceller_acquire(struct rrd_collector *rdc) {
-    int32_t expected = __atomic_load_n(&rdc->refcount_canceller, __ATOMIC_RELAXED);
+bool rrd_collector_dispatcher_acquire(struct rrd_collector *rdc) {
+    int32_t expected = __atomic_load_n(&rdc->refcount_dispatcher, __ATOMIC_RELAXED);
     int32_t wanted;
     do {
         if(expected < 0)
             return false;
 
         wanted = expected + 1;
-    } while(!__atomic_compare_exchange_n(&rdc->refcount_canceller, &expected, wanted, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    } while(!__atomic_compare_exchange_n(&rdc->refcount_dispatcher, &expected, wanted, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
     return true;
 }
 
-void rrd_collector_canceller_release(struct rrd_collector *rdc) {
-    __atomic_sub_fetch(&rdc->refcount_canceller, 1, __ATOMIC_RELAXED);
+void rrd_collector_dispatcher_release(struct rrd_collector *rdc) {
+    __atomic_sub_fetch(&rdc->refcount_dispatcher, 1, __ATOMIC_RELAXED);
 }
 
 static void rrd_collector_free(struct rrd_collector *rdc) {
@@ -85,7 +85,7 @@ void rrd_collector_finished(void) {
     // delaying the exit of the thread is required to avoid cleaning up this structure.
 
     int32_t expected = 0;
-    while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount_canceller, &expected, -1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+    while(!__atomic_compare_exchange_n(&thread_rrd_collector->refcount_dispatcher, &expected, -1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
         expected = 0;
         sleep_usec(1 * USEC_PER_MS);
     }

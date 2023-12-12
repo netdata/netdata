@@ -452,6 +452,7 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
 }
 
 #define RRDFUNCTIONS_CGTOP_HELP "View running containers"
+#define RRDFUNCTIONS_SYSTEMD_SERVICES_HELP "View systemd services"
 
 int cgroup_function_cgroup_top(BUFFER *wb, int timeout, const char *function, void *collector_data,
         rrd_function_result_callback_t result_cb, void *result_cb_data,

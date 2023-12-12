@@ -421,7 +421,7 @@ static bool find_filename_to_serve(const char *filename, char *dst, size_t dst_l
 static int mysendfile(struct web_client *w, char *filename) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
-    if(!web_client_can_access_dashboard(w))
+    if(!http_can_access_dashboard(w))
         return web_client_permission_denied(w);
 
     // skip leading slashes
@@ -632,14 +632,14 @@ static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char 
 }
 
 static inline int UNUSED_FUNCTION(check_host_and_dashboard_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(!web_client_can_access_dashboard(w))
+    if(!http_can_access_dashboard(w))
         return web_client_permission_denied(w);
 
     return check_host_and_call(host, w, url, func);
 }
 
 static inline int UNUSED_FUNCTION(check_host_and_mgmt_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(!web_client_can_access_mgmt(w))
+    if(!http_can_access_mgmt(w))
         return web_client_permission_denied(w);
 
     return check_host_and_call(host, w, url, func);
@@ -912,7 +912,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
         s = &s[7];
 
 #ifdef ENABLE_HTTPS
-        if (!SSL_connection(&w->ssl) && web_client_is_using_ssl_force(w)) {
+        if (!SSL_connection(&w->ssl) && http_is_using_ssl_force(w)) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
@@ -1054,7 +1054,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
-                    if (!w->ssl.conn && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != HTTP_REQUEST_MODE_STREAM)) {
+                    if (!w->ssl.conn && (http_is_using_ssl_force(w) || http_is_using_ssl_default(w)) && (w->mode != HTTP_REQUEST_MODE_STREAM)) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
                         web_client_disable_wait_receive(w);
@@ -1467,7 +1467,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return web_client_process_url(host, w, decoded_url_path);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
-            if(unlikely(!web_client_can_access_netdataconf(w)))
+            if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: generating netdata.conf ...", w->id);
@@ -1478,7 +1478,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
-            if(unlikely(!web_client_can_access_netdataconf(w)))
+            if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
             w->response.data->content_type = CT_TEXT_PLAIN;
@@ -1494,7 +1494,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
-            if(unlikely(!web_client_can_access_netdataconf(w)))
+            if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
             buffer_flush(w->response.data);
@@ -1534,7 +1534,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_BAD_REQUEST;
         }
         else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
-            if(unlikely(!web_client_can_access_netdataconf(w)))
+            if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
@@ -1603,7 +1603,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
             switch(w->mode) {
                 case HTTP_REQUEST_MODE_STREAM:
-                    if(unlikely(!web_client_can_access_stream(w))) {
+                    if(unlikely(!http_can_access_stream(w))) {
                         web_client_permission_denied(w);
                         return;
                     }
@@ -1613,11 +1613,11 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
                 case HTTP_REQUEST_MODE_OPTIONS:
                     if(unlikely(
-                            !web_client_can_access_dashboard(w) &&
-                            !web_client_can_access_registry(w) &&
-                            !web_client_can_access_badges(w) &&
-                            !web_client_can_access_mgmt(w) &&
-                            !web_client_can_access_netdataconf(w)
+                            !http_can_access_dashboard(w) &&
+                            !http_can_access_registry(w) &&
+                            !http_can_access_badges(w) &&
+                            !http_can_access_mgmt(w) &&
+                            !http_can_access_netdataconf(w)
                     )) {
                         web_client_permission_denied(w);
                         break;
@@ -1635,11 +1635,11 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 case HTTP_REQUEST_MODE_PUT:
                 case HTTP_REQUEST_MODE_DELETE:
                     if(unlikely(
-                            !web_client_can_access_dashboard(w) &&
-                            !web_client_can_access_registry(w) &&
-                            !web_client_can_access_badges(w) &&
-                            !web_client_can_access_mgmt(w) &&
-                            !web_client_can_access_netdataconf(w)
+                            !http_can_access_dashboard(w) &&
+                            !http_can_access_registry(w) &&
+                            !http_can_access_badges(w) &&
+                            !http_can_access_mgmt(w) &&
+                            !http_can_access_netdataconf(w)
                     )) {
                         web_client_permission_denied(w);
                         break;

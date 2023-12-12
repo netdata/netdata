@@ -31,7 +31,7 @@ typedef struct query {
     usec_t finished_ut;
 
     HTTP_REQUEST_MODE mode;
-    WEB_CLIENT_ACL acl;
+    HTTP_ACL acl;
 
     uint32_t sent_size;
     uint32_t response_size;
@@ -173,7 +173,7 @@ static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, uuid_t *transact
         uuid_copy(qp->transaction, *transaction);
 }
 
-static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, HTTP_REQUEST_MODE mode, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
+static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, const char *payload, const char *client) {
     qp->mode = mode;
     qp->acl = acl;
     qp->started_ut = started_ut ? started_ut : now_realtime_usec();
@@ -210,7 +210,7 @@ static inline void query_progress_unlink_from_cache_unsafe(QUERY_PROGRESS *qp) {
 // ----------------------------------------------------------------------------
 // Progress API
 
-void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, WEB_CLIENT_ACL acl, const char *query, const char *payload, const char *client) {
+void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, const char *payload, const char *client) {
     if(!transaction)
         return;
 
@@ -425,9 +425,9 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
         buffer_json_add_array_item_string(wb, buffer_tostring(qp->query));
 
         if(!buffer_strlen(qp->client)) {
-            if(qp->acl & WEB_CLIENT_ACL_ACLK)
+            if(qp->acl & HTTP_ACL_ACLK)
                 buffer_json_add_array_item_string(wb, "ACLK");
-            else if(qp->acl & WEB_CLIENT_ACL_WEBRTC)
+            else if(qp->acl & HTTP_ACL_WEBRTC)
                 buffer_json_add_array_item_string(wb, "WEBRTC");
             else
                 buffer_json_add_array_item_string(wb, "unknown");

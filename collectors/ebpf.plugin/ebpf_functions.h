@@ -6,7 +6,7 @@
 #ifdef NETDATA_DEV_MODE
 // Common
 static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
-    fprintf(stdout, "%s \"%s\" 10 \"%s\"\n", PLUGINSD_KEYWORD_FUNCTION, NAME, DESC);
+    fprintf(stdout, "%s \"%s\" 10 \"%s\" \"top\" \"all\"\n", PLUGINSD_KEYWORD_FUNCTION, NAME, DESC);
 }
 #endif
 

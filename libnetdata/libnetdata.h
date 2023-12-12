@@ -710,7 +710,7 @@ extern char *netdata_configured_host_prefix;
 #include "xxhash.h"
 
 #include "uuid/uuid.h"
-
+#include "http/http_access.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
 #include "os.h"

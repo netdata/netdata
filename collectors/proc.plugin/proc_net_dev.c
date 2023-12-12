@@ -1927,7 +1927,9 @@ void *netdev_main(void *ptr)
     netdata_thread_cleanup_push(netdev_main_cleanup, ptr);
 
     rrd_collector_started();
-    rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_NETDEV_HELP, "top", true, netdev_function_net_interfaces, NULL);
+    rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_NETDEV_HELP,
+                     "top", HTTP_ACCESS_ALL,
+                     true, netdev_function_net_interfaces, NULL);
 
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;

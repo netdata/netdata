@@ -224,6 +224,8 @@ LIBNETDATA_FILES = \
     libnetdata/worker_utilization/worker_utilization.c \
     libnetdata/worker_utilization/worker_utilization.h \
     libnetdata/xxhash.h \
+    libnetdata/http/http_access.h \
+    libnetdata/http/http_access.c \
     libnetdata/http/http_defs.h \
     libnetdata/http/http_defs.c \
     libnetdata/dyn_conf/dyn_conf.c \

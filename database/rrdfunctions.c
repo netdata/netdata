@@ -85,13 +85,14 @@ typedef enum __attribute__((packed)) {
 struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
     RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
+    HTTP_ACCESS access;
     STRING *help;
     STRING *tags;
     int timeout;                    // the default timeout of the function
 
     rrd_function_execute_cb_t execute_cb;
-
     void *execute_cb_data;
+
     struct rrd_collector *collector;
 };
 
@@ -262,7 +263,8 @@ void rrdfunctions_host_destroy(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, const char *help, const char *tags,
-                      bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+                      HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
+                      void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function
     // to create a GLOBAL function
@@ -284,6 +286,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .sync = sync,
         .timeout = timeout,
         .options = (st)?RRD_FUNCTION_LOCAL:RRD_FUNCTION_GLOBAL,
+        .access = access,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
         .help = string_strdupz(help),
@@ -306,11 +309,12 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     struct rrd_host_function *tmp;
     dfe_start_read(st->functions_view, tmp) {
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\"\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" \"%s\"\n"
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
                        , string2str(tmp->tags)
+                       , http_id2access(tmp->access)
                        );
     }
     dfe_done(tmp);
@@ -325,11 +329,12 @@ void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
             continue;
 
         buffer_sprintf(wb
-                , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\"\n"
+                , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" \"%s\"\n"
                 , tmp_dfe.name
                 , tmp->timeout
                 , string2str(tmp->help)
                 , string2str(tmp->tags)
+                , http_id2access(tmp->access)
         );
     }
     dfe_done(tmp);
@@ -803,7 +808,7 @@ void rrd_function_cancel(const char *transaction) {
 
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
-    if(!rrd_collector_canceller_acquire(r->rdcf->collector)) {
+    if(!rrd_collector_dispatcher_acquire(r->rdcf->collector)) {
         netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the collector is not running.",
                          transaction);
         goto cleanup;
@@ -812,7 +817,7 @@ void rrd_function_cancel(const char *transaction) {
     if(r->canceller.cb)
         r->canceller.cb(r->canceller.data);
 
-    rrd_collector_canceller_release(r->rdcf->collector);
+    rrd_collector_dispatcher_release(r->rdcf->collector);
 
 cleanup:
     dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
@@ -843,6 +848,7 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb)
 
             buffer_json_member_add_string_or_empty(wb, "options", options);
             buffer_json_member_add_string_or_empty(wb, "tags", string2str(t->tags));
+            buffer_json_member_add_string(wb, "access", http_id2access(t->access));
         }
         buffer_json_object_close(wb);
     }
@@ -877,6 +883,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
             }
             buffer_json_array_close(wb);
             buffer_json_member_add_string(wb, "tags", string2str(t->tags));
+            buffer_json_member_add_string(wb, "access", http_id2access(t->access));
         }
         buffer_json_object_close(wb);
     }
@@ -897,7 +904,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
     dfe_done(t);
 }
 
-void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags) {
+void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags, HTTP_ACCESS *access) {
     if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
 
     struct rrd_host_function *t;
@@ -909,6 +916,9 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
 
         if(tags)
             *tags = t->tags;
+
+        if(access)
+            *access = t->access;
 
         dictionary_set(dst, t_dfe.name, value, value_size);
     }

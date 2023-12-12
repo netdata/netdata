@@ -1019,12 +1019,12 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
         analytics_log_dashboard();
-        if(unlikely(!web_client_can_access_dashboard(w)))
+        if(unlikely(!http_can_access_dashboard(w)))
             return web_client_permission_denied(w);
     }
     else {
         // everything else, registry ACL
-        if(unlikely(!web_client_can_access_registry(w)))
+        if(unlikely(!http_can_access_registry(w)))
             return web_client_permission_denied(w);
 
         if(unlikely(do_not_track)) {
@@ -1548,43 +1548,43 @@ int web_client_api_request_v1_mgmt(RRDHOST *host, struct web_client *w, char *ur
 }
 
 static struct web_api_command api_commands_v1[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info,     0                     },
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data,     0                     },
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_chart,    0                     },
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_charts,   0                     },
-        { "context",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_context,  0                     },
-        { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts, 0                     },
+        {"info", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_info, 0                     },
+        {"data", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_data, 0                     },
+        {"chart", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_chart, 0                     },
+        {"charts", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_charts, 0                     },
+        {"context", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_context, 0                     },
+        {"contexts", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_contexts, 0                     },
 
         // registry checks the ACL by itself, so we allow everything
-        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,               web_client_api_request_v1_registry, 0                     },
+        {"registry", 0, HTTP_ACL_NOCHECK, web_client_api_request_v1_registry, 0                     },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge, 0 },
+        {"badge.svg", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC | HTTP_ACL_BADGE, web_client_api_request_v1_badge, 0 },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms,          0              },
-        { "alarms_values",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values,   0              },
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log,       0              },
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables, 0              },
-        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count,     0              },
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics,      0              },
+        {"alarms", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms, 0              },
+        {"alarms_values", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values, 0              },
+        {"alarm_log", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log, 0              },
+        {"alarm_variables", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables, 0              },
+        {"alarm_count", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count, 0              },
+        {"allmetrics", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics, 0              },
 
 #if defined(ENABLE_ML)
-        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info, 0                      },
-        // { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        {"ml_info", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_ml_info, 0                      },
+        // { "ml_models",       0, HTTP_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
-        {"manage",        0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_mgmt, 1 },
-        { "aclk",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state, 0            },
-        { "metric_correlations", 0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations, 0   },
-        { "weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights, 0               },
+        {"manage", 0, HTTP_ACL_MGMT | HTTP_ACL_ACLK, web_client_api_request_v1_mgmt, 1 },
+        {"aclk", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_aclk_state, 0            },
+        {"metric_correlations", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations, 0   },
+        {"weights", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights, 0               },
 
-        {"function",             0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
-        {"functions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
+        {"function", 0, HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
+        {"functions", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
 
-        { "dbengine_stats",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
+        {"dbengine_stats", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
 
         // terminator
-        { NULL,                  0, WEB_CLIENT_ACL_NONE,      NULL, 0 },
+        {NULL, 0, HTTP_ACL_NONE, NULL, 0 },
 };
 
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {

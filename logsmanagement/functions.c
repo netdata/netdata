@@ -736,7 +736,7 @@ struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsman
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     netdata_mutex_lock(&stdout_mut);
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\"\n",
                     LOGS_MANAG_FUNC_NAME, 
                     LOGS_MANAG_QUERY_TIMEOUT_DEFAULT, 
                     FUNCTION_LOGSMANAGEMENT_HELP_SHORT);
