@@ -1,0 +1,160 @@
+plugin_name: python.d.plugin
+modules:
+  - meta:
+      plugin_name: python.d.plugin
+      module_name: alerts
+      monitored_instance:
+        name: Netdata Agent Alerts
+        link: https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alerts/README.md
+        categories:
+          - data-collection.other
+        icon_filename: ""
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - alerts
+        - netdata
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector creates an 'Alerts' menu with three stacked plots of `alerts.counts`, `alerts.warning`, `alerts.critical`.
+        method_description: |
+          Alert status is read from the Netdata agent rest api [`/api/v1/alarms?all`](https://learn.netdata.cloud/api#/alerts/alerts1).
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            It discovers instances of Netdata running on localhost, and gathers metrics from `http://127.0.0.1:19999/api/v1/alarms?all`. 
+            By default all alerts produced will be monitored.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: python.d/alerts.conf
+          description: ""
+        options:
+          description: |
+            There are 2 sections:
+            
+            * Global variables
+            * One or more JOBS that can define multiple different instances to monitor.
+            
+            The following options can be defined globally: priority, penalty, autodetection_retry, update_every, but can also be defined per JOB to override the global values.
+            
+            Additionally, the following collapsed table contains all the options that can be configured inside a JOB definition.
+            
+            Every configuration JOB starts with a `job_name` value which will appear in the dashboard, unless a `name` parameter is specified.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: url
+              description: Netdata agent alerts endpoint to collect from. Can be local or remote so long as reachable by agent.
+              default_value: http://127.0.0.1:19999/api/v1/alarms?all
+              required: true
+            - name: alert_contains_words
+              description: >
+                A "," separated list of words you want to filter alert names for. For example 'cpu,load' would filter for only alerts with "cpu" or "load" in alert name. Default includes all.
+              default_value: ""
+              required: true
+            - name: alert_excludes_words
+              description: >
+                A "," separated list of words you want to exclude based on alert name. For example 'cpu,load' would exclude all alerts with "cpu" or "load" in alert name. Default excludes None.
+              default_value: ""
+              required: true
+            - name: update_every
+              description: Sets the default data collection frequency.
+              default_value: 10
+              required: false
+            - name: priority
+              description: Controls the order of charts at the netdata dashboard.
+              default_value: 60000
+              required: false
+            - name: autodetection_retry
+              description: Sets the job re-check interval in seconds.
+              default_value: 0
+              required: false
+            - name: penalty
+              description: Indicates whether to apply penalty to update_every in case of failures.
+              default_value: yes
+              required: false
+            - name: name
+              description: Job name. This value will overwrite the `job_name` value. JOBS with the same name are mutually exclusive. Only one of them will be allowed running at any time. This allows autodetection to try several alternatives and pick the one that works.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+            - name: Advanced
+              folding:
+                enabled: true
+              description: |
+                An advanced example configuration with multiple jobs collecting different subsets of alerts for plotting on different charts.
+                "ML" job will collect status and values for all alerts with "ml_" in the name. Default job will collect status for all other alerts.
+              config: |
+                ML:
+                  update_every: 5
+                  url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+                  alarm_contains_words: 'ml_'
+                
+                Default:
+                  update_every: 5
+                  url: 'http://127.0.0.1:19999/api/v1/alarms?all'
+                  alarm_excludes_words: 'ml_'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: |
+            These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: alerts.counts
+              description: Alerts Counts
+              unit: "alerts"
+              chart_type: stacked
+              dimensions:
+                - name: Dimensions for `clear`, `warning`, `critical` alert counts.
+            - name: alerts.warning
+              description: Warning Alerts
+              unit: "alerts"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per alert in WARNING state.
+            - name: alerts.critical
+              description: Critical Alerts
+              unit: "alerts"
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per alert in CRITICAL state.

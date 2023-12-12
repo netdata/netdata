@@ -41,6 +41,7 @@ dist_pythonconfig_DATA = \
 
 include adaptec_raid/Makefile.inc
 include alarms/Makefile.inc
+include alerts/Makefile.inc
 include am2320/Makefile.inc
 include anomalies/Makefile.inc
 include beanstalk/Makefile.inc
