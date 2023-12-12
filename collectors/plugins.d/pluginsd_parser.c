@@ -1320,6 +1320,9 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
         case 42:
             return pluginsd_function_result_begin(words, num_words, parser);
 
+        case 43:
+            return pluginsd_function_progress(words, num_words, parser);
+
         case 51:
             return pluginsd_label(words, num_words, parser);
 

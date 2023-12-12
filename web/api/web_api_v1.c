@@ -1416,6 +1416,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
     return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
                             NULL, NULL,
+                            query_progress_functions_update, &w->transaction,
                             web_client_interrupt_callback, w, NULL);
 }
 

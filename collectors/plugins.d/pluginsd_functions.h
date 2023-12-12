@@ -6,22 +6,33 @@
 #include "pluginsd_internals.h"
 
 struct inflight_function {
+    uuid_t transaction;
+
     int code;
     int timeout;
     STRING *function;
     BUFFER *result_body_wb;
-    rrd_function_result_callback_t result_cb;
-    void *result_cb_data;
     usec_t timeout_ut;
     usec_t started_ut;
     usec_t sent_ut;
     const char *payload;
     PARSER *parser;
     bool virtual;
+
+    struct {
+        rrd_function_result_callback_t cb;
+        void *data;
+    } result;
+
+    struct {
+        rrd_function_progress_cb_t cb;
+        void *data;
+    } progress;
 };
 
 PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER *parser);
+PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *parser);
 
 void pluginsd_inflight_functions_init(PARSER *parser);
 void pluginsd_inflight_functions_cleanup(PARSER *parser);

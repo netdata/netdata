@@ -325,6 +325,32 @@ void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int 
     }
 }
 
+void query_progress_functions_update(void *data, size_t done, size_t all) {
+    if(!data)
+        return;
+
+    uuid_t *transaction = data;
+
+    spinlock_lock(&progress.spinlock);
+    query_progress_init_unsafe();
+
+    QUERY_PROGRESS *qp = query_progress_find_in_hashtable_unsafe(transaction);
+
+    internal_fatal(!qp, "Attempt to update the progress of a transaction that has not been started");
+
+    if(qp) {
+        if(all)
+            qp->all = all;
+
+        if(done)
+            qp->done = done;
+
+        qp->updates++;
+    }
+
+    spinlock_unlock(&progress.spinlock);
+}
+
 // ----------------------------------------------------------------------------
 // /api/v2/progress - to get the progress of a transaction
 

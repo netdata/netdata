@@ -60,18 +60,19 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
             .result_body_wb = wb,
             .timeout = VIRT_FNC_TIMEOUT * 10,
             .function = string_strdupz(buffer_tostring(function_out)),
-            .result_cb = callback,
-            .result_cb_data = callback_data,
             .payload = payload != NULL ? strdupz(payload) : NULL,
             .virtual = true,
+
+            .result = {
+                    .cb = callback,
+                    .data = callback_data,
+            }
     };
     buffer_free(function_out);
 
-    uuid_t uuid;
-    uuid_generate_time(uuid);
-
-    char key[UUID_STR_LEN];
-    uuid_unparse_lower(uuid, key);
+    uuid_generate_time(tmp.transaction);
+    char key[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(tmp.transaction, key);
 
     dictionary_write_lock(parser->inflight.functions);
 
@@ -105,17 +106,19 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
             .result_body_wb = wb,
             .timeout = VIRT_FNC_TIMEOUT,
             .function = string_strdupz(name),
-            .result_cb = virt_fnc_got_data_cb,
-            .result_cb_data = &cond,
             .payload = payload != NULL ? strdupz(payload) : NULL,
             .virtual = true,
+
+            .result = {
+                    .cb = virt_fnc_got_data_cb,
+                    .data = &cond,
+            }
     };
 
-    uuid_t uuid;
-    uuid_generate_time(uuid);
+    uuid_generate_time(tmp.transaction);
 
-    char key[UUID_STR_LEN];
-    uuid_unparse_lower(uuid, key);
+    char key[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(tmp.transaction, key);
 
     dictionary_write_lock(parser->inflight.functions);
 

@@ -134,6 +134,7 @@ Netdata parses lines starting with:
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
 -    `FUNCTION` - define functions
+-    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
 -    `FUNCTION_RESULT_END` - to end the transmission of function results
 
@@ -144,9 +145,9 @@ Charts can be added any time (not just the beginning).
 Netdata may send the following commands to the plugin's `stdin`:
 
 -    `FUNCTION` - to call a specific function, with all parameters inline
--    `FUNCTION_CANCEL` - cancel a running function transaction
 -    `FUNCTION_PAYLOAD` - to call a specific function, with a payload of parameters
 -    `FUNCTION_PAYLOAD_END` - to end the payload of parameters
+-    `FUNCTION_CANCEL` - cancel a running function transaction
 
 ### Command line parameters
 

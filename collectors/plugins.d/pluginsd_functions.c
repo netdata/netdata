@@ -17,6 +17,10 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
     const char *transaction = dictionary_acquired_item_name(item);
 
+    int rc = uuid_parse_flexi(transaction, pf->transaction);
+    if(rc != 0)
+        netdata_log_error("FUNCTION: '%s': cannot parse transaction UUID of function '%s'", string2str(pf->function));
+
     char buffer[2048 + 1];
     snprintfz(buffer, sizeof(buffer) - 1, "%s %s %d \"%s\"\n",
               pf->payload ? PLUGINSD_KEYWORD_FUNCTION_PAYLOAD : PLUGINSD_KEYWORD_FUNCTION,
@@ -65,7 +69,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
 
     netdata_log_error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
     pf->code = rrd_call_function_error(pf->result_body_wb, "This request is already in progress", HTTP_RESP_BAD_REQUEST);
-    pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
+    pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
     string_freez(pf->function);
 
     return false;
@@ -144,7 +148,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
         }
     }
 
-    pf->result_cb(pf->result_body_wb, pf->code, pf->result_cb_data);
+    pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
 
     string_freez(pf->function);
     freez((void *)pf->payload);
@@ -220,12 +224,14 @@ static void pluginsd_function_cancel(void *data) {
 
 // this is the function called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
-static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, const char *function,
+static int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
+                                        int timeout, const char *function,
                                         void *execute_cb_data,
                                         rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                        rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                                         rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
                                         void *is_cancelled_cb_data __maybe_unused,
-                                        rrd_function_register_canceller_cb_t register_canceller_cb,
+                                        rrd_function_register_cancel_cb_t register_canceller_cb,
                                         void *register_canceller_db_data) {
     PARSER  *parser = execute_cb_data;
 
@@ -237,23 +243,28 @@ static int pluginsd_function_execute_cb(BUFFER *result_body_wb, int timeout, con
             .result_body_wb = result_body_wb,
             .timeout = timeout,
             .function = string_strdupz(function),
-            .result_cb = result_cb,
-            .result_cb_data = result_cb_data,
             .payload = NULL,
             .parser = parser,
+
+            .result = {
+                    .cb = result_cb,
+                    .data = result_cb_data,
+            },
+            .progress = {
+                    .cb = progress_cb,
+                    .data = progress_cb_data,
+            },
     };
+    uuid_copy(tmp.transaction, *transaction);
 
-    uuid_t uuid;
-    uuid_generate_random(uuid);
-
-    char transaction[UUID_STR_LEN];
-    uuid_unparse_lower(uuid, transaction);
+    char transaction_str[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(tmp.transaction, transaction_str);
 
     dictionary_write_lock(parser->inflight.functions);
 
     // if there is any error, our dictionary callbacks will call the caller callback to notify
     // the caller about the error - no need for error handling here.
-    void *t = dictionary_set(parser->inflight.functions, transaction, &tmp, sizeof(struct inflight_function));
+    void *t = dictionary_set(parser->inflight.functions, transaction_str, &tmp, sizeof(struct inflight_function));
     if(register_canceller_cb)
         register_canceller_cb(register_canceller_db_data, pluginsd_function_cancel, t);
 
@@ -336,15 +347,27 @@ static void pluginsd_function_result_end(struct parser *parser, void *action_dat
     parser->user.data_collections_count++;
 }
 
+static inline struct inflight_function *inflight_function_find(PARSER *parser, const char *transaction) {
+    struct inflight_function *pf = NULL;
+
+    if(transaction && *transaction)
+        pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, transaction);
+
+    if(!pf)
+        netdata_log_error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", transaction ? transaction : "(unset)");
+
+    return pf;
+}
+
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER *parser) {
-    char *key = get_word(words, num_words, 1);
+    char *transaction = get_word(words, num_words, 1);
     char *status = get_word(words, num_words, 2);
     char *format = get_word(words, num_words, 3);
     char *expires = get_word(words, num_words, 4);
 
-    if (unlikely(!key || !*key || !status || !*status || !format || !*format || !expires || !*expires)) {
+    if (unlikely(!transaction || !*transaction || !status || !*status || !format || !*format || !expires || !*expires)) {
         netdata_log_error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " without providing the required data (key = '%s', status = '%s', format = '%s', expires = '%s')."
-        , key ? key : "(unset)"
+        , transaction ? transaction : "(unset)"
         , status ? status : "(unset)"
         , format ? format : "(unset)"
         , expires ? expires : "(unset)"
@@ -357,15 +380,8 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER 
 
     time_t expiration = (expires && *expires) ? str2l(expires) : 0;
 
-    struct inflight_function *pf = NULL;
-
-    if(key && *key)
-        pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, key);
-
-    if(!pf) {
-        netdata_log_error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", key?key:"(unset)");
-    }
-    else {
+    struct inflight_function *pf = inflight_function_find(parser, transaction);
+    if(pf) {
         if(format && *format)
             pf->result_body_wb->content_type = functions_format_to_content_type(format);
 
@@ -381,8 +397,27 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER 
     parser->defer.response = (pf) ? pf->result_body_wb : NULL;
     parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
     parser->defer.action = pluginsd_function_result_end;
-    parser->defer.action_data = string_strdupz(key); // it is ok is key is NULL
+    parser->defer.action_data = string_strdupz(transaction); // it is ok is key is NULL
     parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
+
+    return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *parser) {
+    size_t i = 1;
+
+    char *transaction   = get_word(words, num_words, i++);
+    char *done_str      = get_word(words, num_words, i++);
+    char *all_str       = get_word(words, num_words, i++);
+
+    struct inflight_function *pf = inflight_function_find(parser, transaction);
+    if(pf) {
+        size_t done = done_str && *done_str ? str2u(done_str) : 0;
+        size_t all = all_str && *all_str ? str2u(all_str) : 0;
+
+        if(pf->progress.cb)
+            pf->progress.cb(pf->progress.data, done, all);
+    }
 
     return PARSER_RC_OK;
 }

@@ -1118,9 +1118,8 @@ struct inflight_stream_function {
     usec_t received_ut;
 };
 
-void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
+static void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
     struct inflight_stream_function *tmp = data;
-
     struct sender_state *s = tmp->sender;
 
     if(rrdhost_can_send_definitions_to_parent(s->host)) {
@@ -1148,6 +1147,20 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
     string_freez(tmp->transaction);
     buffer_free(func_wb);
     freez(tmp);
+}
+
+static void stream_execute_function_progress_callback(void *data, size_t done, size_t all) {
+    struct inflight_stream_function *tmp = data;
+    struct sender_state *s = tmp->sender;
+
+    if(rrdhost_can_send_definitions_to_parent(s->host)) {
+        BUFFER *wb = sender_start(s);
+
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu",
+                       string2str(tmp->transaction), done, all);
+
+        sender_commit(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
+    }
 }
 
 // This is just a placeholder until the gap filling state machine is inserted
@@ -1204,8 +1217,11 @@ void execute_commands(struct sender_state *s) {
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
 
                 char *payload = s->receiving_function_payload ? (char *)buffer_tostring(s->function_payload.payload) : NULL;
-                int code = rrd_function_run(s->host, wb, timeout, HTTP_ACCESS_ADMINS, function, false, transaction,
-                                            stream_execute_function_callback, tmp, NULL, NULL, payload);
+                int code = rrd_function_run(s->host, wb,
+                                            timeout, HTTP_ACCESS_ADMINS, function, false, transaction,
+                                            stream_execute_function_callback, tmp,
+                                            stream_execute_function_progress_callback, tmp,
+                                            NULL, NULL, payload);
 
                 if(code != HTTP_RESP_OK) {
                     if (!buffer_strlen(wb))
