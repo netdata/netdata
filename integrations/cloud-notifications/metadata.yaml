@@ -372,6 +372,44 @@
           - Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID, or invite it into a group and use the `/getgroupid` command to get the group chat ID.
           - Alternatively, you can get the chat ID directly from the bot API. Send your bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg. `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
 
+- id: 'notify-cloud-splunk'
+  meta:
+    name: 'Splunk'
+    link: 'https://splunk.com/'
+    categories:
+      - notify.cloud
+    icon_filename: 'splunk.svg'
+  keywords:
+    - Splunk
+  overview:
+    notification_description: "From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Splunk."
+    notification_limitations: ''
+  setup:
+    description: |
+      ### Prerequisites
+
+      To add Splunk notification you need:
+
+      - A Netdata Cloud account
+      - Access to the space as an **administrator**
+      - Space needs to be on **Business** plan or higher
+      - URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions.
+
+      ### Steps
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Notification** tab
+      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+      4. On the **Splunk** card click on **+ Add**
+      5. A modal will be presented to you to enter the required details to enable the configuration:
+        - **Notification settings** are Netdata specific settings
+            - Configuration name - provide a descriptive name for your configuration to easily identify it.
+            - Rooms - select the nodes or areas of your infrastructure you want to receive notifications about.
+            - Notification - choose the type of notifications you want to receive: All Alerts and unreachable, All Alerts, Critical only.
+        - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk:
+            - HTTP Event Collector URI - The URI of your HTTP event collector in Splunk
+            - HTTP Event Collector Token - the token that Splunk provided to you when you created the HTTP Event Collector
+
 - id: 'notify-cloud-webhook'
   meta:
     name: 'Webhook'
