@@ -17,13 +17,13 @@ static short int web_client_check_acl_and_bearer(struct web_client *w, HTTP_ACL 
         // the channel we received the request from (w->acl) is not compatible with the endpoint
         return HTTP_RESP_FORBIDDEN;
 
-    if(!netdata_is_protected_by_bearer && !(endpoint_acl & HTTP_ACL_BEARER_REQUIRED)) {
+    if(!netdata_is_protected_by_bearer && !(endpoint_acl & (HTTP_ACL_BEARER_REQUIRED | HTTP_ACL_BEARER_OPTIONAL))) {
         // bearer protection is not enabled and is not required by the endpoint
         w->access = HTTP_ACCESS_ANY;
         return HTTP_RESP_OK;
     }
 
-    if(!(endpoint_acl & (HTTP_ACL_BEARER_REQUIRED | HTTP_ACL_BEARER_OPTIONAL))) {
+    if(!(endpoint_acl & (HTTP_ACL_BEARER_REQUIRED | HTTP_ACL_BEARER_OPTIONAL | HTTP_ACL_BEARER_IF_PROTECTED))) {
         // endpoint does not require a bearer
         w->access = HTTP_ACCESS_ANY;
         return HTTP_RESP_OK;
@@ -44,6 +44,11 @@ static short int web_client_check_acl_and_bearer(struct web_client *w, HTTP_ACL 
     if(t == BEARER_STATUS_AVAILABLE_AND_VALIDATED) {
         // we have a valid bearer on the request
         w->access = HTTP_ACCESS_MEMBERS;
+        return HTTP_RESP_OK;
+    }
+
+    if(endpoint_acl & HTTP_ACL_BEARER_OPTIONAL) {
+        w->access = HTTP_ACCESS_ANY;
         return HTTP_RESP_OK;
     }
 

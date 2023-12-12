@@ -1204,7 +1204,7 @@ void execute_commands(struct sender_state *s) {
                 BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
 
                 char *payload = s->receiving_function_payload ? (char *)buffer_tostring(s->function_payload.payload) : NULL;
-                int code = rrd_function_run(s->host, wb, timeout, function, false, transaction,
+                int code = rrd_function_run(s->host, wb, timeout, HTTP_ACCESS_ADMINS, function, false, transaction,
                                             stream_execute_function_callback, tmp, NULL, NULL, payload);
 
                 if(code != HTTP_RESP_OK) {

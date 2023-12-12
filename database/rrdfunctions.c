@@ -689,7 +689,7 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, const char *payload, rrd_function_result_callback_t callback, void *callback_data);
 // ----------------------------------------------------------------------------
 
-int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *cmd,
+int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, HTTP_ACCESS access, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload) {
@@ -713,6 +713,12 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, const char *
         return code;
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
+
+    if(access != HTTP_ACCESS_ADMINS && rdcf->access != HTTP_ACCESS_ANY && access > rdcf->access) {
+        rrd_call_function_error(result_wb, "This function requires a higher access level.", code);
+        dictionary_acquired_item_release(host->functions, host_function_acquired);
+        return HTTP_RESP_PRECOND_FAIL;
+    }
 
     if(timeout <= 0)
         timeout = rdcf->timeout;

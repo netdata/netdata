@@ -1414,7 +1414,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 
-    return rrd_function_run(host, wb, timeout, function, true, transaction,
+    return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
                             NULL, NULL,
                             web_client_interrupt_callback, w, NULL);
 }
@@ -1578,7 +1578,7 @@ static struct web_api_command api_commands_v1[] = {
         {"metric_correlations", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_metric_correlations, 0   },
         {"weights", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_weights, 0               },
 
-        {"function", 0, HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
+        {"function", 0, HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_OPTIONAL_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
         {"functions", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
 
         {"dbengine_stats", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
