@@ -700,7 +700,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                     .section = (Word_t)ctx,
                     .first_time_s = vd.start_time_s,
                     .last_time_s = vd.end_time_s,
-                    .latest_update_every_s = (uint32_t) vd.update_every_s,
+                    .latest_update_every_s = vd.update_every_s,
             };
 
             bool added;
@@ -1226,7 +1226,7 @@ void *journalfile_v2_write_data_page(struct journal_v2_header *j2_header, void *
     data_page->delta_end_s = (uint32_t) (page_info->end_time_s - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
     data_page->extent_index = page_info->extent_index;
 
-    data_page->update_every_s = (uint32_t) page_info->update_every_s;
+    data_page->update_every_s = page_info->update_every_s;
     data_page->page_length = (uint16_t) (ei ? ei->page_length : page_info->page_length);
     data_page->type = 0;
 
@@ -1252,7 +1252,7 @@ static void *journalfile_v2_write_descriptors(struct journal_v2_header *j2_heade
         page_info = *PValue;
         // Write one descriptor and return the next data page location
         data_page = journalfile_v2_write_data_page(j2_header, (void *) data_page, page_info);
-        update_every_s = (uint32_t) page_info->update_every_s;
+        update_every_s = page_info->update_every_s;
         if (NULL == data_page)
             break;
     }

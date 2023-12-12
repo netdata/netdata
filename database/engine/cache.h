@@ -27,7 +27,7 @@ typedef struct pgc_entry {
     time_t end_time_s;          // the end time of the page
     size_t size;                // the size in bytes of the allocation, outside the cache
     void *data;                 // a pointer to data outside the cache
-    uint32_t update_every_s;      // the update every of the page
+    uint32_t update_every_s;    // the update every of the page
     bool hot;                   // true if this entry is currently being collected
     uint8_t *custom_data;
 } PGC_ENTRY;
@@ -210,8 +210,8 @@ Word_t pgc_page_section(PGC_PAGE *page);
 Word_t pgc_page_metric(PGC_PAGE *page);
 time_t pgc_page_start_time_s(PGC_PAGE *page);
 time_t pgc_page_end_time_s(PGC_PAGE *page);
-time_t pgc_page_update_every_s(PGC_PAGE *page);
-time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every_s);
+uint32_t pgc_page_update_every_s(PGC_PAGE *page);
+uint32_t pgc_page_fix_update_every(PGC_PAGE *page, uint32_t update_every_s);
 time_t pgc_page_fix_end_time_s(PGC_PAGE *page, time_t end_time_s);
 void *pgc_page_data(PGC_PAGE *page);
 void *pgc_page_custom_data(PGC *cache, PGC_PAGE *page);

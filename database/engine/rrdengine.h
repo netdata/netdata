@@ -153,9 +153,9 @@ struct jv2_metrics_info {
 struct jv2_page_info {
     time_t start_time_s;
     time_t end_time_s;
-    time_t update_every_s;
-    size_t page_length;
+    uint32_t update_every_s;
     uint32_t extent_index;
+    size_t page_length;
     void *custom_data;
 
     // private
@@ -217,7 +217,7 @@ struct rrdeng_query_handle {
 
     // internal data
     time_t now_s;
-    time_t dt_s;
+    uint32_t dt_s;
 
     unsigned position;
     unsigned entries;
@@ -481,7 +481,7 @@ struct page_descr_with_data *page_descriptor_get(void);
 typedef struct validated_page_descriptor {
     time_t start_time_s;
     time_t end_time_s;
-    time_t update_every_s;
+    uint32_t update_every_s;
     size_t page_length;
     size_t point_size;
     size_t entries;
@@ -498,16 +498,16 @@ typedef struct validated_page_descriptor {
 VALIDATED_PAGE_DESCRIPTOR validate_page(uuid_t *uuid,
                                         time_t start_time_s,
                                         time_t end_time_s,
-                                        time_t update_every_s,
+                                        uint32_t update_every_s,
                                         size_t page_length,
                                         uint8_t page_type,
                                         size_t entries,
                                         time_t now_s,
-                                        time_t overwrite_zero_update_every_s,
+                                        uint32_t overwrite_zero_update_every_s,
                                         bool have_read_error,
                                         const char *msg,
                                         RRDENG_COLLECT_PAGE_FLAGS flags);
-VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
+VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error);
 void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags);
 
 typedef enum {
