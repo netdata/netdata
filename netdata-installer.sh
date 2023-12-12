@@ -677,7 +677,7 @@ build_jsonc() {
   fi
 
   cd "${1}" > /dev/null || exit 1
-  run eval "${env_cmd} ${cmake} ${CMAKE_OPTS} -DBUILD_SHARED_LIBS=OFF ."
+  run eval "${env_cmd} ${cmake} ${CMAKE_OPTS} -DBUILD_SHARED_LIBS=OFF -DDISABLE_WERROR=On ."
   run eval "${env_cmd} ${cmake} --build . --parallel ${JOBS} -- ${BUILD_OPTS}"
   cd - > /dev/null || return 1
 }
