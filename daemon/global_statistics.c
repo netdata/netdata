@@ -867,13 +867,13 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "tier0_gorilla_pages"
                     , NULL
-                    , "tier0_gorilla_pages"
+                    , "dbengine gorilla"
                     , NULL
                     , "Number of gorilla_pages"
                     , "count"
                     , "netdata"
                     , "stats"
-                    , 131004
+                    , 134010
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -898,13 +898,13 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "tier0_compression_info"
                     , NULL
-                    , "tier0_compression_info"
+                    , "dbengine gorilla"
                     , NULL
                     , "Tier 0 compression info"
                     , "bytes"
                     , "netdata"
                     , "stats"
-                    , 131005
+                    , 134010
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
