@@ -88,7 +88,6 @@ struct journal_file {
 
 extern DICTIONARY *journal_files_registry;
 extern DICTIONARY *used_hashes_registry;
-extern DICTIONARY *function_query_status_dict;
 extern DICTIONARY *boot_ids_to_first_ut;
 
 int journal_file_dict_items_backward_compar(const void *a, const void *b);
@@ -120,7 +119,6 @@ struct journal_directory {
 extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
 
 void journal_init_files_and_directories(void);
-void journal_init_query_status(void);
 void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled);
 void journal_file_update_header(const char *filename, struct journal_file *jf);
 

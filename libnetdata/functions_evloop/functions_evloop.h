@@ -103,4 +103,10 @@ static inline void pluginsd_function_result_to_stdout(const char *transaction, i
     fflush(stdout);
 }
 
+static inline void pluginsd_function_progress_to_stdout(const char *transaction, size_t done, size_t all) {
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",
+            transaction, done, all);
+    fflush(stdout);
+}
+
 #endif //NETDATA_FUNCTIONS_EVLOOP_H

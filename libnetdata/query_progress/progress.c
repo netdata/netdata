@@ -254,9 +254,6 @@ void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
     query_progress_init_unsafe();
 
     QUERY_PROGRESS *qp = query_progress_find_in_hashtable_unsafe(transaction);
-
-    internal_fatal(!qp, "Attempt to update the progress of a transaction that has not been started");
-
     if(qp) {
         qp->updates++;
 
@@ -275,9 +272,6 @@ void query_progress_done_step(uuid_t *transaction, size_t done) {
     query_progress_init_unsafe();
 
     QUERY_PROGRESS *qp = query_progress_find_in_hashtable_unsafe(transaction);
-
-    internal_fatal(!qp, "Attempt to update the progress of a transaction that has not been started");
-
     if(qp) {
         qp->updates++;
         qp->done += done;
@@ -335,8 +329,6 @@ void query_progress_functions_update(void *data, size_t done, size_t all) {
     query_progress_init_unsafe();
 
     QUERY_PROGRESS *qp = query_progress_find_in_hashtable_unsafe(transaction);
-
-    internal_fatal(!qp, "Attempt to update the progress of a transaction that has not been started");
 
     if(qp) {
         if(all)
@@ -463,16 +455,19 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         if(finished) {
             buffer_json_add_array_item_string(wb, "finished");
-            buffer_json_add_array_item_double(wb, NAN);
-        }
-        else if(qp->all) {
-            double percent = (double)qp->done * 100.0 / (double)qp->all;
-            buffer_json_add_array_item_string(wb, "in-progress");
-            buffer_json_add_array_item_double(wb, percent);
+            buffer_json_add_array_item_string(wb, "100.00 %%");
         }
         else {
-            buffer_json_add_array_item_string(wb, "working");
-            buffer_json_add_array_item_uint64(wb, qp->done);
+            char buf[50];
+
+            buffer_json_add_array_item_string(wb, "in-progress");
+
+            if (qp->all)
+                snprintfz(buf, sizeof(buf), "%0.2f %%", (double) qp->done * 100.0 / (double) qp->all);
+            else
+                snprintfz(buf, sizeof(buf), "%zu", qp->done);
+
+            buffer_json_add_array_item_string(wb, buf);
         }
 
         buffer_json_add_array_item_double(wb, (double)duration_ut / USEC_PER_MS);
@@ -566,7 +561,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         // progress
         buffer_rrdf_table_add_field(wb, field_id++, "Progress", "Query Progress",
-                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
@@ -614,4 +609,45 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
     buffer_json_finalize(wb);
 
     return 200;
+}
+
+
+// ----------------------------------------------------------------------------
+
+int progress_unittest(void) {
+    size_t permanent = 100;
+    uuid_t valid[permanent];
+
+    usec_t started = now_monotonic_usec();
+
+    for(size_t i = 0; i < permanent ;i++) {
+        uuid_generate_random(valid[i]);
+        query_progress_start_or_update(&valid[i], 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK, "permanent", NULL, "test");
+    }
+
+    for(size_t n = 0; n < 5000000 ;n++) {
+        uuid_t t;
+        uuid_generate_random(t);
+        query_progress_start_or_update(&t, 0, HTTP_REQUEST_MODE_OPTIONS, HTTP_ACL_WEBRTC, "ephemeral", NULL, "test");
+        query_progress_finished(&t, 0, 200, 1234, 123, 12);
+
+        QUERY_PROGRESS *qp;
+        for(size_t i = 0; i < permanent ;i++) {
+            qp = query_progress_find_in_hashtable_unsafe(&valid[i]);
+            assert(qp);
+        }
+    }
+
+    usec_t ended = now_monotonic_usec();
+    usec_t duration = ended - started;
+
+    printf("progress hashtable resizes: %zu, size: %zu, used: %zu, deleted: %zu, searches: %zu, collisions: %zu, additions: %zu, deletions: %zu\n",
+           progress.hashtable.resizes,
+           progress.hashtable.size, progress.hashtable.used, progress.hashtable.deleted,
+           progress.hashtable.searches, progress.hashtable.collisions, progress.hashtable.additions, progress.hashtable.deletions);
+
+    double d = (double)duration / USEC_PER_SEC;
+    printf("hashtable ops: %0.2f / sec\n", (double)progress.hashtable.searches / d);
+
+    return 0;
 }

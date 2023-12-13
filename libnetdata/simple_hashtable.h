@@ -263,8 +263,8 @@ static void simple_hashtable_destroy_named(SIMPLE_HASHTABLE_NAMED *ht) {
 static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht);
 
 #define simple_hashtable_data_unset ((void *)NULL)
-#define simple_hashtable_data_deleted ((void *)0x01)
-#define simple_hashtable_data_usernull ((void *)0x02)
+#define simple_hashtable_data_deleted ((void *)UINT64_MAX)
+#define simple_hashtable_data_usernull ((void *)(UINT64_MAX - 1))
 #define simple_hashtable_is_slot_unset(sl) ((sl)->data == simple_hashtable_data_unset)
 #define simple_hashtable_is_slot_deleted(sl) ((sl)->data == simple_hashtable_data_deleted)
 #define simple_hashtable_is_slot_usernull(sl) ((sl)->data == simple_hashtable_data_usernull)
