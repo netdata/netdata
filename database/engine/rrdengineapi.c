@@ -199,7 +199,7 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
         if(unlikely(!handle->update_every_ut))
             handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
         else
-            mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
+            mrg_metric_set_update_every(main_mrg, handle->metric, (uint32_t)(handle->update_every_ut / USEC_PER_SEC));
     }
 }
 

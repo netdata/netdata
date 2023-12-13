@@ -790,7 +790,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
 #endif
                         "DBENGINE: metric '%s' %s invalid page of type %u "
-                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu (flags: %s)",
+                        "from %ld to %ld (now %ld), update every %u, page length %zu, entries %zu (flags: %s)",
                         uuid_str, msg, vd.type,
                         vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries, wb?buffer_tostring(wb):""
             );
@@ -810,9 +810,9 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
 #endif
                         "DBENGINE: metric '%s' %s page of type %u "
-                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu (flags: %s), "
+                        "from %ld to %ld (now %ld), update every %u, page length %zu, entries %zu (flags: %s), "
                         "found inconsistent - the right is "
-                        "from %ld to %ld, update every %ld, page length %zu, entries %zu: "
+                        "from %ld to %ld, update every %u, page length %zu, entries %zu: "
                         "%s%s%s%s%s%s%s",
                         uuid_str, msg, vd.type,
                         start_time_s, end_time_s, now_s, update_every_s, page_length, entries, wb?buffer_tostring(wb):"",
