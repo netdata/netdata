@@ -141,9 +141,16 @@ struct rrd_function_inflight {
     } canceller;
 
     struct {
+        // callback to receive progress reports from function
         rrd_function_progress_cb_t cb;
         void *data;
     } progress;
+
+    struct {
+        // callback to send progress requests to function
+        rrd_function_progresser_cb_t cb;
+        void *data;
+    } progresser;
 };
 
 static DICTIONARY *rrd_functions_inflight_requests = NULL;
@@ -497,6 +504,12 @@ static void rrd_inflight_async_function_register_canceller_cb(void *register_can
     r->canceller.data = canceller_cb_data;
 }
 
+static void rrd_inflight_async_function_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
+    struct rrd_function_inflight *r = register_progresser_cb_data;
+    r->progresser.cb = progresser_cb;
+    r->progresser.data = progresser_cb_data;
+}
+
 // ----------------------------------------------------------------------------
 // waiting for async function completion
 
@@ -574,7 +587,8 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
                                    rrd_inflight_async_function_nowait_finished, r,
                                    r->progress.cb, r->progress.data,
                                    rrd_inflight_async_function_is_cancelled, r,
-                                   rrd_inflight_async_function_register_canceller_cb, r);
+                                   rrd_inflight_async_function_register_canceller_cb, r,
+                                   rrd_inflight_async_function_register_progresser_cb, r);
 
     if(code != HTTP_RESP_OK) {
         if (!buffer_strlen(r->result.wb))
@@ -614,7 +628,8 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                                    rrd_async_function_signal_when_ready, tmp,
                                    r->progress.cb, r->progress.data,
                                    rrd_inflight_async_function_is_cancelled, r,
-                                   rrd_inflight_async_function_register_canceller_cb, r);
+                                   rrd_inflight_async_function_register_canceller_cb, r,
+                                   rrd_inflight_async_function_register_progresser_cb, r);
 
     if (code == HTTP_RESP_OK) {
         netdata_mutex_lock(&tmp->mutex);
@@ -771,7 +786,9 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, HTTP_ACCESS 
                                 result_cb, result_cb_data,
                                 progress_cb, progress_cb_data,
                                 is_cancelled_cb, is_cancelled_cb_data,  // it is ok to pass these, we block the caller
-                                NULL, NULL);  // no need to pass, we will wait
+                                NULL, NULL,   // no need to register canceller, we will wait
+                                NULL, NULL    // ?? do we need a progresser in this case?
+                                );
 
         if(code != HTTP_RESP_OK && !buffer_strlen(result_wb))
             rrd_call_function_error(result_wb, "Collector reported error.", code);
@@ -833,7 +850,7 @@ void rrd_function_cancel(const char *transaction) {
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
     if(!item) {
-        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the transaction is not running.",
+        netdata_log_info("FUNCTIONS: received a CANCEL request for transaction '%s', but the transaction is not running.",
                          transaction);
         return;
     }
@@ -842,7 +859,7 @@ void rrd_function_cancel(const char *transaction) {
 
     bool cancelled = __atomic_load_n(&r->cancelled, __ATOMIC_RELAXED);
     if(cancelled) {
-        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but it is already cancelled.",
+        netdata_log_info("FUNCTIONS: received a CANCEL request for transaction '%s', but it is already cancelled.",
                          transaction);
         goto cleanup;
     }
@@ -850,13 +867,38 @@ void rrd_function_cancel(const char *transaction) {
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
     if(!rrd_collector_dispatcher_acquire(r->rdcf->collector)) {
-        netdata_log_info("FUNCTIONS: received a cancel request for transaction '%s', but the collector is not running.",
+        netdata_log_info("FUNCTIONS: received a CANCEL request for transaction '%s', but the collector is not running.",
                          transaction);
         goto cleanup;
     }
 
     if(r->canceller.cb)
         r->canceller.cb(r->canceller.data);
+
+    rrd_collector_dispatcher_release(r->rdcf->collector);
+
+cleanup:
+    dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
+}
+
+void rrd_function_progress(const char *transaction) {
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
+    if(!item) {
+        netdata_log_info("FUNCTIONS: received a PROGRESS request for transaction '%s', but the transaction is not running.",
+                transaction);
+        return;
+    }
+
+    struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
+
+    if(!rrd_collector_dispatcher_acquire(r->rdcf->collector)) {
+        netdata_log_info("FUNCTIONS: received a PROGRESS request for transaction '%s', but the collector is not running.",
+                transaction);
+        goto cleanup;
+    }
+
+    if(r->progresser.cb)
+        r->progresser.cb(r->progresser.data);
 
     rrd_collector_dispatcher_release(r->rdcf->collector);
 
@@ -979,8 +1021,10 @@ int rrdhost_function_progress(uuid_t *transaction __maybe_unused, BUFFER *wb,
                               rrd_function_result_callback_t result_cb, void *result_cb_data,
                               rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
                               rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                              rrd_function_register_cancel_cb_t register_canceller_cb __maybe_unused,
-                              void *register_canceller_cb_data __maybe_unused) {
+                              rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                              void *register_canceller_cb_data __maybe_unused,
+                              rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                              void *register_progresser_cb_data __maybe_unused) {
 
     int response = progress_function_result(wb, rrdhost_hostname(localhost));
 
@@ -1001,8 +1045,10 @@ int rrdhost_function_streaming(uuid_t *transaction __maybe_unused, BUFFER *wb,
                                rrd_function_result_callback_t result_cb, void *result_cb_data,
                                rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
                                rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                               rrd_function_register_cancel_cb_t register_canceller_cb __maybe_unused,
-                               void *register_canceller_cb_data __maybe_unused) {
+                               rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                               void *register_canceller_cb_data __maybe_unused,
+                               rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                               void *register_progresser_cb_data __maybe_unused) {
 
     time_t now = now_realtime_sec();
 

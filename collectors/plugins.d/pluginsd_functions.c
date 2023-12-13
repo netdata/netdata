@@ -222,6 +222,36 @@ static void pluginsd_function_cancel(void *data) {
                "PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
 }
 
+static void pluginsd_function_progress_to_plugin(void *data) {
+    struct inflight_function *look_for = data, *t;
+
+    bool sent = false;
+    dfe_start_read(look_for->parser->inflight.functions, t) {
+        if(look_for == t) {
+            const char *transaction = t_dfe.name;
+
+            internal_error(true, "PLUGINSD: sending function progress to plugin for transaction '%s'", transaction);
+
+            char buffer[2048 + 1];
+            snprintfz(buffer, sizeof(buffer) - 1, "%s %s\n",
+                    PLUGINSD_KEYWORD_FUNCTION_PROGRESS,
+                    transaction);
+
+            // send the command to the plugin
+            ssize_t ret = send_to_plugin(buffer, t->parser);
+            if(ret < 0)
+                sent = true;
+
+            break;
+        }
+    }
+    dfe_done(t);
+
+    if(sent <= 0)
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                "PLUGINSD: FUNCTION_PROGRESS request didn't match any pending function requests in pluginsd.d.");
+}
+
 // this is the function called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
 static int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
@@ -231,8 +261,10 @@ static int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body
                                         rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                                         rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
                                         void *is_cancelled_cb_data __maybe_unused,
-                                        rrd_function_register_cancel_cb_t register_canceller_cb,
-                                        void *register_canceller_db_data) {
+                                        rrd_function_register_canceller_cb_t register_canceller_cb,
+                                        void *register_canceller_cb_data,
+                                        rrd_function_register_progresser_cb_t register_progresser_cb,
+                                        void *register_progresser_cb_data) {
     PARSER  *parser = execute_cb_data;
 
     usec_t now = now_realtime_usec();
@@ -266,7 +298,10 @@ static int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body
     // the caller about the error - no need for error handling here.
     void *t = dictionary_set(parser->inflight.functions, transaction_str, &tmp, sizeof(struct inflight_function));
     if(register_canceller_cb)
-        register_canceller_cb(register_canceller_db_data, pluginsd_function_cancel, t);
+        register_canceller_cb(register_canceller_cb_data, pluginsd_function_cancel, t);
+
+    if(register_progresser_cb)
+        register_progresser_cb(register_progresser_cb_data, pluginsd_function_progress_to_plugin, t);
 
     if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
         parser->inflight.smaller_timeout = tmp.timeout_ut;

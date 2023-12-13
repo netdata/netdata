@@ -103,8 +103,10 @@ int cgroup_function_cgroup_top(uuid_t *transaction __maybe_unused, BUFFER *wb,
                                rrd_function_result_callback_t result_cb, void *result_cb_data,
                                rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                                rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                               rrd_function_register_cancel_cb_t register_canceller_cb __maybe_unused,
-                               void *register_canceller_cb_data __maybe_unused) {
+                               rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                               void *register_canceller_cb_data __maybe_unused,
+                               rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                               void *register_progresser_cb_data __maybe_unused) {
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -350,8 +352,10 @@ int cgroup_function_systemd_top(uuid_t *transaction __maybe_unused, BUFFER *wb,
                                 rrd_function_result_callback_t result_cb, void *result_cb_data,
                                 rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
                                 rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                                rrd_function_register_cancel_cb_t register_canceller_cb __maybe_unused,
-                                void *register_canceller_cb_data __maybe_unused) {
+                                rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                                void *register_canceller_cb_data __maybe_unused,
+                                rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                                void *register_progresser_cb_data __maybe_unused) {
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;

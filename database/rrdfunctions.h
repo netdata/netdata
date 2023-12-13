@@ -13,15 +13,18 @@
 typedef void (*rrd_function_result_callback_t)(BUFFER *wb, int code, void *result_cb_data);
 typedef bool (*rrd_function_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 typedef void (*rrd_function_cancel_cb_t)(void *data);
-typedef void (*rrd_function_register_cancel_cb_t)(void *register_cancel_cb_data, rrd_function_cancel_cb_t cancel_cb, void *cancel_cb_data);
+typedef void (*rrd_function_register_canceller_cb_t)(void *register_cancel_cb_data, rrd_function_cancel_cb_t cancel_cb, void *cancel_cb_data);
 typedef void (*rrd_function_progress_cb_t)(void *data, size_t done, size_t all);
+typedef void (*rrd_function_progresser_cb_t)(void *data);
+typedef void (*rrd_function_register_progresser_cb_t)(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data);
 
 typedef int (*rrd_function_execute_cb_t)(uuid_t *transaction, BUFFER *wb,
                                          int timeout, const char *function, void *collector_data,
                                          rrd_function_result_callback_t result_cb, void *result_cb_data,
                                          rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                                          rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                                         rrd_function_register_cancel_cb_t register_cancel_cb, void *register_cancel_db_data);
+                                         rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data,
+                                         rrd_function_register_progresser_cb_t register_progresser_cb, void *register_progresser_cb_data);
 
 void rrd_functions_inflight_init(void);
 void rrdfunctions_host_init(RRDHOST *host);
@@ -41,6 +44,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, HTTP_ACCESS 
 
 // cancel a running function, to be run from anywhere
 void rrd_function_cancel(const char *transaction);
+void rrd_function_progress(const char *transaction);
 
 void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);
@@ -59,14 +63,18 @@ int rrdhost_function_progress(uuid_t *transaction, BUFFER *wb,
                               rrd_function_result_callback_t result_cb, void *result_cb_data,
                               rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                               rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                              rrd_function_register_cancel_cb_t register_canceller_cb, void *register_canceller_cb_data);
+                              rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data,
+                              rrd_function_register_progresser_cb_t register_progresser_cb,
+                              void *register_progresser_cb_data);
 
 int rrdhost_function_streaming(uuid_t *transaction, BUFFER *wb,
                                int timeout, const char *function, void *collector_data,
                                rrd_function_result_callback_t result_cb, void *result_cb_data,
                                rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                                rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                               rrd_function_register_cancel_cb_t register_canceller_cb, void *register_canceller_cb_data);
+                               rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data,
+                               rrd_function_register_progresser_cb_t register_progresser_cb,
+                               void *register_progresser_cb_data);
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 

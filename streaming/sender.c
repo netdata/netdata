@@ -1283,6 +1283,14 @@ void execute_commands(struct sender_state *s) {
             if(transaction && *transaction)
                 rrd_function_cancel(transaction);
         }
+        else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PROGRESS) == 0) {
+            worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
+            nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
+
+            char *transaction = get_word(s->line.words, s->line.num_words, 1);
+            if(transaction && *transaction)
+                rrd_function_progress(transaction);
+        }
         else if (command && strcmp(command, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_REPLAY_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
