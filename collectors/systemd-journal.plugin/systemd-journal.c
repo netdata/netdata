@@ -1085,7 +1085,7 @@ static bool jf_is_mine(struct journal_file *jf, FUNCTION_QUERY_STATUS *fqs) {
     if((fqs->source_type == SDJF_NONE && !fqs->sources) || (jf->source_type & fqs->source_type) ||
        (fqs->sources && simple_pattern_matches(fqs->sources, string2str(jf->source)))) {
 
-        if(!jf->msg_last_ut || !jf->msg_last_ut)
+        if(!jf->msg_last_ut)
             // the file is not scanned yet, or the timestamps have not been updated,
             // so we don't know if it can contribute or not - let's add it.
             return true;

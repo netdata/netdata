@@ -637,9 +637,12 @@ static int journalfile_check_superblock(uv_file file)
     fatal_assert(req.result >= 0);
     uv_fs_req_cleanup(&req);
 
-    if (strncmp(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ) ||
-        strncmp(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ)) {
-        netdata_log_error("DBENGINE: File has invalid superblock.");
+
+    char jf_magic[RRDENG_MAGIC_SZ] = RRDENG_JF_MAGIC;
+    char jf_ver[RRDENG_VER_SZ] = RRDENG_JF_VER;
+    if (strncmp(superblock->magic_number, jf_magic, RRDENG_MAGIC_SZ) != 0 ||
+        strncmp(superblock->version, jf_ver, RRDENG_VER_SZ) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -700,7 +703,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                     .section = (Word_t)ctx,
                     .first_time_s = vd.start_time_s,
                     .last_time_s = vd.end_time_s,
-                    .latest_update_every_s = (uint32_t) vd.update_every_s,
+                    .latest_update_every_s = vd.update_every_s,
             };
 
             bool added;
@@ -1226,7 +1229,7 @@ void *journalfile_v2_write_data_page(struct journal_v2_header *j2_header, void *
     data_page->delta_end_s = (uint32_t) (page_info->end_time_s - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
     data_page->extent_index = page_info->extent_index;
 
-    data_page->update_every_s = (uint32_t) page_info->update_every_s;
+    data_page->update_every_s = page_info->update_every_s;
     data_page->page_length = (uint16_t) (ei ? ei->page_length : page_info->page_length);
     data_page->type = 0;
 
@@ -1252,7 +1255,7 @@ static void *journalfile_v2_write_descriptors(struct journal_v2_header *j2_heade
         page_info = *PValue;
         // Write one descriptor and return the next data page location
         data_page = journalfile_v2_write_data_page(j2_header, (void *) data_page, page_info);
-        update_every_s = (uint32_t) page_info->update_every_s;
+        update_every_s = page_info->update_every_s;
         if (NULL == data_page)
             break;
     }

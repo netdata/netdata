@@ -274,7 +274,7 @@ static void process_nice_level(void) {
     else
         netdata_log_debug(D_SYSTEM, "Set netdata nice level to %d.", nice_level);
 #endif // HAVE_NICE
-};
+}
 
 #define SCHED_FLAG_NONE                      0x00
 #define SCHED_FLAG_PRIORITY_CONFIGURABLE     0x01 // the priority is user configurable

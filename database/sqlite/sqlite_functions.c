@@ -725,7 +725,7 @@ struct node_instance_list *get_node_list(void)
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to get node instance information");
         return NULL;
-    };
+    }
 
     int row = 0;
     char host_guid[37];
@@ -774,7 +774,7 @@ failed:
         error_report("Failed to finalize the prepared statement when fetching node instance information");
 
     return node_list;
-};
+}
 
 #define SQL_GET_HOST_NODE_ID "SELECT node_id FROM node_instance WHERE host_id = @host_id"
 
@@ -793,7 +793,7 @@ void sql_load_node_id(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to fetch node id");
         return;
-    };
+    }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
@@ -812,8 +812,7 @@ void sql_load_node_id(RRDHOST *host)
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("Failed to finalize the prepared statement when loading node instance information");
-};
-
+}
 
 #define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id"
 

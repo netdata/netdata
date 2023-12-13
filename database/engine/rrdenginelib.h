@@ -8,15 +8,8 @@
 /* Forward declarations */
 struct rrdengine_instance;
 
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
-
-#define BITS_PER_ULONG (sizeof(unsigned long) * 8)
-
 #define ALIGN_BYTES_FLOOR(x) (((x) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
 #define ALIGN_BYTES_CEILING(x) ((((x) + RRDENG_BLOCK_SIZE - 1) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
-
-#define ROUND_USEC_TO_SEC(x) (((x) + USEC_PER_SEC / 2 - 1) / USEC_PER_SEC)
 
 typedef uintptr_t rrdeng_stats_t;
 

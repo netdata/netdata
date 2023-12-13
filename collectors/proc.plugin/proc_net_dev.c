@@ -1924,32 +1924,32 @@ void *netdev_main(void *ptr)
     worker_register("NETDEV");
     worker_register_job_name(0, "netdev");
 
-    netdata_thread_cleanup_push(netdev_main_cleanup, ptr);
+    netdata_thread_cleanup_push(netdev_main_cleanup, ptr) {
+        rrd_collector_started();
+        rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_NETDEV_HELP, true
+                         , netdev_function_net_interfaces, NULL);
 
-    rrd_collector_started();
-    rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_NETDEV_HELP, true, netdev_function_net_interfaces, NULL);
+        usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+        heartbeat_t hb;
+        heartbeat_init(&hb);
 
-    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
-    heartbeat_t hb;
-    heartbeat_init(&hb);
+        while (service_running(SERVICE_COLLECTORS)) {
+            worker_is_idle();
+            usec_t hb_dt = heartbeat_next(&hb, step);
 
-    while (service_running(SERVICE_COLLECTORS)) {
-        worker_is_idle();
-        usec_t hb_dt = heartbeat_next(&hb, step);
+            if (unlikely(!service_running(SERVICE_COLLECTORS)))
+                break;
 
-        if (unlikely(!service_running(SERVICE_COLLECTORS)))
-            break;
+            cgroup_netdev_reset_all();
 
-        cgroup_netdev_reset_all();
+            worker_is_busy(0);
 
-        worker_is_busy(0);
-
-        netdata_mutex_lock(&netdev_dev_mutex);
-        if(do_proc_net_dev(localhost->rrd_update_every, hb_dt))
-            break;
-        netdata_mutex_unlock(&netdev_dev_mutex);
+            netdata_mutex_lock(&netdev_dev_mutex);
+            if (do_proc_net_dev(localhost->rrd_update_every, hb_dt))
+                break;
+            netdata_mutex_unlock(&netdev_dev_mutex);
+        }
     }
-
     netdata_thread_cleanup_pop(1);
 
     return NULL;

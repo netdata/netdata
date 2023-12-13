@@ -1426,7 +1426,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq) {
     return rq->sender_last_flush_ut == rrdpush_sender_get_flush_time(rq->sender);
-};
+}
 
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
     bool ret = false;
@@ -1838,17 +1838,16 @@ static void replication_worker_cleanup(void *ptr __maybe_unused) {
 static void *replication_worker_thread(void *ptr) {
     replication_initialize_workers(false);
 
-    netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
-
-    while(service_running(SERVICE_REPLICATION)) {
-        if(unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
-            sender_thread_buffer_free();
-            worker_is_busy(WORKER_JOB_WAIT);
-            worker_is_idle();
-            sleep_usec(1 * USEC_PER_SEC);
+    netdata_thread_cleanup_push(replication_worker_cleanup, ptr) {
+        while (service_running(SERVICE_REPLICATION)) {
+            if (unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
+                sender_thread_buffer_free();
+                worker_is_busy(WORKER_JOB_WAIT);
+                worker_is_idle();
+                sleep_usec(1 * USEC_PER_SEC);
+            }
         }
     }
-
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

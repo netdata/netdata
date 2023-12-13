@@ -1444,7 +1444,7 @@ void print_build_info(void) {
     print_build_info_category_to_console(BIC_PLUGINS, "Plugins");
     print_build_info_category_to_console(BIC_EXPORTERS, "Exporters");
     print_build_info_category_to_console(BIC_DEBUG_DEVEL, "Debug/Developer Features");
-};
+}
 
 void build_info_to_json_object(BUFFER *b) {
     populate_packaging_info();
@@ -1478,7 +1478,7 @@ void print_build_info_json(void) {
     buffer_json_finalize(b);
     printf("%s\n", buffer_tostring(b));
     buffer_free(b);
-};
+}
 
 void analytics_build_info(BUFFER *b) {
     populate_packaging_info();

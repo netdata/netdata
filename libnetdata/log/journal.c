@@ -3,14 +3,11 @@
 #include "journal.h"
 
 bool is_path_unix_socket(const char *path) {
+    // Check if the path is valid
     if(!path || !*path)
         return false;
 
     struct stat statbuf;
-
-    // Check if the path is valid
-    if (!path || !*path)
-        return false;
 
     // Use stat to check if the file exists and is a socket
     if (stat(path, &statbuf) == -1)
@@ -97,6 +94,11 @@ static inline bool journal_send_with_memfd(int fd, const char *msg, size_t msg_l
     msghdr.msg_controllen = sizeof(cmsgbuf);
 
     cmsghdr = CMSG_FIRSTHDR(&msghdr);
+    if(!cmsghdr) {
+        close(memfd);
+        return false;
+    }
+
     cmsghdr->cmsg_level = SOL_SOCKET;
     cmsghdr->cmsg_type = SCM_RIGHTS;
     cmsghdr->cmsg_len = CMSG_LEN(sizeof(int));

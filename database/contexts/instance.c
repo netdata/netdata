@@ -404,7 +404,7 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
         fatal("RRDCONTEXT: cannot switch rrdcontext without switching rrdinstance too");
 }
 
-#define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__);
+#define rrdset_get_rrdinstance(st) rrdset_get_rrdinstance_with_trace(st, __FUNCTION__)
 static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const char *function) {
     if(unlikely(!st->rrdcontexts.rrdinstance)) {
         netdata_log_error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), function);

@@ -885,14 +885,14 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
 
                 collected_number tmp_val; 
-                #define set_prop_pathname(prop_filename, prop_pathname, p_ff){                  \
+                #define set_prop_pathname(prop_filename, prop_pathname, p_ff) do {              \
                     snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, prop_filename);     \
                     if((p_ff && !read_clk_freq_file(p_ff, filename, &tmp_val)) ||               \
                           !read_single_number_file(filename, (unsigned long long *) &tmp_val))  \
                         prop_pathname = strdupz(filename);                                      \
                     else                                                                        \
                         collector_info("Cannot read file '%s'", filename);                      \
-                }
+                } while(0)
 
                 /* Initialize GPU and VRAM utilization metrics */
 

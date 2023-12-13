@@ -178,8 +178,6 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
     // let's free it with the system allocator
     netdata_log_error("ONEWAYALLOC: request to free address 0x%p that is not allocated by this OWA", ptr);
 #endif
-
-    return;
 }
 
 void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize) {

@@ -145,7 +145,7 @@ static inline void lgs_mng_update_chart_end(time_t sec){
     printf("END %" PRId64 " 0 1\n", sec);
 }
 
-#define lgs_mng_do_num_of_logs_charts_init(p_file_info, chart_prio){                            \
+#define lgs_mng_do_num_of_logs_charts_init(p_file_info, chart_prio) do {                        \
                                                                                                 \
     /* Number of collected logs total - initialise */                                           \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
@@ -179,9 +179,9 @@ static inline void lgs_mng_update_chart_end(time_t sec){
         lgs_mng_add_dim("records", RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);                       \
     }                                                                                           \
                                                                                                 \
-}                                                                                               \
+} while(0)
 
-#define lgs_mng_do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data){              \
+#define lgs_mng_do_num_of_logs_charts_update(p_file_info, lag_in_sec, chart_data) do {          \
                                                                                                 \
     /* Number of collected logs total - update previous values */                               \
     if(p_file_info->parser_config->chart_config & CHART_COLLECTED_LOGS_TOTAL){                  \
@@ -220,9 +220,9 @@ static inline void lgs_mng_update_chart_end(time_t sec){
         lgs_mng_update_chart_set("records", chart_data->num_lines);                             \
         lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);                     \
     }                                                                                           \
-}
+} while(0)
 
-#define lgs_mng_do_custom_charts_init(p_file_info) {                                            \
+#define lgs_mng_do_custom_charts_init(p_file_info) do {                                         \
                                                                                                 \
     for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){                   \
                                                                                                 \
@@ -269,9 +269,9 @@ static inline void lgs_mng_update_chart_end(time_t sec){
                         RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);                                  \
                                                                                                 \
     }                                                                                           \
-}
+} while(0)
 
-#define lgs_mng_do_custom_charts_update(p_file_info, lag_in_sec) {                              \
+#define lgs_mng_do_custom_charts_update(p_file_info, lag_in_sec) do {                           \
                                                                                                 \
     for(time_t  sec = p_file_info->parser_metrics->last_update - lag_in_sec;                    \
                 sec < p_file_info->parser_metrics->last_update;                                 \
@@ -307,6 +307,6 @@ static inline void lgs_mng_update_chart_end(time_t sec){
                                                                                                 \
         lgs_mng_update_chart_end(p_file_info->parser_metrics->last_update);                     \
     }                                                                                           \
-}
+} while(0)
 
 #endif // RRD_API_H_

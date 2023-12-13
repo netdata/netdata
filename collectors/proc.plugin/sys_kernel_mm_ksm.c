@@ -13,7 +13,7 @@ typedef struct ksm_name_value {
 #define PAGES_SHARING  1
 #define PAGES_UNSHARED 2
 #define PAGES_VOLATILE 3
-#define PAGES_TO_SCAN  4
+// #define PAGES_TO_SCAN  4
 
 KSM_NAME_VALUE values[] = {
         [PAGES_SHARED]   = { "/sys/kernel/mm/ksm/pages_shared",   0ULL },
