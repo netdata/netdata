@@ -6,7 +6,9 @@
  *  logs management querying API.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "query.h"
 #include <uv.h>

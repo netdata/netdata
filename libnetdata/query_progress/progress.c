@@ -416,6 +416,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
     size_t archived = 0, running = 0;
     SIMPLE_HASHTABLE_FOREACH_READ_ONLY(&progress.hashtable, sl, _QUERY) {
         QUERY_PROGRESS *qp = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
+        if(unlikely(!qp)) continue; // not really needed, just for completeness
 
         if(qp->prev)
             archived++;

@@ -147,7 +147,8 @@ struct rrd_function_inflight {
     } progress;
 
     struct {
-        // callback to send progress requests to function
+        // to be registered by the function itself
+        // used to send progress requests to function
         rrd_function_progresser_cb_t cb;
         void *data;
     } progresser;
