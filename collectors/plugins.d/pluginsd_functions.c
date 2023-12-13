@@ -19,7 +19,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
     int rc = uuid_parse_flexi(transaction, pf->transaction);
     if(rc != 0)
-        netdata_log_error("FUNCTION: '%s': cannot parse transaction UUID of function '%s'", string2str(pf->function));
+        netdata_log_error("FUNCTION: '%s': cannot parse transaction UUID", string2str(pf->function));
 
     char buffer[2048 + 1];
     snprintfz(buffer, sizeof(buffer) - 1, "%s %s %d \"%s\"\n",
