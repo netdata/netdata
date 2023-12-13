@@ -455,7 +455,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
 fi
 
 enable_feature() {
-  NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed -e "s/-DENABLE_${1}=Off//g" -e "s/-DENABLE_${1}=On//g")"
+  NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed -e "s/-DENABLE_${1}=Off[[:space:]]*//g" -e "s/-DENABLE_${1}=On[[:space:]]*//g")"
   if [ "${2}" -eq 1 ]; then
     NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed "s/$/ -DENABLE_${1}=On/")"
   else
