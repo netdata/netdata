@@ -4397,7 +4397,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
-static void function_processes(const char *transaction, char *function __maybe_unused, int timeout __maybe_unused, bool *cancelled __maybe_unused) {
+static void function_processes(const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };

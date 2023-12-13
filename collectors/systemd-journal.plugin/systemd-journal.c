@@ -183,8 +183,7 @@
 
 typedef struct function_query_status {
     bool *cancelled; // a pointer to the cancelling boolean
-    usec_t stop_monotonic_ut;
-    usec_t started_monotonic_ut;
+    usec_t *stop_monotonic_ut;
 
     // request
     const char *transaction;
@@ -808,7 +807,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_backward(
                 FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
                 last_bytes = bytes;
 
-                status = check_stop(fqs->cancelled, &fqs->stop_monotonic_ut);
+                status = check_stop(fqs->cancelled, fqs->stop_monotonic_ut);
             }
         }
         else if(sample == SAMPLING_SKIP_FIELDS)
@@ -915,7 +914,7 @@ ND_SD_JOURNAL_STATUS netdata_systemd_journal_query_forward(
                 FUNCTION_PROGRESS_UPDATE_BYTES(fqs->bytes_read, bytes - last_bytes);
                 last_bytes = bytes;
 
-                status = check_stop(fqs->cancelled, &fqs->stop_monotonic_ut);
+                status = check_stop(fqs->cancelled, fqs->stop_monotonic_ut);
             }
         }
         else if(sample == SAMPLING_SKIP_FIELDS)
@@ -1166,9 +1165,7 @@ static int netdata_systemd_journal_query(BUFFER *wb, FACETS *facets, FUNCTION_QU
         started_ut = ended_ut;
 
         // do not even try to do the query if we expect it to pass the timeout
-        if(ended_ut > (query_started_ut + (fqs->stop_monotonic_ut - query_started_ut) * 3 / 4) &&
-            ended_ut + max_duration_ut * 2 >= fqs->stop_monotonic_ut) {
-
+        if(ended_ut + max_duration_ut * 3 >= *fqs->stop_monotonic_ut) {
             partial = true;
             status = ND_SD_JOURNAL_TIMED_OUT;
             break;
@@ -1523,7 +1520,7 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
     buffer_free(wb);
 }
 
-void function_systemd_journal(const char *transaction, char *function, int timeout, bool *cancelled) {
+void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled) {
     fstat_thread_calls = 0;
     fstat_thread_cached_responses = 0;
 
@@ -1531,11 +1528,9 @@ void function_systemd_journal(const char *transaction, char *function, int timeo
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
-    usec_t now_monotonic_ut = now_monotonic_usec();
     FUNCTION_QUERY_STATUS tmp_fqs = {
             .cancelled = cancelled,
-            .started_monotonic_ut = now_monotonic_ut,
-            .stop_monotonic_ut = now_monotonic_ut + (timeout * USEC_PER_SEC),
+            .stop_monotonic_ut = stop_monotonic_ut,
     };
     FUNCTION_QUERY_STATUS *fqs = NULL;
     const DICTIONARY_ITEM *fqs_item = NULL;

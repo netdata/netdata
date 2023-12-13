@@ -113,7 +113,7 @@ typedef struct logs_query_params {
     int order_by_asc;
     unsigned long quota;
     bool *cancelled;
-    usec_t stop_monotonic_ut;
+    usec_t *stop_monotonic_ut;
     char *chartname[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *filename[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *keyword;
