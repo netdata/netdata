@@ -1308,6 +1308,61 @@ void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
     rrdset_metadata_updated(st);
 }
 
+struct rrdlabel_sort_entry {
+    const char *key;
+    const char *value;
+    RRDLABEL_SRC src;
+};
+
+static int rrdlabels_sorted_compar(const void *a, const void *b) {
+    const struct rrdlabel_sort_entry *aa = a, *bb = b;
+
+    return strcmp(aa->key, bb->key);
+}
+
+int rrdlabels_sorted_walkthrough_read(RRDLABELS *rrdlabels, int (*cb)(const char *key, const char *value, RRDLABEL_SRC src __maybe_unused, void *data), void *data) {
+    if(!rrdlabels)
+        return 0;
+
+    size_t entries = rrdlabels_entries(rrdlabels);
+
+    if(!entries)
+        return 0;
+
+    struct rrdlabel_sort_entry array[entries];
+
+    RRDLABEL *lb;
+    RRDLABEL_SRC ls;
+    size_t i = 0;
+    lfe_start_read(rrdlabels, lb, ls) {
+        if (i >= entries)
+            break;
+
+        array[i].key = string2str(lb->index.key);
+        array[i].value = string2str(lb->index.value);
+        array[i].src = ls;
+        i++;
+    }
+    lfe_done(rrdlabels);
+
+    entries = i;
+    if(!entries)
+        return 0;
+
+    qsort(array, entries, sizeof(struct rrdlabel_sort_entry), rrdlabels_sorted_compar);
+
+    int ret = 0;
+    for(i = 0; i < entries ;i++) {
+        int r = cb(array[i].key, array[i].value, array[i].src, data);
+
+        if(r < 0)
+            return r;
+
+        ret += r;
+    }
+
+    return ret;
+}
 
 // ----------------------------------------------------------------------------
 // rrdlabels unit test

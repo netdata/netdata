@@ -20,9 +20,6 @@
 
 // --------------------------------------------------------------------------------------
 
-// DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
-// #define STATSD_MULTITHREADED 1
-
 #define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT)
 #define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divisor
 
@@ -38,8 +35,6 @@ typedef struct statsd_metric_counter { // counter and meter
 } STATSD_METRIC_COUNTER;
 
 typedef struct statsd_histogram_extensions {
-    netdata_mutex_t mutex;
-
     // average is stored in metric->last
     collected_number last_min;
     collected_number last_max;
@@ -110,6 +105,8 @@ typedef enum __attribute__((packed)) statsd_metric_type {
 
 
 typedef struct statsd_metric {
+    SPINLOCK spinlock;
+
     const char *name;               // the name of the metric - linked to dictionary name
     uint32_t hash;                  // hash of the name
 
@@ -129,9 +126,12 @@ typedef struct statsd_metric {
         STATSD_METRIC_DICTIONARY dictionary;
     };
 
-    char *units;
-    char *dimname;
-    char *family;
+    STRING *units;
+    STRING *dimname;
+    STRING *family;
+    STRING *context;
+    STRING *title;
+    RRDLABELS *rrdlabels;
 
     // chart related members
     STATS_METRIC_OPTIONS options;   // STATSD_METRIC_OPTION_* (bitfield)
@@ -150,16 +150,21 @@ typedef struct statsd_metric {
 // each type of metric has its own index
 
 typedef struct statsd_index {
-    char *name;                     // the name of the index of metrics
-    uint32_t events;                // the number of events processed for this index
-    uint32_t metrics;               // the number of metrics in this index
-    uint32_t useful;                // the number of useful metrics in this index
+    char *name;                         // the name of the index of metrics
 
     STATS_METRIC_OPTIONS default_options;  // default options for all metrics in this index
-    STATSD_METRIC_TYPE type;        // the type of index
+    STATSD_METRIC_TYPE type;            // the type of index
     DICTIONARY *dict;
 
-    STATSD_METRIC *first_useful;    // the linked list of useful metrics (new metrics are added in front)
+    struct {
+        uint32_t events;                // the number of events processed for this index
+    } atomic;
+
+    struct {                            // this structure is only accessed by the flusher
+        uint32_t count;                 // the number of useful metrics in this index
+        STATSD_METRIC *first;           // the linked list of useful metrics (new metrics are added in front)
+    } useful;
+
 } STATSD_INDEX;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -240,6 +245,11 @@ struct collection_thread_status {
     netdata_thread_t thread;
 };
 
+#define statsd_atomic_get(a) __atomic_load_n(&statsd.atomic.a, __ATOMIC_RELAXED)
+#define statsd_atomic_increment(a) __atomic_add_fetch(&statsd.atomic.a, 1, __ATOMIC_RELAXED)
+#define statsd_atomic_decrement(a) __atomic_sub_fetch(&statsd.atomic.a, 1, __ATOMIC_RELAXED)
+#define statsd_atomic_add(a, v) __atomic_add_fetch(&statsd.atomic.a, v, __ATOMIC_RELAXED)
+
 static struct statsd {
     STATSD_INDEX gauges;
     STATSD_INDEX counters;
@@ -249,17 +259,19 @@ static struct statsd {
     STATSD_INDEX sets;
     STATSD_INDEX dictionaries;
 
-    size_t unknown_types;
-    size_t socket_errors;
-    size_t tcp_socket_connects;
-    size_t tcp_socket_disconnects;
-    size_t tcp_socket_connected;
-    size_t tcp_socket_reads;
-    size_t tcp_packets_received;
-    size_t tcp_bytes_read;
-    size_t udp_socket_reads;
-    size_t udp_packets_received;
-    size_t udp_bytes_read;
+    struct {
+        size_t unknown_types;
+        size_t socket_errors;
+        size_t tcp_socket_connects;
+        size_t tcp_socket_disconnects;
+        size_t tcp_socket_connected;
+        size_t tcp_socket_reads;
+        size_t tcp_packets_received;
+        size_t tcp_bytes_read;
+        size_t udp_socket_reads;
+        size_t udp_packets_received;
+        size_t udp_bytes_read;
+    } atomic;
 
     int32_t update_every;
     bool enabled;
@@ -292,56 +304,42 @@ static struct statsd {
 
         .gauges     = {
                 .name = "gauge",
-                .events = 0,
-                .metrics = 0,
                 .dict = NULL,
                 .type = STATSD_METRIC_TYPE_GAUGE,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .counters   = {
                 .name = "counter",
-                .events = 0,
-                .metrics = 0,
                 .dict = NULL,
                 .type = STATSD_METRIC_TYPE_COUNTER,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .timers     = {
                 .name = "timer",
-                .events = 0,
-                .metrics = 0,
                 .dict = NULL,
                 .type = STATSD_METRIC_TYPE_TIMER,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .histograms = {
                 .name = "histogram",
-                .events = 0,
-                .metrics = 0,
                 .dict = NULL,
                 .type = STATSD_METRIC_TYPE_HISTOGRAM,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .meters     = {
                 .name = "meter",
-                .events = 0,
-                .metrics = 0,
                 .dict = NULL,
                 .type = STATSD_METRIC_TYPE_METER,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .sets       = {
                 .name = "set",
-                .events = 0,
-                .metrics = 0,
                 .dict = NULL,
                 .type = STATSD_METRIC_TYPE_SET,
                 .default_options = STATSD_METRIC_OPTION_NONE
         },
         .dictionaries = {
                 .name = "dictionary",
-                .events = 0,
-                .metrics = 0,
                 .dict = NULL,
                 .type = STATSD_METRIC_TYPE_DICTIONARY,
                 .default_options = STATSD_METRIC_OPTION_NONE
@@ -353,7 +351,7 @@ static struct statsd {
         .histogram_percentile = 95.0,
         .histogram_increase_step = 10,
         .dictionary_max_unique = 200,
-        .threads = 0,
+        .threads = 1,
         .collection_threads_status = NULL,
         .sockets = {
                 .config          = &netdata_config,
@@ -380,12 +378,10 @@ static void dictionary_metric_insert_callback(const DICTIONARY_ITEM *item, void 
     m->type = index->type;
     m->options = index->default_options;
 
-    if (m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
+    if (m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER)
         m->histogram.ext = callocz(1,sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS));
-        netdata_mutex_init(&m->histogram.ext->mutex);
-    }
 
-    __atomic_fetch_add(&index->metrics, 1, __ATOMIC_RELAXED);
+    spinlock_init(&m->spinlock);
 }
 
 static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
@@ -398,27 +394,22 @@ static void dictionary_metric_delete_callback(const DICTIONARY_ITEM *item, void 
         m->histogram.ext = NULL;
     }
 
-    freez(m->units);
-    freez(m->family);
-    freez(m->dimname);
+    string_freez(m->units);
+    string_freez(m->family);
+    string_freez(m->dimname);
+    string_freez(m->context);
+    string_freez(m->title);
+    rrdlabels_destroy(m->rrdlabels);
 }
 
 static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name) {
     netdata_log_debug(D_STATSD, "searching for metric '%s' under '%s'", name, index->name);
 
-#ifdef STATSD_MULTITHREADED
     // avoid the write lock of dictionary_set() for existing metrics
     STATSD_METRIC *m = dictionary_get(index->dict, name);
     if(!m) m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
-#else
-    // no locks here, go faster
-    // this will call the dictionary_metric_insert_callback() if an item
-    // is inserted, otherwise it will return the existing one.
-    // We used the flag DICT_OPTION_DONT_OVERWRITE_VALUE to support this.
-    STATSD_METRIC *m = dictionary_set(index->dict, name, NULL, sizeof(STATSD_METRIC));
-#endif
 
-    index->events++;
+    __atomic_add_fetch(&index->atomic.events, 1, __ATOMIC_RELAXED);
     return m;
 }
 
@@ -489,12 +480,13 @@ static inline void metric_update_counters_and_obsoletion(STATSD_METRIC *m) {
     }
 }
 
-static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
-    if(!is_metric_useful_for_collection(m)) return;
+static inline NETDATA_DOUBLE statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(!is_metric_useful_for_collection(m))
+        goto cleanup;
 
     if(unlikely(!value || !*value)) {
         collector_error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
-        return;
+        goto cleanup;
     }
 
     if(unlikely(m->reset)) {
@@ -513,10 +505,14 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
 
         metric_update_counters_and_obsoletion(m);
     }
+
+cleanup:
+    return m->gauge.value;
 }
 
-static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
-    if(!is_metric_useful_for_collection(m)) return;
+static inline NETDATA_DOUBLE statsd_process_counter_or_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(!is_metric_useful_for_collection(m))
+        goto cleanup;
 
     // we accept empty values for counters
 
@@ -530,17 +526,21 @@ static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char 
 
         metric_update_counters_and_obsoletion(m);
     }
+
+cleanup:
+    return (NETDATA_DOUBLE)m->counter.value;
 }
 
 #define statsd_process_counter(m, value, sampling) statsd_process_counter_or_meter(m, value, sampling)
 #define statsd_process_meter(m, value, sampling) statsd_process_counter_or_meter(m, value, sampling)
 
-static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const char *value, const char *sampling, const char *type) {
-    if(!is_metric_useful_for_collection(m)) return;
+static inline NETDATA_DOUBLE statsd_process_histogram_or_timer(STATSD_METRIC *m, const char *value, const char *sampling, const char *type) {
+    if(!is_metric_useful_for_collection(m))
+        goto cleanup;
 
     if(unlikely(!value || !*value)) {
         collector_error("STATSD: metric of type %s, with empty value is ignored.", type);
-        return;
+        goto cleanup;
     }
 
     if(unlikely(m->reset)) {
@@ -561,10 +561,8 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
         while(samples-- > 0) {
 
             if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
-                netdata_mutex_lock(&m->histogram.ext->mutex);
                 m->histogram.ext->size += statsd.histogram_increase_step;
                 m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(NETDATA_DOUBLE) * m->histogram.ext->size);
-                netdata_mutex_unlock(&m->histogram.ext->mutex);
             }
 
             m->histogram.ext->values[m->histogram.ext->used++] = v;
@@ -572,17 +570,21 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
 
         metric_update_counters_and_obsoletion(m);
     }
+
+cleanup:
+    return (NETDATA_DOUBLE)m->histogram.ext->used;
 }
 
 #define statsd_process_timer(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "timer")
 #define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
-static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
-    if(!is_metric_useful_for_collection(m)) return;
+static inline NETDATA_DOUBLE statsd_process_set(STATSD_METRIC *m, const char *value) {
+    if(!is_metric_useful_for_collection(m))
+        goto cleanup;
 
     if(unlikely(!value || !*value)) {
         netdata_log_error("STATSD: metric of type set, with empty value is ignored.");
-        return;
+        goto cleanup;
     }
 
     if(unlikely(m->reset)) {
@@ -600,23 +602,23 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
         // magic loading of metric, without affecting anything
     }
     else {
-#ifdef STATSD_MULTITHREADED
-        // avoid the write lock to check if something is already there
-        if(!dictionary_get(m->set.dict, value))
-            dictionary_set(m->set.dict, value, NULL, 0);
-#else
         dictionary_set(m->set.dict, value, NULL, 0);
-#endif
+        m->events++;
+        m->count++;
         metric_update_counters_and_obsoletion(m);
     }
+
+cleanup:
+    return m->set.dict ? (NETDATA_DOUBLE)dictionary_entries(m->set.dict) : NAN;
 }
 
-static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value) {
-    if(!is_metric_useful_for_collection(m)) return;
+static inline NETDATA_DOUBLE statsd_process_dictionary(STATSD_METRIC *m, const char *value) {
+    if(!is_metric_useful_for_collection(m))
+        goto cleanup;
 
     if(unlikely(!value || !*value)) {
         netdata_log_error("STATSD: metric of type set, with empty value is ignored.");
-        return;
+        goto cleanup;
     }
 
     if(unlikely(m->reset))
@@ -641,6 +643,9 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
         t->count++;
         metric_update_counters_and_obsoletion(m);
     }
+
+cleanup:
+    return m->dictionary.dict ? (NETDATA_DOUBLE)dictionary_entries(m->dictionary.dict) : NAN;
 }
 
 
@@ -690,44 +695,58 @@ static void statsd_process_metric(const char *name, const char *value, const cha
 
     char t0 = type[0], t1 = type[1];
     if(unlikely(t0 == 'g' && t1 == '\0')) {
-        statsd_process_gauge(
-            m = statsd_find_or_add_metric(&statsd.gauges, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.gauges, name);
+        if(m) {
+            spinlock_lock(&m->spinlock);
+            statsd_process_gauge(m, value, sampling);
+        }
     }
     else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
         // etsy/statsd uses 'c'
         // brubeck     uses 'C'
-        statsd_process_counter(
-            m = statsd_find_or_add_metric(&statsd.counters, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.counters, name);
+        if(m) {
+            spinlock_lock(&m->spinlock);
+            statsd_process_counter(m, value, sampling);
+        }
     }
     else if(unlikely(t0 == 'm' && t1 == '\0')) {
-        statsd_process_meter(
-            m = statsd_find_or_add_metric(&statsd.meters, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.meters, name);
+        if(m) {
+            spinlock_lock(&m->spinlock);
+            statsd_process_meter(m, value, sampling);
+        }
     }
     else if(unlikely(t0 == 'h' && t1 == '\0')) {
-        statsd_process_histogram(
-            m = statsd_find_or_add_metric(&statsd.histograms, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.histograms, name);
+        if(m) {
+            spinlock_lock(&m->spinlock);
+            statsd_process_histogram(m, value, sampling);
+        }
     }
     else if(unlikely(t0 == 's' && t1 == '\0')) {
-        statsd_process_set(
-            m = statsd_find_or_add_metric(&statsd.sets, name),
-            value);
+        m = statsd_find_or_add_metric(&statsd.sets, name);
+        if(m) {
+            spinlock_lock(&m->spinlock);
+            statsd_process_set(m, value);
+        }
     }
     else if(unlikely(t0 == 'd' && t1 == '\0')) {
-        statsd_process_dictionary(
-            m = statsd_find_or_add_metric(&statsd.dictionaries, name),
-            value);
+        m = statsd_find_or_add_metric(&statsd.dictionaries, name);
+        if(m) {
+            spinlock_lock(&m->spinlock);
+            statsd_process_dictionary(m, value);
+        }
     }
     else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
-        statsd_process_timer(
-            m = statsd_find_or_add_metric(&statsd.timers, name),
-            value, sampling);
+        m = statsd_find_or_add_metric(&statsd.timers, name);
+        if(m) {
+            spinlock_lock(&m->spinlock);
+            statsd_process_timer(m, value, sampling);
+        }
     }
     else {
-        statsd.unknown_types++;
+        statsd_atomic_increment(unknown_types);
         netdata_log_error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
     }
 
@@ -754,24 +773,259 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             statsd_parse_field_trim(tagkey, tagkey_end);
             statsd_parse_field_trim(tagvalue, tagvalue_end);
 
-            if(tagkey && *tagkey && tagvalue && *tagvalue) {
-                if (strcmp(tagkey, "units") == 0 && (!m->units || strcmp(m->units, tagvalue) != 0)) {
-                    m->units = strdupz(tagvalue);
+            if(*tagkey && tagvalue && *tagvalue) {
+                if (strcmp(tagkey, "units") == 0 && (!m->units || strcmp(string2str(m->units), tagvalue) != 0)) {
+                    m->units = string_strdupz(tagvalue);
                     m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
                 }
 
-                if (strcmp(tagkey, "name") == 0 && (!m->dimname || strcmp(m->dimname, tagvalue) != 0)) {
-                    m->dimname = strdupz(tagvalue);
+                if (strcmp(tagkey, "name") == 0 && (!m->dimname || strcmp(string2str(m->dimname), tagvalue) != 0)) {
+                    m->dimname = string_strdupz(tagvalue);
                     m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
                 }
 
-                if (strcmp(tagkey, "family") == 0 && (!m->family || strcmp(m->family, tagvalue) != 0)) {
-                    m->family = strdupz(tagvalue);
+                if (strcmp(tagkey, "family") == 0 && (!m->family || strcmp(string2str(m->family), tagvalue) != 0)) {
+                    m->family = string_strdupz(tagvalue);
                     m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
                 }
             }
         }
     }
+
+    if(m)
+        spinlock_unlock(&m->spinlock);
+}
+
+static int sorted_rrdlabel_callback(const char *key, const char *value, RRDLABEL_SRC src __maybe_unused, void *data) {
+    BUFFER *b = data;
+
+    if(buffer_strlen(b))
+        buffer_strcat(b, "|");
+
+    buffer_strcat(b, key);
+    buffer_strcat(b, "=");
+    buffer_strcat(b, value);
+
+    return 1;
+}
+
+int web_client_api_request_v2_statsd(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    char *type = NULL;
+    char *metric = NULL;
+    char *value = NULL;
+    char *dimname = NULL;
+    char *units = NULL;
+    char *family = NULL;
+    char *title = NULL;
+    char *instance = NULL;
+
+    RRDLABELS *rrdlabels = NULL;
+    BUFFER *b = NULL;
+
+    while (url) {
+        char *v = strsep_skip_consecutive_separators(&url, "&");
+        if (!v || !*v) continue;
+
+        char *n = strsep_skip_consecutive_separators(&v, "=");
+        if (!n || !v || !*n || !*v) continue;
+
+        if(!strcmp(n, "type"))
+            type = v;
+        else if(!strcmp(n, "metric"))
+            metric = v;
+        else if(!strcmp(n, "value"))
+            value = v;
+        else if(!strcmp(n, "name"))
+            dimname = v;
+        else if(!strcmp(n, "units"))
+            units = v;
+        else if(!strcmp(n, "title"))
+            title = v;
+        else if(!strcmp(n, "family"))
+            family = v;
+        else if(!strcmp(n, "instance"))
+            instance = v;
+        else if(!strcmp(n, "tag") || !strcmp(n, "tags") || !strcmp(n, "label") || !strcmp(n, "labels")) {
+            if(!rrdlabels)
+                rrdlabels = rrdlabels_create();
+
+            char *key = v;
+            while(*key) {
+                char *key_end = key;
+                while (*key_end && *key_end != ':') key_end++;
+
+                while (*key_end == ':')
+                    *key_end++ = '\0';
+
+                char *next = key_end;
+                while(*next && *next != '|' && *next != ',')
+                    next++;
+
+                while(*next == '|' || *next == ',')
+                    *next++ = '\0';
+
+                rrdlabels_add(rrdlabels, key, *key_end ? key_end : "[set]", RRDLABEL_SRC_AUTO);
+
+                key = next;
+            }
+        }
+    }
+
+    char *context = metric;
+
+    if(!dimname) {
+        if(units)
+            dimname = units;
+        else
+            dimname = "value";
+    }
+
+    int ret;
+    if(!type || !metric || !value || !*type ||  !*metric || !*value) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Bad request: The request should at least have 'type', 'metric' and 'value'");
+
+        ret = HTTP_RESP_BAD_REQUEST;
+        goto cleanup;
+    }
+
+    if(instance && *instance) {
+        metric = instance;
+        netdata_fix_chart_id(metric);
+    }
+    else if(rrdlabels && rrdlabels_entries(rrdlabels)) {
+        if(!b)
+            b = buffer_create(0, NULL);
+        else
+            buffer_flush(b);
+
+        buffer_strcat(b, metric);
+        buffer_strcat(b, "_");
+
+        rrdlabels_sorted_walkthrough_read(rrdlabels, sorted_rrdlabel_callback, b);
+
+        uint32_t hash = simple_hash(buffer_tostring(b));
+        buffer_strcat(b, "_");
+        buffer_print_uint64_hex(b, hash);
+
+        metric = (char *)buffer_tostring(b);
+        netdata_fix_chart_id(metric);
+    }
+
+    netdata_fix_chart_id(context);
+
+    STATSD_METRIC *m = NULL;
+    const char *show_name;
+    NETDATA_DOUBLE show_value;
+    if(!strcmp(type, "meter")) {
+        m = statsd_find_or_add_metric(&statsd.meters, metric);
+        spinlock_lock(&m->spinlock);
+        show_value = statsd_process_meter(m, value, NULL);
+        show_name = "meter_value";
+    }
+    else if(!strcmp(type, "counter")) {
+        m = statsd_find_or_add_metric(&statsd.counters, metric);
+        spinlock_lock(&m->spinlock);
+        show_value = statsd_process_counter(m, value, NULL);
+        show_name = "counter_value";
+    }
+    else if(!strcmp(type, "gauge")) {
+        m = statsd_find_or_add_metric(&statsd.gauges, metric);
+        spinlock_lock(&m->spinlock);
+        show_value = statsd_process_gauge(m, value, NULL);
+        show_name = "gauge_value";
+    }
+    else if(!strcmp(type, "timer")) {
+        m = statsd_find_or_add_metric(&statsd.timers, metric);
+        spinlock_lock(&m->spinlock);
+        show_value = statsd_process_timer(m, value, NULL);
+        show_name = "timer_entries";
+    }
+    else if(!strcmp(type, "histogram")) {
+        m = statsd_find_or_add_metric(&statsd.histograms, metric);
+        spinlock_lock(&m->spinlock);
+        show_value = statsd_process_histogram(m, value, NULL);
+        show_name = "histogram_entries";
+    }
+    else if(!strcmp(type, "set")) {
+        m = statsd_find_or_add_metric(&statsd.sets, metric);
+        spinlock_lock(&m->spinlock);
+        show_value = statsd_process_set(m, value);
+        show_name = "set_entries";
+    }
+    else if(!strcmp(type, "dictionary")) {
+        m = statsd_find_or_add_metric(&statsd.dictionaries, metric);
+        spinlock_lock(&m->spinlock);
+        show_value = statsd_process_dictionary(m, value);
+        show_name = "dictionary_entries";
+    }
+    else {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Bad request: invalid / unknown 'type' requested");
+
+        ret = HTTP_RESP_BAD_REQUEST;
+        goto cleanup;
+    }
+
+    if(!m->rrdlabels) {
+        m->rrdlabels = rrdlabels;
+        rrdlabels = NULL;
+    }
+    else {
+        rrdlabels_migrate_to_these(m->rrdlabels, rrdlabels);
+    }
+
+    if(units && *units && (!m->units || strcmp(units, string2str(m->units)) != 0)) {
+        string_freez(m->units);
+        m->units = string_strdupz(units);
+        m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+    }
+    if(family && *family && (!m->family || strcmp(family, string2str(m->family)) != 0)) {
+        string_freez(m->family);
+        m->family = string_strdupz(family);
+        m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+    }
+    if(*dimname && (!m->dimname || strcmp(dimname, string2str(m->dimname)) != 0)) {
+        string_freez(m->dimname);
+        m->dimname = string_strdupz(dimname);
+        m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+    }
+    if(*context && (!m->context || strcmp(context, string2str(m->context)) != 0)) {
+        string_freez(m->context);
+        m->context = string_strdupz(context);
+        m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+    }
+    if(title && *title && (!m->title || strcmp(title, string2str(m->title)) != 0)) {
+        string_freez(m->title);
+        m->title = string_strdupz(title);
+        m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+    }
+
+    buffer_flush(w->response.data);
+    buffer_json_initialize(w->response.data, "\"", "\"", 0, true, false);
+    buffer_json_member_add_string(w->response.data, "metric", metric);
+    buffer_json_member_add_string(w->response.data, "context", context);
+    buffer_json_member_add_string(w->response.data, "value", value);
+    buffer_json_member_add_string(w->response.data, "family", string2str(m->family));
+    buffer_json_member_add_string(w->response.data, "title", string2str(m->title));
+    buffer_json_member_add_string(w->response.data, "name", string2str(m->dimname));
+    buffer_json_member_add_object(w->response.data, "labels");
+    rrdlabels_to_buffer_json_members(m->rrdlabels, w->response.data);
+    buffer_json_object_close(w->response.data); // labels
+    buffer_json_member_add_object(w->response.data, "status");
+    buffer_json_member_add_double(w->response.data, show_name, show_value);
+    buffer_json_member_add_uint64(w->response.data, "events", m->events);
+    buffer_json_member_add_uint64(w->response.data, "count", m->count);
+    buffer_json_object_close(w->response.data); // status
+    buffer_json_finalize(w->response.data);
+    spinlock_unlock(&m->spinlock);
+
+    ret = HTTP_RESP_OK;
+
+cleanup:
+    buffer_free(b);
+    rrdlabels_destroy(rrdlabels);
+    return ret;
 }
 
 static inline size_t statsd_process(char *buffer, size_t size, int require_newlines) {
@@ -883,8 +1137,8 @@ static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
     struct statsd_tcp *t = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
     t->type = STATSD_SOCKET_DATA_TYPE_TCP;
     t->size = STATSD_TCP_BUFFER_SIZE - 1;
-    statsd.tcp_socket_connects++;
-    statsd.tcp_socket_connected++;
+    statsd_atomic_increment(tcp_socket_connects);
+    statsd_atomic_increment(tcp_socket_connected);
 
     worker_is_idle();
     return t;
@@ -899,12 +1153,12 @@ static void statsd_del_callback(POLLINFO *pi) {
     if(likely(t)) {
         if(t->type == STATSD_SOCKET_DATA_TYPE_TCP) {
             if(t->len != 0) {
-                statsd.socket_errors++;
+                statsd_atomic_increment(socket_errors);
                 netdata_log_error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
                 statsd_process(t->buffer, t->len, 0);
             }
-            statsd.tcp_socket_disconnects++;
-            statsd.tcp_socket_connected--;
+            statsd_atomic_increment(tcp_socket_disconnects);
+            statsd_atomic_decrement(tcp_socket_connected);
         }
         else
             netdata_log_error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
@@ -917,7 +1171,7 @@ static void statsd_del_callback(POLLINFO *pi) {
 
 // Receive data
 static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
-    int retval = -1;
+    int retval;
     worker_is_busy(WORKER_JOB_TYPE_RCV_DATA);
 
     *events = POLLIN;
@@ -929,7 +1183,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
             struct statsd_tcp *d = (struct statsd_tcp *)pi->data;
             if(unlikely(!d)) {
                 netdata_log_error("STATSD: internal error: expected TCP data pointer is NULL");
-                statsd.socket_errors++;
+                statsd_atomic_increment(socket_errors);
                 retval = -1;
                 goto cleanup;
             }
@@ -937,7 +1191,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_TCP)) {
                 netdata_log_error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
-                statsd.socket_errors++;
+                statsd_atomic_increment(socket_errors);
                 retval = -1;
                 goto cleanup;
             }
@@ -951,7 +1205,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
                         netdata_log_error("STATSD: recv() on TCP socket %d failed.", fd);
-                        statsd.socket_errors++;
+                        statsd_atomic_increment(socket_errors);
                         ret = -1;
                     }
                 }
@@ -963,12 +1217,12 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                 else {
                     // data received
                     d->len += rc;
-                    statsd.tcp_socket_reads++;
-                    statsd.tcp_bytes_read += rc;
+                    statsd_atomic_increment(tcp_socket_reads);
+                    statsd_atomic_add(tcp_bytes_read, rc);
                 }
 
                 if(likely(d->len > 0)) {
-                    statsd.tcp_packets_received++;
+                    statsd_atomic_increment(tcp_packets_received);
                     d->len = statsd_process(d->buffer, d->len, 1);
                 }
 
@@ -985,7 +1239,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
             struct statsd_udp *d = (struct statsd_udp *)pi->data;
             if(unlikely(!d)) {
                 netdata_log_error("STATSD: internal error: expected UDP data pointer is NULL");
-                statsd.socket_errors++;
+                statsd_atomic_increment(socket_errors);
                 retval = -1;
                 goto cleanup;
             }
@@ -993,7 +1247,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
 #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
                 netdata_log_error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_UDP);
-                statsd.socket_errors++;
+                statsd_atomic_increment(socket_errors);
                 retval = -1;
                 goto cleanup;
             }
@@ -1007,19 +1261,19 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
                         netdata_log_error("STATSD: recvmmsg() on UDP socket %d failed.", fd);
-                        statsd.socket_errors++;
+                        statsd_atomic_increment(socket_errors);
                         retval = -1;
                         goto cleanup;
                     }
                 } else if (rc) {
                     // data received
-                    statsd.udp_socket_reads++;
-                    statsd.udp_packets_received += rc;
+                    statsd_atomic_increment(udp_socket_reads);
+                    statsd_atomic_add(udp_packets_received, rc);
 
                     size_t i;
                     for (i = 0; i < (size_t)rc; ++i) {
                         size_t len = (size_t)d->msgs[i].msg_len;
-                        statsd.udp_bytes_read += len;
+                        statsd_atomic_add(udp_bytes_read, len);
                         statsd_process(d->msgs[i].msg_hdr.msg_iov->iov_base, len, 0);
                     }
                 }
@@ -1033,15 +1287,15 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
                         netdata_log_error("STATSD: recv() on UDP socket %d failed.", fd);
-                        statsd.socket_errors++;
+                        statsd_atomic_increment(socket_errors);
                         retval = -1;
                         goto cleanup;
                     }
                 } else if (rc) {
                     // data received
-                    statsd.udp_socket_reads++;
-                    statsd.udp_packets_received++;
-                    statsd.udp_bytes_read += rc;
+                    statsd_atomic_increment(udp_socket_reads);
+                    statsd_atomic_increment(udp_packets_received);
+                    statsd_atomic_add(udp_bytes_read, rc);
                     statsd_process(d->buffer, (size_t) rc, 0);
                 }
             } while (rc != -1);
@@ -1052,7 +1306,7 @@ static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
 
         default: {
             netdata_log_error("STATSD: internal error: unknown socktype %d on socket %d", pi->socktype, fd);
-            statsd.socket_errors++;
+            statsd_atomic_increment(socket_errors);
             retval = -1;
             goto cleanup;
         }
@@ -1214,8 +1468,8 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     dim->metric_hash = simple_hash(dim->metric);
 
     dim->name = strdupz((dim_name)?dim_name:"");
-    dim->multiplier = multiplier;
-    dim->divisor = divisor;
+    dim->multiplier = (int32_t)multiplier;
+    dim->divisor = (int32_t)divisor;
     dim->value_type = value_type;
     dim->flags = flags;
     dim->options = options;
@@ -1582,7 +1836,10 @@ static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, c
         snprintfz(id, len, "%s", metrictype);
 
     // for the context, we want the full of both the above, separated with a dot (type.id):
-    snprintfz(context, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+    if(m->context)
+        snprintfz(context, RRD_ID_LENGTH_MAX, STATSD_CHART_PREFIX "_%s", string2str(m->context));
+    else
+        snprintfz(context, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     // make sure they don't have illegal characters
     netdata_fix_chart_id(type);
@@ -1590,8 +1847,8 @@ static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, c
     netdata_fix_chart_id(context);
 }
 
-static inline RRDSET *statsd_private_rrdset_create(
-        STATSD_METRIC *m __maybe_unused
+static inline void statsd_private_rrdset_create(
+        STATSD_METRIC *m
         , const char *type
         , const char *id
         , const char *name
@@ -1603,11 +1860,13 @@ static inline RRDSET *statsd_private_rrdset_create(
         , int update_every
         , RRDSET_TYPE chart_type
 ) {
-    if(!m->st)
-        statsd.private_charts++;
+    if(m->st)
+        return;
 
-    RRDSET *st = rrdset_create_custom(
-            localhost         // host
+    statsd.private_charts++;
+
+    RRDSET *st = m->st = rrdset_create_custom(
+            localhost    // host
             , type            // type
             , id              // id
             , name            // name
@@ -1628,8 +1887,16 @@ static inline RRDSET *statsd_private_rrdset_create(
     if(statsd.private_charts_hidden)
         rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
 
+    if(m->rrdlabels) {
+        if (!st->rrdlabels) {
+            st->rrdlabels = rrdlabels_create();
+            rrdlabels_copy(st->rrdlabels, m->rrdlabels);
+        }
+        else
+            rrdlabels_migrate_to_these(st->rrdlabels, m->rrdlabels);
+    }
+
     // rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
-    return st;
 }
 
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
@@ -1645,23 +1912,26 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
         statsd_get_metric_type_and_id(m, type, id, context, "gauge", RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for gauge %s", m->name);
+        if(m->title)
+            snprintfz(title, RRD_ID_LENGTH_MAX, "%s", string2str(m->title));
+        else
+            snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for gauge %s", m->name);
 
-        m->st = statsd_private_rrdset_create(
+        statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
-                , m->family?m->family:"gauges"      // family (submenu)
+                , m->family?string2str(m->family):"gauges"      // family (submenu)
                 , context       // context
                 , title         // title
-                , m->units?m->units:"value"       // units
+                , m->units?string2str(m->units):"value"       // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_LINE
         );
 
-        m->rd_value = rrddim_add(m->st, "gauge",  m->dimname?m->dimname:NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value = rrddim_add(m->st, "gauge",  string2str(m->dimname), 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
@@ -1688,23 +1958,26 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
         statsd_get_metric_type_and_id(m, type, id, context, dim, RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
+        if(m->title)
+            snprintfz(title, RRD_ID_LENGTH_MAX, "%s", string2str(m->title));
+        else
+            snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
 
-        m->st = statsd_private_rrdset_create(
+        statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
-                , m->family?m->family:family        // family (submenu)
+                , m->family?string2str(m->family):family        // family (submenu)
                 , context       // context
                 , title         // title
-                , m->units?m->units:"events/s"    // units
+                , m->units?string2str(m->units):"events/s"    // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_AREA
         );
 
-        m->rd_value = rrddim_add(m->st, dim, m->dimname?m->dimname:NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        m->rd_value = rrddim_add(m->st, dim, string2str(m->dimname), 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1731,23 +2004,26 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
         statsd_get_metric_type_and_id(m, type, id, context, "set", RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for set %s", m->name);
+        if(m->title)
+            snprintfz(title, RRD_ID_LENGTH_MAX, "%s", string2str(m->title));
+        else
+            snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for set %s", m->name);
 
-        m->st = statsd_private_rrdset_create(
+        statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
-                , m->family?m->family:"sets"        // family (submenu)
+                , m->family?string2str(m->family):"sets"        // family (submenu)
                 , context       // context
                 , title         // title
-                , m->units?m->units:"entries"     // units
+                , m->units?string2str(m->units):"entries"     // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_LINE
         );
 
-        m->rd_value = rrddim_add(m->st, "set", m->dimname?m->dimname:"unique", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value = rrddim_add(m->st, "set", m->dimname?string2str(m->dimname):"unique", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1774,17 +2050,20 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
         statsd_get_metric_type_and_id(m, type, id, context, "dictionary", RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for dictionary %s", m->name);
+        if(m->title)
+            snprintfz(title, RRD_ID_LENGTH_MAX, "%s", string2str(m->title));
+        else
+            snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for dictionary %s", m->name);
 
-        m->st = statsd_private_rrdset_create(
+        statsd_private_rrdset_create(
             m
             , type
             , id
             , NULL          // name
-            , m->family?m->family:"dictionaries" // family (submenu)
+            , m->family?string2str(m->family):"dictionaries" // family (submenu)
             , context       // context
             , title         // title
-            , m->units?m->units:"events/s"     // units
+            , m->units?string2str(m->units):"events/s"     // units
             , NETDATA_CHART_PRIO_STATSD_PRIVATE
             , statsd.update_every
             , RRDSET_TYPE_STACKED
@@ -1820,17 +2099,20 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
         statsd_get_metric_type_and_id(m, type, id, context, dim, RRD_ID_LENGTH_MAX);
 
         char title[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
+        if(m->title)
+            snprintfz(title, RRD_ID_LENGTH_MAX, "%s", string2str(m->title));
+        else
+            snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
 
-        m->st = statsd_private_rrdset_create(
+        statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
-                , m->family?m->family:family        // family (submenu)
+                , m->family?string2str(m->family):family        // family (submenu)
                 , context       // context
                 , title         // title
-                , m->units?m->units:units         // units
+                , m->units?string2str(m->units):units         // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_AREA
@@ -1972,8 +2254,6 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
 
     int updated = 0;
     if(unlikely(!m->reset && m->count && m->histogram.ext->used > 0)) {
-        netdata_mutex_lock(&m->histogram.ext->mutex);
-
         size_t len = m->histogram.ext->used;
         NETDATA_DOUBLE *series = m->histogram.ext->values;
         sort_series(series, len);
@@ -1990,8 +2270,6 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
             m->histogram.ext->last_percentile = (collected_number)(series[0] * statsd.decimal_detail);
         else
             m->histogram.ext->last_percentile = (collected_number)roundndd(series[pct_len - 1] * statsd.decimal_detail);
-
-        netdata_mutex_unlock(&m->histogram.ext->mutex);
 
         netdata_log_debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
               dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
@@ -2361,9 +2639,9 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         // check if it is used in charts
         if((m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED|STATSD_METRIC_OPTION_USED_IN_APPS)) && !(m->options & STATSD_METRIC_OPTION_USEFUL)) {
             m->options |= STATSD_METRIC_OPTION_USEFUL;
-            index->useful++;
-            m->next_useful = index->first_useful;
-            index->first_useful = m;
+            index->useful.count++;
+            m->next_useful = index->useful.first;
+            index->useful.first = m;
         }
     }
     dfe_done(m);
@@ -2371,7 +2649,9 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
     // flush all the useful metrics
     STATSD_METRIC *m_prev;
     for(m_prev = m = index->first_useful; m ; m = m->next_useful) {
+        spinlock_lock(&m->spinlock);
         flush_metric(m);
+        spinlock_unlock(&m->spinlock);
         if (m->options & STATSD_METRIC_OPTION_OBSOLETE) {
             if (m == index->first_useful)
                 index->first_useful = m->next_useful;
@@ -2553,16 +2833,12 @@ void *statsd_main(void *ptr) {
 
     size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_STATSD, "statsd server max TCP sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
 
-#ifdef STATSD_MULTITHREADED
-    statsd.threads = (int)config_get_number(CONFIG_SECTION_STATSD, "threads", processors);
+    statsd.threads = (int)config_get_number(CONFIG_SECTION_STATSD, "threads", statsd.threads);
     if(statsd.threads < 1) {
-        collector_error("STATSD: Invalid number of threads %d, using %d", statsd.threads, processors);
-        statsd.threads = processors;
+        collector_error("STATSD: Invalid number of threads %d, using %d", statsd.threads, statsd.threads);
+        statsd.threads = 1;
         config_set_number(CONFIG_SECTION_STATSD, "collector threads", statsd.threads);
     }
-#else
-    statsd.threads = 1;
-#endif
 
     // read custom application definitions
     statsd_readdir(netdata_configured_user_config_dir, netdata_configured_stock_config_dir, "statsd.d");
@@ -2834,52 +3110,52 @@ void *statsd_main(void *ptr) {
             break;
 
         if(global_statistics_enabled) {
-            rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
-            rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)statsd.counters.metrics);
-            rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)statsd.timers.metrics);
-            rrddim_set_by_pointer(st_metrics, rd_metrics_meter,        (collected_number)statsd.meters.metrics);
-            rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
-            rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
-            rrddim_set_by_pointer(st_metrics, rd_metrics_dictionary,   (collected_number)statsd.dictionaries.metrics);
+            rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)dictionary_entries(statsd.gauges.dict));
+            rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)dictionary_entries(statsd.counters.dict));
+            rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)dictionary_entries(statsd.timers.dict));
+            rrddim_set_by_pointer(st_metrics, rd_metrics_meter,        (collected_number)dictionary_entries(statsd.meters.dict));
+            rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)dictionary_entries(statsd.histograms.dict));
+            rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)dictionary_entries(statsd.sets.dict));
+            rrddim_set_by_pointer(st_metrics, rd_metrics_dictionary,   (collected_number)dictionary_entries(statsd.dictionaries.dict));
             rrdset_done(st_metrics);
 
-            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_gauge,        (collected_number)statsd.gauges.useful);
-            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_counter,      (collected_number)statsd.counters.useful);
-            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_timer,        (collected_number)statsd.timers.useful);
-            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_meter,        (collected_number)statsd.meters.useful);
-            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_histogram,    (collected_number)statsd.histograms.useful);
-            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_set,          (collected_number)statsd.sets.useful);
-            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_dictionary,   (collected_number)statsd.dictionaries.useful);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_gauge,        (collected_number)statsd.gauges.useful.count);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_counter,      (collected_number)statsd.counters.useful.count);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_timer,        (collected_number)statsd.timers.useful.count);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_meter,        (collected_number)statsd.meters.useful.count);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_histogram,    (collected_number)statsd.histograms.useful.count);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_set,          (collected_number)statsd.sets.useful.count);
+            rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_dictionary,   (collected_number)statsd.dictionaries.useful.count);
             rrdset_done(st_useful_metrics);
 
-            rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
-            rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)statsd.counters.events);
-            rrddim_set_by_pointer(st_events,  rd_events_timer,         (collected_number)statsd.timers.events);
-            rrddim_set_by_pointer(st_events,  rd_events_meter,         (collected_number)statsd.meters.events);
-            rrddim_set_by_pointer(st_events,  rd_events_histogram,     (collected_number)statsd.histograms.events);
-            rrddim_set_by_pointer(st_events,  rd_events_set,           (collected_number)statsd.sets.events);
-            rrddim_set_by_pointer(st_events,  rd_events_dictionary,    (collected_number)statsd.dictionaries.events);
-            rrddim_set_by_pointer(st_events,  rd_events_unknown,       (collected_number)statsd.unknown_types);
-            rrddim_set_by_pointer(st_events,  rd_events_errors,        (collected_number)statsd.socket_errors);
+            rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)__atomic_load_n(&statsd.gauges.atomic.events, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)__atomic_load_n(&statsd.counters.atomic.events, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_events,  rd_events_timer,         (collected_number)__atomic_load_n(&statsd.timers.atomic.events, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_events,  rd_events_meter,         (collected_number)__atomic_load_n(&statsd.meters.atomic.events, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_events,  rd_events_histogram,     (collected_number)__atomic_load_n(&statsd.histograms.atomic.events, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_events,  rd_events_set,           (collected_number)__atomic_load_n(&statsd.sets.atomic.events, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_events,  rd_events_dictionary,    (collected_number)__atomic_load_n(&statsd.dictionaries.atomic.events, __ATOMIC_RELAXED));
+            rrddim_set_by_pointer(st_events,  rd_events_unknown,       (collected_number)statsd_atomic_get(unknown_types));
+            rrddim_set_by_pointer(st_events,  rd_events_errors,        (collected_number)statsd_atomic_get(socket_errors));
             rrdset_done(st_events);
 
-            rrddim_set_by_pointer(st_reads,   rd_reads_tcp,            (collected_number)statsd.tcp_socket_reads);
-            rrddim_set_by_pointer(st_reads,   rd_reads_udp,            (collected_number)statsd.udp_socket_reads);
+            rrddim_set_by_pointer(st_reads,   rd_reads_tcp,            (collected_number)statsd_atomic_get(tcp_socket_reads));
+            rrddim_set_by_pointer(st_reads,   rd_reads_udp,            (collected_number)statsd_atomic_get(udp_socket_reads));
             rrdset_done(st_reads);
 
-            rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,            (collected_number)statsd.tcp_bytes_read);
-            rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,            (collected_number)statsd.udp_bytes_read);
+            rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,            (collected_number)statsd_atomic_get(tcp_bytes_read));
+            rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,            (collected_number)statsd_atomic_get(udp_bytes_read));
             rrdset_done(st_bytes);
 
-            rrddim_set_by_pointer(st_packets, rd_packets_tcp,          (collected_number)statsd.tcp_packets_received);
-            rrddim_set_by_pointer(st_packets, rd_packets_udp,          (collected_number)statsd.udp_packets_received);
+            rrddim_set_by_pointer(st_packets, rd_packets_tcp,          (collected_number)statsd_atomic_get(tcp_packets_received));
+            rrddim_set_by_pointer(st_packets, rd_packets_udp,          (collected_number)statsd_atomic_get(udp_packets_received));
             rrdset_done(st_packets);
 
-            rrddim_set_by_pointer(st_tcp_connects, rd_tcp_connects,    (collected_number)statsd.tcp_socket_connects);
-            rrddim_set_by_pointer(st_tcp_connects, rd_tcp_disconnects, (collected_number)statsd.tcp_socket_disconnects);
+            rrddim_set_by_pointer(st_tcp_connects, rd_tcp_connects,    (collected_number)statsd_atomic_get(tcp_socket_connects));
+            rrddim_set_by_pointer(st_tcp_connects, rd_tcp_disconnects, (collected_number)statsd_atomic_get(tcp_socket_disconnects));
             rrdset_done(st_tcp_connects);
 
-            rrddim_set_by_pointer(st_tcp_connected, rd_tcp_connected,  (collected_number)statsd.tcp_socket_connected);
+            rrddim_set_by_pointer(st_tcp_connected, rd_tcp_connected,  (collected_number)statsd_atomic_get(tcp_socket_connected));
             rrdset_done(st_tcp_connected);
 
             rrddim_set_by_pointer(st_pcharts, rd_pcharts,              (collected_number)statsd.private_charts);
