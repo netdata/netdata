@@ -1,4 +1,4 @@
-FROM debian:buster AS build
+FROM debian:12 AS build
 
 # Disable apt/dpkg interactive mode
 ENV DEBIAN_FRONTEND=noninteractive

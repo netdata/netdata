@@ -43,10 +43,8 @@ jobs:
             **.h
             **.hh
             **.in
-            configure.ac
+            CMakeLists.txt
             netdata-installer.sh
-            **/Makefile*
-            Makefile*
             .github/data/distros.yml
             .github/workflows/build.yml
             .github/scripts/build-static.sh
@@ -105,20 +103,13 @@ jobs:
         id: build
         if: needs.file-check.outputs.run == 'true'
         run: |
-          git describe
-          mkdir -p artifacts
-          ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-          autoreconf -ivf
-          ./configure --prefix=/usr \
-                      --sysconfdir=/etc \
-                      --localstatedir=/var \
-                      --libexecdir=/usr/libexec \
-                      --with-zlib \
-                      --with-math \
-                      --with-user=netdata
-          make dist
+          mkdir -p artifacts/
+          tar --create --file "artifacts/netdata-$(git describe).tar.gz" \
+              --sort=name --posix --auto-compress --exclude=artifacts/ --exclude=.git \
+              --exclude=.gitignore --exclude=.gitattributes --exclude=.gitmodules \
+              --transform "s/^\\.\\//netdata-$(git describe)\\//" --verbose .
+          cd artifacts/
           echo "distfile=$(find . -name 'netdata-*.tar.gz')" >> "${GITHUB_OUTPUT}"
-          cp netdata-*.tar.gz artifacts/
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
@@ -417,12 +408,6 @@ jobs:
         id: load
         if: needs.file-check.outputs.run == 'true'
         run: docker load --input image.tar
-      - name: Regular build on ${{ matrix.distro }}
-        id: build-basic
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c 'autoreconf -ivf && ./configure --disable-dependency-tracking && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         id: build-no-cloud
         if: needs.file-check.outputs.run == 'true'
@@ -454,7 +439,6 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Fetch test environment: ${{ steps.fetch.outcome }}
               Load test environment: ${{ steps.load.outcome }}
-              Regular build: ${{ steps.build-basic.outcome }}
               netdata-installer, disable cloud: ${{ steps.build-no-cloud.outcome }}
               netdata-installer, require cloud: ${{ steps.build-cloud.outcome }}
               netdata-installer, no JSON-C: ${{ steps.build-no-jsonc.outcome }}
@@ -513,6 +497,7 @@ jobs:
           cp dist-tarball/* artifacts/download/latest || exit 1
           cd artifacts/download/latest || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
+          ls -lFh
           sha256sum -b ./* > "sha256sums.txt" || exit 1
           cat sha256sums.txt
       - name: Fetch test environment

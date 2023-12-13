@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "cli.h"
 #include "daemon/pipename.h"
+#include "daemon/common.h"
+#include "libnetdata/required_dummies.h"
 
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
     va_list args;

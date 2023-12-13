@@ -72,13 +72,17 @@ include:
       arches:
         - x86_64
         - aarch64
-    test:
+    test: &amzn_test
       ebpf-core: false
+      skip-local-build: true
   - <<: *amzn
     version: "2023"
     packages:
       <<: *amzn_packages
       repo_distro: amazonlinux/2023
+    test:
+      <<: *amzn_test
+      skip-local-build: false
 
   - distro: centos
     version: "7"
@@ -95,6 +99,7 @@ include:
         - x86_64
     test:
       ebpf-core: false
+      skip-local-build: true
 
   - &centos_stream
     distro: centos-stream

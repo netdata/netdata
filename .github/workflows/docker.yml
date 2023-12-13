@@ -41,10 +41,8 @@ jobs:
             **.hh
             **.in
             .dockerignore
-            configure.ac
             netdata-installer.sh
-            **/Makefile*
-            Makefile*
+            CMakeLists.txt
             .github/workflows/docker.yml
             .github/scripts/docker-test.sh
             build/**

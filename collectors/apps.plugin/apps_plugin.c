@@ -4241,7 +4241,7 @@ static int am_i_running_as_root() {
     return 0;
 }
 
-#ifdef HAVE_CAPABILITY
+#ifdef HAVE_SYS_CAPABILITY_H
 static int check_capabilities() {
     cap_t caps = cap_get_proc();
     if(!caps) {
@@ -5307,7 +5307,7 @@ int main(int argc, char **argv) {
 
     if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
         uid_t uid = getuid(), euid = geteuid();
-#ifdef HAVE_CAPABILITY
+#ifdef HAVE_SYS_CAPABILITY_H
         netdata_log_error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                       "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                       "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "

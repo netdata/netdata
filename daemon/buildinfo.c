@@ -69,17 +69,12 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LZ4,
     BIB_LIB_ZSTD,
     BIB_LIB_ZLIB,
-    BIB_LIB_JUDY,
-    BIB_LIB_DLIB,
     BIB_LIB_PROTOBUF,
     BIB_LIB_OPENSSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
     BIB_LIB_LIBCAP,
     BIB_LIB_LIBCRYPTO,
-    BIB_LIB_LIBM,
-    BIB_LIB_JEMALLOC,
-    BIB_LIB_TCMALLOC,
     BIB_PLUGIN_APPS,
     BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
@@ -655,23 +650,6 @@ static struct {
                 .json = "zlib",
                 .value = NULL,
         },
-        [BIB_LIB_JUDY] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "Judy (high-performance dynamic arrays and hashtables)",
-                .json = "judy",
-                .status = true,
-                .value = "bundled",
-        },
-        [BIB_LIB_DLIB] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "dlib (robust machine learning toolkit)",
-                .json = "dlib",
-                .value = NULL,
-        },
         [BIB_LIB_PROTOBUF] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
@@ -718,30 +696,6 @@ static struct {
                 .analytics = "libcrypto",
                 .print = "libcrypto (cryptographic functions)",
                 .json = "libcrypto",
-                .value = NULL,
-        },
-        [BIB_LIB_LIBM] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "libm",
-                .print = "libm (mathematical functions)",
-                .json = "libm",
-                .value = NULL,
-        },
-        [BIB_LIB_JEMALLOC] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "jemalloc",
-                .print = "jemalloc",
-                .json = "jemalloc",
-                .value = NULL,
-        },
-        [BIB_LIB_TCMALLOC] = {
-                .category = BIC_LIBS,
-                .type = BIT_BOOLEAN,
-                .analytics = "tcmalloc",
-                .print = "TCMalloc",
-                .json = "tcmalloc",
                 .value = NULL,
         },
         [BIB_PLUGIN_APPS] = {
@@ -1203,17 +1157,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_CRYPTO
     build_info_set_status(BIB_LIB_LIBCRYPTO, true);
 #endif
-#ifdef STORAGE_WITH_MATH
-    build_info_set_status(BIB_LIB_LIBM, true);
-#endif
-#ifdef ENABLE_JEMALLOC
-    build_info_set_status(BIB_LIB_JEMALLOC, true);
-#endif
-#ifdef ENABLE_TCMALLOC
-    build_info_set_status(BIB_LIB_TCMALLOC, true);
-#endif
 
-#ifdef ENABLE_APPS_PLUGIN
+#ifdef ENABLE_PLUGIN_APPS
     build_info_set_status(BIB_PLUGIN_APPS, true);
 #endif
 #ifdef HAVE_SETNS
@@ -1225,28 +1170,28 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_PLUGIN_IDLEJITTER, true);
     build_info_set_status(BIB_PLUGIN_BASH, true);
 
-#ifdef ENABLE_DEBUGFS_PLUGIN
+#ifdef ENABLE_PLUGIN_DEBUGFS
     build_info_set_status(BIB_PLUGIN_DEBUGFS, true);
 #endif
-#ifdef HAVE_CUPS
+#ifdef ENABLE_PLUGIN_CUPS
     build_info_set_status(BIB_PLUGIN_CUPS, true);
 #endif
-#ifdef HAVE_LIBBPF
+#ifdef ENABLE_PLUGIN_EBPF
     build_info_set_status(BIB_PLUGIN_EBPF, true);
 #endif
-#ifdef HAVE_FREEIPMI
+#ifdef ENABLE_PLUGIN_FREEIPMI
     build_info_set_status(BIB_PLUGIN_FREEIPMI, true);
 #endif
-#ifdef HAVE_NFACCT
+#ifdef ENABLE_PLUGIN_NFACCT
     build_info_set_status(BIB_PLUGIN_NFACCT, true);
 #endif
-#ifdef ENABLE_PERF_PLUGIN
+#ifdef ENABLE_PLUGIN_PERF
     build_info_set_status(BIB_PLUGIN_PERF, true);
 #endif
-#ifdef ENABLE_SLABINFO
+#ifdef ENABLE_PLUGIN_SLABINFO
     build_info_set_status(BIB_PLUGIN_SLABINFO, true);
 #endif
-#ifdef HAVE_LIBXENSTAT
+#ifdef ENABLE_PLUGIN_XENSTAT
     build_info_set_status(BIB_PLUGIN_XEN, true);
 #endif
 #ifdef HAVE_XENSTAT_VBD_ERROR

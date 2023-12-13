@@ -311,7 +311,7 @@ static inline void disable_instance(struct instance *instance)
 
 #include "exporting/prometheus/prometheus.h"
 #include "exporting/opentsdb/opentsdb.h"
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
+#ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
 #include "exporting/prometheus/remote_write/remote_write.h"
 #endif
 
