@@ -586,7 +586,7 @@ inline bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
 inline void mrg_update_metric_retention_and_granularity_by_uuid(
         MRG *mrg, Word_t section, uuid_t *uuid,
         time_t first_time_s, time_t last_time_s,
-        time_t update_every_s, time_t now_s)
+        uint32_t update_every_s, time_t now_s)
 {
     if(unlikely(last_time_s > now_s)) {
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -623,7 +623,7 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
                 .section = section,
                 .first_time_s = first_time_s,
                 .last_time_s = last_time_s,
-                .latest_update_every_s = (uint32_t) update_every_s
+                .latest_update_every_s = update_every_s
         };
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }

@@ -222,7 +222,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     time_t now_s = wanted_start_time_s;
-    time_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
+    uint32_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
 
     if(!dt_s)
         dt_s = default_rrd_update_every;
@@ -547,7 +547,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
             if(prc == PAGE_IS_IN_THE_FUTURE)
                 break;
 
-            time_t page_update_every_s = page_entry_in_journal->update_every_s;
+            uint32_t page_update_every_s = page_entry_in_journal->update_every_s;
             size_t page_length = page_entry_in_journal->page_length;
 
             if(datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) { //for open cache item
@@ -567,7 +567,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
                         .metric_id = metric_id,
                         .start_time_s = page_first_time_s,
                         .end_time_s = page_last_time_s,
-                        .update_every_s = (uint32_t) page_update_every_s,
+                        .update_every_s = page_update_every_s,
                         .data = datafile,
                         .size = 0,
                         .custom_data = (uint8_t *) &ei,
