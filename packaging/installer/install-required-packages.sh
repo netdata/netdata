@@ -946,7 +946,7 @@ declare -A pkg_postfix=(
 )
 
 declare -A pkg_pkg_config=(
-  ['alpine']="pkgconfig"
+  ['alpine']="pkgconf"
   ['arch']="pkgconfig"
   ['centos']="pkgconfig"
   ['debian']="pkg-config"

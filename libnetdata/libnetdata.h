@@ -11,10 +11,6 @@ extern "C" {
 #include <config.h>
 #endif
 
-#if defined(ENABLE_BROTLIENC) && defined(ENABLE_BROTLIDEC)
-#define ENABLE_BROTLI 1
-#endif
-
 #ifdef ENABLE_OPENSSL
 #define ENABLE_HTTPS 1
 #endif
@@ -189,7 +185,7 @@ extern "C" {
 
 #include <zlib.h>
 
-#ifdef HAVE_CAPABILITY
+#ifdef HAVE_SYS_CAPABILITY_H
 #include <sys/capability.h>
 #endif
 

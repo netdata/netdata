@@ -34,9 +34,7 @@ jobs:
             **.h
             **.hh
             **.in
-            configure.ac
-            **/Makefile*
-            Makefile*
+            CMakeLists.txt
             .gitignore
             .github/workflows/checks.yml
             build/**
@@ -78,11 +76,8 @@ jobs:
           'apk add bash;
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
           apk del openssl openssl-dev;
-          apk add libressl libressl-dev;
-          autoreconf -ivf;
-          ./configure --disable-dependency-tracking;
-          make;'
-
+          apk add libressl libressl-dev protobuf-dev;
+          ./netdata-installer.sh --disable-telemetry --dont-start-it --dont-wait --one-time-build;'
   clang-checks:
     name: Clang
     needs:

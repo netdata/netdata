@@ -24,7 +24,10 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
     static size_t allocated_lines = 0, allocated_columns = 0;
     static uint32_t *data = NULL;
 
-    if(unlikely(do_per_core == -1)) do_per_core = config_get_boolean("plugin:proc:/proc/net/softnet_stat", "softnet_stat per core", 1);
+    if (unlikely(do_per_core == -1)) {
+        do_per_core =
+            config_get_boolean("plugin:proc:/proc/net/softnet_stat", "softnet_stat per core", CONFIG_BOOLEAN_NO);
+    }
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];

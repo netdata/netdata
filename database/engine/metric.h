@@ -89,6 +89,6 @@ size_t mrg_aral_overhead(void);
 void mrg_update_metric_retention_and_granularity_by_uuid(
         MRG *mrg, Word_t section, uuid_t *uuid,
         time_t first_time_s, time_t last_time_s,
-        time_t update_every_s, time_t now_s);
+        uint32_t update_every_s, time_t now_s);
 
 #endif // DBENGINE_METRIC_H

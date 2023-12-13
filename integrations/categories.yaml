@@ -408,17 +408,23 @@
       most_popular: false
       priority: -1
       children: []
+- id: logs
+  name: Logs
+  description: "Monitoring logs on your infrastructure"
+  most_popular: true
+  priority: 3
+  children: []
 - id: export
   name: exporters
   description: "Exporter Integrations"
   most_popular: true
-  priority: 4
+  priority: 5
   children: []
 - id: notify
   name: notifications
   description: "Notification Integrations"
   most_popular: true
-  priority: 3
+  priority: 4
   children:
     - id: notify.agent
       name: Agent Dispatched Notifications

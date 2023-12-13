@@ -31,7 +31,7 @@ static int exporting_tls_is_enabled(EXPORTING_CONNECTOR_TYPE type __maybe_unused
  * @return Always returns 0.
  */
 int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
-#if NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_INTERNAL_CHECKS
     char sample[1024];
     const char *s = buffer_tostring(buffer);
     char *d = sample, *e = &sample[sizeof(sample) - 1];
@@ -391,7 +391,7 @@ void simple_connector_worker(void *instance_p)
 #endif
     }
 
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
+#ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE)
         clean_prometheus_remote_write(instance);
 #endif

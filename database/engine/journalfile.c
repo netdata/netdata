@@ -1008,7 +1008,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         time_t end_time_s = header_start_time_s + metric->delta_end_s;
 
         mrg_update_metric_retention_and_granularity_by_uuid(
-                main_mrg, (Word_t)ctx, &metric->uuid, start_time_s, end_time_s, (time_t) metric->update_every_s, now_s);
+                main_mrg, (Word_t)ctx, &metric->uuid, start_time_s, end_time_s, metric->update_every_s, now_s);
 
         metric++;
     }
