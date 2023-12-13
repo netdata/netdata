@@ -59,7 +59,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     struct interrupt *irrs = NULL;
 
     if(unlikely(do_per_core == CONFIG_BOOLEAN_INVALID))
-        do_per_core = config_get_boolean_ondemand("plugin:proc:/proc/softirqs", "interrupts per core", CONFIG_BOOLEAN_AUTO);
+        do_per_core = config_get_boolean_ondemand("plugin:proc:/proc/softirqs", "interrupts per core", CONFIG_BOOLEAN_NO);
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
