@@ -8,6 +8,15 @@
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
+static bool journal_data_direcories_exist() {
+    struct stat st;
+    for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES && journal_directories[i].path; i++) {
+        if ((stat(journal_directories[i].path, &st) == 0) && S_ISDIR(st.st_mode))
+            return true;
+    }
+    return false;
+}
+
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     clocks_init();
     netdata_thread_set_tag("SDMAIN");
@@ -22,6 +31,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     netdata_systemd_journal_message_ids_init();
     journal_init_query_status();
     journal_init_files_and_directories();
+
+    if (!journal_data_direcories_exist()) {
+        nd_log_collector(NDLP_INFO, "unable to locate journal data directories. Exiting...");
+        fprintf(stdout, "DISABLE\n");
+        fflush(stdout);
+        exit(0);
+    }
 
     // ------------------------------------------------------------------------
     // debug
