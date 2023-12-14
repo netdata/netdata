@@ -292,10 +292,9 @@ typedef DICTFE_CONST struct dictionary_foreach {
 #define dfe_start_rw(dict, value, mode)                                                             \
         do {                                                                                        \
             DICTFE value ## _dfe = {};                                                              \
-            DICTIONARY_ITEM *const *value ## _item_dfe = &value ## _dfe.item;                       \
             (void)(value); /* needed to avoid warning when looping without using this */            \
             for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode));              \
-                *(value ## _item_dfe) ;                                                             \
+                (value ## _dfe.item) || (value) ;                                                   \
                 (value) = dictionary_foreach_next(&value ## _dfe))                                  \
             {
 
