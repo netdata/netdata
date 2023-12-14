@@ -1123,7 +1123,7 @@ NETDATA_GROUP="$(id -g -n "${NETDATA_USER}" 2> /dev/null)"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
-prepare_cmake_opts
+prepare_cmake_options
 
 if [ -n "${NETDATA_PREPARE_ONLY}" ]; then
     progress "Exiting before building Netdata as requested."
